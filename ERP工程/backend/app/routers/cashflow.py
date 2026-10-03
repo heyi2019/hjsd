@@ -65,15 +65,15 @@ def update_cashflow(cf_id: int, cf: CashFlowCreate, db: Session = Depends(get_db
 
 @router.delete("/{cf_id}", status_code=204)
 def delete_cashflow(cf_id: int, db: Session = Depends(get_db)):
-    """物理删除。
+    """删除手工流水。
 
-    带 order_id 的流水由 create_order 联动生成，删除订单不会级联清理，
-    因此这里拒绝删除，避免留下破坏荷包口径的孤儿流水。
+    订单联动生成的流水（source='order'）由订单侧级联管理，
+    此处拒绝单独删除，避免留下破坏荷包口径的孤儿流水。
     """
     row = db.get(CashFlow, cf_id)
     if not row:
         raise HTTPException(404, "记录不存在")
-    if row.order_id is not None:
+    if row.source == "order" or row.order_id is not None:
         raise HTTPException(400, "该流水由订单联动生成，请在订单侧处理")
     db.delete(row)
     db.commit()

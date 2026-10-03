@@ -58,10 +58,14 @@ class CashFlow(Base):
     __tablename__ = "cashflow"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
-    category: Mapped[str] = mapped_column(String(32))  # 投资款/房租日用/办公用品/运营/员工薪资/其他
+    category: Mapped[str] = mapped_column(String(32))  # 投资款/房租/日用/办公用品/运营/员工薪资/其他
     direction: Mapped[str] = mapped_column(String(8))  # 收入/支出
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), nullable=True)
+    # 来源标记：'manual' 手工记账 / 'order' 订单联动生成。
+    # 没有它就无法区分「订单产生的流水」与「用户手记的账」——
+    # 订单删除后 SQLite 会把 order_id 置 NULL，行留存，此时无从判断该不该删。
+    source: Mapped[str] = mapped_column(String(8), default="manual", nullable=False)
     remark: Mapped[str] = mapped_column(Text, default="")
 
     order: Mapped["Order"] = relationship(back_populates="cashflows")

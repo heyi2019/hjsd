@@ -5,7 +5,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import init_db
-from app.routers import accounts, cashflow, installments, leads, orders, reports
+from app.routers import (
+    accounts, cashflow, installments, leads, linkage, orders, reports,
+)
 
 
 @asynccontextmanager
@@ -30,6 +32,7 @@ app.include_router(cashflow.router)
 app.include_router(reports.router)
 app.include_router(installments.router)
 app.include_router(leads.router)
+app.include_router(linkage.router)
 
 
 @app.get("/")

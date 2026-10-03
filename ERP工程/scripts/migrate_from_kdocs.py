@@ -262,9 +262,27 @@ def cross_check(session, raw_cashflow_all):
     return income, expense, income - expense
 
 
+def ensure_columns(session):
+    """给既有表补齐后加的列。
+
+    create_all 只建新表，不会给已存在的表加列；历史库缺 source 时
+    后续 INSERT 会直接报错，故这里显式补齐（幂等）。
+    """
+    from sqlalchemy import inspect, text
+    insp = inspect(session.bind)
+    if "cashflow" in insp.get_table_names():
+        cols = {c["name"] for c in insp.get_columns("cashflow")}
+        if "source" not in cols:
+            session.execute(text(
+                "ALTER TABLE cashflow ADD COLUMN source VARCHAR(8) NOT NULL DEFAULT 'manual'"))
+            session.commit()
+            print("[schema] cashflow 补齐 source 列")
+
+
 def main():
     appdb.init_db()
     session = appdb.SessionLocal()
+    ensure_columns(session)
 
     # 幂等：先清后写
     for m in (CashFlow, Order, Account, Installment, Lead):

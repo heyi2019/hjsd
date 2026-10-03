@@ -82,11 +82,30 @@ class CashFlowBase(BaseModel):
     direction: str
     amount: Decimal
     order_id: Optional[int] = None
+    source: str = "manual"  # manual=手工记账 / order=订单联动生成
     remark: str = ""
 
 
 class CashFlowCreate(CashFlowBase):
-    pass
+    """手工记账入口：只允许创建 manual 来源。
+
+    禁止手工构造 order 来源或自挂 order_id —— 那是订单联动的职责，
+    放任会造成「看起来来自订单、实际是手记」的流水，删除订单时被误删。
+    """
+
+    @field_validator("source")
+    @classmethod
+    def must_be_manual(cls, v):
+        if v != "manual":
+            raise ValueError("手工记账只能创建 source=manual")
+        return v
+
+    @field_validator("order_id")
+    @classmethod
+    def no_manual_order_link(cls, v):
+        if v is not None:
+            raise ValueError("手工记账不得指定 order_id，订单流水由订单联动生成")
+        return v
 
 
 class CashFlowOut(CashFlowBase):
@@ -135,3 +154,9 @@ class LeadOut(LeadBase):
 class WalletSummary(BaseModel):
     principal_wallet: Decimal
     profit_wallet: Decimal
+
+
+class LinkRequest(BaseModel):
+    """人工关联订单与账号。"""
+    model_config = ConfigDict(from_attributes=True)
+    account_id: int

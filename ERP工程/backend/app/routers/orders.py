@@ -35,16 +35,19 @@ def create_order(order: OrderCreate, db: Session = Depends(get_db)):
             acc.status = "已售"
 
     # 自动写现金流（用于流水展示；荷包聚合以 orders 为准）
+    # source='order' 标记来源，使其可与手工记账区分开（见 CashFlow.source）
     if order.principal != 0:
         db.add(CashFlow(
             date=order.date, category="账号回收",
             direction="收入" if order.principal > 0 else "支出",
-            amount=abs(order.principal), order_id=db_order.id,
+            amount=abs(order.principal), order_id=db_order.id, source="order",
+            remark=f"订单#{db_order.id} 本金",
         ))
     if order.profit != 0:
         db.add(CashFlow(
             date=order.date, category="账号回收",
             direction="收入", amount=order.profit, order_id=db_order.id,
+            source="order", remark=f"订单#{db_order.id} 利润",
         ))
 
     db.commit()
@@ -64,13 +67,16 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 def delete_order(order_id: int, db: Session = Depends(get_db)):
     """删除订单，并级联清理由 create_order 联动生成的流水。
 
-    若不级联，cashflow 会残留 order_id 指向已不存在订单的孤儿行，
-    且这些行金额会污染记账页与利润口径。
+    按 `source='order'` 删，而不是按 order_id 删：SQLite 默认不启用外键约束，
+    ORM 删除时只会把 order_id 置为 NULL、行仍留存 —— 那既不是干净级联，
+    也会把订单现金侧混进手工流水里。此处显式按来源删，才是真的清理干净。
     """
     o = db.get(Order, order_id)
     if not o:
         raise HTTPException(404, "订单不存在")
-    db.query(CashFlow).filter(CashFlow.order_id == order_id).delete(synchronize_session=False)
+    db.query(CashFlow).filter(
+        CashFlow.order_id == order_id, CashFlow.source == "order"
+    ).delete(synchronize_session=False)
     # 账号回滚：若该账号已无其他订单引用，恢复为在库
     if o.account_id:
         remaining = db.query(Order).filter(

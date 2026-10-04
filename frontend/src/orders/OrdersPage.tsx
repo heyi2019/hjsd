@@ -15,7 +15,7 @@ import {
   type Order,
   type OrderType,
 } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import { EVENT_TYPE_LABEL, today } from "../shared/lib/format";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -188,7 +188,7 @@ export function OrdersPage() {
         }
       />
 
-      <ErrorBanner message={loadError?.message} code={loadError?.code} />
+      <ErrorBanner error={loadError} />
 
       <StatRow
         items={[
@@ -374,9 +374,3 @@ export function OrdersPage() {
   );
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}

@@ -60,11 +60,16 @@ class Settings(BaseSettings):
     # database（先 SQLite；生产换 PostgreSQL URL，业务代码零改动）
     database_url: str = f"sqlite:///./{DEFAULT_DEV_DB_RELPATH}"
 
-    # cors（逗号分隔）：dev 5173 + preview 4173（vite preview 默认端口）
+    # cors（逗号分隔）：显式白名单，任何环境都生效
     cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
         "http://localhost:4173,http://127.0.0.1:4173"
     )
+
+    # dev 端口通配：仅 development 生效，允许 localhost/127.0.0.1 任意端口。
+    # 解决「换个端口起前端就静默 0 数据」——CORS 预检 400 时页面不报错，
+    # 只显示空态，排查成本极高。生产环境强制忽略此项。
+    cors_dev_allow_any_local_port: bool = True
 
     # frontend
     vite_api_base_url: str = "http://127.0.0.1:8123/api/v1"
@@ -132,6 +137,13 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        """dev 下的本机任意端口；非 development 一律返回 None（不放宽）。"""
+        if not self.cors_dev_allow_any_local_port or not self.is_development:
+            return None
+        return r"^http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
 
     @property
     def is_development(self) -> bool:

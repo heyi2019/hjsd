@@ -8,7 +8,7 @@ import {
   type Counterparty,
   type Customer,
 } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
@@ -144,7 +144,7 @@ function CustomerPanel() {
         </PermissionButton>
       }
     >
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Typography.Paragraph type="secondary">
         联系方式默认脱敏；完整联系方式按权限展示并记录读取审计。停用/已合并客户不可作为新订单参与方。
       </Typography.Paragraph>
@@ -289,7 +289,7 @@ function CounterpartyPanel() {
         </PermissionButton>
       }
     >
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可停用。
       </Typography.Paragraph>
@@ -334,9 +334,3 @@ function CounterpartyPanel() {
   );
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}

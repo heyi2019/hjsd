@@ -2,12 +2,13 @@
  * 原则：组件只在这里取形，页面不再各写一套卡片/表格/金额样式。 */
 
 /* ── PageHeader ───────────────────────────────────────────── */
+/* 纵向节奏统一由父级 .ui-stack 的 gap 独占。
+ * 组件自带 margin-block-end 会与之叠加成双倍间距（曾实测 16+16=32px 锯齿）。 */
 .ui-page-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-block-end: var(--space-4);
   flex-wrap: wrap;
 }
 .ui-page-header__text { min-width: 0; }
@@ -37,7 +38,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: var(--space-3);
-  margin-block-end: var(--space-4);
 }
 .ui-stat {
   display: flex;

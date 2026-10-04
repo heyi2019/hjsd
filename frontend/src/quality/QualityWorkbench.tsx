@@ -7,7 +7,7 @@ import {
   type QualityIssue,
   type QualityOverviewItem,
 } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
@@ -185,7 +185,7 @@ export function QualityWorkbench() {
         }
       />
 
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
 
       <StatRow
         items={[
@@ -300,9 +300,3 @@ export function QualityWorkbench() {
   );
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}

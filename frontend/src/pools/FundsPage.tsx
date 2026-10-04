@@ -10,7 +10,7 @@ import {
   type Pool,
   type PoolBalance,
 } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import {
   DataTable,
@@ -193,7 +193,7 @@ export function FundsPage() {
         description="总览、池间划转与押金占用；现金头寸与可用余额分列，押金不影响经营损益。"
       />
 
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
 
       <Tabs
         defaultActiveKey="overview"
@@ -339,9 +339,3 @@ export function FundsPage() {
   );
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}

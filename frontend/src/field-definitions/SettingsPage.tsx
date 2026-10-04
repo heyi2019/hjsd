@@ -10,7 +10,7 @@ import {
   type OrderType,
   type Pool,
 } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
@@ -71,7 +71,7 @@ function OrderTypesPanel() {
 
   return (
     <Card className="glass" title="业务类型主数据">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Typography.Paragraph type="secondary">
         新增业务无需改代码：配置编号前缀与资金路由后即可开单（BAS-02）。
       </Typography.Paragraph>
@@ -140,7 +140,7 @@ function PoolsPanel() {
 
   return (
     <Card className="glass" title="资金池主数据">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <DataTable<Pool>
         columns={columns}
         rows={rows}
@@ -226,7 +226,7 @@ function FieldsPanel() {
 
   return (
     <Card className="glass" title="活字段">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Typography.Paragraph type="secondary">
         活字段仅承载辅助信息，不得覆盖核算字段；有历史值只能停用（BAS-04）。
       </Typography.Paragraph>
@@ -267,9 +267,3 @@ function FieldsPanel() {
   );
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}

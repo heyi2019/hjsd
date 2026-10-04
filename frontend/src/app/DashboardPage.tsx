@@ -2,9 +2,10 @@
 import { Card, Space } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { poolsApi, qualityApi, type Pool, type PoolBalance } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
+  ErrorBanner,
   MoneyText,
   PageHeader,
   PermissionGate,
@@ -24,6 +25,7 @@ export function DashboardPage() {
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [loading, setLoading] = useState(false);
   const [openIssues, setOpenIssues] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,8 +36,11 @@ export function DashboardPage() {
         list.map(async (pool) => [pool.id, await poolsApi.balance(pool.id)] as const),
       );
       setBalances(Object.fromEntries(entries));
+      setLoadError(null);
     } catch (error) {
-      console.error(errorMessage(error));
+      // 必须落到 UI：后端不可达时若只 console.error，页面会静默显示
+      // 「资金池数量 0 / 尚未配置资金池」，与「真的没有数据」无法区分。
+      setLoadError(normalizeError(error));
     } finally {
       setLoading(false);
     }
@@ -114,6 +119,8 @@ export function DashboardPage() {
         title="今日总览"
         description="现金头寸、可用余额、押金与 TH 代垫分列展示，禁止混用（FIN-01-03）。"
       />
+
+      <ErrorBanner error={loadError} />
 
       <StatRow
         items={[

@@ -60,9 +60,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="黑金时代工作室 ERP v1.0（业务规则以 docs/ERP_PRD_v1.0.md 为准）",
     )
 
+    origin_regex = settings.cors_origin_regex
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        allow_origin_regex=origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

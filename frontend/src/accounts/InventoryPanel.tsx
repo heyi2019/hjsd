@@ -3,7 +3,7 @@ import { Card, Form, Input, Select } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { accountsApi, type Account } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
@@ -75,7 +75,7 @@ export function InventoryPanel() {
 
   return (
     <section className="ui-stack">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
 
       <StatRow
         items={[
@@ -135,9 +135,3 @@ export function InventoryPanel() {
   );
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}

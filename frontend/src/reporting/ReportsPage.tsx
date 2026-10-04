@@ -17,7 +17,7 @@ import {
   type OrderProfitReport,
   type OrderProfitRow,
 } from "../shared/api/catalog";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
@@ -89,12 +89,6 @@ function useRange() {
   return { params, picker };
 }
 
-function normalizeError(err: unknown): { message: string; code?: string } {
-  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
-    ?.response?.data?.detail;
-  if (detail?.message) return { message: detail.message, code: detail.code };
-  return { message: errorMessage(err) };
-}
 
 function InventoryReport() {
   const { data, loading, error } = useReport<InventoryHealthReport>(
@@ -124,7 +118,7 @@ function InventoryReport() {
   ];
   return (
     <Card className="glass" title="库存健康表 R1">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Note>只统计在库与分期中的真实占用；TH 永不进入库存（RPT-01-01）。</Note>
       <StatRow
         items={[
@@ -167,7 +161,7 @@ function MonthlyPnl() {
   ];
   return (
     <Card className="glass" title="月度经营损益 R2">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>账号采购成本属直接成本，不计入运营费用，避免双重扣减（RPT-01-02）。</Note>
       <StatRow
@@ -212,7 +206,7 @@ function Commission() {
   ];
   return (
     <Card className="glass" title="提成对账 R3">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>人员维度可钻取到每一单；应付与已付差异即为待追补金额（RPT-01-03）。</Note>
       <StatRow
@@ -262,7 +256,7 @@ function DailyFunds() {
   ];
   return (
     <Card className="glass" title={`资金日报 R4 · ${data?.date ?? ""}`}>
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Note>与 FIN-01 同日口径一致：押金与 TH 代垫单列，不并入可用余额（RPT-01-04）。</Note>
       <StatRow
         items={[
@@ -313,7 +307,7 @@ function BusinessPnl() {
   ];
   return (
     <Card className="glass" title="业务级损益 R5">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>
         完整收益 = 主营毛利 + 已结算净返点；未归集返点独立列示，不摊给业务（REB-01-06）。
@@ -363,7 +357,7 @@ function OrderProfit() {
   ];
   return (
     <Card className="glass" title="订单利润明细">
-      <ErrorBanner message={error?.message} code={error?.code} />
+      <ErrorBanner error={error} />
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow
         items={[

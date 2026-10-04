@@ -326,3 +326,18 @@
 :where(.ant-skeleton .ant-skeleton-content .ant-skeleton-title, .ant-skeleton .ant-skeleton-content .ant-skeleton-paragraph > li) {
   background: linear-gradient(90deg, var(--soft), var(--violet-soft), var(--soft)) !important;
 }
+
+/* ── Typography 标题字号接管 ──────────────────────────────────
+ * 问题：antd 的 Typography.Title 自带固定字号（h1=38 / h2=30 / h3=24px），
+ *  完全绕开 tokens.css 的 --font-* 体系。实测顶栏 <Typography.Title level={3}>
+ * 渲染为 24px，大于页面页头的 20px，造成**视觉层级倒挂**。
+ * 做法：把 antd 标题映射到与原生标题一致的令牌，保证 h1>h2>h3 严格递减。
+ *
+ * 必须用 !important：实测 :where() 零特异性**压不过** antd 的 css-dev-only 类
+ * （同为 0,1,0 时由样式表顺序决定，antd 运行时注入在最后），
+ * 首版零特异性方案实测 h3 仍为 24px，故改用 !important（与本文件既有约定一致）。 */
+:where(h1.ant-typography, .ant-typography h1) { font: var(--font-h1) !important; }
+:where(h2.ant-typography, .ant-typography h2) { font: var(--font-section) !important; }
+:where(h3.ant-typography, .ant-typography h3) { font: var(--font-card-title) !important; }
+:where(h4.ant-typography, .ant-typography h4),
+:where(h5.ant-typography, .ant-typography h5) { font: var(--font-body-s) !important; }

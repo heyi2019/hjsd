@@ -50,13 +50,14 @@
   padding: var(--space-4) !important;
 }
 
-/* antd Card 的玻璃表面由 styles.css:42 的「orders glass-system adapter」统一收口
-   （.ant-card / .ant-modal-content / .ant-drawer-content / .ant-popover-inner / .ant-collapse
-   共用 --color-surface + 紫边 + --e1 + backdrop-filter:blur(18px) saturate(160%)），
-   与 antd 模态/抽屉/气泡同属一套紫调玻璃族，且特异性(0,1,0)+!important 高于本文件的 :where() 收敛点，
-   故此处不再重复声明 .ant-card（:where() 特异性 0 会输给 styles.css:42，反而把 backdrop 从 18px 降到 16px）。
-   真正的「压平」修复在 styles.css：把 .ant-card 从 :98 的 box-shadow:none!important 摘掉，
-   使其回到 styles.css:42 的 --e1 高程。 */
+/* antd Card 的玻璃表面由 shared/styles/hierarchy.css 统一收口（亮/暗双轨）：
+   .ant-card / .ant-modal-content / .ant-drawer-content / .ant-popover-inner / .ant-collapse
+   共用 --glass + --glass-border + --e1~e3 + backdrop-filter: var(--glass-blur)。
+   （2026-10-04 更正：原注释称此处为「styles.css:42 / :98」，但 styles.css 实际仅 3 行、
+   全项目零 @keyframes 级别的行号引用早已随跨项目搬运失效，且那套 glass-system
+   规则在本仓库根本不存在——本文件当时也从未声明 .ant-card。已改由 hierarchy.css 真正落地。）
+   故此处不再重复声明 .ant-card：:where() 特异性为 0，与 hierarchy.css 的普通选择器
+   同名时必输给后者，重复写只会把 --glass-blur 降级覆盖回去。 */
 :where(.ant-table-thead > tr > th) {
   background: color-mix(in srgb, var(--color-primary) 5%, var(--glass)) !important;
 }
@@ -92,8 +93,36 @@
   color: var(--color-error) !important;
 }
 
-:where(.ant-btn-primary, .ant-btn-color-primary, .ant-tabs-ink-bar) {
+/* 主色实底统一走品牌渐变蓝；白字用既有的 --on-accent 令牌，不硬编码 #fff。
+   ⚠️ color 必须与 background 一起覆盖：antd 的 .ant-btn-primary 默认给
+   color: rgba(0,0,0,0.88)（深灰），只改 background 会让深灰压在蓝底上 ——
+   实测对比度仅 3.24:1，低于 WCAG AA 正文 4.5:1；而白字对渐变最浅段 #0c68d9
+   为 5.25:1、最深段 #0757c7 为 6.57:1，均通过。
+   tabs 指示条只有色块无文字，不参与 color 覆盖。 */
+:where(.ant-btn-primary, .ant-btn-color-primary) {
   background: var(--accent-grad) !important;
+  color: var(--on-accent) !important;
+}
+:where(.ant-tabs-ink-bar) {
+  background: var(--accent-grad) !important;
+}
+
+/* Typography.Text type="secondary"：antd 默认色 rgba(0,0,0,0.45) 压在本项目
+   .view-head 玻璃上实测仅 3.33:1（低于 AA 正文 4.5:1）→ 换设计系统的
+   --color-text-secondary（亮色 #48484a，暗色令牌自动接管）。
+   type="secondary" 语义是「次要文字」，本就该走 secondary 令牌而非 antd 原始值。 */
+:where(.ant-typography-secondary) {
+  color: var(--color-text-secondary) !important;
+}
+
+/* 侧栏菜单选中项：antd 默认 rgb(22,119,255) 蓝字压在 rgb(230,244,255) 浅蓝选中底上
+   实测仅 3.66:1 → 改用 --primary-ink（其定义注释即「蓝色文本在浅底保持达标对比」）。
+   底色一并交给 --violet-soft，保持与项目其余选中态同一套紫调。 */
+:where(.sidebar .ant-menu-item-selected) {
+  color: var(--primary-ink) !important;
+}
+:where(.sidebar .ant-menu-item-selected .ant-menu-title-content) {
+  color: var(--primary-ink) !important;
 }
 
 :where(.ant-input, .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper) {
@@ -252,10 +281,32 @@
 }
 
 /* Apple 弹簧入场（覆盖 antd 默认 zoom/slide 动效）：仅在用户未要求减弱动效时生效。
-   作用根容器（antd 动效亦挂在根），避免内层再叠加导致双动效；select 根动效在 styles.css:283 收口。 */
+   作用根容器（antd 动效亦挂在根），避免内层再叠加导致双动效；
+   select 根动效也走本条（下拉与日期面板同属 rc-trigger 弹层，行为一致）。 */
 @media (prefers-reduced-motion: no-preference) {
-  :where(.ant-picker-dropdown, .ant-dropdown) {
+  :where(.ant-picker-dropdown, .ant-dropdown, .ant-select-dropdown) {
     animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
+  }
+}
+
+/* 减弱动效兜底（2026-10-04 补齐）：把 antd 全部弹层的入场/离场动效压掉，只留淡入。
+   背景：上一条 no-preference 块只包了 .ant-picker-dropdown / .ant-dropdown，
+   Modal / Drawer / Select / Tooltip / Popover 仍播 antd 默认的 zoom-big / slide-up
+   （**缩放位移**类动效）—— 开了系统「减弱动效」的用户依然看到弹层放大出现。
+   WCAG 2.3.3 Animation from Interactions：非必要的位移/缩放应可关闭。
+   做法：命中 antd 生成的动效类（*ZoomBigIn/Out、*SlideUp/Down*In/Out、*MoveUp/Down*In/Out），
+   统一替换为只改 opacity 的短淡入。类名里的 hash 段（css-mncuj7-*）随 antd 版本变，
+   故用 [class*="ZoomBig"] 属性包含匹配，不写死 hash。
+   保留：antSpinMove（loading 旋转）—— 它是状态指示、移除会丢失加载反馈。 */
+@media (prefers-reduced-motion: reduce) {
+  :where([class*="ZoomBigIn"], [class*="ZoomBigOut"],
+         [class*="SlideUpIn"], [class*="SlideUpOut"],
+         [class*="SlideDownIn"], [class*="SlideDownOut"],
+         [class*="MoveUpIn"], [class*="MoveUpOut"],
+         [class*="MoveDownIn"], [class*="MoveDownOut"]) {
+    animation-name: none !important;
+    transition: opacity var(--dur-reduced) linear !important;
+    opacity: 1;
   }
 }
 

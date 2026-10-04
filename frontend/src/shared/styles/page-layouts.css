@@ -55,9 +55,15 @@
   width: 100%;
   min-height: var(--ui-control-height-lg);
   font: var(--font-card-title);
-  /* 覆盖 styles.css .login-card button 的纯紫底（其对白仅 3.52-4.13）：恢复设计系统渐变+纯色兜底（A11Y E3） */
+  /* 恢复设计系统的品牌渐变蓝 + 纯色兜底（A11Y E3）。
+     color 必须显式配 --on-accent：--accent-deep 的定义注释本身就写着「蓝底白字
+     实底达标」，但本规则原先只给了 background，文字色仍由浏览器/组件默认决定
+     （原生 button 默认 ButtonText 深灰），白字意图落空。
+     原注释引用的「styles.css .login-card button 纯紫底」在本仓库已不存在
+     （styles.css 仅 3 行），一并更正。 */
   background: var(--accent-grad);
-  background-color: var(--accent-deep)
+  background-color: var(--accent-deep);
+  color: var(--on-accent);
 }
 
 /* 品牌锁定（2026-09-19 第二十二轮放大）：标记原为 18×18px、字号 10px，

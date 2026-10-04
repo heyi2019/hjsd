@@ -1,0 +1,60 @@
+/*
+ * 直接操纵反馈层（2026-10-04 新增，Apple HIG「直接操纵 / Direct Manipulation」）
+ * ---------------------------------------------------------------------------
+ * 契约：
+ * 1. 可点元素按下必须有即时视觉位移（缩量），松手回弹 —— 这是 Apple 流体界面的
+ *    首要特征（「界面行为模拟现实物理世界，即时响应」）。此前全 src 零 :active
+ *    规则，按钮按下毫无反馈，交互「不粘手」。
+ * 2. 全部包在 prefers-reduced-motion: no-preference 内：开启「减弱动效」的用户
+ *    只拿到颜色/透明度反馈，不拿到位移（WCAG 2.3.3 Animation from Interactions）。
+ * 3. 只动 transform，不碰 top/left/width/height —— 避免触发布局回流。
+ * 4. 与 antd 的关系：antd 5.29 的 .ant-btn 在 :active 里只改 background/color，
+ *    未占用 transform，故此处叠加无冲突。
+ *
+ * 【踩坑记录，勿改回 animation 方案】
+ * 最初用 `@keyframes ui-press` + `animation ... both` 做回弹，实测（agent-browser
+ * getComputedStyle）静止态 transform 被锁在 matrix(0.97,0,0,0.97,0,0)——
+ * `both` 填充模式在动画结束后保持起始帧，按钮**永久缩在 0.97**，肉眼可见整枚按钮变小。
+ * 正确做法是纯 transition：基态给弹簧缓动（松手回弹带过冲），
+ * :active 上把 duration 改短（按下必须即时，不能也走 0.26s 弹簧而显滞后）。
+ * transition-duration 作用于「进入该状态」的过程，故按下/松手可分别设速。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.ant-btn, .permission-tree summary) {
+    /* 松手回弹：--ease-spring 峰值 1.015 的过冲由这里提供。 */
+    transition-property: transform, background-color, border-color, color, opacity;
+    transition-duration: var(--dur);
+    transition-timing-function: var(--ease-spring);
+  }
+  :where(.ant-btn:not(:disabled), .permission-tree summary):active {
+    /* 按下：缩量 + 极短时长（0.97 是一级控件通行值；再深会被读作「缩小」而非「压下」）。 */
+    transform: scale(0.97);
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease);
+  }
+}
+
+/* ── 侧栏导航项：按压反馈更轻（0.985）────────────────────────────────
+   导航是高频连续点击面，缩量过深会造成列表抖动感，Apple 侧栏
+   实际给的是「背景变亮 + 极轻缩量」。 */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.sidebar .nav-item, .sidebar .nav-level-three button, .sidebar .nav-level-four button) {
+    transition-property: transform, background-color, color, opacity;
+    transition-duration: var(--dur);
+    transition-timing-function: var(--ease-spring);
+  }
+  :where(.sidebar .nav-item, .sidebar .nav-level-three button, .sidebar .nav-level-four button):active {
+    transform: scale(0.985);
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease);
+  }
+}
+
+/* ── 表格行（可点击行）：仅做背景提示，不做缩量 ──────────────────────
+   行高 40–44px，缩量会让整行文字抖动反而干扰阅读；
+   Apple 对列表行的反馈也是高亮而非形变。 */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.ui-table-wrap .ant-table-tbody > tr):active > td {
+    background: var(--violet-soft);
+  }
+}

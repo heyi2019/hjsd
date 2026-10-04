@@ -32,6 +32,36 @@
   border-bottom: 0;
 }
 
+/* ── AppShell 两个「有类名无样式」的死钩子（2026-10-04 补齐）──
+   背景：AppShell.tsx:35/63 一直挂着 .app-brand 与 .page-content，
+   但全项目零样式定义 → 浏览器实测两者 padding 全为 0px：
+   侧栏品牌名直接贴边缘、内容区贴边。类名既已在 DOM 上，补样式比删类名更合算
+   （删类名会让这两处退回无任何布局控制）。 */
+
+/* 侧栏品牌区：与侧栏内边距对齐，给导航让出呼吸位。 */
+.app-brand {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  font: var(--font-card-title);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ERP 后缀弱化：主标与副标拉开层级，不抢导航的注意力。 */
+.app-brand > span {
+  font: var(--font-caption);
+  color: var(--color-text-secondary);
+}
+
+/* 内容区：桌面端给业务内容统一留白；窄屏收窄，避免横向被挤。 */
+.page-content {
+  padding: var(--space-4);
+  min-width: 0;
+}
+@media (--bp-sm) {
+  .page-content { padding: var(--space-3); }
+}
+
 @media (--bp-801) {
   .sidebar.glass {
     position: sticky;
@@ -116,6 +146,58 @@
 :root[data-theme="dark"] .ant-collapse,
 :root[data-theme="dark"] .ant-table-wrapper .ant-table {
   background: var(--glass) !important;
+}
+
+/* ── 亮色玻璃族（2026-10-04 补齐，与上方暗色块对等）──
+   背景：暗色有 .ant-card / .ant-modal-content / .ant-drawer-content / .ant-popover-inner
+   / .ant-collapse 的玻璃底，而**亮色下这批选择器一条规则都没有** → 亮色时它们落回 antd
+   默认白底 + 默认阴影。实测后果：亮/暗切换时卡片「材质」断层（毛玻璃 → 纯白），
+   且 Modal/Drawer 在亮色下明显比暗色「重」。
+   本项目自身的 .ui-stat / .ui-card / .ui-table-wrap 本来就是亮暗双轨玻璃，
+   只有 antd 容器漏了亮色这一半，故补在同文件相邻位置。 */
+.ant-card,
+.ant-modal-content,
+.ant-drawer-content,
+.ant-popover-inner,
+.ant-collapse {
+  background: var(--glass);
+  border: var(--border-w) solid var(--glass-border);
+  box-shadow: var(--e1);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+/* 弹层（Modal/Drawer/Popover）比卡片「更浮」，用 --e2 抬一档；
+   Popover/Tooltip 类小气泡不叠玻璃，避免多层 backdrop 相互加重模糊。 */
+.ant-modal-content,
+.ant-drawer-content {
+  box-shadow: var(--e3);
+}
+.ant-popover-inner {
+  box-shadow: var(--e2);
+}
+/* 卡片头保持透明，交给 .ant-card 的玻璃底；表头用弱一档的 --soft。 */
+.ant-card-head {
+  background: transparent;
+  border-bottom: var(--border-w) solid var(--color-border);
+}
+/* 遮罩层用弱模糊（--scrim-blur），与玻璃本体分档，勿混用 --glass-blur。 */
+.ant-modal-mask,
+.ant-drawer-mask {
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
+}
+/* 减弱动效偏好：backdrop-filter 属装饰，直接关闭（与 ui-components.css 的 .ui-stat 同口径）。 */
+@media (prefers-reduced-motion: reduce) {
+  .ant-card,
+  .ant-modal-content,
+  .ant-drawer-content,
+  .ant-popover-inner,
+  .ant-collapse,
+  .ant-modal-mask,
+  .ant-drawer-mask {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 :root[data-theme="dark"] .ant-card-head,

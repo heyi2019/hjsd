@@ -272,6 +272,12 @@
   --font-body-m: 400 1rem/1.6 var(--font-sans); /* Body · 17 */
   --font-body-s: 400 0.8824rem/1.5 var(--font-sans); /* Subheadline · 15 */
   --font-caption: 400 0.7647rem/1.5 var(--font-sans); /* Footnote · 13 */
+  /* Caption 2 · 11（2026-10-04 补齐）。ui-components.css:63/94 的 .ui-stat__hint 与
+     .ui-drawer-hint 引用 var(--font-caption-2)，但本文件从未定义该名 —— var() 引用
+     不存在的自定义属性时整条 font 简写作废、静默回落浏览器默认（实测 13px，
+     恰与父级继承值撞车而看不出异常），真正的 Caption 2 11px 从未生效。
+     注意别与 --font-nav-caption（导航专用，同为 11px 但 700 字重）混用。 */
+  --font-caption-2: 400 0.6471rem/1.4 var(--font-sans); /* Caption 2 · 11 */
   --font-table-header: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13 */
   /* 长度型字号：专供 fontSize/font-size 场景。--font-body-s/--font-caption 等是 font 简写
      （含 weight/line-height），放进 font-size 属非法值 → 静默 unset 回继承（2026-09-07 实测踩坑）。 */
@@ -451,14 +457,31 @@
   --sz-760: 760px;
 }
 
+/* ── 动效关键帧（放在 :root 之外：@keyframes 是全局规则，嵌在选择器内虽合法但易被误读）──
+   弹层入场 ui-spring-in（2026-10-04 补齐）。
+   此前 --ease-spring / --dur-spring 令牌已就位，antd-adapter.css 也在
+   .ant-picker-dropdown / .ant-dropdown 上引用了 ui-spring-in，但全 src 从未定义
+   @keyframes ui-spring-in —— 引用落空时浏览器按「无动画」处理（animation-name 匹配不到
+   整条声明即失效，且零报错），等于「声明了 Apple 弹簧入场、实际没有一条弹层在动」。
+   物理口径：起手 scale 0.94 + 上移 8px，落到 scale 1 / 位移 0；
+   1.5% 过冲由 --ease-spring 曲线的峰值 1.015 提供，不再另写 cubic-bezier。
+   用 translateY 而非 top/left：antd 5.29 的 rc-trigger 用 left/top 定位，
+   叠加 transform 不干扰定位，改 top 会直接错位。 */
+@keyframes ui-spring-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
 
   /* 保留：无 --color-* 对应的原始名 */
   --paper: #0b1420;
   /* --color-bg 与 --paper 在亮色下本就同值（#f2f2f7），深色必须同步覆盖：
-     此前缺这一条，styles.css:150 的 `html{background:...var(--color-bg)}` 在深色下
-     仍取亮色 #f2f2f7，页面 html 层透出亮底（2026-09-11 实测确认后补）。 */
+     此前缺这一条，styles.css 里给 html 设 background 的那条规则在深色下
+     仍取亮色 #f2f2f7，页面 html 层透出亮底（2026-09-11 实测确认后补）。
+     （2026-10-04 更正：原注释写的是「styles.css:150」，但 styles.css 实际仅 3 行，
+     行号系跨项目搬运残留；且该文件现由 styles.css:3 的 body 规则承载背景令牌。） */
   --color-bg: #0b1420;
   --label: #f3f8ff;
   --panel-2: rgba(20, 40, 64, 0.78);

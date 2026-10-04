@@ -340,6 +340,14 @@ class AuditAction(StrEnum):
     FIELD_DEFINITION_CHANGE = "FIELD_DEFINITION_CHANGE"
     POLICY_CHANGE = "POLICY_CHANGE"
     EXCEPTION_APPROVE = "EXCEPTION_APPROVE"
+    # 历史导入（MIG-01）：与 EXCEPTION_APPROVE 分开，避免「导入」被误读为「异常审批」。
+    # audit_logs.action 无 CHECK 约束，新增枚举值不需要迁移。
+    HISTORY_LAND = "HISTORY_LAND"  # 原始行落地（只存原文，不做字段推断）
+    HISTORY_COMMIT = "HISTORY_COMMIT"  # 映射确认后生成业务实体
+    HISTORY_MAP = "HISTORY_MAP"  # 人工指派某行的订单/账号映射
+    HISTORY_MARK_UNLINKED = "HISTORY_MARK_UNLINKED"  # 标记为未关联划转
+    HISTORY_ROLLBACK = "HISTORY_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
+    HISTORY_CORRECTION = "HISTORY_CORRECTION"  # 建冲销/更正批次
 
 
 __all__ = [

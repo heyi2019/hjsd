@@ -108,7 +108,7 @@ def create_batch(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.HISTORY_IMPORT if hasattr(AuditAction, "HISTORY_IMPORT") else AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.HISTORY_LAND,
         entity_type="import_batch",
         entity_id=batch.id,
         actor=actor,
@@ -188,7 +188,7 @@ def assign_mapping(
     _refresh_counts(session, row.batch_id)
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.HISTORY_MAP,
         entity_type="import_row",
         entity_id=row.id,
         actor=actor,
@@ -252,7 +252,7 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.HISTORY_COMMIT,
         entity_type="import_batch",
         entity_id=batch.id,
         actor=actor,
@@ -353,7 +353,7 @@ def mark_unlinked_transfer(
 
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.HISTORY_MARK_UNLINKED,
         entity_type="import_row",
         entity_id=row.id,
         actor=actor,
@@ -590,7 +590,7 @@ def rollback_batch(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.HISTORY_ROLLBACK,
         entity_type="import_batch",
         entity_id=batch.id,
         actor=actor,
@@ -652,7 +652,7 @@ def create_correction_batch(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.HISTORY_CORRECTION,
         entity_type="import_batch",
         entity_id=new_batch.id,
         actor=actor,

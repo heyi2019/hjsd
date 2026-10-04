@@ -1,0 +1,27 @@
+{
+  "name": "heijin-erp-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "node scripts/ui_guards.mjs && tsc && vite build",
+    "check": "node scripts/ui_guards.mjs && tsc",
+    "guard": "node scripts/ui_guards.mjs"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "antd": "^5.29.3",
+    "axios": "^1.20.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.7",
+    "typescript": "^5.6.2",
+    "vite": "^6.4.3"
+  }
+}

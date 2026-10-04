@@ -1,0 +1,143 @@
+/* Desktop information hierarchy: labels stay muted; headings and business values stay primary. */
+.ui-page-layout > h2,
+.fin-page-header h2,
+.ui-page-layout .ant-statistic-content,
+.ord-line-title,
+.small-metric-card strong,
+.ord-day-order b,
+.ord-depth-grid b,
+.ord-period-grid b,
+.ord-event-grid h3,
+.ord-event-row b,
+.ord-biz-summary strong,
+.ui-section-header h3,
+.ord-detail-grid strong {
+  color: var(--color-text-primary);
+}
+
+/* Keep the desktop React shell independent from legacy generic section/header rules. */
+.app-shell > .workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.workspace > .view-head {
+  border-bottom: 0;
+}
+
+@media (--bp-801) {
+  .sidebar.glass {
+    position: sticky;
+    top: var(--space-4);
+    align-self: start;
+    height: calc(100vh - var(--space-6));
+    max-height: calc(100vh - var(--space-6));
+    overflow: hidden;
+  }
+}
+
+/* body 字号已统一收口到 typography.css（--fs-footnote 13px，2026-09-03 用户裁定：
+   右侧正文比左侧导航小一点）。此处旧 !important 覆盖已删除，避免双头声明。 */
+
+/* Desktop dark theme: these legacy business surfaces previously kept light literals. */
+/* 修正 2026-09-11：原 `:root[data-theme="dark"] html` 是死代码——html 即 :root 本身，
+   不可能成为 :root 的后代，该选择器永不匹配，导致深色下 html 层仍是亮色。
+   data-theme 打在 documentElement 上，直接写 :root[data-theme="dark"] 即可。 */
+:root[data-theme="dark"] {
+  background: var(--paper);
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 8% 5%, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 25rem),
+    radial-gradient(circle at 92% 88%, color-mix(in srgb, var(--color-info) 10%, transparent), transparent 30rem),
+    var(--paper);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="dark"] .login-card,
+:root[data-theme="dark"] .small-metric-card,
+:root[data-theme="dark"] .ord-date-controls input,
+:root[data-theme="dark"] .finance-tabs button.secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="dark"] .metric-card-container--violet,
+:root[data-theme="dark"] .ord-line-panel,
+:root[data-theme="dark"] .ord-day-order div,
+:root[data-theme="dark"] .ord-depth-grid div,
+:root[data-theme="dark"] .ord-period-grid div,
+:root[data-theme="dark"] .ord-event-grid section {
+  background: var(--panel-2);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="dark"] .ord-line-trigger,
+:root[data-theme="dark"] .ord-line-menu,
+:root[data-theme="dark"] .ord-segments,
+:root[data-theme="dark"] .trend-chart .chart-tip,
+:root[data-theme="dark"] .ui-table-wrap th,
+:root[data-theme="dark"] .ui-page-layout .ant-alert {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="dark"] .ord-line-menu label:hover {
+  background: var(--soft);
+}
+
+:root[data-theme="dark"] .ord-biz-summary article,
+:root[data-theme="dark"] .ui-card,
+:root[data-theme="dark"] .fin-page-header,
+:root[data-theme="dark"] .ui-page-layout > .ant-tabs,
+:root[data-theme="dark"] .ui-page-layout > .ant-table-wrapper {
+  background: var(--glass);
+  border-color: var(--glass-border);
+}
+
+:root[data-theme="dark"] .ant-card,
+:root[data-theme="dark"] .ant-modal-content,
+:root[data-theme="dark"] .ant-drawer-content,
+:root[data-theme="dark"] .ant-popover-inner,
+:root[data-theme="dark"] .ant-collapse,
+:root[data-theme="dark"] .ant-table-wrapper .ant-table {
+  background: var(--glass) !important;
+}
+
+:root[data-theme="dark"] .ant-card-head,
+:root[data-theme="dark"] .ant-table-thead > tr > th {
+  background: var(--soft) !important;
+}
+
+:root[data-theme="dark"] .ant-input,
+:root[data-theme="dark"] .ant-input-number,
+:root[data-theme="dark"] .ant-select-selector,
+:root[data-theme="dark"] .ant-picker,
+:root[data-theme="dark"] .ant-input-affix-wrapper {
+  background: var(--color-surface) !important;
+}
+
+:root[data-theme="dark"] .view-head {
+  background: var(--violet-head-dark-grad);
+  border-color: var(--glass-border);
+}
+
+:root[data-theme="dark"] .view-head .secondary {
+  background: var(--soft);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}

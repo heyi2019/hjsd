@@ -1,0 +1,632 @@
+/*
+ * ERP 设计令牌（权威源）
+ * 设计令牌是颜色、间距、圆角、阴影与动效的唯一事实源。
+ * - 颜色、间距、圆角、阴影、动效一律引用此处令牌，页面/组件不得新增孤立字面量。
+ * - 浅色为默认主题；深色仅通过 [data-theme="dark"] 切换，组件不硬编码第二套颜色。
+ */
+
+:root {
+  color-scheme: light;
+  /* iOS 基准：106.25% × 16px = 17px ≈ iOS body 17pt。
+     用 % 而非 px，尊重浏览器默认字号设置（等效 Dynamic Type）。
+     注意：此值是 rem 的唯一锚点，勿在别处用 px/!important 重置 html 字号。 */
+  font-size: 106.25%;
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+
+  /* 墨色 / 文本（--ink/--muted/--line 已删除，改用 --color-text-* 与 --color-border） */
+  --paper: #f2f2f7;
+  --label: #1c1c1e;
+
+  /* 面板 / 强调（--panel/--accent/--accent-cyan 已删除，改用 --color-surface/--color-primary/--color-info） */
+  --panel-2: rgba(255, 255, 255, 0.72);
+  --soft: rgba(118, 118, 128, 0.12);
+  --on-accent: #fff;
+
+  /* 液态玻璃（guidelines §2：四件套） */
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-blur: blur(24px) saturate(150%);
+  --scrim-blur: blur(2px); /* 遮罩层弱模糊（抽屉/弹层背景），与玻璃材质分档，勿混用 --glass-blur */
+  --glass-blur-md: blur(16px); /* 次级玻璃（article 卡片等），弱于 --glass-blur；历史值，勿擅自合并两档 */
+  --glass-hi: rgba(255, 255, 255, 0.72);
+  --cal-dropdown-bg: rgba(255, 255, 255, 0.40); /* 日历弹层底色（亮）：等效原 55%×0.72≈0.40；与 --glass-hi 解耦，暗色单独提（2026-09-24） */
+  /* 玻璃稀释面（sidebar.glass / view-head / antd 输入框等用 color-mix 再稀释的玻璃）：
+     抽成令牌，使 RT/CT 降级块能把它整体翻成不透明实底，而非被 color-mix(...transparent) 稀释回半透明。
+     正常值统一 88%（原各处以 74/82/86/92 散落，此处收敛为一致值）。 */
+  --glass-tint: color-mix(in srgb, var(--glass) 88%, transparent);
+  --glass-hi-tint: color-mix(in srgb, var(--glass-hi) 90%, transparent);
+
+  /* 阴影 / 抬升（Phase 1.5 语义名 --shadow-xs/sm/md/lg、--control-height-*、--motion-* 无引用，去兼容已删除；沿用 --e1/--e2/--e3/--shadow 原始名） */
+  --e0: 0 1px 2px rgba(91, 33, 182, 0.12);
+  --e1: 0 1px 2px rgba(28, 28, 30, 0.03), 0 4px 12px rgba(28, 28, 30, 0.05);
+  --e2: 0 14px 34px rgba(28, 28, 30, 0.08), 0 4px 12px rgba(28, 28, 30, 0.04);
+  --e3: 0 28px 64px rgba(28, 28, 30, 0.12), 0 10px 22px rgba(28, 28, 30, 0.06);
+  --ring: 0 0 0 3px rgba(175, 82, 222, 0.26);
+  /* 卡片高程（iOS 玻璃浮起：柔和投影 + 顶部镜面高光；暗色在 [data-theme=dark] 覆盖） */
+  --card-elevation: 0 10px 28px rgba(28, 28, 30, 0.07), 0 2px 8px rgba(28, 28, 30, 0.05);
+  --card-top-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --accent-grad: linear-gradient(135deg, #0757c7 0%, #0a63d8 52%, #0c68d9 100%); /* 品牌蓝实底：白字在整段均保持可读对比 */
+
+  /* 圆角（规范名 --radius-*；旧名 --r-* / --card-radius / --ui-radius-* 已全量迁移并删除，无兼容 alias） */
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+  /* 圆角补充档（2026-09-11 收口，对齐散落非标 6/8px；维度值双主题同值，不加 dark 覆盖） */
+  --radius-2xs: 6px;
+  --radius-xs: 8px;
+  --radius-compact: 9px;
+  --radius-control: 11px;
+  --radius-wide: 14px;
+  --radius-glass: 18px;
+  /* 边框宽度（2026-09-18 收口，消除 border 散落 1/1.5/2/3px；dimension 双主题同值，不加 dark 覆盖） */
+  --border-w: 1px;
+  --border-w-1-5: 1.5px;
+  --border-w-2: 2px;
+  --border-w-3: 3px;
+  /* 定位偏移（2026-09-18 收口，消除 top/left/right/bottom/inset 散落 px；dimension 双主题同值，不加 dark 覆盖） */
+  --pos-4: 4px;
+  --pos-8: 8px;
+  --pos-neg-3: -3px;
+  /* 2026-09-18 二维孤儿清理：负向定位偏移（装饰光斑，维度契约此前漏守负值） */
+  --pos-neg-70: -70px;
+  --pos-neg-100: -100px;
+
+  /* 间距（规范名 --space-half..6：2/4/8/12/16/24/32；--ui-space-* 已全量迁移并删除，无兼容 alias） */
+  --space-half: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-negative-1: -4px;
+  --space-negative-2: -8px;
+  --space-negative-half: -2px;
+  /* 紧凑密度半档（2026-09-11 新增）：表格单元格 10px / 班次单元格 6px 是项目既定密度，
+     原先散落成手写 px，现显式入量表。仅用于紧凑型内边距/间隙，常规块间距仍走整档。 */
+  --space-1-half: 6px;
+  --space-2-half: 10px;
+  --space-compact: 3px;
+  --shadow-hairline: 0 1px 3px rgba(28, 28, 30, 0.18);
+  --shadow-soft: 0 2px 8px rgba(28, 28, 30, 0.08);
+  --shadow-raised: 0 4px 12px rgba(28, 28, 30, 0.10);
+  --shadow-button: 0 5px 13px color-mix(in srgb, var(--violet-ink) 22%, transparent);
+
+  /* 控件 */
+  --ui-control-height: 44px;
+  --ui-control-height-compact: 30px;
+  --ui-control-height-compact-inner: 28px;
+  --ui-control-height-chip: 24px;
+  /* 标准小号档 24px：与 antd controlHeightSM 同值，用于表格行内操作与密集增删行。
+     是设计系统承认的标准档位（非破例），使用时必须显式写 size="sm"，不得靠 CSS 默认继承。 */
+  --ui-control-height-sm: 24px;
+  /* 控件高度补充档（2026-09-11 收口，对齐散落 32/36px；维度值双主题同值，不加 dark 覆盖） */
+  --ui-control-height-md: 32px;
+  --ui-control-height-lg: 36px;
+  /* 控件最小宽（2026-09-11 收口，徽章/芯片 min-width:48px×3；维度值双主题同值，不加 dark 覆盖） */
+  --control-min-w: 48px;
+  /* 业务控件尺寸：日期筛选与返利趋势图在桌面、窄屏下保持同一信息密度。 */
+  --control-date-width: 176px;
+  --control-quick-date-min-width: 72px;
+  --control-rebate-trend-min-height: 190px;
+  --control-rebate-trend-item-min-width: 48px;
+  --control-rebate-trend-item-height: 170px;
+  --control-rebate-trend-label-max-width: 70px;
+  --control-rebate-trend-bar-width: 28px;
+  /* 表单 / 筛选条字段宽（2026-09-17 收口，消除 styles.css 散落 220/360/168px；维度值双主题同值） */
+  --control-field-min-width: 220px;
+  --control-inline-field-width: 360px;
+  --control-filter-select-width: 168px;
+  --control-rebate-trend-bar-min-height: 8px;
+  /* 表格列宽 / 内联控件宽（2026-09-17 收口，消除薪资模块散落列宽魔法数；值命名令牌，
+     零视觉变化，双主题同值）。antd 列 width 与 React style width 均接受 CSS var 字符串，
+     浏览器解析后与原 px 等宽。新增列宽须复用此处令牌，不得再写裸数字。 */
+  --col-w-46: 46px;
+  --col-w-60: 60px;
+  --col-w-64: 64px;
+  --col-w-70: 70px;
+  --col-w-72: 72px;
+  --col-w-76: 76px;
+  --col-w-80: 80px;
+  --col-w-86: 86px;
+  --col-w-90: 90px;
+  --col-w-92: 92px;
+  --col-w-96: 96px;
+  --col-w-100: 100px;
+  --col-w-104: 104px;
+  --col-w-110: 110px;
+  --col-w-120: 120px;
+  --col-w-128: 128px;
+  --col-w-130: 130px;
+  --col-w-140: 140px;
+  --col-w-150: 150px;
+  --col-w-160: 160px;
+  --col-w-170: 170px;
+  --col-w-180: 180px;
+  --col-w-200: 200px;
+  --col-w-240: 240px;
+  --col-w-250: 250px;
+  --col-w-280: 280px;
+  --col-w-300: 300px;
+  --col-w-320: 320px;
+  --col-w-640: 640px;
+  /* 2026-09-18 二维孤儿清理：grid 列宽去重新增 */
+  --col-w-84: 84px;
+  --col-w-144: 144px;
+  --col-w-190: 190px;
+  --col-w-210: 210px;
+  --col-w-220: 220px;
+  --col-w-260: 260px;
+  --col-w-290: 290px;
+  --radius-compact-bar-end: 2px;
+  /* 中性一次性尺寸令牌（2026-09-17 收口，消除各 CSS 散落几何 px，零视觉变化；
+     维度值双主题同值，不加 dark 覆盖）。命名=value 即可读性，专供图标/装饰 blob/卡片
+     最小高/进度条高等无复用语义的偶发尺寸；新增偶发尺寸须复用此处而非再写裸数字。 */
+  --sz-4: 4px;
+  --sz-6: 6px;
+  --sz-7: 7px;
+  --sz-8: 8px;
+  --sz-9: 9px;
+  --sz-14: 14px;
+  --sz-18: 18px;
+  --sz-22: 22px;
+  --sz-24: 24px;
+  --sz-28: 28px;
+  --sz-30: 30px;
+  --sz-32: 32px;
+  --sz-34: 34px;
+  --sz-35: 35px;
+  --sz-36: 36px;
+  --sz-38: 38px;
+  --sz-40: 40px;
+  --sz-42: 42px;
+  --sz-52: 52px;
+  --sz-58: 58px;
+  --sz-84: 84px;
+  --sz-88: 88px;
+  --sz-94: 94px;
+  --sz-106: 106px;
+  --sz-122: 122px;
+  --sz-132: 132px;
+  --sz-152: 152px;
+  --sz-154: 154px;
+  --sz-165: 165px;
+  --sz-180: 180px;
+  --sz-320: 320px;
+  --sz-360: 360px;
+  --sz-680: 680px;
+  --sz-1260: 1260px;
+  /* 日历弹层尺寸（2026-09-23 收口，消除 Calendar.css 散落 %/小数，零视觉变化；
+     维度值双主题同值，不加 dark 覆盖）。range 整宽/面板宽/preset 宽已并入并行会话的 --col-w-*，此处不再重复；
+     --cal-date-cell-ratio 为 7 列日期网格专用，year 3 列面板须排除。 */
+  --cal-date-cell-ratio: 14.2857%;
+  --cal-range-cell-gap: 0.2px;
+  --cal-range-in-range-inset: 1.5px;
+  /* 容器尺寸（2026-09-11 收口，对齐散落容器/对话框 max-width；维度值双主题同值，不加 dark 覆盖） */
+  --content-max-sm: 420px;
+  --app-max-width: 1680px;
+
+  /* 响应式断点（2026-09-11 收口，原值精确入表，零行为变更；维度值双主题同值，不加 dark 覆盖）
+     语义尺度 sm/md/lg = 640/960/1280 由第二 :root 块（设计系统 Phase 3.3）统一定义，本块只放散值；
+     原 800/900 查询已统一翻到 --bp-md/--bp-lg（语义尺度），不再需要 --bp-800/--bp-900 值命名；
+     --bp-sm=640 / --bp-xl=1100 与既定义不冲突，保留语义名；散值 --bp-600/650/700/720/760/801 保留原值命名 */
+  --bp-600: 600px;
+  --bp-sm: 640px;
+  --bp-650: 650px;
+  --bp-700: 700px;
+  --bp-720: 720px;
+  --bp-760: 760px;
+  --bp-800: 800px;
+  --bp-560: 560px;
+  --sz-20: 20px;
+  --sz-260: 260px;
+  --sz-280: 280px;
+  --sz-300: 300px;
+  --bp-xl: 1100px;
+  --bp-801: 801px; /* min-width 断点 */
+
+  /* 动效 */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast: 0.16s;
+  --dur: 0.26s;
+  /* 减弱动效档（prefers-reduced-motion）：位移/缩放被禁用后，颜色与透明度仍需一段
+     可感知的渐变，否则用户失去「状态已变化」的反馈（WCAG 2.3.3 + Apple 减弱动效准则）。 */
+  --dur-reduced: 0.12s;
+  /* 全局 reduced-motion 兜底：keyframe 动画瞬时杀掉（停位移/缩放）；时长收敛为变量便于统一调控 */
+  --dur-motion-instant: 0.01ms;
+  /* reduced-motion 下 loading spinner 仍保留旋转（仅放慢），避免被 .01ms 冻成静止环、误判为已完成 */
+  --dur-spin-reduced: 1.2s;
+
+  /* 弹簧动效（Apple WWDC 物理参数）。
+     --spring-damping / --spring-response 是参数真值，但 CSS 无法运行时求解微分方程，
+     所以 --ease-spring 是按二者**预采样**好的 linear() 曲线（二者必须同步，改参数要重算）。
+     注意 linear() 文法只接受【无单位数字 0..1】：写成百分比 Chrome/Safari 会整条声明丢弃，
+     缓动静默退回 ease（弹簧消失且无任何报错）——曾踩过，改这条务必用 getComputedStyle 实测。
+     推导：sigma = ln(100)/response；omega_n = sigma/zeta；omega_d = omega_n*sqrt(1-zeta^2)；
+     欠阻尼阶跃响应 x(t) = 1 - e^(-sigma*t)*(cos(omega_d*t) + sigma/omega_d*sin(omega_d*t))。
+     取值 0.8/0.3 = Apple sheet/抽屉档，理论过冲 1.5%（实测曲线峰值 1.01501 吻合）；
+     采样窗口 0.5s = --dur-spring，尾段已收敛到 1.0，动画结束无跳变。
+     替代了原先手调的 cubic-bezier(0.34,1.56,0.64,1)：那条曲线过冲远超 1.5%，偏卡通。 */
+  --spring-damping: 0.8;
+  --spring-response: 0.3s;
+  --ease-spring: linear(0, 0.0383, 0.1301, 0.2486, 0.3752, 0.4978, 0.6093, 0.706, 0.7867, 0.8518, 0.9025, 0.9409, 0.9688, 0.9883, 1.0012, 1.0091, 1.0133, 1.015, 1.015, 1.0139, 1.0123, 1.0104, 1.0085, 1.0067, 1.0051, 1.0038, 1.0027, 1.0018, 1.0011, 1.0007, 1.0003, 1.0001, 1);
+  --dur-spring: 0.5s;
+
+  /* 排版令牌（iOS SF 文本阶梯统一，2026-09-09）：复合值 font-size+line-height+weight。
+     rem 锚点 = :root 106.25%（17px ≈ iOS Body 17pt），全部对齐阶梯：
+     Title1 28 / Title2 22 / Title3 20 / Callout 16 / Subheadline 15 / Footnote 13。 */
+  --font-h1: 700 1.6471rem/1.3 var(--font-sans); /* Title 1 · 28 */
+  --font-large-title: 700 2rem/1.21 var(--font-sans); /* Large Title · 34（登录页首屏标题） */
+  --font-section: 600 1.1765rem/1.35 var(--font-sans); /* Title 3 · 20，页头 */
+  --font-card-title: 600 1rem/1.4 var(--font-sans); /* Body · 17，普通卡片标题 */
+  --font-data-display-title: 600 1rem/1.4 var(--font-sans); /* Body · 17，二级容器/多数据展示标题 */
+  --font-nav-primary: 600 0.8824rem/1.4 var(--font-sans); /* Subheadline · 15，一级导航 */
+  --font-nav-secondary: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13，二级导航 */
+  --font-nav-tertiary: 500 0.7059rem/1.4 var(--font-sans); /* Caption 1 · 12，三级及以下导航 */
+  --font-nav-caption: 700 0.6471rem/1.4 var(--font-sans); /* Caption 2 · 11，导航分组说明 */
+  --font-body-m: 400 1rem/1.6 var(--font-sans); /* Body · 17 */
+  --font-body-s: 400 0.8824rem/1.5 var(--font-sans); /* Subheadline · 15 */
+  --font-caption: 400 0.7647rem/1.5 var(--font-sans); /* Footnote · 13 */
+  --font-table-header: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13 */
+  /* 长度型字号：专供 fontSize/font-size 场景。--font-body-s/--font-caption 等是 font 简写
+     （含 weight/line-height），放进 font-size 属非法值 → 静默 unset 回继承（2026-09-07 实测踩坑）。 */
+  --font-size-body-s: 0.8824rem; /* Subheadline · 15 */
+  --font-size-caption: 0.7647rem; /* Footnote · 13 */
+
+  /* iOS SF 文本阶梯（长度型，2026-09-09 全局统一唯一字号来源）。
+     页面/组件禁止手写 px 字号；图标字形（×、图标符号）不入阶梯，用局部 px。 */
+  --fs-large-title: 2rem; /* 34 · Large Title */
+  --fs-title-1: 1.6471rem; /* 28 · Title 1（视图 H1 / KPI 大数字） */
+  --fs-title-2: 1.2941rem; /* 22 · Title 2（指标数值） */
+  --fs-title-3: 1.1765rem; /* 20 · Title 3（页头 H2） */
+  --fs-headline: 1rem; /* 17 · Headline（配 600） */
+  --fs-body: 1rem; /* 17 · Body（rem 锚点基准） */
+  --fs-callout: 0.9412rem; /* 16 · Callout（卡片标题） */
+  --fs-subheadline: 0.8824rem; /* 15 · Subheadline（导航/表格/控件） */
+  --fs-footnote: 0.7647rem; /* 13 · Footnote（正文基线，2026-09-03 裁定：正文小于导航） */
+  --fs-caption-1: 0.7059rem; /* 12 · Caption 1（说明/badge/三级导航） */
+  --fs-caption-2: 0.6471rem; /* 11 · Caption 2（最小注脚） */
+  --fs-14: 0.8235rem; /* 14 · 非 iOS 阶梯（图标对齐/特殊文本），长度型 */
+  /* 字距光学收紧（亚像素，负值；2026-09-18 二维孤儿清理） */
+  --ls-tight: -0.5px;
+  --ls-tighter: -0.3px;
+
+  /* 品牌蓝点缀。为兼容复制来的组件样式，历史 --violet-* 变量名保留，值统一为蓝色。 */
+  --tint-violet: rgba(10, 99, 216, 0.12);
+  --violet-ink: #0757c7;
+  --violet-border: #b7d5fb;
+  --violet-hover: #7db5f4;
+  --violet-soft: rgba(10, 99, 216, 0.1);
+
+  /* 紫调字面量收口（antd 适配器清扫：零视觉变化，1:1 等价引用 styles.css/a11y.css 内硬编码 violet hex） */
+  --violet-50: #eaf3ff; /* 导航激活态最浅底 */
+  --violet-100: #f1f7ff; /* 浅蓝底 / hover */
+  --violet-200: #d6eaff; /* 导航激活态渐变止点 */
+  --violet-300: #c6def8; /* 边框（ord-line-trigger / calendar） */
+  --violet-edge-1: #c7dcef; /* login 输入边框 */
+  --violet-edge-2: #e1ebf5; /* 表格 th/td 边框 */
+  --violet-edge-3: #e7f0f9; /* 禁用按钮底 */
+  --violet-edge-4: #d6e4f1; /* 卡片 / 面板边框（多处） */
+  --violet-edge-5: #cddfec; /* 虚线分隔 */
+  --violet-edge-6: #d9e6f0; /* 网格线 / 边框 */
+  --violet-edge-7: #e1ebf4; /* 边框 */
+  --violet-edge-8: #eaf2fa; /* segments 底 */
+  --violet-surface-1: #f6faff; /* metric-card-container--violet 底 */
+  --violet-surface-2: #f9fcff; /* ord-line-panel 底 */
+  --violet-head-dark-grad: linear-gradient(120deg, rgba(8, 48, 107, 0.9), rgba(8, 32, 70, 0.78)); /* 深蓝 .view-head 品牌渐变底 */
+
+  /* 中性 / 语义字面量收口（选项1：彻底贯彻令牌优先；原 styles.css 内 #fff 等） */
+  --white: #fff; /* 白底表面（卡片 / 表头 / 日历 / 图表 tip） */
+  --color-text-disabled: #8e8e93; /* 禁用按钮文字（iOS 三级灰）*/
+  --chart-amber: #f59e0b; /* 订单趋势第3数据系列（amber；≠ --color-warning #b45309，故独立令牌保零视觉变化） */
+  /* 图表分类调色板（iOS 系统色系：紫为锚点外补蓝/青/绿/粉/橙，避免多系列紫同色） */
+  --chart-1: #0a63d8; /* 品牌蓝 = primary */
+  --chart-2: #0a84ff; /* iOS blue 蓝 */
+  --chart-3: #30c4b0; /* teal 青 */
+  --chart-4: #34c759; /* green 绿 */
+  --chart-5: #f59e0b; /* amber 琥珀（同 --chart-amber） */
+  /* 薪资驾驶舱折线图尺寸（2026-09-18 收口，消除 PayrollCockpitPage 内联裸 px；双主题同值，不加 dark 覆盖） */
+  --chart-min-width: 620px;
+  --chart-height: 260px;
+  /* 经营看板趋势图横向滚动容器最小宽（2026-09-25 收口 orders.css 裸 1180px；双主题同值，不加 dark 覆盖） */
+  --trend-chart-min-width: 1180px;
+
+  /* 语义色彩层（去兼容：--color-* 升为唯一权威名；旧 --ink/--muted/--line/--panel/--accent/--accent-cyan/--success/--warning/--error 已删除，值 1:1 搬运） */
+  --color-text-primary: #1c1c1e;
+  --color-text-secondary: #48484a;
+  --color-text-tertiary: rgba(60, 60, 67, 0.38);
+  --code-badge-text: color-mix(in srgb, var(--color-info) 78%, #000);
+  --warning-ink: color-mix(in srgb, var(--color-warning) 88%, #000); /* 警告文字墨：warning 本值对 Alert 底(12% mix)仅 4.25，深化 12% 达 5.16；背景/边框仍用 --color-warning */
+  /* ui-code-badge 字色：info 对白仅 3.64，深化 22% 黑达 5.4+ */
+  --color-bg: #f2f2f7;
+  --color-surface: rgba(255, 255, 255, 0.78);
+  --color-border: rgba(60, 60, 67, 0.18);
+  --color-primary: #0a63d8;
+  --primary-ink: color-mix(in srgb, var(--color-primary) 72%, #000); /* 蓝色文本在浅底保持达标对比 */
+  --accent-deep: color-mix(in srgb, var(--color-primary) 90%, #000); /* 蓝底白字实底达标 */
+  --color-primary-text: color-mix(in srgb, var(--color-primary) 70%, #000);
+  --color-info: #0a84ff;
+  --color-success: #14724b;
+  --color-warning: #b45309;
+  --color-error: #b23b3b;
+  --danger-solid: var(--color-error); /* 实底 danger 按钮底：浅色 error 对白 5.86 已达标 */
+
+  /* 自动化状态卡（.automation-status.success/.failed）的柔和状态色：装饰用淡边框 + 8% 淡底。
+     语义上 ≠ --color-success / --color-error 主色（主色是深邃墨色，此处要淡），不可就近归档。
+     浅色值 = 原 styles.css 硬编码原样搬运，零视觉变化。 */
+  --status-success-border: #a9dfc3;
+  --status-success-soft: #f0faf5;
+  --status-failed-border: #efb0b0;
+  --status-failed-soft: #fff5f5;
+  --status-neutral-border: #dfe4ee;
+  --status-neutral-soft: #f7f9fc;
+  --status-success-shadow: 0 2px 8px rgba(35, 125, 83, 0.06);
+  --status-failed-shadow: 0 2px 8px rgba(174, 59, 59, 0.06);
+  --wash-warning-soft: #fff8e6;
+  --wash-warning-softer: #fffaf0;
+
+  /* 文件类型徽章色（附件列表 MIME → 色点）：装饰性色点，无文字承载，故不参与对比度约束；
+     浅色值 = 原 AttachmentsWorkspace.tsx 硬编码原样搬运，零视觉变化。 */
+  --color-filetype-image: #34c759;
+  --color-filetype-pdf: #ff3b30;
+  --color-filetype-excel: #1f8a3b;
+  --color-filetype-word: #2b6cef;
+  --color-filetype-archive: #ff9f0a;
+  --color-filetype-text: #8e8e93;
+  --color-filetype-audio: #0a63d8;
+  --color-filetype-video: #ff2d55;
+
+  /* antd 桥接专用（AppWorkspace ConfigProvider 运行时读取；原 AppWorkspace.tsx 内硬编码原样搬运）：
+     antd 容器 / 浮层底色必须**不透明**，不能用半透明的 --color-surface；占位符色此前无令牌。 */
+  --color-antd-bg-container: #ffffff;
+  --color-antd-bg-elevated: #ffffff;
+  --color-antd-text-placeholder: #6e6e73;
+
+  /* 模态遮罩（B 巡检：原硬编码 rgba 收口为令牌，零视觉变化） */
+  --scrim-modal: rgba(8, 24, 48, 0.42);
+  --scrim-drawer: rgba(15, 18, 30, 0.28);
+
+  /* 装饰光晕（全量清扫：原硬编码 violet 光晕 rgba 收口，零视觉变化） */
+  --glow-violet-a: #75aef2;
+  --glow-violet-b: #b7d5fb;
+
+  /* 表面洗色（半透明叠层，原散落 rgba 字面量；2026-09-11 收口，零视觉变化，双主题同值） */
+  --wash-white-90: rgba(255, 255, 255, 0.9);
+  --wash-white-78: rgba(255, 255, 255, 0.78);
+  --wash-ice-90: rgba(244, 247, 253, 0.9);
+  --wash-ice-96: rgba(245, 246, 251, 0.96);
+  --wash-violet-80: rgba(239, 247, 255, 0.8);
+  --wash-violet-74: rgba(232, 242, 253, 0.74);
+  /* 自动化任务表斑马纹偶数行底（2026-09-25 收口原 dangling --wash-violet-42：原稿意图紫洗底，悬空回退透明丢失斑马纹；按 --wash-violet-74 同基色、0.42 alpha 补全，零视觉变化） */
+  --wash-violet-42: rgba(232, 242, 253, 0.42);
+  /* 细分隔线 / 静默填充（中性灰低 alpha，双主题同值） */
+  --hairline-soft: rgba(60, 60, 67, 0.12);
+  --fill-muted: rgba(60, 60, 67, 0.1);
+  /* 静态微投影（芯片等，双主题同值） */
+  --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  /* 布局令牌（guidelines §3：布局层，不进通用组件） */
+  --sidebar-width: clamp(220px, 20vw, 300px);
+  --panel-pad: 16px;
+  /* SchemaForm 单列组限宽（2026-09-25 收口原 dangling --form-max-width：作者意图为整站可调令牌但漏注册，fallback 720px 掩盖悬空；双主题同值，不加 dark 覆盖） */
+  --form-max-width: 720px;
+
+  /* 响应式断点（设计系统 Phase 3.3 统一尺度 sm/md/lg = 640/960/1280；
+     2026-09-11 曾因与业务块重名被删，现按用户「执行 A」统一 800/900 查询到该尺度而恢复） */
+  --bp-sm: 640px;
+  --bp-md: 960px;
+  --bp-lg: 1280px;
+
+  /* ── 看板组件库专用令牌（2026-09-23 Apple 化收口，零视觉变化；尺寸双主题同值） ── */
+  /* 强调色（编辑器/选择面板 chrome，非语义主色，需独立品牌橙/蓝） */
+  --accent-amber: #e98a00;
+  --accent-blue: #377dff;
+  --border-amber: #f9d9b2;
+  /* 字号补充档（iOS 阶梯外的编辑器/卡身字号） */
+  --fs-18: 1.0588rem; /* 18 */
+  --fs-19: 1.1176rem; /* 19 */
+  --fs-21: 1.2353rem; /* 21 */
+  --fs-25: 1.4706rem; /* 25 · 卡身标签/提示 */
+  /* 指标/统计卡尺寸 */
+  --card-min-h: 240px;
+  --card-min-h-sm: 190px;
+  --card-pad-y: 42px;
+  --card-pad-x: 44px;
+  --card-pad-y-sm: 24px;
+  --card-pad-x-sm: 28px;
+  --card-gap: 28px;
+  --card-gap-sm: 12px;
+  --radius-card: 30px;
+  --radius-preview: 10px;
+  /* 选择面板尺寸 */
+  --sz-26: 26px;
+  --sz-48: 48px;
+  --sz-62: 62px;
+  --sz-78: 78px;
+  --sz-760: 760px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* 保留：无 --color-* 对应的原始名 */
+  --paper: #0b1420;
+  /* --color-bg 与 --paper 在亮色下本就同值（#f2f2f7），深色必须同步覆盖：
+     此前缺这一条，styles.css:150 的 `html{background:...var(--color-bg)}` 在深色下
+     仍取亮色 #f2f2f7，页面 html 层透出亮底（2026-09-11 实测确认后补）。 */
+  --color-bg: #0b1420;
+  --label: #f3f8ff;
+  --panel-2: rgba(20, 40, 64, 0.78);
+  --soft: rgba(255, 255, 255, 0.1);
+  --glass: rgba(18, 36, 58, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-hi: rgba(255, 255, 255, 0.12);
+  --cal-dropdown-bg: rgba(255, 255, 255, 0.40); /* 日历弹层底色（暗）：从 ~0.066 提到 0.40，保证日期可读（2026-09-24 拆亮/暗双令牌） */
+  --e0: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --e2: 0 10px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --e3: 0 22px 52px rgba(0, 0, 0, 0.42), 0 6px 16px rgba(0, 0, 0, 0.3);
+  /* 卡片高程·暗色覆盖：更深柔投影 + 弱顶部高光（暗底浮起感） */
+  --card-elevation: 0 14px 34px rgba(0, 0, 0, 0.46), 0 3px 10px rgba(0, 0, 0, 0.34);
+  --card-top-hi: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* 视图卡片暗态抬升（payroll 核算规则视图卡，仅暗态使用，零视觉变化收口原 rgba 字面量） */
+  --shadow-view-1: 0 2px 10px rgba(0, 0, 0, 0.28);
+  --shadow-view-2: 0 4px 14px rgba(0, 0, 0, 0.36);
+
+  /* 语义色深色覆盖（映射到原 --ink/--muted/--line/--panel/--success/--warning/--error 深色值） */
+  --color-text-primary: #eaf3ff;
+  --color-text-secondary: #c3d2e4;
+  --color-text-tertiary: rgba(219, 234, 250, 0.3);
+  --code-badge-text: var(--color-info);
+  --warning-ink: var(--color-warning); /* 深色 warning 对暗面 11.6 已达标，不深化 */
+  /* 深色 info(#64a8ff) 对暗面 6.79 已达标，不深化 */
+  --color-surface: rgba(20, 38, 62, 0.72);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-primary: #6aaeff;
+  --primary-ink: color-mix(in srgb, var(--color-primary) 78%, #fff); /* 深色下用更亮蓝增强边界与文本可读性 */
+  --accent-deep: color-mix(in srgb, var(--color-primary) 75%, #000); /* 深色蓝底保留白字可读性 */
+  --color-primary-text: color-mix(in srgb, var(--color-primary) 70%, #fff);
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+  --danger-solid: #d0343a; /* 实底 danger 按钮底：error(#f87171) 白字仅 2.77，压深到 4.93 达标（error 文字色不变） */
+  --color-info: #64a8ff;
+  /* 状态柔和色深色覆盖：由 --color-success / --color-error 派生，自动跟随主色、不新增字面量 */
+  --status-success-border: color-mix(in srgb, var(--color-success) 50%, transparent);
+  --status-success-soft: color-mix(in srgb, var(--color-success) 12%, transparent);
+  --status-failed-border: color-mix(in srgb, var(--color-error) 50%, transparent);
+  --status-failed-soft: color-mix(in srgb, var(--color-error) 12%, transparent);
+  --status-neutral-border: rgba(255, 255, 255, 0.14);
+  --status-neutral-soft: rgba(255, 255, 255, 0.06);
+  --status-success-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --status-failed-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --wash-warning-soft: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  --wash-warning-softer: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  /* 文件类型徽章色深色覆盖（Apple 深色系统色变体，暗底上更亮一档以保持可辨） */
+  --color-filetype-image: #30d158;
+  --color-filetype-pdf: #ff453a;
+  --color-filetype-excel: #248a3d;
+  --color-filetype-word: #0a84ff;
+  --color-filetype-archive: #ff9f0a;
+  --color-filetype-text: #8e8e93;
+  --color-filetype-audio: #6aaeff;
+  --color-filetype-video: #ff375f;
+  /* antd 桥接专用深色覆盖 */
+  --color-antd-bg-container: #14263e;
+  --color-antd-bg-elevated: #14263e;
+  --color-antd-text-placeholder: rgba(219, 234, 250, 0.55);
+
+  /* 紫调字面量收口：暗色覆盖（选项2；原 hex 未覆盖，现补齐保持令牌一致，避免浅薰衣草回退到深底） */
+  --violet-50: #13253b;
+  --violet-100: #18304b;
+  --violet-200: #1d3b5c;
+  --violet-300: #27507b;
+  --violet-edge-1: #23415f;
+  --violet-edge-2: #13253b;
+  --violet-edge-3: #18304b;
+  --violet-edge-4: #23415f;
+  --violet-edge-5: #27507b;
+  --violet-edge-6: #23415f;
+  --violet-edge-7: #13253b;
+  --violet-edge-8: #18304b;
+  --violet-surface-1: #0e1c2d;
+  --violet-surface-2: #102238;
+
+  /* 暗色品牌蓝覆盖：激活态与 hover 使用更亮的蓝，避免在深色玻璃底上失去边界。 */
+  --violet-ink: #9bc9ff;
+  --violet-border: #7db5f4;
+  --violet-hover: #9bc9ff;
+  --violet-soft: rgba(90, 168, 255, 0.16);
+
+  /* 图表分类调色板·暗色（随浅色同系，暗态略提亮保可见） */
+  --chart-1: #6aaeff;
+  --chart-2: #64a8ff;
+  --chart-3: #4fd6c4;
+  --chart-4: #30d158;
+  --chart-5: #fbbf24;
+
+  /* 看板组件库强调色·暗色（独立橙/蓝提亮保可见） */
+  --accent-amber: #ffb340;
+  --accent-blue: #64a8ff;
+  --border-amber: rgba(255, 178, 64, 0.35);
+}
+
+/* 响应式断点媒体查询（2026-09-11 修复：CSS `var()` 不能在 @media 条件值内解析，
+   原 `var(--bp-*)` 媒体查询全部静默失效。改为 `@custom-media` 声明 + 构建期文本
+   替换：vite.config.ts 的 resolveCustomMedia 插件读取本块，把源码 `@media (--bp-md)`
+   直接替换为 `@media (max-width: 960px)`（不依赖 postcss-custom-media 插件，规避
+   Vite 模块隔离与插件版本 churn 导致的整条丢弃）。用法：`@media (--bp-md)`。
+   定义须顶层（不在 :root 内）；值与原 --bp-* 运行时属性严格一致。 */
+@custom-media --bp-600 (max-width: 600px);
+@custom-media --bp-650 (max-width: 650px);
+@custom-media --bp-700 (max-width: 700px);
+@custom-media --bp-720 (max-width: 720px);
+@custom-media --bp-760 (max-width: 760px);
+@custom-media --bp-800 (max-width: 800px);
+@custom-media --bp-sm (max-width: 640px);
+@custom-media --bp-md (max-width: 960px);
+@custom-media --bp-lg (max-width: 1280px);
+@custom-media --bp-xl (max-width: 1100px);
+@custom-media --bp-801 (min-width: 801px);
+@custom-media --bp-560 (max-width: 560px);
+@custom-media --bp-620 (max-width: 620px);
+@custom-media --bp-900 (max-width: 900px);
+@custom-media --bp-980 (max-width: 980px);
+@custom-media --bp-1200 (max-width: 1200px);
+@custom-media --bp-1120 (min-width: 1120px);
+@custom-media --bp-1420 (min-width: 1420px);
+@custom-media --bp-1740 (min-width: 1740px);
+@custom-media --bp-1740-dn (max-width: 1740px);
+@custom-media --bp-1420-dn (max-width: 1420px);
+@custom-media --bp-1120-dn (max-width: 1120px);
+
+/* 无障碍：降低透明度（对应 macOS「降低透明度」，此前全站零适配）。
+   毛玻璃材质整体降级为不透明实底、模糊关闭，边框换用常规边框色保证边界可辨。
+   选择器写成 :root 与 :root[data-theme="dark"] 并列，才能压过上方深色覆盖块（同特异性取后者）。 */
+@media (prefers-reduced-transparency: reduce) {
+  :root, :root[data-theme="dark"] {
+    --glass: var(--color-antd-bg-container);
+    --glass-border: var(--color-border);
+    --glass-hi: var(--color-antd-bg-container); /* 玻璃-hi 面作填充须为实底，原 --color-border 为半透明描边色（alpha≈0.18）仍透 */
+    --glass-blur: none;
+    --glass-blur-md: none; /* G4：次级玻璃模糊令牌同样关闭，原漏配导致 small-metric-card / article 卡片在 RT 下仍 blur(16px) */
+    --scrim-blur: none; /* G1：遮罩模糊在 RT 下同样关闭，原漏配导致弹层/抽屉背景仍模糊 */
+    --cal-dropdown-bg: var(--color-antd-bg-container);
+    --glass-tint: var(--color-antd-bg-container); /* G3：玻璃稀释面整体翻实底，不被 color-mix(transparent) 稀释回半透明 */
+    --glass-hi-tint: var(--color-antd-bg-container); /* G3：玻璃-hi 稀释面同样翻实底（须实底，非半透明描边色） */
+    --panel-2: var(--color-antd-bg-container);
+    --color-surface: var(--color-antd-bg-container);
+  }
+}
+
+/* 无障碍：增强对比度（对应 macOS「增强对比度」/ WCAG 1.4.6，此前全站零适配）。
+   次级文本并入主文本、三级并入次级；边框加实；半透明材质同样降级为实底。
+   不改 --border-w，避免高对比下控件尺寸发生布局抖动。 */
+@media (prefers-contrast: more) {
+  :root, :root[data-theme="dark"] {
+    --glass: var(--color-antd-bg-container);
+    --glass-border: var(--color-text-secondary);
+    --glass-hi: var(--color-antd-bg-container); /* G2：CT 补 --glass-hi，与 RT 对齐；玻璃-hi 面作填充须实底，原 --color-border 半透明(alpha≈0.18)，改 --color-antd-bg-container */
+    --glass-blur: none;
+    --glass-blur-md: none; /* G4：次级玻璃模糊令牌同样关闭，与 RT 对齐（small-metric-card / article 卡片） */
+    --scrim-blur: none; /* 遮罩模糊在 CT 下同样关闭，保持与 RT 一致 */
+    --cal-dropdown-bg: var(--color-antd-bg-container);
+    /* 半透明表面色同样降级：半透明叠加会让文字对比度不可控（实测暗态卡片底仍为 0.72 alpha） */
+    --glass-tint: var(--color-antd-bg-container); /* G3：玻璃稀释面整体翻实底 */
+    --glass-hi-tint: var(--color-antd-bg-container); /* G3：玻璃-hi 稀释面同样翻实底（须实底，非半透明描边色） */
+    --color-surface: var(--color-antd-bg-container);
+    --panel-2: var(--color-antd-bg-container);
+    --color-text-secondary: var(--color-text-primary);
+    --color-text-tertiary: #48484a; /* 亮色：三级并入原次级（#48484a） */
+    --color-border: #8e8e93;
+  }
+  :root[data-theme="dark"] {
+    --color-text-tertiary: #c3d2e4; /* 暗色三级并入当前次级 */
+    --color-border: rgba(255, 255, 255, 0.42);
+  }
+}

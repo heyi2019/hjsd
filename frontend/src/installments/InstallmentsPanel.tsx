@@ -1,0 +1,309 @@
+/** 分期：分期出售（STOCK_SALE）与代分期（ADVANCE_PURCHASE）分列（页面原型 §3.4）。
+ * 收款必须选择首付或期次；未结清不可换绑交付。 */
+import { Card, Form, Input, Modal, Select, Space, Table, Tabs, Typography, message } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { useCallback, useEffect, useState } from "react";
+import {
+  installmentsApi,
+  ordersApi,
+  type Installment,
+  type Order,
+  type Schedule,
+} from "../shared/api/catalog";
+import { errorMessage } from "../shared/api/client";
+import { today } from "../shared/lib/format";
+import {
+  DataTable,
+  ErrorBanner,
+  MoneyText,
+  PermissionButton,
+  StatRow,
+  StatusTag,
+} from "../shared/ui";
+
+function ContractTable({
+  contractType,
+  reloadKey,
+}: {
+  contractType: string;
+  reloadKey: number;
+}) {
+  const [rows, setRows] = useState<Installment[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [schedules, setSchedules] = useState<Record<number, Schedule[]>>({});
+  const [payTarget, setPayTarget] = useState<Installment | null>(null);
+  const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [payForm] = Form.useForm();
+  const [deliverForm] = Form.useForm();
+
+  const load = useCallback(async () => {
+    try {
+      const [list, orderList] = await Promise.all([installmentsApi.list(), ordersApi.list()]);
+      const filtered = list.filter((item) => item.contract_type === contractType);
+      setRows(filtered);
+      setOrders(orderList);
+      const entries = await Promise.all(
+        filtered.map(async (item) => [item.id, await installmentsApi.schedules(item.id)] as const),
+      );
+      setSchedules(Object.fromEntries(entries));
+      setError(null);
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  }, [contractType]);
+
+  useEffect(() => {
+    void load();
+  }, [load, reloadKey]);
+
+  const submitPay = async (values: Record<string, unknown>) => {
+    if (!payTarget) return;
+    try {
+      await installmentsApi.pay(payTarget.id, {
+        amount: values.amount as string,
+        paid_on: values.paid_on as string,
+        period_no: values.period_no === undefined ? undefined : Number(values.period_no),
+      });
+      message.success("收款已登记");
+      setPayTarget(null);
+      payForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitDeliver = async (values: Record<string, unknown>) => {
+    if (!deliverTarget) return;
+    try {
+      await installmentsApi.deliver(deliverTarget.id, {
+        delivery_mode: values.delivery_mode as string,
+        delivered_on: values.delivered_on as string,
+        note: values.note as string,
+      });
+      message.success("已生成无金额 DELIVER，不新增现金流");
+      setDeliverTarget(null);
+      deliverForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  // 只读展示口径：总应收 = 首付 + 每期 × 期数。
+  const receivable = (row: Installment) =>
+    Number(row.down_payment) + Number(row.per_period) * row.periods;
+
+  const totalReceivable = rows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
+  const totalPaid = rows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);
+
+  const columns: ColumnsType<Installment> = [
+    { title: "合约号", dataIndex: "inst_no" },
+    {
+      title: "订单",
+      render: (_v, row) => orders.find((order) => order.id === row.order_id)?.order_no ?? row.order_id,
+    },
+    {
+      title: "总应收",
+      align: "right",
+      render: (_v, row) => <MoneyText value={receivable(row).toFixed(2)} />,
+    },
+    {
+      title: "已收",
+      dataIndex: "paid_amount",
+      align: "right",
+      render: (v: string) => <MoneyText value={v} />,
+    },
+    {
+      title: "剩余",
+      align: "right",
+      render: (_v, row) => (
+        <MoneyText value={(receivable(row) - Number(row.paid_amount)).toFixed(2)} />
+      ),
+    },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    {
+      title: "操作",
+      render: (_v, row) => (
+        <Space>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            disabled={["DELIVERED", "CANCELLED"].includes(row.status)}
+            onClick={() => {
+              setPayTarget(row);
+              payForm.setFieldsValue({ paid_on: today() });
+            }}
+          >
+            登记收款
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            type="primary"
+            disabled={row.status !== "SETTLED"}
+            onClick={() => {
+              setDeliverTarget(row);
+              deliverForm.setFieldsValue({ delivered_on: today() });
+            }}
+          >
+            换绑交付
+          </PermissionButton>
+        </Space>
+      ),
+    },
+  ];
+
+  const scheduleColumns: ColumnsType<Schedule> = [
+    { title: "期次", render: (_v, s) => (s.period_no === 0 ? "首付" : `第 ${s.period_no} 期`) },
+    { title: "到期日", dataIndex: "due_on" },
+    {
+      title: "应收",
+      dataIndex: "due_amount",
+      align: "right",
+      render: (v: string) => <MoneyText value={v} />,
+    },
+    {
+      title: "已收",
+      dataIndex: "received_amount",
+      align: "right",
+      render: (v: string) => <MoneyText value={v} />,
+    },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+  ];
+
+  return (
+    <section className="ui-stack">
+      <ErrorBanner message={error?.message} code={error?.code} />
+
+      <StatRow
+        items={[
+          { label: "合约数", kind: "count", amount: String(rows.length) },
+          { label: "总应收", amount: totalReceivable },
+          { label: "已收合计", amount: totalPaid },
+          {
+            label: "逾期合约",
+            kind: "count",
+            amount: String(rows.filter((r) => r.status === "OVERDUE").length),
+            tone: rows.some((r) => r.status === "OVERDUE") ? "warn" : "plain",
+          },
+        ]}
+      />
+
+      <Card className="glass">
+        <DataTable<Installment>
+          columns={columns}
+          rows={rows}
+          page={1}
+          pageSize={Math.max(rows.length, 10)}
+          total={rows.length}
+          emptyText="暂无分期合约"
+          onPageChange={() => undefined}
+          expandable={{
+            expandedRowRender: (row) => (
+              <Table<Schedule>
+                size="small"
+                rowKey="id"
+                pagination={false}
+                dataSource={schedules[row.id] ?? []}
+                columns={scheduleColumns}
+              />
+            ),
+          }}
+        />
+      </Card>
+
+      <Modal
+        title={payTarget ? `分期收款 · ${payTarget.inst_no}` : "分期收款"}
+        open={Boolean(payTarget)}
+        onCancel={() => setPayTarget(null)}
+        footer={null}
+      >
+        <Form form={payForm} layout="vertical" onFinish={submitPay}>
+          <Form.Item name="period_no" label="期次（0=首付，留空按到期顺序）">
+            <Select
+              allowClear
+              options={(schedules[payTarget?.id ?? 0] ?? []).map((schedule) => ({
+                value: schedule.period_no,
+                label: schedule.period_no === 0 ? "首付" : `第 ${schedule.period_no} 期`,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="amount" label="本次实收" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="paid_on" label="收款日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
+            确认收款
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={deliverTarget ? `换绑交付 · ${deliverTarget.inst_no}` : "换绑交付"}
+        open={Boolean(deliverTarget)}
+        onCancel={() => setDeliverTarget(null)}
+        footer={null}
+      >
+        <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
+          <Form.Item name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" },
+                { value: "CUSTOMER_SELF", label: "客户自行换绑" },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="delivered_on" label="换绑日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="note" label="换绑凭证" rules={[{ required: true }]}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <Typography.Paragraph type="secondary">
+            仅已结清合约可交付；DELIVER 无金额、不生成现金流，不再确认收入。
+          </Typography.Paragraph>
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
+            确认交付
+          </PermissionButton>
+        </Form>
+      </Modal>
+    </section>
+  );
+}
+
+export function InstallmentsPanel() {
+  const [reloadKey, setReloadKey] = useState(0);
+  return (
+    <Tabs
+      defaultActiveKey="stock"
+      tabBarExtraContent={
+        <PermissionButton permission="finance.read" size="small" onClick={() => setReloadKey((key) => key + 1)}>
+          刷新
+        </PermissionButton>
+      }
+      items={[
+        {
+          key: "stock",
+          label: "分期出售（HS·STOCK_SALE）",
+          children: <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey} />,
+        },
+        {
+          key: "advance",
+          label: "代分期（DFQ·ADVANCE_PURCHASE）",
+          children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey} />,
+        },
+      ]}
+    />
+  );
+}
+
+function normalizeError(err: unknown): { message: string; code?: string } {
+  const detail = (err as { response?: { data?: { detail?: { message?: string; code?: string } } } })
+    ?.response?.data?.detail;
+  if (detail?.message) return { message: detail.message, code: detail.code };
+  return { message: errorMessage(err) };
+}

@@ -1,0 +1,121 @@
+/*
+ * 排版基线（Phase 1.6 + 2026-09-09 iOS 阶梯统一）
+ * 字体栈统一走 tokens.css 的 --font-sans；body = --fs-footnote（13px ≈ iOS Footnote），
+ * 落实 2026-09-03 用户裁定（正文小于左侧导航 15px）。body 字号唯一声明在此，
+ * hierarchy.css 的旧 !important 覆盖已删除。
+ */
+
+html {
+  font-family: var(--font-sans);
+  /* 光学字号（Apple 排版）：此前只写在零引用的 .ui-optical 类里，全站从未生效。
+     字体支持 optical size 轴时按字号自动切换字形，提升小字号可读性；无支持时静默无副作用。 */
+  font-optical-sizing: auto;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-footnote);
+  line-height: 1.6;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* UA 默认纵向外边距统一归零（2026-09-19 全量收口）
+   块间距唯一事实源 = 容器 gap / * + * 节奏；标题与段落不再自带 UA margin，
+   否则会与容器节奏叠加成不均间距（spacing-rhythm-contract 要消除的正是这个）。
+   归零后各散落的「标题/段落纵向归零」类重置即可整批删除。 */
+h1, h2, h3, h4, h5, h6, p, figure, blockquote, ul, ol, dl, dd {
+  margin-block: 0;
+}
+
+/* Desktop content hierarchy: page / section / card / body / auxiliary. */
+.workspace > .view-head h1 {
+  font: var(--font-h1);
+  letter-spacing: var(--ls-tight);
+}
+
+.login-card h1 {
+  font: var(--font-large-title); /* iOS Large Title · 34：登录首屏是全应用唯一 Large Title 面 */
+  letter-spacing: var(--ls-tight);
+}
+
+.login-card > p:not(.eyebrow),
+.login-card label {
+  font: var(--font-body-s);
+}
+
+.ui-page-layout > h2,
+.fin-page-header h2,
+.pay-page-header h1,
+.erp-page-head h2 {
+  font: var(--font-section);
+  letter-spacing: var(--ls-tighter);
+}
+
+.ui-section-header h3,
+.ui-card h3,
+.ant-card-head-title,
+.channel-settings h3 {
+  font: var(--font-card-title);
+  font-weight: 600 !important;
+  letter-spacing: 0;
+}
+
+.ui-card h3,
+.ui-section-header h3,
+.channel-settings h3 {
+  font-weight: 600;
+}
+
+.workspace > article.ui-card > h2,
+.workspace > .ui-card > h2 {
+  font: var(--font-card-title);
+  letter-spacing: 0;
+}
+
+.workspace > .view-head p,
+.fin-page-header p,
+.fin-page-header span,
+.pay-page-header span,
+.pay-source-bar span,
+.fin-card-meta {
+  font: var(--font-body-s);
+}
+
+table,
+.ant-table {
+  font: var(--font-body-s);
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+.ant-table-thead > tr > th {
+  font: var(--font-table-header);
+}
+
+/* Money, counts and dates must remain visually aligned as values change. */
+.kpi-grid strong,
+.ord-biz-summary strong,
+.small-metric-card strong,
+.ord-day-order b,
+.ord-depth-grid b,
+.ord-period-grid b,
+.ord-detail-grid strong,
+.ui-page-layout .ant-statistic-content,
+.ui-metric-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* antd Statistic 内容值：antd 内部按 heading3 派生（fontSize 15 → 26px，阶梯外）。
+   统一收口到 iOS Title 1 · 28（与 .kpi-grid strong / .finance-metric-grid strong 同档）。
+   antd css-in-js 运行时后注入，须加特异性 + !important 才能压过（项目 antd 覆盖惯例）。 */
+.ant-statistic .ant-statistic-content {
+  font-size: var(--fs-title-1) !important;
+}

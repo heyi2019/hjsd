@@ -1,0 +1,379 @@
+"""domain.trade：订单、事件、现金流、账号、分期、押金、返点。
+
+依据：《ERP_数据字典_v1.0.md》《ERP_数据库DDL与迁移方案_v1.0.md》《ERP_功能规格说明书_v1.0.md》
+ORD-01/02、ACC-01、HS-01、TH-01、DG-01、DFQ-01、REB-01、FIN-01~04。
+
+不可突破的口径：
+- 订单汇总金额、账号成本、分期已收**均由事件派生**，不允许直接写（ORD-02-02）；
+- 一个事件最多派生一条有效现金流（FIN-02-03），`DELIVER` 无金额、无现金流；
+- 新 `INTERNAL` 划转必须成对且同 `transfer_id`（A07）；
+- 所有金额列 `DECIMAL(18,2)`，禁止 float。
+"""
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+from app.core.money import Amount
+from app.domain.base import AuditMixin, TimestampMixin
+from app.domain.enums import (
+    AccountStatus,
+    CapitalType,
+    DepositStatus,
+    Direction,
+    EventType,
+    InstallmentContractType,
+    InstallmentStatus,
+    LinkStatus,
+    Nature,
+    OrderStatus,
+    Portion,
+    RebateStatus,
+    ScheduleStatus,
+)
+
+
+class Account(Base, AuditMixin):
+    """游戏账号台账：成本由 BUY + COST 事件累计（ACC-01-04）。"""
+
+    __tablename__ = "accounts"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN {AccountStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="account_status_valid",
+        ),
+        UniqueConstraint("account_no", name="uq_accounts_no"),
+        UniqueConstraint("game_account", name="uq_accounts_game_account"),
+        Index("ix_accounts_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=AccountStatus.PENDING.value
+    )
+    buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    cost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    risk_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    channels: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Order(Base, AuditMixin):
+    """订单主表：编号按业务前缀分配（HS0001/TH0001/DG0001/DFQ0001）。"""
+
+    __tablename__ = "orders"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN {OrderStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="order_status_valid",
+        ),
+        CheckConstraint(
+            f"capital_type IN {CapitalType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="order_capital_type_valid",
+        ),
+        UniqueConstraint("order_no", name="uq_orders_no"),
+        Index("ix_orders_type_date", "order_type", "trade_date"),
+        Index("ix_orders_link_status", "link_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    order_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    trade_date: Mapped[date] = mapped_column(Date, nullable=False)
+    account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=OrderStatus.DRAFT.value
+    )
+    link_status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=LinkStatus.LINKED.value
+    )
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OrderEvent(Base, AuditMixin):
+    """业务事件：过账后原子派生现金流，已过账事件不可改，只能冲销。"""
+
+    __tablename__ = "order_events"
+    __table_args__ = (
+        CheckConstraint(
+            f"event_type IN {EventType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="event_type_valid",
+        ),
+        UniqueConstraint("event_no", name="uq_order_events_no"),
+        Index("ix_order_events_order", "order_id", "event_type", "occurred_on"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    portion: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=Portion.GROSS.value
+    )
+    occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
+    pool_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pools.id", ondelete="RESTRICT"), nullable=True
+    )
+    offset_event_id: Mapped[int | None] = mapped_column(
+        ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True
+    )
+    delivery_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    is_posted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Cashflow(Base, AuditMixin):
+    """现金流：必属池；订单事件来源流水一对一；新 INTERNAL 成对。"""
+
+    __tablename__ = "cashflow"
+    __table_args__ = (
+        CheckConstraint(
+            f"nature IN {Nature.values()!r}".replace("[", "(").replace("]", ")"),
+            name="cashflow_nature_valid",
+        ),
+        CheckConstraint(
+            f"direction IN {Direction.values()!r}".replace("[", "(").replace("]", ")"),
+            name="cashflow_direction_valid",
+        ),
+        UniqueConstraint("flow_no", name="uq_cashflow_no"),
+        UniqueConstraint("order_event_id", name="uq_cashflow_event"),
+        Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
+        Index("ix_cashflow_nature", "nature"),
+        Index("ix_cashflow_transfer", "transfer_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    flow_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    pool_id: Mapped[int] = mapped_column(
+        ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
+    )
+    occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
+    nature: Mapped[str] = mapped_column(String(16), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    order_event_id: Mapped[int | None] = mapped_column(
+        ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True
+    )
+    transfer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OrderProfitAllocation(Base, TimestampMixin):
+    """多人利润分配：同订单有效比例合计必须为 100%（BAS-06-03）。"""
+
+    __tablename__ = "order_profit_allocations"
+    __table_args__ = (
+        UniqueConstraint("order_id", "user_id", "role", name="uq_order_profit_alloc"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    allocation_rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    policy_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class Installment(Base, AuditMixin):
+    """分期合约：一单一合约；STOCK_SALE 仅 HS、ADVANCE_PURCHASE 仅 DFQ。"""
+
+    __tablename__ = "installments"
+    __table_args__ = (
+        CheckConstraint(
+            f"contract_type IN {InstallmentContractType.values()!r}"
+            .replace("[", "(").replace("]", ")"),
+            name="installment_contract_valid",
+        ),
+        CheckConstraint(
+            f"status IN {InstallmentStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="installment_status_valid",
+        ),
+        UniqueConstraint("inst_no", name="uq_installments_no"),
+        UniqueConstraint("order_id", name="uq_installments_order"),
+        Index("ix_installments_status", "status", "first_due_on"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    inst_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
+    )
+    account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    contract_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    principal: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    down_payment: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    periods: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    per_period: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=InstallmentStatus.PENDING.value
+    )
+    delivery_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    delivered_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    first_due_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class InstallmentSchedule(Base, TimestampMixin):
+    """分期计划明细：支持部分收款、逾期、减免与展期留痕。"""
+
+    __tablename__ = "installment_schedules"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN {ScheduleStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="schedule_status_valid",
+        ),
+        UniqueConstraint("installment_id", "period_no", name="uq_installment_period"),
+        Index("ix_schedules_due", "installment_id", "due_on", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    installment_id: Mapped[int] = mapped_column(
+        ForeignKey("installments.id", ondelete="CASCADE"), nullable=False
+    )
+    period_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    due_on: Mapped[date] = mapped_column(Date, nullable=False)
+    due_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    received_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=ScheduleStatus.PENDING.value
+    )
+
+
+class Deposit(Base, AuditMixin):
+    """押金占用：不进损益，只影响可用余额（FIN-04）。"""
+
+    __tablename__ = "deposits"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN {DepositStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="deposit_status_valid",
+        ),
+        UniqueConstraint("deposit_no", name="uq_deposits_no"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    deposit_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    pool_id: Mapped[int] = mapped_column(
+        ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
+    )
+    counterparty_id: Mapped[int | None] = mapped_column(
+        ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True
+    )
+    source_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    returned_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=DepositStatus.PAID.value
+    )
+    paid_on: Mapped[date] = mapped_column(Date, nullable=False)
+    expected_release_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    released_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RebateRecord(Base, AuditMixin):
+    """返点归集：新数据 source_order 必填，编号 `REBHS0001`（REB-01）。"""
+
+    __tablename__ = "rebate_records"
+    __table_args__ = (
+        CheckConstraint(
+            f"status IN {RebateStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="rebate_status_valid",
+        ),
+        UniqueConstraint("rebate_group_no", name="uq_rebate_records_no"),
+        Index("ix_rebate_source_order", "source_order_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    rebate_group_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    base_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    link_status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=LinkStatus.LINKED.value
+    )
+    status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=RebateStatus.OPEN.value
+    )
+    collected_on: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RebateSettlement(Base, AuditMixin):
+    """返点分次结算：净额 = 毛额 − 手续费，子号 `-01/-02`。"""
+
+    __tablename__ = "rebate_settlements"
+    __table_args__ = (
+        UniqueConstraint("settlement_no", name="uq_rebate_settlements_no"),
+        UniqueConstraint("cashflow_id", name="uq_rebate_settlements_flow"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    settlement_no: Mapped[str] = mapped_column(String(48), nullable=False)
+    rebate_record_id: Mapped[int] = mapped_column(
+        ForeignKey("rebate_records.id", ondelete="RESTRICT"), nullable=False
+    )
+    settled_on: Mapped[date] = mapped_column(Date, nullable=False)
+    gross_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    platform_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    net_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    cashflow_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+__all__ = [
+    "Account",
+    "Cashflow",
+    "Deposit",
+    "Installment",
+    "InstallmentSchedule",
+    "Order",
+    "OrderEvent",
+    "OrderProfitAllocation",
+    "RebateRecord",
+    "RebateSettlement",
+]

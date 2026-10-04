@@ -1,0 +1,37 @@
+/*
+ * 全局可访问性增强（Phase 7.2）
+ * - 键盘聚焦可见环：仅在使用键盘（Tab）聚焦时出现，不影响鼠标点击的视觉；
+ *   使用令牌色，深/浅色主题下均可见。
+ * - 不动用 !important（仅作 a11y 焦点提示，非解决样式冲突）。
+ */
+:focus-visible {
+  outline: var(--border-w-2) solid var(--color-primary);
+  outline-offset: var(--border-w-2);
+}
+
+/* 侧栏项目已有选中材质，焦点提示内嵌以避免产生额外的框线层级。 */
+.sidebar .nav-item:focus-visible,
+.sidebar .nav-level-two:focus-visible,
+.sidebar .nav-level-three button:focus-visible,
+.sidebar .system-nav-items .nav-item:focus-visible {
+  outline: var(--border-w-2) solid var(--color-primary);
+  outline-offset: var(--border-w-2);
+  box-shadow: none;
+  background: var(--soft);
+}
+
+.sidebar .nav-item.active:focus-visible {
+  background: linear-gradient(135deg, var(--violet-50) 0%, var(--violet-200) 100%);
+}
+
+/* 选中项已经有自己的选中材质；焦点提示改为内嵌，避免出现第二层外框。 */
+.sidebar .nav-level-three button.active:focus-visible,
+.sidebar .nav-level-four button.active:focus-visible {
+  outline-offset: var(--pos-neg-3);
+}
+
+/* 鼠标点击产生的普通焦点不重复绘制键盘焦点环。 */
+.sidebar .nav-level-three button:focus:not(:focus-visible),
+.sidebar .nav-level-four button:focus:not(:focus-visible) {
+  outline: none;
+}

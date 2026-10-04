@@ -1,0 +1,114 @@
+/* 共享 UI 组件的样式层（与 shared/ui/*.tsx 一一对应）。
+ * 原则：组件只在这里取形，页面不再各写一套卡片/表格/金额样式。 */
+
+/* ── PageHeader ───────────────────────────────────────────── */
+.ui-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-block-end: var(--space-4);
+  flex-wrap: wrap;
+}
+.ui-page-header__text { min-width: 0; }
+.ui-page-header__title {
+  margin: 0;
+  font: var(--font-section);
+  color: var(--color-text-primary);
+}
+.ui-page-header__desc {
+  margin: var(--space-1) 0 0;
+  max-width: 72rem;
+  font: var(--font-caption);
+}
+.ui-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+@media (--bp-md) {
+  .ui-page-header { align-items: stretch; }
+  .ui-page-header__actions { width: 100%; }
+}
+
+/* ── StatCard / StatRow ───────────────────────────────────── */
+.ui-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+.ui-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
+}
+.ui-stat__label { font: var(--font-caption); }
+.ui-stat__value {
+  font-family: var(--font-sans);
+  font-size: var(--fs-title-2);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ui-stat__hint { font: var(--font-caption-2); }
+.ui-stat--income { border-color: color-mix(in srgb, var(--color-success) 34%, var(--glass-border)); }
+.ui-stat--expense { border-color: color-mix(in srgb, var(--color-error) 34%, var(--glass-border)); }
+.ui-stat--warn {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--glass-border));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--glass));
+}
+
+/* ── MoneyText ────────────────────────────────────────────── */
+.ui-money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+.ui-money--strong { font-weight: 600; }
+/* 中国区惯例：收入/正数为红，支出/负数为绿；颜色只是辅助，符号与文案同步承载语义。 */
+.ui-money--income { color: var(--color-error); }
+.ui-money--expense { color: var(--color-success); }
+.ui-money--plain { color: var(--color-text-primary); }
+
+/* ── DataTable ────────────────────────────────────────────── */
+.ui-table-loading {
+  display: grid;
+  place-items: center;
+  min-height: 8rem;
+}
+.ui-table-wrap .ant-table-tbody > tr > td { font-variant-numeric: tabular-nums; }
+
+/* ── FormDrawer / ErrorBanner 辅助 ────────────────────────── */
+.ui-drawer-hint {
+  margin: var(--space-3) 0 0;
+  font: var(--font-caption-2);
+  color: var(--color-text-secondary);
+}
+.ui-error-banner { margin-block-end: var(--space-3); }
+
+/* 减少动效偏好：玻璃模糊属于装饰，直接关闭。 */
+@media (prefers-reduced-motion: reduce) {
+  .ui-stat { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* ── 页面纵向栈与筛选条 ───────────────────────────────────── */
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ui-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -1,0 +1,328 @@
+/*
+ * antd 适配器（Phase 4.5 收敛层）
+ * ---------------------------------------------------------------
+ * 本文件是「业务域中所有 antd 组件样式覆写」的唯一收敛点。
+ *
+ * 契约：
+ * 1. 业务域（finance / orders / payroll）只允许通过组件 API（props、theme token）
+ *    使用 antd，不得在各自文件里写 `.ant-*` 选择器覆写。任何对 antd 默认观感的
+ *    统一调整，都集中落到这里，避免散落覆盖导致主题漂移。
+ * 2. antd 的表层状态色统一映射至 ERP 的紫色令牌；业务语义由组件属性保留，
+ *    不让默认蓝色进入界面。
+ * 3. 全局令牌见 shared/styles/tokens.css；本文件只承载「antd 表层」对齐规则。
+ *
+ * 当前状态：finance/orders/payroll 均为组件式使用（无 .ant-* className 覆写，
+ * 见 Phase 4 探测）。统一的 Ant 表层视觉仅在此维护，且必须以 var() 引用令牌。
+ */
+
+:where(.ant-tag-blue, .ant-tag-processing) {
+  border-color: color-mix(in srgb, var(--color-info) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-info) 12%, var(--color-surface)) !important;
+  /* a11y：info 对白仅 3.64，字色用深化令牌（深色回退原 info，见 tokens.css --code-badge-text） */
+  color: var(--code-badge-text) !important;
+}
+
+:where(.ant-tag-green, .ant-tag-success) {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface)) !important;
+  color: var(--color-success) !important;
+}
+
+:where(.ant-tag-orange, .ant-tag-warning) {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface)) !important;
+  color: var(--warning-ink) !important;
+}
+
+:where(.ant-tag-red, .ant-tag-error) {
+  border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-error) 12%, var(--color-surface)) !important;
+  color: var(--color-error) !important;
+}
+
+:where(.ant-card-head) {
+  min-height: var(--sz-52) !important;
+  padding-inline: var(--space-4) !important;
+  background: transparent !important;
+}
+
+:where(.ant-card-body) {
+  padding: var(--space-4) !important;
+}
+
+/* antd Card 的玻璃表面由 styles.css:42 的「orders glass-system adapter」统一收口
+   （.ant-card / .ant-modal-content / .ant-drawer-content / .ant-popover-inner / .ant-collapse
+   共用 --color-surface + 紫边 + --e1 + backdrop-filter:blur(18px) saturate(160%)），
+   与 antd 模态/抽屉/气泡同属一套紫调玻璃族，且特异性(0,1,0)+!important 高于本文件的 :where() 收敛点，
+   故此处不再重复声明 .ant-card（:where() 特异性 0 会输给 styles.css:42，反而把 backdrop 从 18px 降到 16px）。
+   真正的「压平」修复在 styles.css：把 .ant-card 从 :98 的 box-shadow:none!important 摘掉，
+   使其回到 styles.css:42 的 --e1 高程。 */
+:where(.ant-table-thead > tr > th) {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--glass)) !important;
+}
+
+/* 表头不折行（2026-09-20 用户裁决 A）。
+   背景：antd 表头默认可折行（实测 computed 为 normal，且全仓无任何规则声明 th 的
+   white-space），窄列（如「状态」「操作」）会被压成两行；而项目既有的
+   `.ui-table-wrap th` 与下方 @media (--bp-sm) 的窄屏规则都是 nowrap ——
+   桌面端允许折行本属不一致。
+   作用域限定为本项目 DataTable（`.ui-datatable`），不波及 DatePicker 日历、
+   Select 下拉等 antd 内部表格的 th。
+   注：仅 th；td 保持可折行（长文本列需要换行，压制会触发横向溢出）。 */
+:where(.ui-datatable .ant-table-thead > tr > th) {
+  white-space: nowrap !important;
+}
+
+:where(.ant-table-tbody > tr:hover > td, .ant-pagination-item-active) {
+  background: var(--violet-soft) !important;
+}
+
+/* 分页 active 页码：淡紫底上紫字仅 3.5，改用紫墨保证 4.5+（A11Y E3） */
+:where(.ant-pagination .ant-pagination-item-active a) {
+  color: var(--primary-ink) !important;
+}
+
+/* POOL 代码徽章：深色下 antd purple 字色对暗底仅 3.39，统一紫墨（A11Y E3） */
+:where(.ant-tag-purple) {
+  color: var(--primary-ink) !important;
+}
+
+/* danger 次级按钮（白底红字变体）：深色下 antd 派生红对暗底仅 2.48，用 error 令牌（浅/深 error 令牌，见 --color-error）（A11Y E3） */
+:where(.ant-btn-dangerous:not(.ant-btn-primary)) {
+  color: var(--color-error) !important;
+}
+
+:where(.ant-btn-primary, .ant-btn-color-primary, .ant-tabs-ink-bar) {
+  background: var(--accent-grad) !important;
+}
+
+:where(.ant-input, .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper) {
+  min-height: var(--ui-control-height-lg) !important;
+  height: var(--ui-control-height-lg) !important;
+  box-shadow: none !important;
+}
+
+/* 普通 Ant 控件锁定统一高度；small/表格紧凑态由业务选择器显式覆盖。 */
+:where(.ant-btn:not(.ant-btn-sm), .ant-btn-primary, .ant-btn-color-primary) {
+  min-height: var(--ui-control-height-lg) !important;
+  height: var(--ui-control-height-lg) !important;
+}
+
+:where(.ant-statistic-content-value, .ant-table-cell) {
+  font-variant-numeric: tabular-nums;
+}:where(.ant-statistic-title) + * {
+  margin-block-start:var(--space-2) !important;
+}
+:where(.ant-statistic-title) {
+  color: var(--color-text-secondary) !important;
+  font: var(--font-caption) !important
+}
+
+:where(.ant-statistic-content) {
+  letter-spacing: -0.02em;
+  line-height: 1.21; /* iOS Title 1 行高比率 34/28 */
+}
+
+:where(.ant-table-thead > tr > th, .ant-table-tbody > tr > td) {
+  /* 普通数据表采用紧凑密度：文字行约 40–44px，避免上下留白把表格撑高。
+     特殊表格可在业务作用域内覆盖；此规则是 orders/finance/payroll 所有 antd 表的统一默认值。 */
+  padding: var(--space-2) var(--space-4) !important;
+}
+
+/* 池/团队列表分页保持单行：窄容器也不允许页码和箭头换行。 */
+:where(.ant-pagination) {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+:where(.ant-pagination .ant-pagination-item,
+       .ant-pagination .ant-pagination-prev,
+       .ant-pagination .ant-pagination-next) {
+  flex: 0 0 auto;
+  margin-inline: 0 !important;
+}
+:where(.ant-pagination .ant-pagination-item,
+       .ant-pagination .ant-pagination-prev,
+       .ant-pagination .ant-pagination-next,
+       .ant-pagination .ant-pagination-item-link) {
+  width: var(--sz-36) !important;
+  min-width: var(--sz-36) !important;
+  height: var(--ui-control-height-lg) !important;
+  line-height: var(--sz-34) !important;
+  margin-block: 0 !important;
+}
+:where(.ant-pagination .ant-pagination-item a) {
+  line-height: var(--sz-34) !important;
+}:where(.finance-entry-actions) + * {
+  margin-block-start:var(--space-5) !important;
+}
+:where(.finance-entry-actions) {
+  display: flex !important
+}
+
+/* 窄屏表格保持完整列宽，通过容器横向滑动查看，避免复选框与内容重叠。 */
+:where(.ant-table-wrapper) {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (--bp-sm) {
+  :where(.ant-table-wrapper .ant-table) {
+    min-width: var(--sz-680);
+  }
+  :where(.ant-table-thead > tr > th, .ant-table-tbody > tr > td) {
+    white-space: nowrap;
+  }
+}
+
+:where(.ant-alert-info) {
+  border-color: var(--violet-border) !important;
+  background: var(--violet-soft) !important;
+}
+
+:where(.ant-alert-info .ant-alert-icon, .ant-alert-info .ant-alert-message) {
+  color: var(--primary-ink) !important;
+}
+
+:where(.ant-alert-success) {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent) !important;
+}
+
+:where(.ant-alert-warning) {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent) !important;
+}
+
+:where(.ant-alert-error) {
+  border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-error) 10%, transparent) !important;
+}
+
+:where(.ant-alert-success .ant-alert-icon, .ant-alert-success .ant-alert-message) {
+  color: var(--color-success) !important;
+}
+
+:where(.ant-alert-warning .ant-alert-icon, .ant-alert-warning .ant-alert-message) {
+  color: var(--warning-ink) !important;
+}
+
+:where(.ant-alert-error .ant-alert-icon, .ant-alert-error .ant-alert-message) {
+  color: var(--color-error) !important;
+}
+
+:where(.ant-select-item-option-selected:not(.ant-select-item-option-disabled), .ant-select-item-option-active:not(.ant-select-item-option-disabled)) {
+  background: var(--violet-soft) !important;
+  color: var(--primary-ink) !important;
+}
+
+:where(.ant-empty .ant-empty-img-simple-ellipse) {
+  fill: var(--violet-soft) !important;
+}
+
+:where(.ant-empty .ant-empty-img-simple-path) {
+  stroke: var(--violet-border) !important;
+}
+
+:where(.ant-empty) {
+  margin: var(--space-5) 0 !important;
+  color: var(--color-text-secondary) !important;
+}
+
+:where(.ant-empty-description) {
+  color: var(--color-text-secondary) !important;
+  font: var(--font-body-s) !important;
+}
+
+:where(.ant-table-thead > tr > th:not(:last-child, .ant-table-selection-column, .ant-table-row-expand-icon-cell)::before) {
+  background: transparent !important;
+}
+
+:where(.ant-select-dropdown, .ant-picker-dropdown .ant-picker-panel, .ant-dropdown-menu) {
+  border: var(--border-w) solid var(--glass-border) !important;
+  border-radius: var(--radius-glass) !important;
+  background: var(--glass) !important;
+  box-shadow: var(--e2) !important;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Apple 弹簧入场（覆盖 antd 默认 zoom/slide 动效）：仅在用户未要求减弱动效时生效。
+   作用根容器（antd 动效亦挂在根），避免内层再叠加导致双动效；select 根动效在 styles.css:283 收口。 */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.ant-picker-dropdown, .ant-dropdown) {
+    animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
+  }
+}
+
+/* Tooltip：统一为玻璃气泡，与下拉/弹层同调（guidelines 组件覆盖矩阵原列"待定"，现收口）。
+   暗态由令牌双块自动接管（--glass / --glass-border / --color-text-primary 在 :root 与 [data-theme=dark] 均定义）。 */
+.ant-tooltip .ant-tooltip-inner {
+  background: var(--glass) !important;
+  color: var(--color-text-primary) !important;
+  border: var(--border-w) solid var(--glass-border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--e2) !important;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.ant-tooltip .ant-tooltip-arrow::before,
+.ant-tooltip .ant-tooltip-arrow::after {
+  background: var(--glass) !important;
+}
+
+:where(.ant-form) {
+  display: grid;
+  gap: var(--space-4);
+}
+
+:where(.ant-form-item) {
+  margin-block-end: 0 !important;
+}
+
+:where(.ant-form-item-label > label) {
+  color: var(--color-text-secondary) !important;
+  font: var(--font-body-s) !important;
+}
+
+:where(.ant-input:hover, .ant-input-number:hover, .ant-select-selector:hover, .ant-picker:hover, .ant-input-affix-wrapper:hover) {
+  border-color: var(--violet-border) !important;
+}
+
+:where(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-select-focused .ant-select-selector, .ant-picker-focused, .ant-input-affix-wrapper-focused) {
+  border-color: var(--color-primary) !important;
+  box-shadow: var(--ring) !important;
+}
+
+:where(.ant-modal-content, .ant-drawer-content) {
+  border: var(--border-w) solid var(--glass-border) !important;
+  background: var(--glass) !important;
+  box-shadow: var(--e3) !important;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+:where(.ant-modal-header, .ant-drawer-header) {
+  border-bottom-color: var(--color-border) !important;
+  background: transparent !important;
+}
+
+:where(.ant-modal-footer, .ant-drawer-footer) {
+  border-top-color: var(--color-border) !important;
+}
+
+:where(.ant-empty, .ant-result) {
+  padding-block: var(--space-6) !important;
+}
+
+:where(.ant-empty-description, .ant-result-subtitle) {
+  color: var(--color-text-secondary) !important;
+}
+
+:where(.ant-skeleton .ant-skeleton-content .ant-skeleton-title, .ant-skeleton .ant-skeleton-content .ant-skeleton-paragraph > li) {
+  background: linear-gradient(90deg, var(--soft), var(--violet-soft), var(--soft)) !important;
+}

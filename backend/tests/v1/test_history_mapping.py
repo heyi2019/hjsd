@@ -66,14 +66,23 @@ class TestTypeGate:
             "回收": "HS",
             "氪金联盟提号": "TH",
             "代挂": "DG",
+            "蹭点": "DG",
         }
-        # 「返点」「蹭点」绝不能出现在可导映射里
+        # 「返点」绝不能出现在可导映射里——它该走 rebate_records，不是订单类型
         assert "返点" not in mapper.ORDER_TYPE_MAP
-        assert "蹭点" not in mapper.ORDER_TYPE_MAP
+
+    def test_cengdian_maps_to_dg_per_prd(self, mapper):
+        """PRD §术语等价表：蹭点 = 代挂的叫法，非独立业务。
+
+        这是主理人 2026-10-04 的裁决——源数据把「蹭点」单列，
+        实际是代挂的口语叫法。数据侧佐证：该单本金为 0，与代挂同形态。
+        """
+        assert mapper.ORDER_TYPE_MAP["蹭点"] == "DG"
+        assert "蹭点" not in mapper.SKIP_TYPES
 
     def test_skipped_types_have_reasons(self, mapper):
         """跳过必须带原因——静默漏导是最难查的一类问题。"""
-        assert set(mapper.SKIP_TYPES) == {"返点", "蹭点"}
+        assert set(mapper.SKIP_TYPES) == {"返点"}
         for name, reason in mapper.SKIP_TYPES.items():
             assert reason.strip(), f"{name} 的跳过理由不能为空"
 
@@ -87,10 +96,11 @@ class TestTypeGate:
             ],
         )
         report = mapper.map_orders(seeded_db, dry_run=False)
-        assert report["orders"] == 1
-        assert report["skipped_type"] == {"返点": 1, "蹭点": 1}
-        assert seeded_db.query(Order).count() == 1
-        assert seeded_db.query(Order).one().order_type == "HS"
+        # 回收 + 蹭点(→DG) = 2 单；返点被跳过
+        assert report["orders"] == 2
+        assert report["skipped_type"] == {"返点": 1}
+        types = sorted(o.order_type for o in seeded_db.query(Order).all())
+        assert types == ["DG", "HS"]
 
     def test_unparseable_date_is_skipped_not_crashed(self, mapper, seeded_db):
         _seed_order_rows(

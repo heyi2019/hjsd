@@ -44,6 +44,9 @@ const LABELS: Record<string, string> = {
   REJECTED: "已拒绝",
   IMPORTED: "已导入",
   SKIPPED: "已跳过",
+  // 经营规则版本状态（PolicyStatus）
+  EXPIRED: "已失效",
+  SUPERSEDED: "已被取代",
 };
 
 export function StatusTag(props: { status: string; label?: string; color?: string }) {

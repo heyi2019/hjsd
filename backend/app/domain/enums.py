@@ -220,6 +220,36 @@ class PolicyStatus(StrEnum):
     DRAFT = "DRAFT"
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
+    SUPERSEDED = "SUPERSEDED"  # 已被新版本取代（BAS-06-02：已引用版本不可改，只能新建）
+
+
+class PolicyScopeType(StrEnum):
+    """规则适用范围（BAS-06-01：可按规则、范围、版本、生效期管理）。"""
+
+    GLOBAL = "GLOBAL"  # 全局
+    ORDER_TYPE = "ORDER_TYPE"  # 按业务类型（scope_id = order_type_defs.id）
+    USER = "USER"  # 按人员（scope_id = users.id）
+    POOL = "POOL"  # 按资金池（scope_id = pools.id）
+
+
+class PolicyType(StrEnum):
+    """可配置经营参数（BAS-06-01 列举的六类）。"""
+
+    REBATE = "REBATE"  # 返点
+    COMMISSION = "COMMISSION"  # 提成
+    INSTALLMENT = "INSTALLMENT"  # 分期
+    WRITE_DOWN = "WRITE_DOWN"  # 跌价
+    REFUND = "REFUND"  # 退款
+    DG_MIXED = "DG_MIXED"  # DG 混合单默认策略
+
+
+class AllocationRole(StrEnum):
+    """订单利润分配角色（BAS-06-03：固定结构化比例与人员角色）。"""
+
+    OWNER = "OWNER"  # 主责
+    BUYER = "BUYER"  # 采买
+    SALES = "SALES"  # 销售
+    SERVICE = "SERVICE"  # 服务
 
 
 class IssueType(StrEnum):

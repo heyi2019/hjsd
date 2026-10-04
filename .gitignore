@@ -10,6 +10,21 @@ dist/
 .env
 # SQLite 运行产物：由scripts/migrate_v2.py 从原始 JSON 重建，不入版本库
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 运行期目录：日志、运行时状态、监控数据、截图产物，不入版本库
+/logs/*
+!/logs/.gitkeep
+/runtime/*
+!/runtime/.gitkeep
+/monitor/*
+!/monitor/.gitkeep
+/outputs/*
+!/outputs/.gitkeep
+/business_output/*
+!/business_output/.gitkeep
 
 # WorkBuddy 记忆目录，与项目代码无关
 .workbuddy/

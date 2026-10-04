@@ -20,6 +20,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
+from app.policy import service as policy_service
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
@@ -28,6 +29,7 @@ from app.domain.enums import (
     EventType,
     Nature,
     OrderStatus,
+    PolicyType,
     PoolStatus,
     SequenceKey,
 )
@@ -73,6 +75,21 @@ def create_order(
             details={"order_type": order_type},
         )
 
+    # BAS-06-04 规则快照：按成交日固化当时生效的返点/提成规则。
+    # 规则改版不回写这里，历史订单永远按当时口径计算。
+    snapshot: dict[str, Any] = {}
+    primary_version_id: int | None = None
+    for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
+        version_id, snap = policy_service.make_snapshot(
+            session, policy_code=code, on=trade_date
+        )
+        if snap is None:
+            continue
+        snapshot[code] = snap
+        # policy_version_id 只存一个主版本（返点优先），完整参数在 policy_snapshot 里
+        if primary_version_id is None:
+            primary_version_id = version_id
+
     order = Order(
         order_no=foundation_service.next_order_no(session, definition),
         order_type=definition.code,
@@ -80,6 +97,8 @@ def create_order(
         trade_date=trade_date,
         account_id=account_id,
         status=OrderStatus.DRAFT.value,
+        policy_version_id=primary_version_id,
+        policy_snapshot=snapshot or None,
         owner_id=owner_id,
         note=note,
         created_by=actor,

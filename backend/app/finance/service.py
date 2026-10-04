@@ -17,12 +17,14 @@ from app.core.errors import NotFound, Validation
 from app.core.errors import ErrorCode
 from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
+from app.policy import service as policy_service
 from app.domain.enums import (
     AuditAction,
     DepositStatus,
     Direction,
     Nature,
     OrderStatus,
+    PolicyType,
     RebateStatus,
     SequenceKey,
 )
@@ -183,6 +185,10 @@ def create_rebate(
 
     seq = allocate_number(session, SequenceKey.REBATE)
     number = seq.split("REB")[-1]
+    # BAS-06-04：按归集日固化返点规则版本，改版不影响历史归集
+    policy_version_id, snapshot = policy_service.make_snapshot(
+        session, policy_code=PolicyType.REBATE.value, on=collected_on
+    )
     record = RebateRecord(
         rebate_group_no=f"REB{order.order_type}{number}",
         source_order_id=order.id,
@@ -190,6 +196,8 @@ def create_rebate(
         rate=to_money(rate),
         base_amount=to_money(base_amount),
         collected_on=collected_on,
+        policy_version_id=policy_version_id,
+        policy_snapshot=snapshot,
         status=RebateStatus.OPEN.value,
         note=note,
         created_by=actor,

@@ -19,6 +19,7 @@ import {
   PermissionGate,
   StatusTag,
 } from "../shared/ui";
+import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
 
 export function SettingsPage() {
   return (
@@ -33,6 +34,7 @@ export function SettingsPage() {
           { key: "order-types", label: "业务类型", children: <OrderTypesPanel /> },
           { key: "pools", label: "资金池", children: <PoolsPanel /> },
           { key: "fields", label: "活字段", children: <FieldsPanel /> },
+        { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
         ]}
       />
     </section>

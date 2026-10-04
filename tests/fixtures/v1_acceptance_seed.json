@@ -1,0 +1,30 @@
+{
+  "version": "v1.0",
+  "reference_date": "2026-10-04",
+  "pools": [
+    {"code": "HJ_INVEST", "name": "经营本金池", "ownership": "OWNED"},
+    {"code": "HJ_PROFIT", "name": "经营利润池", "ownership": "OWNED"}
+  ],
+  "customers": [
+    {"ref": "seller", "display_name": "测试卖家", "wechat": "seed_seller"},
+    {"ref": "buyer", "display_name": "测试买家", "phone": "13800000001"},
+    {"ref": "installment_customer", "display_name": "测试分期客户", "qq": "10000001"},
+    {"ref": "duplicate_customer", "display_name": "测试买家重复档", "phone": "13800000001"}
+  ],
+  "counterparties": [
+    {"ref": "peer", "display_name": "测试同行", "type": "PEER"},
+    {"ref": "supplier", "display_name": "测试供货方", "type": "SUPPLIER"}
+  ],
+  "scenarios": [
+    {"id": "A01", "order_type": "HS", "events": [{"type": "BUY", "amount": "1000.00"}, {"type": "COST", "amount": "50.00"}, {"type": "SELL", "amount": "1400.00"}], "expected": {"account_cost": "1050.00", "inventory_released": true}},
+    {"id": "A02", "order_type": "TH", "counterparty_ref": "peer", "events": [{"type": "BUY", "amount": "1000.00"}, {"type": "SELL", "amount": "1100.00"}], "expected": {"inventory_counted": false, "advance_after_sell": "0.00"}},
+    {"id": "A03", "order_type": "DG", "events": [{"type": "SELL", "amount": "200.00"}], "expected": {"inventory_required": false}},
+    {"id": "A04", "order_type": "DFQ", "counterparty_ref": "supplier", "installment": {"contract_type": "ADVANCE_PURCHASE", "delivery_mode": "PLATFORM_OPERATOR", "payments": ["300.00", "300.00", "300.00"], "deliver": true}},
+    {"id": "A05", "order_type": "HS", "installment": {"contract_type": "STOCK_SALE", "delivery_mode": "CUSTOMER_SELF", "payments": ["500.00", "500.00"], "deliver": true}},
+    {"id": "A06", "rebate": {"source_order_type": "HS", "settlements": [{"gross": "100.00", "fee": "5.00"}, {"gross": "50.00", "fee": "0.00"}]}},
+    {"id": "A07", "transfer": {"source_pool": "HJ_INVEST", "target_pool": "HJ_PROFIT", "amount": "500.00"}},
+    {"id": "A08", "deposit": {"pool": "HJ_INVEST", "paid": "1000.00", "returned": "300.00"}},
+    {"id": "A10", "field_definition": {"entity_type": "customer", "field_key": "preferred_platform", "deactivate_after_value": true}},
+    {"id": "A11", "participant_validation": {"customer_role": "SELLER", "counterparty_role": "PEER", "duplicate_customer_ref": "duplicate_customer", "merge_target_ref": "buyer"}}
+  ]
+}

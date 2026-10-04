@@ -106,6 +106,13 @@ class Order(Base, AuditMixin):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=OrderStatus.DRAFT.value
     )
+    # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
+    # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
+    # 规则版本改了也不回写快照，历史利润永远按当时口径。
+    policy_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     link_status: Mapped[str] = mapped_column(
         String(24), nullable=False, default=LinkStatus.LINKED.value
     )
@@ -235,6 +242,11 @@ class Installment(Base, AuditMixin):
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
     )
     contract_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    # BAS-06-04 规则快照：分期利率/期数等参数在签约时固化，规则改版不回写历史合约。
+    policy_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     principal: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     down_payment: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     periods: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -331,6 +343,13 @@ class RebateRecord(Base, AuditMixin):
     channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     base_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
+    # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
+    # 规则版本改了也不回写快照，历史利润永远按当时口径。
+    policy_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     link_status: Mapped[str] = mapped_column(
         String(24), nullable=False, default=LinkStatus.LINKED.value
     )

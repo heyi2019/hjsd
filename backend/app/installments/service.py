@@ -19,6 +19,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
+from app.policy import service as policy_service
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
@@ -26,6 +27,7 @@ from app.domain.enums import (
     EventType,
     InstallmentContractType,
     InstallmentStatus,
+    PolicyType,
     ScheduleStatus,
     SequenceKey,
 )
@@ -132,11 +134,17 @@ def create_installment(
                 details={"delivery_mode": delivery_mode},
             ) from exc
 
+    # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约
+    policy_version_id, policy_snapshot = policy_service.make_snapshot(
+        session, policy_code=PolicyType.INSTALLMENT.value, on=first_due_on or date.today()
+    )
     installment = Installment(
         inst_no=allocate_number(session, SequenceKey.INSTALLMENT),
         order_id=order.id,
         account_id=account.id if account else None,
         contract_type=contract_type,
+        policy_version_id=policy_version_id,
+        policy_snapshot=policy_snapshot,
         principal=to_money(principal),
         down_payment=to_money(down_payment),
         periods=periods,

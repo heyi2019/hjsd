@@ -602,3 +602,70 @@ export const historyApi = {
   createCorrection: (batchId: number, payload: { rows: Record<string, unknown>[]; reason: string }) =>
     api.post<ImportBatch>(`/history/batches/${batchId}/corrections`, payload).then((r) => r.data),
 };
+
+/* ── M5：经营规则与订单利润分配（T19 / T20，BAS-06-01~04）───────── */
+
+export interface PolicyDefinition {
+  id: number;
+  policy_code: string;
+  name: string;
+  scope_type: string;
+  scope_id?: number | null;
+  description?: string | null;
+  status: string;
+  created_at?: string | null;
+}
+
+export interface PolicyVersion {
+  id: number;
+  policy_definition_id: number;
+  version: number;
+  effective_from: string;
+  effective_to?: string | null;
+  config: Record<string, unknown>;
+  status: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  note?: string | null;
+}
+
+export interface ProfitAllocation {
+  id: number;
+  order_id: number;
+  user_id: number;
+  role: string;
+  allocation_rate: string;
+  policy_version_id?: number | null;
+  total_rate?: string;
+}
+
+export const policyApi = {
+  list: (params?: { status?: string; policy_code?: string }) =>
+    api.get<{ items: PolicyDefinition[]; total: number }>("/policies", { params }).then((r) => r.data),
+  create: (payload: { policy_code: string; name: string; scope_type: string; scope_id?: number; description?: string }) =>
+    api.post<PolicyDefinition>("/policies", payload).then((r) => r.data),
+  versions: (definitionId: number, status?: string) =>
+    api.get<{ items: PolicyVersion[]; total: number }>(`/policies/${definitionId}/versions`, { params: { status } }).then((r) => r.data),
+  createVersion: (definitionId: number, payload: { effective_from: string; effective_to?: string | null; config: Record<string, unknown>; note?: string }) =>
+    api.post<PolicyVersion>(`/policies/${definitionId}/versions`, payload).then((r) => r.data),
+  updateDraft: (versionId: number, config: Record<string, unknown>) =>
+    api.patch<PolicyVersion>(`/policy-versions/${versionId}`, { config }).then((r) => r.data),
+  approve: (versionId: number, payload: { approver?: string; note?: string }) =>
+    api.post<PolicyVersion>(`/policy-versions/${versionId}/approve`, payload).then((r) => r.data),
+  resolve: (policyCode: string, on: string) =>
+    api
+      .get<{ found: boolean; version: PolicyVersion | null }>("/policy-versions/resolve", {
+        params: { policy_code: policyCode, on },
+      })
+      .then((r) => r.data),
+  allocations: (orderId: number) =>
+    api.get<{ items: ProfitAllocation[]; total: number }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
+  setAllocations: (orderId: number, items: { user_id: number; role: string; allocation_rate: string }[]) =>
+    api.put<{ items: ProfitAllocation[]; total: number }>(`/orders/${orderId}/profit-allocations`, { items }).then((r) => r.data),
+  orderSnapshot: (orderId: number) =>
+    api
+      .get<{ found: boolean; snapshot: { policy_version_id?: number | null; policy_snapshot?: Record<string, unknown> | null } | null }>(
+        `/orders/${orderId}/policy-snapshot`,
+      )
+      .then((r) => r.data),
+};

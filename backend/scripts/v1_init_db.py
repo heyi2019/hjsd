@@ -52,7 +52,7 @@ def check_seed() -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="黑金时代 ERP v1 数据库初始化")
+    parser = argparse.ArgumentParser(description="宜游轩 ERP v1 数据库初始化")
     parser.add_argument("--check", action="store_true", help="仅校验种子，不执行迁移")
     args = parser.parse_args()
 

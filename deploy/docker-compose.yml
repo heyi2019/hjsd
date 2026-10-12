@@ -1,4 +1,4 @@
-# 黑金时代 ERP 生产编排
+# 宜游轩 ERP 生产编排
 # 用法（在 deploy/ 目录）：
 #   cp env/.env.production.example .env   # 填入 JWT_SECRET_KEY 等
 #   docker compose build

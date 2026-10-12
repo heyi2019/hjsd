@@ -1,4 +1,4 @@
-# 黑金时代 ERP 后端镜像
+# 宜游轩 ERP 后端镜像
 # 构建：docker compose build backend
 # 用 3.12 而非 3.13：pandas 2.2.2 无 3.13 预编译 wheel，3.13-slim 又缺 C 编译器会导致源码编译失败。
 # 3.12 上 pandas/numpy 均为预编译 wheel，安装快且稳；生产 ECS 同样适用。

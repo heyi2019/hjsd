@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * 黑金时代 ERP 前端 E2E 配置。
+ * 宜游轩 ERP 前端 E2E 配置。
  *
  * 关键约束（来自 src/app/AppShell.tsx）：
  *   - `import.meta.env.DEV` 为真时直接进 AppShell，跳过登录（DEV 态）。

@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     # application
     app_env: str = "development"
-    app_name: str = "黑金时代ERP"
+    app_name: str = "宜游轩ERP"
     app_version: str = "1.0.0"
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"

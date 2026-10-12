@@ -1,4 +1,4 @@
-# 黑金时代 ERP · 阿里云部署指南
+# 宜游轩 ERP · 阿里云部署指南
 
 > 目标：在阿里云 ECS 上用 Docker Compose 跑起后端（FastAPI + SQLite）与前端（React + Vite + Nginx）。
 > 已就绪的部署包：`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`deploy/docker-compose.yml`、`deploy/env/.env.production.example`、`deploy/scripts/deploy.sh`。

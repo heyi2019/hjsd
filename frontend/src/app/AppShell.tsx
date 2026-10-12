@@ -37,7 +37,7 @@ export function AppShell() {
     <div className="app-shell">
       <aside className="sidebar glass">
         <div className="app-brand">
-          黑金时代 <span>ERP</span>
+          宜游轩 <span>ERP</span>
         </div>
         <nav className="nav-list" aria-label="主导航">
           {navigation.map((n) => (
@@ -53,12 +53,12 @@ export function AppShell() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-foot">黑金时代 · 经营工作台</div>
+        <div className="sidebar-foot">宜游轩 · 经营工作台</div>
       </aside>
       <div className="main">
         <header className="topbar view-head">
           <div className="topbar__title">
-            <span className="topbar__eyebrow">黑金时代 ERP</span>
+            <span className="topbar__eyebrow">宜游轩 ERP</span>
             <h1 className="topbar__page">{item.label}</h1>
           </div>
           <Space size="small">

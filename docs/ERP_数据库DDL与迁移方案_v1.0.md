@@ -1,4 +1,4 @@
-# 黑金时代 ERP · 数据库 DDL 与迁移方案 v1.0
+# 宜游轩 ERP · 数据库 DDL 与迁移方案 v1.0
 
 > **依据**：PRD v1.0 → 功能规格说明书 v1.0 → 数据字典 v1.0。MVP 使用 SQLite，生产迁 PostgreSQL 时由 Alembic 承接同结构；历史迁移仅为 P2 参考能力。
 

@@ -1,4 +1,4 @@
-# 黑金时代 ERP 前端镜像（多阶段构建）
+# 宜游轩 ERP 前端镜像（多阶段构建）
 # 构建上下文为项目根（docker-compose.yml 中 context: ..），
 # 以便 ui_guards.mjs 能读取 backend/app/domain/enums.py 校验前后端枚举对齐。
 FROM node:20-alpine AS build

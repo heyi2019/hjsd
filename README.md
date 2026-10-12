@@ -1,4 +1,4 @@
-# 黑金时代 ERP
+# 宜游轩 ERP
 
 FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py`），旧版后端已归档在 `archive/v0_backend/`，不参与运行与测试。
 

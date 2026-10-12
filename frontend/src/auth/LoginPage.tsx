@@ -12,7 +12,7 @@ export function LoginPage() {
   };
   return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
     <Card className="glass" style={{ width: 380 }}>
-      <Typography.Title level={2}>黑金时代 ERP</Typography.Title>
+      <Typography.Title level={2}>宜游轩 ERP</Typography.Title>
       <Typography.Paragraph type="secondary">请登录后进入经营工作台</Typography.Paragraph>
       {error && <Typography.Text type="danger">{error}</Typography.Text>}
       <Form layout="vertical" onFinish={submit} style={{ marginTop: 16 }}>

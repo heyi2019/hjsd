@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 黑金时代 ERP 一键部署（在阿里云 ECS 上执行）
+# 宜游轩 ERP 一键部署（在阿里云 ECS 上执行）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

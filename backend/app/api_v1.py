@@ -58,7 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
-        description="黑金时代 ERP v1.0（业务规则以 docs/ERP_PRD_v1.0.md 为准）",
+        description="宜游轩 ERP v1.0（业务规则以 docs/ERP_PRD_v1.0.md 为准）",
     )
 
     origin_regex = settings.cors_origin_regex

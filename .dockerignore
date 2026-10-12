@@ -1,0 +1,28 @@
+# 前端构建上下文为项目根（docker-compose.yml -> frontend build context: ..）
+# 此处排除的内容不会被打入构建上下文，既缩小上传体积，也避免误拷宿主机依赖。
+frontend/node_modules
+frontend/dist
+frontend/test-results
+backend/.venv
+backend/data
+backend/.pytest_cache
+backend/__pycache__
+**/__pycache__
+**/*.pyc
+.git
+*.db
+.DS_Store
+.env
+.env.local
+**/.env.local
+deploy
+docs
+rawdata
+archive
+tests
+outputs
+logs
+runtime
+monitor
+business_output
+.workbuddy

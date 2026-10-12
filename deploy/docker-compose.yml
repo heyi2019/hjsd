@@ -1,0 +1,37 @@
+# 黑金时代 ERP 生产编排
+# 用法（在 deploy/ 目录）：
+#   cp env/.env.production.example .env   # 填入 JWT_SECRET_KEY 等
+#   docker compose build
+#   docker compose up -d
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env            # 生产环境变量（含 JWT_SECRET_KEY / DATABASE_URL / CORS_ORIGINS）
+    volumes:
+      - erp_db:/app/data   # SQLite 持久化
+    expose:
+      - "8123"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8123/api/v1/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  erp_db:

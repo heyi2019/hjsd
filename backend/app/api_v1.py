@@ -25,6 +25,7 @@ from app.finance.router import router as finance_router
 from app.installments.router import router as installments_router
 from app.orders.router import router as orders_router
 from app.parties.router import router as parties_router
+from app.auth.router import router as auth_router, admin_router as users_router, teams_router
 
 
 def install_exception_handlers(app: FastAPI) -> None:
@@ -57,7 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
-        description="黑金时代工作室 ERP v1.0（业务规则以 docs/ERP_PRD_v1.0.md 为准）",
+        description="黑金时代 ERP v1.0（业务规则以 docs/ERP_PRD_v1.0.md 为准）",
     )
 
     origin_regex = settings.cors_origin_regex
@@ -82,6 +83,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(quality_router, prefix=settings.api_prefix)
     app.include_router(history_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)
+    app.include_router(auth_router, prefix=settings.api_prefix)
+    app.include_router(users_router, prefix=settings.api_prefix)
+    app.include_router(teams_router, prefix=settings.api_prefix)
 
     @app.get("/", tags=["health"])
     def root() -> dict[str, str]:

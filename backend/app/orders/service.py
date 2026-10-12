@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
+from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
 from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
 from app.policy import service as policy_service
@@ -149,21 +150,30 @@ def _counterparty_role(order_id: int, counterparty_id: int, role: str):
     )
 
 
-def get_order(session: Session, order_id: int) -> Order:
+def get_order(session: Session, order_id: int, user: CurrentUser | None = None) -> Order:
     order = session.get(Order, order_id)
     if order is None:
         raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
+    if user is not None and user.owner_scope != "ALL" and not user.is_admin:
+        visible_ids = owner_scope_ids(session, user)
+        if order.owner_id not in (visible_ids or set()):
+            raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
     return order
 
 
 def list_orders(
-    session: Session, *, order_type: str | None = None, status: str | None = None
+    session: Session, *, order_type: str | None = None, status: str | None = None,
+    user: CurrentUser | None = None,
 ) -> list[Order]:
     stmt = select(Order)
     if order_type:
         stmt = stmt.where(Order.order_type == order_type)
     if status:
         stmt = stmt.where(Order.status == status)
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(Order.id)).all())
 
 

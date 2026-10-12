@@ -48,7 +48,7 @@ def list_customers(
     user: CurrentUser = read_customers,
 ) -> list[dict]:
     reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
-    customers = service.list_customers(db, keyword=keyword, status=status)
+    customers = service.list_customers(db, keyword=keyword, status=status, user=user)
     return [service.to_customer_out(item, reveal_contact=reveal) for item in customers]
 
 
@@ -69,7 +69,7 @@ def create_customer(
         wechat=payload.wechat,
         qq=payload.qq,
         source=payload.source,
-        owner_id=payload.owner_id,
+        owner_id=user.id if payload.owner_id is None and user.owner_scope != "ALL" else payload.owner_id,
         tags=payload.tags,
         note=payload.note,
     )
@@ -93,7 +93,7 @@ def get_customer(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> dict:
-    customer = service.get_customer(db, customer_id)
+    customer = service.get_customer(db, customer_id, user)
     show_full = reveal and user.has(PERM_CUSTOMER_CONTACT_READ)
     if show_full:
         record_audit(

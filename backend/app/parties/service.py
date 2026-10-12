@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
+from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
 from app.core.numbering import allocate_number
 from app.domain.enums import (
     AuditAction,
@@ -171,7 +172,8 @@ def duplicate_candidates(
 
 
 def list_customers(
-    session: Session, *, keyword: str | None = None, status: str | None = None
+    session: Session, *, keyword: str | None = None, status: str | None = None,
+    user: CurrentUser | None = None,
 ) -> list[Customer]:
     stmt = select(Customer)
     if status:
@@ -187,13 +189,21 @@ def list_customers(
                 Customer.qq.like(pattern),
             )
         )
+    if user is not None:
+        scope = owner_scope_filter(Customer.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(Customer.id)).all())
 
 
-def get_customer(session: Session, customer_id: int) -> Customer:
+def get_customer(session: Session, customer_id: int, user: CurrentUser | None = None) -> Customer:
     customer = session.get(Customer, customer_id)
     if customer is None:
         raise NotFound(f"客户 {customer_id} 不存在", details={"customer_id": customer_id})
+    if user is not None and user.owner_scope != "ALL" and not user.is_admin:
+        visible_ids = owner_scope_ids(session, user)
+        if customer.owner_id not in (visible_ids or set()):
+            raise NotFound(f"客户 {customer_id} 不存在", details={"customer_id": customer_id})
     return customer
 
 

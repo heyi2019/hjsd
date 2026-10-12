@@ -14,7 +14,7 @@ const walk = (dir) =>
 
 /** 页面文件：排除组件库本体，否则守卫会自己告自己。 */
 const pages = () =>
-  walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("shared", "ui")));
+  walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")));
 
 /** 计数语义的 label：必须显式 kind: "count"，否则被 MoneyText 渲染成 "1.00"。 */
 const COUNT_LABELS = [

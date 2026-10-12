@@ -5,6 +5,7 @@ export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/
 
 /** dev 直通用户：后端以 `X-Dev-User` 识别；切换角色即可验证权限显隐。 */
 export const DEV_USER_KEY = "hj.dev-user";
+export const ACCESS_TOKEN_KEY = "hj.access-token";
 
 export function currentDevUser(): string {
   return localStorage.getItem(DEV_USER_KEY) || "admin";
@@ -17,9 +18,31 @@ export function setDevUser(user: string): void {
 export const api = axios.create({ baseURL: API_BASE, timeout: 15_000 });
 
 api.interceptors.request.use((config) => {
-  config.headers["X-Dev-User"] = currentDevUser();
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  else config.headers["X-Dev-User"] = currentDevUser();
   return config;
 });
+
+export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean };
+
+export async function login(username: string, password: string) {
+  const response = await api.post<{ access_token: string; user: SessionUser }>("/auth/login", { username, password });
+  localStorage.setItem(ACCESS_TOKEN_KEY, response.data.access_token);
+  return response.data.user;
+}
+
+export async function currentUser(): Promise<SessionUser> {
+  return (await api.get<SessionUser>("/auth/me")).data;
+}
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  await api.post("/auth/change-password", { old_password: oldPassword, new_password: newPassword });
+}
+
+export async function logout(): Promise<void> {
+  try { await api.post("/auth/logout"); } finally { localStorage.removeItem(ACCESS_TOKEN_KEY); }
+}
 
 /** 后端不可达标记：页面据此显示「连接失败」横幅，而不是静默渲染空态。
  *  典型场景：后端未启动 / 端口错 / CORS 预检被拒 —— 三者都表现为 response 为空。 */

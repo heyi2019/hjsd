@@ -13,13 +13,20 @@ import hashlib
 import hmac
 import json
 import time
+import os
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
 from fastapi import Depends, Header
+from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.errors import AuthError, PermissionDenied, TokenExpired
+from app.core.database import get_db
 from app.core.settings import Settings, get_settings
+from app.domain.users import RevokedToken
 
 # ------------------------------------------------------------------ 角色与权限点
 ROLE_ADMIN = "ADMIN"
@@ -55,6 +62,7 @@ PERM_QUALITY_READ = "quality.read"
 PERM_QUALITY_RESOLVE = "quality.resolve"
 PERM_REPORT_READ = "report.read"
 PERM_HISTORY_IMPORT = "history.import"
+PERM_USER_MANAGE = "user.manage"
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(
     {
@@ -83,6 +91,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_QUALITY_RESOLVE,
         PERM_REPORT_READ,
         PERM_HISTORY_IMPORT,
+        PERM_USER_MANAGE,
     }
 )
 
@@ -176,6 +185,40 @@ class CurrentUser:
             return True
         return pool_id in self.pool_ids
 
+    def can_see_owner(self, owner_id: int | None) -> bool:
+        """Fast-path check for owner-scoped records; TEAM needs a DB-aware helper."""
+        if self.is_admin or self.owner_scope == "ALL":
+            return True
+        return owner_id == self.id
+
+
+def owner_scope_ids(session: Any, user: CurrentUser) -> set[int] | None:
+    """Resolve the owner ids visible to a user, including TEAM membership.
+
+    Team membership is intentionally resolved in Python for now: the membership
+    list is stored as JSON during this incremental rollout and remains portable
+    across SQLite and PostgreSQL.
+    """
+    if user.is_admin or user.owner_scope == "ALL":
+        return None
+    if user.owner_scope != "TEAM" or not user.team_ids:
+        return {user.id}
+    from app.domain.users import User
+
+    visible = {user.id}
+    for owner_id, team_ids in session.query(User.id, User.team_ids).all():
+        if set(team_ids or []).intersection(user.team_ids):
+            visible.add(owner_id)
+    return visible
+
+
+def owner_scope_filter(column: ColumnElement, user: CurrentUser, session: Any | None = None) -> ColumnElement | None:
+    """Return a SQL predicate for owner-scoped tables; None means unrestricted."""
+    ids = owner_scope_ids(session, user) if session is not None else None
+    if ids is None and (user.is_admin or user.owner_scope == "ALL"):
+        return None
+    return column.in_(ids or {user.id})
+
 
 # ------------------------------------------------------------------ JWT（stdlib）
 def _b64url_encode(raw: bytes) -> str:
@@ -238,11 +281,34 @@ def decode_token(token: str, *, settings: Settings | None = None) -> dict[str, A
     return payload
 
 
+def hash_password(password: str) -> str:
+    """Hash a password with PBKDF2; the stored value contains its salt."""
+    if len(password) < 8:
+        raise ValueError("密码至少需要 8 位")
+    salt = os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 240_000)
+    return f"pbkdf2_sha256$240000${_b64url_encode(salt)}${_b64url_encode(digest)}"
+
+
+def verify_password(password: str, encoded: str) -> bool:
+    try:
+        scheme, rounds, salt, digest = encoded.split("$", 3)
+        if scheme != "pbkdf2_sha256":
+            return False
+        candidate = hashlib.pbkdf2_hmac(
+            "sha256", password.encode(), _b64url_decode(salt), int(rounds)
+        )
+        return hmac.compare_digest(candidate, _b64url_decode(digest))
+    except (ValueError, TypeError):
+        return False
+
+
 def build_access_token(user: "CurrentUser", *, settings: Settings | None = None) -> str:
     """把 CurrentUser 的关键信息打包进 token（不写入手机号等敏感资料）。"""
     return encode_token(
         {
             "sub": str(user.id),
+            "jti": uuid.uuid4().hex,
             "username": user.username,
             "roles": list(user.roles),
             "pool_ids": sorted(user.pool_ids),
@@ -285,13 +351,17 @@ def get_current_user(
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_dev_user: str | None = Header(default=None, alias="X-Dev-User"),
     settings: Settings = Depends(get_settings),
+    db: Session = Depends(get_db),
 ) -> CurrentUser:
     """解析当前登录用户；无凭证返回 401 `AUTH_REQUIRED`。"""
     if authorization:
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
             raise AuthError("登录凭证格式无效")
-        return user_from_payload(decode_token(token, settings=settings))
+        payload = decode_token(token, settings=settings)
+        if payload.get("jti") and db.get(RevokedToken, payload["jti"]):
+            raise AuthError("登录已退出，请重新登录")
+        return user_from_payload(payload)
 
     if settings.is_development and x_dev_user:
         user = DEV_USERS.get(x_dev_user.strip().lower())
@@ -344,7 +414,10 @@ __all__ = [
     "decode_token",
     "encode_token",
     "get_current_user",
+    "hash_password",
+    "owner_scope_filter",
     "require_permissions",
     "require_role",
     "user_from_payload",
+    "verify_password",
 ]

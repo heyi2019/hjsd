@@ -40,7 +40,7 @@ def list_orders(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> list[schemas.OrderOut]:
-    orders = service.list_orders(db, order_type=order_type, status=status)
+    orders = service.list_orders(db, order_type=order_type, status=status, user=_user)
     return [schemas.OrderOut.model_validate(item) for item in orders]
 
 
@@ -56,7 +56,7 @@ def create_order(
         trade_date=payload.trade_date,
         actor=_actor(user),
         account_id=payload.account_id,
-        owner_id=payload.owner_id,
+        owner_id=user.id if payload.owner_id is None and user.owner_scope != "ALL" else payload.owner_id,
         capital_type=payload.capital_type,
         note=payload.note,
         customer_roles=[
@@ -79,7 +79,7 @@ def get_order(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> schemas.OrderOut:
-    return schemas.OrderOut.model_validate(service.get_order(db, order_id))
+    return schemas.OrderOut.model_validate(service.get_order(db, order_id, _user))
 
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)
@@ -89,6 +89,7 @@ def post_event(
     db: Session = Depends(get_db),
     user: CurrentUser = post_events,
 ) -> dict:
+    service.get_order(db, order_id, user)
     event, flow = service.post_event(
         db,
         order_id,
@@ -138,6 +139,9 @@ def pool_balance(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_finance,
 ) -> dict:
+    if not _user.can_see_pool(pool_id):
+        from app.core.errors import NotFound
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
     return service.pool_balance(db, pool_id)
 
 

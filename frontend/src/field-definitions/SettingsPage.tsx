@@ -20,8 +20,19 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
+import { UsersPanel } from "../users/UsersPanel";
+import { TeamsPanel } from "../users/TeamsPanel";
+import { useSession } from "../shared/state/session";
 
 export function SettingsPage() {
+  const { can } = useSession();
+  const items = [
+    { key: "order-types", label: "业务类型", children: <OrderTypesPanel /> },
+    { key: "pools", label: "资金池", children: <PoolsPanel /> },
+    { key: "fields", label: "活字段", children: <FieldsPanel /> },
+    { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
+    ...(can("user.manage") ? [{ key: "users", label: "人员与权限", children: <UsersPanel /> }, { key: "teams", label: "团队管理", children: <TeamsPanel /> }] : []),
+  ];
   return (
     <section className="ui-stack">
       <PageHeader
@@ -30,12 +41,7 @@ export function SettingsPage() {
       />
       <Tabs
         defaultActiveKey="order-types"
-        items={[
-          { key: "order-types", label: "业务类型", children: <OrderTypesPanel /> },
-          { key: "pools", label: "资金池", children: <PoolsPanel /> },
-          { key: "fields", label: "活字段", children: <FieldsPanel /> },
-        { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
-        ]}
+        items={items}
       />
     </section>
   );

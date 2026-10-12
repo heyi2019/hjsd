@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
+from app.core.security import CurrentUser
 from app.core.numbering import allocate_number, ensure_sequence, peek_number
 from app.domain.enums import (
     AuditAction,
@@ -74,10 +75,12 @@ def _get_order_type_or_404(session: Session, order_type_id: int) -> OrderTypeDef
 
 
 # --------------------------------------------------------------------- 资金池
-def list_pools(session: Session, *, include_disabled: bool = True) -> list[Pool]:
+def list_pools(session: Session, *, include_disabled: bool = True, user: CurrentUser | None = None) -> list[Pool]:
     stmt = select(Pool).order_by(Pool.id)
     if not include_disabled:
         stmt = stmt.where(Pool.status == PoolStatus.ACTIVE.value)
+    if user is not None and not user.is_admin and user.owner_scope != "ALL":
+        stmt = stmt.where(Pool.id.in_(sorted(user.pool_ids)))
     return list(session.scalars(stmt))
 
 

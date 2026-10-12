@@ -1,21 +1,26 @@
 # 后端目录架构
 
-参考 `business-line-erp/backend/app` 的领域分包，黑金 ERP 采用：
+黑金 ERP 当前采用按业务领域拆分的后端结构：
 
 ```
 app/
-├── core/             # 金额、数据库、异常、运行时
-├── foundation/       # 池/业务类型/类别/活字段主数据
+├── core/             # 配置、数据库、金额、安全、审计等基础设施
+├── domain/           # 当前 ORM 模型与领域对象
+├── foundation/       # 基础主数据与业务类型
 ├── finance/          # 资金池、流水、划转、押金
 ├── orders/           # 订单、事件、编号
 ├── accounts/         # 账号库存和成本
-├── installments/     # DFQ 合约与收款
+├── installments/     # 分期合约与收款
 ├── rebates/          # 返点归集与结算
-├── reporting/        # R1–R5 只读报表
+├── reporting/        # 只读报表
 ├── quality/          # 异常工作台
 ├── migration/        # 历史迁移与审计
-├── models_new/       # 当前 v2 模型，逐步按领域迁移
-└── services_new/     # 当前 v2 服务，逐步拆入领域服务
+├── auth/             # 登录、令牌与用户认证
+├── parties/          # 客户、合作方等主体
+├── policy/            # 规则版本与策略
+└── audit/             # 审计查询接口
 ```
 
-迁移期禁止删除或直接改动 legacy `routers/`、`models.py`、`services.py`。新功能优先写入领域包；当一个领域已完成 API/测试迁移，再下线对应 legacy 路由。
+每个业务领域通常由 `router.py`、`service.py`、`schemas.py` 和测试组成；写路径统一经过 Service 事务和审计记录。
+
+旧版后端位于仓库根目录的 `archive/v0_backend/`，仅用于历史迁移参考，不参与当前运行和测试。

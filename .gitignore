@@ -8,6 +8,8 @@ venv/
 node_modules/
 dist/
 .env
+**/.env.local
+frontend/test-results/
 # SQLite 运行产物：由scripts/migrate_v2.py 从原始 JSON 重建，不入版本库
 *.db
 *.db-journal

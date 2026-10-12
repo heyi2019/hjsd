@@ -74,13 +74,19 @@
   white-space: nowrap !important;
 }
 
-:where(.ant-table-tbody > tr:hover > td, .ant-pagination-item-active) {
+:where(.ant-table-tbody > tr:hover > td) {
   background: var(--violet-soft) !important;
 }
 
-/* 分页 active 页码：淡紫底上紫字仅 3.5，改用紫墨保证 4.5+（A11Y E3） */
+/* 分页 active 页码：实心品牌蓝胶囊 + 白字（A11Y E3：白字对品牌蓝渐变最浅段 5.25:1）。
+   此前 :where(.ant-pagination-item-active) 只给了淡紫底，antd 默认描边/文字仍走 #1677ff，
+   与品牌蓝形成「两个蓝色」；现统一实心品牌蓝，收口到单色体系。 */
+:where(.ant-pagination-item-active) {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
 :where(.ant-pagination .ant-pagination-item-active a) {
-  color: var(--primary-ink) !important;
+  color: var(--on-accent) !important;
 }
 
 /* POOL 代码徽章：深色下 antd purple 字色对暗底仅 3.39，统一紫墨（A11Y E3） */
@@ -120,6 +126,7 @@
    底色一并交给 --violet-soft，保持与项目其余选中态同一套紫调。 */
 :where(.sidebar .ant-menu-item-selected) {
   color: var(--primary-ink) !important;
+  background: var(--violet-soft) !important;
 }
 :where(.sidebar .ant-menu-item-selected .ant-menu-title-content) {
   color: var(--primary-ink) !important;

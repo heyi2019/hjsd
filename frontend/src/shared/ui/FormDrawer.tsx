@@ -38,7 +38,12 @@ export function FormDrawer(props: {
             type="primary"
             loading={props.submitting}
             onClick={() => {
-              form.validateFields().then((values) => props.onSubmit(values));
+              // 校验失败由表单内联错误承载；这里必须吞掉 rejection，
+              // 否则每次点提交都产生一个 unhandled promise rejection（测试与控制台都会报）。
+              form
+                .validateFields()
+                .then((values) => props.onSubmit(values))
+                .catch(() => undefined);
             }}
           >
             {props.submitText ?? "提交"}

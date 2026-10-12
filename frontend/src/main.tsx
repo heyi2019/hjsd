@@ -3,6 +3,8 @@ import zhCN from "antd/locale/zh_CN";
 import { createRoot } from "react-dom/client";
 import { AppShell } from "./app/AppShell";
 import { SessionProvider } from "./shared/state/session";
+import { ThemeProvider, useTheme } from "./shared/state/theme";
+import { buildTheme } from "./shared/state/antdTheme";
 import "./styles.css";
 import "./system-shell.css";
 import "./shared/styles/tokens.css";
@@ -18,10 +20,19 @@ import "./shared/styles/ui-components.css";
 import "./shared/styles/interactions.css";
 import "./shared/ui/antd-adapter.css";
 
+function ThemedApp() {
+  const { mode } = useTheme();
+  return (
+    <ConfigProvider locale={zhCN} theme={buildTheme(mode)}>
+      <SessionProvider>
+        <AppShell />
+      </SessionProvider>
+    </ConfigProvider>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
-  <ConfigProvider locale={zhCN}>
-    <SessionProvider>
-      <AppShell />
-    </SessionProvider>
-  </ConfigProvider>,
+  <ThemeProvider>
+    <ThemedApp />
+  </ThemeProvider>,
 );

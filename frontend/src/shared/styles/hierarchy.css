@@ -159,13 +159,22 @@
 .ant-modal-content,
 .ant-drawer-content,
 .ant-popover-inner,
-.ant-collapse {
-  background: var(--glass);
-  border: var(--border-w) solid var(--glass-border);
-  box-shadow: var(--e1);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-}
+  .ant-collapse {
+    background: var(--glass);
+    border: var(--border-w) solid var(--glass-border);
+    box-shadow: var(--e1);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+  /* 通用玻璃表面：此前 .glass 类名在 DOM 上被广泛引用（AppShell 侧栏、Card 等），
+     但全项目零规则定义 → 玻璃材质实际从未生效，侧栏退化成不透明白块。
+     补这条使其与 .ant-card 等既有规则同源，成为可复用玻璃表面。 */
+  .glass {
+    background: var(--glass);
+    border: var(--border-w) solid var(--glass-border);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
 /* 弹层（Modal/Drawer/Popover）比卡片「更浮」，用 --e2 抬一档；
    Popover/Tooltip 类小气泡不叠玻璃，避免多层 backdrop 相互加重模糊。 */
 .ant-modal-content,

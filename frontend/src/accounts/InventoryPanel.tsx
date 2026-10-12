@@ -108,6 +108,7 @@ export function InventoryPanel() {
           page={page}
           pageSize={pageSize}
           total={rows.length}
+          controlledPaging
           emptyText="暂无账号"
           onPageChange={(nextPage, nextSize) => {
             setPage(nextPage);

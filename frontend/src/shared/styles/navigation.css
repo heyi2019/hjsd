@@ -108,9 +108,11 @@
 }
 
 .theme-switch-options {
+  display: inline-flex;
   gap: 0;
   padding: var(--space-half);
   border-radius: var(--radius-md);
+  background: var(--soft);
 }
 
 .theme-switch button {
@@ -120,6 +122,11 @@
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
   font: var(--font-nav-secondary);
+}
+.theme-switch-options button.is-active {
+  background: var(--color-antd-bg-container);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-soft);
 }
 
 .user-caption,
@@ -132,4 +139,112 @@
   .sidebar .nav-item {
     font: var(--font-nav-secondary);
   }
+}
+
+/* ── AppShell 外壳（替代 antd Layout/Sider/Menu，复活 .glass 与 .nav-item）──
+   左固定导航 + 右自适应内容；侧栏 sticky 占满视口高。 */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 侧栏：玻璃表面 + 纵向导航流。.glass 提供背景/边框/模糊，这里只补布局与浮起高光。 */
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-right: var(--border-w) solid var(--glass-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+}
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--ui-control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--font-nav-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.nav-item:hover { background: var(--soft); color: var(--color-text-primary); }
+.nav-item--active,
+.nav-item--active:hover {
+  background: var(--violet-soft);
+  color: var(--primary-ink);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+.nav-item__icon { display: inline-flex; font-size: var(--fs-subheadline); line-height: 1; }
+.nav-item__label { font: inherit; }
+.sidebar-foot {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: var(--border-w) solid var(--color-border);
+  font: var(--font-nav-caption);
+  color: var(--color-text-tertiary);
+}
+
+/* 顶栏：复用 .view-head 玻璃稀释底 + 装饰光斑，这里补两行式标题结构。 */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  flex-wrap: wrap;
+}
+.topbar__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.topbar__eyebrow {
+  font: var(--font-caption);
+  color: var(--color-text-tertiary);
+  letter-spacing: var(--ls-tight);
+}
+/* 顶栏页名降为小节标题（17px/600），与页面内 PageHeader(20px) 拉开层级，
+   避免两层 20px 等权标题互相抢视觉焦点（iOS 层次：顶栏=上下文标签，页内=主标题）。 */
+.topbar__page { margin: 0; font: var(--font-card-title); color: var(--color-text-primary); letter-spacing: var(--ls-tighter); }
+
+/* 窄屏：侧栏转为顶部横向滚动导航，避免导航完全消失。 */
+@media (--bp-md) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+    border-right: 0;
+    border-bottom: var(--border-w) solid var(--glass-border);
+    overflow-x: auto;
+  }
+  .app-brand { padding: var(--space-2) var(--space-3); white-space: nowrap; }
+  .nav-list { flex-direction: row; margin-top: 0; }
+  .nav-item { width: auto; white-space: nowrap; box-shadow: none !important; }
+  .nav-item--active { box-shadow: inset 0 -3px 0 var(--color-primary) !important; }
+  .sidebar-foot { display: none; }
+  .page-content { padding: var(--space-3); }
 }

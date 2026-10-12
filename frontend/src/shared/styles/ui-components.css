@@ -65,7 +65,9 @@
 .ui-stat--expense { border-color: color-mix(in srgb, var(--color-error) 34%, var(--glass-border)); }
 .ui-stat--warn {
   border-color: color-mix(in srgb, var(--color-warning) 40%, var(--glass-border));
-  background: color-mix(in srgb, var(--color-warning) 8%, var(--glass));
+  background: color-mix(in srgb, var(--color-warning) 6%, var(--glass));
+  /* 左侧品牌警告色条强调，替代整块脏橙底，保持卡片材质统一。 */
+  box-shadow: inset 3px 0 0 var(--color-warning), var(--shadow-soft);
 }
 
 /* ── MoneyText ────────────────────────────────────────────── */

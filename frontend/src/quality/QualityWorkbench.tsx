@@ -240,6 +240,7 @@ export function QualityWorkbench() {
           page={page}
           pageSize={pageSize}
           total={total}
+          controlledPaging
           rowKey="id"
           emptyText="当前筛选条件下没有异常工单"
           onPageChange={(nextPage, nextSize) => {

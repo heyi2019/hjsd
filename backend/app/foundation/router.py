@@ -43,7 +43,7 @@ def list_pools(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.PoolOut]:
-    pools = service.list_pools(db, include_disabled=include_disabled)
+    pools = service.list_pools(db, include_disabled=include_disabled, user=_user)
     return [schemas.PoolOut.model_validate(pool) for pool in pools]
 
 
@@ -150,6 +150,7 @@ def update_order_type(
     user: CurrentUser = manage_order_types,
 ) -> schemas.OrderTypeOut:
     order_type = service.update_order_type(
+        db,
         order_type_id,
         actor=_actor(user),
         name=payload.name,

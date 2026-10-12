@@ -17,6 +17,9 @@ cp .env.example .env
 # 2) 建库 + 种子（迁移到 head 并写入基础种子）
 cd backend && python3 scripts/v1_init_db.py && cd ..
 
+# 2.1) 初始化正式管理员（首次部署必须执行；密码不会写入脚本）
+cd backend && ADMIN_PASSWORD='请替换为强密码' python3 scripts/create_admin.py && cd ..
+
 # 3) 起后端（:8000）
 cd backend && python3 -m uvicorn app.main:app --reload
 
@@ -32,6 +35,8 @@ cd frontend && npm run dev
 | http://127.0.0.1:8000/api/v1/health | 健康检查（返回 sqlite 是否已建） |
 | http://127.0.0.1:8000/docs | Swagger，全部 89 个端点 |
 | http://127.0.0.1:5173/ | 前端（开发账号 `admin`） |
+
+生产环境进入登录页，使用上一步创建的 `admin` 账号登录；开发环境仍保留角色直通，仅用于本地权限联调。
 
 ### 配置约定
 
@@ -66,7 +71,7 @@ cd frontend && npm run build
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | ORM 模型（**不叫 models**，与 legacy 命名冲突） |
 | `backend/app/foundation` `finance` `orders` `installments` `policy` `quality` `reporting` | 领域服务与路由，每个含 `service.py` + `router.py` |
-| `backend/alembic/versions` | 迁移（0001 M0 … 0005 M5 规则快照） |
+| `backend/alembic/versions` | 迁移（0001 M0 … 0005 M5 规则快照、0006 用户认证、0007 团队范围） |
 | `backend/tests/v1` | v1 测试 |
 | `frontend/src` | `shared/`（UI 与 API）、各领域页面目录 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |

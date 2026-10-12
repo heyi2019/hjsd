@@ -1,4 +1,4 @@
-# 黑金时代工作室 ERP · 架构设计 v1.0
+# 黑金时代 ERP · 架构设计 v1.0
 
 > **权威来源**：[PRD v1.0](ERP_PRD_v1.0.md) → [功能规格说明书 v1.0](ERP_功能规格说明书_v1.0.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
 

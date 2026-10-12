@@ -158,7 +158,9 @@ class Customer(Base, AuditMixin):
     wechat: Mapped[str | None] = mapped_column(String(128), nullable=True)
     qq: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=CustomerStatus.ACTIVE.value
     )
@@ -216,7 +218,9 @@ class OrderCustomerRole(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    order_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
+    )
     customer_id: Mapped[int] = mapped_column(
         ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False
     )
@@ -234,7 +238,9 @@ class OrderCounterpartyRole(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    order_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
+    )
     counterparty_id: Mapped[int] = mapped_column(
         ForeignKey("counterparties.id", ondelete="RESTRICT"), nullable=False
     )

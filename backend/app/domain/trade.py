@@ -60,6 +60,7 @@ class Account(Base, AuditMixin):
         UniqueConstraint("account_no", name="uq_accounts_no"),
         UniqueConstraint("game_account", name="uq_accounts_game_account"),
         Index("ix_accounts_status", "status"),
+        CheckConstraint("cost_amount >= 0", name="cost_nonneg"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -93,6 +94,7 @@ class Order(Base, AuditMixin):
         UniqueConstraint("order_no", name="uq_orders_no"),
         Index("ix_orders_type_date", "order_type", "trade_date"),
         Index("ix_orders_link_status", "link_status"),
+        Index("ix_orders_trade_date", "trade_date"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -116,7 +118,9 @@ class Order(Base, AuditMixin):
     link_status: Mapped[str] = mapped_column(
         String(24), nullable=False, default=LinkStatus.LINKED.value
     )
-    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -131,6 +135,8 @@ class OrderEvent(Base, AuditMixin):
         ),
         UniqueConstraint("event_no", name="uq_order_events_no"),
         Index("ix_order_events_order", "order_id", "event_type", "occurred_on"),
+        CheckConstraint("amount >= 0", name="amount_nonneg"),
+        Index("ix_order_events_occurred_on", "occurred_on"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -175,6 +181,8 @@ class Cashflow(Base, AuditMixin):
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_nature", "nature"),
         Index("ix_cashflow_transfer", "transfer_id"),
+        CheckConstraint("amount >= 0", name="amount_nonneg"),
+        Index("ix_cashflow_occurred_on", "occurred_on"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -200,13 +208,16 @@ class OrderProfitAllocation(Base, TimestampMixin):
     __tablename__ = "order_profit_allocations"
     __table_args__ = (
         UniqueConstraint("order_id", "user_id", "role", name="uq_order_profit_alloc"),
+        CheckConstraint("allocation_rate >= 0", name="rate_nonneg"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
     )
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     allocation_rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     policy_version_id: Mapped[int | None] = mapped_column(
@@ -231,6 +242,10 @@ class Installment(Base, AuditMixin):
         UniqueConstraint("inst_no", name="uq_installments_no"),
         UniqueConstraint("order_id", name="uq_installments_order"),
         Index("ix_installments_status", "status", "first_due_on"),
+        CheckConstraint(
+            "principal >= 0 AND down_payment >= 0 AND per_period >= 0 AND paid_amount >= 0",
+            name="amount_nonneg",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -272,6 +287,10 @@ class InstallmentSchedule(Base, TimestampMixin):
         ),
         UniqueConstraint("installment_id", "period_no", name="uq_installment_period"),
         Index("ix_schedules_due", "installment_id", "due_on", "status"),
+        CheckConstraint(
+            "due_amount >= 0 AND received_amount >= 0",
+            name="amount_nonneg",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -298,6 +317,10 @@ class Deposit(Base, AuditMixin):
             name="deposit_status_valid",
         ),
         UniqueConstraint("deposit_no", name="uq_deposits_no"),
+        CheckConstraint(
+            "paid_amount >= 0 AND returned_amount >= 0",
+            name="amount_nonneg",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -333,6 +356,10 @@ class RebateRecord(Base, AuditMixin):
         ),
         UniqueConstraint("rebate_group_no", name="uq_rebate_records_no"),
         Index("ix_rebate_source_order", "source_order_id"),
+        CheckConstraint(
+            "rate >= 0 AND base_amount >= 0",
+            name="amount_nonneg",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -367,6 +394,10 @@ class RebateSettlement(Base, AuditMixin):
     __table_args__ = (
         UniqueConstraint("settlement_no", name="uq_rebate_settlements_no"),
         UniqueConstraint("cashflow_id", name="uq_rebate_settlements_flow"),
+        CheckConstraint(
+            "gross_amount >= 0 AND platform_fee >= 0 AND net_amount >= 0",
+            name="amount_nonneg",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

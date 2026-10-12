@@ -14,7 +14,8 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text, event
+from sqlalchemy import Engine
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -55,12 +56,20 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    # 覆盖 database.py 的全局 connect 监听：该监听会在每次连接时强制 `PRAGMA foreign_keys=ON`，
+    # 而 SQLite 的 batch 重建父表（orders）需 DROP 原表，FK 开启会因子表引用而失败。
+    # 这里在引擎实例上注册 FK=OFF 监听，注册顺序晚于 database.py 的类级监听，故 OFF 在其后生效；
+    # 且对任意新建连接（含 batch 重建可能开启的子连接）都生效。
+    # 注意：`PRAGMA foreign_keys` 在事务内是 no-op，所以必须保留 transactional_ddl=True，
+    # 由 Alembic 在外层事务结束时统一 COMMIT（否则约束写入与版本戳会在连接关闭时被静默回滚）。
+    event.listen(connectable, "connect", lambda c, p: c.execute("PRAGMA foreign_keys=OFF"))
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             render_as_batch=True,  # SQLite 结构性变更需要 batch 模式
             compare_type=True,
+            transactional_ddl=True,  # 由 Alembic 统一 COMMIT，避免 DDL/版本戳在连接关闭时静默回滚
         )
         with context.begin_transaction():
             context.run_migrations()

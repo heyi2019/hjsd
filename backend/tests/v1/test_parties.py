@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import pytest
+from datetime import date, datetime
 from sqlalchemy import select
 
 from app.core.errors import ErrorCode
 from app.domain.enums import AuditAction, CustomerStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import Customer, OrderCustomerRole
+from app.domain.trade import Order
 from app.parties import service
 
 CUSTOMERS = "/api/v1/customers"
@@ -97,6 +99,13 @@ class TestMerge:
         source = service.create_customer(seeded_db, display_name="源", actor="pytest")
         target = service.create_customer(seeded_db, display_name="目标", actor="pytest")
         seeded_db.commit()
+        # 迁移 0008 后 order_customer_roles.order_id 指向 orders，占位订单 1 必须先存在
+        seeded_db.add(Order(
+            id=1, order_no="ORD0001", order_type="HS", capital_type="STOCK",
+            trade_date=date.today(), status="ACTIVE", link_status="UNLINKED",
+            created_by="pytest", updated_by="pytest", created_at=datetime.now(), updated_at=datetime.now(),
+        ))
+        seeded_db.flush()
         seeded_db.add(OrderCustomerRole(order_id=1, customer_id=source.id, role="SELLER"))
         seeded_db.commit()
 

@@ -10,6 +10,10 @@ const commission = vi.fn();
 const dailyFunds = vi.fn();
 const businessPnl = vi.fn();
 const orderProfit = vi.fn();
+const poolsList = vi.fn();
+const poolsBalance = vi.fn();
+const qualityOverview = vi.fn();
+const ordersList = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   reportsApi: {
@@ -20,6 +24,15 @@ vi.mock("../shared/api/catalog", () => ({
     businessPnl: (...a: unknown[]) => businessPnl(...a),
     orderProfit: (...a: unknown[]) => orderProfit(...a),
   },
+  // 数据中心 Tab 与报表面板同页挂载（antd Tabs 不卸载非激活面板）：必须给齐它的
+  // 取数桩，否则 qualityApi.overview 等会在挂载 effect 里同步 TypeError 炸测试。
+  poolsApi: {
+    list: (...a: unknown[]) => poolsList(...a),
+    balance: (...a: unknown[]) => poolsBalance(...a),
+    create: vi.fn(),
+  },
+  qualityApi: { overview: (...a: unknown[]) => qualityOverview(...a) },
+  ordersApi: { list: (...a: unknown[]) => ordersList(...a) },
 }));
 
 const emptyHealth = { generated_on: "2026-10-01", total_cost: "0.00", items: [] };
@@ -32,6 +45,20 @@ beforeEach(() => {
   dailyFunds.mockResolvedValue({ date: "2026-10-01", total: {}, items: [] });
   businessPnl.mockResolvedValue({ items: [], total: {} });
   orderProfit.mockResolvedValue({ items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  // 数据中心面板（同页挂载）：空池空单、0 异常——本文件只关心报表 Tab，桩位兜底即可。
+  poolsList.mockResolvedValue([]);
+  poolsBalance.mockResolvedValue({
+    income: "0.00",
+    expense: "0.00",
+    transfer_in: "0.00",
+    transfer_out: "0.00",
+    cash_balance: "0.00",
+    deposit_held: "0.00",
+    th_advance: "0.00",
+    available: "0.00",
+  });
+  qualityOverview.mockResolvedValue({ items: [] });
+  ordersList.mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -39,12 +66,21 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
-  it("六个报表 Tab 齐全（R1-R5 + 订单利润）", async () => {
+  it("七个 Tab 齐全（R1-R5 + 订单利润 + 数据中心）", async () => {
     renderApp(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "库存 R1" });
-    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润"]) {
+    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("数据中心 Tab：渲染资金统计与订单入口卡，点击入口卡跳业务中心", async () => {
+    const onNavigate = vi.fn();
+    renderApp(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });
+    await gotoTab("数据中心");
+    expect(await screen.findByText("可用余额合计")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /订单总数/ }));
+    expect(onNavigate).toHaveBeenCalledWith("business");
   });
 });
 

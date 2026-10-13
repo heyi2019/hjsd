@@ -296,55 +296,54 @@
    浏览器不重播、animationend 永不到来 → 下拉关不掉、两个下拉同时展开
    （2026-10-13 真机复现，CreateOrderModal 账号/客户双下拉同屏）。
    离场保持 antd 原生 slide-up/down-out。 */
+/* Apple 弹簧入场（覆盖 antd 默认 zoom/slide 动效）。
+   ⚠ 真机复验（2026-10-13）修正：本构建 antd v5.29 的弹层**不发出 enter-active /
+   appear-active 类**（实测 .ant-modal 仅含 `ant-modal css-dev-only-*`、animationName:none，
+   MutationObserver 全程 0 次 class 变更）——原先 `[class*="enter-active"]` 选择器
+   全是死规则、从不命中，弹层实际零动效。
+   修正为「直接作用于弹层内容盒」（.ant-modal-content / .ant-popover-inner /
+   .ant-dropdown-menu / .ant-picker-panel 等子节点）：
+     1) 保证 Apple 弹簧必定播放，不依赖 antd 是否发 motion 类；
+     2) 只动子节点，antd 的显隐/离场管理在根容器(.ant-modal/.ant-popover)，
+        子节点动画不影响离场，不会复现早前"钉死关不掉"回归（早前回归是覆盖根容器所致）。 */
 @media (prefers-reduced-motion: no-preference) {
-  /* 下拉弹簧：Picker / Dropdown 菜单仍在此处统一收口（弹簧入场）；
-     Select 下拉因「钉死导致关不掉」回归已不再用弹簧，改为 .ui-select-pop 极短淡入（见下条）。 */
-  :where(.ant-picker-dropdown.ant-slide-up-enter-active,
-         .ant-picker-dropdown.ant-slide-down-enter-active,
-         .ant-dropdown.ant-slide-up-enter-active,
-         .ant-dropdown.ant-slide-down-enter-active) {
+  :where(.ant-modal-content,
+         .ant-popover-inner,
+         .ant-dropdown .ant-dropdown-menu,
+         .ant-picker-dropdown .ant-picker-panel) {
     animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
   }
-  /* 业务下拉（Select 封装组件 ui-select-pop）入场收敛为极短淡入、无位移缩放，
-     解决「下拉出现太久」；仅覆盖入场态，离场交还 antd 原生、关闭正常。 */
-  :where(.ant-select-dropdown.ui-select-pop.ant-slide-up-enter-active,
-         .ant-select-dropdown.ui-select-pop.ant-slide-up-appear-active,
-         .ant-select-dropdown.ui-select-pop.ant-slide-down-enter-active,
-         .ant-select-dropdown.ui-select-pop.ant-slide-down-appear-active) {
+  /* 业务下拉（Select 封装 ui-select-pop）入场收敛为极短淡入、无位移缩放（设计裁决）。
+     直接作用于下拉根：本构建 motion 关闭，随挂载播一次、关闭即卸载，不会关不掉。 */
+  :where(.ant-select-dropdown.ui-select-pop) {
     animation-name: none !important;
     transition: opacity 0.12s linear !important;
-  }
-  /* Modal / Popover（含 Popconfirm）弹簧：用 rc-motion 的「进入态」*-enter-active 类限定，
-     只覆盖进入动画；离场时该类被移除、恢复 antd 原生离场——
-     若直接覆盖 .ant-modal 基础选择器，连离场也会被替换成 ui-spring-in，
-     导致关闭弹窗时反而从下方升起出现（明显回归）。
-     Modal 进入态为 ant-zoom-enter-active，Popover/Popconfirm 为 ant-zoom-big-enter-active，
-     均含 "enter-active"。匹配不到时安全降级为 antd 默认 zoom，不引入新回归。 */
-  :where(.ant-modal[class*="enter-active"], .ant-popover[class*="enter-active"]) {
-    animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
   }
 }
 
 /* 反馈动效：message 轻提示（Apple 流体 · 2026-10-13）。
    antd message 默认从顶部下滑淡入；套 ui-spring-in 让其以「自上方 8px 微升 + 缩放回弹」绽放，
-   方向与顶部出现语义一致（起点在终点上方），不冲突。仅覆盖 *-enter-active 入场态，
-   离场交还 antd 原生，避免覆盖离场导致提示残留不消失。
-   notification（边角横向滑入）方向语义与 translateY 错乱，按前期抽屉同理不动，保留原生滑入。 */
+   方向与顶部出现语义一致（起点在终点上方），不冲突。
+   ⚠ 同弹层修正：本构建 antd message 不发出 enter-active 类，故直接作用于
+   .ant-message-notice（随挂载播一次）。antd 按 duration 计时从 React state 卸载消息，
+   子节点动画不阻塞离场，不会残留不消失。 */
 @media (prefers-reduced-motion: no-preference) {
-  :where(.ant-message-notice[class*="enter-active"]) {
+  :where(.ant-message-notice) {
     animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
   }
 }
 
 /* 抽屉弹簧（Apple 流体 · 2026-10-13）。
-   抽屉按 placement 走 transform 滑入（rc-motion 在 *-enter-active / *-leave-active 置
-   transition: all，timing-function 默认 ease）——是「过渡」而非关键帧动画。
+   抽屉按 placement 走 transform 滑入（实测 .ant-drawer-content-wrapper 有 `transition: 0.3s`、
+   timing-function 默认 ease；**不发出 enter-active/leave-active 类**，实测 class 仅
+   `ant-drawer-content-wrapper`）。是「过渡」而非关键帧动画。
    若强行套 ui-spring-in（含 translateY+scale）会覆盖滑入的 transform，抽屉原地缩放而非滑入（回归）。
-   故仅把 timing-function 覆为 --ease-spring：保留方向正确的横向/纵向滑入，并附加 1.5% 过冲"回弹"，
-   时长沿用 antd（约 0.3s）。只命中 .ant-drawer-content-wrapper，不波及遮罩(.ant-drawer-mask)。 */
+   故直接把 .ant-drawer-content-wrapper 的 transition-timing-function 覆为 --ease-spring：
+   保留 antd 方向正确的滑入/滑出，附加 1.5% 过冲"回弹"，时长沿用 antd（0.3s）。
+   直接覆 timing-function（非 animation、非 transform）不影响 antd 对开/合的 transform 管理，
+   不会关不掉。只命中内容盒，不波及遮罩(.ant-drawer-mask)。 */
 @media (prefers-reduced-motion: no-preference) {
-  :where(.ant-drawer-content-wrapper[class*="enter-active"],
-         .ant-drawer-content-wrapper[class*="leave-active"]) {
+  :where(.ant-drawer-content-wrapper) {
     transition-timing-function: var(--ease-spring) !important;
   }
 }
@@ -466,15 +465,18 @@
  *   可安全轻微上抬 1px 表达真实浮起。
  * 入场动画挂在 tbody > tr 上：antd 按 rowKey 复用节点，同数据不重播；
  *   仅新数据/翻页/排序后新出现的行重播，等效"数据流入时逐行点亮"。 */
+/* 注：须加 !important。:where() 零特异性压不过 antd 运行时注入的
+ *   .ant-table-tbody > tr > td { transition: background .2s, border-color .2s }，
+ *   首版零特异性方案实测 td 过渡成 antd 默认（死代码）。与文件既有约定一致用 !important。 */
 :where(.ant-table-tbody > tr > td) {
-  transition: background-color 160ms var(--ease-spring);
+  transition: background-color 160ms var(--ease-spring) !important;
 }
 :where(.ant-table-tbody > tr.ant-table-row-selected > td) {
   background: var(--row-selected) !important;
 }
 
 :where(.ant-list-item) {
-  transition: background-color 160ms var(--ease-spring), transform 160ms var(--ease-spring);
+  transition: background-color 160ms var(--ease-spring), transform 160ms var(--ease-spring) !important;
 }
 :where(.ant-list-item:hover) {
   background: var(--violet-soft) !important;

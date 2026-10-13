@@ -25,12 +25,24 @@ export default defineConfig({
     headless: true,
     trace: "on-first-retry",
   },
-  webServer: {
-    command: "npx vite --port 5180 --strictPort",
-    url: "http://localhost:5180",
-    // 端口空闲则起新实例；若已有 vite 在 5180 则复用。
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  webServer: [
+    {
+      command: "npx vite --port 5180 --strictPort",
+      url: "http://localhost:5180",
+      // 端口空闲则起新实例；若已有 vite 在 5180 则复用。
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      // 联调 e2e（auth-login / integration）需要真实后端。自动拉起 uvicorn，
+      // 绑 0.0.0.0 以便前端 .env.local 的 LAN IP（192.168.124.12:8123）也能到达；
+      // 若 8123 已有实例则复用（reuseExistingServer）。本机 8000 被 Docker 占用，用 8123。
+      command:
+        "cd /Users/aries/黑金时代/backend && /Users/aries/Applications/Python_3.13/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8123",
+      url: "http://127.0.0.1:8123/api/v1/auth/me",
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+  ],
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

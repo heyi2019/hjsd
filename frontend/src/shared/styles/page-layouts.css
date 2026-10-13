@@ -320,3 +320,13 @@
 .permission-tree-leaves label { color: var(--color-text-secondary); font-size: var(--fs-footnote); }
 .scope-directory { max-height: var(--control-field-min-width); overflow: auto; padding: var(--space-2-half) var(--space-3); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font-size: var(--fs-caption-1); }
 .scope-directory strong,.scope-directory span { display: block; }.scope-directory span { margin: var(--space-1) 0 var(--space-2); }.scope-directory details { padding-left: var(--space-2); }.scope-directory summary { color: var(--color-text-primary); cursor: pointer; }.scope-directory details div { padding: var(--space-1) 0 var(--space-1-half) var(--space-3); }
+
+/* ── 用户中心（auth/UserCenterPage，顶栏入口） ─────────────── */
+.user-center { max-width: 40rem; }
+.user-center__card { width: 100%; }
+.user-center__meta { display: grid; gap: var(--space-2); margin: 0; }
+.user-center__meta div { display: flex; gap: var(--space-3); }
+.user-center__meta dt { min-width: 5rem; color: var(--color-text-secondary); }
+.user-center__meta dd { margin: 0; color: var(--color-text-primary); }
+.user-center__perms { display: flex; flex-wrap: wrap; gap: var(--space-1-half); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.user-center__perms li { padding: 2px var(--space-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-compact); background: var(--soft); color: var(--color-text-secondary); font-size: var(--fs-caption-1); }

@@ -120,7 +120,7 @@ def _load(stem: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
 
 
 def _existing_batches(session: Any) -> set[str]:
-    from app.domain.quality import ImportBatch
+    from app.domain.history import ImportBatch
 
     return {row.source_name for row in session.query(ImportBatch).all()}
 

@@ -4,11 +4,11 @@
 1. **禁止自动匹配**历史订单/账号/返点 —— 映射只能由人工指派 `assign_mapping`；
 2. **禁止补造历史单边划转** —— 本模块不写任何 cashflow / order_event；
 3. 历史行**不覆盖新单** —— 导入只落 `import_rows.raw`，不 upsert 业务表；
-4. 未映射行提交时转为 `HISTORY_UNMAPPED` 异常工单，可见但不阻塞新业务。
+4. 未映射行提交时保持 `UNMAPPED` 状态并在 `issue_note` 留痕，可见但不阻塞新业务。
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -22,10 +22,9 @@ from app.domain.enums import (
     AuditAction,
     ImportBatchStatus,
     ImportRowStatus,
-    IssueType,
     SequenceKey,
 )
-from app.domain.quality import ImportBatch, ImportRow, QualityIssue
+from app.domain.history import ImportBatch, ImportRow
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 
 COMMITTABLE = (ImportBatchStatus.MAPPED.value, ImportBatchStatus.DRAFT.value)
@@ -243,7 +242,7 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
         else:
             row.status = ImportRowStatus.UNMAPPED.value
             unmapped += 1
-            _raise_unmapped_issue(session, batch, row, actor)
+            row.issue_note = row.issue_note or f"历史行未映射：{batch.source_name} 第 {row.row_no} 行"
 
     batch.status = ImportBatchStatus.COMMITTED.value
     batch.committed_at = datetime.now()
@@ -260,34 +259,6 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
         after={"status": batch.status, "imported": imported, "unmapped": unmapped},
     )
     return {**_batch_out(batch), "imported": imported, "unmapped": unmapped}
-
-
-def _raise_unmapped_issue(
-    session: Session, batch: ImportBatch, row: ImportRow, actor: str
-) -> None:
-    exists = session.scalar(
-        select(QualityIssue.id).where(
-            QualityIssue.issue_type == IssueType.HISTORY_UNMAPPED.value,
-            QualityIssue.entity_type == "import_row",
-            QualityIssue.entity_id == row.id,
-        )
-    )
-    if exists:
-        return
-    session.add(
-        QualityIssue(
-            issue_no=allocate_number(session, SequenceKey.ISSUE.value),
-            issue_type=IssueType.HISTORY_UNMAPPED.value,
-            entity_type="import_row",
-            entity_id=row.id,
-            entity_label=f"{batch.batch_no}-{row.row_no}",
-            detected_on=date.today(),
-            note=f"历史行未映射：{batch.source_name} 第 {row.row_no} 行",
-            created_by=actor,
-            updated_by=actor,
-        )
-    )
-    session.flush()
 
 
 def _refresh_counts(session: Session, batch_id: int) -> None:
@@ -312,8 +283,8 @@ def mark_unlinked_transfer(
 ) -> dict[str, Any]:
     """MIG-01-06：标记「历史单边划转未裁决」。
 
-    红线：只打标记 + 开工单，**绝不生成配对流水**。Q14 类未裁决记录
-    必须在系统里可见，但不得凭空补出对手方。
+    红线：只打标记 + 留痕，**绝不生成配对流水**。Q14 类未裁决记录
+    必须在系统里可见（row.issue_note），但不得凭空补出对手方。
     """
     row = session.get(ImportRow, row_id)
     if row is None:
@@ -325,31 +296,6 @@ def mark_unlinked_transfer(
     row.unlinked_transfer = True
     row.issue_note = note or row.issue_note or "历史单边划转未裁决：已标记，不自动配对"
     session.flush()
-
-    exists = session.scalar(
-        select(QualityIssue.id).where(
-            QualityIssue.issue_type == IssueType.UNLINKED_TRANSFER.value,
-            QualityIssue.entity_type == "import_row",
-            QualityIssue.entity_id == row.id,
-        )
-    )
-    if not exists:
-        batch = session.get(ImportBatch, row.batch_id)
-        session.add(
-            QualityIssue(
-                issue_no=allocate_number(session, SequenceKey.ISSUE.value),
-                issue_type=IssueType.UNLINKED_TRANSFER.value,
-                severity="HIGH",
-                entity_type="import_row",
-                entity_id=row.id,
-                entity_label=f"{batch.batch_no}-{row.row_no}" if batch else str(row.row_no),
-                detected_on=date.today(),
-                note=row.issue_note,
-                created_by=actor,
-                updated_by=actor,
-            )
-        )
-        session.flush()
 
     record_audit(
         session,

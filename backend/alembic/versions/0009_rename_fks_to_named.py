@@ -17,7 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.schema import CreateTable
 
 from app.core.database import Base  # noqa: F401  注册全部 v1 表
-from app.domain import foundation, parties, quality, trade, users  # noqa: F401
+from app.domain import foundation, history, parties, trade, users  # noqa: F401
 
 revision = "0009_rename_fks_to_named"
 down_revision = "0008_integrity_constraints"

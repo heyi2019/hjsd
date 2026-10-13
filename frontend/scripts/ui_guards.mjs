@@ -18,7 +18,7 @@ const pages = () =>
 
 /** 计数语义的 label：必须显式 kind: "count"，否则被 MoneyText 渲染成 "1.00"。 */
 const COUNT_LABELS = [
-  "资金池数量", "未闭环异常", "阻断级异常", "已指派", "异常总数", "订单总数",
+  "资金池数量", "订单总数",
   "待处理", "TH 未闭环", "在库 / 分期中", "在库账号", "已售", "客户总数",
   "启用中", "已停用", "合约数", "逾期合约", "归集总数", "待结算", "订单数",
 ];
@@ -59,40 +59,7 @@ const client = readFileSync(join(SRC, "shared/api/client.ts"), "utf8");
 if (client.includes("127.0.0.1:8000")) fail("port", "client.ts 仍指向 8000（应为 8123）");
 if (!client.includes("127.0.0.1:8123")) fail("port", "client.ts 缺少 8123 兜底基址");
 
-// 规则 6：异常类型中文映射必须与后端 IssueType 枚举逐条对齐（漏一条页面上就露出英文枚举）
-const enumsSrc = readFileSync(
-  join(process.cwd(), "..", "backend", "app", "domain", "enums.py"),
-  "utf8",
-);
-// 注意：不能按空行截断——枚举体后面紧跟注释行，须截到下一个顶层 class/def 为止。
-const issueTypeBlock = enumsSrc.match(/class IssueType\(StrEnum\):[\s\S]*?(?=\n(?:class|def) )/);
-if (!issueTypeBlock) {
-  fail("issue-type", "未找到后端 IssueType 枚举，无法校验前端映射");
-} else {
-  const backendTypes = [...issueTypeBlock[0].matchAll(/^\s+[A-Z_]+\s*=\s*"([A-Z_]+)"/gm)].map(
-    (m) => m[1],
-  );
-  const workbench = readFileSync(join(SRC, "quality", "QualityWorkbench.tsx"), "utf8");
-  const labelBlock = workbench.match(/ISSUE_TYPE_LABEL[^=]*=\s*\{([\s\S]*?)\n\};/);
-  const frontendTypes = labelBlock
-    ? [...labelBlock[1].matchAll(/([A-Z_]+):/g)].map((m) => m[1])
-    : [];
-  if (backendTypes.length === 0) {
-    fail("issue-type", "后端 IssueType 枚举解析出 0 条，守卫正则可能已失效");
-  }
-  for (const type of backendTypes) {
-    if (!frontendTypes.includes(type)) {
-      fail("issue-type", `前端 ISSUE_TYPE_LABEL 缺后端枚举 ${type}`);
-    }
-  }
-  for (const type of frontendTypes) {
-    if (!backendTypes.includes(type)) {
-      fail("issue-type", `前端 ISSUE_TYPE_LABEL 的 ${type} 在后端枚举中不存在（键名拼错或已废弃）`);
-    }
-  }
-}
-
-// 规则 7：StatusTag 必须覆盖后端状态枚举（否则页面上直接露出英文枚举）
+// 规则 6：StatusTag 必须覆盖后端状态枚举（否则页面上直接露出英文枚举）
 const enumsPy = readFileSync(
   join(process.cwd(), "..", "backend", "app", "domain", "enums.py"),
   "utf8",
@@ -105,8 +72,8 @@ const labelKeys = labelBlockM
 // 这些枚举的值会直接进 StatusTag，必须全部有中文标签
 const STATUS_ENUMS = [
   "OrderStatus", "InstallmentStatus", "AccountStatus", "RebateStatus",
-  "IssueStatus", "IssueSeverity", "ImportBatchStatus", "ImportRowStatus",
-  "PoolStatus", "DepositStatus", "PolicyStatus", "ImportBatchStatus", "ImportRowStatus",
+  "ImportBatchStatus", "ImportRowStatus",
+  "PoolStatus", "DepositStatus", "PolicyStatus",
 ];
 /** 取枚举块。注意：传给 new RegExp 的模式里反斜杠必须双写（`\\(`），
  *  否则 JS 字符串会把 `\(` 变成空转义 `(`，整条规则静默失效。 */
@@ -116,7 +83,7 @@ const ENUM_BLOCK = (name) =>
 for (const enumName of STATUS_ENUMS) {
   const m = enumsPy.match(ENUM_BLOCK(enumName));
   if (!m) {
-    fail("status-label", `后端未找到枚举 ${enumName}，规则 7 覆盖不完整`);
+    fail("status-label", `后端未找到枚举 ${enumName}，规则 6 覆盖不完整`);
     continue;
   }
   const values = [...m[0].matchAll(/^\s+[A-Z_]+\s*=\s*"([A-Z_]+)"/gm)].map((x) => x[1]);
@@ -129,7 +96,7 @@ for (const enumName of STATUS_ENUMS) {
   }
 }
 
-// 规则 8：normalizeError 必须来自共享层，禁止各页面复制一份。
+// 规则 7：normalizeError 必须来自共享层，禁止各页面复制一份。
 // 背景：曾有 11 个页面各自复制一份逐字相同的实现，修复一处网络层文案要改 11 个文件，
 // 且极易漏改。共享实现见 shared/api/client.ts。
 const SHARED_CLIENT = join(SRC, "shared", "api", "client.ts");
@@ -153,7 +120,7 @@ for (const file of pages()) {
   }
 }
 
-// 规则 9：`.ui-stack` 的直接子组件不得自带 margin-block-end。
+// 规则 8：`.ui-stack` 的直接子组件不得自带 margin-block-end。
 // 背景（实测事故）：父级 .ui-stack gap:16px 与子组件 margin-block-end:16px
 // 叠加成 32px，导致全站块间距呈 [32,32,32,16] 锯齿，与设计令牌 16px 不符。
 // 纵向节奏必须由单一机制（父级 gap）独占。
@@ -163,7 +130,7 @@ for (const file of pages()) {
 const STACK_CHILD_MARGIN_BAN = [".ui-page-header", ".ui-stat-row"];
 const uiComponentsCss = join(SRC, "shared", "styles", "ui-components.css");
 if (!existsSync(uiComponentsCss)) {
-  fail("stack-gap", `缺少 ${relative(process.cwd(), uiComponentsCss)}，规则 9 无从检查`);
+  fail("stack-gap", `缺少 ${relative(process.cwd(), uiComponentsCss)}，规则 8 无从检查`);
 } else {
   const text = readFileSync(uiComponentsCss, "utf8");
   for (const sel of STACK_CHILD_MARGIN_BAN) {
@@ -171,7 +138,7 @@ if (!existsSync(uiComponentsCss)) {
     const found = [...text.matchAll(re)];
     // 解析出 0 个声明块也算失败——说明选择器改名了，规则已失效（见 ENUM_BLOCK 注释）。
     if (found.length === 0) {
-      fail("stack-gap", `ui-components.css 未找到 ${sel} 声明块，规则 9 覆盖不完整`);
+      fail("stack-gap", `ui-components.css 未找到 ${sel} 声明块，规则 8 覆盖不完整`);
       continue;
     }
     for (const m of found) {
@@ -185,18 +152,18 @@ if (!existsSync(uiComponentsCss)) {
   }
 }
 
-// 规则 10：CSS 自定义属性（令牌）不得「引用了但从未定义」。
+// 规则 9：CSS 自定义属性（令牌）不得「引用了但从未定义」。
 // 背景（实测事故 2026-10-04）：ui-components.css 引用 var(--font-caption-2)，
 // 但 tokens.css 只有 --font-caption 与 --font-nav-caption，没有 --font-caption-2。
 // var() 引用不存在的自定义属性时，**整条声明作废且零报错**，静默回落浏览器默认
 // （实测 font 简写整体失效、字号退回 13px，恰与父级继承值撞车而看不出异常）。
-// 这类缺陷 tsc / vite / 现有 9 条规则全都抓不到，只能靠交叉比对声明与引用。
+// 这类缺陷 tsc / vite / 现有 8 条规则全都抓不到，只能靠交叉比对声明与引用。
 const cssFiles = walk(SRC).filter((f) => f.endsWith(".css"));
 /**
  * 剥注释必须能跨行：块注释 /* ... *\/ 常整段跨多行（如 tokens.css 里
  * 「响应式断点媒体查询」那段就整块提到 @media (--bp-md) 的用法），
  * 只做单行 replace 的话，注释第二行起的 `var(--bp-*)` 会被当成真代码 →
- * 规则 10 首次运行就误报（实测 var(--bp-) 这种根本不可能的变量名 = 典型症状）。
+ * 规则 9 首次运行就误报（实测 var(--bp-) 这种根本不可能的变量名 = 典型症状）。
  * 故先整块去注释，再按行处理。
  */
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -219,7 +186,7 @@ for (const file of cssFiles) {
   });
 }
 
-// 规则 11：animation / animation-name 不得引用未定义的 @keyframes。
+// 规则 10：animation / animation-name 不得引用未定义的 @keyframes。
 // 背景（实测事故 2026-10-04，同类）：antd-adapter.css 引用 ui-spring-in，
 // 但全项目从未定义该 @keyframes → animation-name 匹配不到即整体不生效、零报错，
 // 等于「声明了弹簧入场、实际没有任何弹层在动」。
@@ -243,7 +210,7 @@ for (const file of cssFiles) {
     if (!token) return;
     if (KF_SKIP.has(token)) return;
     if (/^[\w-]+\(/.test(token)) return; // cubic-bezier / steps / linear(...)
-    if (/^[-+]?[\d.]+m?s?$/.test(token)) return; // 纯时长
+    if (/^[-+]?[\d.]+m?s$/.test(token)) return; // 纯时长
     if (!definedKf.has(token)) {
       fail(
         "css-keyframes",
@@ -252,10 +219,10 @@ for (const file of cssFiles) {
     }
   });
 }
-// 规则 11 自检：若全项目一个 @keyframes 都没有，说明本规则正则已失效
+// 规则 10 自检：若全项目一个 @keyframes 都没有，说明本规则正则已失效
 // （历史上踩过「正则永不匹配 → 整条规则静默失效 → 守卫一直报绿」）。
 if (definedKf.size === 0) {
-  fail("css-keyframes", "全项目未找到任何 @keyframes，规则 11 的解析正则可能已失效");
+  fail("css-keyframes", "全项目未找到任何 @keyframes，规则 10 的解析正则可能已失效");
 }
 
 if (failures.length) {
@@ -264,5 +231,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  `UI 守卫通过：${pages().length} 个页面文件，11 条规则全过（含后端 IssueType 对齐 + StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧引用完整性）。`,
+  `UI 守卫通过：${pages().length} 个页面文件，10 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧引用完整性）。`,
 );

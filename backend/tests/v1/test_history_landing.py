@@ -125,7 +125,7 @@ class TestNoInference:
         assert batch["unmapped_count"] == 1
         assert batch["status"] == ImportBatchStatus.DRAFT.value
 
-        from app.domain.quality import ImportRow
+        from app.domain.history import ImportRow
 
         row = seeded_db.query(ImportRow).filter_by(batch_id=batch["id"]).one()
         assert row.status == ImportRowStatus.UNMAPPED.value
@@ -159,7 +159,7 @@ class TestIdempotency:
         src.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
 
-        from app.domain.quality import ImportBatch
+        from app.domain.history import ImportBatch
 
         history_service.create_batch(
             seeded_db,

@@ -1,16 +1,15 @@
-"""domain.quality：异常工单与 P2 历史导入批次（QLT-01 / MIG-01）。
+"""domain.history：P2 历史导入批次与原始行（MIG-01）。
 
 设计红线（MIG-01）：历史导入**只落原始行与人工映射结果**，
 禁止自动匹配订单/账号/返点，禁止补造历史单边划转。
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -22,57 +21,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.core.money import Amount
 from app.domain.base import AuditMixin, TimestampMixin
-from app.domain.enums import (
-    ImportBatchStatus,
-    ImportRowStatus,
-    IssueSeverity,
-    IssueStatus,
-    IssueType,
-)
-
-
-class QualityIssue(Base, AuditMixin):
-    """异常工单：检测任务发现 → 指派 → 处置 → 关闭，全链留痕（QLT-01-05）。"""
-
-    __tablename__ = "quality_issues"
-    __table_args__ = (
-        CheckConstraint(
-            f"issue_type IN {IssueType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="issue_type_valid",
-        ),
-        CheckConstraint(
-            f"severity IN {IssueSeverity.values()!r}".replace("[", "(").replace("]", ")"),
-            name="issue_severity_valid",
-        ),
-        CheckConstraint(
-            f"status IN {IssueStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="issue_status_valid",
-        ),
-        Index("ix_quality_issues_type_status", "issue_type", "status"),
-        Index("ix_quality_issues_detected", "detected_on"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    issue_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
-    issue_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    severity: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=IssueSeverity.MEDIUM.value
-    )
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=IssueStatus.OPEN.value
-    )
-    # 对象定位：类型 + 业务 id + 可读单号，便于前端一键跳转
-    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    entity_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    detected_on: Mapped[date] = mapped_column(Date, nullable=False)
-    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+from app.domain.enums import ImportBatchStatus, ImportRowStatus
 
 
 class ImportBatch(Base, AuditMixin):
@@ -153,4 +103,4 @@ class ImportRow(Base, TimestampMixin):
     issue_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-__all__ = ["ImportBatch", "ImportRow", "QualityIssue"]
+__all__ = ["ImportBatch", "ImportRow"]

@@ -8,7 +8,6 @@ import { OrdersPage } from "../orders/OrdersPage";
 import { CustomersPage } from "../customers/CustomersPage";
 import { FundsPage } from "../pools/FundsPage";
 import { ReportsPage } from "../reporting/ReportsPage";
-import { QualityWorkbench } from "../quality/QualityWorkbench";
 import { SettingsPage } from "../field-definitions/SettingsPage";
 import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
@@ -22,7 +21,6 @@ const PAGES: Record<string, (props: PageProps) => JSX.Element> = {
   customers: CustomersPage,
   funds: FundsPage,
   operations: ReportsPage,
-  quality: QualityWorkbench,
   settings: SettingsPage,
 };
 

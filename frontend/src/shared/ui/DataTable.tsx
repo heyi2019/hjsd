@@ -4,7 +4,7 @@
  *  - 前端分页（默认，缺省 controlledPaging）：调用方一次加载全量 rows，DataTable 内部自管
  *    current/pageSize，antd 直接对 dataSource 切片。适用于所有只读/全量展示列表。
  *  - 服务端分页（controlledPaging=true）：调用方自管 page/pageSize 并向后端取数
- *    （如 QualityWorkbench 用 offset 分页），DataTable 完全受控。
+ *    （如历史批次行用 offset 分页），DataTable 完全受控。
  */
 import { Empty, Spin, Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";

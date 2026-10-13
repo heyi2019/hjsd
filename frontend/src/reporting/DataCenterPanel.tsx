@@ -3,7 +3,7 @@
 import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { poolsApi, qualityApi, ordersApi, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
+import { poolsApi, ordersApi, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
@@ -27,7 +27,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
-  const [openIssues, setOpenIssues] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -56,21 +55,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     void load();
   }, [load]);
 
-  useEffect(() => {
-    let cancelled = false;
-    qualityApi
-      .overview()
-      .then((ov) => {
-        if (!cancelled) setOpenIssues(ov.items.reduce((sum, item) => sum + item.open, 0));
-      })
-      .catch(() => {
-        /* 概览失败不阻断数据中心，其余数据仍可用 */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const rows: PoolRow[] = pools.map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
 
   const sum = (pick: (b?: PoolBalance) => string | undefined) =>
@@ -80,8 +64,8 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   const totalThAdvance = sum((b) => b?.th_advance);
   const totalDeposit = sum((b) => b?.deposit_held);
 
-  // 业务计数口径：与业务中心同口径（DRAFT/ACTIVE 为待处理；提号单 ACTIVE 为未闭环）。
-  const pendingCount = orders.filter((o) => ["DRAFT", "ACTIVE"].includes(o.status)).length;
+  // 业务计数口径：与业务中心同口径（ACTIVE 为待处理；提号单 ACTIVE 为未闭环）。
+  const pendingCount = orders.filter((o) => o.status === "ACTIVE").length;
   const thOpenCount = orders.filter((o) => o.order_type === "TH" && o.status === "ACTIVE").length;
 
   const columns: ColumnsType<PoolRow> = [
@@ -163,12 +147,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       <StatRow
         items={[
           { label: "资金池数量", kind: "count", amount: String(pools.length) },
-          {
-            label: "未闭环异常",
-            kind: "count",
-            amount: openIssues === null ? "-" : String(openIssues),
-            tone: openIssues ? "warn" : "plain",
-          },
         ]}
       />
 

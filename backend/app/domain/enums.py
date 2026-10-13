@@ -78,7 +78,6 @@ class SequenceKey(StrEnum):
     CASHFLOW = "CASHFLOW"
     REBATE = "REBATE"
     DEPOSIT = "DEPOSIT"
-    ISSUE = "ISSUE"
     IMPORT = "IMPORT"
 
 
@@ -138,9 +137,8 @@ class EntityType(StrEnum):
 
 # ---------------------------------------------------------------- 订单 / 事件
 class OrderStatus(StrEnum):
-    """订单状态机（错误码文档 §2）。"""
+    """订单状态机（错误码文档 §2）：创建即 ACTIVE，无草稿态（2026-10-13 移除）。"""
 
-    DRAFT = "DRAFT"
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
@@ -152,7 +150,6 @@ class EventType(StrEnum):
     SELL = "SELL"
     PAYMENT = "PAYMENT"
     DELIVER = "DELIVER"
-    TRANSFER = "TRANSFER"
     CANCEL = "CANCEL"
 
 
@@ -160,7 +157,6 @@ class Nature(StrEnum):
     EXTERNAL_IN = "EXTERNAL_IN"
     BUSINESS_IN = "BUSINESS_IN"
     BUSINESS_OUT = "BUSINESS_OUT"
-    INTERNAL = "INTERNAL"
 
 
 class Direction(StrEnum):
@@ -252,36 +248,6 @@ class AllocationRole(StrEnum):
     SERVICE = "SERVICE"  # 服务
 
 
-class IssueType(StrEnum):
-    """异常类型（QLT-01-01）：八类可检测异常 + 历史导入保留。"""
-
-    UNROUTED_EVENT = "UNROUTED_EVENT"  # 未路由事件
-    SINGLE_SIDED_TRANSFER = "SINGLE_SIDED_TRANSFER"  # 单边划转
-    NEGATIVE_AVAILABLE = "NEGATIVE_AVAILABLE"  # 负可用余额
-    TH_UNCLOSED = "TH_UNCLOSED"  # TH 未闭环
-    UNCOLLECTED_REBATE = "UNCOLLECTED_REBATE"  # 未归集返点
-    OVERDUE_INSTALLMENT = "OVERDUE_INSTALLMENT"  # 分期逾期
-    ACCOUNT_CONFLICT = "ACCOUNT_CONFLICT"  # 账号状态冲突
-    ORPHAN_CASHFLOW = "ORPHAN_CASHFLOW"  # 孤儿流水
-    HISTORY_UNMAPPED = "HISTORY_UNMAPPED"  # 历史行未映射（P2，不自动猜测）
-    UNLINKED_TRANSFER = "UNLINKED_TRANSFER"  # 历史单边划转未裁决（MIG-01-06，仅标记不配对）
-
-
-class IssueSeverity(StrEnum):
-    BLOCKER = "BLOCKER"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-
-
-class IssueStatus(StrEnum):
-    OPEN = "OPEN"
-    ASSIGNED = "ASSIGNED"
-    RESOLVED = "RESOLVED"
-    CLOSED = "CLOSED"
-    IGNORED = "IGNORED"
-
-
 class ImportBatchStatus(StrEnum):
     """P2 历史导入批次：导入只落「原始行 + 映射」，绝不自动匹配（MIG-01）。"""
 
@@ -329,7 +295,6 @@ class AuditAction(StrEnum):
     ORDER_UPDATE = "ORDER_UPDATE"
     EVENT_CREATE = "EVENT_CREATE"
     EVENT_POST = "EVENT_POST"
-    TRANSFER_CREATE = "TRANSFER_CREATE"
     DEPOSIT_CREATE = "DEPOSIT_CREATE"
     DEPOSIT_RELEASE = "DEPOSIT_RELEASE"
     INSTALLMENT_CREATE = "INSTALLMENT_CREATE"
@@ -368,9 +333,6 @@ __all__ = [
     "EventType",
     "InstallmentContractType",
     "InstallmentStatus",
-    "IssueSeverity",
-    "IssueStatus",
-    "IssueType",
     "LinkStatus",
     "Nature",
     "OrderStatus",

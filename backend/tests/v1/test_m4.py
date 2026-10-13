@@ -1,192 +1,20 @@
-"""M4：异常工作台 / R1-R5 报表 / 审计查询 / P2 历史导入。
+"""M4：R1-R5 报表 / 审计查询 / P2 历史导入。
 
-功能编号：QLT-01-01、QLT-01-03、QLT-01-05、RPT-01-01~06、MIG-01-01~04、BAS-05-03
+功能编号：RPT-01-01~06、MIG-01-01~08、BAS-05-03
 """
 from __future__ import annotations
 
 from datetime import date
 
 import pytest
-from fastapi.testclient import TestClient
 
-from sqlalchemy.orm import Session
-
-from app.core.money import to_money
-from app.domain.enums import ImportRowStatus, IssueStatus, IssueType
-from app.domain.quality import ImportBatch, ImportRow, QualityIssue
+from app.domain.enums import ImportRowStatus
+from app.domain.history import ImportBatch, ImportRow
 from app.history import service as history_service
 from app.orders import service as order_service
-from app.quality import service as quality_service
 from app.reporting import service as reporting_service
 
-ISSUES = "/api/v1/quality/issues"
 REPORTS = "/api/v1/reports"
-
-
-# --------------------------------------------------------------------- 异常检测
-class TestDetection:
-    def test_detection_is_idempotent(self, seeded_db):
-        from datetime import date
-
-        from app.domain.enums import Direction, Nature
-        from app.domain.trade import Cashflow
-
-        seeded_db.add(
-            Cashflow(
-                flow_no="HJF9000",
-                pool_id=1,
-                occurred_on=date(2026, 10, 4),
-                nature=Nature.BUSINESS_IN.value,
-                category="OTHER",
-                direction=Direction.IN.value,
-                amount=to_money("500.00"),
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        seeded_db.commit()
-        first = quality_service.run_detection(seeded_db, actor="pytest")
-        second = quality_service.run_detection(seeded_db, actor="pytest")
-        assert first["created_total"] >= 1
-        # 第二次复跑不应再新增同一对象工单
-        assert second["created_total"] == 0
-
-    def test_orphan_cashflow_is_detected(self, seeded_db):
-        from datetime import date
-
-        from app.core.money import to_money
-        from app.domain.enums import Direction, Nature
-        from app.domain.trade import Cashflow
-
-        seeded_db.add(
-            Cashflow(
-                flow_no="HJF9001",
-                pool_id=1,
-                occurred_on=date(2026, 10, 4),
-                nature=Nature.BUSINESS_IN.value,
-                category="OTHER",
-                direction=Direction.IN.value,
-                amount=to_money("888.00"),
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        seeded_db.commit()
-        result = quality_service.run_detection(seeded_db, actor="pytest")
-        assert result["created"]["orphan_cashflow"] >= 1
-        issues = quality_service.list_issues(
-            seeded_db, issue_type=IssueType.ORPHAN_CASHFLOW.value
-        )
-        assert issues
-        assert issues[0]["amount"] == "888.00"
-
-    def test_negative_available_is_detected(self, seeded_db):
-        from datetime import date
-
-        from app.domain.enums import Direction, Nature
-        from app.domain.trade import Cashflow
-
-        seeded_db.add(
-            Cashflow(
-                flow_no="HJF9002",
-                pool_id=1,
-                occurred_on=date(2026, 10, 4),
-                nature=Nature.BUSINESS_OUT.value,
-                category="OTHER",
-                direction=Direction.OUT.value,
-                amount=to_money("99999.00"),
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        seeded_db.commit()
-        quality_service.run_detection(seeded_db, actor="pytest")
-        issues = quality_service.list_issues(
-            seeded_db, issue_type=IssueType.NEGATIVE_AVAILABLE.value
-        )
-        assert issues
-
-    def test_overview_groups_by_type_and_severity(self, seeded_db):
-        quality_service.run_detection(seeded_db, actor="pytest")
-        data = quality_service.overview(seeded_db)
-        assert "total" in data and "blockers" in data
-        for item in data["items"]:
-            assert item["severity"] in ("BLOCKER", "HIGH", "MEDIUM", "LOW")
-            assert item["entry"].startswith("/quality")
-
-
-# --------------------------------------------------------------------- 工单闭环
-class TestIssueWorkflow:
-    def _new_issue(self, seeded_db):
-        """显式造一条孤儿流水，保证工单存在（不依赖环境残留）。"""
-        from datetime import date
-
-        from app.domain.enums import Direction, Nature
-        from app.domain.trade import Cashflow
-
-        seeded_db.add(
-            Cashflow(
-                flow_no="HJF9100",
-                pool_id=1,
-                occurred_on=date(2026, 10, 4),
-                nature=Nature.BUSINESS_IN.value,
-                category="OTHER",
-                direction=Direction.IN.value,
-                amount=to_money("123.00"),
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        seeded_db.commit()
-        quality_service.run_detection(seeded_db, actor="pytest")
-        issues = quality_service.list_issues(
-            seeded_db, issue_type=IssueType.ORPHAN_CASHFLOW.value
-        )
-        assert issues, "孤儿流水检测未产出工单"
-        return issues[0]
-
-    def test_assign_then_resolve_requires_resolution(self, seeded_db):
-        issue = self._new_issue(seeded_db)
-        assigned = quality_service.assign_issue(
-            seeded_db, issue["id"], 7, actor="pytest"
-        )
-        assert assigned["status"] == IssueStatus.ASSIGNED.value
-        assert assigned["owner_id"] == 7
-
-        with pytest.raises(Exception) as exc:
-            quality_service.resolve_issue(
-                seeded_db, issue["id"], resolution="  ", actor="pytest"
-            )
-        assert "解决方式" in str(exc.value)
-
-        closed = quality_service.resolve_issue(
-            seeded_db, issue["id"], resolution="已补录路由", actor="pytest"
-        )
-        assert closed["status"] == IssueStatus.CLOSED.value
-        assert closed["closed_at"] is not None
-
-    def test_closed_issue_cannot_be_reassigned(self, seeded_db):
-        issue = self._new_issue(seeded_db)
-        quality_service.resolve_issue(
-            seeded_db, issue["id"], resolution="已处置", actor="pytest"
-        )
-        with pytest.raises(Exception):
-            quality_service.assign_issue(seeded_db, issue["id"], 1, actor="pytest")
-
-    def test_resolution_writes_audit(self, seeded_db):
-        from sqlalchemy import select
-
-        from app.domain.foundation import AuditLog
-
-        issue = self._new_issue(seeded_db)
-        quality_service.resolve_issue(
-            seeded_db, issue["id"], resolution="已处置", actor="pytest"
-        )
-        seeded_db.commit()
-        rows = seeded_db.scalars(
-            select(AuditLog).where(AuditLog.entity_type == "quality_issue")
-        ).all()
-        assert rows
 
 
 # --------------------------------------------------------------------- 报表
@@ -287,7 +115,7 @@ class TestHistoryImport:
         assert committed["imported"] == 1
         assert committed["unmapped"] == 0
 
-    def test_unmapped_rows_become_issues_not_business_data(self, seeded_db):
+    def test_unmapped_rows_stay_unmapped_not_business_data(self, seeded_db):
         from sqlalchemy import select
 
         from app.domain.trade import Cashflow, OrderEvent
@@ -305,10 +133,10 @@ class TestHistoryImport:
         assert len(seeded_db.scalars(select(Cashflow)).all()) == before_flows
         assert len(seeded_db.scalars(select(OrderEvent)).all()) == before_events
 
-        issues = quality_service.list_issues(
-            seeded_db, issue_type=IssueType.HISTORY_UNMAPPED.value
-        )
-        assert len(issues) == 2
+        # 未映射行保持 UNMAPPED 并在 issue_note 留痕，可见但不阻塞新业务
+        rows = history_service.list_rows(seeded_db, batch["id"])
+        assert all(r["status"] == ImportRowStatus.UNMAPPED.value for r in rows)
+        assert all(r["issue_note"] for r in rows)
 
     def test_commit_is_not_repeatable(self, seeded_db):
         batch = history_service.create_batch(
@@ -333,23 +161,10 @@ class TestM4Api:
             response = seeded_client.get(f"{REPORTS}{path[8:]}", headers=viewer_headers)
             assert response.status_code in (200, 403), path
 
-    def test_quality_endpoints(self, seeded_client, headers):
-        assert seeded_client.get("/api/v1/quality/overview", headers=headers).status_code == 200
-        assert seeded_client.post("/api/v1/quality/detect", headers=headers).status_code == 200
-        listed = seeded_client.get(ISSUES, headers=headers)
-        assert listed.status_code == 200
-        assert "items" in listed.json()
-
     def test_audit_logs_endpoint(self, seeded_client, headers):
         response = seeded_client.get("/api/v1/audit-logs", headers=headers)
         assert response.status_code == 200
         assert "items" in response.json()
-
-    def test_viewer_cannot_run_detection(self, seeded_client, viewer_headers):
-        response = seeded_client.post(
-            "/api/v1/quality/detect", headers=viewer_headers
-        )
-        assert response.status_code == 403
 
     def test_history_endpoints(self, seeded_client, headers):
         created = seeded_client.post(
@@ -366,69 +181,6 @@ class TestM4Api:
             ).status_code
             == 200
         )
-
-
-__all__ = ["TestClient"]
-
-
-class TestIssuePagination:
-    """工单分页契约：total 必须是筛选后的总数，不是当前页条数。
-
-    回归背景：初版 list_issues 直接返回 len(items)，前端分页器据此渲染，
-    数据量超过一页后 total 就等于 limit，翻页会出现空页。
-    """
-
-    @staticmethod
-    def _make_issues(seeded_db: Session, count: int) -> None:
-        from app.domain.quality import QualityIssue
-        from app.domain.enums import IssueSeverity, IssueStatus, IssueType
-
-        for i in range(count):
-            seeded_db.add(
-                QualityIssue(
-                    issue_no=f"QIP{i:04d}",
-                    issue_type=IssueType.ACCOUNT_CONFLICT.value,
-                    severity=IssueSeverity.LOW.value,
-                    status=IssueStatus.OPEN.value,
-                    entity_type="account",
-                    entity_id=i + 1,
-                    entity_label=f"acc-{i}",
-                    amount=to_money("1.00"),
-                    detected_on=date(2026, 10, 4),
-                )
-            )
-        seeded_db.commit()
-
-    def test_total_is_filtered_count_not_page_length(self, seeded_client, seeded_db, headers):
-        self._make_issues(seeded_db, 7)
-        response = seeded_client.get(f"{ISSUES}?limit=3&offset=0", headers=headers)
-        assert response.status_code == 200
-        body = response.json()
-        assert len(body["items"]) == 3
-        assert body["total"] >= 7, "total 必须反映筛选后总数"
-
-    def test_second_page_returns_remaining_rows(self, seeded_client, seeded_db, headers):
-        self._make_issues(seeded_db, 7)
-        first = seeded_client.get(f"{ISSUES}?limit=3&offset=0", headers=headers).json()
-        second = seeded_client.get(f"{ISSUES}?limit=3&offset=3", headers=headers).json()
-        first_ids = {row["id"] for row in first["items"]}
-        second_ids = {row["id"] for row in second["items"]}
-        assert first_ids and second_ids
-        assert not (first_ids & second_ids), "两页不应重复返回同一工单"
-        assert second["total"] == first["total"], "翻页时 total 不得变化"
-
-    def test_filtered_total_shrinks(self, seeded_client, seeded_db, headers):
-        self._make_issues(seeded_db, 5)
-        unfiltered = seeded_client.get(ISSUES, headers=headers).json()
-        filtered = seeded_client.get(
-            f"{ISSUES}?issue_type=ACCOUNT_CONFLICT", headers=headers
-        ).json()
-        assert filtered["total"] == unfiltered["total"]
-        none_match = seeded_client.get(
-            f"{ISSUES}?issue_type=TH_UNCLOSED", headers=headers
-        ).json()
-        assert none_match["total"] == 0
-        assert none_match["items"] == []
 
 
 class TestHistoryClosure:
@@ -523,8 +275,7 @@ class TestHistoryClosure:
         assert mapped["mapping_basis"] == "无"
 
     # ── MIG-01-06 UNLINKED_TRANSFER 标记 ──
-    def test_mark_unlinked_creates_issue_without_pairing(self, seeded_db):
-        from app.domain.enums import IssueType
+    def test_mark_unlinked_without_pairing(self, seeded_db):
         from app.domain.trade import Cashflow
 
         batch = history_service.create_batch(
@@ -536,24 +287,17 @@ class TestHistoryClosure:
         assert marked["unlinked_transfer"] is True
         # 关键红线：打了标记但绝不能凭空补出配对流水
         assert seeded_db.query(Cashflow).count() == flows_before
-        issues = quality_service.list_issues(
-            seeded_db, issue_type=IssueType.UNLINKED_TRANSFER.value
-        )
-        assert len(issues) == 1, "应生成一条 UNLINKED_TRANSFER 工单"
+        # 留痕落在行上，可见但不生成任何配对数据
+        assert marked["issue_note"]
 
     def test_mark_unlinked_is_idempotent(self, seeded_db):
-        from app.domain.enums import IssueType
-
         batch = history_service.create_batch(
             seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
         )
         row = history_service.list_rows(seeded_db, batch["id"])[0]
-        history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
-        history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
-        issues = quality_service.list_issues(
-            seeded_db, issue_type=IssueType.UNLINKED_TRANSFER.value
-        )
-        assert len(issues) == 1, "重复标记不得重复建单"
+        first = history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
+        second = history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
+        assert first["issue_note"] == second["issue_note"], "重复标记不得改写留痕"
 
     # ── MIG-01-07 回滚 ──
     def test_rollback_draft_batch(self, seeded_db):
@@ -662,33 +406,10 @@ class TestHistoryClosure:
 class TestEnumConstraintDrift:
     """防回归：模型枚举与数据库 CHECK 约束必须一致。
 
-    实测踩过：给 `IssueType` 加了 `UNLINKED_TRANSFER` 但没重建 `quality_issues`，
-    插入工单时 sqlite3.IntegrityError（CHECK constraint failed），
-    而 `alembic check` 当时是「No new upgrade operations detected」——它不校验 CHECK 内容。
+    实测踩过：给枚举加了新值但没重建对应表，插入时 sqlite3.IntegrityError
+    （CHECK constraint failed），而 `alembic check` 是「No new upgrade
+    operations detected」——它不校验 CHECK 内容。
     """
-
-    def test_every_issue_type_passes_db_check(self, seeded_db):
-        from app.domain.enums import IssueType
-
-        for issue_type in IssueType:
-            issue = QualityIssue(
-                issue_no=f"CHK{issue_type.value[:6]}",
-                issue_type=issue_type.value,
-                severity="LOW",
-                status="OPEN",
-                entity_type="probe",
-                entity_id=1,
-                detected_on=date(2026, 10, 4),
-            )
-            seeded_db.add(issue)
-            try:
-                seeded_db.flush()
-            except Exception as exc:  # noqa: BLE001
-                pytest.fail(
-                    f"枚举 {issue_type.value} 被数据库 CHECK 拒绝：{exc}。"
-                    "需在迁移中重建对应表（alembic check 查不出 CHECK 内容漂移）。"
-                )
-        seeded_db.rollback()
 
     def test_every_batch_status_passes_db_check(self, seeded_db):
         from app.domain.enums import ImportBatchStatus

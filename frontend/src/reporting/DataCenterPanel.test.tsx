@@ -5,11 +5,10 @@ import { renderApp } from "../test/render";
 import { DataCenterPanel } from "./DataCenterPanel";
 
 /** 数据中心用例集：2026-10-13 从「工作台资金总览」原样迁入（内容未变，只换容器）。
- *  覆盖：资金池表格、金额/计数两种统计口径、异常数聚合与失败回落、错误条必达 UI、
+ *  覆盖：资金池表格、金额/计数两种统计口径、错误条必达 UI、
  *  finance.read 门控、订单入口卡计数与跳转。 */
 const poolsList = vi.fn();
 const poolsBalance = vi.fn();
-const qualityOverview = vi.fn();
 const ordersList = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
@@ -18,7 +17,6 @@ vi.mock("../shared/api/catalog", () => ({
     balance: (...a: unknown[]) => poolsBalance(...a),
     create: vi.fn(),
   },
-  qualityApi: { overview: (...a: unknown[]) => qualityOverview(...a) },
   ordersApi: { list: (...a: unknown[]) => ordersList(...a) },
 }));
 
@@ -29,8 +27,6 @@ const pools = [
 const balance = {
   income: "1000.00",
   expense: "200.00",
-  transfer_in: "0.00",
-  transfer_out: "0.00",
   cash_balance: "800.00",
   deposit_held: "100.00",
   th_advance: "50.00",
@@ -46,7 +42,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   poolsList.mockResolvedValue(pools);
   poolsBalance.mockResolvedValue(balance);
-  qualityOverview.mockResolvedValue({ items: [{ type: "X", open: 2 }, { type: "Y", open: 3 }] });
   ordersList.mockResolvedValue(orders);
 });
 
@@ -72,22 +67,6 @@ describe("DataCenterPanel：资金总览", () => {
     const card = screen.getByText("资金池数量").closest(".ui-stat");
     expect(card?.textContent).toContain("2");
     expect(card?.textContent).not.toContain("2.00");
-  });
-
-  it("未闭环异常取 quality 概览的 open 求和", async () => {
-    renderApp(<DataCenterPanel />, { user: "admin" });
-    await waitFor(() => {
-      const card = screen.getByText("未闭环异常").closest(".ui-stat");
-      expect(card?.textContent).toContain("5"); // 2 + 3
-    });
-  });
-
-  it("quality 概览失败不阻断数据中心，异常数回落 -", async () => {
-    qualityOverview.mockRejectedValueOnce(new Error("boom"));
-    renderApp(<DataCenterPanel />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    const card = screen.getByText("未闭环异常").closest(".ui-stat");
-    expect(card?.textContent).toContain("-");
   });
 
   it("后端不可达时显示错误条，不能静默显示「尚未配置资金池」", async () => {

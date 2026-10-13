@@ -45,7 +45,7 @@ def _seed_order_rows(session, rows):
         source_kind="LEGACY_ORDER",
         actor="pytest",
     )
-    from app.domain.quality import ImportRow
+    from app.domain.history import ImportRow
 
     # 测试会话是 autoflush=False（见 conftest「savepoint 挡不住 commit」的说明），
     # 所以必须显式 flush，否则被测代码的查询看不到刚落库的 ImportRow。
@@ -219,7 +219,7 @@ class TestIdempotency:
         mapper.map_orders(seeded_db, dry_run=False)
         seeded_db.commit()
         # 手工把 status 拨回 UNMAPPED，模拟「幂等判断被绕过」
-        from app.domain.quality import ImportRow
+        from app.domain.history import ImportRow
 
         seeded_db.query(ImportRow).update({"status": ImportRowStatus.UNMAPPED.value})
         seeded_db.commit()

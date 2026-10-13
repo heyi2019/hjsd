@@ -50,7 +50,6 @@ PERM_ORDER_UPDATE = "order.update"
 PERM_ORDER_EVENT_POST = "order.event.post"
 PERM_ORDER_EXCEPTION_APPROVE = "order.exception.approve"
 PERM_FINANCE_READ = "finance.read"
-PERM_FINANCE_TRANSFER = "finance.transfer"
 PERM_DEPOSIT_POST = "deposit.post"
 PERM_POLICY_MANAGE = "policy.manage"
 PERM_POLICY_APPROVE = "policy.approve"
@@ -58,8 +57,6 @@ PERM_FIELD_DEFINITION_MANAGE = "field-definition.manage"
 PERM_AUDIT_READ = "audit.read"
 PERM_POOL_MANAGE = "pool.manage"
 PERM_ORDER_TYPE_MANAGE = "order-type.manage"
-PERM_QUALITY_READ = "quality.read"
-PERM_QUALITY_RESOLVE = "quality.resolve"
 PERM_REPORT_READ = "report.read"
 PERM_HISTORY_IMPORT = "history.import"
 PERM_USER_MANAGE = "user.manage"
@@ -79,7 +76,6 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_ORDER_EVENT_POST,
         PERM_ORDER_EXCEPTION_APPROVE,
         PERM_FINANCE_READ,
-        PERM_FINANCE_TRANSFER,
         PERM_DEPOSIT_POST,
         PERM_POLICY_MANAGE,
         PERM_POLICY_APPROVE,
@@ -87,8 +83,6 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_AUDIT_READ,
         PERM_POOL_MANAGE,
         PERM_ORDER_TYPE_MANAGE,
-        PERM_QUALITY_READ,
-        PERM_QUALITY_RESOLVE,
         PERM_REPORT_READ,
         PERM_HISTORY_IMPORT,
         PERM_USER_MANAGE,
@@ -109,7 +103,6 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_ORDER_UPDATE,
             PERM_ORDER_EVENT_POST,
             PERM_FINANCE_READ,
-            PERM_QUALITY_READ,
             PERM_REPORT_READ,
         }
     ),
@@ -119,10 +112,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_CUSTOMER_CONTACT_READ,
             PERM_COUNTERPARTY_READ,
             PERM_FINANCE_READ,
-            PERM_FINANCE_TRANSFER,
             PERM_DEPOSIT_POST,
             PERM_AUDIT_READ,
-            PERM_QUALITY_READ,
             PERM_REPORT_READ,
         }
     ),
@@ -136,12 +127,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_POLICY_MANAGE,
             PERM_POLICY_APPROVE,
             PERM_AUDIT_READ,
-            PERM_QUALITY_READ,
-            PERM_QUALITY_RESOLVE,
             PERM_REPORT_READ,
         }
     ),
-    ROLE_VIEWER: frozenset({PERM_FINANCE_READ, PERM_QUALITY_READ, PERM_REPORT_READ}),
+    ROLE_VIEWER: frozenset({PERM_FINANCE_READ, PERM_REPORT_READ}),
 }
 
 

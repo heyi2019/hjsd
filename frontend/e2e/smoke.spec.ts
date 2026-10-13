@@ -2,14 +2,14 @@ import { expect, test } from "@playwright/test";
 import { NAV_LABELS, navItem } from "./support/api-stub";
 
 /**
- * 导航冒烟：验证 AppShell 在 DEV 态零登录即可挂载，8 个主导航入口逐个可达，
+ * 导航冒烟：验证 AppShell 在 DEV 态零登录即可挂载，6 个主导航入口逐个可达，
  * 点击后顶栏页面标题更新、主内容区可见、无未捕获页面错误（不白屏）。
  *
  * 不拦截后端 API（与 fallback 一致）：后端不可达时前端走 ErrorBanner 降级、
  * 不抛错，恰好验证「生产态后端抖动也不白屏」。各页面的数据渲染逻辑已由
  * 组件测试（vitest）覆盖，E2E 只守「外壳 + 导航」这条主干。
  */
-test("AppShell 渲染且 8 个导航入口齐全", async ({ page }) => {
+test("AppShell 渲染且 6 个导航入口齐全", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
 

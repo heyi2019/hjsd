@@ -70,8 +70,8 @@ cd frontend && npm run build
 |---|---|
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | ORM 模型（**不叫 models**，与 legacy 命名冲突） |
-| `backend/app/foundation` `finance` `orders` `installments` `policy` `quality` `reporting` | 领域服务与路由，每个含 `service.py` + `router.py` |
-| `backend/alembic/versions` | 迁移（0001 M0 … 0005 M5 规则快照、0006 用户认证、0007 团队范围） |
+| `backend/app/foundation` `finance` `orders` `installments` `policy` `reporting` | 领域服务与路由，每个含 `service.py` + `router.py` |
+| `backend/alembic/versions` | 迁移（0001 M0 … 0005 M5 规则快照、0006 用户认证、0007 团队范围、…、0010 移除异常工单） |
 | `backend/tests/v1` | v1 测试 |
 | `frontend/src` | `shared/`（UI 与 API）、各领域页面目录 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |

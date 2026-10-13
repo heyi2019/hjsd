@@ -17,8 +17,6 @@ export interface PoolBalance {
   pool_code: string;
   income: string;
   expense: string;
-  transfer_in: string;
-  transfer_out: string;
   cash_balance: string;
   deposit_held: string;
   th_advance: string;
@@ -57,6 +55,8 @@ export interface Customer {
   status: string;
   contact_masked?: boolean;
   merged_into_id?: number | null;
+  /** 活字段值：field_key → 值，由设置页字段定义驱动（BAS-04） */
+  extra_values?: Record<string, unknown> | null;
 }
 
 export interface Counterparty {
@@ -175,6 +175,8 @@ export interface FieldDefinition {
   required: boolean;
   sort_order: number;
   is_active: boolean;
+  /** SELECT / MULTI_SELECT 的选项集 */
+  options?: string[] | null;
 }
 
 export const poolsApi = {
@@ -244,17 +246,6 @@ export const ordersApi = {
       note?: string;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
-  transfer: (payload: {
-    source_pool_id: number;
-    target_pool_id: number;
-    amount: string;
-    occurred_on: string;
-    note?: string;
-  }) =>
-    api.post<{ transfer_id: string; out_flow_no: string; in_flow_no: string; amount: string }>(
-      "/transfers",
-      payload,
-    ).then((r) => r.data),
 };
 
 export const accountsApi = {
@@ -316,41 +307,11 @@ export const fieldsApi = {
     api.post<FieldDefinition>("/field-definitions", payload).then((r) => r.data),
   setActive: (id: number, active: boolean) =>
     api.patch<FieldDefinition>(`/field-definitions/${id}/active?active=${active}`).then((r) => r.data),
+  /** 删除字段定义：有历史值返回 409，只能停用（BAS-04-03） */
+  remove: (id: number) => api.delete(`/field-definitions/${id}`),
 };
 
-/* ── M4：质量工单 / 报表 / 审计 ─────────────────────────────── */
-
-export interface QualityIssue {
-  id: number;
-  issue_no: string;
-  issue_type: string;
-  severity: string;
-  status: string;
-  entity_type?: string | null;
-  entity_id?: number | null;
-  entity_label?: string | null;
-  amount: string;
-  detected_on: string;
-  owner_id?: number | null;
-  resolution?: string | null;
-  closed_at?: string | null;
-  note?: string | null;
-}
-
-export interface QualityOverviewItem {
-  issue_type: string;
-  severity: string;
-  open: number;
-  assigned: number;
-  total: number;
-  entry: string;
-}
-
-export interface QualityOverview {
-  total: number;
-  blockers: number;
-  items: QualityOverviewItem[];
-}
+/* ── M4：报表 / 审计 ─────────────────────────────── */
 
 export interface InventoryHealthRow {
   account_no: string;
@@ -428,8 +389,6 @@ export interface DailyFundsRow {
   opening: string;
   income: string;
   expense: string;
-  transfer_in: string;
-  transfer_out: string;
   deposit_paid: string;
   deposit_held: string;
   th_advance: string;
@@ -461,25 +420,6 @@ export interface OrderProfitReport {
   total: { income: string; buy_amount?: string; direct_cost: string; rebate: string; net_profit: string };
   items: OrderProfitRow[];
 }
-
-export const qualityApi = {
-  overview: () => api.get<QualityOverview>("/quality/overview").then((r) => r.data),
-  detect: () => api.post<{ detected_on: string; created_total: number }>("/quality/detect").then((r) => r.data),
-  listIssues: (params?: {
-    issue_type?: string;
-    status?: string;
-    severity?: string;
-    limit?: number;
-    offset?: number;
-  }) => api.get<{ items: QualityIssue[]; total: number }>("/quality/issues", { params }).then((r) => r.data),
-  issue: (id: number) => api.get<QualityIssue>(`/quality/issues/${id}`).then((r) => r.data),
-  assign: (id: number, ownerId: number) =>
-    api.post<QualityIssue>(`/quality/issues/${id}/assign`, { owner_id: ownerId }).then((r) => r.data),
-  resolve: (id: number, payload: { resolution: string; note?: string }) =>
-    api.post<QualityIssue>(`/quality/issues/${id}/resolve`, payload).then((r) => r.data),
-  ignore: (id: number, reason: string) =>
-    api.post<QualityIssue>(`/quality/issues/${id}/ignore`, { reason }).then((r) => r.data),
-};
 
 export const reportsApi = {
   inventoryHealth: () => api.get<InventoryHealthReport>("/reports/inventory-health").then((r) => r.data),

@@ -7,13 +7,12 @@ app/
 ├── core/             # 配置、数据库、金额、安全、审计等基础设施
 ├── domain/           # 当前 ORM 模型与领域对象
 ├── foundation/       # 基础主数据与业务类型
-├── finance/          # 资金池、流水、划转、押金
+├── finance/          # 资金池、流水、押金
 ├── orders/           # 订单、事件、编号
 ├── accounts/         # 账号库存和成本
 ├── installments/     # 分期合约与收款
 ├── rebates/          # 返点归集与结算
 ├── reporting/        # 只读报表
-├── quality/          # 异常工作台
 ├── migration/        # 历史迁移与审计
 ├── auth/             # 登录、令牌与用户认证
 ├── parties/          # 客户、合作方等主体

@@ -36,7 +36,6 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
     "reportsApi",
     "auditApi",
     "historyApi",
-    "qualityApi",
     "policyApi",
   ]);
   return { deepStub, OBJECT_SHAPED };

@@ -1,19 +1,18 @@
 """history 历史导入契约测试（MIG-01 守卫分支）。
 
 与 test_m4.py / test_history_mapping.py / test_history_landing.py 的分工：
-既有文件已覆盖建批、映射依据必填、前态留存、提交转未映射工单、
+既有文件已覆盖建批、映射依据必填、前态留存、提交转未映射留痕、
 预览/对账主路径、回滚与更正主路径；本文件补各函数的 NotFound/空入参守卫、
-`list_batches`、跳过行、提交时 SKIPPED 跳过、未映射工单幂等、
+`list_batches`、跳过行、提交时 SKIPPED 跳过、
 预览空批次/空值计数、对账金额解析的两个容错分支，以及 8 个未测路由端点。
 """
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
 from app.domain.enums import ImportBatchStatus, ImportRowStatus
-from app.domain.quality import ImportBatch, ImportRow
+from app.domain.history import ImportBatch
 from app.history import service
 
 ROWS = [
@@ -150,9 +149,6 @@ class TestCommitGuards:
             service.commit_batch(seeded_db, 999999, actor="pytest")
 
     def test_skipped_rows_are_not_imported(self, seeded_db):
-        from app.domain.enums import IssueType
-        from app.domain.quality import QualityIssue
-
         from app.orders import service as orders_service
         from datetime import date
 
@@ -173,33 +169,8 @@ class TestCommitGuards:
             for row in service.list_rows(seeded_db, batch["id"])
         }
         assert statuses[rows[0]["id"]] == ImportRowStatus.IMPORTED.value
-        # 239：SKIPPED 行保持跳过，不转为未映射工单
+        # SKIPPED 行保持跳过，不转为未映射
         assert statuses[rows[1]["id"]] == ImportRowStatus.SKIPPED.value
-        assert seeded_db.scalar(
-            select(QualityIssue.id).where(
-                QualityIssue.issue_type == IssueType.HISTORY_UNMAPPED.value
-            )
-        ) is None
-
-    def test_unmapped_issue_is_idempotent(self, seeded_db):
-        # 276：同一行重复触发未映射工单时直接返回，不重复建单
-        from app.domain.enums import IssueType
-        from app.domain.quality import QualityIssue
-
-        batch = _batch(seeded_db)
-        row = seeded_db.scalar(
-            select(ImportRow).where(ImportRow.batch_id == batch["id"])
-        )
-        batch_obj = seeded_db.get(ImportBatch, batch["id"])
-        service._raise_unmapped_issue(seeded_db, batch_obj, row, "pytest")
-        service._raise_unmapped_issue(seeded_db, batch_obj, row, "pytest")
-        assert len(
-            seeded_db.scalars(
-                select(QualityIssue).where(
-                    QualityIssue.issue_type == IssueType.HISTORY_UNMAPPED.value
-                )
-            ).all()
-        ) == 1
 
 
 # ------------------------------------------------------------------ 单边划转

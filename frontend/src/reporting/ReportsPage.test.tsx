@@ -41,7 +41,7 @@ async function gotoTab(label: string) {
 describe("ReportsPage：经营中心报表", () => {
   it("六个报表 Tab 齐全（R1-R5 + 订单利润）", async () => {
     renderApp(<ReportsPage />, { user: "admin" });
-    await screen.findByText("经营中心");
+    await screen.findByRole("tab", { name: "库存 R1" });
     for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
@@ -122,7 +122,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     });
     renderApp(<ReportsPage />, { user: "admin" });
     await gotoTab("业务损益 R5");
-    expect(await screen.findByText("HS")).toBeInTheDocument();
+    expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
   });
 

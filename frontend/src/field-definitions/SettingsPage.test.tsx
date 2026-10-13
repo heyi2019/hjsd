@@ -47,10 +47,9 @@ beforeEach(() => {
   policyApi.list.mockResolvedValue({ items: [], total: 0 });
 });
 
-it("渲染设置标题与四个主数据 Tab，默认业务类型列表可见", async () => {
+it("渲染四个主数据 Tab，默认业务类型列表可见", async () => {
   renderApp(<SettingsPage />, { user: "admin" });
-  expect(await screen.findByText("设置")).toBeInTheDocument();
-  expect(screen.getByRole("tab", { name: "业务类型" })).toBeInTheDocument();
+  expect(await screen.findByRole("tab", { name: "业务类型" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "资金池" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "活字段" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "经营规则" })).toBeInTheDocument();

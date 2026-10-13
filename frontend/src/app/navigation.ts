@@ -1,4 +1,4 @@
-import { AlertOutlined, BarChartOutlined, CloudUploadOutlined, FileTextOutlined, HomeOutlined, SettingOutlined, TeamOutlined, WalletOutlined } from "@ant-design/icons";
+import { AlertOutlined, BarChartOutlined, FileTextOutlined, HomeOutlined, SettingOutlined, TeamOutlined, WalletOutlined } from "@ant-design/icons";
 import { createElement } from "react";
 
 export const navigation = [
@@ -8,6 +8,5 @@ export const navigation = [
   { key: "funds", label: "资金中心", icon: createElement(WalletOutlined) },
   { key: "operations", label: "经营中心", icon: createElement(BarChartOutlined) },
   { key: "quality", label: "异常工作台", icon: createElement(AlertOutlined) },
-  { key: "history", label: "历史迁移", icon: createElement(CloudUploadOutlined) },
   { key: "settings", label: "设置", icon: createElement(SettingOutlined) },
 ];

@@ -1,7 +1,8 @@
-/** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5（RPT-01）。 */
+/** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。 */
 import { Card, Input, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
+import { DataCenterPanel } from "./DataCenterPanel";
 import {
   reportsApi,
   type BusinessPnlReport,
@@ -18,22 +19,18 @@ import {
   type OrderProfitRow,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
+import { ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
   MoneyText,
-  PageHeader,
   StatRow,
   StatusTag,
 } from "../shared/ui";
 
-export function ReportsPage() {
+export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void }) {
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="经营中心"
-        description="R1/R2/R3/R4/R5 与订单利润，全部由后端聚合口径生成，前端不做二次计算。"
-      />
       <Tabs
         defaultActiveKey="r1"
         items={[
@@ -43,6 +40,7 @@ export function ReportsPage() {
           { key: "r4", label: "资金日报 R4", children: <DailyFunds /> },
           { key: "r5", label: "业务损益 R5", children: <BusinessPnl /> },
           { key: "profit", label: "订单利润", children: <OrderProfit /> },
+          { key: "data-center", label: "数据中心", children: <DataCenterPanel onNavigate={onNavigate} /> },
         ]}
       />
     </section>
@@ -237,7 +235,7 @@ function DailyFunds() {
     [],
   );
   const columns: ColumnsType<DailyFundsRow> = [
-    { title: "资金池", dataIndex: "pool_code", width: 110 },
+    { title: "资金池", dataIndex: "pool_name", width: 150 },
     { title: "名称", dataIndex: "pool_name" },
     { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -287,7 +285,7 @@ function BusinessPnl() {
     [params.from, params.to],
   );
   const columns: ColumnsType<BusinessPnlRow> = [
-    { title: "业务", dataIndex: "order_type", width: 100 },
+    { title: "业务", dataIndex: "order_type", width: 100, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）` },
     { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} /> },
     {
@@ -342,7 +340,7 @@ function OrderProfit() {
   );
   const columns: ColumnsType<OrderProfitRow> = [
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "业务", dataIndex: "order_type", width: 90 },
+    { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）` },
     { title: "成交日", dataIndex: "trade_date", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },

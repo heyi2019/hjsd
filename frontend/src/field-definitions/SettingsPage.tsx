@@ -14,15 +14,16 @@ import { errorMessage, normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
-  PageHeader,
   PermissionButton,
   PermissionGate,
   StatusTag,
 } from "../shared/ui";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
+import { HistoryWorkbench } from "../history/HistoryWorkbench";
 import { UsersPanel } from "../users/UsersPanel";
 import { TeamsPanel } from "../users/TeamsPanel";
 import { useSession } from "../shared/state/session";
+import { CAPITAL_TYPE_LABEL, ENTITY_TYPE_LABEL, FIELD_TYPE_LABEL, POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../shared/lib/labels";
 
 export function SettingsPage() {
   const { can } = useSession();
@@ -31,14 +32,11 @@ export function SettingsPage() {
     { key: "pools", label: "资金池", children: <PoolsPanel /> },
     { key: "fields", label: "活字段", children: <FieldsPanel /> },
     { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
+    ...(can("history.import") ? [{ key: "history", label: "历史迁移", children: <HistoryWorkbench embedded /> }] : []),
     ...(can("user.manage") ? [{ key: "users", label: "人员与权限", children: <UsersPanel /> }, { key: "teams", label: "团队管理", children: <TeamsPanel /> }] : []),
   ];
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="设置"
-        description="主数据与活字段：新增业务、账号、客户字段无需改代码（BAS-02 / BAS-04）。"
-      />
       <Tabs
         defaultActiveKey="order-types"
         items={items}
@@ -65,7 +63,7 @@ function OrderTypesPanel() {
   const columns: ColumnsType<OrderType> = [
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
-    { title: "资金性质", dataIndex: "capital_type" },
+    { title: "资金性质", dataIndex: "capital_type", render: (v: string) => CAPITAL_TYPE_LABEL[v] ?? v },
     {
       title: "启用",
       dataIndex: "is_active",
@@ -139,8 +137,8 @@ function PoolsPanel() {
   const columns: ColumnsType<Pool> = [
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
-    { title: "类型", dataIndex: "pool_type" },
-    { title: "归属", dataIndex: "ownership" },
+    { title: "类型", dataIndex: "pool_type", render: (v: string) => POOL_TYPE_LABEL[v] ?? v },
+    { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
   ];
 
@@ -208,10 +206,10 @@ function FieldsPanel() {
   };
 
   const columns: ColumnsType<FieldDefinition> = [
-    { title: "实体", dataIndex: "entity_type" },
+    { title: "实体", dataIndex: "entity_type", render: (v: string) => ENTITY_TYPE_LABEL[v] ?? v },
     { title: "字段键", dataIndex: "field_key" },
     { title: "标签", dataIndex: "label" },
-    { title: "类型", dataIndex: "field_type" },
+    { title: "类型", dataIndex: "field_type", render: (v: string) => FIELD_TYPE_LABEL[v] ?? v },
     {
       title: "启用",
       dataIndex: "is_active",

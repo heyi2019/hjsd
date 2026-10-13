@@ -13,7 +13,6 @@ import {
   ErrorBanner,
   FormDrawer,
   MoneyText,
-  PageHeader,
   PermissionButton,
   StatRow,
   StatusTag,
@@ -170,21 +169,6 @@ export function QualityWorkbench() {
 
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="异常工作台"
-        description="系统按固定规则自动检出异常并生成工单；每条工单的处置都写审计日志，不可绕过。"
-        actions={
-          <PermissionButton
-            permission="quality.resolve"
-            type="primary"
-            loading={acting}
-            onClick={() => void runDetect()}
-          >
-            立即检测
-          </PermissionButton>
-        }
-      />
-
       <ErrorBanner error={error} />
 
       <StatRow
@@ -230,6 +214,14 @@ export function QualityWorkbench() {
             setPage(1);
           }}
         />
+        <PermissionButton
+          permission="quality.resolve"
+          type="primary"
+          loading={acting}
+          onClick={() => void runDetect()}
+        >
+          立即检测
+        </PermissionButton>
       </Space>
 
       <Card className="glass" title="异常工单列表">

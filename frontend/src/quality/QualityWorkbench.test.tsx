@@ -59,11 +59,10 @@ beforeEach(() => {
   ignore.mockResolvedValue({});
 });
 
-it("渲染工作台标题、统计卡与异常列表，异常类型映射为中文", async () => {
+it("渲染统计卡与异常列表，异常类型映射为中文", async () => {
   renderApp(<QualityWorkbench />, { user: "admin" });
-  expect(await screen.findByText("异常工作台")).toBeInTheDocument();
   // 统计卡（kind=count 已满足 ui_guard）
-  expect(screen.getByText("未闭环异常")).toBeInTheDocument();
+  expect(await screen.findByText("未闭环异常")).toBeInTheDocument();
   expect(screen.getByText("阻断级异常")).toBeInTheDocument();
   // ISSUE_TYPE_LABEL 逐字映射：漏一个就会在页面露英文枚举
   expect(await screen.findByText("未路由事件")).toBeInTheDocument();
@@ -81,7 +80,7 @@ it("立即检测：admin 角色可见按钮，点击调用 detect 并重载列�
 
 it("viewer 角色无 quality.resolve：看不到立即检测/处置/忽略", async () => {
   renderApp(<QualityWorkbench />, { user: "viewer" });
-  await screen.findByText("异常工作台");
+  await screen.findByText("未闭环异常");
   expect(screen.queryByRole("button", { name: /立即检测/ })).toBeNull();
   const labels = screen.queryAllByRole("button").map((b) => b.textContent ?? "");
   expect(labels.some((t) => t.includes("处置"))).toBe(false);

@@ -9,10 +9,10 @@ import {
   type Customer,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
+import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
-  PageHeader,
   PermissionButton,
   StatRow,
   StatusTag,
@@ -21,10 +21,6 @@ import {
 export function CustomersPage() {
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="客户中心"
-        description="客户档案与合作方严格分离；联系方式默认脱敏，完整信息按权限展示并留审计。"
-      />
       <Tabs
         defaultActiveKey="customers"
         items={[
@@ -67,6 +63,7 @@ function CustomerPanel() {
         phone: values.phone as string,
         wechat: values.wechat as string,
         qq: values.qq as string,
+        note: (values.note as string) || null,
       });
       if (result.duplicate_candidates.length > 0) {
         message.warning(`已建档，检测到 ${result.duplicate_candidates.length} 条重复候选（未拦截）`);
@@ -169,21 +166,27 @@ function CustomerPanel() {
       />
 
       <Modal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
-        <Form form={form} layout="vertical" onFinish={submitCreate}>
+        <Form form={form} layout="vertical" colon={false} onFinish={submitCreate}>
           <Form.Item name="display_name" label="称呼/昵称" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="contact_name" label="联系人姓名">
-            <Input />
-          </Form.Item>
-          <Form.Item name="phone" label="手机号">
-            <Input />
-          </Form.Item>
-          <Form.Item name="wechat" label="微信号">
-            <Input />
-          </Form.Item>
-          <Form.Item name="qq" label="QQ">
-            <Input />
+          {/* 短字段两列一行，压弹窗高度（称呼为必填主字段保持整行） */}
+          <div className="form-cols-2">
+            <Form.Item name="contact_name" label="联系人姓名">
+              <Input />
+            </Form.Item>
+            <Form.Item name="phone" label="手机号">
+              <Input />
+            </Form.Item>
+            <Form.Item name="wechat" label="微信号">
+              <Input />
+            </Form.Item>
+            <Form.Item name="qq" label="QQ">
+              <Input />
+            </Form.Item>
+          </div>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={3} placeholder="选填：客户来源、偏好、注意事项等" />
           </Form.Item>
           <Typography.Paragraph type="secondary">
             联系方式允许重复；重复只提示候选，不拦截建档。
@@ -200,7 +203,7 @@ function CustomerPanel() {
         onCancel={() => setMergeTarget(null)}
         footer={null}
       >
-        <Form form={mergeForm} layout="vertical" onFinish={submitMerge}>
+        <Form form={mergeForm} layout="vertical" colon={false} onFinish={submitMerge}>
           <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
             <Select
               options={rows
@@ -260,7 +263,7 @@ function CounterpartyPanel() {
   const columns: ColumnsType<Counterparty> = [
     { title: "编号", dataIndex: "counterparty_no" },
     { title: "名称", dataIndex: "display_name" },
-    { title: "类型", dataIndex: "type" },
+    { title: "类型", dataIndex: "type", render: (v: string) => COUNTERPARTY_TYPE_LABEL[v] ?? v },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
     {
       title: "操作",
@@ -303,7 +306,7 @@ function CounterpartyPanel() {
         onPageChange={() => undefined}
       />
       <Modal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
-        <Form form={form} layout="vertical" onFinish={submit} initialValues={{ type: "PEER" }}>
+        <Form form={form} layout="vertical" colon={false} onFinish={submit} initialValues={{ type: "PEER" }}>
           <Form.Item name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

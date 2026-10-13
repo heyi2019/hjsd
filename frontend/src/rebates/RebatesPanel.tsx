@@ -196,7 +196,7 @@ export function RebatesPanel() {
             <Input />
           </Form.Item>
           <Form.Item name="pool_id" label="回款池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.code} ${pool.name}` }))} />
+            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
           <Form.Item name="settled_on" label="到账日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />

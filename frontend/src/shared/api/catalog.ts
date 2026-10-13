@@ -33,6 +33,18 @@ export interface OrderType {
   is_active: boolean;
 }
 
+/** 业务 → 资金池路由（get_order_type routes）。份额可选集必须由它决定：
+ *  HS/TH/DFQ 只配 本金/利润，DG 只配 利润/总额——写死选项必然撞 POOL_ROUTE_MISSING。 */
+export interface OrderTypeRoute {
+  id: number;
+  order_type_code: string;
+  portion: string;
+  pool_code: string;
+  pool_name: string;
+  priority: number;
+  is_active: boolean;
+}
+
 export interface Customer {
   id: number;
   customer_no: string;
@@ -41,6 +53,7 @@ export interface Customer {
   phone?: string | null;
   wechat?: string | null;
   qq?: string | null;
+  note?: string | null;
   status: string;
   contact_masked?: boolean;
   merged_into_id?: number | null;
@@ -175,6 +188,8 @@ export const orderTypesApi = {
   list: () => api.get<OrderType[]>("/order-types").then((r) => r.data),
   create: (payload: Partial<OrderType>) =>
     api.post<OrderType>("/order-types", payload).then((r) => r.data),
+  routes: (orderTypeId: number) =>
+    api.get<OrderTypeRoute[]>(`/order-types/${orderTypeId}/routes`).then((r) => r.data),
 };
 
 export const customersApi = {

@@ -1,165 +1,34 @@
-/** 工作台：今日资金与待办总览（资金池卡片 + TH 未闭环代垫 + 押金占用）。 */
-import { Card, Space } from "antd";
-import { useCallback, useEffect, useState } from "react";
-import { poolsApi, qualityApi, type Pool, type PoolBalance } from "../shared/api/catalog";
-import { normalizeError } from "../shared/api/client";
-import {
-  DataTable,
-  ErrorBanner,
-  MoneyText,
-  PageHeader,
-  PermissionGate,
-  StatRow,
-  StatusTag,
-} from "../shared/ui";
-import type { ColumnsType } from "antd/es/table";
-
-interface PoolRow {
-  key: string;
-  pool: Pool;
-  balance?: PoolBalance;
-}
+/** 工作台：动作入口（新建业务）。资金/订单数据总览已于 2026-10-13 迁至
+ *  「经营中心 · 数据中心」Tab——工作台只保留「发起动作」，不堆数据。 */
+import { Space } from "antd";
+import { useState } from "react";
+import { EntryCard, EntryRow, PermissionGate } from "../shared/ui";
+import { CreateOrderModal } from "../orders/CreateOrderModal";
 
 export function DashboardPage() {
-  const [pools, setPools] = useState<Pool[]>([]);
-  const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
-  const [loading, setLoading] = useState(false);
-  const [openIssues, setOpenIssues] = useState<number | null>(null);
-  const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const list = await poolsApi.list();
-      setPools(list);
-      const entries = await Promise.all(
-        list.map(async (pool) => [pool.id, await poolsApi.balance(pool.id)] as const),
-      );
-      setBalances(Object.fromEntries(entries));
-      setLoadError(null);
-    } catch (error) {
-      // 必须落到 UI：后端不可达时若只 console.error，页面会静默显示
-      // 「资金池数量 0 / 尚未配置资金池」，与「真的没有数据」无法区分。
-      setLoadError(normalizeError(error));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
-    qualityApi
-      .overview()
-      .then((ov) => {
-        if (!cancelled) setOpenIssues(ov.items.reduce((sum, item) => sum + item.open, 0));
-      })
-      .catch(() => {
-        /* 概览失败不阻断工作台，其余数据仍可用 */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const rows: PoolRow[] = pools.map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
-
-  const sum = (pick: (b?: PoolBalance) => string | undefined) =>
-    rows.reduce((acc, row) => acc + Number(pick(row.balance) ?? 0), 0).toFixed(2);
-
-  const totalAvailable = sum((b) => b?.available);
-  const totalThAdvance = sum((b) => b?.th_advance);
-  const totalDeposit = sum((b) => b?.deposit_held);
-
-  const columns: ColumnsType<PoolRow> = [
-    {
-      title: "资金池",
-      dataIndex: ["pool", "code"],
-      render: (_value, row) => `${row.pool.code} · ${row.pool.name}`,
-    },
-    {
-      title: "状态",
-      dataIndex: ["pool", "status"],
-      width: 110,
-      render: (status: string) => <StatusTag status={status} />,
-    },
-    {
-      title: "收入",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.income} />,
-    },
-    {
-      title: "支出",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.expense} />,
-    },
-    {
-      title: "押金",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.deposit_held} />,
-    },
-    {
-      title: "TH 代垫",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.th_advance} />,
-    },
-    {
-      title: "可用余额",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.available} strong />,
-    },
-  ];
-
+  const [createOpen, setCreateOpen] = useState(false);
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="今日总览"
-        description="现金头寸、可用余额、押金与 TH 代垫分列展示，禁止混用（FIN-01-03）。"
-      />
-
-      <ErrorBanner error={loadError} />
-
-      <StatRow
-        items={[
-          { label: "可用余额合计", amount: totalAvailable },
-          { label: "TH 未闭环代垫", amount: totalThAdvance, tone: "warn" },
-          { label: "押金占用", amount: totalDeposit },
-        ]}
-      />
-      <StatRow
-        items={[
-          { label: "资金池数量", kind: "count", amount: String(pools.length) },
-          {
-            label: "未闭环异常",
-            kind: "count",
-            amount: openIssues === null ? "-" : String(openIssues),
-            tone: openIssues ? "warn" : "plain",
-          },
-        ]}
-      />
-
-      <PermissionGate permission="finance.read">
-        <Card className="glass" title="资金池概览">
-          <DataTable<PoolRow>
-            columns={columns}
-            rows={rows}
-            loading={loading}
-            page={1}
-            pageSize={Math.max(rows.length, 10)}
-            total={rows.length}
-            rowKey="key"
-            emptyText="尚未配置资金池"
-            onPageChange={() => undefined}
+      <EntryRow>
+        <PermissionGate permission="order.create">
+          <EntryCard
+            tone="primary"
+            title="新建业务"
+            description="点击打开登记弹窗：选业务类型、关联账号/客户，创建草稿"
+            onClick={() => setCreateOpen(true)}
           />
-        </Card>
-      </PermissionGate>
+        </PermissionGate>
+      </EntryRow>
 
       <Space className="muted" size="small">
-        数据口径与 FIN-01 一致；TH 订单永不进入库存。
+        资金与订单数据总览已迁至「经营中心 · 数据中心」Tab 查看。
       </Space>
+
+      <CreateOrderModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => setCreateOpen(false)}
+      />
     </section>
   );
 }

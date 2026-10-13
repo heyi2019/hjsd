@@ -12,11 +12,11 @@ import {
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
+import { POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
   MoneyText,
-  PageHeader,
   PermissionButton,
   StatRow,
   StatusTag,
@@ -115,8 +115,8 @@ export function FundsPage() {
     .toFixed(2);
 
   const poolColumns: ColumnsType<Pool> = [
-    { title: "资金池", render: (_v, row) => `${row.code} · ${row.name}` },
-    { title: "归属", dataIndex: "ownership" },
+    { title: "资金池", dataIndex: "name", render: (_v, row) => `${row.name}（${row.code}）` },
+    { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     {
       title: "收入",
@@ -188,11 +188,6 @@ export function FundsPage() {
 
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="资金中心"
-        description="总览、池间划转与押金占用；现金头寸与可用余额分列，押金不影响经营损益。"
-      />
-
       <ErrorBanner error={error} />
 
       <Tabs
@@ -280,10 +275,10 @@ export function FundsPage() {
       <Modal title="发起池间划转" open={transferOpen} onCancel={() => setTransferOpen(false)} footer={null}>
         <Form form={transferForm} layout="vertical" onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
           <Form.Item name="source_pool_id" label="转出池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.code} ${pool.name}` }))} />
+            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
           <Form.Item name="target_pool_id" label="转入池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.code} ${pool.name}` }))} />
+            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
           <Form.Item name="amount" label="金额" rules={[{ required: true }]}>
             <Input />
@@ -300,7 +295,7 @@ export function FundsPage() {
       <Modal title="新增押金占用" open={depositOpen} onCancel={() => setDepositOpen(false)} footer={null}>
         <Form form={depositForm} layout="vertical" onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.code} ${pool.name}` }))} />
+            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
           <Form.Item name="amount" label="占用金额" rules={[{ required: true }]}>
             <Input />

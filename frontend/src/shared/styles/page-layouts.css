@@ -330,3 +330,7 @@
 .user-center__meta dd { margin: 0; color: var(--color-text-primary); }
 .user-center__perms { display: flex; flex-wrap: wrap; gap: var(--space-1-half); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
 .user-center__perms li { padding: 2px var(--space-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-compact); background: var(--soft); color: var(--color-text-secondary); font-size: var(--fs-caption-1); }
+
+/* ── 弹窗短字段表单两列布局（如新建客户） ─────────────────── */
+/* 行距沿用 antd Form.Item 自带 margin-bottom，仅控制列距。 */
+.form-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-3); }

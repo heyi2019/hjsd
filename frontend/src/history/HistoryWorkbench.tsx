@@ -28,7 +28,11 @@ import {
   StatusTag,
 } from "../shared/ui";
 
-export function HistoryWorkbench() {
+/** 嵌入模式：作为「设置」页内的 Tab 渲染时，不再重复输出 PageHeader 大标题，
+ *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
+const RED_LINE_DESC = "历史数据仅作参考与回归样本：不覆盖新单、不自动匹配、不补造历史划转。";
+
+export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchId, setBatchId] = useState<number | null>(null);
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -170,43 +174,48 @@ export function HistoryWorkbench() {
     },
   ];
 
+  const headerActions = (
+    <Space className="ui-filter-bar">
+      <Select
+        style={{ width: 280 }}
+        value={batchId ?? undefined}
+        placeholder="选择导入批次"
+        options={batches.map((b) => ({
+          value: b.id,
+          label: `${b.source_name}（${b.batch_no} · ${b.status === "DRAFT" ? "草稿" : b.status === "MAPPED" ? "已映射" : b.status === "COMMITTED" ? "已确认" : b.status}）`,
+        }))}
+        onChange={setBatchId}
+      />
+      <PermissionButton
+        permission="history.import"
+        type="primary"
+        loading={acting}
+        disabled={!canRollback}
+        onClick={() => current && act(() => historyApi.commit(current.id))}
+      >
+        确认批次
+      </PermissionButton>
+      <PermissionButton
+        permission="history.import"
+        danger
+        disabled={!canRollback}
+        onClick={() => current && setRollbackTarget(current)}
+      >
+        回滚
+      </PermissionButton>
+    </Space>
+  );
+
   return (
     <section className="ui-stack">
-      <PageHeader
-        title="历史迁移工作台"
-        description="历史数据仅作参考与回归样本：不覆盖新单、不自动匹配、不补造历史划转。"
-        actions={
-          <Space className="ui-filter-bar">
-            <Select
-              style={{ width: 280 }}
-              value={batchId ?? undefined}
-              placeholder="选择导入批次"
-              options={batches.map((b) => ({
-                value: b.id,
-                label: `${b.batch_no} · ${b.source_name}（${b.status}）`,
-              }))}
-              onChange={setBatchId}
-            />
-            <PermissionButton
-              permission="history.import"
-              type="primary"
-              loading={acting}
-              disabled={!canRollback}
-              onClick={() => current && act(() => historyApi.commit(current.id))}
-            >
-              确认批次
-            </PermissionButton>
-            <PermissionButton
-              permission="history.import"
-              danger
-              disabled={!canRollback}
-              onClick={() => current && setRollbackTarget(current)}
-            >
-              回滚
-            </PermissionButton>
-          </Space>
-        }
-      />
+      {embedded ? (
+        <>
+          <Typography.Paragraph type="secondary">{RED_LINE_DESC}</Typography.Paragraph>
+          {headerActions}
+        </>
+      ) : (
+        <PageHeader title="历史迁移工作台" description={RED_LINE_DESC} actions={headerActions} />
+      )}
 
       <ErrorBanner error={error} />
 

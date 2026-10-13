@@ -14,8 +14,10 @@ import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import { UserCenterPage } from "../auth/UserCenterPage";
 
-// 注：dashboard 不入此映射——工作台需 onNavigate 跳转，由下方三元单独渲染。
-const PAGES: Record<string, () => JSX.Element> = {
+// 注：dashboard 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
+// 其余页面统一收 onNavigate（ReportsPage 的数据中心入口卡跳业务中心用），无跳转需求的页面忽略该 prop。
+type PageProps = { onNavigate?: (key: string) => void };
+const PAGES: Record<string, (props: PageProps) => JSX.Element> = {
   business: OrdersPage,
   customers: CustomersPage,
   funds: FundsPage,
@@ -93,10 +95,11 @@ export function AppShell() {
           </Space>
         </header>
         <main className="page-content">
-          {/* 工作台卡片需要跳转其它一级页：单独传 onNavigate；其余页面无props，走 PAGES 映射。
+          {/* 工作台单独渲染（纯动作入口）；其余页面走 PAGES 映射并收 onNavigate，
+              供数据中心入口卡跳转业务中心；无跳转需求的页面忽略该 prop。
               key={active} 让每次导航切换重挂载 .page-enter，重放 Apple 弹簧入场转场。 */}
           <div className="page-enter" key={active}>
-            {active === "dashboard" ? <DashboardPage onNavigate={setActive} /> : <Page />}
+            {active === "dashboard" ? <DashboardPage /> : <Page onNavigate={setActive} />}
           </div>
         </main>
       </div>

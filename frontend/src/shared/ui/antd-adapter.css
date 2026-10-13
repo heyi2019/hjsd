@@ -135,7 +135,10 @@
 :where(.ant-input, .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper) {
   min-height: var(--ui-control-height-lg) !important;
   height: var(--ui-control-height-lg) !important;
-  box-shadow: none !important;
+  /* 静止态：三层全透明白阴影，与聚焦态 --focus-glow 同层数，保证 box-shadow 平滑过渡
+     （层数不对齐时 CSS 走离散跳变而非插值，光环会"啪"地出现而非绽放）。 */
+  box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent, 0 0 0 0 transparent !important;
+  transition: border-color 160ms var(--ease-spring), box-shadow 220ms var(--ease-spring);
 }
 
 /* 普通 Ant 控件锁定统一高度；small/表格紧凑态由业务选择器显式覆盖。 */
@@ -322,6 +325,17 @@
   }
 }
 
+/* 反馈动效：message 轻提示（Apple 流体 · 2026-10-13）。
+   antd message 默认从顶部下滑淡入；套 ui-spring-in 让其以「自上方 8px 微升 + 缩放回弹」绽放，
+   方向与顶部出现语义一致（起点在终点上方），不冲突。仅覆盖 *-enter-active 入场态，
+   离场交还 antd 原生，避免覆盖离场导致提示残留不消失。
+   notification（边角横向滑入）方向语义与 translateY 错乱，按前期抽屉同理不动，保留原生滑入。 */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.ant-message-notice[class*="enter-active"]) {
+    animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
+  }
+}
+
 /* 减弱动效兜底（2026-10-04 补齐）：把 antd 全部弹层的入场/离场动效压掉，只留淡入。
    背景：上一条 no-preference 块只包了 .ant-picker-dropdown / .ant-dropdown，
    Modal / Drawer / Select / Tooltip / Popover 仍播 antd 默认的 zoom-big / slide-up
@@ -379,7 +393,10 @@
 
 :where(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-select-focused .ant-select-selector, .ant-picker-focused, .ant-input-affix-wrapper-focused) {
   border-color: var(--color-primary) !important;
-  box-shadow: var(--ring) !important;
+  /* Apple 聚焦光环：贴边实色环 + 外溢柔光 + 投影，经 --ease-spring 过渡产生轻微绽放过冲
+     （仅色/透明度插值，无位移/缩放，不触发前庭不适；reduced-motion 下为快速淡入，仍合规）。 */
+  box-shadow: var(--focus-glow) !important;
+  transition: border-color 160ms var(--ease-spring), box-shadow 220ms var(--ease-spring);
 }
 
 :where(.ant-modal-content, .ant-drawer-content) {

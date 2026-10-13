@@ -48,6 +48,12 @@
   --e2: 0 14px 34px rgba(28, 28, 30, 0.08), 0 4px 12px rgba(28, 28, 30, 0.04);
   --e3: 0 28px 64px rgba(28, 28, 30, 0.12), 0 10px 22px rgba(28, 28, 30, 0.06);
   --ring: 0 0 0 3px rgba(10, 99, 216, 0.28);
+  /* 表单聚焦光环（Apple 流体 · 2026-10-13）：聚焦时贴边框的实色环 + 外溢柔光 + 投影。
+     三层结构与 antd-adapter.css 静止态零阴影同层数，box-shadow 经 --ease-spring 过渡产生
+     轻微"绽放"过冲；值引用 --color-primary，亮/暗主题自动接管（无需 dark 覆盖）。 */
+  --focus-glow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent),
+                0 0 0 7px color-mix(in srgb, var(--color-primary) 10%, transparent),
+                0 6px 18px color-mix(in srgb, var(--color-primary) 18%, transparent);
   /* 卡片高程（iOS 玻璃浮起：柔和投影 + 顶部镜面高光；暗色在 [data-theme=dark] 覆盖） */
   --card-elevation: 0 10px 28px rgba(28, 28, 30, 0.07), 0 2px 8px rgba(28, 28, 30, 0.05);
   --card-top-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);

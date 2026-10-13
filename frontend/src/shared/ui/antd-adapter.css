@@ -281,18 +281,35 @@
 :where(.ant-select-dropdown, .ant-picker-dropdown .ant-picker-panel, .ant-dropdown-menu) {
   border: var(--border-w) solid var(--glass-border) !important;
   border-radius: var(--radius-glass) !important;
-  background: var(--glass) !important;
+  /* 弹层改不透明实色（antd 容器色），去掉半透明玻璃 --glass，
+     避免底层页面透出导致选项发虚、对比度不足（2026-10-13 用户裁决）。 */
+  background: var(--color-antd-bg-container) !important;
   box-shadow: var(--e2) !important;
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 /* Apple 弹簧入场（覆盖 antd 默认 zoom/slide 动效）：仅在用户未要求减弱动效时生效。
-   作用根容器（antd 动效亦挂在根），避免内层再叠加导致双动效；
-   select 根动效也走本条（下拉与日期面板同属 rc-trigger 弹层，行为一致）。 */
+   ⚠ 只允许覆盖「入场态」（*-enter-active 类）：rc-motion 靠离场动画的 animationend
+   才给弹层加 hidden；若把根容器动画整条 !important 钉死，关闭时动画名不变、
+   浏览器不重播、animationend 永不到来 → 下拉关不掉、两个下拉同时展开
+   （2026-10-13 真机复现，CreateOrderModal 账号/客户双下拉同屏）。
+   离场保持 antd 原生 slide-up/down-out。 */
 @media (prefers-reduced-motion: no-preference) {
-  :where(.ant-picker-dropdown, .ant-dropdown, .ant-select-dropdown) {
+  /* 下拉弹簧：Picker / Dropdown 菜单仍在此处统一收口（弹簧入场）；
+     Select 下拉因「钉死导致关不掉」回归已不再用弹簧，改为 .ui-select-pop 极短淡入（见下条）。 */
+  :where(.ant-picker-dropdown.ant-slide-up-enter-active,
+         .ant-picker-dropdown.ant-slide-down-enter-active,
+         .ant-dropdown.ant-slide-up-enter-active,
+         .ant-dropdown.ant-slide-down-enter-active) {
     animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
+  }
+  /* 业务下拉（Select 封装组件 ui-select-pop）入场收敛为极短淡入、无位移缩放，
+     解决「下拉出现太久」；仅覆盖入场态，离场交还 antd 原生、关闭正常。 */
+  :where(.ant-select-dropdown.ui-select-pop.ant-slide-up-enter-active,
+         .ant-select-dropdown.ui-select-pop.ant-slide-up-appear-active,
+         .ant-select-dropdown.ui-select-pop.ant-slide-down-enter-active,
+         .ant-select-dropdown.ui-select-pop.ant-slide-down-appear-active) {
+    animation-name: none !important;
+    transition: opacity 0.12s linear !important;
   }
   /* Modal / Popover（含 Popconfirm）弹簧：用 rc-motion 的「进入态」*-enter-active 类限定，
      只覆盖进入动画；离场时该类被移除、恢复 antd 原生离场——

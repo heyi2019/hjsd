@@ -1,5 +1,5 @@
 /** 设置：主数据（业务类型 / 资金池）/ 活字段（页面原型 §7）。 */
-import { Card, Form, Input, Tabs, Typography, message } from "antd";
+import { Card, Form, Input, InputNumber, Popconfirm, Select, Switch, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -173,10 +173,25 @@ function PoolsPanel() {
   );
 }
 
+const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+const ENTITY_TYPE_OPTIONS = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
+
+const parseOptions = (raw: unknown): string[] | undefined => {
+  const text = typeof raw === "string" ? raw : "";
+  const items = text
+    .split(/[,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length ? items : undefined;
+};
+
 function FieldsPanel() {
   const [rows, setRows] = useState<FieldDefinition[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
+  const fieldType = Form.useWatch("field_type", form);
+  const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
   const load = useCallback(async () => {
     try {
       setRows(await fieldsApi.list());
@@ -196,6 +211,9 @@ function FieldsPanel() {
         field_key: values.field_key as string,
         label: values.label as string,
         field_type: (values.field_type as string) ?? "TEXT",
+        options: needsOptions ? parseOptions(values.options) : undefined,
+        required: Boolean(values.required),
+        sort_order: Number(values.sort_order ?? 0),
       });
       message.success("活字段已创建");
       form.resetFields();
@@ -211,19 +229,54 @@ function FieldsPanel() {
     { title: "标签", dataIndex: "label" },
     { title: "类型", dataIndex: "field_type", render: (v: string) => FIELD_TYPE_LABEL[v] ?? v },
     {
+      title: "必填",
+      dataIndex: "required",
+      render: (value: boolean) => (value ? "是" : "否"),
+    },
+    {
+      title: "选项",
+      dataIndex: "options",
+      render: (value: string[] | null | undefined) => (value?.length ? value.join("、") : "-"),
+    },
+    {
       title: "启用",
       dataIndex: "is_active",
-      render: (value: boolean, row) => (
-        <PermissionButton
-          permission="field-definition.manage"
-          size="small"
-          onClick={async () => {
-            await fieldsApi.setActive(row.id, !value);
-            await load();
-          }}
-        >
-          {value ? "停用" : "启用"}
-        </PermissionButton>
+      render: (value: boolean) => (
+        <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
+      ),
+    },
+    {
+      title: "操作",
+      render: (_v, row) => (
+        <PermissionGate permission="field-definition.manage">
+          <PermissionButton
+            permission="field-definition.manage"
+            size="small"
+            onClick={async () => {
+              await fieldsApi.setActive(row.id, !row.is_active);
+              await load();
+            }}
+          >
+            {row.is_active ? "停用" : "启用"}
+          </PermissionButton>
+          <Popconfirm
+            title={`删除字段「${row.label}」`}
+            description="无历史值才可删除；已有历史值只能停用（历史值保留）"
+            onConfirm={async () => {
+              try {
+                await fieldsApi.remove(row.id);
+                message.success("字段已删除");
+                await load();
+              } catch (err) {
+                setError(normalizeError(err));
+              }
+            }}
+          >
+            <PermissionButton permission="field-definition.manage" size="small" danger>
+              删除
+            </PermissionButton>
+          </Popconfirm>
+        </PermissionGate>
       ),
     },
   ];
@@ -232,7 +285,7 @@ function FieldsPanel() {
     <Card className="glass" title="活字段">
       <ErrorBanner error={error} />
       <Typography.Paragraph type="secondary">
-        活字段仅承载辅助信息，不得覆盖核算字段；有历史值只能停用（BAS-04）。
+        活字段仅承载辅助信息，不得覆盖核算字段；有历史值只能停用，无历史值可删除（BAS-04）。
       </Typography.Paragraph>
       <DataTable<FieldDefinition>
         columns={columns}
@@ -249,16 +302,30 @@ function FieldsPanel() {
           layout="inline"
           onFinish={submit}
           style={{ marginTop: 16 }}
-          initialValues={{ entity_type: "customer", field_type: "TEXT" }}
+          initialValues={{ entity_type: "customer", field_type: "TEXT", sort_order: 0 }}
         >
-          <Form.Item name="entity_type">
-            <Input placeholder="实体 customer/account/order" />
+          <Form.Item name="entity_type" label="实体">
+            <Select options={ENTITY_TYPE_OPTIONS} style={{ width: 120 }} />
           </Form.Item>
-          <Form.Item name="field_key" rules={[{ required: true }]}>
-            <Input placeholder="字段键，小写下划线" />
+          <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
+            <Input placeholder="小写下划线，如 credit_level" />
           </Form.Item>
-          <Form.Item name="label" rules={[{ required: true }]}>
-            <Input placeholder="标签" />
+          <Form.Item name="label" label="标签" rules={[{ required: true }]}>
+            <Input placeholder="页面显示名" />
+          </Form.Item>
+          <Form.Item name="field_type" label="类型">
+            <Select options={FIELD_TYPE_OPTIONS} style={{ width: 110 }} />
+          </Form.Item>
+          {needsOptions && (
+            <Form.Item name="options" label="选项">
+              <Input placeholder="逗号分隔，如 优质,观察,黑名单" style={{ width: 200 }} />
+            </Form.Item>
+          )}
+          <Form.Item name="required" label="必填" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item name="sort_order" label="排序">
+            <InputNumber min={0} style={{ width: 90 }} />
           </Form.Item>
           <Form.Item>
             <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">

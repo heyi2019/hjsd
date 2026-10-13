@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +24,9 @@ class CustomerCreate(BaseModel):
     owner_id: int | None = None
     tags: list[str] | None = None
     note: str | None = None
+    extra_values: dict[str, Any] | None = Field(
+        default=None, description="活字段值：field_key → 值，仅接受已启用的字段定义（BAS-04-04）"
+    )
 
 
 class CustomerUpdate(BaseModel):
@@ -37,6 +41,7 @@ class CustomerUpdate(BaseModel):
     owner_id: int | None = None
     tags: list[str] | None = None
     note: str | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class CustomerStatusUpdate(BaseModel):
@@ -69,6 +74,7 @@ class CustomerOut(BaseModel):
     note: str | None = None
     merged_into_id: int | None = None
     contact_masked: bool = True
+    extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class CustomerWithCandidates(BaseModel):

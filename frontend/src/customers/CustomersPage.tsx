@@ -1,12 +1,15 @@
-/** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。 */
-import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, message } from "antd";
+/** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
+ *  活字段（BAS-04）：字段定义来自设置页，建档/编辑表单与详情抽屉按定义动态渲染。 */
+import { Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Switch, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
   counterpartiesApi,
   customersApi,
+  fieldsApi,
   type Counterparty,
   type Customer,
+  type FieldDefinition,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
@@ -14,9 +17,63 @@ import {
   DataTable,
   ErrorBanner,
   PermissionButton,
+  PermissionGate,
   StatRow,
   StatusTag,
 } from "../shared/ui";
+
+/** 活字段值展示：数组用「、」连接，布尔转是/否，空值回落占位。 */
+function formatExtraValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+  if (Array.isArray(value)) return value.map((item) => String(item)).join("、");
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return String(value);
+}
+
+/** DatePicker 值是 dayjs 对象；不引入 dayjs 依赖，按鸭子类型取 format。 */
+function toDateText(value: unknown): string | null {
+  const candidate = value as { format?: (pattern: string) => string } | null;
+  if (candidate && typeof candidate.format === "function") {
+    return candidate.format("YYYY-MM-DD");
+  }
+  return typeof value === "string" ? value : null;
+}
+
+/** 从表单值里收集活字段：跳过空值，日期统一转 YYYY-MM-DD 字符串。 */
+function collectExtras(
+  values: Record<string, unknown>,
+  defs: FieldDefinition[],
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const def of defs) {
+    const raw = values[def.field_key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (Array.isArray(raw) && raw.length === 0) continue;
+    out[def.field_key] = def.field_type === "DATE" ? toDateText(raw) : raw;
+  }
+  return out;
+}
+
+/** 按字段类型渲染表单控件（BAS-04：类型由字段定义决定）。
+ *  必须透传 Form.Item 注入的 id / value / onChange：包装组件若吞掉这些 props，
+ *  标签的 htmlFor 会指向不存在的 id（a11y 断链），且表单值收集为空。 */
+function ExtraFieldControl({ def, ...controlProps }: { def: FieldDefinition; [key: string]: unknown }) {
+  const options = (def.options ?? []).map((option) => ({ value: option, label: option }));
+  switch (def.field_type) {
+    case "NUMBER":
+      return <InputNumber {...controlProps} style={{ width: "100%" }} />;
+    case "DATE":
+      return <DatePicker {...controlProps} style={{ width: "100%" }} />;
+    case "BOOLEAN":
+      return <Switch {...controlProps} />;
+    case "SELECT":
+      return <Select {...controlProps} allowClear options={options} />;
+    case "MULTI_SELECT":
+      return <Select {...controlProps} mode="multiple" options={options} />;
+    default:
+      return <Input {...controlProps} />;
+  }
+}
 
 export function CustomersPage() {
   return (
@@ -34,13 +91,23 @@ export function CustomersPage() {
 
 function CustomerPanel() {
   const [rows, setRows] = useState<Customer[]>([]);
+  const [fieldDefs, setFieldDefs] = useState<FieldDefinition[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Customer | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [mergeForm] = Form.useForm();
+
+  const activeDefs = fieldDefs.filter((def) => def.is_active);
+  const labelOfKey = useCallback(
+    (key: string) => fieldDefs.find((def) => def.field_key === key)?.label ?? key,
+    [fieldDefs],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -55,8 +122,17 @@ function CustomerPanel() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    // 活字段定义加载失败不阻断客户页：字段是辅助信息，静默降级为空
+    fieldsApi
+      .list({ entity_type: "customer" })
+      .then(setFieldDefs)
+      .catch(() => setFieldDefs([]));
+  }, []);
+
   const submitCreate = async (values: Record<string, unknown>) => {
     try {
+      const extraValues = collectExtras(values, activeDefs);
       const result = await customersApi.create({
         display_name: values.display_name as string,
         contact_name: values.contact_name as string,
@@ -64,6 +140,7 @@ function CustomerPanel() {
         wechat: values.wechat as string,
         qq: values.qq as string,
         note: (values.note as string) || null,
+        extra_values: Object.keys(extraValues).length > 0 ? extraValues : undefined,
       });
       if (result.duplicate_candidates.length > 0) {
         message.warning(`已建档，检测到 ${result.duplicate_candidates.length} 条重复候选（未拦截）`);
@@ -72,6 +149,28 @@ function CustomerPanel() {
       }
       setCreateOpen(false);
       form.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitEdit = async (values: Record<string, unknown>) => {
+    if (!editTarget) return;
+    try {
+      const extraValues = collectExtras(values, activeDefs);
+      await customersApi.patch(editTarget.id, {
+        display_name: values.display_name as string,
+        contact_name: values.contact_name as string,
+        phone: values.phone as string,
+        wechat: values.wechat as string,
+        qq: values.qq as string,
+        note: (values.note as string) || null,
+        extra_values: extraValues,
+      });
+      message.success("客户已更新");
+      setEditTarget(null);
+      editForm.resetFields();
       await load();
     } catch (err) {
       setError(normalizeError(err));
@@ -103,9 +202,30 @@ function CustomerPanel() {
     { title: "QQ", dataIndex: "qq" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
     {
+      title: "活字段",
+      key: "extra_values",
+      render: (_v, row) => {
+        const entries = Object.entries(row.extra_values ?? {}).filter(
+          ([, value]) =>
+            value !== null &&
+            value !== undefined &&
+            value !== "" &&
+            !(Array.isArray(value) && value.length === 0),
+        );
+        if (entries.length === 0) return "-";
+        const shown = entries
+          .slice(0, 2)
+          .map(([key, value]) => `${labelOfKey(key)}：${formatExtraValue(value)}`);
+        return entries.length > 2 ? `${shown.join("；")} 等 ${entries.length} 项` : shown.join("；");
+      },
+    },
+    {
       title: "操作",
       render: (_v, row) => (
         <Space>
+          <PermissionButton permission="customer.read" size="small" onClick={() => setDetailTarget(row)}>
+            详情
+          </PermissionButton>
           <PermissionButton
             permission="customer.merge"
             size="small"
@@ -188,14 +308,155 @@ function CustomerPanel() {
           <Form.Item name="note" label="备注">
             <Input.TextArea rows={3} placeholder="选填：客户来源、偏好、注意事项等" />
           </Form.Item>
+          {activeDefs.map((def) => (
+            <Form.Item
+              key={def.field_key}
+              name={def.field_key}
+              label={def.label}
+              valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
+              rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
+            >
+              <ExtraFieldControl def={def} />
+            </Form.Item>
+          ))}
           <Typography.Paragraph type="secondary">
-            联系方式允许重复；重复只提示候选，不拦截建档。
+            联系方式允许重复；重复只提示候选，不拦截建档。活字段在设置页维护，可随时增删。
           </Typography.Paragraph>
           <PermissionButton permission="customer.create" type="primary" htmlType="submit">
             建档
           </PermissionButton>
         </Form>
       </Modal>
+
+      <Modal
+        title={editTarget ? `编辑客户 · ${editTarget.customer_no}` : "编辑客户"}
+        open={Boolean(editTarget)}
+        onCancel={() => {
+          setEditTarget(null);
+          editForm.resetFields();
+        }}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          colon={false}
+          className="form-no-colon"
+          onFinish={submitEdit}
+          initialValues={
+            editTarget
+              ? {
+                  display_name: editTarget.display_name,
+                  contact_name: editTarget.contact_name ?? "",
+                  phone: editTarget.phone ?? "",
+                  wechat: editTarget.wechat ?? "",
+                  qq: editTarget.qq ?? "",
+                  note: editTarget.note ?? "",
+                  ...Object.fromEntries(
+                    activeDefs.map((def) => [def.field_key, editTarget.extra_values?.[def.field_key]]),
+                  ),
+                }
+              : undefined
+          }
+        >
+          <Form.Item name="display_name" label="名字" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <div className="form-cols-2">
+            <Form.Item name="contact_name" label="联系人姓名">
+              <Input />
+            </Form.Item>
+            <Form.Item name="phone" label="手机号">
+              <Input />
+            </Form.Item>
+            <Form.Item name="wechat" label="微信号">
+              <Input />
+            </Form.Item>
+            <Form.Item name="qq" label="QQ">
+              <Input />
+            </Form.Item>
+          </div>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          {activeDefs.map((def) => (
+            <Form.Item
+              key={def.field_key}
+              name={def.field_key}
+              label={def.label}
+              valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
+              rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
+            >
+              <ExtraFieldControl def={def} />
+            </Form.Item>
+          ))}
+          <PermissionButton permission="customer.update" type="primary" htmlType="submit">
+            保存
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Drawer
+        title={detailTarget ? `客户档案 · ${detailTarget.customer_no}` : "客户档案"}
+        open={Boolean(detailTarget)}
+        onClose={() => setDetailTarget(null)}
+        width={480}
+        destroyOnHidden
+        extra={
+          detailTarget && detailTarget.status === "ACTIVE" ? (
+            <PermissionButton
+              permission="customer.update"
+              size="small"
+              onClick={() => {
+                setEditTarget(detailTarget);
+                setDetailTarget(null);
+              }}
+            >
+              编辑
+            </PermissionButton>
+          ) : null
+        }
+      >
+        {detailTarget ? (
+          <>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="客户编号">{detailTarget.customer_no}</Descriptions.Item>
+              <Descriptions.Item label="名字">{detailTarget.display_name}</Descriptions.Item>
+              <Descriptions.Item label="联系人">{detailTarget.contact_name || "-"}</Descriptions.Item>
+              <Descriptions.Item label="手机">{detailTarget.phone || "-"}</Descriptions.Item>
+              <Descriptions.Item label="微信">{detailTarget.wechat || "-"}</Descriptions.Item>
+              <Descriptions.Item label="QQ">{detailTarget.qq || "-"}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <StatusTag status={detailTarget.status} />
+              </Descriptions.Item>
+              <Descriptions.Item label="备注">{detailTarget.note || "-"}</Descriptions.Item>
+            </Descriptions>
+            <Typography.Title level={5} style={{ marginTop: 16 }}>
+              活字段
+            </Typography.Title>
+            {fieldDefs.length === 0 ? (
+              <Typography.Paragraph type="secondary">
+                未配置活字段；在设置页「活字段」新增后，建档与详情会自动带出。
+              </Typography.Paragraph>
+            ) : (
+              <Descriptions column={1} bordered size="small">
+                {fieldDefs.map((def) => {
+                  const value = formatExtraValue(detailTarget.extra_values?.[def.field_key]);
+                  return (
+                    <Descriptions.Item
+                      key={def.field_key}
+                      label={`${def.label}${def.is_active ? "" : "（已停用）"}`}
+                    >
+                      {value || "未填写"}
+                    </Descriptions.Item>
+                  );
+                })}
+              </Descriptions>
+            )}
+          </>
+        ) : null}
+      </Drawer>
 
       <Modal
         title={mergeTarget ? `合并客户 · ${mergeTarget.customer_no}` : "合并客户"}

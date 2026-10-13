@@ -10,10 +10,10 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -61,7 +61,12 @@ def mask_id(value: str | None) -> str | None:
     return head + "*" * (len(text) - 2)
 
 
-def to_customer_out(customer: Customer, *, reveal_contact: bool) -> dict[str, Any]:
+def to_customer_out(
+    customer: Customer,
+    *,
+    reveal_contact: bool,
+    extra_values: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     payload = {
         "id": customer.id,
         "customer_no": customer.customer_no,
@@ -77,6 +82,7 @@ def to_customer_out(customer: Customer, *, reveal_contact: bool) -> dict[str, An
         "note": customer.note,
         "merged_into_id": customer.merged_into_id,
         "contact_masked": False,
+        "extra_values": dict(extra_values or {}),
     }
     if reveal_contact:
         return payload
@@ -101,10 +107,14 @@ def create_customer(
     owner_id: int | None = None,
     tags: Sequence[str] | None = None,
     note: str | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> Customer:
     name = (display_name or "").strip()
     if not name:
         raise Validation("称呼/昵称必填", details={"field": "display_name"})
+
+    extras = dict(extra_values or {})
+    _validate_required_extras(session, EntityType.CUSTOMER.value, extras)
 
     customer = Customer(
         customer_no=allocate_number(session, SequenceKey.CUSTOMER),
@@ -123,13 +133,20 @@ def create_customer(
     )
     session.add(customer)
     session.flush()
+    if extras:
+        set_extra_values(
+            session,
+            entity_type=EntityType.CUSTOMER.value,
+            entity_id=customer.id,
+            values=extras.items(),
+        )
     record_audit(
         session,
         action=AuditAction.CUSTOMER_CREATE,
         entity_type="customer",
         entity_id=customer.customer_no,
         actor=actor,
-        after={"display_name": name, "status": customer.status},
+        after={"display_name": name, "status": customer.status, **({"extra_values": extras} if extras else {})},
     )
     return customer
 
@@ -208,7 +225,7 @@ def get_customer(session: Session, customer_id: int, user: CurrentUser | None = 
 
 
 def update_customer(
-    session: Session, customer_id: int, *, actor: str, **fields: Any
+    session: Session, customer_id: int, *, actor: str, extra_values: Mapping[str, Any] | None = None, **fields: Any
 ) -> Customer:
     customer = get_customer(session, customer_id)
     if customer.status == CustomerStatus.MERGED.value:
@@ -230,6 +247,16 @@ def update_customer(
     customer.updated_by = actor
     session.flush()
 
+    saved_extras: dict[str, Any] = {}
+    if extra_values:
+        _validate_required_extras(session, EntityType.CUSTOMER.value, extra_values, partial=True)
+        saved_extras = set_extra_values(
+            session,
+            entity_type=EntityType.CUSTOMER.value,
+            entity_id=customer.id,
+            values=extra_values.items(),
+        )
+
     action = AuditAction.CONTACT_WRITE if changed_contacts else AuditAction.CUSTOMER_UPDATE
     record_audit(
         session,
@@ -238,7 +265,10 @@ def update_customer(
         entity_id=customer.customer_no,
         actor=actor,
         before=before,
-        after={name: getattr(customer, name) for name in CONTACT_FIELDS},
+        after={
+            **{name: getattr(customer, name) for name in CONTACT_FIELDS},
+            **({"extra_values": saved_extras} if saved_extras else {}),
+        },
     )
     return customer
 
@@ -480,6 +510,93 @@ def assert_counterparty_usable(
 
 
 # --------------------------------------------------------------------- 活字段
+def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
+    """按字段类型校验活字段值；SELECT/MULTI_SELECT 必须在选项内（BAS-04）。"""
+    if value is None:
+        return None
+    kind = definition.field_type
+    if kind == "NUMBER":
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise Validation(
+                f"字段 {definition.label} 必须为数字",
+                details={"field_key": definition.field_key, "value": str(value)[:64]},
+            )
+        return value
+    if kind == "BOOLEAN":
+        if not isinstance(value, bool):
+            raise Validation(
+                f"字段 {definition.label} 必须为布尔值",
+                details={"field_key": definition.field_key},
+            )
+        return value
+    if kind == "DATE":
+        text = str(value).strip()
+        try:
+            date.fromisoformat(text)
+        except ValueError as exc:
+            raise Validation(
+                f"字段 {definition.label} 必须为 YYYY-MM-DD 日期",
+                details={"field_key": definition.field_key},
+            ) from exc
+        return text
+    if kind == "SELECT":
+        options = list(definition.options or [])
+        if options and value not in options:
+            raise Validation(
+                f"字段 {definition.label} 的取值必须在选项内",
+                details={"field_key": definition.field_key, "value": str(value)[:64]},
+            )
+        return value
+    if kind == "MULTI_SELECT":
+        if not isinstance(value, list):
+            raise Validation(
+                f"字段 {definition.label} 必须为数组",
+                details={"field_key": definition.field_key},
+            )
+        options = list(definition.options or [])
+        if options and any(item not in options for item in value):
+            raise Validation(
+                f"字段 {definition.label} 的取值必须在选项内",
+                details={"field_key": definition.field_key},
+            )
+        return value
+    return str(value)
+
+
+def _validate_required_extras(
+    session: Session, entity_type: str, values: Mapping[str, Any], *, partial: bool = False
+) -> None:
+    """必填活字段缺失即拒绝（BAS-04-04）。
+
+    partial=True（更新路径）：只校验**本次提交**涉及到的必填字段非空，
+    不要求把历史上已填过的必填字段再交一遍。
+    """
+    definitions = session.scalars(
+        select(FieldDefinition).where(
+            FieldDefinition.entity_type == entity_type,
+            FieldDefinition.required.is_(True),
+            FieldDefinition.is_active.is_(True),
+        )
+    ).all()
+    if partial:
+        missing = [
+            definition.field_key
+            for definition in definitions
+            if definition.field_key in values and values.get(definition.field_key) in (None, "")
+        ]
+    else:
+        missing = [
+            definition.field_key
+            for definition in definitions
+            if values.get(definition.field_key) in (None, "")
+        ]
+    if missing:
+        raise Validation(
+            f"必填活字段未填写：{', '.join(missing)}",
+            details={"fields": missing},
+        )
+
+
 def create_field_definition(
     session: Session,
     *,
@@ -611,11 +728,11 @@ def set_extra_values(
                 entity_type=entity_type,
                 entity_id=entity_id,
                 field_definition_id=definition.id,
-                value={"value": value},
+                value={"value": _validate_extra_value(definition, value)},
             )
             session.add(row)
         else:
-            row.value = {"value": value}
+            row.value = {"value": _validate_extra_value(definition, value)}
         saved[field_key] = value
     session.flush()
     return saved
@@ -636,16 +753,83 @@ def get_extra_values(session: Session, *, entity_type: str, entity_id: int) -> d
     return result
 
 
+def get_extra_values_bulk(
+    session: Session, *, entity_type: str, entity_ids: Iterable[int]
+) -> dict[int, dict[str, Any]]:
+    """批量读取活字段值：列表页一次查询，避免逐行 N+1。"""
+    ids = list(entity_ids)
+    result: dict[int, dict[str, Any]] = {entity_id: {} for entity_id in ids}
+    if not ids:
+        return result
+    rows = session.scalars(
+        select(EntityExtraValue).where(
+            EntityExtraValue.entity_type == entity_type,
+            EntityExtraValue.entity_id.in_(ids),
+        )
+    ).all()
+    if not rows:
+        return result
+    definitions = session.scalars(
+        select(FieldDefinition).where(
+            FieldDefinition.id.in_({row.field_definition_id for row in rows})
+        )
+    ).all()
+    key_by_id = {definition.id: definition.field_key for definition in definitions}
+    for row in rows:
+        field_key = key_by_id.get(row.field_definition_id)
+        if field_key is not None:
+            result.setdefault(row.entity_id, {})[field_key] = (row.value or {}).get("value")
+    return result
+
+
+def delete_field_definition(
+    session: Session, definition_id: int, *, actor: str
+) -> None:
+    """删除字段定义：无历史值才可物理删除；有值只能停用（BAS-04-03）。"""
+    definition = session.get(FieldDefinition, definition_id)
+    if definition is None:
+        raise NotFound(
+            f"字段定义 {definition_id} 不存在", details={"field_definition_id": definition_id}
+        )
+    used = session.scalar(
+        select(func.count())
+        .select_from(EntityExtraValue)
+        .where(EntityExtraValue.field_definition_id == definition_id)
+    )
+    if used:
+        raise Conflict(
+            f"字段 {definition.label} 已有 {used} 条历史值，只能停用不能删除",
+            code=ErrorCode.FIELD_DEFINITION_HAS_VALUES,
+            details={
+                "field_key": definition.field_key,
+                "value_count": int(used),
+            },
+        )
+    record_audit(
+        session,
+        action=AuditAction.FIELD_DEFINITION_CHANGE,
+        entity_type="field_definition",
+        entity_id=f"{definition.entity_type}.{definition.field_key}",
+        actor=actor,
+        before={"label": definition.label, "is_active": definition.is_active},
+        after={"deleted": True},
+    )
+    session.delete(definition)
+    session.flush()
+
+
 __all__ = [
     "assert_counterparty_usable",
     "assert_customer_usable",
     "create_counterparty",
     "create_customer",
     "create_field_definition",
+    "delete_field_definition",
     "duplicate_candidates",
     "get_counterparty",
     "get_customer",
     "get_extra_values",
+    "get_extra_values_bulk",
     "list_counterparties",
     "list_customers",
     "list_field_definitions",

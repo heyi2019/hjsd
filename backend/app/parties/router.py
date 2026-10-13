@@ -49,7 +49,13 @@ def list_customers(
 ) -> list[dict]:
     reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
     customers = service.list_customers(db, keyword=keyword, status=status, user=user)
-    return [service.to_customer_out(item, reveal_contact=reveal) for item in customers]
+    extras = service.get_extra_values_bulk(
+        db, entity_type="customer", entity_ids=[item.id for item in customers]
+    )
+    return [
+        service.to_customer_out(item, reveal_contact=reveal, extra_values=extras.get(item.id))
+        for item in customers
+    ]
 
 
 @router.post(
@@ -72,6 +78,7 @@ def create_customer(
         owner_id=user.id if payload.owner_id is None and user.owner_scope != "ALL" else payload.owner_id,
         tags=payload.tags,
         note=payload.note,
+        extra_values=payload.extra_values,
     )
     candidates = service.duplicate_candidates(
         db,
@@ -80,8 +87,9 @@ def create_customer(
         qq=payload.qq,
         exclude_customer_id=customer.id,
     )
+    extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return {
-        "customer": service.to_customer_out(customer, reveal_contact=True),
+        "customer": service.to_customer_out(customer, reveal_contact=True, extra_values=extras),
         "duplicate_candidates": candidates,
     }
 
@@ -104,7 +112,8 @@ def get_customer(
             actor=_actor(user),
         )
         db.flush()
-    return service.to_customer_out(customer, reveal_contact=show_full)
+    extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
+    return service.to_customer_out(customer, reveal_contact=show_full, extra_values=extras)
 
 
 @router.patch("/customers/{customer_id}", response_model=schemas.CustomerOut)
@@ -117,7 +126,8 @@ def update_customer(
     customer = service.update_customer(
         db, customer_id, actor=_actor(user), **payload.model_dump(exclude_unset=True)
     )
-    return service.to_customer_out(customer, reveal_contact=True)
+    extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
+    return service.to_customer_out(customer, reveal_contact=True, extra_values=extras)
 
 
 @router.patch("/customers/{customer_id}/status", response_model=schemas.CustomerOut)
@@ -278,6 +288,16 @@ def set_field_definition_active(
 ) -> dict:
     item = service.set_field_definition_active(db, definition_id, active, actor=_actor(user))
     return schemas.FieldDefinitionOut.model_validate(item)
+
+
+@router.delete("/field-definitions/{definition_id}", status_code=204)
+def delete_field_definition(
+    definition_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_fields,
+) -> None:
+    """删除字段定义：无历史值才可删；有值返回 409 只能停用（BAS-04-03）。"""
+    service.delete_field_definition(db, definition_id, actor=_actor(user))
 
 
 __all__ = ["router", "get_current_user"]

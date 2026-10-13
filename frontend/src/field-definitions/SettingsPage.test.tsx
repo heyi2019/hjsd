@@ -8,7 +8,7 @@ import { SettingsPage } from "./SettingsPage";
 const { orderTypesApi, poolsApi, fieldsApi, policyApi } = vi.hoisted(() => ({
   orderTypesApi: { list: vi.fn(), create: vi.fn() },
   poolsApi: { list: vi.fn(), create: vi.fn() },
-  fieldsApi: { list: vi.fn(), create: vi.fn(), setActive: vi.fn() },
+  fieldsApi: { list: vi.fn(), create: vi.fn(), setActive: vi.fn(), remove: vi.fn() },
   policyApi: {
     list: vi.fn(),
     versions: vi.fn(),
@@ -81,6 +81,47 @@ it("活字段 Tab：viewer 无 field-definition.manage → 看不到启用/停�
   await screen.findByText("区域");
   const labels = screen.queryAllByRole("button").map((b) => b.textContent ?? "");
   expect(labels.some((t) => t.includes("启用") || t.includes("停用"))).toBe(false);
+});
+
+it("活字段 Tab：admin 可删除无历史值字段（确认后调 remove 并刷新）", async () => {
+  renderApp(<SettingsPage />, { user: "admin" });
+  await screen.findByText("HS");
+  await userEvent.click(screen.getByRole("tab", { name: "活字段" }));
+  await screen.findByText("区域");
+  await userEvent.click(screen.getByRole("button", { name: /删\s*除/ }));
+  // 弹层确认按钮：测试环境下 antd locale 经 portal 后回退英文（OK），生产环境为「确定」，
+  // 选择器同时覆盖两种文案以保证测试稳定。
+  await userEvent.click(await screen.findByRole("button", { name: /确\s*定|OK/ }));
+  await waitFor(() => expect(fieldsApi.remove).toHaveBeenCalledWith(1));
+  await waitFor(() => expect(fieldsApi.list).toHaveBeenCalledTimes(2));
+});
+
+it("活字段 Tab：viewer 无 field-definition.manage → 无删除按钮", async () => {
+  renderApp(<SettingsPage />, { user: "viewer" });
+  await screen.findByText("HS");
+  await userEvent.click(screen.getByRole("tab", { name: "活字段" }));
+  await screen.findByText("区域");
+  expect(screen.queryByRole("button", { name: /删\s*除/ })).toBeNull();
+});
+
+it("活字段 Tab：默认 TEXT 不展开选项输入，提交按定义回传类型/必填/排序", async () => {
+  renderApp(<SettingsPage />, { user: "admin" });
+  await screen.findByText("HS");
+  await userEvent.click(screen.getByRole("tab", { name: "活字段" }));
+  await screen.findByText("区域");
+  expect(screen.queryByPlaceholderText(/逗号分隔/)).toBeNull();
+  await userEvent.type(screen.getByPlaceholderText("小写下划线，如 credit_level"), "credit_level");
+  await userEvent.type(screen.getByPlaceholderText("页面显示名"), "信用评级");
+  await userEvent.click(screen.getByRole("button", { name: /新增字段/ }));
+  await waitFor(() => expect(fieldsApi.create).toHaveBeenCalled());
+  expect(fieldsApi.create.mock.calls[0][0]).toMatchObject({
+    entity_type: "customer",
+    field_key: "credit_level",
+    label: "信用评级",
+    field_type: "TEXT",
+    required: false,
+    sort_order: 0,
+  });
 });
 
 it("经营规则 Tab：挂载后渲染 PolicySettingsPanel（StatRow「规则总数」唯一标识）", async () => {

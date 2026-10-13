@@ -21,16 +21,74 @@
  */
 @media (prefers-reduced-motion: no-preference) {
   :where(.ant-btn, .permission-tree summary) {
-    /* 松手回弹：--ease-spring 峰值 1.015 的过冲由这里提供。 */
-    transition-property: transform, background-color, border-color, color, opacity;
-    transition-duration: var(--dur);
-    transition-timing-function: var(--ease-spring);
+    /* 定位上下文：供 ::after 按压高亮覆盖；零特异性下若 antd 已设 relative 也不冲突。 */
+    position: relative;
+    /* 真机复验（2026-10-13）修正：本构建 antd v5 基类 .ant-btn 实测声明了
+     *   transition: all ...（getComputedStyle 得 transition-property="all"），
+     *   零特异性的 transition-* 被压成 antd 默认 ease，弹簧(--ease-spring)形同虚设。
+     *   故 transition-* 全部 !important，与文件「:where 被 antd 占则补 !important」
+     *   的既定约定（td/drawer 同例）一致——弹簧缓动才能真正落地。 */
+    transition-property: transform, background-color, border-color, color, opacity, box-shadow !important;
+    transition-duration: var(--dur) !important;
+    transition-timing-function: var(--ease-spring) !important;
   }
-  :where(.ant-btn:not(:disabled), .permission-tree summary):active {
-    /* 按下：缩量 + 极短时长（0.97 是一级控件通行值；再深会被读作「缩小」而非「压下」）。 */
+  /* 悬浮轻抬（Apple 流体：按钮悬停微微浮起 + 投影；与入口卡同源）。
+     文字链按钮(.ant-btn-link)不做位移，改走颜色反馈（下方链接规则）。
+     transform/box-shadow 加 !important：防 antd 个别变体 hover 设 box-shadow 覆盖我方。
+     注意：本规则须排在 :active 缩量之前（见下），否则同特异性下后者生效会抢走按下态。 */
+  :where(.ant-btn:not(:disabled):not(.ant-btn-link)):hover {
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-raised) !important;
+  }
+  /* 按下缩量（0.97 是一级控件通行值；再深会被读作「缩小」而非「压下」）。
+     须排除 .ant-btn-link 并排在本 hover 规则之后：二者特异性同为 (0,0,3,0)，
+     源码靠后者胜出，保证「悬停+按下」同时命中时显示缩量而非抬升（回归防护）。
+     文字链按钮(.ant-btn-link)不缩量，仅保留 ::after 按压高亮（下方），避免行内文字抖动。
+     时长/缓动须 !important 才能压过基类 .ant-btn 的 !important（同特异性后者生效）。 */
+  :where(.ant-btn:not(:disabled):not(.ant-btn-link)):active {
     transform: scale(0.97);
-    transition-duration: var(--dur-fast);
-    transition-timing-function: var(--ease);
+    transition-duration: var(--dur-fast) !important;
+    transition-timing-function: var(--ease) !important;
+  }
+  :where(.permission-tree summary):active {
+    transform: scale(0.97);
+    transition-duration: var(--dur-fast) !important;
+    transition-timing-function: var(--ease) !important;
+  }
+  /* 按压高亮（Apple iOS 按钮按下瞬间中心微暗）：径向覆盖、松手淡出。
+     替代 Material「坐标 ripple」（需 JS 落点），CSS-only 用「中心高亮」表达「已按下」，
+     深色半透明对任意底色（蓝/白/幽灵）都成立，优于白色高亮在白底按钮上不可见。
+     transition 加 !important 以压过 antd 基类 transition:all。 */
+  :where(.ant-btn:not(:disabled))::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at center, rgb(0 0 0 / 0.10), rgb(0 0 0 / 0) 70%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-fast) var(--ease) !important;
+  }
+  :where(.ant-btn:not(:disabled)):active::after {
+    opacity: 1;
+    transition-duration: 60ms !important;
+  }
+  /* 可勾选 Tag（交互型）：hover 蓝底提示 + 按下缩量，与按钮同源。
+     antd 对 .ant-tag-checkable:hover 设了背景/色、且基类可能带 transition，故这里
+     transition-* 与 hover 色均 !important，才不是死规则——与文件既定约定一致。 */
+  :where(.ant-tag-checkable) {
+    transition-property: transform, background-color, color !important;
+    transition-duration: var(--dur) !important;
+    transition-timing-function: var(--ease-spring) !important;
+  }
+  :where(.ant-tag-checkable):hover {
+    background: var(--violet-soft) !important;
+    color: var(--color-primary-text) !important;
+  }
+  :where(.ant-tag-checkable):active {
+    transform: scale(0.97);
+    transition-duration: var(--dur-fast) !important;
+    transition-timing-function: var(--ease) !important;
   }
 }
 
@@ -57,4 +115,23 @@
   :where(.ui-table-wrap .ant-table-tbody > tr):active > td {
     background: var(--violet-soft);
   }
+}
+
+/* ── 文字链接（antd Typography.Link / .ant-typography a）─────────────
+   与按钮同源的「颜色弹簧」+ 按下淡出；不做位移（行内元素 transform 不稳）。
+   放在减弱动效媒体查询之外：颜色/透明度反馈对 reduced-motion 用户仍安全。
+   antd 对 .ant-typography a:hover 设了颜色（特异性压过 :where），故 color/transition
+   用 !important 才不是死规则（与本文件既定约定一致）。 */
+:where(.ant-typography a, a.ant-typography) {
+  transition: color var(--dur) var(--ease), opacity var(--dur-fast) var(--ease) !important;
+}
+:where(.ant-typography a, a.ant-typography):hover {
+  color: var(--color-primary-text) !important;
+}
+:where(.ant-typography a, a.ant-typography):active {
+  opacity: 0.62 !important;
+}
+/* 文字链按钮：hover 加深蓝，与上述链接保持一致（antd 同样占 :hover 色，须 !important）。 */
+:where(.ant-btn-link:not(:disabled)):hover {
+  color: var(--color-primary-text) !important;
 }

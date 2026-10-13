@@ -107,15 +107,19 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
   });
 });
 
-describe("AppShell：角色切换", () => {
-  it("顶栏可切换 dev 角色并持久化", async () => {
+describe("AppShell：角色展示与退出", () => {
+  it("顶栏角色为只读文本（管理员配置，无下拉选择器）", () => {
     renderApp(<AppShell />, { user: "admin" });
-    // 角色选择器是 antd Select：先 mousedown 打开再点选项（rc-select 监听 selector 的 mousedown）
-    const selector = document.querySelector(".ant-select-selector") as Element;
-    expect(selector).toBeTruthy();
-    await userEvent.click(selector);
-    const option = await screen.findByTitle("财务");
-    await userEvent.click(option);
-    await waitFor(() => expect(localStorage.getItem("hj.dev-user")).toBe("finance"));
+    const topbar = document.querySelector(".topbar") as HTMLElement;
+    expect(within(topbar).getByText("当前角色（开发态）")).toBeTruthy();
+    expect(within(topbar).getByText("系统管理员")).toBeTruthy();
+    // 角色不是运行时可选参数：顶栏不得出现任何 antd 选择器
+    expect(topbar.querySelector(".ant-select-selector")).toBeNull();
+  });
+
+  it("DEV 态顶栏也常驻退出登录按钮", () => {
+    renderApp(<AppShell />, { user: "admin" });
+    const topbar = document.querySelector(".topbar") as HTMLElement;
+    expect(within(topbar).getByRole("button", { name: "退出登录" })).toBeTruthy();
   });
 });

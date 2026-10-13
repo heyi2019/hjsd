@@ -115,13 +115,24 @@
   background: var(--soft);
 }
 
+/* 按钮高度取 --ui-control-height-md(32)：+2px 轨道内衬后整轨 36px，
+   与顶栏 antd 选择器（antd-adapter 全局托管 36px）严格同高，行基线不抖动。
+   border 必须显式归零：UA 默认 2px outset 会叠在 soft 轨道上形成双重描边。 */
 .theme-switch button {
   min-width: var(--sz-40);
-  min-height: var(--ui-control-height-lg);
+  min-height: var(--ui-control-height-md);
   margin: 0;
   padding: 0 var(--space-2);
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
   font: var(--font-nav-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.theme-switch button:not(.is-active):hover {
+  color: var(--color-text-primary);
 }
 .theme-switch-options button.is-active {
   background: var(--color-antd-bg-container);
@@ -223,6 +234,38 @@
 /* 顶栏页名 = 视图 H1（Title 1 · 28），页内 PageHeader 为小节标题（20px），
    保持 h1 > h2 的正常层级（2026-10-13 用户裁决：17px 倒挂试验作废）。 */
 .topbar__page { margin: 0; font: var(--font-h1); color: var(--color-text-primary); letter-spacing: var(--ls-tight); }
+
+/* 顶栏右侧工具区：行内只放紧凑控件，统一 36px 行高（与 antd 选择器同高），
+   不再复用 .nav-item（44px + 透明底 + 15px）把整行撑高还像个文本标签。 */
+.topbar-actions { align-items: center; }
+.topbar-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ui-control-height-lg);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: var(--font-nav-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.topbar-action:hover { background: var(--soft); color: var(--color-text-primary); }
+
+/* 顶栏角色展示：管理员配置的只读文本——无 chevron、无 hover、无指针手势，
+   与可操作的 .topbar-action 在视觉上明确区分（操作=幽灵按钮，状态=纯文本）。 */
+.topbar-role {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--ui-control-height-lg);
+  font: var(--font-nav-secondary);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.topbar-role-name { color: var(--color-text-primary); }
 
 /* 窄屏：侧栏转为顶部横向滚动导航，避免导航完全消失。 */
 @media (--bp-md) {

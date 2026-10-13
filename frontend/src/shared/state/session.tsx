@@ -89,7 +89,9 @@ const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<string>(currentDevUser());
-  const [authenticated, setAuthenticated] = useState<boolean>(() => Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
+  // DEV 态默认视为已登录（X-Dev-User 直通、本地无 token）；显式点「退出登录」后
+  // 回落 false 落登录页，刷新页面即恢复直通——开发态不会被关在登录页外。
+  const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
   useEffect(() => {
     if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return;

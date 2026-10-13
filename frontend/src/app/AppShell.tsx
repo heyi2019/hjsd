@@ -1,4 +1,4 @@
-import { Modal, Select, Space } from "antd";
+import { Modal, Space } from "antd";
 import { useState } from "react";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
@@ -29,12 +29,14 @@ const PAGES: Record<string, (props: PageProps) => JSX.Element> = {
 export function AppShell() {
   const [active, setActive] = useState("dashboard");
   const [userCenterOpen, setUserCenterOpen] = useState(false);
-  const { user, switchUser, authenticated, mustChangePassword, logout } = useSession();
+  const { user, authenticated, mustChangePassword, logout } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const Page = PAGES[active] ?? DashboardPage;
-  if (!import.meta.env.DEV && !authenticated) return <LoginPage />;
-  if (!import.meta.env.DEV && mustChangePassword) return <ChangePasswordPage />;
+  // DEV 与生产同一套退出语义：DEV 初始即已登录（session 内默认 true，X-Dev-User 直通），
+  // 点「退出登录」后落登录页，刷新即恢复直通；生产态无 token 同样落登录页。
+  if (!authenticated) return <LoginPage />;
+  if (mustChangePassword) return <ChangePasswordPage />;
   return (
     <div className="app-shell">
       <aside className="sidebar glass">
@@ -63,7 +65,7 @@ export function AppShell() {
           <div className="topbar__title">
             <h1 className="topbar__page">{item?.label ?? "用户中心"}</h1>
           </div>
-          <Space size="small">
+          <Space size="small" className="topbar-actions">
             <div className="theme-switch" role="group" aria-label="主题切换">
               <div className="theme-switch-options">
                 <button
@@ -86,11 +88,18 @@ export function AppShell() {
             </div>
             {/* 用户中心入口：DEV 与生产态都可从顶栏进入（改密码、看角色权限）。
                 以 Modal 弹出挂载 UserCenterPage，不占用侧栏 nav 计数与一级路由。
-                用原生 button + nav-item 样式（同「退出登录」）。 */}
-            <button type="button" className="nav-item" onClick={() => setUserCenterOpen(true)}>
+                用 .topbar-action 紧凑幽灵按钮（36px，与分段控件/选择器同高），
+                不再复用 .nav-item（44px 会把顶栏整行撑高）。 */}
+            <button type="button" className="topbar-action" onClick={() => setUserCenterOpen(true)}>
               用户中心
             </button>
-            {import.meta.env.DEV ? <><span className="muted">当前角色（开发态）</span><Select size="small" value={user} style={{ width: 140 }} options={DEV_ROLES} onChange={switchUser} /></> : <button type="button" className="nav-item" onClick={() => void logout()}>退出登录</button>}
+            {/* 当前角色只读展示：角色由管理员配置（生产态=登录账号角色，DEV 态=X-Dev-User 头），
+                不是运行时可选参数——故不放下拉选择器，避免误以为可自行切换权限。 */}
+            <span className="topbar-role">
+              <span className="muted">当前角色{import.meta.env.DEV ? "（开发态）" : ""}</span>
+              <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === user)?.label ?? user}</span>
+            </span>
+            <button type="button" className="topbar-action" onClick={() => void logout()}>退出登录</button>
           </Space>
         </header>
         <main className="page-content">

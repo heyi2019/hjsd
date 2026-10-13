@@ -24,6 +24,9 @@
   --panel-2: rgba(255, 255, 255, 0.72);
   --soft: rgba(118, 118, 128, 0.12);
   --on-accent: #fff;
+  /* 表格/列表行微交互（2026-10-13 Apple 流体）：hover 复用既有 --violet-soft（蓝系，与品牌一致）；
+     selected 用更强的蓝填充以区别于 hover。深色在 [data-theme=dark] 覆盖。 */
+  --row-selected: rgba(10, 99, 216, 0.16);
 
   /* 液态玻璃（guidelines §2：四件套） */
   --glass: rgba(255, 255, 255, 0.62);
@@ -479,6 +482,13 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* 表格/列表行入场：仅自下方 6px 微升 + 淡入，不做 scale（表格行 scale 会横向抖动/裁切）。
+   1.5% 过冲由 --ease-spring 的峰值 1.015 提供；stagger 由 antd-adapter.css 的 nth-child 递延时实现。 */
+@keyframes ui-row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
 
@@ -493,6 +503,7 @@
   --label: #f3f8ff;
   --panel-2: rgba(20, 40, 64, 0.78);
   --soft: rgba(255, 255, 255, 0.1);
+  --row-selected: rgba(10, 132, 255, 0.26);
   --glass: rgba(18, 36, 58, 0.72);
   --glass-border: rgba(255, 255, 255, 0.16);
   --glass-hi: rgba(255, 255, 255, 0.12);

@@ -425,3 +425,48 @@
 :where(h3.ant-typography, .ant-typography h3) { font: var(--font-card-title) !important; }
 :where(h4.ant-typography, .ant-typography h4),
 :where(h5.ant-typography, .ant-typography h5) { font: var(--font-body-s) !important; }
+
+/* ── 表格 / 列表行微交互（Apple 流体 · 2026-10-13）──────────────────────
+ * 设计意图（用户选「表格/列表行微交互」）：
+ *   1. hover 平滑过渡 + 轻微色彩浮起（复用 --violet-soft，蓝系与品牌一致）；
+ *   2. 选中行用更强的蓝填充（--row-selected）区别于 hover；
+ *   3. 行入场逐行 stagger 淡入（ui-row-in），仅 no-preference 生效。
+ * 取舍：表格行**不做 translateY 位移**——密集行位移会互相重叠/被裁切；
+ *   色彩浮起已足够表达"轻浮起"。列表项（.ant-list-item）带间距、类卡片，
+ *   可安全轻微上抬 1px 表达真实浮起。
+ * 入场动画挂在 tbody > tr 上：antd 按 rowKey 复用节点，同数据不重播；
+ *   仅新数据/翻页/排序后新出现的行重播，等效"数据流入时逐行点亮"。 */
+:where(.ant-table-tbody > tr > td) {
+  transition: background-color 160ms var(--ease-spring);
+}
+:where(.ant-table-tbody > tr.ant-table-row-selected > td) {
+  background: var(--row-selected) !important;
+}
+
+:where(.ant-list-item) {
+  transition: background-color 160ms var(--ease-spring), transform 160ms var(--ease-spring);
+}
+:where(.ant-list-item:hover) {
+  background: var(--violet-soft) !important;
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 行入场：自下方 6px 微升 + 淡入（ui-row-in，无 scale 防表格行抖动）；
+     前 12 行递延时形成 stagger，其后行随首行同时入场（可视区通常 ≤12 行）。 */
+  .ant-table-tbody > tr.ant-table-row {
+    animation: ui-row-in var(--dur-spring) var(--ease-spring) both;
+  }
+  .ant-table-tbody > tr.ant-table-row:nth-child(1)  { animation-delay: 0ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(2)  { animation-delay: 24ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(3)  { animation-delay: 48ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(4)  { animation-delay: 72ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(5)  { animation-delay: 96ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(6)  { animation-delay: 120ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(7)  { animation-delay: 144ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(8)  { animation-delay: 168ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(9)  { animation-delay: 192ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(10) { animation-delay: 216ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(11) { animation-delay: 240ms; }
+  .ant-table-tbody > tr.ant-table-row:nth-child(12) { animation-delay: 264ms; }
+}

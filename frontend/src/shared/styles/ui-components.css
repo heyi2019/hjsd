@@ -70,6 +70,71 @@
   box-shadow: inset 3px 0 0 var(--color-warning), var(--shadow-soft);
 }
 
+/* ── EntryCard / EntryRow ─────────────────────────────────── */
+/* 可点击入口卡（工作台速览区）：玻璃材质与 StatCard 同源，差异只在
+ * cursor/焦点态/tone。纵向节奏仍由父级 .ui-stack gap 独占，卡内不带 margin。 */
+.ui-entry-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+.ui-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition:
+    transform var(--dur) var(--ease-spring),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+.ui-entry-card:hover {
+  border-color: var(--violet-border);
+  box-shadow: var(--shadow-raised);
+}
+/* 直接操纵（Apple HIG）：可点卡片悬浮轻抬、按下即时缩量，松手弹簧回弹。
+   与 interactions.css 的按钮/导航反馈同源；仅供「减弱动效」未开启的用户。 */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-entry-card:hover { transform: translateY(-2px); }
+  .ui-entry-card:active {
+    transform: scale(0.98);
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease);
+  }
+}
+.ui-entry-card:focus-visible {
+  outline: var(--border-w-2) solid var(--color-primary);
+  outline-offset: var(--space-1);
+}
+.ui-entry-card__title {
+  font: var(--font-caption);
+  color: var(--color-text-secondary);
+}
+.ui-entry-card__value {
+  font-family: var(--font-sans);
+  font-size: var(--fs-title-2);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ui-entry-card__desc { font: var(--font-caption-2); }
+.ui-entry-card--primary {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--glass-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--glass));
+}
+.ui-entry-card--warn {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--glass-border));
+}
+.ui-entry-card--warn .ui-entry-card__value { color: var(--color-warning); }
+
 /* ── MoneyText ────────────────────────────────────────────── */
 .ui-money {
   font-variant-numeric: tabular-nums;

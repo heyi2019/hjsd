@@ -9,19 +9,17 @@ import { CustomersPage } from "../customers/CustomersPage";
 import { FundsPage } from "../pools/FundsPage";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { QualityWorkbench } from "../quality/QualityWorkbench";
-import { HistoryWorkbench } from "../history/HistoryWorkbench";
 import { SettingsPage } from "../field-definitions/SettingsPage";
 import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 
+// 注：dashboard 不入此映射——工作台需 onNavigate 跳转，由下方三元单独渲染。
 const PAGES: Record<string, () => JSX.Element> = {
-  dashboard: DashboardPage,
   business: OrdersPage,
   customers: CustomersPage,
   funds: FundsPage,
   operations: ReportsPage,
   quality: QualityWorkbench,
-  history: HistoryWorkbench,
   settings: SettingsPage,
 };
 
@@ -37,6 +35,7 @@ export function AppShell() {
     <div className="app-shell">
       <aside className="sidebar glass">
         <div className="app-brand">
+          <span className="app-brand__mark" aria-hidden="true">宜</span>
           宜游轩 <span>ERP</span>
         </div>
         <nav className="nav-list" aria-label="主导航">
@@ -86,7 +85,11 @@ export function AppShell() {
           </Space>
         </header>
         <main className="page-content">
-          <Page />
+          {/* 工作台卡片需要跳转其它一级页：单独传 onNavigate；其余页面无props，走 PAGES 映射。
+              key={active} 让每次导航切换重挂载 .page-enter，重放 Apple 弹簧入场转场。 */}
+          <div className="page-enter" key={active}>
+            {active === "dashboard" ? <DashboardPage onNavigate={setActive} /> : <Page />}
+          </div>
         </main>
       </div>
     </div>

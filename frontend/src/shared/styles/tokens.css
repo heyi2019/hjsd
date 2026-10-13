@@ -472,6 +472,13 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* 页面/整块入场：自下方轻微升起 + 淡入，1.5% 过冲由 --ease-spring 的峰值 1.015 提供。
+   用于 AppShell 导航切换时重挂载的 .page-enter 容器，替代「硬切换、零转场」。 */
+@keyframes ui-page-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
 

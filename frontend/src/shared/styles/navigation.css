@@ -197,7 +197,8 @@
 .nav-item--active:hover {
   background: var(--violet-soft);
   color: var(--primary-ink);
-  box-shadow: inset 3px 0 0 var(--color-primary);
+  /* Apple 侧栏选中态：圆角染色胶囊 + 轻投影浮起，替代生硬的左描边条。 */
+  box-shadow: var(--shadow-soft);
 }
 .nav-item__icon { display: inline-flex; font-size: var(--fs-subheadline); line-height: 1; }
 .nav-item__label { font: inherit; }
@@ -224,9 +225,9 @@
   color: var(--color-text-tertiary);
   letter-spacing: var(--ls-tight);
 }
-/* 顶栏页名降为小节标题（17px/600），与页面内 PageHeader(20px) 拉开层级，
-   避免两层 20px 等权标题互相抢视觉焦点（iOS 层次：顶栏=上下文标签，页内=主标题）。 */
-.topbar__page { margin: 0; font: var(--font-card-title); color: var(--color-text-primary); letter-spacing: var(--ls-tighter); }
+/* 顶栏页名 = 视图 H1（Title 1 · 28），页内 PageHeader 为小节标题（20px），
+   保持 h1 > h2 的正常层级（2026-10-13 用户裁决：17px 倒挂试验作废）。 */
+.topbar__page { margin: 0; font: var(--font-h1); color: var(--color-text-primary); letter-spacing: var(--ls-tight); }
 
 /* 窄屏：侧栏转为顶部横向滚动导航，避免导航完全消失。 */
 @media (--bp-md) {

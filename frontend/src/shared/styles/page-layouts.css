@@ -114,6 +114,48 @@
   font: var(--font-body-s);
 }
 
+/* 登录门面（Apple 流体 · 2026-10-13）：居中舞台 + 玻璃卡从下方升起入场 + 品牌横向锚点。
+   原 LoginPage / ChangePasswordPage 用 antd Card + 内联 style，设计层 .login-card / .login-brand-mark
+   等从未被套用（死类）。本次统一接到设计层，消除「声明了样式、实际零生效」。
+   卡内容经 antd 的 .ant-card-body 包裹，故纵向节奏改用 body 的 flex 列 + gap，
+   不再依赖已失效的 .login-card > * / > p 直接子代选择器。 */
+.login-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh; /* 移动端地址栏动态高度，避免卡被顶出视口 */
+  padding: var(--space-6);
+}
+
+.login-card {
+  width: min(420px, 92vw);
+}
+
+.login-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.login-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.login-sub {
+  color: var(--color-text-secondary);
+  font: var(--font-body-s);
+}
+
+/* 玻璃卡从下方轻微升起 + 淡入；1.5% 过冲由 --ease-spring 的峰值 1.015 提供（复用已定义的 ui-page-rise）。
+   仅「减弱动效」未开启时播放，开启者只看瞬时显隐（无障碍）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .login-card {
+    animation: ui-page-rise var(--dur-spring) var(--ease-spring) both;
+  }
+}
+
 /* Keep async page loading calm and centered inside the content canvas. */
 .workspace > .ant-spin-spinning {
   display: flex !important;

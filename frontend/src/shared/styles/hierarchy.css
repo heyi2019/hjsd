@@ -40,12 +40,31 @@
 
 /* 侧栏品牌区：与侧栏内边距对齐，给导航让出呼吸位。 */
 .app-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-4) var(--space-4) var(--space-2);
   font: var(--font-card-title);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 品牌锚点：渐变方块 + 字标，给侧栏一个高质感起点（Apple 侧栏 logo 惯例）。
+   优先级 .app-brand > .app-brand__mark（0,2,0）高于 .app-brand > span（0,1,1），
+   确保字标不被 .app-brand > span 的 caption/secondary 覆盖。 */
+.app-brand > .app-brand__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--sz-28);
+  height: var(--sz-28);
+  border-radius: var(--radius-md);
+  background: var(--accent-grad);
+  color: var(--on-accent);
+  font: var(--font-card-title);
+  box-shadow: var(--shadow-button);
 }
 /* ERP 后缀弱化：主标与副标拉开层级，不抢导航的注意力。 */
 .app-brand > span {
@@ -57,6 +76,14 @@
 .page-content {
   padding: var(--space-4);
   min-width: 0;
+}
+/* 页面切换转场（Apple 流体）：导航切换时 AppShell 用 key={active} 重挂载 .page-enter 容器，
+   重放弹簧入场。位移/缩放仅在「减弱动效」未开启时生效（开启者只看到瞬时显隐）。 */
+.page-enter {
+  animation: ui-page-rise var(--dur-spring) var(--ease-spring) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
 }
 @media (--bp-sm) {
   .page-content { padding: var(--space-3); }

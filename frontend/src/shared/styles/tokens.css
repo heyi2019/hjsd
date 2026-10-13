@@ -58,6 +58,10 @@
   --card-elevation: 0 10px 28px rgba(28, 28, 30, 0.07), 0 2px 8px rgba(28, 28, 30, 0.05);
   --card-top-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --accent-grad: linear-gradient(135deg, #0757c7 0%, #0a63d8 52%, #0c68d9 100%); /* 品牌蓝实底：白字在整段均保持可读对比 */
+  /* 登录门面固定品牌色（2026-10-13 用户裁决：登录页不随主题切换——白底 + 渐变蓝卡）。
+     刻意不设 dark 覆盖：登录页是品牌门面，dark 主题下同样保持白底蓝卡。 */
+  --login-canvas: #ffffff; /* 登录页背景 / 卡内输入框底色，恒白 */
+  --login-ink: #1c1c1e;    /* 白底输入框内的固定深色文字 */
 
   /* 圆角（规范名 --radius-*；旧名 --r-* / --card-radius / --ui-radius-* 已全量迁移并删除，无兼容 alias） */
   --radius-sm: 9px;

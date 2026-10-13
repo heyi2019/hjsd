@@ -55,15 +55,14 @@
   width: 100%;
   min-height: var(--ui-control-height-lg);
   font: var(--font-card-title);
-  /* 恢复设计系统的品牌渐变蓝 + 纯色兜底（A11Y E3）。
-     color 必须显式配 --on-accent：--accent-deep 的定义注释本身就写着「蓝底白字
-     实底达标」，但本规则原先只给了 background，文字色仍由浏览器/组件默认决定
-     （原生 button 默认 ButtonText 深灰），白字意图落空。
-     原注释引用的「styles.css .login-card button 纯紫底」在本仓库已不存在
-     （styles.css 仅 3 行），一并更正。 */
-  background: var(--accent-grad);
-  background-color: var(--accent-deep);
-  color: var(--on-accent);
+  /* 卡面已是渐变蓝（见 .login-card.ant-card），按钮反白构成单视觉焦点；
+     color 显式配 --accent-deep 保证白底上蓝字达标。 */
+  background: var(--on-accent);
+  color: var(--accent-deep);
+}
+.login-card button[type="submit"]:hover {
+  background: color-mix(in srgb, var(--on-accent) 88%, var(--accent-deep));
+  color: var(--accent-deep);
 }
 
 /* 品牌锁定（2026-09-19 第二十二轮放大）：标记原为 18×18px、字号 10px，
@@ -92,10 +91,20 @@
   font: 700 var(--fs-title-3)/1 var(--font-sans);
 }
 
-.login-card input {
-  min-height: var(--ui-control-height);
-  border-color: var(--color-border);
-  background: var(--color-surface);
+/* 卡已是固定品牌面（渐变蓝），输入框底色/文字用 --login-canvas/--login-ink，不随主题反转。
+   高度统一交还 antd-adapter 全局 36px 托管：此前这里写死 min-height:44px，
+   用户名（裸 input）被撑到 44、密码框内嵌 input 也 44 但外层 wrapper 仍 36 →
+   内层撑出外层、文字不居中且两字段不等高——「密码要上下居中和用户名一样」的根因之一。 */
+.login-card input,
+/* dark 主题下压过 hierarchy 的 :root[data-theme="dark"] .ant-input（0,2,1 + !important）。
+   此处用 0,3,1 + !important 才能盖过它——hierarchy 给所有暗色 antd 输入框铺 --color-surface。 */
+:root[data-theme="dark"] .login-card input {
+  border-color: transparent !important;
+  background: var(--login-canvas) !important;
+  color: var(--login-ink) !important;
+}
+.login-card input::placeholder {
+  color: color-mix(in srgb, var(--login-ink) 45%, transparent);
 }
 
 .login-card input:focus {
@@ -107,9 +116,9 @@
 .login-card .error {
   margin: var(--space-3) 0 0;
   padding: var(--space-2) var(--space-3);
-  border: var(--border-w) solid color-mix(in srgb, var(--color-error) 28%, var(--color-border));
+  border: var(--border-w) solid color-mix(in srgb, var(--color-error) 40%, transparent);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+  background: var(--login-canvas); /* 蓝卡上错误信息落白底药丸，保证红字对比 */
   color: var(--color-error);
   font: var(--font-body-s);
 }
@@ -125,16 +134,54 @@
   min-height: 100vh;
   min-height: 100dvh; /* 移动端地址栏动态高度，避免卡被顶出视口 */
   padding: var(--space-6);
+  /* 用户裁决（2026-10-13）：登录页背景恒白，不随主题切换。 */
+  background: var(--login-canvas);
 }
 
-.login-card {
+/* 渐变蓝卡：品牌门面（用户裁决 2026-10-13），dark 主题下同样保持。
+   选择器带 .ant-card 压过 antd 运行时注入的 .ant-card 底色（同为类选择器，靠特异性取胜）。 */
+.login-card.ant-card {
   width: min(420px, 92vw);
+  border: 0; /* variant=borderless 之外再显式归零，防 antd 运行时兜底描边 */
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--accent-grad);
+  background-color: var(--accent-deep); /* 渐变不可用时的纯色兜底 */
+  color: var(--on-accent);
 }
 
 .login-card .ant-card-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* 渐变蓝卡内的固定配色：白字 + 品牌标反白 + 白底输入，整卡不随主题反转。 */
+.login-card .login-sub {
+  color: color-mix(in srgb, var(--on-accent) 75%, transparent);
+}
+.login-card .ant-form-item .ant-form-item-label > label {
+  /* adapter 的 :where(.ant-form-item-label > label) 带 !important（全站 label 灰），
+     此处同为 !important 但特异性更高（0,3,1 > :where 的 0）→ 卡内 label 反白。 */
+  color: var(--on-accent) !important;
+}
+.login-card .ant-input-suffix .anticon {
+  color: var(--login-ink);
+  opacity: 0.45;
+}
+.login-card .login-brand-mark {
+  background: var(--on-accent);
+  color: var(--accent-deep);
+}
+/* adapter 把全站主按钮映射为渐变蓝 !important；卡面本身已是渐变蓝，
+   按钮必须反白才构成单焦点（白底蓝字对整卡对比最强）。 */
+.login-card .ant-btn-primary {
+  background: var(--on-accent) !important;
+  color: var(--accent-deep) !important;
+}
+.login-card .ant-btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--on-accent) 88%, var(--accent-deep)) !important;
+  color: var(--accent-deep) !important;
 }
 
 .login-hero {
@@ -331,7 +378,7 @@
 .user-center__perms { display: flex; flex-wrap: wrap; gap: var(--space-1-half); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
 .user-center__perms li { padding: 2px var(--space-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-compact); background: var(--soft); color: var(--color-text-secondary); font-size: var(--fs-caption-1); }
 
-/* ── 弹窗短字段表单两列布局（如新建客户） ─────────────────── */
+/* 弹窗短字段表单两列布局（如新建客户） ─────────────────── */
 /* 行距沿用 antd Form.Item 自带 margin-bottom，仅控制列距。 */
 .form-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-3); }
 

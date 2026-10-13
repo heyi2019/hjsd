@@ -12,7 +12,7 @@ export function LoginPage() {
   };
   return (
     <main className="login-shell">
-      <Card className="login-card glass">
+      <Card className="login-card" variant="borderless">
         <div className="login-hero">
           <span className="login-brand-mark" aria-hidden="true">宜</span>
           <h1>宜游轩 ERP</h1>

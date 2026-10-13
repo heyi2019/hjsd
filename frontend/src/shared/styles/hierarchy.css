@@ -125,7 +125,8 @@
   border-color: var(--color-border);
 }
 
-:root[data-theme="dark"] .login-card,
+/* .login-card 已移出本组：登录卡是恒定品牌面（渐变蓝，见 page-layouts.css），
+   不随主题切换——2026-10-13 用户裁决「登录页背景白、登录框渐变蓝」。 */
 :root[data-theme="dark"] .small-metric-card,
 :root[data-theme="dark"] .ord-date-controls input,
 :root[data-theme="dark"] .finance-tabs button.secondary {
@@ -166,7 +167,8 @@
   border-color: var(--glass-border);
 }
 
-:root[data-theme="dark"] .ant-card,
+/* .login-card 排除：登录卡保持品牌渐变蓝，不吃暗色玻璃底（同上，2026-10-13 用户裁决）。 */
+:root[data-theme="dark"] .ant-card:not(.login-card),
 :root[data-theme="dark"] .ant-modal-content,
 :root[data-theme="dark"] .ant-drawer-content,
 :root[data-theme="dark"] .ant-popover-inner,

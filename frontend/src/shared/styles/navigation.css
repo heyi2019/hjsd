@@ -220,11 +220,6 @@
   flex-wrap: wrap;
 }
 .topbar__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.topbar__eyebrow {
-  font: var(--font-caption);
-  color: var(--color-text-tertiary);
-  letter-spacing: var(--ls-tight);
-}
 /* 顶栏页名 = 视图 H1（Title 1 · 28），页内 PageHeader 为小节标题（20px），
    保持 h1 > h2 的正常层级（2026-10-13 用户裁决：17px 倒挂试验作废）。 */
 .topbar__page { margin: 0; font: var(--font-h1); color: var(--color-text-primary); letter-spacing: var(--ls-tight); }

@@ -61,7 +61,6 @@ export function AppShell() {
       <div className="main">
         <header className="topbar view-head">
           <div className="topbar__title">
-            <span className="topbar__eyebrow">宜游轩 ERP</span>
             <h1 className="topbar__page">{item?.label ?? "用户中心"}</h1>
           </div>
           <Space size="small">

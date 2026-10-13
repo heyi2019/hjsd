@@ -97,7 +97,7 @@ function CustomerPanel() {
 
   const columns: ColumnsType<Customer> = [
     { title: "客户编号", dataIndex: "customer_no" },
-    { title: "称呼/昵称", dataIndex: "display_name" },
+    { title: "名字", dataIndex: "display_name" },
     { title: "手机", dataIndex: "phone" },
     { title: "微信", dataIndex: "wechat" },
     { title: "QQ", dataIndex: "qq" },
@@ -166,8 +166,8 @@ function CustomerPanel() {
       />
 
       <Modal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
-        <Form form={form} layout="vertical" colon={false} onFinish={submitCreate}>
-          <Form.Item name="display_name" label="称呼/昵称" rules={[{ required: true }]}>
+        <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submitCreate}>
+          <Form.Item name="display_name" label="名字" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           {/* 短字段两列一行，压弹窗高度（称呼为必填主字段保持整行） */}
@@ -203,7 +203,7 @@ function CustomerPanel() {
         onCancel={() => setMergeTarget(null)}
         footer={null}
       >
-        <Form form={mergeForm} layout="vertical" colon={false} onFinish={submitMerge}>
+        <Form form={mergeForm} layout="vertical" colon={false} className="form-no-colon" onFinish={submitMerge}>
           <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
             <Select
               options={rows
@@ -306,7 +306,7 @@ function CounterpartyPanel() {
         onPageChange={() => undefined}
       />
       <Modal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
-        <Form form={form} layout="vertical" colon={false} onFinish={submit} initialValues={{ type: "PEER" }}>
+        <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
           <Form.Item name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
           </Form.Item>

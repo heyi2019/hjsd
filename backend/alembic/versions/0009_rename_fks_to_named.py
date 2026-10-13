@@ -1,0 +1,84 @@
+"""Rebuild tables so foreign keys carry the ORM naming-convention names.
+
+背景：ECS 生产库早期迁移（0001–0005）用 `op.create_table` 建表，未套用
+`NAMING_CONVENTION`，外键落到磁盘是**未命名**的；而 ORM 经约定生成命名外键
+（`fk_<table>_<col>`），导致 `alembic check` 报 FK 命名漂移。SQLite 不存储外键名、
+完整性照常生效（功能性无害），但为消除漂移、对齐 dev/prod 两环境，统一重建。
+
+实现（每张表）：从真实 ORM 元数据编译 CREATE TABLE（命名约束正确）→ 把表头名改为
+`_new_<t>` → 建临时表 → 拷贝数据 → 删旧表 → 改名 → 重建命名索引。依赖 env.py 已覆盖的
+`PRAGMA foreign_keys=OFF`（批量重建父表需关闭 FK 强制）。
+
+为何不用 batch_alter_table：2.0.35 反射未命名 FK 为 name=None，`drop_constraint(name)`
+按名删找不到；只 `create_foreign_key` 会生成重复 FK。故走整表重建路径。
+"""
+from alembic import op
+from sqlalchemy import text
+from sqlalchemy.schema import CreateTable
+
+from app.core.database import Base  # noqa: F401  注册全部 v1 表
+from app.domain import foundation, parties, quality, trade, users  # noqa: F401
+
+revision = "0009_rename_fks_to_named"
+down_revision = "0008_integrity_constraints"
+branch_labels = None
+depends_on = None
+
+# 需重建的表（alembic check 在 2.0.35 下报 FK 命名漂移的表）
+TABLES = [
+    "cashflow",
+    "deposits",
+    "import_batches",
+    "import_rows",
+    "installment_schedules",
+    "installments",
+    "order_events",
+    "order_profit_allocations",
+    "orders",
+    "policy_versions",
+    "rebate_records",
+    "rebate_settlements",
+]
+
+
+def _rebuild(bind, tname: str) -> None:
+    orm_t = Base.metadata.tables[tname]
+    ddl = str(CreateTable(orm_t).compile(dialect=bind.dialect))
+    ddl = ddl.replace(f"CREATE TABLE {tname} (", f"CREATE TABLE _new_{tname} (", 1)
+    bind.execute(text(f"DROP TABLE IF EXISTS _new_{tname}"))
+    bind.execute(text(ddl))
+    cols = [c.name for c in orm_t.columns]
+    col_sql = ", ".join(cols)
+    bind.execute(
+        text(f"INSERT INTO _new_{tname} ({col_sql}) SELECT {col_sql} FROM {tname}")
+    )
+    bind.execute(text(f"DROP TABLE {tname}"))
+    bind.execute(text(f"ALTER TABLE _new_{tname} RENAME TO {tname}"))
+    # 在最终表名上重建命名索引（含唯一），IF NOT EXISTS 幂等。
+    # 必须放 RENAME 之后：旧表（及其同名索引）已删除，避免
+    # `CREATE INDEX IF NOT EXISTS` 因全局同名索引已存在而静默跳过、随后被 DROP 旧表带走。
+    for idx in orm_t.indexes:
+        uniq = "UNIQUE " if idx.unique else ""
+        cexpr = ", ".join(c.name for c in idx.columns)
+        bind.execute(
+            text(f"CREATE {uniq}INDEX IF NOT EXISTS {idx.name} ON {tname} ({cexpr})")
+        )
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    # 防御：确保环境已关闭 FK 强制（env.py 已覆盖；此处再确认）
+    bind.execute(text("PRAGMA foreign_keys=OFF"))
+    # 整批重建 12 张表，使其外键/索引对齐 ORM 命名约定。
+    # 不做“是否需要重建”的预判断：SQLite 反射经 PRAGMA 返回的外键名为 NULL，
+    # 与磁盘 CREATE TABLE 文本是否含命名约束无关，预判断会漏判（policy_versions 即此例）。
+    # 重建是幂等的：重跑产生相同 DDL + 数据零丢失。
+    for tname in TABLES:
+        _rebuild(bind, tname)
+
+
+def downgrade() -> None:
+    # 命名外键→未命名属可接受的回退形态（drift 回到 0008 状态）；
+    # 因重建是不可逆的结构变换，downgrade 不强制复原，仅保留版本回退能力。
+    # 如需完全还原 0008，应从备份恢复。
+    pass

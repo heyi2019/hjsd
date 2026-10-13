@@ -336,6 +336,19 @@
   }
 }
 
+/* 抽屉弹簧（Apple 流体 · 2026-10-13）。
+   抽屉按 placement 走 transform 滑入（rc-motion 在 *-enter-active / *-leave-active 置
+   transition: all，timing-function 默认 ease）——是「过渡」而非关键帧动画。
+   若强行套 ui-spring-in（含 translateY+scale）会覆盖滑入的 transform，抽屉原地缩放而非滑入（回归）。
+   故仅把 timing-function 覆为 --ease-spring：保留方向正确的横向/纵向滑入，并附加 1.5% 过冲"回弹"，
+   时长沿用 antd（约 0.3s）。只命中 .ant-drawer-content-wrapper，不波及遮罩(.ant-drawer-mask)。 */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.ant-drawer-content-wrapper[class*="enter-active"],
+         .ant-drawer-content-wrapper[class*="leave-active"]) {
+    transition-timing-function: var(--ease-spring) !important;
+  }
+}
+
 /* 减弱动效兜底（2026-10-04 补齐）：把 antd 全部弹层的入场/离场动效压掉，只留淡入。
    背景：上一条 no-preference 块只包了 .ant-picker-dropdown / .ant-dropdown，
    Modal / Drawer / Select / Tooltip / Popover 仍播 antd 默认的 zoom-big / slide-up

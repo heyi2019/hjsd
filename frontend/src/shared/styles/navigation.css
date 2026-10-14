@@ -186,6 +186,24 @@
   margin-top: var(--space-2);
   min-height: 0;
   overflow-y: auto;
+  /* iOS 26 Scroll Edge Effect：内容滚过玻璃边缘渐隐，避免导航项被硬切边。
+     渐隐距离由 --edge-top / --edge-bottom 驱动（AppShell 按滚动位置写入 0–18px）。
+     两值均为 0 时 mask 退化为「0 处即全黑」，短列表不受影响。 */
+  --edge-top: 0px;
+  --edge-bottom: 0px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--edge-top),
+    #000 calc(100% - var(--edge-bottom)),
+    transparent 100%
+  );
+}
+/* 降低透明度下玻璃已是实底，边缘渐隐会让文字半透明，直接关闭。 */
+@media (prefers-reduced-transparency: reduce) {
+  .nav-list {
+    mask-image: none;
+  }
 }
 .nav-item {
   display: flex;

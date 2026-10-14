@@ -5,6 +5,14 @@
  * - 浅色为默认主题；深色仅通过 [data-theme="dark"] 切换，组件不硬编码第二套颜色。
  */
 
+/* iOS 27 透明度滑桿的驱动变量：注册为 <number> 使其可被过渡/继承，且非法值回落 initial-value。
+   未注册时 var(--glass-alpha) 只是字符串替换，calc 里出错会整条声明失效（玻璃变透明）。 */
+@property --glass-alpha {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 :root {
   color-scheme: light;
   /* iOS 基准：106.25% × 16px = 17px ≈ iOS body 17pt。
@@ -28,9 +36,19 @@
      selected 用更强的蓝填充以区别于 hover。深色在 [data-theme=dark] 覆盖。 */
   --row-selected: rgba(10, 99, 216, 0.16);
 
-  /* 液态玻璃（guidelines §2：四件套） */
-  --glass: rgba(255, 255, 255, 0.62);
-  --glass-border: rgba(255, 255, 255, 0.72);
+  /* 液态玻璃（guidelines §2：四件套）
+     iOS 27 透明度滑桿：--glass-alpha 是全站玻璃材质系数，1 = 设计基准值（等价旧版固定 alpha）。
+     crystal-clear 端系数 <1（更透），fully tinted 端 >1（更实；alpha 超过 1 由 rgb() 自动 clamp）。
+     亮/暗基色 alpha 本就不同（0.62 / 0.72），故用乘法系数而非绝对 alpha，保证两端观感一致。
+     降级块（prefers-reduced-transparency / prefers-contrast）整条覆盖 --glass 为实底，
+     系数自然失效，无需额外钩子。 */
+  --glass-alpha: 1;
+  --glass-rgb: 255 255 255;
+  --glass-a: 0.62;
+  --glass: rgb(var(--glass-rgb) / calc(var(--glass-a) * var(--glass-alpha)));
+  --glass-border-rgb: 255 255 255;
+  --glass-border-a: 0.72;
+  --glass-border: rgb(var(--glass-border-rgb) / calc(var(--glass-border-a) * var(--glass-alpha)));
   --glass-blur: blur(24px) saturate(150%);
   --scrim-blur: blur(2px); /* 遮罩层弱模糊（抽屉/弹层背景），与玻璃材质分档，勿混用 --glass-blur */
   --glass-blur-md: blur(16px); /* 次级玻璃（article 卡片等），弱于 --glass-blur；历史值，勿擅自合并两档 */
@@ -514,8 +532,11 @@
   --panel-2: rgba(20, 40, 64, 0.78);
   --soft: rgba(255, 255, 255, 0.1);
   --row-selected: rgba(10, 132, 255, 0.26);
-  --glass: rgba(18, 36, 58, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.16);
+  /* 暗色玻璃基色更暗且 alpha 更高（0.72 vs 亮色 0.62），滑桿系数沿用同一套乘法口径 */
+  --glass-rgb: 18 36 58;
+  --glass-a: 0.72;
+  --glass-border-rgb: 255 255 255;
+  --glass-border-a: 0.16;
   --glass-hi: rgba(255, 255, 255, 0.12);
   --cal-dropdown-bg: rgba(255, 255, 255, 0.40); /* 日历弹层底色（暗）：从 ~0.066 提到 0.40，保证日期可读（2026-09-24 拆亮/暗双令牌） */
   --e0: 0 1px 2px rgba(0, 0, 0, 0.22);

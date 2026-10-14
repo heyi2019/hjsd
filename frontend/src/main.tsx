@@ -2,6 +2,7 @@ import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { createRoot } from "react-dom/client";
 import { AppShell } from "./app/AppShell";
+import { GlassProvider } from "./shared/state/glass";
 import { SessionProvider } from "./shared/state/session";
 import { ThemeProvider, useTheme } from "./shared/state/theme";
 import { buildTheme } from "./shared/state/antdTheme";
@@ -33,6 +34,8 @@ function ThemedApp() {
 
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
-    <ThemedApp />
+    <GlassProvider>
+      <ThemedApp />
+    </GlassProvider>
   </ThemeProvider>,
 );

@@ -19,6 +19,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
+import { AppearancePanel } from "../app/AppearancePanel";
 import { HistoryWorkbench } from "../history/HistoryWorkbench";
 import { UsersPanel } from "../users/UsersPanel";
 import { TeamsPanel } from "../users/TeamsPanel";
@@ -34,6 +35,7 @@ export function SettingsPage() {
     { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
     ...(can("history.import") ? [{ key: "history", label: "历史迁移", children: <HistoryWorkbench embedded /> }] : []),
     ...(can("user.manage") ? [{ key: "users", label: "人员与权限", children: <UsersPanel /> }, { key: "teams", label: "团队管理", children: <TeamsPanel /> }] : []),
+    { key: "appearance", label: "外观", children: <AppearancePanel /> },
   ];
   return (
     <section className="ui-stack">

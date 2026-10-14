@@ -1,5 +1,5 @@
 import { Modal, Space } from "antd";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
@@ -31,6 +31,32 @@ export function AppShell() {
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const Page = PAGES[active] ?? DashboardPage;
+  // iOS 26 Scroll Edge Effect：按滚动位置写入上下渐隐距离，内容触边时才渐隐。
+  // 未溢出时两值均为 0，mask 退化为全不透明（见 navigation.css 的 .nav-list）。
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return undefined;
+    const EDGE = 18;
+    let frame = 0;
+    const apply = () => {
+      frame = 0;
+      const max = nav.scrollHeight - nav.clientHeight;
+      nav.style.setProperty("--edge-top", `${Math.min(nav.scrollTop, EDGE)}px`);
+      nav.style.setProperty("--edge-bottom", `${Math.min(Math.max(max - nav.scrollTop, 0), EDGE)}px`);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(apply);
+    };
+    apply();
+    nav.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      nav.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
   // DEV 与生产同一套退出语义：DEV 初始即已登录（session 内默认 true，X-Dev-User 直通），
   // 点「退出登录」后落登录页，刷新即恢复直通；生产态无 token 同样落登录页。
   if (!authenticated) return <LoginPage />;
@@ -42,7 +68,7 @@ export function AppShell() {
           <span className="app-brand__mark" aria-hidden="true">宜</span>
           宜游轩 <span>ERP</span>
         </div>
-        <nav className="nav-list" aria-label="主导航">
+        <nav className="nav-list" aria-label="主导航" ref={navRef}>
           {navigation.map((n) => (
             <button
               key={n.key}

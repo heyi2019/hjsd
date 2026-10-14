@@ -1,0 +1,44 @@
+/**
+ * 外观设置：玻璃材质透明度（iOS 27 透明度滑桿口径）。
+ * 单一系数驱动全站玻璃，实时预览，无需刷新。
+ */
+import { Card, Slider, Typography } from "antd";
+import {
+  GLASS_DEFAULT,
+  GLASS_MAX,
+  GLASS_MIN,
+  GLASS_STEP,
+  useGlass,
+} from "../shared/state/glass";
+
+export function AppearancePanel() {
+  const { alpha, setAlpha, reduced } = useGlass();
+
+  return (
+    <div className="ui-stack">
+      <Card className="glass" title="玻璃材质透明度">
+        <div className="ui-stack">
+          <Typography.Text type="secondary">
+            调节全站玻璃材质的通透程度：向左更清透（crystal-clear，背景内容透出更多），
+            向右更厚实（fully tinted，文字对比更强）。调节结果即时生效并记住。
+          </Typography.Text>
+          <Slider
+            min={GLASS_MIN}
+            max={GLASS_MAX}
+            step={GLASS_STEP}
+            value={alpha}
+            onChange={setAlpha}
+            aria-label="玻璃材质透明度"
+            marks={{ [GLASS_MIN]: "清透", [GLASS_DEFAULT]: "默认", [GLASS_MAX]: "厚实" }}
+          />
+          {reduced ? (
+            <Typography.Text type="warning">
+              系统已开启「降低透明度」或「增强对比度」，玻璃材质当前强制为不透明实底，
+              本滑桿暂不产生视觉变化。关闭系统偏好后自动恢复。
+            </Typography.Text>
+          ) : null}
+        </div>
+      </Card>
+    </div>
+  );
+}

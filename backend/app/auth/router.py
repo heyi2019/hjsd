@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import AuthError, PermissionDenied
+from app.core.schemas import RequestModel
 from app.core.security import (
     CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
 )
@@ -18,23 +19,23 @@ admin_router = APIRouter(prefix="/users", tags=["users"])
 teams_router = APIRouter(prefix="/teams", tags=["teams"])
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(RequestModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=128)
 
 
-class PasswordChange(BaseModel):
+class PasswordChange(RequestModel):
     old_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
 
 
-class PasswordResetRequest(BaseModel):
+class PasswordResetRequest(RequestModel):
     model_config = ConfigDict(extra="forbid")
 
     password: str = Field(min_length=8, max_length=128)
 
 
-class UserCreate(BaseModel):
+class UserCreate(RequestModel):
     username: str = Field(min_length=2, max_length=64)
     display_name: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=8, max_length=128)
@@ -46,7 +47,7 @@ class UserCreate(BaseModel):
     note: str | None = None
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(RequestModel):
     display_name: str | None = None
     role: str | None = None
     owner_scope: str | None = None
@@ -57,13 +58,13 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class TeamCreate(BaseModel):
+class TeamCreate(RequestModel):
     code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=1, max_length=128)
     description: str | None = None
 
 
-class TeamUpdate(BaseModel):
+class TeamUpdate(RequestModel):
     name: str | None = None
     description: str | None = None
     is_active: bool | None = None

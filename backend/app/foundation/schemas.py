@@ -8,10 +8,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.schemas import RequestModel
 from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, PoolType, Portion
 
 
-class PoolCreate(BaseModel):
+class PoolCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     code: str = Field(min_length=2, max_length=64, description="池代码，创建后不可修改")
@@ -21,7 +22,7 @@ class PoolCreate(BaseModel):
     note: str | None = None
 
 
-class PoolUpdate(BaseModel):
+class PoolUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str | None = Field(default=None, min_length=1, max_length=128)
@@ -30,7 +31,7 @@ class PoolUpdate(BaseModel):
     ownership: PoolOwnership | None = None
 
 
-class PoolStatusUpdate(BaseModel):
+class PoolStatusUpdate(RequestModel):
     status: PoolStatus
 
 
@@ -48,7 +49,7 @@ class PoolOut(BaseModel):
     updated_at: datetime
 
 
-class OrderTypeCreate(BaseModel):
+class OrderTypeCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     code: str = Field(min_length=2, max_length=10, description="2-10 位大写字母数字，创建后不可修改")
@@ -59,7 +60,7 @@ class OrderTypeCreate(BaseModel):
     description: str | None = None
 
 
-class OrderTypeUpdate(BaseModel):
+class OrderTypeUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str | None = Field(default=None, min_length=1, max_length=64)
@@ -83,7 +84,7 @@ class OrderTypeOut(BaseModel):
     updated_at: datetime
 
 
-class RouteIn(BaseModel):
+class RouteIn(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     portion: Portion

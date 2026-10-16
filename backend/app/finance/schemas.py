@@ -6,8 +6,10 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.schemas import RequestModel
 
-class DepositCreate(BaseModel):
+
+class DepositCreate(RequestModel):
     pool_id: int
     amount: Decimal
     paid_on: date
@@ -17,12 +19,12 @@ class DepositCreate(BaseModel):
     note: str | None = None
 
 
-class DepositReturn(BaseModel):
+class DepositReturn(RequestModel):
     amount: Decimal
     released_on: date
 
 
-class DepositLoss(BaseModel):
+class DepositLoss(RequestModel):
     amount: Decimal
     lost_on: date
     category: str
@@ -65,7 +67,7 @@ class CashflowOut(BaseModel):
     note: str | None = None
 
 
-class CashflowCreate(BaseModel):
+class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
@@ -76,16 +78,16 @@ class CashflowCreate(BaseModel):
     note: str | None = None
 
 
-class CashflowReject(BaseModel):
+class CashflowReject(RequestModel):
     reason: str
 
 
-class CashflowReverse(BaseModel):
+class CashflowReverse(RequestModel):
     reversed_on: date
     reason: str
 
 
-class ReconciliationCreate(BaseModel):
+class ReconciliationCreate(RequestModel):
     pool_id: int
     reconciled_on: date
     account_label: str
@@ -95,7 +97,7 @@ class ReconciliationCreate(BaseModel):
     note: str | None = None
 
 
-class ReconciliationResolve(BaseModel):
+class ReconciliationResolve(RequestModel):
     reason: str
 
 
@@ -117,7 +119,7 @@ class ReconciliationOut(BaseModel):
     note: str | None = None
 
 
-class TransferCreate(BaseModel):
+class TransferCreate(RequestModel):
     source_pool_id: int
     target_pool_id: int
     amount: Decimal
@@ -125,7 +127,7 @@ class TransferCreate(BaseModel):
     note: str | None = None
 
 
-class TransferRepair(BaseModel):
+class TransferRepair(RequestModel):
     counterpart_pool_id: int
     reason: str
 
@@ -139,7 +141,7 @@ class TransferOut(BaseModel):
     cashflows: list[CashflowOut]
 
 
-class RebateCreate(BaseModel):
+class RebateCreate(RequestModel):
     source_order_id: int
     base_amount: Decimal
     collected_on: date
@@ -160,7 +162,7 @@ class RebateOut(BaseModel):
     collected_on: date
 
 
-class SettlementCreate(BaseModel):
+class SettlementCreate(RequestModel):
     gross_amount: Decimal
     settled_on: date
     pool_id: int
@@ -182,7 +184,7 @@ class SettlementOut(BaseModel):
     reversal_of_id: int | None = None
 
 
-class SettlementReverse(BaseModel):
+class SettlementReverse(RequestModel):
     reversed_on: date
     reason: str
 

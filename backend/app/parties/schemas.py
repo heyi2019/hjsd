@@ -9,10 +9,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.schemas import RequestModel
 from app.domain.enums import CounterpartyType, CustomerStatus
 
 
-class CustomerCreate(BaseModel):
+class CustomerCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     display_name: str = Field(min_length=1, max_length=128, description="称呼/昵称，必填")
@@ -29,7 +30,7 @@ class CustomerCreate(BaseModel):
     )
 
 
-class CustomerUpdate(BaseModel):
+class CustomerUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     display_name: str | None = Field(default=None, min_length=1, max_length=128)
@@ -44,7 +45,7 @@ class CustomerUpdate(BaseModel):
     extra_values: dict[str, Any] | None = None
 
 
-class CustomerStatusUpdate(BaseModel):
+class CustomerStatusUpdate(RequestModel):
     status: CustomerStatus
 
 
@@ -82,12 +83,12 @@ class CustomerWithCandidates(BaseModel):
     duplicate_candidates: list[DuplicateCandidate] = Field(default_factory=list)
 
 
-class MergeRequest(BaseModel):
+class MergeRequest(RequestModel):
     target_customer_id: int
     reason: str = Field(min_length=1, max_length=500)
 
 
-class CounterpartyCreate(BaseModel):
+class CounterpartyCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     display_name: str = Field(min_length=1, max_length=128)
@@ -100,7 +101,7 @@ class CounterpartyCreate(BaseModel):
     note: str | None = None
 
 
-class CounterpartyUpdate(BaseModel):
+class CounterpartyUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     display_name: str | None = Field(default=None, min_length=1, max_length=128)
@@ -129,7 +130,7 @@ class CounterpartyOut(BaseModel):
     created_at: datetime
 
 
-class FieldDefinitionCreate(BaseModel):
+class FieldDefinitionCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     entity_type: str = Field(min_length=1, max_length=32)
@@ -155,7 +156,7 @@ class FieldDefinitionOut(BaseModel):
     is_active: bool
 
 
-class ExtraValueIn(BaseModel):
+class ExtraValueIn(RequestModel):
     field_key: str
     value: str | int | float | bool | list | dict | None = None
 

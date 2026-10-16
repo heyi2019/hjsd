@@ -6,13 +6,15 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.schemas import RequestModel
 
-class ScheduleCreate(BaseModel):
+
+class ScheduleCreate(RequestModel):
     period_no: int = Field(ge=1)
     due_on: date
 
 
-class InstallmentCreate(BaseModel):
+class InstallmentCreate(RequestModel):
     order_id: int
     contract_type: str = Field(description="STOCK_SALE / ADVANCE_PURCHASE")
     principal: Decimal = Decimal("0")
@@ -60,7 +62,7 @@ class ScheduleOut(BaseModel):
     status: str
 
 
-class PaymentIn(BaseModel):
+class PaymentIn(RequestModel):
     amount: Decimal
     paid_on: date
     period_no: int | None = None
@@ -68,28 +70,28 @@ class PaymentIn(BaseModel):
     note: str | None = None
 
 
-class EarlySettlementIn(BaseModel):
+class EarlySettlementIn(RequestModel):
     paid_on: date
     pool_id: int | None = None
     note: str | None = None
 
 
-class DefaultIn(BaseModel):
+class DefaultIn(RequestModel):
     reason: str = Field(min_length=1)
 
 
-class ScheduleWaiveIn(BaseModel):
+class ScheduleWaiveIn(RequestModel):
     amount: Decimal = Field(gt=0)
     waived_on: date
     reason: str = Field(min_length=1)
 
 
-class ScheduleExtendIn(BaseModel):
+class ScheduleExtendIn(RequestModel):
     new_due_on: date
     reason: str = Field(min_length=1)
 
 
-class DeliverIn(BaseModel):
+class DeliverIn(RequestModel):
     delivery_mode: str
     delivered_on: date
     note: str = Field(min_length=1, description="换绑凭证说明")

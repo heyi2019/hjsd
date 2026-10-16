@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.schemas import RequestModel
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
@@ -56,7 +57,7 @@ class AccountOut(BaseModel):
     created_at: datetime
 
 
-class AccountProfileUpdate(BaseModel):
+class AccountProfileUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     game_account: str | None = Field(default=None, max_length=128)

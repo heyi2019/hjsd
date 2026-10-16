@@ -12,6 +12,8 @@ from app.core.settings import (
     locate_env_file,
 )
 
+SECURE_TEST_SECRET = "test-production-secret-0123456789-abcdef"
+
 
 def test_env_file_is_project_root_dotenv():
     """本地开发与联调指南 §1：必须读根目录 .env，而不是 backend/.env。"""
@@ -87,9 +89,28 @@ def test_dev_allows_any_local_port():
 def test_production_never_widens_cors():
     """生产环境必须收紧：端口通配一律失效，且不得回落成 *。"""
     for env in ("production", "staging", "prod"):
-        settings = Settings(app_env=env)
+        settings = Settings(app_env=env, jwt_secret_key=SECURE_TEST_SECRET)
         assert settings.cors_origin_regex is None, f"{env} 不应放宽 CORS"
         assert "*" not in settings.cors_origin_list
+
+
+def test_production_rejects_default_jwt_secret():
+    with pytest.raises(ValidationError) as exc:
+        Settings(
+            app_env="production",
+            jwt_secret_key="dev-insecure-secret-not-for-production-use!!",
+        )
+    assert "JWT" in str(exc.value)
+
+
+def test_production_rejects_wildcard_cors():
+    with pytest.raises(ValidationError) as exc:
+        Settings(
+            app_env="production",
+            jwt_secret_key=SECURE_TEST_SECRET,
+            cors_origins="*",
+        )
+    assert "CORS" in str(exc.value)
 
 
 def test_cors_origin_list_still_parses_env():

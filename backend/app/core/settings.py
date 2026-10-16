@@ -11,7 +11,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # app/core/settings.py -> backend
@@ -73,6 +73,21 @@ class Settings(BaseSettings):
 
     # frontend
     vite_api_base_url: str = "http://127.0.0.1:8123/api/v1"
+
+    @model_validator(mode="after")
+    def _validate_runtime_security(self) -> "Settings":
+        """生产配置不得沿用开发密钥或通配 CORS。"""
+        if self.is_development:
+            return self
+        if (
+            len(self.jwt_secret_key) < 32
+            or self.jwt_secret_key == "dev-insecure-secret-not-for-production-use!!"
+            or self.jwt_secret_key.startswith("replace-with-")
+        ):
+            raise ValueError("生产环境必须配置至少 32 位随机 JWT_SECRET_KEY")
+        if "*" in self.cors_origin_list:
+            raise ValueError("生产环境 CORS_ORIGINS 不得使用通配符 *")
+        return self
 
     @field_validator("database_url")
     @classmethod

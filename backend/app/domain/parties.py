@@ -37,6 +37,7 @@ from app.domain.enums import (
     EntityType,
     PolicyStatus,
     CounterpartyRole,
+    FieldType,
 )
 
 
@@ -113,6 +114,11 @@ class FieldDefinition(Base, AuditMixin):
             f"entity_type = '{EntityType.CUSTOMER.value}'",
             name="field_entity_valid",
         ),
+        CheckConstraint(
+            f"field_type IN {FieldType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="field_type_valid",
+        ),
+        CheckConstraint("sort_order >= 0", name="field_sort_order_nonnegative"),
         UniqueConstraint("entity_type", "field_key", name="uq_field_definitions_key"),
     )
 

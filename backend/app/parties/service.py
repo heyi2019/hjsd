@@ -26,6 +26,7 @@ from app.domain.enums import (
     CounterpartyType,
     CustomerStatus,
     EntityType,
+    FieldType,
     SequenceKey,
 )
 from app.domain.parties import (
@@ -651,6 +652,16 @@ def create_field_definition(
         raise Validation(
             f"实体类型必须为 {EntityType.values()}",
             details={"field": "entity_type", "value": entity_type},
+        )
+    if field_type not in FieldType.values():
+        raise Validation(
+            f"字段类型必须为 {FieldType.values()}",
+            details={"field": "field_type", "value": field_type},
+        )
+    if sort_order < 0:
+        raise Validation(
+            "排序值不能为负数",
+            details={"field": "sort_order", "value": sort_order},
         )
     key = (field_key or "").strip()
     if not FIELD_KEY_PATTERN.match(key):

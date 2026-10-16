@@ -19,7 +19,7 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AuditAction, CounterpartyStatus, CustomerStatus
 from app.domain.foundation import AuditLog
-from app.domain.parties import OrderCounterpartyRole, OrderCustomerRole
+from app.domain.parties import FieldDefinition, OrderCounterpartyRole, OrderCustomerRole
 from app.orders import service as orders_service
 from app.parties import service
 
@@ -353,6 +353,65 @@ class TestCounterpartyGuards:
 
 # ------------------------------------------------------------------ 活字段
 class TestFieldDefinitionGuards:
+    @pytest.mark.parametrize("field_type", ["UNKNOWN", "JSON", "number"])
+    def test_invalid_field_type_rejected(self, seeded_db, field_type):
+        with pytest.raises(Validation) as exc:
+            service.create_field_definition(
+                seeded_db,
+                entity_type="customer",
+                field_key="custom_type",
+                label="字段",
+                field_type=field_type,
+                actor="pytest",
+            )
+        assert "字段类型必须为" in str(exc.value)
+
+    def test_negative_sort_order_rejected(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.create_field_definition(
+                seeded_db,
+                entity_type="customer",
+                field_key="negative_order",
+                label="字段",
+                sort_order=-1,
+                actor="pytest",
+            )
+        assert "排序值不能为负数" in str(exc.value)
+
+    def test_database_rejects_invalid_field_definition_values(self, seeded_db):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                FieldDefinition.__table__.insert().values(
+                    entity_type="customer",
+                    field_key="invalid_db_type",
+                    label="字段",
+                    field_type="UNKNOWN",
+                    options=[],
+                    required=False,
+                    sort_order=0,
+                    is_active=True,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
+    def test_database_rejects_negative_sort_order(self, seeded_db):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                FieldDefinition.__table__.insert().values(
+                    entity_type="customer",
+                    field_key="negative_db_order",
+                    label="字段",
+                    field_type="TEXT",
+                    options=[],
+                    required=False,
+                    sort_order=-1,
+                    is_active=True,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
     def test_invalid_entity_type_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_field_definition(

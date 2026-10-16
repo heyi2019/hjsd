@@ -20,8 +20,8 @@ cd backend && python3 scripts/v1_init_db.py && cd ..
 # 2.1) 初始化正式管理员（首次部署必须执行；密码不会写入脚本）
 cd backend && ADMIN_PASSWORD='请替换为强密码' python3 scripts/create_admin.py && cd ..
 
-# 3) 起后端（:8000）
-cd backend && python3 -m uvicorn app.main:app --reload
+# 3) 起后端（:8123）
+cd backend && python3 -m uvicorn app.main:app --reload --port 8123
 
 # 4) 起前端（:5173，新终端）
 cd frontend && npm run dev
@@ -31,9 +31,9 @@ cd frontend && npm run dev
 
 | 地址 | 用途 |
 |---|---|
-| http://127.0.0.1:8000/ | 服务信息（库路径、env 路径、版本） |
-| http://127.0.0.1:8000/api/v1/health | 健康检查（返回 sqlite 是否已建） |
-| http://127.0.0.1:8000/docs | Swagger，全部 89 个端点 |
+| http://127.0.0.1:8123/ | 服务信息（库路径、env 路径、版本） |
+| http://127.0.0.1:8123/api/v1/health | 健康检查（返回 sqlite 是否已建） |
+| http://127.0.0.1:8123/docs | Swagger，全部 v1 端点 |
 | http://127.0.0.1:5173/ | 前端（开发账号 `admin`） |
 
 生产环境进入登录页，使用上一步创建的 `admin` 账号登录；开发环境仍保留角色直通，仅用于本地权限联调。

@@ -3,7 +3,7 @@
 ```bash
 cd backend
 PY=/Users/aries/Applications/Python_3.13/bin/python3
-$PY -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+$PY -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
 ```
 
 健康：GET /           健康检查：GET /api/v1/health

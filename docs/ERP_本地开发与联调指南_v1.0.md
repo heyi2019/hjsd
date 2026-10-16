@@ -23,10 +23,10 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
 ```
 
-健康检查：`GET http://127.0.0.1:8000/`；接口文档：`http://127.0.0.1:8000/docs`。v1 新接口统一挂载 `/api/v1`；旧路由仅在迁移期兼容，新增业务不得继续扩展旧路由。
+健康检查：`GET http://127.0.0.1:8123/`；接口文档：`http://127.0.0.1:8123/docs`。v1 新接口统一挂载 `/api/v1`；新增业务不得继续扩展旧路由。
 
 ### 前端
 
@@ -36,7 +36,7 @@ npm ci
 npm run dev
 ```
 
-浏览器访问 Vite 输出的地址（默认 `http://localhost:5173`）。前端请求基址只从 `VITE_API_BASE_URL` 读取，不得散落硬编码 URL。
+浏览器访问 Vite 输出的地址（默认 `http://localhost:5173`）。前端请求基址只从 `VITE_API_BASE` 读取，不得散落硬编码 URL；本地默认后端端口为 `8123`。
 
 ### 测试与构建
 

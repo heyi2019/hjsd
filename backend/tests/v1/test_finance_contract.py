@@ -184,6 +184,31 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_settlement_net_amount_matches_gross_less_fee(self, seeded_db):
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        seeded_db.add(
+            RebateSettlement(
+                settlement_no="REB-INVALID-NET",
+                rebate_record_id=record.id,
+                settled_on=TODAY,
+                gross_amount=Decimal("100"),
+                platform_fee=Decimal("10"),
+                net_amount=Decimal("95"),
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_rebate_rate_must_be_percentage_and_fee_non_negative(self, seeded_db):
         order_id = _active_order(seeded_db)
 

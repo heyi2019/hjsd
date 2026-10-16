@@ -492,6 +492,10 @@ class RebateSettlement(Base, AuditMixin):
             "gross_amount >= 0 AND platform_fee >= 0 AND net_amount >= 0",
             name="amount_nonneg",
         ),
+        CheckConstraint(
+            "net_amount = gross_amount - platform_fee",
+            name="net_amount_matches_breakdown",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

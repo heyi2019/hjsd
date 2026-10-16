@@ -463,7 +463,7 @@ def list_cashflows(
     for flow, order_no in session.execute(stmt).all():
         if flow.order_event_id is not None:
             source = "ORDER_EVENT"
-        elif flow.category == "REBATE":
+        elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
             source = "REBATE_SETTLEMENT"
         elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
             source = "DEPOSIT"
@@ -681,16 +681,9 @@ def settle_rebate(
         )
     net = gross - fee
 
-    # 可结算上限 = 返点基数 base_amount；累计毛额（含本次）不得突破（REB-01 分次结算）
+    # 可结算上限 = 返点基数 base_amount；反向记录按负数抵减累计毛额。
     receivable = to_money(record.base_amount)
-    already_gross = to_money(
-        session.scalar(
-            select(func.coalesce(func.sum(RebateSettlement.gross_amount), 0)).where(
-                RebateSettlement.rebate_record_id == record.id
-            )
-        )
-        or 0
-    )
+    already_gross, _, _ = _effective_rebate_totals(session, record.id)
     if already_gross + gross > receivable:
         raise Validation(
             "累计结算金额超过可结算上限",
@@ -738,20 +731,8 @@ def settle_rebate(
     )
     session.add(settlement)
 
-    settled_gross_total = to_money(
-        session.scalar(
-            select(func.coalesce(func.sum(RebateSettlement.gross_amount), 0)).where(
-                RebateSettlement.rebate_record_id == record.id
-            )
-        )
-        or 0
-    ) + gross
-    record.status = (
-        RebateStatus.SETTLED.value
-        if settled_gross_total >= receivable
-        else RebateStatus.PARTIALLY_SETTLED.value
-    )
     session.flush()
+    _refresh_rebate_status(session, record)
     record_audit(
         session,
         action=AuditAction.REBATE_SETTLE,
@@ -761,6 +742,172 @@ def settle_rebate(
         after={"gross": str(gross), "fee": str(fee), "net": str(net)},
     )
     return settlement
+
+
+def _effective_rebate_totals(
+    session: Session, rebate_record_id: int
+) -> tuple[Decimal, Decimal, Decimal]:
+    """返回有效毛额、手续费和净额；反向结算按负数计算。"""
+    gross = Decimal("0")
+    fee = Decimal("0")
+    net = Decimal("0")
+    rows = session.scalars(
+        select(RebateSettlement).where(
+            RebateSettlement.rebate_record_id == rebate_record_id
+        )
+    ).all()
+    for row in rows:
+        sign = Decimal("-1") if row.reversal_of_id is not None else Decimal("1")
+        gross += sign * to_money(row.gross_amount)
+        fee += sign * to_money(row.platform_fee)
+        net += sign * to_money(row.net_amount)
+    return gross, fee, net
+
+
+def _refresh_rebate_status(session: Session, record: RebateRecord) -> None:
+    settled_gross, _, _ = _effective_rebate_totals(session, record.id)
+    receivable = to_money(record.base_amount)
+    if settled_gross <= 0:
+        record.status = RebateStatus.OPEN.value
+    elif settled_gross >= receivable:
+        record.status = RebateStatus.SETTLED.value
+    else:
+        record.status = RebateStatus.PARTIALLY_SETTLED.value
+
+
+def list_rebate_settlements(
+    session: Session,
+    rebate_record_id: int,
+    *,
+    user: CurrentUser | None = None,
+) -> list[RebateSettlement]:
+    record = session.get(RebateRecord, rebate_record_id)
+    if record is None:
+        raise NotFound(
+            f"返点记录 {rebate_record_id} 不存在",
+            details={"rebate_record_id": rebate_record_id},
+        )
+    if record.source_order_id is None:
+        if user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+            raise NotFound(
+                f"返点记录 {rebate_record_id} 不存在",
+                details={"rebate_record_id": rebate_record_id},
+            )
+    else:
+        orders_service.get_order(session, record.source_order_id, user)
+    return list(
+        session.scalars(
+            select(RebateSettlement)
+            .where(RebateSettlement.rebate_record_id == record.id)
+            .order_by(RebateSettlement.id)
+        ).all()
+    )
+
+
+def reverse_rebate_settlement(
+    session: Session,
+    rebate_record_id: int,
+    settlement_id: int,
+    *,
+    reversed_on: date,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> RebateSettlement:
+    """以反向结算和反向流水更正一笔已发生的返点到账。"""
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("返点冲销必须填写原因", details={"field": "reason"})
+    record = session.get(RebateRecord, rebate_record_id)
+    if record is None or record.source_order_id is None:
+        raise NotFound(
+            f"返点记录 {rebate_record_id} 不存在",
+            details={"rebate_record_id": rebate_record_id},
+        )
+    orders_service.get_order(session, record.source_order_id, user)
+    original = session.scalar(
+        select(RebateSettlement).where(
+            RebateSettlement.id == settlement_id,
+            RebateSettlement.rebate_record_id == record.id,
+        )
+    )
+    if original is None:
+        raise NotFound(
+            f"返点结算 {settlement_id} 不存在",
+            details={"settlement_id": settlement_id},
+        )
+    if original.reversal_of_id is not None:
+        raise Validation("冲销记录不能再次冲销")
+    if session.scalar(
+        select(RebateSettlement.id).where(
+            RebateSettlement.reversal_of_id == original.id
+        )
+    ) is not None:
+        raise Validation("该返点结算已冲销", details={"settlement_id": settlement_id})
+    if original.cashflow_id is None:
+        raise Validation("返点结算缺少资金流水，无法冲销")
+    original_flow = session.get(Cashflow, original.cashflow_id)
+    if original_flow is None:
+        raise Validation("返点结算关联的资金流水不存在")
+    if user is not None and not user.can_see_pool(original_flow.pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": original_flow.pool_id})
+
+    settlement_no = rebate_settlement_no(
+        session, rebate_no=record.rebate_no, rebate_record_id=record.id
+    )
+    reversal_flow = Cashflow(
+        flow_no=settlement_no,
+        pool_id=original_flow.pool_id,
+        occurred_on=reversed_on,
+        nature=Nature.BUSINESS_OUT.value,
+        category="REBATE_REVERSAL",
+        direction=Direction.OUT.value,
+        amount=to_money(original.net_amount),
+        order_id=record.source_order_id,
+        reversal_of_id=original_flow.id,
+        status=CashflowStatus.APPROVED.value,
+        reviewed_by=actor,
+        reviewed_at=datetime.now(),
+        reversal_reason=text_reason,
+        note=f"返点冲销 {original.settlement_no}",
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(reversal_flow)
+    session.flush()
+
+    reversal = RebateSettlement(
+        settlement_no=settlement_no,
+        rebate_record_id=record.id,
+        settled_on=reversed_on,
+        gross_amount=to_money(original.gross_amount),
+        platform_fee=to_money(original.platform_fee),
+        net_amount=to_money(original.net_amount),
+        cashflow_id=reversal_flow.id,
+        reversal_of_id=original.id,
+        note=text_reason,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(reversal)
+    session.flush()
+    _refresh_rebate_status(session, record)
+    record_audit(
+        session,
+        action=AuditAction.REBATE_REVERSE,
+        entity_type="rebate_settlement",
+        entity_id=settlement_no,
+        actor=actor,
+        after={
+            "reversal_of": original.settlement_no,
+            "gross": str(reversal.gross_amount),
+            "fee": str(reversal.platform_fee),
+            "net": str(reversal.net_amount),
+            "status": record.status,
+        },
+        reason=text_reason,
+    )
+    return reversal
 
 
 def list_rebates(
@@ -781,14 +928,8 @@ def list_rebates(
 
 
 def settled_net_total(session: Session, rebate_record_id: int) -> Decimal:
-    return to_money(
-        session.scalar(
-            select(func.coalesce(func.sum(RebateSettlement.net_amount), 0)).where(
-                RebateSettlement.rebate_record_id == rebate_record_id
-            )
-        )
-        or 0
-    )
+    _, _, net = _effective_rebate_totals(session, rebate_record_id)
+    return net
 
 
 __all__ = [
@@ -805,5 +946,7 @@ __all__ = [
     "reject_cashflow",
     "reverse_cashflow",
     "settle_rebate",
+    "list_rebate_settlements",
+    "reverse_rebate_settlement",
     "settled_net_total",
 ]

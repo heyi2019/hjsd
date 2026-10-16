@@ -69,6 +69,19 @@ def _rebuild(bind, tname: str) -> None:
     # 避免当前 ORM 重命名后在历史重建阶段提前丢失数据。
     if tname == "rebate_records" and "rebate_group_no" in source_columns:
         ddl = ddl.replace("rebate_no", "rebate_group_no")
+    # reversal_of_id 属于 0040 才新增的返点结算字段；0009 使用当前 ORM
+    # 编译 DDL，但历史表此时还没有该列，必须把未来字段及其自引用约束移除。
+    if tname == "rebate_settlements" and "reversal_of_id" not in source_columns:
+        ddl = ddl.replace("\treversal_of_id INTEGER, \n", "")
+        ddl = ddl.replace(
+            "\tCONSTRAINT uq_rebate_settlements_reversal UNIQUE (reversal_of_id), \n",
+            "",
+        )
+        ddl = ddl.replace(
+            "\tCONSTRAINT fk_rebate_settlements_reversal_of_id FOREIGN KEY(reversal_of_id) REFERENCES rebate_settlements (id) ON DELETE RESTRICT\n",
+            "",
+        )
+        ddl = ddl.replace(", \n)", "\n)")
     ddl = ddl.replace(f"CREATE TABLE {tname} (", f"CREATE TABLE _new_{tname} (", 1)
     bind.execute(text(f"DROP TABLE IF EXISTS _new_{tname}"))
     bind.execute(text(ddl))
@@ -87,6 +100,12 @@ def _rebuild(bind, tname: str) -> None:
     # 必须放 RENAME 之后：旧表（及其同名索引）已删除，避免
     # `CREATE INDEX IF NOT EXISTS` 因全局同名索引已存在而静默跳过、随后被 DROP 旧表带走。
     for idx in orm_t.indexes:
+        if (
+            tname == "rebate_settlements"
+            and "reversal_of_id" not in source_columns
+            and any(column.name == "reversal_of_id" for column in idx.columns)
+        ):
+            continue
         uniq = "UNIQUE " if idx.unique else ""
         cexpr = ", ".join(c.name for c in idx.columns)
         bind.execute(

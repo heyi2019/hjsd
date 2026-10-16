@@ -132,6 +132,13 @@ class SettlementOut(BaseModel):
     platform_fee: Decimal
     net_amount: Decimal
     settled_on: date
+    cashflow_id: int | None = None
+    reversal_of_id: int | None = None
+
+
+class SettlementReverse(BaseModel):
+    reversed_on: date
+    reason: str
 
 
 __all__ = [
@@ -148,4 +155,5 @@ __all__ = [
     "RebateOut",
     "SettlementCreate",
     "SettlementOut",
+    "SettlementReverse",
 ]

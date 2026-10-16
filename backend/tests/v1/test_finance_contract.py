@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow
+from app.domain.trade import Cashflow, RebateSettlement
 from app.finance import service
 from app.orders import service as orders_service
 from app.reporting import service as reporting_service
@@ -201,6 +201,123 @@ class TestRebateGuards:
         by_order = service.list_rebates(seeded_db, source_order_id=second)
         assert [item.base_amount for item in by_order] == [Decimal("200.00")]
         assert len(service.list_rebates(seeded_db)) == 2
+
+    def test_rebate_settlement_reversal_keeps_original_and_reopens_receivable(
+        self, seeded_db
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        original = service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount=Decimal("100"),
+            settled_on=TODAY,
+            pool_id=invest.id,
+            actor="pytest",
+            platform_fee=Decimal("10"),
+        )
+
+        reversal = service.reverse_rebate_settlement(
+            seeded_db,
+            record.id,
+            original.id,
+            reversed_on=TODAY,
+            actor="finance",
+            reason="手续费录入错误",
+        )
+
+        seeded_db.refresh(record)
+        assert reversal.reversal_of_id == original.id
+        assert original.gross_amount == Decimal("100.00")
+        assert record.status == "OPEN"
+        assert service.settled_net_total(seeded_db, record.id) == Decimal("0.00")
+        assert seeded_db.scalar(
+            select(Cashflow).where(Cashflow.id == reversal.cashflow_id)
+        ).direction == "OUT"
+        assert len(
+            seeded_db.scalars(
+                select(RebateSettlement).where(
+                    RebateSettlement.rebate_record_id == record.id
+                )
+            ).all()
+        ) == 2
+
+        corrected = service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount=Decimal("100"),
+            settled_on=TODAY,
+            pool_id=invest.id,
+            actor="pytest",
+            platform_fee=Decimal("5"),
+        )
+        seeded_db.refresh(record)
+        assert corrected.net_amount == Decimal("95.00")
+        assert record.status == "SETTLED"
+        assert service.settled_net_total(seeded_db, record.id) == Decimal("95.00")
+
+        with pytest.raises(Validation, match="已冲销"):
+            service.reverse_rebate_settlement(
+                seeded_db,
+                record.id,
+                original.id,
+                reversed_on=TODAY,
+                actor="finance",
+                reason="重复冲销",
+            )
+
+    def test_rebate_reversal_is_signed_in_reports(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+            rate=Decimal("100"),
+        )
+        original = service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount=Decimal("100"),
+            settled_on=TODAY,
+            pool_id=invest.id,
+            actor="pytest",
+            platform_fee=Decimal("10"),
+        )
+        service.reverse_rebate_settlement(
+            seeded_db,
+            record.id,
+            original.id,
+            reversed_on=TODAY,
+            actor="finance",
+            reason="更正手续费",
+        )
+        service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount=Decimal("100"),
+            settled_on=TODAY,
+            pool_id=invest.id,
+            actor="pytest",
+            platform_fee=Decimal("5"),
+        )
+
+        r5 = reporting_service.r5_business_pnl(seeded_db)
+        hs = next(item for item in r5["items"] if item["order_type"] == "HS")
+        assert hs["settled_rebate"] == Decimal("95.00")
+        assert hs["uncollected_rebate"] == Decimal("0.00")
+
+        detail = reporting_service.order_profit_detail(seeded_db)
+        assert detail["items"][0]["rebate"] == Decimal("95.00")
 
 
 class TestCashflowLifecycle:
@@ -739,3 +856,42 @@ class TestFinanceApi:
         )
         assert response.status_code == 201, response.text
         assert response.json()["net_amount"] == "100.00"
+
+    def test_rebate_settlement_list_and_reverse_endpoints(
+        self, seeded_client, seeded_db, headers
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        original = service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount=Decimal("100"),
+            settled_on=TODAY,
+            pool_id=invest.id,
+            actor="pytest",
+        )
+
+        reversed_response = seeded_client.post(
+            f"/api/v1/rebates/{record.id}/settlements/{original.id}/reverse",
+            json={
+                "reversed_on": TODAY.isoformat(),
+                "reason": "接口更正手续费",
+            },
+            headers=headers,
+        )
+        assert reversed_response.status_code == 200, reversed_response.text
+        assert reversed_response.json()["reversal_of_id"] == original.id
+
+        listed = seeded_client.get(
+            f"/api/v1/rebates/{record.id}/settlements", headers=headers
+        )
+        assert listed.status_code == 200, listed.text
+        assert len(listed.json()) == 2
+        assert {row["reversal_of_id"] for row in listed.json()} == {None, original.id}

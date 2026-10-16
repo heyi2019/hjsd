@@ -226,7 +226,13 @@ def r2_monthly_pnl(
         Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
         Cashflow.category.notin_(
-            {"REBATE", "DEPOSIT_HOLD", "DEPOSIT_RELEASE", "TRANSFER"}
+            {
+                "REBATE",
+                "REBATE_REVERSAL",
+                "DEPOSIT_HOLD",
+                "DEPOSIT_RELEASE",
+                "TRANSFER",
+            }
         ),
     )
     pool_ids = _visible_pool_ids(user)
@@ -259,6 +265,7 @@ def r2_monthly_pnl(
             RebateSettlement.settled_on,
             RebateSettlement.gross_amount,
             RebateSettlement.platform_fee,
+            RebateSettlement.reversal_of_id,
         )
         .join(RebateRecord, RebateRecord.id == RebateSettlement.rebate_record_id)
         .join(Order, Order.id == RebateRecord.source_order_id)
@@ -266,12 +273,13 @@ def r2_monthly_pnl(
     rebate_stmt = _apply_order_scope(rebate_stmt, user, session)
     rebate_rows = session.execute(rebate_stmt).all()
     rebate_net: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    for settled_on, gross, fee in rebate_rows:
+    for settled_on, gross, fee, reversal_of_id in rebate_rows:
         if from_date and settled_on < from_date:
             continue
         if to_date and settled_on > to_date:
             continue
-        rebate_net[_month_key(settled_on)] += _money(gross) - _money(fee)
+        sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
+        rebate_net[_month_key(settled_on)] += sign * (_money(gross) - _money(fee))
 
     for bucket in (revenue, direct_cost, operating, rebate_net):
         for month in list(bucket):
@@ -402,7 +410,13 @@ def r5_business_pnl(
     settled: dict[str, Decimal] = defaultdict(lambda: ZERO)
     unsettled: dict[str, Decimal] = defaultdict(lambda: ZERO)
     rebate_stmt = (
-        select(RebateRecord, RebateSettlement.gross_amount, RebateSettlement.platform_fee, Order.order_type)
+        select(
+            RebateRecord,
+            RebateSettlement.gross_amount,
+            RebateSettlement.platform_fee,
+            RebateSettlement.reversal_of_id,
+            Order.order_type,
+        )
         .outerjoin(RebateSettlement, RebateSettlement.rebate_record_id == RebateRecord.id)
         .outerjoin(Order, Order.id == RebateRecord.source_order_id)
     )
@@ -415,7 +429,7 @@ def r5_business_pnl(
             )
     rebates = session.execute(rebate_stmt).all()
     rebate_totals: dict[int, tuple[RebateRecord, str | None, Decimal, Decimal]] = {}
-    for record, gross, fee, order_type in rebates:
+    for record, gross, fee, reversal_of_id, order_type in rebates:
         previous = rebate_totals.get(record.id)
         if previous is None:
             rebate_totals[record.id] = (
@@ -426,11 +440,12 @@ def r5_business_pnl(
             )
             previous = rebate_totals[record.id]
         if gross is not None:
+            sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
             rebate_totals[record.id] = (
                 previous[0],
                 previous[1],
-                previous[2] + _money(gross),
-                previous[3] + _money(fee),
+                previous[2] + sign * _money(gross),
+                previous[3] + sign * _money(fee),
             )
 
     for record, order_type, settled_gross, settled_fee in rebate_totals.values():
@@ -560,12 +575,17 @@ def order_profit_detail(
         income, buy, direct_cost = _event_totals(events)
         rebate = ZERO
         settlements = session.execute(
-            select(RebateSettlement.gross_amount, RebateSettlement.platform_fee)
+            select(
+                RebateSettlement.gross_amount,
+                RebateSettlement.platform_fee,
+                RebateSettlement.reversal_of_id,
+            )
             .join(RebateRecord, RebateRecord.id == RebateSettlement.rebate_record_id)
             .where(RebateRecord.source_order_id == order.id)
         ).all()
-        for gross, fee in settlements:
-            rebate += _money(gross) - _money(fee)
+        for gross, fee, reversal_of_id in settlements:
+            sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
+            rebate += sign * (_money(gross) - _money(fee))
         items.append(
             {
                 "order_no": order.order_no,

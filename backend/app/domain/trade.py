@@ -425,12 +425,17 @@ class RebateRecord(Base, AuditMixin):
 
 
 class RebateSettlement(Base, AuditMixin):
-    """返点分次结算：净额 = 毛额 − 手续费，子号 `-01/-02`。"""
+    """返点分次结算：净额 = 毛额 − 手续费，冲销通过反向子记录留痕。"""
 
     __tablename__ = "rebate_settlements"
     __table_args__ = (
         UniqueConstraint("settlement_no", name="uq_rebate_settlements_no"),
         UniqueConstraint("cashflow_id", name="uq_rebate_settlements_flow"),
+        Index(
+            "uq_rebate_settlements_reversal",
+            "reversal_of_id",
+            unique=True,
+        ),
         CheckConstraint(
             "gross_amount >= 0 AND platform_fee >= 0 AND net_amount >= 0",
             name="amount_nonneg",
@@ -448,6 +453,9 @@ class RebateSettlement(Base, AuditMixin):
     net_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     cashflow_id: Mapped[int | None] = mapped_column(
         ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
+    )
+    reversal_of_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

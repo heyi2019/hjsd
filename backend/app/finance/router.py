@@ -40,7 +40,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
     order = db.get(Order, flow.order_id) if flow.order_id else None
     if flow.order_event_id is not None:
         source = "ORDER_EVENT"
-    elif flow.category == "REBATE":
+    elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
         source = "REBATE_SETTLEMENT"
     elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
         source = "DEPOSIT"
@@ -350,6 +350,41 @@ def settle_rebate(
         actor=_actor(user),
         platform_fee=payload.platform_fee,
         note=payload.note,
+        user=user,
+    )
+    return schemas.SettlementOut.model_validate(item)
+
+
+@router.get(
+    "/rebates/{rebate_id}/settlements", response_model=list[schemas.SettlementOut]
+)
+def list_rebate_settlements(
+    rebate_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.SettlementOut]:
+    items = service.list_rebate_settlements(db, rebate_id, user=user)
+    return [schemas.SettlementOut.model_validate(item) for item in items]
+
+
+@router.post(
+    "/rebates/{rebate_id}/settlements/{settlement_id}/reverse",
+    response_model=schemas.SettlementOut,
+)
+def reverse_rebate_settlement(
+    rebate_id: int,
+    settlement_id: int,
+    payload: schemas.SettlementReverse,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_rebate,
+) -> schemas.SettlementOut:
+    item = service.reverse_rebate_settlement(
+        db,
+        rebate_id,
+        settlement_id,
+        reversed_on=payload.reversed_on,
+        actor=_actor(user),
+        reason=payload.reason,
         user=user,
     )
     return schemas.SettlementOut.model_validate(item)

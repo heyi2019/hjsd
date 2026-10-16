@@ -48,7 +48,7 @@ const BUSINESS_CONTEXT: Partial<Record<BusinessOrderType, { business: string; ty
   HS: { business: "自营", type: "回收" },
   TH: { business: "分销", type: "提号" },
   DG: { business: "分销", type: "代挂" },
-  DFQ: { business: "增值服务（可附着自营/分销）", type: "代分期" },
+  DFQ: { business: "增值服务（独立分销服务）", type: "代分期" },
 };
 
 export function getAccountValues(values: Record<string, unknown>, orderType: AccountCreationOrderType) {

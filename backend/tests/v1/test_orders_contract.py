@@ -55,6 +55,22 @@ class TestCreateOrderValidation:
             _order(seeded_db)
         assert "已停用" in str(exc.value)
 
+    def test_dfq_cannot_link_inventory_account(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-DFQ-1",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        with pytest.raises(Validation) as exc:
+            _order(seeded_db, order_type="DFQ", account_id=account.id)
+
+        assert "DFQ 代分期订单不关联库存账号" in str(exc.value)
+
 
 # ------------------------------------------------------------------ 查询与作用域
 class TestGetAndListOrders:

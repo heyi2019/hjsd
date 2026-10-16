@@ -41,7 +41,6 @@ def _account(seeded_db, game_account: str):
 
 class TestA04DfqAdvancePurchase:
     def test_buy_downpayment_two_periods_deliver(self, seeded_db):
-        account = _account(seeded_db, "dfq-acc")
         supplier = parties_service.create_counterparty(
             seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"
         )
@@ -53,7 +52,6 @@ class TestA04DfqAdvancePurchase:
             order_type="DFQ",
             trade_date=TODAY,
             actor="pytest",
-            account_id=account.id,
             customer_roles=[(customer.id, "INSTALLMENT_CUSTOMER")],
             counterparty_roles=[(supplier.id, "SUPPLIER")],
         )
@@ -64,7 +62,6 @@ class TestA04DfqAdvancePurchase:
             occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
-        assert seeded_db.get(type(account), account.id).status == AccountStatus.INSTALLMENT.value
 
         contract = installment_service.create_installment(
             seeded_db,
@@ -117,10 +114,9 @@ class TestA04DfqAdvancePurchase:
         assert len(deliver_flows) == 3  # 首付 + 两期
 
     def test_unsettled_contract_cannot_deliver(self, seeded_db):
-        account = _account(seeded_db, "dfq-acc2")
         seeded_db.commit()
         order = orders_service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest", account_id=account.id
+            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         contract = installment_service.create_installment(
@@ -142,10 +138,9 @@ class TestA04DfqAdvancePurchase:
         assert exc.value.code == ErrorCode.DELIVERY_CONDITION_UNMET
 
     def test_payment_cannot_exceed_receivable(self, seeded_db):
-        account = _account(seeded_db, "dfq-acc3")
         seeded_db.commit()
         order = orders_service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest", account_id=account.id
+            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         contract = installment_service.create_installment(

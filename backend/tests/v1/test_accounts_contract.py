@@ -313,17 +313,13 @@ class TestAccountsApi:
             "collected_at": rebate.created_at.isoformat(),
         }]
 
-    def test_execution_detail_keeps_inventory_source_when_later_dfq_is_attached(
+    def test_execution_detail_ignores_independent_dfq_order(
         self, seeded_client, seeded_db, headers
     ):
         account = _account(seeded_db, "source-priority-acc")
         source_order = _buy(seeded_db, account, amount="300")
-        attached_order = orders_service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest", account_id=account.id
-        )
-        orders_service.post_event(
-            seeded_db, attached_order.id, event_type="BUY", amount=Decimal("500"),
-            occurred_on=TODAY, actor="pytest",
+        orders_service.create_order(
+            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
         )
 
         response = seeded_client.get(

@@ -77,6 +77,11 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
+    if definition.code == "DFQ" and account_id is not None:
+        raise Validation(
+            "DFQ 代分期订单不关联库存账号",
+            details={"order_type": definition.code, "account_id": account_id},
+        )
 
 
     # BAS-06-04 规则快照：按成交日固化当时生效的返点/提成规则。

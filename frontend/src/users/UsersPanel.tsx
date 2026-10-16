@@ -31,7 +31,7 @@ export function UsersPanel() {
   };
   const resetPassword = async (values: { password: string }) => {
     if (!resetting) return;
-    try { await api.post(`/users/${resetting.id}/reset-password`, { username: resetting.username, password: values.password }); message.success("密码已重置，下次登录需修改"); setResetting(null); resetForm.resetFields(); }
+    try { await api.post(`/users/${resetting.id}/reset-password`, { password: values.password }); message.success("密码已重置，下次登录需修改"); setResetting(null); resetForm.resetFields(); }
     catch (err) { message.error(errorMessage(err)); }
   };
   return <Card className="glass" title="用户管理">

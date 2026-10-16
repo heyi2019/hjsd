@@ -64,6 +64,6 @@ describe("UsersPanel：用户管理动作", () => {
     const resetDialog = within(screen.getByRole("dialog", { name: "重置密码：operator01" }));
     await ui.type(resetDialog.getByPlaceholderText("新密码（至少 8 位）"), "new-password");
     await ui.click(resetDialog.getByRole("button", { name: /OK/ }));
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/users/7/reset-password", { username: "operator01", password: "new-password" }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/users/7/reset-password", { password: "new-password" }));
   });
 });

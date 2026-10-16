@@ -201,6 +201,10 @@ class Cashflow(Base, AuditMixin):
             f"status IN {CashflowStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_status_valid",
         ),
+        CheckConstraint(
+            "nature != 'INTERNAL' OR transfer_id IS NOT NULL",
+            name="internal_transfer_link_valid",
+        ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),

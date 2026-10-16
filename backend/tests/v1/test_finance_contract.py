@@ -11,6 +11,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
@@ -41,6 +42,26 @@ def _active_order(seeded_db) -> int:
 
 
 class TestDepositQueries:
+    def test_internal_cashflow_requires_transfer_id(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        seeded_db.add(
+            Cashflow(
+                flow_no="CF-INTERNAL-WITHOUT-TRANSFER",
+                pool_id=invest.id,
+                occurred_on=TODAY,
+                nature="INTERNAL",
+                category="TRANSFER",
+                direction="IN",
+                amount=Decimal("1.00"),
+                status="APPROVED",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_deposit_source_order_must_exist(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
 

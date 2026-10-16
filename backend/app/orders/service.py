@@ -841,7 +841,13 @@ def _validate_participant_roles(
                 code=ErrorCode.PARTICIPANT_ROLE_INVALID,
                 details={"role": role},
             )
-        key = (int(_participant_id), role)
+        if isinstance(_participant_id, bool) or not isinstance(_participant_id, int) or _participant_id <= 0:
+            raise Validation(
+                "客户参与方 ID 必须为正整数",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"customer_id": _participant_id, "role": role},
+            )
+        key = (_participant_id, role)
         if key in customer_seen:
             raise Validation(
                 "同一客户同一角色不可重复",
@@ -857,7 +863,13 @@ def _validate_participant_roles(
                 code=ErrorCode.PARTICIPANT_ROLE_INVALID,
                 details={"role": role},
             )
-        key = (int(_participant_id), role)
+        if isinstance(_participant_id, bool) or not isinstance(_participant_id, int) or _participant_id <= 0:
+            raise Validation(
+                "合作方参与方 ID 必须为正整数",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"counterparty_id": _participant_id, "role": role},
+            )
+        key = (_participant_id, role)
         if key in counterparty_seen:
             raise Validation(
                 "同一合作方同一角色不可重复",

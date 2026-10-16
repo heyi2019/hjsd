@@ -136,6 +136,16 @@ class TestCreateOrderValidation:
                 ],
             )
 
+    def test_participant_id_shape_is_rejected_before_database_flush(self, seeded_db):
+        with pytest.raises(Validation, match="参与方 ID"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="pytest",
+                customer_roles=[("not-an-id", "SELLER")],
+            )
+
     def test_disabled_order_type_rejected(self, seeded_db):
         definition = foundation_service.get_order_type_by_code(seeded_db, "HS")
         foundation_service.set_order_type_active(

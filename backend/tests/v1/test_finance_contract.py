@@ -86,6 +86,37 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_rate_must_be_percentage_and_fee_non_negative(self, seeded_db):
+        order_id = _active_order(seeded_db)
+
+        with pytest.raises(Validation, match="返点比例"):
+            service.create_rebate(
+                seeded_db,
+                source_order_id=order_id,
+                base_amount=Decimal("100"),
+                collected_on=TODAY,
+                actor="pytest",
+                rate=Decimal("100.01"),
+            )
+
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        with pytest.raises(Validation, match="不能为负数"):
+            service.settle_rebate(
+                seeded_db,
+                record.id,
+                gross_amount=Decimal("10"),
+                settled_on=TODAY,
+                pool_id=_pool(seeded_db, "HJ_INVEST").id,
+                actor="pytest",
+                platform_fee=Decimal("-1"),
+            )
+
     def test_rebate_is_settled_by_gross_amount_not_net_amount(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)

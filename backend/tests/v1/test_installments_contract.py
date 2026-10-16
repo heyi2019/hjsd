@@ -16,11 +16,13 @@ from sqlalchemy import select
 
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import (
+    AuditAction,
     DeliveryMode,
     InstallmentContractType,
     InstallmentStatus,
     ScheduleStatus,
 )
+from app.domain.foundation import AuditLog
 from app.domain.trade import Installment, InstallmentSchedule, Order
 from app.installments import service as installment_service
 from app.orders import service as orders_service
@@ -78,6 +80,11 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    def test_negative_amount_is_rejected_before_flush(self, seeded_db):
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match="不能为负数"):
+            _contract(seeded_db, order.id, down_payment="-1")
+
     def test_invalid_contract_type_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
@@ -275,6 +282,17 @@ class TestMarkOverdue:
         assert marked == 1  # 期次 0 已收满不标记；期次 1 到期未收
         refreshed = seeded_db.get(Installment, contract.id)
         assert refreshed.status == InstallmentStatus.OVERDUE.value
+
+        audit = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == AuditAction.INSTALLMENT_OVERDUE.value,
+                AuditLog.entity_id == contract.inst_no,
+            )
+            .order_by(AuditLog.id.desc())
+        )
+        assert audit is not None
+        assert audit.after_json["overdue_periods"] == 1
         overdue = seeded_db.scalars(
             select(InstallmentSchedule).where(
                 InstallmentSchedule.installment_id == contract.id,

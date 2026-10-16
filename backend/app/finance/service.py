@@ -18,7 +18,7 @@ from app.core.business_numbering import rebate_no as order_rebate_no
 from app.core.business_numbering import rebate_settlement_no
 from app.core.errors import NotFound, Validation
 from app.core.errors import ErrorCode
-from app.core.money import require_positive, to_money
+from app.core.money import require_non_negative, require_positive, to_money
 from app.core.numbering import allocate_number
 from app.policy import service as policy_service
 from app.domain.enums import (
@@ -33,6 +33,13 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit, Order, RebateRecord, RebateSettlement
 from app.foundation import service as foundation_service
+
+
+def _non_negative(value: Any, *, field: str) -> Decimal:
+    try:
+        return require_non_negative(value, field=field)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
 # --------------------------------------------------------------------- 押金
@@ -318,6 +325,14 @@ def create_rebate(
             details={"order_no": order.order_no, "status": order.status},
         )
 
+    base = require_positive(base_amount, field="base_amount")
+    rebate_rate = _non_negative(rate, field="rate")
+    if rebate_rate > Decimal("100.00"):
+        raise Validation(
+            "返点比例必须在 0% 到 100% 之间",
+            details={"field": "rate", "value": str(rebate_rate)},
+        )
+
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
     policy_version_id, snapshot = policy_service.make_snapshot(
@@ -327,8 +342,8 @@ def create_rebate(
         rebate_no=rebate_no,
         source_order_id=order.id,
         channel=channel,
-        rate=to_money(rate),
-        base_amount=to_money(base_amount),
+        rate=rebate_rate,
+        base_amount=base,
         collected_on=collected_on,
         policy_version_id=policy_version_id,
         policy_snapshot=snapshot,
@@ -345,7 +360,7 @@ def create_rebate(
         entity_type="rebate_record",
         entity_id=record.rebate_no,
         actor=actor,
-        after={"source_order": order.order_no, "base_amount": str(to_money(base_amount))},
+        after={"source_order": order.order_no, "base_amount": str(base)},
     )
     return record
 
@@ -367,7 +382,7 @@ def settle_rebate(
             f"返点记录 {rebate_record_id} 不存在", details={"rebate_record_id": rebate_record_id}
         )
     gross = require_positive(gross_amount, field="gross_amount")
-    fee = to_money(platform_fee)
+    fee = _non_negative(platform_fee, field="platform_fee")
     if fee > gross:
         raise Validation(
             "手续费不得大于到账金额", details={"gross": str(gross), "fee": str(fee)}

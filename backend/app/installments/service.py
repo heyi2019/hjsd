@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.business_numbering import installment_no as order_installment_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.core.money import require_positive, to_money
+from app.core.money import require_non_negative, require_positive, to_money
 from app.core.numbering import allocate_number
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.policy import service as policy_service
@@ -35,6 +35,13 @@ from app.domain.enums import (
 )
 from app.domain.trade import Account, Installment, InstallmentSchedule, Order, OrderEvent
 from app.orders import service as orders_service
+
+
+def _non_negative(value: Any, *, field: str) -> Decimal:
+    try:
+        return require_non_negative(value, field=field)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
 def _add_months(base: date, months: int) -> date:
@@ -157,6 +164,14 @@ def create_installment(
                 details={"delivery_mode": delivery_mode},
             ) from exc
 
+    principal_amount = _non_negative(principal, field="principal")
+    down_payment_amount = _non_negative(down_payment, field="down_payment")
+    service_fee_amount = _non_negative(service_fee, field="service_fee")
+    per_period_service_fee_amount = _non_negative(
+        per_period_service_fee, field="per_period_service_fee"
+    )
+    per_period_amount = _non_negative(per_period, field="per_period")
+
     # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约
     policy_version_id, policy_snapshot = policy_service.make_snapshot(
         session, policy_code=PolicyType.INSTALLMENT.value, on=first_due_on or date.today()
@@ -167,12 +182,12 @@ def create_installment(
         contract_type=contract_type,
         policy_version_id=policy_version_id,
         policy_snapshot=policy_snapshot,
-        principal=to_money(principal),
-        down_payment=to_money(down_payment),
-        service_fee=to_money(service_fee),
+        principal=principal_amount,
+        down_payment=down_payment_amount,
+        service_fee=service_fee_amount,
         periods=periods,
-        per_period_service_fee=to_money(per_period_service_fee),
-        per_period=to_money(per_period),
+        per_period_service_fee=per_period_service_fee_amount,
+        per_period=per_period_amount,
         paid_amount=Decimal("0"),
         status=InstallmentStatus.PENDING.value,
         first_due_on=first_due_on,
@@ -190,7 +205,7 @@ def create_installment(
             installment_id=installment.id,
             period_no=0,
             due_on=first_due_on,
-            due_amount=to_money(down_payment),
+            due_amount=down_payment_amount,
             received_amount=Decimal("0"),
             status=ScheduleStatus.PENDING.value,
         )
@@ -201,7 +216,7 @@ def create_installment(
                 installment_id=installment.id,
                 period_no=index,
                 due_on=schedule_dates.get(index, _add_months(first_due_on, index - 1)),
-                due_amount=to_money(per_period),
+                due_amount=per_period_amount,
                 received_amount=Decimal("0"),
                 status=ScheduleStatus.PENDING.value,
             )
@@ -443,6 +458,22 @@ def mark_overdue(session: Session, *, as_of: date, actor: str = "system") -> int
             installment = session.get(Installment, installment_id)
             if installment and installment.status == InstallmentStatus.ACTIVE.value:
                 installment.status = InstallmentStatus.OVERDUE.value
+                record_audit(
+                    session,
+                    action=AuditAction.INSTALLMENT_OVERDUE,
+                    entity_type="installment",
+                    entity_id=installment.inst_no,
+                    actor=actor,
+                    after={
+                        "status": installment.status,
+                        "as_of": as_of.isoformat(),
+                        "overdue_periods": sum(
+                            1
+                            for row in rows
+                            if row.installment_id == installment.id
+                        ),
+                    },
+                )
     session.flush()
     return count
 

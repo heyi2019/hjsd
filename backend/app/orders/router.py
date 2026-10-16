@@ -245,6 +245,7 @@ def post_event(
         reason=payload.reason,
         flow_category=payload.flow_category,
         note=payload.note,
+        user=user,
     )
     return {
         "event": schemas.EventOut.model_validate(event),

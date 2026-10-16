@@ -348,6 +348,7 @@ def pay(
         pool_id=pool_id,
         portion="PROFIT",
         note=note or f"分期收款 {installment.inst_no} 第 {schedule.period_no} 期",
+        user=user,
     )
 
     if installment.status == InstallmentStatus.PENDING.value:
@@ -445,6 +446,7 @@ def deliver(
         actor=actor,
         delivery_mode=delivery_mode,
         note=note,
+        user=user,
     )
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "DELIVER", entity="分期合约"

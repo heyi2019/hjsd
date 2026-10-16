@@ -138,6 +138,9 @@ def create_order(
 
     _validate_participant_roles(customer_roles, counterparty_roles)
 
+    if user is not None and not user.is_admin and user.owner_scope != "ALL":
+        owner_id = user.id
+
     if account_profile is not None:
         inventory_context = {
             "HS": ("SELF", "RECOVERY"),
@@ -282,6 +285,7 @@ def post_event(
     reason: str | None = None,
     flow_category: str | None = None,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """过账：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
     try:
@@ -292,7 +296,9 @@ def post_event(
             details={"field": "event_type", "value": event_type},
         ) from exc
 
-    order = get_order(session, order_id)
+    order = get_order(session, order_id, user)
+    if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
     if order.status != OrderStatus.ACTIVE.value:
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
@@ -368,6 +374,8 @@ def post_event(
         or (offset.pool_id if offset is not None else None)
         or _resolve_pool(session, order, portion).id
     )
+    if user is not None and not user.can_see_pool(resolved_pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
     _assert_pool_active(session, resolved_pool_id)
     cancel_direction = Direction.IN.value
     if event_type == EventType.CANCEL.value:

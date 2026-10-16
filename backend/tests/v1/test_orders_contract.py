@@ -113,6 +113,19 @@ class TestCreateOrderValidation:
                 user=_scoped_user(),
             )
 
+    def test_scoped_user_cannot_assign_order_to_other_owner_in_service(
+        self, seeded_db
+    ):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="operator",
+            owner_id=1,
+            user=_scoped_user(),
+        )
+        assert order.owner_id == 9
+
     def test_dg_commission_terms_are_persisted(self, seeded_db):
         order = order_service.create_order(
             seeded_db,
@@ -176,6 +189,40 @@ class TestGetAndListOrders:
         order = _order(seeded_db, owner_id=1)
         with pytest.raises(NotFound):
             order_service.get_order(seeded_db, order.id, _scoped_user())
+
+    def test_scoped_user_cannot_post_event_to_foreign_order(self, seeded_db):
+        order = _order(seeded_db, owner_id=1)
+        with pytest.raises(NotFound):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("10"),
+                occurred_on=D,
+                actor="operator",
+                user=_scoped_user(),
+            )
+
+    def test_scoped_user_cannot_post_event_to_foreign_pool(self, seeded_db):
+        order = _order(seeded_db, owner_id=9)
+        scoped = CurrentUser.build(
+            id=9,
+            username="operator",
+            roles=["OPERATOR"],
+            owner_scope="SELF",
+            pool_ids=frozenset({2}),
+        )
+        with pytest.raises(NotFound):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("10"),
+                occurred_on=D,
+                actor="operator",
+                pool_id=1,
+                user=scoped,
+            )
 
     def test_list_orders_filters_and_scope(self, seeded_db):
         mine = _order(seeded_db, owner_id=9)

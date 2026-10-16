@@ -194,6 +194,11 @@ class TestRouteGuards:
         with pytest.raises(NotFound):
             service.resolve_default_pool(seeded_db, "ZZ", "PRINCIPAL")
 
+    def test_invalid_portion_in_default_pool_lookup_rejected(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.resolve_default_pool(seeded_db, "HS", "BOGUS")
+        assert "portion 取值非法" in str(exc.value)
+
 
 class TestNumberingHelpers:
     def test_ensure_and_preview_order_no(self, seeded_db):

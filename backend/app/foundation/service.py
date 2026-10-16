@@ -463,6 +463,10 @@ def set_route(
 
 def resolve_default_pool(session: Session, order_type_code: str, portion: str) -> Pool | None:
     """读取默认资金池（不抛错），供上层决定是否需要显式覆盖。"""
+    if portion not in Portion.values():
+        raise Validation(
+            "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
+        )
     order_type = get_order_type_by_code(session, order_type_code)
     if order_type is None:
         raise NotFound("业务类型不存在", details={"order_type_code": order_type_code})

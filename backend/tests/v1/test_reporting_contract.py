@@ -327,6 +327,34 @@ class TestR3Commission:
 
 # --------------------------------------------------------------------- R5 业务
 class TestR5BusinessPnl:
+    def test_partial_rebate_settlement_keeps_uncollected_balance(self, seeded_db):
+        order = _order(seeded_db)
+        record = finance_service.create_rebate(
+            seeded_db,
+            source_order_id=order.id,
+            base_amount="1000.00",
+            collected_on=D,
+            actor="pytest",
+            rate="10",
+        )
+        finance_service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount="60.00",
+            settled_on=D,
+            pool_id=2,
+            actor="pytest",
+        )
+        seeded_db.commit()
+
+        item = next(
+            row
+            for row in reporting_service.r5_business_pnl(seeded_db)["items"]
+            if row["order_type"] == "HS"
+        )
+        assert item["settled_rebate"] == 60
+        assert item["uncollected_rebate"] == 40
+
     def test_uncollected_and_settled_rebate_buckets(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(

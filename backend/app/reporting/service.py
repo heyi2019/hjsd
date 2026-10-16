@@ -413,15 +413,33 @@ def r5_business_pnl(
                 (RebateRecord.source_order_id.is_(None)) | scope
             )
     rebates = session.execute(rebate_stmt).all()
+    rebate_totals: dict[int, tuple[RebateRecord, str | None, Decimal, Decimal]] = {}
     for record, gross, fee, order_type in rebates:
+        previous = rebate_totals.get(record.id)
+        if previous is None:
+            rebate_totals[record.id] = (
+                record,
+                order_type,
+                ZERO,
+                ZERO,
+            )
+            previous = rebate_totals[record.id]
+        if gross is not None:
+            rebate_totals[record.id] = (
+                previous[0],
+                previous[1],
+                previous[2] + _money(gross),
+                previous[3] + _money(fee),
+            )
+
+    for record, order_type, settled_gross, settled_fee in rebate_totals.values():
         bucket = order_type or "UNCOLLECTED"
-        if gross is None:
-            # 尚未结算：按基数 × 费率计“未归集”，独立列示不摊给业务
-            unsettled[bucket] += (
-                _money(record.base_amount) * _money(record.rate) / Decimal("100")
-            ).quantize(Decimal("0.01"))
-        else:
-            settled[bucket] += _money(gross) - _money(fee)
+        expected = (
+            _money(record.base_amount) * _money(record.rate) / Decimal("100")
+        ).quantize(Decimal("0.01"))
+        settled[bucket] += settled_gross - settled_fee
+        # 分次结算只减少剩余未归集金额；没有结算记录时即为全部应收返点。
+        unsettled[bucket] += max(ZERO, expected - settled_gross)
 
     items = []
     for order_type in sorted(set(revenue) | set(cost) | set(settled) | set(unsettled)):

@@ -17,7 +17,7 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, CapitalType, OrderStatus
-from app.domain.trade import Account, Cashflow, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.foundation import service as foundation_service
 from app.orders import service as order_service
 
@@ -353,6 +353,67 @@ class TestAccountEffect:
 
         assert account.cost_amount == Decimal("400.00")
         assert account.status == AccountStatus.IN_STOCK.value
+
+    def test_cancel_sell_restores_stock_without_reducing_cost(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-ORD-SELL-CANCEL",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+        order = _order(seeded_db, order_type="TH", account_id=account.id)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="500.00",
+            occurred_on=D, actor="pytest",
+        )
+        sell, _ = order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="800.00",
+            occurred_on=D, actor="pytest",
+        )
+        assert account.status == AccountStatus.SOLD.value
+
+        order_service.post_event(
+            seeded_db, order.id, event_type="CANCEL", amount="800.00",
+            occurred_on=D, actor="pytest", offset_event_id=sell.id,
+            reason="售出撤销",
+        )
+
+        assert account.cost_amount == Decimal("500.00")
+        assert account.status == AccountStatus.IN_STOCK.value
+
+    def test_cancel_payment_is_rejected_until_schedule_reversal_is_supported(self, seeded_db):
+        order = _order(seeded_db, order_type="HS")
+        contract = Installment(
+            inst_no="FQ-CANCEL-PAYMENT",
+            order_id=order.id,
+            contract_type="STOCK_SALE",
+            principal=to_money("1000"),
+            down_payment=to_money("0"),
+            service_fee=to_money("0"),
+            periods=1,
+            per_period_service_fee=to_money("0"),
+            per_period=to_money("1000"),
+            paid_amount=to_money("0"),
+            status="ACTIVE",
+        )
+        seeded_db.add(contract)
+        seeded_db.flush()
+        payment, _ = order_service.post_event(
+            seeded_db, order.id, event_type="PAYMENT", amount="100.00",
+            occurred_on=D, actor="pytest",
+        )
+
+        with pytest.raises(Validation) as exc:
+            order_service.post_event(
+                seeded_db, order.id, event_type="CANCEL", amount="100.00",
+                occurred_on=D, actor="pytest", offset_event_id=payment.id,
+                reason="收款撤销",
+            )
+
+        assert "分期" in str(exc.value)
 
     def test_account_none_branch_is_defensive(self, seeded_db):
         # FK 全局强制使 ORM 路径不可达（账号删除是 SET NULL）；直调私有函数覆盖防御分支

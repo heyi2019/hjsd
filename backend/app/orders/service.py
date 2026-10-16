@@ -482,6 +482,13 @@ def _assert_event_allowed(
                 "TH/DFQ 的 CANCEL 必须指定 offset_event_id",
                 details={"field": "offset_event_id"},
             )
+        if offset_event_id is not None:
+            offset = _get_offset_event(session, offset_event_id, order_id=order.id)
+            if offset.event_type == EventType.PAYMENT.value:
+                raise Validation(
+                    "分期收款不能直接冲销，请通过分期收款更正流程处理",
+                    details={"offset_event_id": offset_event_id},
+                )
 
 
 def _validate_participant_roles(
@@ -687,6 +694,15 @@ def _apply_account_effect(
     elif event_type == EventType.SELL.value:
         account.status = transition(ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号")
     elif event_type == EventType.CANCEL.value:
+        if offset_event is not None and offset_event.event_type == EventType.SELL.value:
+            if cancel_fully_consumed:
+                account.status = transition(
+                    ACCOUNT_TRANSITIONS,
+                    account.status,
+                    "CANCEL_SELL",
+                    entity="账号",
+                )
+            return
         account.cost_amount = to_money(account.cost_amount) - amount
         if offset_event is None or (
             offset_event.event_type == EventType.BUY.value and cancel_fully_consumed

@@ -21,7 +21,11 @@ ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     "IN_STOCK": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "INSTALLMENT", "SELL": "SOLD", "INSTALLMENT": "INSTALLMENT", "VOID": "VOID"},
     "FOR_SALE": {"SELL": "SOLD", "VOID": "VOID"},
     "INSTALLMENT": {"DELIVER": "SOLD", "VOID": "VOID"},
-    "SOLD": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "INSTALLMENT"},
+    "SOLD": {
+        "BUY_STOCK": "IN_STOCK",
+        "BUY_CREDIT": "INSTALLMENT",
+        "CANCEL_SELL": "IN_STOCK",
+    },
     "VOID": {},
 }
 

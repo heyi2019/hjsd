@@ -554,5 +554,4 @@ __all__ = [
     "list_orders",
     "pool_balance",
     "post_event",
-    "transfer",
 ]

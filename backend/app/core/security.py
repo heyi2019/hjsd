@@ -369,7 +369,10 @@ def get_current_user(
                 team_ids=frozenset(account.team_ids or []),
                 owner_scope=account.owner_scope,
             )
-        return user_from_payload(payload)
+        if settings.is_development:
+            # 开发/测试环境允许用签名 token 模拟尚未落库的角色，便于权限链路验证。
+            return user_from_payload(payload)
+        raise AuthError("登录账号不存在或凭证已失效")
 
     if settings.is_development and x_dev_user:
         user = DEV_USERS.get(x_dev_user.strip().lower())

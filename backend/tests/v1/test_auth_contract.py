@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,8 @@ from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.core.security import hash_password
 from app.domain.users import User
+from app.core.settings import Settings
+from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
 
 
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",
@@ -107,6 +110,25 @@ def test_me_falls_back_to_token_payload_without_db_record(client: TestClient):
     assert body["username"] == "admin"
     assert body["role"] == "ADMIN"
     assert body["is_active"] is True
+
+
+def test_production_bearer_token_requires_database_user(db: Session):
+    settings = Settings(
+        app_env="production",
+        jwt_secret_key="test-production-secret-0123456789-abcdef",
+    )
+    token = build_access_token(
+        CurrentUser.build(id=9999, username="deleted-user", roles=["ADMIN"], owner_scope="ALL"),
+        settings=settings,
+    )
+    with pytest.raises(AuthError) as exc:
+        get_current_user(
+            authorization=f"Bearer {token}",
+            x_dev_user=None,
+            settings=settings,
+            db=db,
+        )
+    assert "账号" in str(exc.value)
 
 
 def test_me_requires_authentication(client: TestClient):

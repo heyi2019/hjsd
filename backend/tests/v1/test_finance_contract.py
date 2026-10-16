@@ -85,6 +85,31 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_is_settled_by_gross_amount_not_net_amount(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+
+        settlement = service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount=Decimal("100"),
+            settled_on=TODAY,
+            pool_id=invest.id,
+            actor="pytest",
+            platform_fee=Decimal("10"),
+        )
+
+        seeded_db.refresh(record)
+        assert settlement.net_amount == Decimal("90.00")
+        assert record.status == "SETTLED"
+
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_rebate(

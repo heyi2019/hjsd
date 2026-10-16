@@ -431,17 +431,17 @@ def settle_rebate(
     )
     session.add(settlement)
 
-    settled_total = to_money(
+    settled_gross_total = to_money(
         session.scalar(
-            select(func.coalesce(func.sum(RebateSettlement.net_amount), 0)).where(
+            select(func.coalesce(func.sum(RebateSettlement.gross_amount), 0)).where(
                 RebateSettlement.rebate_record_id == record.id
             )
         )
         or 0
-    ) + net
+    ) + gross
     record.status = (
         RebateStatus.SETTLED.value
-        if settled_total >= receivable
+        if settled_gross_total >= receivable
         else RebateStatus.PARTIALLY_SETTLED.value
     )
     session.flush()

@@ -29,6 +29,8 @@ from app.domain.enums import (
     AccountStatus,
     AuditAction,
     CapitalType,
+    CounterpartyRole,
+    CustomerRole,
     Direction,
     EventType,
     Nature,
@@ -89,6 +91,11 @@ def create_order(
             "订单不能同时关联已有库存账号和新建账号资料",
             details={"order_type": definition.code},
         )
+    if account_id is not None:
+        accounts_service.get_account(session, account_id)
+
+    _validate_participant_roles(customer_roles, counterparty_roles)
+
     if account_profile is not None:
         inventory_context = {
             "HS": ("SELF", "RECOVERY"),
@@ -266,6 +273,10 @@ def post_event(
     money = require_positive(amount, field="amount")
     resolved_pool_id = pool_id or _resolve_pool(session, order, portion).id
     _assert_pool_active(session, resolved_pool_id)
+    cancel_direction = Direction.IN.value
+    if event_type == EventType.CANCEL.value:
+        cancel_direction = _opposite_direction(offset_event_id, session, order_id=order.id)
+
     event = OrderEvent(
         event_no=next_event_no(
             session, order_no=order.order_no, order_id=order.id, event_type=event_type
@@ -295,7 +306,7 @@ def post_event(
             )
         category = flow_category
     if event_type == EventType.CANCEL.value:
-        direction = _opposite_direction(offset_event_id, session)
+        direction = cancel_direction
 
     flow = Cashflow(
         flow_no=next_cashflow_no(
@@ -377,13 +388,52 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
         )
 
 
-def _opposite_direction(offset_event_id: int | None, session: Session) -> str:
+def _validate_participant_roles(
+    customer_roles: Sequence[tuple[int, str]],
+    counterparty_roles: Sequence[tuple[int, str]],
+) -> None:
+    for _participant_id, role in customer_roles:
+        if role not in CustomerRole.values():
+            raise Validation(
+                f"客户角色必须为 {CustomerRole.values()}",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"role": role},
+            )
+    for _participant_id, role in counterparty_roles:
+        if role not in CounterpartyRole.values():
+            raise Validation(
+                f"合作方角色必须为 {CounterpartyRole.values()}",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"role": role},
+            )
+
+
+def _opposite_direction(
+    offset_event_id: int | None,
+    session: Session,
+    *,
+    order_id: int | None = None,
+) -> str:
     if offset_event_id is None:
         return Direction.IN.value
     offset = session.get(OrderEvent, offset_event_id)
     if offset is None:
         raise NotFound(
             f"被冲销事件 {offset_event_id} 不存在",
+            details={"offset_event_id": offset_event_id},
+        )
+    if order_id is not None and offset.order_id != order_id:
+        raise Validation(
+            "冲销事件必须属于同一订单",
+            details={
+                "order_id": order_id,
+                "offset_event_id": offset_event_id,
+                "offset_order_id": offset.order_id,
+            },
+        )
+    if not offset.is_posted:
+        raise Validation(
+            "只能冲销已过账事件",
             details={"offset_event_id": offset_event_id},
         )
     return Direction.IN.value if offset.event_type == EventType.BUY.value else Direction.OUT.value

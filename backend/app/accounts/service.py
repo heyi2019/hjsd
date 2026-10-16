@@ -72,6 +72,24 @@ def create_account(
     )
     session.add(account)
     session.flush()
+    record_audit(
+        session,
+        action=AuditAction.ACCOUNT_CREATE,
+        entity_type="account",
+        entity_id=account.inventory_no,
+        actor=actor,
+        after={
+            "inventory_no": account.inventory_no,
+            "game_account": account.game_account,
+            "game_type": account.game_type,
+            "business_mode": account.business_mode,
+            "inventory_type": account.inventory_type,
+            "platform": account.platform,
+            "status": account.status,
+            "account_description": account.account_description,
+            "account_images": account.account_images or [],
+        },
+    )
     return account
 
 
@@ -102,7 +120,6 @@ def update_account_profile(
     before = {
         "game_account": account.game_account,
         "game_type": account.game_type,
-        "game_password": account.game_password,
         "channel_region": account.channel_region,
         "bound_phone": account.bound_phone,
         "has_secondary": account.has_secondary,
@@ -148,7 +165,6 @@ def update_account_profile(
         after={
             "game_account": account.game_account,
             "game_type": account.game_type,
-            "game_password": account.game_password,
             "channel_region": account.channel_region,
             "bound_phone": account.bound_phone,
             "has_secondary": account.has_secondary,

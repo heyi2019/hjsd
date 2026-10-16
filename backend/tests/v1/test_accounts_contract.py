@@ -79,7 +79,24 @@ class TestCreateAccountGuards:
                 .order_by(AuditLog.id)
             )
         )
-        assert actions == [AuditAction.ACCOUNT_UPDATE.value]
+        assert actions[-1] == AuditAction.ACCOUNT_UPDATE.value
+
+    def test_account_creation_is_recorded_as_account_audit(self, seeded_db):
+        account = _account(seeded_db, "created-audited-account", game_type="王者荣耀")
+
+        audit = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.entity_type == "account",
+                AuditLog.entity_id == account.inventory_no,
+                AuditLog.action == AuditAction.ACCOUNT_CREATE.value,
+            )
+        )
+
+        assert audit is not None
+        assert audit.actor == "pytest"
+        assert audit.after_json["inventory_no"] == account.inventory_no
+        assert audit.after_json["game_type"] == "王者荣耀"
 
     def test_empty_identifier_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:

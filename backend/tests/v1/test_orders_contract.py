@@ -12,7 +12,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.core.errors import NotFound, Validation
+from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, CapitalType, OrderStatus
@@ -188,6 +188,32 @@ class TestCancelOffsetDirection:
         }
         assert flows[cancel_a.id].direction == Direction.IN.value
         assert flows[cancel_b.id].direction == Direction.OUT.value
+
+    def test_cancel_offset_must_belong_to_the_same_order(self, seeded_db):
+        first = _order(seeded_db)
+        second = _order(seeded_db, order_type="TH")
+        order_event, _ = order_service.post_event(
+            seeded_db,
+            second.id,
+            event_type="SELL",
+            amount="150.00",
+            occurred_on=D,
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation) as exc:
+            order_service.post_event(
+                seeded_db,
+                first.id,
+                event_type="CANCEL",
+                amount="10.00",
+                occurred_on=D,
+                actor="pytest",
+                offset_event_id=order_event.id,
+            )
+
+        assert exc.value.code == ErrorCode.VALIDATION_ERROR
+        assert "同一订单" in str(exc.value)
 
 
 # ------------------------------------------------------------------ 账号效果

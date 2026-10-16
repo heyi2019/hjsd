@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.core.errors import ErrorCode
+from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus, SequenceKey
 from app.domain.foundation import Pool
@@ -251,6 +251,31 @@ class TestA03DgZeroCapital:
 
 
 class TestEventRules:
+    def test_unknown_account_is_rejected_before_database_flush(self, seeded_db):
+        with pytest.raises(NotFound) as exc:
+            service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=TODAY,
+                actor="pytest",
+                account_id=999999,
+            )
+
+        assert exc.value.details == {"account_id": 999999}
+
+    def test_invalid_participant_roles_are_rejected_before_database_flush(self, seeded_db):
+        customer = _customer(seeded_db)
+        with pytest.raises(Validation) as exc:
+            service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=TODAY,
+                actor="pytest",
+                customer_roles=[(customer.id, "INVALID")],
+            )
+
+        assert exc.value.code == ErrorCode.PARTICIPANT_ROLE_INVALID
+
     def test_deliver_generates_no_cashflow(self, seeded_db):
         account = _new_account(seeded_db)
         seeded_db.commit()

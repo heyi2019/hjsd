@@ -513,7 +513,7 @@ def r5_business_pnl(
 def daily_funds_report(
     session: Session, *, on: date | None = None, user: CurrentUser | None = None
 ) -> dict[str, Any]:
-    """资金日报：各池期初/收入/支出/押金/可用余额。"""
+    """资金日报：各池期初、经营收支、内部划转、押金与可用余额。"""
     from app.orders.service import pool_balance
 
     target = on or date.today()
@@ -564,6 +564,28 @@ def daily_funds_report(
                 )
             )
         )
+        transfer_in = _money(
+            session.scalar(
+                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
+                    Cashflow.pool_id == pool.id,
+                    Cashflow.occurred_on == target,
+                    Cashflow.direction == Direction.IN.value,
+                    Cashflow.nature == Nature.INTERNAL.value,
+                    Cashflow.status == CashflowStatus.APPROVED.value,
+                )
+            )
+        )
+        transfer_out = _money(
+            session.scalar(
+                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
+                    Cashflow.pool_id == pool.id,
+                    Cashflow.occurred_on == target,
+                    Cashflow.direction == Direction.OUT.value,
+                    Cashflow.nature == Nature.INTERNAL.value,
+                    Cashflow.status == CashflowStatus.APPROVED.value,
+                )
+            )
+        )
         deposit_paid = _money(
             session.scalar(
                 select(func.coalesce(func.sum(Deposit.paid_amount), 0)).where(
@@ -579,6 +601,8 @@ def daily_funds_report(
                 "opening": opening,
                 "income": day_in,
                 "expense": day_out,
+                "transfer_in": transfer_in,
+                "transfer_out": transfer_out,
                 "deposit_paid": deposit_paid,
                 "deposit_held": balance["deposit_held"],
                 "cash_balance": balance["cash_balance"],
@@ -592,6 +616,8 @@ def daily_funds_report(
             "opening": _sum_report_field(items, "opening"),
             "income": _sum_report_field(items, "income"),
             "expense": _sum_report_field(items, "expense"),
+            "transfer_in": _sum_report_field(items, "transfer_in"),
+            "transfer_out": _sum_report_field(items, "transfer_out"),
             "deposit_paid": _sum_report_field(items, "deposit_paid"),
             "deposit_held": _sum_report_field(items, "deposit_held"),
             "cash_balance": _sum_report_field(items, "cash_balance"),

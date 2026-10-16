@@ -985,7 +985,7 @@ def _apply_account_effect(
 
 # --------------------------------------------------------------------- 池余额
 def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
-    """资金池卡片：现金余额、押金占用与可用余额。"""
+    """资金池卡片：经营收支、内部划转、押金占用与可用余额。"""
     pool = session.get(Pool, pool_id)
     if pool is None:
         raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
@@ -1002,6 +1002,8 @@ def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
 
     income = total(Direction.IN.value, Nature.BUSINESS_IN.value)
     expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value)
+    transfer_in = total(Direction.IN.value, Nature.INTERNAL.value)
+    transfer_out = total(Direction.OUT.value, Nature.INTERNAL.value)
     # 现金头寸包含 INTERNAL 划转；经营收入/支出仍只统计 BUSINESS_*，避免把划转算进损益。
     cash_balance = total(Direction.IN.value) - total(Direction.OUT.value)
 
@@ -1011,6 +1013,8 @@ def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
         "pool_code": pool.code,
         "income": income,
         "expense": expense,
+        "transfer_in": transfer_in,
+        "transfer_out": transfer_out,
         "cash_balance": cash_balance,
         "deposit_held": deposit_held,
         "available": cash_balance - deposit_held,

@@ -17,6 +17,8 @@ export interface PoolBalance {
   pool_code: string;
   income: string;
   expense: string;
+  transfer_in: string;
+  transfer_out: string;
   cash_balance: string;
   deposit_held: string;
   available: string;

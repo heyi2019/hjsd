@@ -179,6 +179,8 @@ class PoolBalanceOut(BaseModel):
     pool_code: str
     income: Decimal
     expense: Decimal
+    transfer_in: Decimal
+    transfer_out: Decimal
     cash_balance: Decimal
     deposit_held: Decimal
     available: Decimal

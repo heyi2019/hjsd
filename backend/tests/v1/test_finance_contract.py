@@ -939,7 +939,20 @@ class TestFinanceApi:
         target_balance = orders_service.pool_balance(seeded_db, profit.id)
         assert source_balance["cash_balance"] == Decimal("-125.50")
         assert target_balance["cash_balance"] == Decimal("125.50")
+        assert source_balance["transfer_in"] == Decimal("0.00")
+        assert source_balance["transfer_out"] == Decimal("125.50")
+        assert target_balance["transfer_in"] == Decimal("125.50")
+        assert target_balance["transfer_out"] == Decimal("0.00")
         assert source_balance["cash_balance"] + target_balance["cash_balance"] == Decimal("0.00")
+
+        report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+        by_code = {item["pool_code"]: item for item in report["items"]}
+        assert by_code["HJ_INVEST"]["transfer_in"] == Decimal("0.00")
+        assert by_code["HJ_INVEST"]["transfer_out"] == Decimal("125.50")
+        assert by_code["HJ_PROFIT"]["transfer_in"] == Decimal("125.50")
+        assert by_code["HJ_PROFIT"]["transfer_out"] == Decimal("0.00")
+        assert report["total"]["transfer_in"] == Decimal("125.50")
+        assert report["total"]["transfer_out"] == Decimal("125.50")
 
     def test_repair_unpaired_transfer_creates_only_missing_side(
         self, seeded_db

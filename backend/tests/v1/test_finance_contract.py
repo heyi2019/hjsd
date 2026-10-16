@@ -440,6 +440,77 @@ class TestFinanceApi:
         assert response.status_code == 200, response.text
         assert [row["flow_no"] for row in response.json()] == ["CF-PAGE-1"]
 
+    def test_scoped_cashflow_order_filter_respects_order_owner(
+        self, seeded_client, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        own_order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="scoped-finance",
+            owner_id=9,
+        )
+        foreign_order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="other",
+            owner_id=8,
+        )
+        seeded_db.add_all(
+            [
+                Cashflow(
+                    flow_no="CF-SCOPE-OWN",
+                    pool_id=1,
+                    occurred_on=TODAY,
+                    nature="BUSINESS_IN",
+                    category="OTHER",
+                    direction="IN",
+                    amount=Decimal("10"),
+                    order_id=own_order.id,
+                    created_by="pytest",
+                    updated_by="pytest",
+                ),
+                Cashflow(
+                    flow_no="CF-SCOPE-OTHER",
+                    pool_id=1,
+                    occurred_on=TODAY,
+                    nature="BUSINESS_IN",
+                    category="OTHER",
+                    direction="IN",
+                    amount=Decimal("20"),
+                    order_id=foreign_order.id,
+                    created_by="pytest",
+                    updated_by="pytest",
+                ),
+            ]
+        )
+        seeded_db.flush()
+
+        own = seeded_client.get(
+            "/api/v1/cashflows",
+            params={"order_id": own_order.id},
+            headers=headers,
+        )
+        foreign = seeded_client.get(
+            "/api/v1/cashflows",
+            params={"order_id": foreign_order.id},
+            headers=headers,
+        )
+
+        assert own.status_code == 200, own.text
+        assert [row["flow_no"] for row in own.json()] == ["CF-SCOPE-OWN"]
+        assert foreign.status_code == 200, foreign.text
+        assert foreign.json() == []
+
     def test_scoped_operator_cannot_write_rebate_for_other_order(
         self, seeded_client, seeded_db
     ):

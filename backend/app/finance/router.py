@@ -99,6 +99,7 @@ def list_cashflows(
             status=status,
             limit=limit,
             offset=offset,
+            user=user,
         )
         return [schemas.CashflowOut.model_validate(item) for item in items]
 
@@ -112,6 +113,7 @@ def list_cashflows(
         status=status,
         limit=limit,
         offset=offset,
+        user=user,
     )
     return [schemas.CashflowOut.model_validate(item) for item in items]
 

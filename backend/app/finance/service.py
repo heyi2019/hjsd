@@ -423,6 +423,7 @@ def list_cashflows(
     status: str | None = None,
     limit: int = 100,
     offset: int = 0,
+    user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
     """统一查询资金明细，直接返回订单号，避免前端按日期和金额猜来源。"""
     stmt = (
@@ -438,6 +439,10 @@ def list_cashflows(
         stmt = stmt.where(Cashflow.pool_id.in_(list(pool_ids)))
     if order_id is not None:
         stmt = stmt.where(Cashflow.order_id == order_id)
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(Cashflow.order_id.is_(None) | scope)
     if direction is not None:
         stmt = stmt.where(Cashflow.direction == direction)
     if occurred_from is not None:

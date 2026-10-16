@@ -285,6 +285,21 @@ def test_create_user_with_unknown_team_ids(client: TestClient):
     assert response.json()["details"]["team_ids"] == [999]
 
 
+def test_create_user_with_unknown_pool_ids(client: TestClient):
+    response = client.post(
+        "/api/v1/users",
+        json={
+            "username": "pool-user",
+            "display_name": "池授权用户",
+            "password": "password123",
+            "pool_ids": [999],
+        },
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["details"]["pool_ids"] == [999]
+
+
 def test_create_user_with_existing_team_ids(client: TestClient):
     team = client.post(
         "/api/v1/teams",
@@ -378,7 +393,7 @@ def test_update_user_success(client: TestClient):
 def test_reset_password_not_found(client: TestClient):
     response = client.post(
         "/api/v1/users/999/reset-password",
-        json={"username": "x", "password": "resetpass1"},
+        json={"password": "resetpass1"},
         headers={"X-Dev-User": "admin"},
     )
     assert response.status_code == 422
@@ -389,7 +404,7 @@ def test_reset_password_success(client: TestClient):
     created = _create_user(client)
     response = client.post(
         f"/api/v1/users/{created['id']}/reset-password",
-        json={"username": "alice", "password": "resetpass1"},
+        json={"password": "resetpass1"},
         headers={"X-Dev-User": "admin"},
     )
     assert response.status_code == 200, response.text
@@ -506,7 +521,7 @@ def test_admin_mutations_write_audit(client: TestClient, db: Session):
     assert updated.status_code == 200, updated.text
     reset = client.post(
         f"/api/v1/users/{created['id']}/reset-password",
-        json={"username": "alice", "password": "resetpass1"},
+        json={"password": "resetpass1"},
         headers={"X-Dev-User": "admin"},
     )
     assert reset.status_code == 200, reset.text

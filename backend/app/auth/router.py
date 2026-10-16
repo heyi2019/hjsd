@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,12 @@ class LoginRequest(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password: str = Field(min_length=8, max_length=128)
 
 
 class UserCreate(BaseModel):
@@ -162,7 +168,7 @@ def update_user(user_id: int, payload: UserUpdate, actor: CurrentUser = Depends(
 
 
 @admin_router.post("/{user_id}/reset-password")
-def reset_password(user_id: int, payload: LoginRequest, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def reset_password(user_id: int, payload: PasswordResetRequest, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _admin(actor)
     service.reset_password(db, user_id, password=payload.password, actor=actor.username)
     return {"ok": True}

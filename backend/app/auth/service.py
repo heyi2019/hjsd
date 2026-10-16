@@ -14,6 +14,7 @@ from app.core.audit import record_audit
 from app.core.errors import AuthError, Conflict, Validation
 from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password
 from app.domain.enums import AuditAction
+from app.domain.foundation import Pool
 from app.domain.users import RevokedToken, Team, User
 
 _USER_FIELDS = ("username", "display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active")
@@ -53,6 +54,18 @@ def _check_team_ids(session: Session, team_ids: list[int] | None) -> None:
         raise Validation("团队不存在", details={"team_ids": sorted(requested - actual)})
 
 
+def _check_pool_ids(session: Session, pool_ids: list[int] | None) -> None:
+    if pool_ids is None:
+        return
+    requested = set(pool_ids)
+    actual = {
+        row[0]
+        for row in session.execute(select(Pool.id).where(Pool.id.in_(requested))).all()
+    }
+    if actual != requested:
+        raise Validation("资金池不存在", details={"pool_ids": sorted(requested - actual)})
+
+
 def create_user(
     session: Session,
     *,
@@ -75,6 +88,7 @@ def create_user(
     normalized_display_name = _required_text(display_name, message="显示名称不能为空")
     if session.scalar(select(User).where(User.username == normalized_username)):
         raise Conflict("用户名已存在")
+    _check_pool_ids(session, pool_ids)
     _check_team_ids(session, team_ids)
     user = User(
         username=normalized_username,
@@ -111,6 +125,7 @@ def update_user(
     user = session.get(User, user_id)
     if user is None:
         raise Validation("用户不存在")
+    _check_pool_ids(session, changes.get("pool_ids") if "pool_ids" in changes else None)  # type: ignore[arg-type]
     _check_team_ids(session, changes.get("team_ids") if "team_ids" in changes else None)  # type: ignore[arg-type]
     if "role" in changes and changes["role"] not in ALL_ROLES:
         raise Validation("无效角色")

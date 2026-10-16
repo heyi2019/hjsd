@@ -534,7 +534,7 @@ class RebateSettlement(Base, AuditMixin):
         ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
     )
     reversal_of_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
+        ForeignKey("rebate_settlements.id", ondelete="RESTRICT"), nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

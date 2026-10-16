@@ -215,6 +215,32 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_reversal_must_reference_existing_settlement(self, seeded_db):
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        seeded_db.add(
+            RebateSettlement(
+                settlement_no="REB-INVALID-REVERSAL",
+                rebate_record_id=record.id,
+                settled_on=TODAY,
+                gross_amount=Decimal("0"),
+                platform_fee=Decimal("0"),
+                net_amount=Decimal("0"),
+                reversal_of_id=999999,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_rebate_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
         order_id = _active_order(seeded_db)
         record = service.create_rebate(

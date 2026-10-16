@@ -191,6 +191,21 @@ class TestCreateInstallmentValidation:
             _contract(seeded_db, order.id, delivery_mode="BOGUS")
         assert "交付方式" in str(exc.value)
 
+    def test_schedule_rejects_unknown_fields_in_service(self, seeded_db):
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match="分期计划字段校验失败"):
+            _contract(
+                seeded_db,
+                order.id,
+                schedule=[
+                    {
+                        "period_no": 1,
+                        "due_on": TODAY,
+                        "unknown": "不应写入",
+                    }
+                ],
+            )
+
     def test_cancelled_order_cannot_create_contract(self, seeded_db):
         order = _order(seeded_db)
         order.status = "CANCELLED"

@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from pydantic import ValidationError as PydanticValidationError
 
 from app.core.audit import record_audit
 from app.core.business_numbering import installment_no as order_installment_no
@@ -37,6 +38,7 @@ from app.domain.enums import (
 from app.domain.trade import Account, Installment, InstallmentSchedule, Order, OrderEvent
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
+from app.installments.schemas import ScheduleCreate
 
 
 def _non_negative(value: Any, *, field: str) -> Decimal:
@@ -44,6 +46,30 @@ def _non_negative(value: Any, *, field: str) -> Decimal:
         return require_non_negative(value, field=field)
     except ValueError as exc:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
+
+
+def _normalize_schedule(schedule: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if not schedule:
+        return []
+    try:
+        return [
+            item.model_dump()
+            for item in (ScheduleCreate.model_validate(raw) for raw in schedule)
+        ]
+    except PydanticValidationError as exc:
+        raise Validation(
+            "分期计划字段校验失败",
+            details={
+                "field": "schedule",
+                "errors": [
+                    {
+                        "field": ".".join(str(part) for part in error["loc"]),
+                        "message": error["msg"],
+                    }
+                    for error in exc.errors()
+                ],
+            },
+        ) from exc
 
 
 def _add_months(base: date, months: int) -> date:
@@ -153,8 +179,8 @@ def create_installment(
         raise Validation("期数必须大于 0", details={"field": "periods", "value": periods})
 
     schedule_dates: dict[int, date] = {}
-    for item in schedule or []:
-        period_no = int(item["period_no"])
+    for item in _normalize_schedule(schedule):
+        period_no = item["period_no"]
         if period_no < 1 or period_no > periods or period_no in schedule_dates:
             raise Validation("分期计划期次必须从 1 开始且不能重复", details={"period_no": period_no})
         schedule_dates[period_no] = item["due_on"]

@@ -99,6 +99,68 @@ class TestDepositQueries:
             "600.00"
         )
 
+    def test_deposit_loss_becomes_operating_expense_without_double_holding(
+        self, seeded_db
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = service.create_deposit(
+            seeded_db,
+            pool_id=invest.id,
+            amount=Decimal("1000"),
+            paid_on=TODAY,
+            actor="pytest",
+        )
+
+        lost = service.lose_deposit(
+            seeded_db,
+            deposit.id,
+            amount=Decimal("300"),
+            lost_on=TODAY,
+            category="OPERATING_COST",
+            reason="对方违约扣除",
+            actor="finance",
+        )
+        seeded_db.refresh(deposit)
+        assert lost.category == "OPERATING_COST"
+        assert lost.direction == "OUT"
+        assert deposit.lost_amount == Decimal("300.00")
+        assert deposit.status == "PAID"
+        assert service.deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
+            "700.00"
+        )
+
+        service.lose_deposit(
+            seeded_db,
+            deposit.id,
+            amount=Decimal("700"),
+            lost_on=TODAY,
+            category="OPERATING_COST",
+            reason="剩余全部损失",
+            actor="finance",
+        )
+        seeded_db.refresh(deposit)
+        assert deposit.status == "LOST"
+        assert service.deposit_held_total(seeded_db, pool_id=invest.id) == Decimal("0.00")
+
+        pnl = reporting_service.r2_monthly_pnl(seeded_db)
+        assert pnl["items"][0]["operating_expense"] == Decimal("1000.00")
+
+    def test_deposit_loss_cannot_exceed_unreleased_balance(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = service.create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+        )
+        with pytest.raises(Validation, match="未释放余额"):
+            service.lose_deposit(
+                seeded_db,
+                deposit.id,
+                amount=Decimal("101"),
+                lost_on=TODAY,
+                category="OPERATING_COST",
+                reason="超额",
+                actor="finance",
+            )
+
 
 class TestRebateGuards:
     def test_rebate_rate_must_be_percentage_and_fee_non_negative(self, seeded_db):
@@ -919,6 +981,27 @@ class TestFinanceApi:
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
         assert "deposit_no" not in response.json()[0]
+
+    def test_deposit_loss_endpoint_returns_operating_cashflow(
+        self, seeded_client, seeded_db, headers
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = service.create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+        )
+        response = seeded_client.post(
+            f"/api/v1/deposits/{deposit.id}/losses",
+            json={
+                "amount": "40",
+                "lost_on": TODAY.isoformat(),
+                "category": "OPERATING_COST",
+                "reason": "对方违约扣除",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["category"] == "OPERATING_COST"
+        assert response.json()["source"] == "DEPOSIT"
 
     def test_list_rebates_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)

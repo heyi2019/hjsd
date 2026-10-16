@@ -42,7 +42,11 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         source = "ORDER_EVENT"
     elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
         source = "REBATE_SETTLEMENT"
-    elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
+    elif flow.deposit_id is not None or flow.category in {
+        "DEPOSIT_HOLD",
+        "DEPOSIT_RELEASE",
+        "DEPOSIT_LOSS",
+    }:
         source = "DEPOSIT"
     elif flow.category == "TRANSFER":
         source = "TRANSFER"
@@ -354,6 +358,29 @@ def return_deposit(
         user=user,
     )
     return schemas.DepositOut.model_validate(item)
+
+
+@router.post("/deposits/{deposit_id}/losses", response_model=schemas.CashflowOut)
+def lose_deposit(
+    deposit_id: int,
+    payload: schemas.DepositLoss,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.CashflowOut:
+    deposit = db.get(Deposit, deposit_id)
+    if deposit is None or not user.can_see_pool(deposit.pool_id):
+        raise NotFound("押金不存在", details={"deposit_id": deposit_id})
+    flow = service.lose_deposit(
+        db,
+        deposit_id,
+        amount=payload.amount,
+        lost_on=payload.lost_on,
+        category=payload.category,
+        reason=payload.reason,
+        actor=_actor(user),
+        user=user,
+    )
+    return _cashflow_out(db, flow)
 
 
 # --------------------------------------------------------------------- 返点

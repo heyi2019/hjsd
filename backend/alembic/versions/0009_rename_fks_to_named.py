@@ -65,6 +65,13 @@ def _rebuild(bind, tname: str) -> None:
             "CONSTRAINT pk_deposits PRIMARY KEY (id),\n\tCONSTRAINT uq_deposits_no UNIQUE (deposit_no),",
             1,
         )
+    # 押金损失字段直到 0042 才加入；0009 仍处于历史字段重建阶段，不能提前把
+    # 当前 ORM 的新列带进来，否则 0042 会重复添加。
+    if tname == "deposits" and "lost_amount" not in source_columns:
+        ddl = ddl.replace("\tlost_amount NUMERIC(18, 2) NOT NULL, \n", "")
+        ddl = ddl.replace("\tlost_on DATE, \n", "")
+        ddl = ddl.replace("'LOST', ", "")
+        ddl = ddl.replace(" AND lost_amount >= 0", "")
     # rebate_group_no 在 0022 才统一命名为 rebate_no；0009 必须保留旧列，
     # 避免当前 ORM 重命名后在历史重建阶段提前丢失数据。
     if tname == "rebate_records" and "rebate_group_no" in source_columns:

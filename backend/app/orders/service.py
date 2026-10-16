@@ -834,9 +834,12 @@ def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
 def _deposit_held(session: Session, pool_id: int) -> Decimal:
     from app.domain.trade import Deposit
 
-    stmt = select(func.coalesce(func.sum(Deposit.paid_amount - Deposit.returned_amount), 0)).where(
-        Deposit.pool_id == pool_id
-    )
+    stmt = select(
+        func.coalesce(
+            func.sum(Deposit.paid_amount - Deposit.returned_amount - Deposit.lost_amount),
+            0,
+        )
+    ).where(Deposit.pool_id == pool_id)
     return to_money(session.scalar(stmt) or 0)
 
 

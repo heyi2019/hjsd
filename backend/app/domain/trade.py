@@ -397,7 +397,7 @@ class Deposit(Base, AuditMixin):
             name="deposit_status_valid",
         ),
         CheckConstraint(
-            "paid_amount >= 0 AND returned_amount >= 0",
+            "paid_amount >= 0 AND returned_amount >= 0 AND lost_amount >= 0",
             name="amount_nonneg",
         ),
     )
@@ -414,12 +414,14 @@ class Deposit(Base, AuditMixin):
     )
     paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     returned_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    lost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     status: Mapped[str] = mapped_column(
         String(24), nullable=False, default=DepositStatus.PAID.value
     )
     paid_on: Mapped[date] = mapped_column(Date, nullable=False)
     expected_release_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     released_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    lost_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

@@ -22,6 +22,13 @@ class DepositReturn(BaseModel):
     released_on: date
 
 
+class DepositLoss(BaseModel):
+    amount: Decimal
+    lost_on: date
+    category: str
+    reason: str
+
+
 class DepositOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,9 +36,11 @@ class DepositOut(BaseModel):
     pool_id: int
     paid_amount: Decimal
     returned_amount: Decimal
+    lost_amount: Decimal
     status: str
     paid_on: date
     released_on: date | None = None
+    lost_on: date | None = None
 
 
 class CashflowOut(BaseModel):
@@ -177,6 +186,7 @@ __all__ = [
     "DepositCreate",
     "DepositOut",
     "DepositReturn",
+    "DepositLoss",
     "CashflowOut",
     "CashflowCreate",
     "CashflowReject",

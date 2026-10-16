@@ -306,6 +306,7 @@ def create_deposit(
         source_order_id=source_order_id,
         paid_amount=money,
         returned_amount=Decimal("0"),
+        lost_amount=Decimal("0"),
         status=DepositStatus.PAID.value,
         paid_on=paid_on,
         expected_release_on=expected_release_on,
@@ -358,7 +359,11 @@ def return_deposit(
     if user is not None and not user.can_see_pool(deposit.pool_id):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
     money = require_positive(amount, field="amount")
-    outstanding = to_money(deposit.paid_amount) - to_money(deposit.returned_amount)
+    outstanding = (
+        to_money(deposit.paid_amount)
+        - to_money(deposit.returned_amount)
+        - to_money(deposit.lost_amount)
+    )
     if money > outstanding:
         raise Validation(
             "退还金额超过未释放余额",
@@ -368,11 +373,16 @@ def return_deposit(
 
     deposit.returned_amount = to_money(deposit.returned_amount) + money
     deposit.released_on = released_on
-    deposit.status = (
-        DepositStatus.RETURNED.value
-        if deposit.returned_amount >= deposit.paid_amount
-        else DepositStatus.PARTIALLY_RETURNED.value
-    )
+    if to_money(deposit.returned_amount) + to_money(deposit.lost_amount) >= to_money(
+        deposit.paid_amount
+    ):
+        deposit.status = (
+            DepositStatus.LOST.value
+            if to_money(deposit.lost_amount) > 0
+            else DepositStatus.RETURNED.value
+        )
+    else:
+        deposit.status = DepositStatus.PARTIALLY_RETURNED.value
     deposit.updated_by = actor
     session.add(
         Cashflow(
@@ -403,6 +413,85 @@ def return_deposit(
         },
     )
     return deposit
+
+
+def lose_deposit(
+    session: Session,
+    deposit_id: int,
+    *,
+    amount: Any,
+    lost_on: date,
+    category: str,
+    reason: str,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    """把未释放押金转为受控运营费用，押金占用同步减少。"""
+    deposit = session.get(Deposit, deposit_id)
+    if deposit is None or (user is not None and not user.can_see_pool(deposit.pool_id)):
+        raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("押金损失必须填写原因", details={"field": "reason"})
+    label = (category or "").strip().upper()
+    if not label:
+        raise Validation("押金损失必须填写费用分类", details={"field": "category"})
+    if label in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE", "DEPOSIT_LOSS", "TRANSFER"}:
+        raise Validation("押金损失费用分类不能使用系统分类", details={"field": "category"})
+    money = require_positive(amount, field="amount")
+    outstanding = (
+        to_money(deposit.paid_amount)
+        - to_money(deposit.returned_amount)
+        - to_money(deposit.lost_amount)
+    )
+    if money > outstanding:
+        raise Validation(
+            "损失金额超过未释放余额",
+            code=ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE,
+            details={"deposit_id": deposit.id, "outstanding": str(outstanding)},
+        )
+    deposit.lost_amount = to_money(deposit.lost_amount) + money
+    deposit.lost_on = lost_on
+    if (
+        to_money(deposit.returned_amount) + to_money(deposit.lost_amount)
+        >= to_money(deposit.paid_amount)
+    ):
+        deposit.status = DepositStatus.LOST.value
+    deposit.updated_by = actor
+    flow = Cashflow(
+        flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+        pool_id=deposit.pool_id,
+        occurred_on=lost_on,
+        nature=Nature.BUSINESS_OUT.value,
+        category=label,
+        direction=Direction.OUT.value,
+        amount=money,
+        order_id=deposit.source_order_id,
+        deposit_id=deposit.id,
+        status=CashflowStatus.APPROVED.value,
+        reviewed_by=actor,
+        reviewed_at=datetime.now(),
+        note=text_reason,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(flow)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.DEPOSIT_LOSS,
+        entity_type="deposit",
+        entity_id=str(deposit.id),
+        actor=actor,
+        after={
+            "amount": str(money),
+            "category": label,
+            "lost_amount": str(deposit.lost_amount),
+            "status": deposit.status,
+        },
+        reason=text_reason,
+    )
+    return flow
 
 
 def list_deposits(
@@ -473,7 +562,11 @@ def list_cashflows(
             source = "ORDER_EVENT"
         elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
             source = "REBATE_SETTLEMENT"
-        elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
+        elif flow.deposit_id is not None or flow.category in {
+            "DEPOSIT_HOLD",
+            "DEPOSIT_RELEASE",
+            "DEPOSIT_LOSS",
+        }:
             source = "DEPOSIT"
         elif flow.category == "TRANSFER":
             source = "TRANSFER"
@@ -757,7 +850,12 @@ def create_transfer(
 
 
 def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
-    stmt = select(func.coalesce(func.sum(Deposit.paid_amount - Deposit.returned_amount), 0))
+    stmt = select(
+        func.coalesce(
+            func.sum(Deposit.paid_amount - Deposit.returned_amount - Deposit.lost_amount),
+            0,
+        )
+    )
     if pool_id:
         stmt = stmt.where(Deposit.pool_id == pool_id)
     return to_money(session.scalar(stmt) or 0)
@@ -1140,6 +1238,7 @@ __all__ = [
     "list_rebates",
     "create_transfer",
     "return_deposit",
+    "lose_deposit",
     "reject_cashflow",
     "reverse_cashflow",
     "settle_rebate",

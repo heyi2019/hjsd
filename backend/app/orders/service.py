@@ -105,14 +105,16 @@ def _validate_existing_account_context(order_type: str, account: Account) -> Non
         )
 
 
-def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+def _normalize_account_data(
+    value: dict[str, Any], *, field: str, message: str
+) -> dict[str, Any]:
     try:
-        return OrderAccountCreate.model_validate(snapshot).model_dump(exclude_none=True)
+        return OrderAccountCreate.model_validate(value).model_dump(exclude_none=True)
     except PydanticValidationError as exc:
         raise Validation(
-            "订单账号快照字段校验失败",
+            message,
             details={
-                "field": "account_snapshot",
+                "field": field,
                 "errors": [
                     {
                         "field": ".".join(str(part) for part in error["loc"]),
@@ -122,6 +124,22 @@ def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
                 ],
             },
         ) from exc
+
+
+def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    return _normalize_account_data(
+        snapshot,
+        field="account_snapshot",
+        message="订单账号快照字段校验失败",
+    )
+
+
+def _normalize_account_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    return _normalize_account_data(
+        profile,
+        field="account_profile",
+        message="订单账号资料字段校验失败",
+    )
 
 
 # --------------------------------------------------------------------- 订单
@@ -166,6 +184,8 @@ def create_order(
         raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
+    if account_profile is not None:
+        account_profile = _normalize_account_profile(account_profile)
     selected_capital_type = capital_type or definition.capital_type
     if selected_capital_type not in CapitalType.values():
         raise Validation(

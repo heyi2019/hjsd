@@ -177,6 +177,19 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="DG", account_id=account.id)
 
+    def test_order_account_profile_rejects_unknown_fields_in_service(self, seeded_db):
+        with pytest.raises(Validation, match="订单账号资料字段校验失败"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="pytest",
+                account_profile={
+                    "game_account": "profile-invalid",
+                    "unknown": "不应写入",
+                },
+            )
+
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(
             inventory_no="ACC-SCOPE-1",

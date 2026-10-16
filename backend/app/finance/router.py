@@ -21,6 +21,8 @@ from app.core.security import (
     require_permissions,
 )
 from app.finance import schemas, service
+from app.domain.trade import Deposit, RebateRecord
+from app.orders import service as orders_service
 
 router = APIRouter(tags=["FIN-04/REB-01 押金与返点"])
 
@@ -51,22 +53,17 @@ def list_cashflows(
     if pool_id is None and not (user.is_admin or user.owner_scope == "ALL"):
         if not user.pool_ids:
             return []
-        rows: list[dict] = []
-        for allowed_pool_id in sorted(user.pool_ids):
-            rows.extend(
-                service.list_cashflows(
-                    db,
-                    pool_id=allowed_pool_id,
-                    order_id=order_id,
-                    direction=direction,
-                    occurred_from=occurred_from,
-                    occurred_to=occurred_to,
-                    limit=limit,
-                    offset=offset,
-                )
-            )
-        rows.sort(key=lambda item: (item["occurred_on"], item["id"]), reverse=True)
-        return [schemas.CashflowOut.model_validate(item) for item in rows[offset : offset + limit]]
+        items = service.list_cashflows(
+            db,
+            pool_ids=sorted(user.pool_ids),
+            order_id=order_id,
+            direction=direction,
+            occurred_from=occurred_from,
+            occurred_to=occurred_to,
+            limit=limit,
+            offset=offset,
+        )
+        return [schemas.CashflowOut.model_validate(item) for item in items]
 
     items = service.list_cashflows(
         db,
@@ -136,7 +133,13 @@ def list_deposits(
 ) -> list[schemas.DepositOut]:
     if pool_id is not None and not user.can_see_pool(pool_id):
         return []
-    items = service.list_deposits(db, pool_id=pool_id)
+    items = service.list_deposits(
+        db,
+        pool_id=pool_id,
+        pool_ids=None
+        if pool_id is not None or user.is_admin or user.owner_scope == "ALL"
+        else sorted(user.pool_ids),
+    )
     return [schemas.DepositOut.model_validate(item) for item in items]
 
 
@@ -146,6 +149,8 @@ def create_deposit(
     db: Session = Depends(get_db),
     user: CurrentUser = post_deposit,
 ) -> schemas.DepositOut:
+    if not user.can_see_pool(payload.pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": payload.pool_id})
     item = service.create_deposit(
         db,
         pool_id=payload.pool_id,
@@ -167,6 +172,9 @@ def return_deposit(
     db: Session = Depends(get_db),
     user: CurrentUser = post_deposit,
 ) -> schemas.DepositOut:
+    deposit = db.get(Deposit, deposit_id)
+    if deposit is None or not user.can_see_pool(deposit.pool_id):
+        raise NotFound("押金不存在", details={"deposit_id": deposit_id})
     item = service.return_deposit(
         db,
         deposit_id,
@@ -184,7 +192,7 @@ def list_rebates(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.RebateOut]:
-    items = service.list_rebates(db, source_order_id=source_order_id)
+    items = service.list_rebates(db, source_order_id=source_order_id, user=_user)
     return [schemas.RebateOut.model_validate(item) for item in items]
 
 
@@ -194,6 +202,7 @@ def create_rebate(
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
 ) -> schemas.RebateOut:
+    orders_service.get_order(db, payload.source_order_id, user)
     item = service.create_rebate(
         db,
         source_order_id=payload.source_order_id,
@@ -216,6 +225,12 @@ def settle_rebate(
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
 ) -> schemas.SettlementOut:
+    rebate = db.get(RebateRecord, rebate_id)
+    if rebate is None:
+        raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
+    if rebate.source_order_id is None:
+        raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
+    orders_service.get_order(db, rebate.source_order_id, user)
     item = service.settle_rebate(
         db,
         rebate_id,

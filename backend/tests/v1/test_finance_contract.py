@@ -15,6 +15,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
+from app.domain.trade import Cashflow
 from app.finance import service
 from app.orders import service as orders_service
 
@@ -218,6 +219,116 @@ class TestFinanceApi:
         )
         assert deposits.status_code == 200
         assert deposits.json() == []
+
+    def test_scoped_finance_filters_unqualified_deposits_and_rebates(
+        self, seeded_client, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+
+        service.create_deposit(
+            seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
+        )
+        service.create_deposit(
+            seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
+        )
+        own_order = orders_service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="scoped-finance", owner_id=9
+        )
+        other_order = orders_service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
+        )
+        service.create_rebate(
+            seeded_db, source_order_id=own_order.id, base_amount=Decimal("10"),
+            collected_on=TODAY, actor="pytest"
+        )
+        service.create_rebate(
+            seeded_db, source_order_id=other_order.id, base_amount=Decimal("20"),
+            collected_on=TODAY, actor="pytest"
+        )
+
+        deposits = seeded_client.get("/api/v1/deposits", headers=scoped_headers)
+        assert deposits.status_code == 200, deposits.text
+        assert {row["pool_id"] for row in deposits.json()} == {1}
+
+        rebates = seeded_client.get("/api/v1/rebates", headers=scoped_headers)
+        assert rebates.status_code == 200, rebates.text
+        assert [row["source_order_id"] for row in rebates.json()] == [own_order.id]
+
+        create_other_pool = seeded_client.post(
+            "/api/v1/deposits",
+            json={"pool_id": 2, "amount": "5", "paid_on": TODAY.isoformat()},
+            headers=scoped_headers,
+        )
+        assert create_other_pool.status_code == 404
+
+    def test_scoped_cashflow_pagination_is_global_across_allowed_pools(
+        self, seeded_client, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1, 2}),
+        )
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        seeded_db.add_all(
+            [
+                Cashflow(
+                    flow_no="CF-PAGE-1", pool_id=1, occurred_on=date(2026, 10, 1),
+                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("1"),
+                    created_by="pytest", updated_by="pytest",
+                ),
+                Cashflow(
+                    flow_no="CF-PAGE-2", pool_id=2, occurred_on=date(2026, 10, 2),
+                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("2"),
+                    created_by="pytest", updated_by="pytest",
+                ),
+                Cashflow(
+                    flow_no="CF-PAGE-3", pool_id=1, occurred_on=date(2026, 10, 3),
+                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("3"),
+                    created_by="pytest", updated_by="pytest",
+                ),
+            ]
+        )
+        seeded_db.flush()
+
+        response = seeded_client.get(
+            "/api/v1/cashflows",
+            params={"limit": 2, "offset": 2},
+            headers=scoped_headers,
+        )
+        assert response.status_code == 200, response.text
+        assert [row["flow_no"] for row in response.json()] == ["CF-PAGE-1"]
+
+    def test_scoped_operator_cannot_write_rebate_for_other_order(
+        self, seeded_client, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        other_order = orders_service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
+        )
+
+        response = seeded_client.post(
+            "/api/v1/rebates",
+            json={
+                "source_order_id": other_order.id,
+                "base_amount": "10",
+                "collected_on": TODAY.isoformat(),
+            },
+            headers=headers,
+        )
+        assert response.status_code == 404
 
     def test_create_transfer_posts_symmetric_internal_cashflows(
         self, seeded_client, seeded_db, headers

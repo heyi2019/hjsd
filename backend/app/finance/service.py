@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from collections.abc import Iterable
 from typing import Any
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ from app.core.errors import NotFound, Validation
 from app.core.errors import ErrorCode
 from app.core.money import require_non_negative, require_positive, to_money
 from app.core.numbering import allocate_number
+from app.core.security import CurrentUser, owner_scope_filter
 from app.policy import service as policy_service
 from app.domain.enums import (
     AuditAction,
@@ -155,10 +157,17 @@ def return_deposit(
     return deposit
 
 
-def list_deposits(session: Session, *, pool_id: int | None = None) -> list[Deposit]:
+def list_deposits(
+    session: Session,
+    *,
+    pool_id: int | None = None,
+    pool_ids: Iterable[int] | None = None,
+) -> list[Deposit]:
     stmt = select(Deposit)
-    if pool_id:
+    if pool_id is not None:
         stmt = stmt.where(Deposit.pool_id == pool_id)
+    elif pool_ids is not None:
+        stmt = stmt.where(Deposit.pool_id.in_(list(pool_ids)))
     return list(session.scalars(stmt.order_by(Deposit.id)).all())
 
 
@@ -166,6 +175,7 @@ def list_cashflows(
     session: Session,
     *,
     pool_id: int | None = None,
+    pool_ids: Iterable[int] | None = None,
     order_id: int | None = None,
     direction: str | None = None,
     occurred_from: date | None = None,
@@ -183,6 +193,8 @@ def list_cashflows(
     )
     if pool_id is not None:
         stmt = stmt.where(Cashflow.pool_id == pool_id)
+    elif pool_ids is not None:
+        stmt = stmt.where(Cashflow.pool_id.in_(list(pool_ids)))
     if order_id is not None:
         stmt = stmt.where(Cashflow.order_id == order_id)
     if direction is not None:
@@ -471,10 +483,20 @@ def settle_rebate(
     return settlement
 
 
-def list_rebates(session: Session, *, source_order_id: int | None = None) -> list[RebateRecord]:
+def list_rebates(
+    session: Session,
+    *,
+    source_order_id: int | None = None,
+    user: CurrentUser | None = None,
+) -> list[RebateRecord]:
+    from app.domain.trade import Order
+
     stmt = select(RebateRecord)
-    if source_order_id:
+    if source_order_id is not None:
         stmt = stmt.where(RebateRecord.source_order_id == source_order_id)
+    scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
+    if scope is not None:
+        stmt = stmt.join(Order, Order.id == RebateRecord.source_order_id).where(scope)
     return list(session.scalars(stmt.order_by(RebateRecord.id)).all())
 
 

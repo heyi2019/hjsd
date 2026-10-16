@@ -46,6 +46,7 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
+from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
 from app.orders.schemas import OrderAccountCreate
@@ -240,6 +241,15 @@ def create_order(
 
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         owner_id = user.id
+    if owner_id is not None:
+        if isinstance(owner_id, bool) or not isinstance(owner_id, int) or owner_id <= 0:
+            raise Validation(
+                "订单负责人 ID 必须为正整数", details={"field": "owner_id", "value": owner_id}
+            )
+        if session.get(User, owner_id) is None:
+            raise Validation(
+                "订单负责人不存在", details={"field": "owner_id", "owner_id": owner_id}
+            )
 
     if account_profile is not None:
         inventory_context = {

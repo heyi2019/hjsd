@@ -261,6 +261,10 @@ class TestCreateOrderValidation:
         )
         assert order.owner_id == 9
 
+    def test_order_owner_must_exist_in_service(self, seeded_db):
+        with pytest.raises(Validation, match="订单负责人不存在"):
+            _order(seeded_db, owner_id=999999)
+
     def test_dg_commission_terms_are_persisted(self, seeded_db):
         order = order_service.create_order(
             seeded_db,

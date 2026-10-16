@@ -304,6 +304,11 @@ def set_customer_status(
     user: CurrentUser | None = None,
 ) -> Customer:
     customer = get_customer(session, customer_id, user)
+    if status not in CustomerStatus.values():
+        raise Validation(
+            f"客户状态无效，必须为 {CustomerStatus.values()}",
+            details={"field": "status", "value": status},
+        )
     if status == CustomerStatus.MERGED.value:
         raise Validation(
             "MERGED 只能由合并动作产生", details={"field": "status", "value": status}

@@ -213,6 +213,14 @@ class TestUpdateCustomer:
             )
         assert "MERGED 只能由合并动作产生" in str(exc.value)
 
+    def test_status_rejects_unknown_value_in_service(self, seeded_db):
+        customer = _customer(seeded_db, "阿甲")
+        with pytest.raises(Validation) as exc:
+            service.set_customer_status(
+                seeded_db, customer.id, "PENDING", actor="pytest"
+            )
+        assert "客户状态无效" in str(exc.value)
+
 
 # ------------------------------------------------------------------ 合并守卫
 class TestMergeGuards:

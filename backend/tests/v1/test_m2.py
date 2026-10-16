@@ -385,25 +385,17 @@ class TestA06Rebate:
 
 class TestM2Api:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):
-        account = seeded_client.post(
-            "/api/v1/accounts",
-            json={
-                "game_account": "api-acc",
-                "platform": "王者",
-                "business_mode": "SELF",
-                "inventory_type": "RECOVERY",
-            },
-            headers=headers,
-        ).json()
-        order = seeded_client.post(
+        order_response = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
-                "account_id": account["id"],
+                "account": {"game_account": "api-acc", "platform": "王者"},
             },
             headers=headers,
-        ).json()
+        )
+        assert order_response.status_code == 201, order_response.text
+        order = order_response.json()
         seeded_client.post(
             f"/api/v1/orders/{order['id']}/events",
             json={"event_type": "BUY", "amount": "800.00", "occurred_on": TODAY.isoformat()},
@@ -456,15 +448,15 @@ class TestM2Api:
         assert returned.json()["status"] == "PARTIALLY_RETURNED"
 
     def test_inventory_endpoint(self, seeded_client, headers):
-        seeded_client.post(
-            "/api/v1/accounts",
+        created = seeded_client.post(
+            "/api/v1/orders",
             json={
-                "game_account": "inv-acc",
-                "platform": "王者",
-                "business_mode": "SELF",
-                "inventory_type": "RECOVERY",
+                "order_type": "HS",
+                "trade_date": TODAY.isoformat(),
+                "account": {"game_account": "inv-acc", "platform": "王者"},
             },
             headers=headers,
         )
+        assert created.status_code == 201, created.text
         inventory = seeded_client.get("/api/v1/accounts/inventory", headers=headers).json()
-        assert inventory["count"] == 1  # 新建账号即在库，代挂等零本金业务也不例外
+        assert inventory["count"] == 1  # 库存账号随订单建档，直接进入在库

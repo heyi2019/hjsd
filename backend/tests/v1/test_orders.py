@@ -311,29 +311,22 @@ class TestEventRules:
 
 class TestOrdersApi:
     def test_create_order_and_post_event(self, seeded_client, headers):
-        account = seeded_client.post(
-            "/api/v1/accounts",
-            json={
-                "game_account": "api-sale-account",
-                "business_mode": "SELF",
-                "inventory_type": "RECOVERY",
-            },
-            headers=headers,
-        )
-        assert account.status_code == 201
         created = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
-                "account_id": account.json()["id"],
+                "account": {
+                    "game_account": "api-sale-account",
+                    "platform": "王者",
+                },
             },
             headers=headers,
         )
         assert created.status_code == 201
         order = created.json()
         assert order["order_no"] == "HS0001"
-        assert order["account_id"] == account.json()["id"]
+        assert order["account_id"]
 
         buy = seeded_client.post(
             f"/api/v1/orders/{order['id']}/events",

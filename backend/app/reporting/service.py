@@ -410,7 +410,8 @@ def r5_business_pnl(
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:
             rebate_stmt = rebate_stmt.where(
-                (RebateRecord.source_order_id.is_(None)) | scope
+                RebateRecord.source_order_id.is_not(None),
+                scope,
             )
     rebates = session.execute(rebate_stmt).all()
     rebate_totals: dict[int, tuple[RebateRecord, str | None, Decimal, Decimal]] = {}

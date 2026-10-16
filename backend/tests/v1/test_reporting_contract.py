@@ -532,3 +532,27 @@ class TestReportsApiDateParams:
         funds = seeded_client.get("/api/v1/reports/daily-funds", headers=finance_headers)
         assert funds.status_code == 200, funds.text
         assert {row["pool_code"] for row in funds.json()["items"]} == {"HJ_INVEST"}
+
+    def test_scoped_business_pnl_hides_unlinked_rebates(
+        self, seeded_db
+    ):
+        seeded_db.add(
+            RebateRecord(
+                rebate_no="RB-R5-SCOPE",
+                source_order_id=None,
+                rate=to_money("10"),
+                base_amount=to_money("500"),
+                status=RebateStatus.OPEN.value,
+                link_status="UNLINKED",
+                collected_on=D,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+        scoped = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+
+        data = reporting_service.r5_business_pnl(seeded_db, user=scoped)
+        assert all(row["order_type"] != "UNCOLLECTED" for row in data["items"])

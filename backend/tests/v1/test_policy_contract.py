@@ -9,10 +9,12 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
-from app.domain.enums import PolicyStatus
+from app.domain.enums import PolicyScopeType, PolicyStatus
+from app.domain.parties import PolicyDefinition
 from app.orders import service as order_service
 from app.policy import service as policy_service
 
@@ -46,6 +48,49 @@ def _publish(seeded_db, definition, *, frm, to=None, config=None, approve=True):
 
 # ------------------------------------------------------------------ 规则定义
 class TestPolicyDefinitions:
+    @pytest.mark.parametrize("scope_type", ["UNKNOWN", "ORDER", "global"])
+    def test_database_rejects_invalid_scope_type(self, seeded_db, scope_type):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                PolicyDefinition.__table__.insert().values(
+                    policy_code=f"BAD_{scope_type.upper()}",
+                    name="非法规则",
+                    scope_type=scope_type,
+                    scope_id=None,
+                    status=PolicyStatus.DRAFT.value,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
+    def test_database_rejects_invalid_global_scope_link(self, seeded_db):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                PolicyDefinition.__table__.insert().values(
+                    policy_code="BAD_GLOBAL",
+                    name="非法全局规则",
+                    scope_type=PolicyScopeType.GLOBAL.value,
+                    scope_id=1,
+                    status=PolicyStatus.DRAFT.value,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
+    def test_database_rejects_unbound_scoped_policy(self, seeded_db):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                PolicyDefinition.__table__.insert().values(
+                    policy_code="BAD_ORDER_TYPE",
+                    name="未绑定业务规则",
+                    scope_type=PolicyScopeType.ORDER_TYPE.value,
+                    scope_id=None,
+                    status=PolicyStatus.DRAFT.value,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
     def test_list_definitions_filters(self, seeded_db):
         rebate = _make_policy(seeded_db, code="REBATE")
         _make_policy(seeded_db, code="COMMISSION", name="提成规则")

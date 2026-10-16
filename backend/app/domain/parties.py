@@ -36,6 +36,7 @@ from app.domain.enums import (
     CustomerStatus,
     EntityType,
     PolicyStatus,
+    PolicyScopeType,
     CounterpartyRole,
     FieldType,
 )
@@ -50,6 +51,15 @@ class PolicyDefinition(Base, AuditMixin):
         CheckConstraint(
             f"status IN {PolicyStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="policy_status_valid",
+        ),
+        CheckConstraint(
+            f"scope_type IN {PolicyScopeType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="policy_scope_type_valid",
+        ),
+        CheckConstraint(
+            "(scope_type = 'GLOBAL' AND scope_id IS NULL) OR "
+            "(scope_type <> 'GLOBAL' AND scope_id IS NOT NULL)",
+            name="policy_scope_link_valid",
         ),
         UniqueConstraint(
             "policy_code", "scope_type", "scope_id",

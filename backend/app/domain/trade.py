@@ -277,6 +277,10 @@ class Reconciliation(Base, AuditMixin):
             name="reconciliation_status_valid",
         ),
         CheckConstraint("statement_balance >= 0", name="reconciliation_statement_nonneg"),
+        CheckConstraint(
+            "difference = statement_balance - system_balance",
+            name="difference_matches_balances",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -388,6 +392,10 @@ class InstallmentSchedule(Base, TimestampMixin):
         CheckConstraint(
             "due_amount >= 0 AND received_amount >= 0 AND waived_amount >= 0",
             name="amount_nonneg",
+        ),
+        CheckConstraint(
+            "received_amount + waived_amount <= due_amount",
+            name="settled_amount_within_due",
         ),
     )
 

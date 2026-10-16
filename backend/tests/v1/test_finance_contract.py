@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow, RebateSettlement
+from app.domain.trade import Cashflow, RebateSettlement, Reconciliation
 from app.finance import service
 from app.orders import service as orders_service
 from app.reporting import service as reporting_service
@@ -65,6 +65,26 @@ class TestDepositQueries:
                 direction="IN",
                 amount=Decimal("1.00"),
                 status="APPROVED",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
+    def test_reconciliation_difference_matches_two_balances_in_database(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        seeded_db.add(
+            Reconciliation(
+                pool_id=invest.id,
+                reconciled_on=TODAY,
+                account_label="invalid-difference",
+                system_balance=Decimal("100"),
+                statement_balance=Decimal("90"),
+                difference=Decimal("0"),
+                status="OPEN",
+                unmatched_flow_ids=[],
                 created_by="pytest",
                 updated_by="pytest",
             )

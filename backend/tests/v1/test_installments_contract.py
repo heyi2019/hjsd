@@ -106,6 +106,26 @@ class TestCreateInstallmentValidation:
             seeded_db.flush()
         seeded_db.rollback()
 
+    def test_schedule_received_and_waived_cannot_exceed_due_amount_in_database(
+        self, seeded_db
+    ):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, periods=1, per_period="100")
+        seeded_db.add(
+            InstallmentSchedule(
+                installment_id=contract.id,
+                period_no=99,
+                due_on=TODAY,
+                due_amount=Decimal("100"),
+                received_amount=Decimal("60"),
+                waived_amount=Decimal("50"),
+                status=ScheduleStatus.PENDING.value,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_negative_amount_is_rejected_before_flush(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="不能为负数"):

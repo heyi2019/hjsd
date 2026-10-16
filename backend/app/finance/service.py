@@ -74,6 +74,7 @@ def create_deposit(
             category="DEPOSIT_HOLD",
             direction=Direction.OUT.value,
             amount=money,
+            order_id=source_order_id,
             note="押金占用",
             created_by=actor,
             updated_by=actor,
@@ -123,6 +124,7 @@ def return_deposit(
             category="DEPOSIT_RELEASE",
             direction=Direction.IN.value,
             amount=money,
+            order_id=deposit.source_order_id,
             note="押金释放",
             created_by=actor,
             updated_by=actor,
@@ -148,6 +150,66 @@ def list_deposits(session: Session, *, pool_id: int | None = None) -> list[Depos
     if pool_id:
         stmt = stmt.where(Deposit.pool_id == pool_id)
     return list(session.scalars(stmt.order_by(Deposit.id)).all())
+
+
+def list_cashflows(
+    session: Session,
+    *,
+    pool_id: int | None = None,
+    order_id: int | None = None,
+    direction: str | None = None,
+    occurred_from: date | None = None,
+    occurred_to: date | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """统一查询资金明细，直接返回订单号，避免前端按日期和金额猜来源。"""
+    stmt = (
+        select(Cashflow, Order.order_no)
+        .outerjoin(Order, Order.id == Cashflow.order_id)
+        .order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    if pool_id is not None:
+        stmt = stmt.where(Cashflow.pool_id == pool_id)
+    if order_id is not None:
+        stmt = stmt.where(Cashflow.order_id == order_id)
+    if direction is not None:
+        stmt = stmt.where(Cashflow.direction == direction)
+    if occurred_from is not None:
+        stmt = stmt.where(Cashflow.occurred_on >= occurred_from)
+    if occurred_to is not None:
+        stmt = stmt.where(Cashflow.occurred_on <= occurred_to)
+
+    rows: list[dict[str, Any]] = []
+    for flow, order_no in session.execute(stmt).all():
+        if flow.order_event_id is not None:
+            source = "ORDER_EVENT"
+        elif flow.category == "REBATE":
+            source = "REBATE_SETTLEMENT"
+        elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
+            source = "DEPOSIT"
+        else:
+            source = "OTHER"
+        rows.append(
+            {
+                "id": flow.id,
+                "flow_no": flow.flow_no,
+                "pool_id": flow.pool_id,
+                "occurred_on": flow.occurred_on,
+                "nature": flow.nature,
+                "category": flow.category,
+                "direction": flow.direction,
+                "amount": flow.amount,
+                "order_id": flow.order_id,
+                "order_no": order_no,
+                "order_event_id": flow.order_event_id,
+                "source": source,
+                "note": flow.note,
+            }
+        )
+    return rows
 
 
 def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
@@ -275,6 +337,7 @@ def settle_rebate(
         category="REBATE",
         direction=Direction.IN.value,
         amount=net,
+        order_id=record.source_order_id,
         note=f"返点结算 {settlement_no}",
         created_by=actor,
         updated_by=actor,
@@ -343,6 +406,7 @@ __all__ = [
     "create_deposit",
     "create_rebate",
     "deposit_held_total",
+    "list_cashflows",
     "list_deposits",
     "list_rebates",
     "return_deposit",

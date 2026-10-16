@@ -307,6 +307,7 @@ def post_event(
         category=category,
         direction=direction,
         amount=money,
+        order_id=order.id,
         order_event_id=event.id,
         note=note,
         created_by=actor,

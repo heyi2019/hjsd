@@ -172,7 +172,7 @@ class OrderEvent(Base, AuditMixin):
 
 
 class Cashflow(Base, AuditMixin):
-    """现金流：必属池；订单事件来源流水一对一。"""
+    """现金流：必属池；每笔流水可追溯到来源订单或订单事件。"""
 
     __tablename__ = "cashflow"
     __table_args__ = (
@@ -187,6 +187,7 @@ class Cashflow(Base, AuditMixin):
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
+        Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_nature", "nature"),
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
@@ -203,6 +204,9 @@ class Cashflow(Base, AuditMixin):
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
     order_event_id: Mapped[int | None] = mapped_column(
         ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True
     )

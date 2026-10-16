@@ -31,7 +31,7 @@
 | order_customer_roles | order_id, customer_id, role | `UNIQUE(order_id, customer_id, role)`；role=SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER；客户可跨订单多角色 |
 | counterparties | counterparty_no, display_name, type, contact_name, phone, wechat, qq, status, note | 合作方主数据；type=PEER/SUPPLIER/PLATFORM；不与客户混用；停用后不可用于新订单 |
 | order_counterparty_roles | order_id, counterparty_id, role | `UNIQUE(order_id, counterparty_id, role)`；role=PEER/SUPPLIER/PLATFORM；TH 同行、DFQ 供货方等从此关联 |
-| cashflow | flow_no, pool_id, occurred_on, nature, category, direction, amount, order_event_id, transfer_id | 必属池；事件派生流水一对一；新 INTERNAL 成对 |
+| cashflow | flow_no, pool_id, occurred_on, nature, category, direction, amount, order_id, order_event_id, transfer_id | 必属池；直接关联来源订单；事件派生流水一对一；新 INTERNAL 成对 |
 | accounts | account_no, game_account, buy_date, cost_amount, status, channels, risk_level | HS/DFQ 必联；账号号可空唯一；手机号不可作键 |
 | installments | inst_no, order_id, contract_type, account_id, principal, down_payment, periods, per_period, paid, status | 分期合约主表；`ADVANCE_PURCHASE` 仅 DFQ，`STOCK_SALE` 仅已买入 HS；一单一合约；总应收=首付+期数×每期 |
 | installment_schedules | installment_id, period_no, due_on, due_amount, received_amount, received_on, status | 分期计划明细；`UNIQUE(installment_id, period_no)`；支持部分收款、逾期、减免与展期留痕 |

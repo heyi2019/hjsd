@@ -20,7 +20,7 @@
 | order_counterparty_roles | `id`, `UNIQUE(order_id, counterparty_id, role)` | FK order/counterparty；角色为 PEER/SUPPLIER/PLATFORM |
 | orders | `id`, `order_no UNIQUE` | FK account nullable；order_type 必须存在主数据 |
 | order_events | `id`, `event_no UNIQUE` | FK order/pool/offset_event；金额>0 |
-| cashflow | `id`, `flow_no UNIQUE`, `order_event_id UNIQUE NULL` | pool 必填；新 INTERNAL 需 transfer_id |
+| cashflow | `id`, `flow_no UNIQUE`, `order_id NULL`, `order_event_id UNIQUE NULL` | pool 必填；来源订单可直接追溯；新 INTERNAL 需 transfer_id |
 | installments | `id`, `inst_no UNIQUE`, `order_id UNIQUE` | `contract_type` 为 STOCK_SALE/ADVANCE_PURCHASE；`delivery_mode` 为 PLATFORM_OPERATOR/CUSTOMER_SELF；前者仅已买入 HS，后者仅 DFQ；总应收勾稽 |
 | installment_schedules | `id`, `UNIQUE(installment_id, period_no)` | FK installments；期次应收/实收/到期日/状态；支持部分收款与逾期 |
 | rebate_records | `id`, `rebate_no UNIQUE` | 新数据 source_order 必填 |

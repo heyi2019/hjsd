@@ -132,6 +132,31 @@ class TestRebateGuards:
 
 
 class TestFinanceApi:
+    def test_list_cashflows_exposes_order_traceability(self, seeded_client, seeded_db, headers):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db, source_order_id=order_id, base_amount=Decimal("200"),
+            collected_on=TODAY, actor="pytest",
+        )
+        service.settle_rebate(
+            seeded_db, record.id, gross_amount=Decimal("120"), settled_on=TODAY,
+            pool_id=invest.id, actor="pytest", platform_fee=Decimal("20"),
+        )
+        service.create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("80"), paid_on=TODAY,
+            actor="pytest", source_order_id=order_id,
+        )
+
+        response = seeded_client.get("/api/v1/cashflows", headers=headers)
+
+        assert response.status_code == 200, response.text
+        rows = response.json()
+        assert {row["category"] for row in rows} >= {"BUY", "REBATE", "DEPOSIT_HOLD"}
+        assert all("order_no" in row for row in rows)
+        assert all(row["order_no"] is not None for row in rows)
+        assert {row["source"] for row in rows} >= {"ORDER_EVENT", "REBATE_SETTLEMENT", "DEPOSIT"}
+
     def test_list_deposits_endpoint(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
         service.create_deposit(

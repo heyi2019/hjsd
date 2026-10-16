@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -27,6 +29,53 @@ post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 
 def _actor(user: CurrentUser) -> str:
     return user.username
+
+
+@router.get("/cashflows", response_model=list[schemas.CashflowOut])
+def list_cashflows(
+    pool_id: int | None = Query(default=None),
+    order_id: int | None = Query(default=None),
+    direction: str | None = Query(default=None),
+    occurred_from: date | None = Query(default=None),
+    occurred_to: date | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.CashflowOut]:
+    if pool_id is not None and not user.can_see_pool(pool_id):
+        return []
+    if pool_id is None and not (user.is_admin or user.owner_scope == "ALL"):
+        if not user.pool_ids:
+            return []
+        rows: list[dict] = []
+        for allowed_pool_id in sorted(user.pool_ids):
+            rows.extend(
+                service.list_cashflows(
+                    db,
+                    pool_id=allowed_pool_id,
+                    order_id=order_id,
+                    direction=direction,
+                    occurred_from=occurred_from,
+                    occurred_to=occurred_to,
+                    limit=limit,
+                    offset=offset,
+                )
+            )
+        rows.sort(key=lambda item: (item["occurred_on"], item["id"]), reverse=True)
+        return [schemas.CashflowOut.model_validate(item) for item in rows[offset : offset + limit]]
+
+    items = service.list_cashflows(
+        db,
+        pool_id=pool_id,
+        order_id=order_id,
+        direction=direction,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+        limit=limit,
+        offset=offset,
+    )
+    return [schemas.CashflowOut.model_validate(item) for item in items]
 
 
 # --------------------------------------------------------------------- 押金

@@ -34,6 +34,22 @@ class DepositOut(BaseModel):
     released_on: date | None = None
 
 
+class CashflowOut(BaseModel):
+    id: int
+    flow_no: str
+    pool_id: int
+    occurred_on: date
+    nature: str
+    category: str
+    direction: str
+    amount: Decimal
+    order_id: int | None = None
+    order_no: str | None = None
+    order_event_id: int | None = None
+    source: str
+    note: str | None = None
+
+
 class RebateCreate(BaseModel):
     source_order_id: int
     base_amount: Decimal
@@ -79,6 +95,7 @@ __all__ = [
     "DepositCreate",
     "DepositOut",
     "DepositReturn",
+    "CashflowOut",
     "RebateCreate",
     "RebateOut",
     "SettlementCreate",

@@ -28,9 +28,49 @@ describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
     renderApp(<DashboardPage />, { user: "admin" });
     expect(await screen.findByRole("button", { name: /自营·回收/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /售出库存账号/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /分销·提号/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /分销·代挂/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "提号" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "代挂" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /代分期/ })).toBeInTheDocument();
+  });
+
+  it("工作台只保留标题和入口，不显示辅助描述文字", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: /自营·回收/ });
+    expect(screen.queryByText("先处理最重要的动作；业务数据与经营指标分别在对应中心查看。")).toBeNull();
+    expect(screen.queryByText("回收 / 提号 / 代挂 库存账号的统一出售入口")).toBeNull();
+    expect(screen.queryByText("从库存中心选择任意渠道（回收 / 提号 / 代挂）的账号售出")).toBeNull();
+    expect(screen.queryByText("录入游戏账号、来源与回收费用，创建回收单")).toBeNull();
+    expect(screen.queryByText("需要快速开始时，从一个明确动作开始。")).toBeNull();
+  });
+
+  it("业务入口按场景使用独立的卡片视觉层级", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: /自营·回收/ });
+    expect(document.querySelector(".dashboard-card-group--sell")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-card-group--self-owned")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-card-group--distribution")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-card-group--service")).toBeInTheDocument();
+  });
+
+  it("主入口展示短标签，强化业务转化层级", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: /售出库存账号/ });
+    expect(screen.getByText("主推入口")).toBeInTheDocument();
+    expect(screen.getByText("高频业务")).toBeInTheDocument();
+  });
+
+  it("分销入口只显示业务名称，不重复显示分销前缀", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    expect(await screen.findByRole("button", { name: "提号" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "代挂" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "分销·提号" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "分销·代挂" })).toBeNull();
+  });
+
+  it("所有业务分组使用统一的等高卡片布局", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: "提号" });
+    expect(document.querySelectorAll(".dashboard-card-group--equal-height")).toHaveLength(4);
   });
 
   it("viewer 无 order.create → 看不到新建业务卡", async () => {
@@ -55,7 +95,7 @@ describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
 
   it("点击提号卡直接打开提号登记弹窗（不跳转页面）", async () => {
     renderApp(<DashboardPage />, { user: "admin" });
-    await userEvent.click(await screen.findByRole("button", { name: /分销·提号/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "提号" }));
     const modal = await screen.findByText("新建提号订单");
     expect(modal.closest(".ant-modal-content")).toBeTruthy();
   });

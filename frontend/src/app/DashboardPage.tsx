@@ -28,63 +28,55 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
     <section className="ui-stack dashboard-page">
       <PageHeader
         title="今天从这里开始"
-        description="先处理最重要的动作；业务数据与经营指标分别在对应中心查看。"
       />
       <EntryRow>
       <PermissionGate permission="order.create">
-        <section className="dashboard-sell-group" aria-labelledby="dashboard-sell-title">
+        <section className="dashboard-sell-group dashboard-card-group--sell dashboard-card-group--equal-height" aria-labelledby="dashboard-sell-title">
           <div className="dashboard-business-group__heading">
             <h2 id="dashboard-sell-title">售出</h2>
-            <span>回收 / 提号 / 代挂 库存账号的统一出售入口</span>
           </div>
           <div className="dashboard-sell-group__items">
             <EntryCard
               tone="primary"
+              eyebrow="主推入口"
               title="售出库存账号"
-              description="从库存中心选择任意渠道（回收 / 提号 / 代挂）的账号售出"
               onClick={() => onNavigate?.("business", "inventory")}
             />
           </div>
         </section>
-        <section className="dashboard-business-group dashboard-self-owned-group" aria-labelledby="dashboard-self-owned-title">
+        <section className="dashboard-business-group dashboard-self-owned-group dashboard-card-group--self-owned dashboard-card-group--equal-height" aria-labelledby="dashboard-self-owned-title">
           <div className="dashboard-business-group__heading">
             <h2 id="dashboard-self-owned-title">自营</h2>
-            <span>内部货源：回收后进入库存，再售出</span>
           </div>
           <div className="dashboard-business-group__items">
             <EntryCard
+              eyebrow="高频业务"
               title="自营·回收"
-              description="录入游戏账号、来源与回收费用，创建回收单"
               onClick={() => openCreate("HS")}
             />
           </div>
         </section>
-          <section className="dashboard-distribution-group" aria-labelledby="dashboard-distribution-title">
+          <section className="dashboard-distribution-group dashboard-card-group--distribution dashboard-card-group--equal-height" aria-labelledby="dashboard-distribution-title">
             <div className="dashboard-distribution-group__heading">
               <h2 id="dashboard-distribution-title">分销</h2>
-              <span>提号、代挂两个订单类型</span>
             </div>
             <div className="dashboard-distribution-group__items">
               <EntryCard
-                title="分销·提号"
-                description="登记提号业务与同行交付信息"
+                title="提号"
                 onClick={() => openCreate("TH")}
               />
               <EntryCard
-                title="分销·代挂"
-                description="登记委托账号与代挂服务信息"
+                title="代挂"
                 onClick={() => openCreate("DG")}
               />
             </div>
           </section>
-          <section className="dashboard-value-service-group" aria-labelledby="dashboard-value-service-title">
+          <section className="dashboard-value-service-group dashboard-card-group--service dashboard-card-group--equal-height" aria-labelledby="dashboard-value-service-title">
             <div className="dashboard-business-group__heading">
               <h2 id="dashboard-value-service-title">增值服务</h2>
-              <span>可附着在自营或分销业务上</span>
             </div>
             <EntryCard
               title="代分期服务"
-              description="为客户代付剩余号款，再按期收回"
               onClick={() => openCreate("DFQ")}
             />
           </section>
@@ -99,12 +91,6 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
           { label: "已完成业务", kind: "count", amount: String(orders.filter((order) => order.status !== "ACTIVE").length) },
         ]} />
       </section>
-
-      <div className="dashboard-note" role="note">
-        <span className="dashboard-note__eyebrow">工作提示</span>
-        <strong>需要快速开始时，从一个明确动作开始。</strong>
-        <span className="muted">待处理事项会在对应业务中心内按状态显示，不在工作台重复堆叠。</span>
-      </div>
 
       <CreateBusinessModal
         open={createOpen}

@@ -271,6 +271,165 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
 }
+
+/* 工作台入口卡：用场景色和统一的操作提示替代大段说明文字。 */
+.dashboard-card-group--sell,
+.dashboard-card-group--self-owned,
+.dashboard-card-group--distribution,
+.dashboard-card-group--service {
+  --dashboard-accent: var(--color-primary);
+  position: relative;
+  align-content: start;
+  min-height: 154px;
+  padding: var(--space-3);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--glass) 92%, transparent);
+  box-shadow: var(--card-top-hi), var(--card-elevation);
+}
+
+.dashboard-card-group--sell { --dashboard-accent: var(--color-primary); }
+.dashboard-card-group--self-owned { --dashboard-accent: var(--color-success); }
+.dashboard-card-group--distribution { --dashboard-accent: var(--color-warning); }
+.dashboard-card-group--service { --dashboard-accent: var(--color-info); }
+
+.dashboard-card-group--sell::before,
+.dashboard-card-group--self-owned::before,
+.dashboard-card-group--distribution::before,
+.dashboard-card-group--service::before {
+  content: "";
+  position: absolute;
+  inset-block-start: var(--space-4);
+  inset-inline-start: var(--space-3);
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--dashboard-accent);
+  opacity: 0.82;
+}
+
+.dashboard-card-group--sell .dashboard-business-group__heading,
+.dashboard-card-group--self-owned .dashboard-business-group__heading,
+.dashboard-card-group--distribution .dashboard-distribution-group__heading,
+.dashboard-card-group--service .dashboard-business-group__heading {
+  padding-inline: var(--space-1);
+}
+
+.dashboard-card-group--sell .dashboard-business-group__heading h2,
+.dashboard-card-group--self-owned .dashboard-business-group__heading h2,
+.dashboard-card-group--distribution .dashboard-distribution-group__heading h2,
+.dashboard-card-group--service .dashboard-business-group__heading h2 {
+  color: var(--color-text-primary);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-page .ui-entry-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  justify-content: flex-end;
+  padding: var(--space-4);
+  border-color: color-mix(in srgb, var(--color-text-primary) 8%, var(--glass-border));
+  background: var(--glass);
+  box-shadow: var(--card-top-hi), var(--shadow-soft);
+}
+
+.dashboard-page .ui-entry-card::before {
+  content: "";
+  position: absolute;
+  inset-block-start: calc(var(--space-1) * -1);
+  inset-inline-end: calc(var(--space-1) * -1);
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 22%, transparent);
+  filter: blur(var(--space-3));
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.dashboard-page .ui-entry-card::after {
+  content: "›";
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  color: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 76%, var(--color-text-secondary));
+  font-size: var(--fs-title-3);
+  font-weight: 500;
+  opacity: 0.78;
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.dashboard-page .ui-entry-card:hover::after,
+.dashboard-page .ui-entry-card:focus-visible::after {
+  transform: translate(var(--space-1), 0);
+}
+
+.dashboard-page .ui-entry-card__title {
+  position: relative;
+  z-index: 1;
+  color: var(--color-text-primary);
+  font: var(--font-body-m);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  transform: translateY(calc(var(--space-2) * -1));
+}
+
+.dashboard-page .ui-entry-card__eyebrow {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  margin-block-end: var(--space-half);
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 86%, var(--color-text-primary));
+  background: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 12%, transparent);
+  font: var(--font-caption-2);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-card-group--sell .ui-entry-card--primary {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary) 19%, var(--glass)),
+    color-mix(in srgb, var(--color-primary) 6%, var(--glass))
+  );
+  box-shadow: var(--card-top-hi), var(--shadow-raised);
+}
+
+.dashboard-card-group--sell .ui-entry-card--primary {
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--glass-border));
+}
+
+.dashboard-card-group--distribution .ui-entry-card {
+  min-height: 104px;
+  padding: var(--space-3);
+}
+
+.dashboard-card-group--distribution .ui-entry-card__title {
+  font-size: var(--fs-subheadline);
+}
+
+/* 所有业务分组的入口卡以同一高度对齐，避免分销双卡显得塌陷。 */
+.dashboard-card-group--equal-height {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.dashboard-card-group--equal-height > .dashboard-business-group__items,
+.dashboard-card-group--equal-height > .dashboard-sell-group__items,
+.dashboard-card-group--equal-height > .dashboard-distribution-group__items {
+  min-height: 0;
+  height: 100%;
+}
+
+.dashboard-card-group--equal-height .ui-entry-card {
+  min-height: var(--sz-106);
+  height: 100%;
+  box-sizing: border-box;
+}
 .th-business-page .ui-page-header__desc { max-width: 42rem; }
 @media (max-width: 640px) {
   .dashboard-distribution-group__items { grid-template-columns: 1fr; }

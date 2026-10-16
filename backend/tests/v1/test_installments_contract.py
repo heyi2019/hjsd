@@ -82,6 +82,24 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    def test_schedule_period_no_cannot_be_negative_in_database(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, periods=1, per_period="100")
+        seeded_db.add(
+            InstallmentSchedule(
+                installment_id=contract.id,
+                period_no=-1,
+                due_on=TODAY,
+                due_amount=Decimal("100"),
+                received_amount=Decimal("0"),
+                waived_amount=Decimal("0"),
+                status=ScheduleStatus.PENDING.value,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_installment_periods_cannot_be_zero_in_database(self, seeded_db):
         order = _order(seeded_db)
         seeded_db.add(

@@ -62,6 +62,11 @@ def _rebuild(bind, tname: str) -> None:
             "\tCONSTRAINT ck_installment_schedules_settled_amount_within_due CHECK (received_amount + waived_amount <= due_amount), \n",
             "",
         )
+    if tname == "installment_schedules":
+        ddl = ddl.replace(
+            "\tCONSTRAINT ck_installment_schedules_period_no_nonnegative CHECK (period_no >= 0), \n",
+            "",
+        )
     # deposit_no 在 0021 才正式移除；即使当前 ORM 已经去掉它，
     # 0009 仍必须把历史字段带过重建，否则 0021 无法完成正式删除。
     if tname == "deposits" and "deposit_no" in source_columns:

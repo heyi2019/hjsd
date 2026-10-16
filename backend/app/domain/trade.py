@@ -406,6 +406,7 @@ class InstallmentSchedule(Base, TimestampMixin):
             "received_amount + waived_amount <= due_amount",
             name="settled_amount_within_due",
         ),
+        CheckConstraint("period_no >= 0", name="period_no_nonnegative"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

@@ -135,6 +135,699 @@
 }
 .ui-entry-card--warn .ui-entry-card__value { color: var(--color-warning); }
 
+/* 工作台：一个明确的主动作，两个低权重导航入口；不虚构尚未加载的数据。 */
+.dashboard-page .ui-page-header { padding-block: var(--space-3) var(--space-2); }
+.dashboard-page .ui-page-header__title {
+  font-size: clamp(30px, 3vw, 42px);
+  letter-spacing: -0.05em;
+}
+.dashboard-page .ui-page-header__desc {
+  max-width: 34rem;
+  color: var(--color-text-secondary);
+}
+.dashboard-page .ui-entry-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.dashboard-page .ui-entry-card {
+  min-height: 104px;
+  justify-content: center;
+  padding: var(--space-4) var(--space-5);
+  border-radius: 20px;
+}
+.dashboard-page .ui-entry-card--primary {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 16%, var(--glass)), var(--glass));
+  box-shadow: var(--shadow-raised);
+}
+.dashboard-note {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  border-inline-start: var(--border-w-2) solid var(--color-primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--glass));
+}
+.dashboard-note__eyebrow {
+  color: var(--color-primary-text);
+  font: var(--font-caption);
+  font-weight: 600;
+}
+.dashboard-note strong { color: var(--color-text-primary); font: var(--font-body-s); }
+.dashboard-note .muted { font: var(--font-caption-2); }
+
+.dashboard-distribution-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--glass) 72%, transparent);
+}
+
+.dashboard-business-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.dashboard-business-group__heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-inline: var(--space-1);
+}
+
+.dashboard-business-group__heading h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-card-title);
+}
+
+.dashboard-business-group__heading span {
+  color: var(--color-text-secondary);
+  font: var(--font-caption-2);
+}
+
+.dashboard-business-group__items {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.dashboard-self-owned-group {
+  min-width: 240px;
+}
+.dashboard-self-owned-group .dashboard-business-group__items {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-sell-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dashboard-sell-group__heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-inline: var(--space-1);
+}
+.dashboard-sell-group__heading h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-card-title);
+}
+.dashboard-sell-group__heading span {
+  color: var(--color-text-secondary);
+  font: var(--font-caption-2);
+}
+.dashboard-sell-group__items {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.dashboard-distribution-group {
+  min-width: 0;
+}
+
+.dashboard-distribution-group__heading,
+.dashboard-distribution-group__items {
+  margin-inline: 0;
+}
+.dashboard-distribution-group__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.dashboard-distribution-group__heading h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-body-m);
+  font-weight: 650;
+}
+.dashboard-distribution-group__heading span { font: var(--font-caption-2); }
+.dashboard-distribution-group__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.th-business-page .ui-page-header__desc { max-width: 42rem; }
+@media (max-width: 640px) {
+  .dashboard-distribution-group__items { grid-template-columns: 1fr; }
+}
+
+/* 回收费用编辑器：主费用突出，附加费用渐进展开，避免把字段堆成一列。 */
+.recovery-fees {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-2) var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--glass-border);
+  width: 100%;
+  min-width: 0;
+}
+.recovery-order-modal {
+  --recovery-grid-row-gap: 16px;
+}
+.recovery-order-modal .ant-modal {
+  --resizable-modal-width: min(1200px, calc(100vw - 48px));
+  --resizable-modal-height: min(860px, calc(100dvh - (var(--space-4) * 6)));
+  width: var(--resizable-modal-width) !important;
+  max-width: calc(100vw - 48px);
+  /* 桌面端保留上下活动空间，窗口拖动不会被内容高度锁死。 */
+  top: calc(var(--space-4) * 3);
+  padding-bottom: var(--space-4);
+}
+.recovery-order-modal .ant-modal-content,
+.recovery-order-modal .ant-modal-body,
+.recovery-order-modal .ant-form,
+.recovery-entry-fields,
+.recovery-customer-fields,
+.recovery-customer-contacts,
+.recovery-fee-card,
+.recovery-fee-row,
+.payment-info-fields {
+  min-width: 0;
+  max-width: 100%;
+}
+.recovery-order-modal .ant-modal-content { container-type: inline-size; }
+.recovery-order-modal .ant-modal-content {
+  height: auto;
+  max-height: var(--resizable-modal-height);
+  display: flex;
+  flex-direction: column;
+}
+.recovery-order-modal .ant-modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  max-height: calc(var(--resizable-modal-height) - 132px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.recovery-order-modal .ant-form-item,
+.recovery-order-modal .ant-form-item-control,
+.recovery-order-modal .ant-form-item-control-input,
+.recovery-order-modal .ant-form-item-control-input-content {
+  min-width: 0;
+  max-width: 100%;
+}
+.recovery-order-modal .ant-modal-title {
+  font-size: var(--fs-title-3);
+  font-weight: 650;
+  line-height: 1.25;
+}
+.recovery-order-modal .ant-form > .ant-btn[type="submit"] {
+  min-height: calc(var(--ui-control-height-lg) * 2);
+  font-size: var(--fs-callout);
+  font-weight: 600;
+}
+.recovery-order-modal .ant-modal-footer {
+  flex: 0 0 auto;
+  z-index: 2;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+  border-top: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--glass) 94%, transparent);
+}
+.recovery-order-modal .ant-modal-footer .ant-btn {
+  width: 100%;
+  min-height: calc(var(--ui-control-height-lg) * 2);
+  font-size: var(--fs-callout);
+  font-weight: 600;
+}
+.recovery-entry-fields > .ant-form-item,
+.recovery-order-modal__party-field {
+  width: min(100%, 420px);
+}
+.recovery-order-modal__note-field { width: min(100%, 720px); }
+.recovery-order-modal .ant-form-item-control-input-content > .ant-input,
+.recovery-order-modal .ant-form-item-control-input-content > .ant-input-affix-wrapper,
+.recovery-order-modal .ant-form-item-control-input-content > .ant-select {
+  width: min(100%, 160px);
+}
+.recovery-order-modal__note-field .ant-form-item-control-input-content > .ant-input,
+.recovery-order-modal__note-field .ant-form-item-control-input-content > .ant-input-affix-wrapper {
+  width: 100%;
+}
+.recovery-entry-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  row-gap: var(--recovery-grid-row-gap);
+  column-gap: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 66%, transparent);
+}
+.recovery-entry-fields > .ant-form-item { min-width: 0; width: 100%; }
+.recovery-entry-fields > .ant-form-item,
+.recovery-customer-fields > .ant-form-item,
+.recovery-customer-contacts > .ant-form-item { margin-bottom: 0; }
+.recovery-entry-fields > .ant-form-item .ant-form-item-row { flex-wrap: nowrap; }
+.recovery-entry-fields > .ant-form-item .ant-form-item-control { min-width: 0; }
+.recovery-entry-fields__account-note {
+  grid-column: 2 / 5;
+  width: 100% !important;
+}
+.recovery-entry-fields__account-note .ant-form-item-control-input-content > .ant-input,
+.recovery-entry-fields__account-note .ant-form-item-control-input-content > .ant-input-affix-wrapper {
+  width: 100% !important;
+}
+.recovery-entry-fields__title {
+  grid-column: 1 / 5;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--color-text-primary);
+  font-size: var(--fs-callout);
+  font-weight: 650;
+  line-height: 1.25;
+}
+.recovery-entry-fields > .recovery-fees {
+  grid-column: 1 / 5 !important;
+  justify-self: stretch;
+}
+.recovery-customer-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  row-gap: var(--recovery-grid-row-gap);
+  column-gap: var(--space-6);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 66%, transparent);
+}
+.recovery-customer-fields__title {
+  grid-column: 1 / 5;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--color-text-primary);
+  font-size: var(--fs-callout);
+  font-weight: 650;
+  line-height: 1.25;
+}
+.recovery-customer-fields > .ant-form-item .ant-form-item-row {
+  flex-wrap: nowrap;
+}
+.recovery-customer-fields > .ant-form-item .ant-form-item-control { min-width: 0; }
+.recovery-customer-source-other .ant-form-item-control-input-content > .ant-input {
+  width: 160px !important;
+  max-width: 100%;
+}
+.recovery-customer-source-other {
+  grid-column: auto;
+  width: min(100%, 420px) !important;
+}
+.recovery-customer-source-other .ant-form-item-label {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  padding-inline-end: var(--space-2) !important;
+}
+.recovery-customer-contacts {
+  grid-column: 1 / 5;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: var(--recovery-grid-row-gap);
+  column-gap: var(--space-6);
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 78%, transparent);
+}
+.recovery-customer-contacts__title {
+  grid-column: 1 / 5;
+  color: var(--color-text-primary);
+  font-weight: 650;
+}
+.recovery-customer-contacts .ant-form-item-label {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  padding-inline-end: var(--space-2) !important;
+  color: var(--color-text-secondary);
+  font: var(--font-caption-2);
+}
+.recovery-customer-contacts .ant-form-item-control-input-content > .ant-input {
+  width: 160px !important;
+  max-width: 100%;
+}
+.recovery-customer-contacts > .ant-form-item .ant-form-item-row { flex-wrap: nowrap; }
+.recovery-customer-contacts > .ant-form-item .ant-form-item-control { min-width: 0; }
+.recovery-customer-preview {
+  grid-column: 1 / 5;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--glass) 78%, transparent);
+  color: var(--color-text-secondary);
+}
+.recovery-customer-preview > div { display: grid; gap: var(--space-1); }
+.recovery-customer-preview span { font: var(--font-caption-2); color: var(--color-text-tertiary); }
+.recovery-customer-preview strong { color: var(--color-text-primary); font-weight: 550; }
+.recovery-customer-fields .recovery-order-modal__note-field {
+  grid-column: 1 / 5;
+  width: 100%;
+}
+.recovery-customer-fields .recovery-order-modal__note-field .ant-input {
+  width: 100%;
+}
+.recovery-fees__heading,
+.recovery-fee-card__head,
+.recovery-fees__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.recovery-fees__title {
+  color: var(--color-text-primary);
+  font-size: var(--fs-callout);
+  font-weight: 650;
+  line-height: 1.25;
+}
+.recovery-fees__hint,
+.recovery-fee-card__desc { color: var(--color-text-tertiary); font: var(--font-caption-2); }
+.recovery-fees__required { color: var(--color-text-tertiary); font: var(--font-caption-2); }
+.primary-amount-section {
+  display: grid;
+  grid-template-columns: max-content auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+.recovery-fee-card--primary {
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--glass-border));
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--glass));
+}
+.recovery-fee-card--primary .ant-form-item { margin: 0; }
+.recovery-fee-card--primary .ant-form-item { grid-column: 2; grid-row: 1; }
+.recovery-fee-card__label { color: var(--color-text-primary); font-weight: 600; }
+.recovery-fee-card--primary .recovery-fee-card__desc { grid-column: 3; grid-row: 1; white-space: nowrap; }
+.recovery-fee-row--other { padding-top: var(--space-2); border-top: 1px solid var(--glass-border); }
+.recovery-fee-row .ant-form-item { margin: 0; }
+.recovery-fee-field .ant-form-item-control,
+.recovery-fee-field .ant-form-item-control-input,
+.recovery-fee-field .ant-form-item-control-input-content {
+  min-width: 0;
+  width: 100%;
+}
+.recovery-fee-control { width: 160px !important; }
+.recovery-fee-row .recovery-fee-field .ant-form-item-control-input-content > * {
+  width: 160px;
+  max-width: 100%;
+}
+.recovery-fee-row--other .recovery-fee-field:nth-child(1) .ant-form-item-control-input-content > *,
+.recovery-fee-row--other .recovery-fee-field:nth-child(2) .ant-form-item-control-input-content > *,
+.recovery-fee-row--other .recovery-fee-field:nth-child(3) .ant-form-item-control-input-content > * { width: 160px; }
+.recovery-fees__total {
+  padding: var(--space-3) var(--space-1) 0;
+  border-top: 1px solid var(--glass-border);
+  color: var(--color-text-secondary);
+}
+.recovery-fees__total strong {
+  color: var(--color-text-primary);
+  font-size: var(--fs-title-3);
+  font-variant-numeric: tabular-nums;
+}
+.payment-info-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  row-gap: var(--recovery-grid-row-gap);
+  column-gap: var(--space-6);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 32%, var(--glass-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--glass));
+  width: 100%;
+  box-sizing: border-box;
+}
+.payment-info-fields__title {
+  grid-column: 1 / 4;
+  color: var(--color-text-primary);
+  font-weight: 650;
+}
+.inventory-detail { margin: calc(var(--space-2) * -1) 0; }
+.inventory-detail .ant-descriptions-item-label { white-space: nowrap; }
+.inventory-execution-list { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.inventory-execution-order { display: grid; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); }
+.inventory-execution-event { margin-top: var(--space-1); }
+.payment-info-fields .ant-form-item { margin: 0; }
+.payment-info-fields > .ant-form-item { min-width: 0; }
+.payment-info-fields > .ant-form-item .ant-form-item-row { flex-wrap: nowrap; }
+.payment-info-fields > .ant-form-item .ant-form-item-control { min-width: 0; }
+.payment-info-fields .ant-form-item-label {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  padding-inline-end: var(--space-2) !important;
+  color: var(--color-text-secondary);
+  font: var(--font-caption-2);
+}
+.payment-info-fields .ant-form-item-control-input-content > .ant-input,
+.payment-info-fields .ant-form-item-control-input-content > .ant-select {
+  width: 160px !important;
+  max-width: 100%;
+}
+.payment-info-fields__note { grid-column: auto; }
+.party-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: calc(var(--space-2) * -1) 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 70%, transparent);
+  color: var(--color-text-secondary);
+  font: var(--font-caption-2);
+}
+.party-preview strong { color: var(--color-text-primary); }
+@media (max-width: 640px) {
+  /* 手机端把回收表单当作完整页面使用，避免窄屏里再套一层小弹窗。 */
+  .recovery-order-modal {
+    padding: 0;
+  }
+  .recovery-order-modal .ant-modal {
+    width: 100vw !important;
+    max-width: 100vw;
+    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    top: 0;
+    padding-bottom: 0;
+  }
+  .recovery-order-modal .ant-modal-content {
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  .recovery-order-modal .ant-modal-body {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    /* 固定底部提交栏不应遮住最后一组字段，给滚动内容留出操作栏的安全区。 */
+    padding-bottom: calc((var(--ui-control-height-lg) * 2) + var(--space-6));
+  }
+  .recovery-order-modal .ant-form-item-row {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-2);
+  }
+  .recovery-order-modal .ant-form-item-label {
+    width: max-content !important;
+    min-width: max-content;
+    max-width: none;
+    flex: 0 0 auto !important;
+    padding-inline-end: 0 !important;
+    overflow: visible;
+  }
+  .recovery-order-modal .ant-form-item-control {
+    min-width: 0;
+    width: auto !important;
+  }
+  .recovery-entry-fields > .ant-form-item,
+  .recovery-customer-fields > .ant-form-item { margin-bottom: 0; }
+  .recovery-fee-card--primary .recovery-fee-card__desc { white-space: normal; }
+  .recovery-entry-fields > .ant-form-item,
+  .recovery-order-modal__party-field,
+  .recovery-order-modal__note-field { width: 100%; }
+  .recovery-order-modal .ant-form-item-control-input-content > .ant-input,
+  .recovery-order-modal .ant-form-item-control-input-content > .ant-input-affix-wrapper,
+  .recovery-order-modal .ant-form-item-control-input-content > .ant-select { width: 100%; }
+  .recovery-fee-row .recovery-fee-field .ant-form-item-control-input-content > *,
+  .recovery-fee-row--other .recovery-fee-field:nth-child(1) .ant-form-item-control-input-content > *,
+  .recovery-fee-row--other .recovery-fee-field:nth-child(2) .ant-form-item-control-input-content > *,
+  .recovery-fee-row--other .recovery-fee-field:nth-child(3) .ant-form-item-control-input-content > * { width: 100%; }
+  .recovery-fee-control { width: 100% !important; }
+  .recovery-fee-card--primary { grid-template-columns: 1fr; }
+  .payment-info-fields__note { grid-column: auto; }
+  .recovery-fee-card--primary .ant-form-item,
+  .recovery-fee-card--primary .recovery-fee-card__desc { grid-column: 1; grid-row: auto; }
+}
+
+/* 唯一的列布局规则：由弹窗实际宽度同步出的布局状态。 */
+.ant-modal[data-recovery-layout="single"] .recovery-entry-fields,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-fields,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="single"] .payment-info-fields { grid-template-columns: 1fr; }
+.ant-modal[data-recovery-layout="double"] .recovery-entry-fields,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-fields,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="double"] .payment-info-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ant-modal[data-recovery-layout="three"] .recovery-entry-fields,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-fields,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="three"] .payment-info-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ant-modal[data-recovery-layout="four"] .recovery-entry-fields,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-fields,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="four"] .payment-info-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ant-modal[data-recovery-layout="single"] .recovery-entry-fields__title,
+.ant-modal[data-recovery-layout="single"] .recovery-entry-fields > .recovery-fees,
+.ant-modal[data-recovery-layout="single"] .recovery-entry-fields__account-note,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-fields__title,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-contacts__title,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="single"] .recovery-customer-fields .recovery-order-modal__note-field,
+.ant-modal[data-recovery-layout="single"] .payment-info-fields__title { grid-column: 1 / 2 !important; }
+.ant-modal[data-recovery-layout="double"] .recovery-entry-fields__title,
+.ant-modal[data-recovery-layout="double"] .recovery-entry-fields > .recovery-fees,
+.ant-modal[data-recovery-layout="double"] .recovery-entry-fields__account-note,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-fields__title,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-contacts__title,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="double"] .recovery-customer-fields .recovery-order-modal__note-field,
+.ant-modal[data-recovery-layout="double"] .payment-info-fields__title { grid-column: 1 / 3 !important; }
+.ant-modal[data-recovery-layout="three"] .recovery-entry-fields__title,
+.ant-modal[data-recovery-layout="three"] .recovery-entry-fields > .recovery-fees,
+.ant-modal[data-recovery-layout="three"] .recovery-entry-fields__account-note,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-fields__title,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-contacts__title,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="three"] .recovery-customer-fields .recovery-order-modal__note-field,
+.ant-modal[data-recovery-layout="three"] .payment-info-fields__title { grid-column: 1 / 4 !important; }
+.ant-modal[data-recovery-layout="four"] .recovery-entry-fields__title,
+.ant-modal[data-recovery-layout="four"] .recovery-entry-fields > .recovery-fees,
+.ant-modal[data-recovery-layout="four"] .recovery-entry-fields__account-note,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-fields__title,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-contacts,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-contacts__title,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-preview,
+.ant-modal[data-recovery-layout="four"] .recovery-customer-fields .recovery-order-modal__note-field,
+.ant-modal[data-recovery-layout="four"] .payment-info-fields__title { grid-column: 1 / 5 !important; }
+
+/* 回收页所有录入网格共用同一条纵向节奏，避免板块和断点各自覆盖。 */
+.recovery-entry-fields,
+.recovery-customer-fields,
+.recovery-customer-contacts,
+.payment-info-fields { row-gap: var(--recovery-grid-row-gap); }
+@media (max-width: 640px) {
+  .recovery-order-modal { --recovery-grid-row-gap: 0px; }
+}
+@media (min-width: 641px) and (max-width: 1800px) {
+  .recovery-order-modal { --recovery-grid-row-gap: 12px; }
+}
+@container (min-width: 1000px) {
+  .recovery-entry-fields,
+  .recovery-customer-fields,
+  .recovery-customer-contacts,
+  .payment-info-fields { --recovery-grid-row-gap: 16px; }
+}
+.dashboard-summary { display: grid; gap: var(--space-3); }
+.dashboard-summary__title {
+  margin: 0;
+  font: var(--font-section);
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+}
+.dashboard-summary .ui-stat {
+  min-height: 96px;
+  justify-content: center;
+  padding: var(--space-4) var(--space-5);
+  border-radius: 20px;
+}
+
+.ui-table-empty {
+  display: grid;
+  min-height: var(--col-w-160);
+  place-items: center;
+  padding: var(--space-5);
+  border: var(--border-w) dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 72%, transparent);
+}
+
+/* 高频表格：表头更轻，分页与内容保持清晰分组，不使用重竖线。 */
+.ui-datatable .ant-table-container {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.ui-datatable .ant-table-thead > tr > th {
+  letter-spacing: 0.01em;
+}
+.ui-datatable .ant-pagination {
+  margin-block: var(--space-4) var(--space-1) !important;
+}
+
+/* 业务中心：把默认 Tab / 表格组合收成一个轻量工作面板。 */
+.page-content .page-enter > .ui-stack > .ant-tabs > .ant-tabs-nav {
+  margin-block-end: var(--space-3);
+}
+.page-content .page-enter > .ui-stack > .ant-tabs .ant-tabs-tab {
+  padding: var(--space-2) var(--space-3);
+  font-weight: 550;
+}
+.page-content .page-enter > .ui-stack > .ant-tabs .ant-tabs-tab-active {
+  font-weight: 650;
+}
+.page-content .page-enter > .ui-stack > .ant-tabs .ant-tabs-ink-bar {
+  height: 2px;
+  border-radius: var(--radius-pill);
+}
+.page-content .page-enter > .ui-stack > .ant-tabs .ant-card {
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft);
+}
+
+/* 抽屉 footer 是唯一操作区：保持底部可见，避免长表单滚动后失去提交路径。 */
+.form-drawer .ant-drawer-footer {
+  padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--glass) 92%, transparent);
+  backdrop-filter: var(--glass-blur-md);
+  -webkit-backdrop-filter: var(--glass-blur-md);
+}
+.form-drawer .ant-drawer-footer .ant-space {
+  gap: var(--space-2) !important;
+}
+.form-drawer .ant-drawer-footer .ant-btn {
+  min-width: var(--col-w-80);
+}
+.form-drawer .ant-form-item:last-child { margin-block-end: var(--space-2); }
+
+@media (--bp-sm) {
+  .form-drawer .ant-drawer-footer .ant-space { width: 100%; }
+  .form-drawer .ant-drawer-footer .ant-btn { flex: 1; }
+}
+
 /* ── MoneyText ────────────────────────────────────────────── */
 .ui-money {
   font-variant-numeric: tabular-nums;
@@ -168,14 +861,89 @@
   .ui-stat { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .ui-error-banner,
+  .form-drawer .ant-drawer-footer {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--color-surface);
+  }
+}
+
+/* 增强对比度时，优先保留边界和文字层级，避免玻璃材质把内容冲淡。 */
+@media (prefers-contrast: more), (forced-colors: active) {
+  .glass,
+  .ui-stat,
+  .ui-entry-card,
+  .ui-table-empty {
+    border-color: var(--color-text-secondary);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .ui-entry-card:hover { border-color: var(--color-text-primary); }
+  .ui-datatable .ant-table-thead > tr > th { border-bottom-color: var(--color-text-secondary); }
+}
+
+/* 触控设备上的表格保留清晰的横向滚动容器，避免内容被裁成不可读的窄列。 */
+.ui-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
 /* ── 页面纵向栈与筛选条 ───────────────────────────────────── */
 .ui-stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
+
+.settings-tabs.ant-tabs-left > .ant-tabs-nav {
+  min-width: 9rem;
+}
+.settings-tabs.ant-tabs-left > .ant-tabs-content-holder {
+  min-width: 0;
+}
+.settings-tabs.ant-tabs-left .ant-tabs-tab {
+  justify-content: flex-start;
+  min-height: var(--ui-control-height);
+  padding-inline: var(--space-3);
+}
+
+@media (--bp-md) {
+  .dashboard-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (--bp-sm) {
+  .dashboard-page .ui-entry-row { grid-template-columns: 1fr; }
+  .dashboard-self-owned-group .dashboard-business-group__items { grid-template-columns: 1fr; }
+  .dashboard-note { padding: var(--space-4); }
+}
 .ui-filter-bar {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+.ui-admin-table .ant-table-wrapper { margin-block: 0; }
+
+/* Shared form geometry: page files choose semantic widths, never inline pixels. */
+.ui-form-spaced { margin-block-start: var(--space-4); }
+.ui-filter-bar--spaced { margin-block-end: var(--space-3); }
+.ui-control-full { width: 100%; }
+.ui-control-width-policy { width: var(--control-filter-select-width); }
+.ui-control-width-inventory { width: var(--col-w-180); }
+.ui-control-width-history { width: var(--col-w-280); }
+.orders-ledger-search { width: var(--col-w-280); }
+.ui-control-width-date { width: var(--control-date-width); }
+.ui-control-width-90 { width: var(--col-w-90); }
+.ui-control-width-100 { width: var(--col-w-100); }
+.ui-control-width-110 { width: var(--col-w-110); }
+.ui-control-width-120 { width: var(--col-w-120); }
+.ui-control-width-140 { width: var(--col-w-140); }
+.ui-control-width-200 { width: var(--col-w-200); }
+.ui-control-min-180 { min-width: var(--col-w-180); }
+.ui-title-spaced { margin-block-start: var(--space-4); }
+.ui-drawer-actions { justify-content: flex-end; width: 100%; }

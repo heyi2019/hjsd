@@ -11,7 +11,7 @@ const ordersList = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   ordersApi: { list: (...a: unknown[]) => ordersList(...a) },
-  // 新建业务弹窗自加载的选项数据：给空列表即可（弹窗自身用例在 CreateOrderModal.test.tsx）。
+  // 业务创建弹窗自加载的选项数据：给空列表即可（弹窗自身用例在 CreateBusinessModal.test.tsx）。
   orderTypesApi: { list: vi.fn().mockResolvedValue([]) },
   customersApi: { list: vi.fn().mockResolvedValue([]) },
   counterpartiesApi: { list: vi.fn().mockResolvedValue([]) },
@@ -24,27 +24,45 @@ beforeEach(() => {
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
-  it("admin 渲染新建业务动作卡", async () => {
+  it("admin 渲染业务入口卡", async () => {
     renderApp(<DashboardPage />, { user: "admin" });
-    expect(await screen.findByRole("button", { name: /新建业务/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /自营·回收/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /售出库存账号/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /分销·提号/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /分销·代挂/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /代分期/ })).toBeInTheDocument();
   });
 
   it("viewer 无 order.create → 看不到新建业务卡", async () => {
     renderApp(<DashboardPage />, { user: "viewer" });
     // 无卡可点：给一帧让权限门控渲染完再断言（sync 渲染，无需 waitFor 数据）。
-    expect(screen.queryByRole("button", { name: /新建业务/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /自营·回收/ })).toBeNull();
   });
 
-  it("点击新建业务卡直接打开登记弹窗（不跳转页面）", async () => {
+  it("点击回收账号卡直接打开回收登记弹窗（不跳转页面）", async () => {
     renderApp(<DashboardPage />, { user: "admin" });
-    await userEvent.click(await screen.findByRole("button", { name: /新建业务/ }));
-    const modal = await screen.findByText("业务类型");
+    await userEvent.click(await screen.findByRole("button", { name: /自营·回收/ }));
+    const modal = await screen.findByText("新建回收订单");
+    expect(modal.closest(".ant-modal-content")).toBeTruthy();
+  });
+
+  it("点击共同出售口进入业务中心库存页", async () => {
+    const onNavigate = vi.fn();
+    renderApp(<DashboardPage onNavigate={onNavigate} />, { user: "admin" });
+    await userEvent.click(await screen.findByRole("button", { name: /售出库存账号/ }));
+    expect(onNavigate).toHaveBeenCalledWith("business", "inventory");
+  });
+
+  it("点击提号卡直接打开提号登记弹窗（不跳转页面）", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await userEvent.click(await screen.findByRole("button", { name: /分销·提号/ }));
+    const modal = await screen.findByText("新建提号订单");
     expect(modal.closest(".ant-modal-content")).toBeTruthy();
   });
 
   it("数据总览已迁走：不再渲染资金池表格/统计/订单入口卡", async () => {
     renderApp(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: /新建业务/ });
+    await screen.findByRole("button", { name: /自营·回收/ });
     expect(screen.queryByText("资金池概览")).toBeNull();
     expect(screen.queryByText("可用余额合计")).toBeNull();
     expect(screen.queryByText("资金池数量")).toBeNull();

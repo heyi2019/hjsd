@@ -548,6 +548,41 @@ def assert_counterparty_usable(
 
 
 # --------------------------------------------------------------------- 活字段
+def _normalize_field_options(
+    field_type: str, options: Sequence[str] | None
+) -> list[str]:
+    """规范化字段选项，避免选择型字段退化成无约束文本。"""
+    if options is None:
+        raw: list[Any] = []
+    elif isinstance(options, (str, bytes)):
+        raise Validation("字段选项必须为字符串数组", details={"field": "options"})
+    else:
+        raw = list(options)
+
+    if field_type not in (FieldType.SELECT.value, FieldType.MULTI_SELECT.value):
+        if raw:
+            raise Validation(
+                "非选择型字段不能配置选项", details={"field": "options"}
+            )
+        return []
+
+    normalized: list[str] = []
+    for option in raw:
+        if not isinstance(option, str) or not option.strip():
+            raise Validation(
+                "字段选项必须为非空字符串",
+                details={"field": "options", "value": str(option)[:64]},
+            )
+        normalized.append(option.strip())
+    if not normalized:
+        raise Validation(
+            "选择型字段至少需要一个选项", details={"field": "options"}
+        )
+    if len(set(normalized)) != len(normalized):
+        raise Validation("字段选项不能重复", details={"field": "options"})
+    return normalized
+
+
 def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
     """按字段类型校验活字段值；SELECT/MULTI_SELECT 必须在选项内（BAS-04）。"""
     if value is None:
@@ -578,8 +613,18 @@ def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
             ) from exc
         return text
     if kind == "SELECT":
+        if not isinstance(value, str):
+            raise Validation(
+                f"字段 {definition.label} 必须为字符串",
+                details={"field_key": definition.field_key},
+            )
         options = list(definition.options or [])
-        if options and value not in options:
+        if not options:
+            raise Validation(
+                f"字段 {definition.label} 未配置有效选项",
+                details={"field_key": definition.field_key},
+            )
+        if value not in options:
             raise Validation(
                 f"字段 {definition.label} 的取值必须在选项内",
                 details={"field_key": definition.field_key, "value": str(value)[:64]},
@@ -591,10 +636,27 @@ def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
                 f"字段 {definition.label} 必须为数组",
                 details={"field_key": definition.field_key},
             )
+        if any(not isinstance(item, str) for item in value):
+            raise Validation(
+                f"字段 {definition.label} 的选项必须为字符串",
+                details={"field_key": definition.field_key},
+            )
         options = list(definition.options or [])
-        if options and any(item not in options for item in value):
+        if not options:
+            raise Validation(
+                f"字段 {definition.label} 未配置有效选项",
+                details={"field_key": definition.field_key},
+            )
+        if len(set(value)) != len(value) or any(item not in options for item in value):
             raise Validation(
                 f"字段 {definition.label} 的取值必须在选项内",
+                details={"field_key": definition.field_key},
+            )
+        return value
+    if kind == "TEXT":
+        if not isinstance(value, str):
+            raise Validation(
+                f"字段 {definition.label} 必须为字符串",
                 details={"field_key": definition.field_key},
             )
         return value
@@ -663,6 +725,7 @@ def create_field_definition(
             "排序值不能为负数",
             details={"field": "sort_order", "value": sort_order},
         )
+    normalized_options = _normalize_field_options(field_type, options)
     key = (field_key or "").strip()
     if not FIELD_KEY_PATTERN.match(key):
         raise Validation(
@@ -681,12 +744,16 @@ def create_field_definition(
             details={"entity_type": entity, "field_key": key},
         )
 
+    normalized_label = (label or "").strip()
+    if not normalized_label:
+        raise Validation("字段名称不能为空", details={"field": "label"})
+
     definition = FieldDefinition(
         entity_type=entity,
         field_key=key,
-        label=label.strip(),
+        label=normalized_label,
         field_type=field_type,
-        options=list(options or []),
+        options=normalized_options,
         required=required,
         sort_order=sort_order,
         is_active=True,

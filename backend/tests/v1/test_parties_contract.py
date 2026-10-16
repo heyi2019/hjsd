@@ -462,6 +462,52 @@ class TestFieldDefinitionGuards:
             )
         assert "字段键必须为小写字母开头" in str(exc.value)
 
+    @pytest.mark.parametrize("field_type", ["SELECT", "MULTI_SELECT"])
+    def test_choice_field_requires_unique_nonempty_options(self, seeded_db, field_type):
+        with pytest.raises(Validation) as exc:
+            service.create_field_definition(
+                seeded_db,
+                entity_type="customer",
+                field_key="choice_field",
+                label="选项字段",
+                field_type=field_type,
+                actor="pytest",
+            )
+        assert "选项" in str(exc.value)
+
+        with pytest.raises(Validation):
+            service.create_field_definition(
+                seeded_db,
+                entity_type="customer",
+                field_key="choice_field_duplicate",
+                label="选项字段",
+                field_type=field_type,
+                options=["A", "A"],
+                actor="pytest",
+            )
+
+    def test_choice_field_rejects_blank_or_non_string_options(self, seeded_db):
+        with pytest.raises(Validation):
+            service.create_field_definition(
+                seeded_db,
+                entity_type="customer",
+                field_key="choice_blank",
+                label="选项字段",
+                field_type="SELECT",
+                options=[""],
+                actor="pytest",
+            )
+        with pytest.raises(Validation):
+            service.create_field_definition(
+                seeded_db,
+                entity_type="customer",
+                field_key="choice_number",
+                label="选项字段",
+                field_type="SELECT",
+                options=[1],
+                actor="pytest",
+            )
+
     def test_duplicate_field_key_conflicts(self, seeded_db):
         service.create_field_definition(
             seeded_db, entity_type="customer", field_key="k1", label="字段", actor="pytest"

@@ -14,7 +14,7 @@ from app.core.audit import record_audit
 from app.core.errors import AuthError, Conflict, Validation
 from app.core.security import ALL_ROLES, hash_password, verify_password
 from app.domain.enums import AuditAction
-from app.domain.users import Team, User
+from app.domain.users import RevokedToken, Team, User
 
 _USER_FIELDS = ("username", "display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active")
 
@@ -163,6 +163,11 @@ def reset_password(
     )
 
 
+def revoke_token(session: Session, *, jti: str, expires_at: int) -> None:
+    """登记已退出的 JWT；幂等交给主键 merge。"""
+    session.merge(RevokedToken(jti=jti, expires_at=expires_at))
+
+
 def create_team(
     session: Session,
     *,
@@ -218,6 +223,7 @@ __all__ = [
     "change_password",
     "create_team",
     "create_user",
+    "revoke_token",
     "reset_password",
     "update_team",
     "update_user",

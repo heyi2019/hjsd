@@ -10,7 +10,7 @@ from app.core.errors import AuthError, PermissionDenied
 from app.core.security import (
     CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
 )
-from app.domain.users import RevokedToken, Team, User
+from app.domain.users import Team, User
 from app.auth import service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -120,7 +120,7 @@ def logout(authorization: str | None = Header(default=None, alias="Authorization
             payload = decode_token(token)
             jti = payload.get("jti")
             if jti:
-                db.merge(RevokedToken(jti=jti, expires_at=int(payload.get("exp", 0))))
+                service.revoke_token(db, jti=jti, expires_at=int(payload.get("exp", 0)))
     return {"ok": True}
 
 

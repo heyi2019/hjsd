@@ -79,6 +79,12 @@ def create_batch(
         raise Validation("source_name 不能为空", details={"field": "source_name"})
     if not rows:
         raise Validation("导入内容为空", details={"field": "rows"})
+    invalid_rows = [index for index, raw in enumerate(rows, start=1) if not isinstance(raw, dict)]
+    if invalid_rows:
+        raise Validation(
+            "每行必须为对象",
+            details={"field": "rows", "invalid_rows": invalid_rows},
+        )
     try:
         source_kind = ImportSourceKind(source_kind).value
     except ValueError as exc:
@@ -574,6 +580,12 @@ def create_correction_batch(
         raise Validation("已回滚批次不可更正", details={"batch_id": batch_id})
     if not rows:
         raise Validation("更正内容为空", details={"field": "rows"})
+    invalid_rows = [index for index, raw in enumerate(rows, start=1) if not isinstance(raw, dict)]
+    if invalid_rows:
+        raise Validation(
+            "每行必须为对象",
+            details={"field": "rows", "invalid_rows": invalid_rows},
+        )
 
     origin.status = ImportBatchStatus.CORRECTED.value
     origin.updated_by = actor

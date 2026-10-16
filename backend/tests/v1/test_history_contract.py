@@ -44,6 +44,16 @@ class TestCreateBatchGuards:
             service.create_batch(seeded_db, source_name="orders.xlsx", rows=[])
         assert "导入内容为空" in str(exc.value)
 
+    def test_each_import_row_must_be_an_object(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.create_batch(
+                seeded_db,
+                source_name="orders.xlsx",
+                rows=[{"订单号": "HS0001"}, ["不是对象"]],
+                actor="pytest",
+            )
+        assert "每行必须为对象" in str(exc.value)
+
     def test_source_kind_is_closed_to_standard_values(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_batch(

@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from collections.abc import Iterable
 from typing import Any
@@ -25,6 +25,7 @@ from app.core.security import CurrentUser, owner_scope_filter
 from app.policy import service as policy_service
 from app.domain.enums import (
     AuditAction,
+    CashflowStatus,
     DepositStatus,
     Direction,
     Nature,
@@ -43,6 +44,226 @@ def _non_negative(value: Any, *, field: str) -> Decimal:
         return require_non_negative(value, field=field)
     except ValueError as exc:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
+
+
+def _get_cashflow(
+    session: Session, cashflow_id: int, user: CurrentUser | None = None
+) -> Cashflow:
+    flow = session.get(Cashflow, cashflow_id)
+    if flow is None:
+        raise NotFound(
+            f"资金流水 {cashflow_id} 不存在", details={"cashflow_id": cashflow_id}
+        )
+    if user is not None and not user.can_see_pool(flow.pool_id):
+        raise NotFound(
+            f"资金流水 {cashflow_id} 不存在", details={"cashflow_id": cashflow_id}
+        )
+    if user is not None and flow.order_id is not None:
+        orders_service.get_order(session, flow.order_id, user)
+    return flow
+
+
+def create_cashflow(
+    session: Session,
+    *,
+    pool_id: int,
+    occurred_on: date,
+    direction: str,
+    nature: str,
+    category: str,
+    amount: Any,
+    actor: str,
+    order_id: int | None = None,
+    note: str | None = None,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
+    try:
+        direction = Direction(direction).value
+    except ValueError as exc:
+        raise Validation(
+            f"direction 必须为 {Direction.values()}", details={"field": "direction"}
+        ) from exc
+    try:
+        nature = Nature(nature).value
+    except ValueError as exc:
+        raise Validation(
+            f"nature 必须为 {Nature.values()}", details={"field": "nature"}
+        ) from exc
+    if nature == Nature.INTERNAL.value:
+        raise Validation("独立现金流不能使用 INTERNAL，请使用池间划转")
+    if direction == Direction.IN.value and nature not in {
+        Nature.EXTERNAL_IN.value,
+        Nature.BUSINESS_IN.value,
+    }:
+        raise Validation("收入流水的 nature 不匹配", details={"direction": direction, "nature": nature})
+    if direction == Direction.OUT.value and nature != Nature.BUSINESS_OUT.value:
+        raise Validation("支出流水的 nature 不匹配", details={"direction": direction, "nature": nature})
+    label = (category or "").strip().upper()
+    if not label:
+        raise Validation("category 不能为空", details={"field": "category"})
+    if nature == Nature.EXTERNAL_IN.value and not (note or "").strip():
+        raise Validation("独立收款必须填写摘要", details={"field": "note"})
+    if user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+    pool = foundation_service.assert_pool_usable(session, pool_id)
+    if order_id is not None:
+        orders_service.get_order(session, order_id, user)
+    money = require_positive(amount, field="amount")
+    flow = Cashflow(
+        flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
+        pool_id=pool.id,
+        occurred_on=occurred_on,
+        nature=nature,
+        category=label,
+        direction=direction,
+        amount=money,
+        order_id=order_id,
+        status=CashflowStatus.PENDING.value,
+        note=note,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(flow)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_CREATE,
+        entity_type="cashflow",
+        entity_id=flow.flow_no,
+        actor=actor,
+        after={
+            "status": flow.status,
+            "pool_id": pool.id,
+            "direction": direction,
+            "nature": nature,
+            "amount": str(money),
+        },
+    )
+    return flow
+
+
+def approve_cashflow(
+    session: Session,
+    cashflow_id: int,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    flow = _get_cashflow(session, cashflow_id, user)
+    if flow.status != CashflowStatus.PENDING.value:
+        raise Validation(
+            "只有待审核流水可以审核",
+            details={"cashflow_id": cashflow_id, "status": flow.status},
+        )
+    flow.status = CashflowStatus.APPROVED.value
+    flow.reviewed_by = actor
+    flow.reviewed_at = datetime.now()
+    flow.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_APPROVE,
+        entity_type="cashflow",
+        entity_id=flow.flow_no,
+        actor=actor,
+        after={"status": flow.status},
+    )
+    return flow
+
+
+def reject_cashflow(
+    session: Session,
+    cashflow_id: int,
+    *,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("驳回流水必须填写原因", details={"field": "reason"})
+    flow = _get_cashflow(session, cashflow_id, user)
+    if flow.status != CashflowStatus.PENDING.value:
+        raise Validation(
+            "只有待审核流水可以驳回",
+            details={"cashflow_id": cashflow_id, "status": flow.status},
+        )
+    flow.status = CashflowStatus.REJECTED.value
+    flow.reviewed_by = actor
+    flow.reviewed_at = datetime.now()
+    flow.reversal_reason = text_reason
+    flow.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_REJECT,
+        entity_type="cashflow",
+        entity_id=flow.flow_no,
+        actor=actor,
+        after={"status": flow.status, "reason": text_reason},
+    )
+    return flow
+
+
+def reverse_cashflow(
+    session: Session,
+    cashflow_id: int,
+    *,
+    reversed_on: date,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("冲销流水必须填写原因", details={"field": "reason"})
+    flow = _get_cashflow(session, cashflow_id, user)
+    if flow.status != CashflowStatus.APPROVED.value:
+        raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
+    if flow.order_event_id is not None:
+        raise Validation("业务事件现金流必须通过业务事件冲销")
+    if flow.deposit_id is not None or flow.transfer_id is not None:
+        raise Validation("押金或划转现金流必须通过原业务流程冲销")
+    if session.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)):
+        raise Validation("该流水已冲销", details={"cashflow_id": cashflow_id})
+
+    if flow.direction == Direction.OUT.value:
+        reverse_direction = Direction.IN.value
+        reverse_nature = Nature.BUSINESS_IN.value
+    else:
+        reverse_direction = Direction.OUT.value
+        reverse_nature = Nature.BUSINESS_OUT.value
+    reversal = Cashflow(
+        flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
+        pool_id=flow.pool_id,
+        occurred_on=reversed_on,
+        nature=reverse_nature,
+        category="REVERSAL",
+        direction=reverse_direction,
+        amount=to_money(flow.amount),
+        order_id=flow.order_id,
+        status=CashflowStatus.APPROVED.value,
+        reversal_of_id=flow.id,
+        reversal_reason=text_reason,
+        note=f"冲销 {flow.flow_no}",
+        reviewed_by=actor,
+        reviewed_at=datetime.now(),
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(reversal)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_REVERSE,
+        entity_type="cashflow",
+        entity_id=reversal.flow_no,
+        actor=actor,
+        after={"reversal_of": flow.flow_no, "amount": str(reversal.amount)},
+        reason=text_reason,
+    )
+    return reversal
 
 
 # --------------------------------------------------------------------- 押金
@@ -199,6 +420,7 @@ def list_cashflows(
     direction: str | None = None,
     occurred_from: date | None = None,
     occurred_to: date | None = None,
+    status: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict[str, Any]]:
@@ -222,6 +444,15 @@ def list_cashflows(
         stmt = stmt.where(Cashflow.occurred_on >= occurred_from)
     if occurred_to is not None:
         stmt = stmt.where(Cashflow.occurred_on <= occurred_to)
+    if status is not None:
+        try:
+            status = CashflowStatus(status).value
+        except ValueError as exc:
+            raise Validation(
+                f"status 必须为 {CashflowStatus.values()}",
+                details={"field": "status", "value": status},
+            ) from exc
+        stmt = stmt.where(Cashflow.status == status)
 
     rows: list[dict[str, Any]] = []
     for flow, order_no in session.execute(stmt).all():
@@ -245,6 +476,10 @@ def list_cashflows(
                 "category": flow.category,
                 "direction": flow.direction,
                 "amount": flow.amount,
+                "status": flow.status,
+                "reviewed_by": flow.reviewed_by,
+                "reviewed_at": flow.reviewed_at,
+                "reversal_of_id": flow.reversal_of_id,
                 "order_id": flow.order_id,
                 "order_no": order_no,
                 "deposit_id": flow.deposit_id,
@@ -552,6 +787,8 @@ def settled_net_total(session: Session, rebate_record_id: int) -> Decimal:
 
 
 __all__ = [
+    "approve_cashflow",
+    "create_cashflow",
     "create_deposit",
     "create_rebate",
     "deposit_held_total",
@@ -560,6 +797,8 @@ __all__ = [
     "list_rebates",
     "create_transfer",
     "return_deposit",
+    "reject_cashflow",
+    "reverse_cashflow",
     "settle_rebate",
     "settled_net_total",
 ]

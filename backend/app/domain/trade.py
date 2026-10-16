@@ -33,6 +33,7 @@ from app.domain.base import AuditMixin, TimestampMixin
 from app.domain.enums import (
     AccountStatus,
     CapitalType,
+    CashflowStatus,
     DepositStatus,
     Direction,
     EventType,
@@ -192,6 +193,10 @@ class Cashflow(Base, AuditMixin):
             f"direction IN {Direction.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_direction_valid",
         ),
+        CheckConstraint(
+            f"status IN {CashflowStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="cashflow_status_valid",
+        ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
@@ -201,6 +206,8 @@ class Cashflow(Base, AuditMixin):
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
         Index("ix_cashflow_occurred_on", "occurred_on"),
+        Index("ix_cashflow_status", "status"),
+        UniqueConstraint("reversal_of_id", name="uq_cashflow_reversal"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -213,6 +220,9 @@ class Cashflow(Base, AuditMixin):
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=CashflowStatus.APPROVED.value
+    )
     order_id: Mapped[int | None] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
     )
@@ -223,6 +233,12 @@ class Cashflow(Base, AuditMixin):
         ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True
     )
     transfer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reversal_of_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cashflow.id", ondelete="RESTRICT"), nullable=True
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reversal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

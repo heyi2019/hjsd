@@ -21,7 +21,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.finance import schemas, service
-from app.domain.trade import Deposit, RebateRecord
+from app.domain.trade import Deposit, Order, RebateRecord
 from app.orders import service as orders_service
 
 router = APIRouter(tags=["FIN-04/REB-01 押金与返点"])
@@ -36,6 +36,41 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
+def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
+    order = db.get(Order, flow.order_id) if flow.order_id else None
+    if flow.order_event_id is not None:
+        source = "ORDER_EVENT"
+    elif flow.category == "REBATE":
+        source = "REBATE_SETTLEMENT"
+    elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
+        source = "DEPOSIT"
+    elif flow.category == "TRANSFER":
+        source = "TRANSFER"
+    else:
+        source = "OTHER"
+    return schemas.CashflowOut(
+        id=flow.id,
+        flow_no=flow.flow_no,
+        pool_id=flow.pool_id,
+        occurred_on=flow.occurred_on,
+        nature=flow.nature,
+        category=flow.category,
+        direction=flow.direction,
+        amount=flow.amount,
+        status=flow.status,
+        reviewed_by=flow.reviewed_by,
+        reviewed_at=flow.reviewed_at,
+        reversal_of_id=flow.reversal_of_id,
+        order_id=flow.order_id,
+        order_no=order.order_no if order else None,
+        deposit_id=flow.deposit_id,
+        order_event_id=flow.order_event_id,
+        transfer_id=flow.transfer_id,
+        source=source,
+        note=flow.note,
+    )
+
+
 @router.get("/cashflows", response_model=list[schemas.CashflowOut])
 def list_cashflows(
     pool_id: int | None = Query(default=None),
@@ -43,6 +78,7 @@ def list_cashflows(
     direction: str | None = Query(default=None),
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
+    status: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -60,6 +96,7 @@ def list_cashflows(
             direction=direction,
             occurred_from=occurred_from,
             occurred_to=occurred_to,
+            status=status,
             limit=limit,
             offset=offset,
         )
@@ -72,10 +109,74 @@ def list_cashflows(
         direction=direction,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
+        status=status,
         limit=limit,
         offset=offset,
     )
     return [schemas.CashflowOut.model_validate(item) for item in items]
+
+
+@router.post("/cashflows", response_model=schemas.CashflowOut, status_code=201)
+def create_cashflow(
+    payload: schemas.CashflowCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.CashflowOut:
+    flow = service.create_cashflow(
+        db,
+        pool_id=payload.pool_id,
+        occurred_on=payload.occurred_on,
+        direction=payload.direction.strip().upper(),
+        nature=payload.nature.strip().upper(),
+        category=payload.category,
+        amount=payload.amount,
+        order_id=payload.order_id,
+        note=payload.note,
+        actor=_actor(user),
+        user=user,
+    )
+    return _cashflow_out(db, flow)
+
+
+@router.post("/cashflows/{cashflow_id}/approve", response_model=schemas.CashflowOut)
+def approve_cashflow(
+    cashflow_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.CashflowOut:
+    flow = service.approve_cashflow(db, cashflow_id, actor=_actor(user), user=user)
+    return _cashflow_out(db, flow)
+
+
+@router.post("/cashflows/{cashflow_id}/reject", response_model=schemas.CashflowOut)
+def reject_cashflow(
+    cashflow_id: int,
+    payload: schemas.CashflowReject,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.CashflowOut:
+    flow = service.reject_cashflow(
+        db, cashflow_id, actor=_actor(user), reason=payload.reason, user=user
+    )
+    return _cashflow_out(db, flow)
+
+
+@router.post("/cashflows/{cashflow_id}/reverse", response_model=schemas.CashflowOut)
+def reverse_cashflow(
+    cashflow_id: int,
+    payload: schemas.CashflowReverse,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.CashflowOut:
+    flow = service.reverse_cashflow(
+        db,
+        cashflow_id,
+        reversed_on=payload.reversed_on,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return _cashflow_out(db, flow)
 
 
 @router.post("/transfers", response_model=schemas.TransferOut, status_code=201)
@@ -111,6 +212,10 @@ def create_transfer(
                 category=flow.category,
                 direction=flow.direction,
                 amount=flow.amount,
+                status=flow.status,
+                reviewed_by=flow.reviewed_by,
+                reviewed_at=flow.reviewed_at,
+                reversal_of_id=flow.reversal_of_id,
                 order_id=flow.order_id,
                 order_no=None,
                 deposit_id=flow.deposit_id,

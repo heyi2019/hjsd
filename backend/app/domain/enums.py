@@ -159,6 +159,14 @@ class Direction(StrEnum):
     OUT = "OUT"
 
 
+class CashflowStatus(StrEnum):
+    """独立资金流水审核状态；业务事件派生流水直接为 APPROVED。"""
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class AccountStatus(StrEnum):
     """账号状态（ACC-01-03）：只由订单事件驱动。"""
 
@@ -309,6 +317,10 @@ class AuditAction(StrEnum):
     DELIVER_CREATE = "DELIVER_CREATE"
     REBATE_CREATE = "REBATE_CREATE"
     REBATE_SETTLE = "REBATE_SETTLE"
+    CASHFLOW_CREATE = "CASHFLOW_CREATE"
+    CASHFLOW_APPROVE = "CASHFLOW_APPROVE"
+    CASHFLOW_REJECT = "CASHFLOW_REJECT"
+    CASHFLOW_REVERSE = "CASHFLOW_REVERSE"
     TRANSFER_CREATE = "TRANSFER_CREATE"
     USER_CREATE = "USER_CREATE"
     USER_UPDATE = "USER_UPDATE"
@@ -333,6 +345,7 @@ __all__ = [
     "AccountStatus",
     "AuditAction",
     "CapitalType",
+    "CashflowStatus",
     "CounterpartyRole",
     "CounterpartyStatus",
     "CounterpartyType",

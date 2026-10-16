@@ -29,6 +29,7 @@ from app.domain.enums import (
     AccountStatus,
     AuditAction,
     CapitalType,
+    CashflowStatus,
     CounterpartyRole,
     CustomerRole,
     Direction,
@@ -805,7 +806,9 @@ def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
 
     def total(direction: str, nature: str | None = None) -> Decimal:
         stmt = select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-            Cashflow.pool_id == pool_id, Cashflow.direction == direction
+            Cashflow.pool_id == pool_id,
+            Cashflow.direction == direction,
+            Cashflow.status == CashflowStatus.APPROVED.value,
         )
         if nature:
             stmt = stmt.where(Cashflow.nature == nature)

@@ -18,6 +18,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.finance import service
 from app.orders import service as orders_service
+from app.reporting import service as reporting_service
 
 TODAY = date(2026, 10, 4)
 
@@ -202,7 +203,125 @@ class TestRebateGuards:
         assert len(service.list_rebates(seeded_db)) == 2
 
 
+class TestCashflowLifecycle:
+    def test_manual_cashflow_is_pending_until_approved(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        before = orders_service.pool_balance(seeded_db, invest.id)
+
+        flow = service.create_cashflow(
+            seeded_db,
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            direction="OUT",
+            nature="BUSINESS_OUT",
+            category="OPERATING",
+            amount=Decimal("120.00"),
+            actor="pytest",
+            note="平台运营费",
+        )
+        assert flow.status == "PENDING"
+        assert orders_service.pool_balance(seeded_db, invest.id) == before
+
+        service.approve_cashflow(seeded_db, flow.id, actor="finance")
+        after = orders_service.pool_balance(seeded_db, invest.id)
+        assert after["expense"] == before["expense"] + Decimal("120.00")
+        assert after["cash_balance"] == before["cash_balance"] - Decimal("120.00")
+
+    def test_rejected_cashflow_does_not_change_balance(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        flow = service.create_cashflow(
+            seeded_db,
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            direction="IN",
+            nature="EXTERNAL_IN",
+            category="OTHER",
+            amount=Decimal("80.00"),
+            actor="pytest",
+            note="待核实收款",
+        )
+        service.reject_cashflow(seeded_db, flow.id, actor="finance", reason="凭证不足")
+        seeded_db.refresh(flow)
+        assert flow.status == "REJECTED"
+        assert orders_service.pool_balance(seeded_db, invest.id)["cash_balance"] == 0
+
+    def test_approved_manual_cashflow_can_be_reversed_once(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        flow = service.create_cashflow(
+            seeded_db,
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            direction="OUT",
+            nature="BUSINESS_OUT",
+            category="OPERATING",
+            amount=Decimal("60.00"),
+            actor="pytest",
+            note="可冲销费用",
+        )
+        service.approve_cashflow(seeded_db, flow.id, actor="finance")
+        reversal = service.reverse_cashflow(
+            seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="重复付款"
+        )
+        assert reversal.reversal_of_id == flow.id
+        assert reversal.status == "APPROVED"
+        assert orders_service.pool_balance(seeded_db, invest.id)["cash_balance"] == 0
+
+        with pytest.raises(Validation, match="已冲销"):
+            service.reverse_cashflow(
+                seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="再次冲销"
+            )
+
+        monthly = reporting_service.r2_monthly_pnl(seeded_db)
+        assert monthly["items"] == []
+
+    def test_business_event_cashflow_must_be_reversed_by_event(self, seeded_db):
+        order_id = _active_order(seeded_db)
+        event = seeded_db.scalar(
+            select(Cashflow).where(Cashflow.order_id == order_id, Cashflow.category == "BUY")
+        )
+        assert event is not None
+        with pytest.raises(Validation, match="业务事件"):
+            service.reverse_cashflow(
+                seeded_db, event.id, reversed_on=TODAY, actor="finance", reason="错误冲销"
+            )
+
+
 class TestFinanceApi:
+    def test_manual_cashflow_review_and_reverse_endpoints(
+        self, seeded_client, seeded_db, headers
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        created = seeded_client.post(
+            "/api/v1/cashflows",
+            json={
+                "pool_id": invest.id,
+                "occurred_on": TODAY.isoformat(),
+                "direction": "OUT",
+                "nature": "BUSINESS_OUT",
+                "category": "OPERATING",
+                "amount": "25.00",
+                "note": "接口测试费用",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        flow = created.json()
+        assert flow["status"] == "PENDING"
+
+        approved = seeded_client.post(
+            f"/api/v1/cashflows/{flow['id']}/approve", headers=headers
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["status"] == "APPROVED"
+
+        reversed_flow = seeded_client.post(
+            f"/api/v1/cashflows/{flow['id']}/reverse",
+            json={"reversed_on": TODAY.isoformat(), "reason": "接口冲销"},
+            headers=headers,
+        )
+        assert reversed_flow.status_code == 200, reversed_flow.text
+        assert reversed_flow.json()["reversal_of_id"] == flow["id"]
+
     def test_pool_scoped_finance_user_cannot_transfer_or_read_other_pool(
         self, seeded_client, seeded_db
     ):

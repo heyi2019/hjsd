@@ -20,6 +20,7 @@ from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AccountStatus,
+    CashflowStatus,
     Direction,
     EventType,
     Nature,
@@ -220,22 +221,38 @@ def r2_monthly_pnl(
         revenue[key] += income
         direct_cost[key] += buy_amount + event_cost
 
-    # 运营费用 = 非订单来源的业务支出流水（账号 COST 走事件，不在此列）
-    op_stmt = select(Cashflow.occurred_on, Cashflow.amount).where(
-        Cashflow.nature == Nature.BUSINESS_OUT.value,
+    # 运营费用 = 非订单来源的已审核业务支出流水；返点、押金、划转不重复计入。
+    op_stmt = select(Cashflow).where(
+        Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
+        Cashflow.category.notin_(
+            {"REBATE", "DEPOSIT_HOLD", "DEPOSIT_RELEASE", "TRANSFER"}
+        ),
     )
     pool_ids = _visible_pool_ids(user)
     if pool_ids is not None:
         op_stmt = op_stmt.where(Cashflow.pool_id.in_(pool_ids))
-    op_rows = session.execute(op_stmt).all()
+    op_rows = session.scalars(op_stmt).all()
     operating: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    for occurred_on, amount in op_rows:
+    for flow in op_rows:
+        occurred_on = flow.occurred_on
         if from_date and occurred_on < from_date:
             continue
         if to_date and occurred_on > to_date:
             continue
-        operating[_month_key(occurred_on)] += _money(amount)
+        amount = _money(flow.amount)
+        if (
+            flow.direction == Direction.OUT.value
+            and flow.nature == Nature.BUSINESS_OUT.value
+        ):
+            operating[_month_key(occurred_on)] += amount
+        elif flow.reversal_of_id is not None:
+            original = session.get(Cashflow, flow.reversal_of_id)
+            if original is not None and (
+                original.direction == Direction.OUT.value
+                and original.nature == Nature.BUSINESS_OUT.value
+            ):
+                operating[_month_key(occurred_on)] -= amount
 
     rebate_stmt = (
         select(
@@ -256,6 +273,10 @@ def r2_monthly_pnl(
             continue
         rebate_net[_month_key(settled_on)] += _money(gross) - _money(fee)
 
+    for bucket in (revenue, direct_cost, operating, rebate_net):
+        for month in list(bucket):
+            if bucket[month] == ZERO:
+                del bucket[month]
     months = sorted(set(revenue) | set(direct_cost) | set(operating) | set(rebate_net))
     items = []
     for month in months:
@@ -447,7 +468,11 @@ def daily_funds_report(
                         ),
                         0,
                     )
-                ).where(Cashflow.pool_id == pool.id, Cashflow.occurred_on < target)
+                ).where(
+                    Cashflow.pool_id == pool.id,
+                    Cashflow.occurred_on < target,
+                    Cashflow.status == CashflowStatus.APPROVED.value,
+                )
             )
         )
         day_in = _money(
@@ -457,6 +482,7 @@ def daily_funds_report(
                     Cashflow.occurred_on == target,
                     Cashflow.direction == Direction.IN.value,
                     Cashflow.nature == Nature.BUSINESS_IN.value,
+                    Cashflow.status == CashflowStatus.APPROVED.value,
                 )
             )
         )
@@ -467,6 +493,7 @@ def daily_funds_report(
                     Cashflow.occurred_on == target,
                     Cashflow.direction == Direction.OUT.value,
                     Cashflow.nature == Nature.BUSINESS_OUT.value,
+                    Cashflow.status == CashflowStatus.APPROVED.value,
                 )
             )
         )

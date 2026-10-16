@@ -1,7 +1,7 @@
 """finance.schemas：押金与返点的请求/响应模型。"""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,6 +43,10 @@ class CashflowOut(BaseModel):
     category: str
     direction: str
     amount: Decimal
+    status: str
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
+    reversal_of_id: int | None = None
     order_id: int | None = None
     order_no: str | None = None
     deposit_id: int | None = None
@@ -50,6 +54,26 @@ class CashflowOut(BaseModel):
     transfer_id: str | None = None
     source: str
     note: str | None = None
+
+
+class CashflowCreate(BaseModel):
+    pool_id: int
+    occurred_on: date
+    direction: str
+    nature: str
+    category: str
+    amount: Decimal
+    order_id: int | None = None
+    note: str | None = None
+
+
+class CashflowReject(BaseModel):
+    reason: str
+
+
+class CashflowReverse(BaseModel):
+    reversed_on: date
+    reason: str
 
 
 class TransferCreate(BaseModel):
@@ -115,6 +139,9 @@ __all__ = [
     "DepositOut",
     "DepositReturn",
     "CashflowOut",
+    "CashflowCreate",
+    "CashflowReject",
+    "CashflowReverse",
     "TransferCreate",
     "TransferOut",
     "RebateCreate",

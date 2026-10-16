@@ -48,7 +48,11 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     """
     key_value = key.value if isinstance(key, SequenceKey) else key
     row = session.scalar(
-        select(DocumentSequence).where(DocumentSequence.sequence_key == key_value)
+        # PostgreSQL 等支持行锁的数据库上，防止并发建单读到同一个 current_value；
+        # SQLite 会忽略 FOR UPDATE，但仍由其写事务串行化保证单库开发环境行为。
+        select(DocumentSequence)
+        .where(DocumentSequence.sequence_key == key_value)
+        .with_for_update()
     )
     if row is None:
         raise Validation(

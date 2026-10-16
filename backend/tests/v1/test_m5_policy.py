@@ -383,6 +383,30 @@ class TestProfitAllocation:
             seeded_db.flush()
         seeded_db.rollback()
 
+    def test_allocation_role_is_closed_in_database(self, seeded_db):
+        order = self._order(seeded_db)
+        seeded_db.add(
+            OrderProfitAllocation(
+                order_id=order.id,
+                role="UNKNOWN",
+                allocation_rate=100,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
+    def test_invalid_allocation_role_rejected_by_service(self, seeded_db):
+        order = self._order(seeded_db)
+        with pytest.raises(Exception) as exc:
+            policy_service.set_allocations(
+                seeded_db,
+                order.id,
+                items=[{"user_id": 1, "role": "UNKNOWN", "allocation_rate": "100"}],
+                actor="pytest",
+            )
+        assert "角色" in str(exc.value)
+
     def test_fifty_fifty(self, seeded_db):
         order = self._order(seeded_db)
         items = policy_service.set_allocations(

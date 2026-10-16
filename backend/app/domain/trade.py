@@ -46,6 +46,7 @@ from app.domain.enums import (
     RebateStatus,
     ReconciliationStatus,
     ScheduleStatus,
+    AllocationRole,
 )
 
 
@@ -308,6 +309,10 @@ class OrderProfitAllocation(Base, TimestampMixin):
     __tablename__ = "order_profit_allocations"
     __table_args__ = (
         UniqueConstraint("order_id", "user_id", "role", name="uq_order_profit_alloc"),
+        CheckConstraint(
+            f"role IN {AllocationRole.values()!r}".replace("[", "(").replace("]", ")"),
+            name="allocation_role_valid",
+        ),
         CheckConstraint("allocation_rate >= 0", name="rate_nonneg"),
         CheckConstraint("allocation_rate <= 100", name="rate_max"),
     )

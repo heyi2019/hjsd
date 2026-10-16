@@ -24,6 +24,7 @@ from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.domain.enums import (
     AuditAction,
+    AllocationRole,
     PolicyScopeType,
     PolicyStatus,
 )
@@ -468,8 +469,14 @@ def set_allocations(
             ) from exc
         if rate < 0:
             raise Validation("分配比例不得为负", details={"allocation_rate": str(rate)})
+        role = str(item.get("role") or "").upper()
+        if role not in AllocationRole.values():
+            raise Validation(
+                f"分配角色必须为 {AllocationRole.values()}",
+                details={"field": "role", "value": item.get("role")},
+            )
         total += rate
-        key = (int(item["user_id"]), str(item["role"]).upper())
+        key = (int(item["user_id"]), role)
         if key in seen:
             raise Validation(
                 "同一人员同一角色不可重复分配",

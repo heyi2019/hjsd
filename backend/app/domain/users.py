@@ -1,7 +1,7 @@
 """Users and role assignments for the first-class login module."""
 from __future__ import annotations
 
-from sqlalchemy import Boolean, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -21,7 +21,17 @@ class Team(Base, TimestampMixin):
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
+    __table_args__ = (
+        UniqueConstraint("username", name="uq_users_username"),
+        CheckConstraint(
+            "role IN ('ADMIN', 'OPERATOR', 'FINANCE', 'AUDITOR', 'VIEWER')",
+            name="role_valid",
+        ),
+        CheckConstraint(
+            "owner_scope IN ('SELF', 'TEAM', 'ALL')",
+            name="owner_scope_valid",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -39,6 +49,9 @@ class User(Base, TimestampMixin):
 
 class RevokedToken(Base):
     __tablename__ = "revoked_tokens"
+    __table_args__ = (
+        CheckConstraint("expires_at > 0", name="expires_at_positive"),
+    )
 
     jti: Mapped[str] = mapped_column(String(64), primary_key=True)
     expires_at: Mapped[int] = mapped_column(Integer, nullable=False)

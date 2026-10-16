@@ -10,12 +10,13 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.core.security import hash_password
-from app.domain.users import User
+from app.domain.users import RevokedToken, User
 from app.core.settings import Settings
 from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
 
@@ -43,6 +44,39 @@ def _login(client: TestClient, username: str, password: str) -> str:
     )
     assert response.status_code == 200, response.text
     return response.json()["access_token"]
+
+
+def test_user_security_scope_values_are_constrained_in_database(seeded_db):
+    seeded_db.add(
+        User(
+            username="invalid-role",
+            display_name="无效角色",
+            password_hash="hash",
+            role="ROOT",
+            owner_scope="SELF",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        seeded_db.flush()
+    seeded_db.rollback()
+
+    seeded_db.add(RevokedToken(jti="invalid-expiry", expires_at=0))
+    with pytest.raises(IntegrityError):
+        seeded_db.flush()
+    seeded_db.rollback()
+
+    seeded_db.add(
+        User(
+            username="invalid-scope",
+            display_name="无效范围",
+            password_hash="hash",
+            role="VIEWER",
+            owner_scope="PUBLIC",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        seeded_db.flush()
+    seeded_db.rollback()
 
 
 # ------------------------------------------------------------------ 登录 / 登出

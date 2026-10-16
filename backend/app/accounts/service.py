@@ -8,15 +8,16 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_number
+from app.core.security import CurrentUser, owner_scope_ids
 from app.domain.enums import AccountStatus, AuditAction, SequenceKey
-from app.domain.trade import Account
+from app.domain.trade import Account, Order
 
 INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.value)
 
@@ -93,9 +94,36 @@ def create_account(
     return account
 
 
-def get_account(session: Session, account_id: int) -> Account:
+def _scope_filter(session: Session, user: CurrentUser | None):
+    if user is None or user.is_admin or user.owner_scope == "ALL":
+        return None
+    visible_owner_ids = owner_scope_ids(session, user) or {user.id}
+    linked_to_visible_order = select(Order.account_id).where(
+        Order.account_id.is_not(None), Order.owner_id.in_(visible_owner_ids)
+    )
+    # 独立建档已不提供 API，但导入/历史数据可能存在；创建者仍可看自己的未关联账号。
+    return or_(
+        Account.created_by == user.username,
+        Account.id.in_(linked_to_visible_order),
+    )
+
+
+def account_is_visible(
+    session: Session, account: Account, user: CurrentUser | None
+) -> bool:
+    predicate = _scope_filter(session, user)
+    if predicate is None:
+        return True
+    return session.scalar(select(Account.id).where(Account.id == account.id, predicate)) is not None
+
+
+def get_account(
+    session: Session, account_id: int, user: CurrentUser | None = None
+) -> Account:
     account = session.get(Account, account_id)
     if account is None:
+        raise NotFound(f"账号 {account_id} 不存在", details={"account_id": account_id})
+    if user is not None and not account_is_visible(session, account, user):
         raise NotFound(f"账号 {account_id} 不存在", details={"account_id": account_id})
     return account
 
@@ -177,18 +205,27 @@ def update_account_profile(
     return account
 
 
-def list_accounts(session: Session, *, status: str | None = None) -> list[Account]:
+def list_accounts(
+    session: Session,
+    *,
+    status: str | None = None,
+    user: CurrentUser | None = None,
+) -> list[Account]:
     stmt = select(Account)
     if status:
         stmt = stmt.where(Account.status == status)
+    scope = _scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(Account.id)).all())
 
 
-def inventory(session: Session) -> list[dict[str, Any]]:
+def inventory(
+    session: Session, *, user: CurrentUser | None = None
+) -> list[dict[str, Any]]:
     """库存健康表 R1（简化版）：只统计在库与分期中的真实占用。"""
-    rows = session.scalars(
-        select(Account).where(Account.status.in_(INVENTORY_STATUSES)).order_by(Account.id)
-    ).all()
+    rows = list_accounts(session, user=user)
+    rows = [row for row in rows if row.status in INVENTORY_STATUSES]
     return [
         {
             "account_id": row.id,
@@ -201,22 +238,30 @@ def inventory(session: Session) -> list[dict[str, Any]]:
     ]
 
 
-def total_inventory_cost(session: Session) -> Decimal:
+def total_inventory_cost(
+    session: Session, *, user: CurrentUser | None = None
+) -> Decimal:
     return to_money(
-        sum((to_money(row.cost_amount) for row in _inventory_rows(session)), Decimal("0"))
+        sum(
+            (to_money(row.cost_amount) for row in _inventory_rows(session, user=user)),
+            Decimal("0"),
+        )
     )
 
 
-def _inventory_rows(session: Session) -> list[Account]:
-    return list(
-        session.scalars(
-            select(Account).where(Account.status.in_(INVENTORY_STATUSES))
-        ).all()
-    )
+def _inventory_rows(
+    session: Session, *, user: CurrentUser | None = None
+) -> list[Account]:
+    stmt = select(Account).where(Account.status.in_(INVENTORY_STATUSES))
+    scope = _scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    return list(session.scalars(stmt).all())
 
 
 __all__ = [
     "create_account",
+    "account_is_visible",
     "get_account",
     "inventory",
     "list_accounts",

@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
+from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account
@@ -150,6 +151,62 @@ class TestAccountQueries:
 
 
 class TestAccountsApi:
+    def test_account_endpoints_follow_order_owner_scope(
+        self, seeded_client, seeded_db
+    ):
+        mine = _account(seeded_db, "scoped-mine")
+        mine_order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="operator",
+            account_id=mine.id,
+            owner_id=9,
+        )
+        orders_service.post_event(
+            seeded_db, mine_order.id, event_type="BUY", amount="300",
+            occurred_on=TODAY, actor="operator",
+        )
+
+        other = _account(seeded_db, "scoped-other")
+        other_order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="other",
+            account_id=other.id,
+            owner_id=8,
+        )
+        orders_service.post_event(
+            seeded_db, other_order.id, event_type="BUY", amount="400",
+            occurred_on=TODAY, actor="other",
+        )
+
+        user = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(user)}"}
+
+        listed = seeded_client.get("/api/v1/accounts", headers=headers)
+        assert listed.status_code == 200, listed.text
+        assert [row["inventory_no"] for row in listed.json()] == [mine.inventory_no]
+
+        hidden_detail = seeded_client.get(
+            f"/api/v1/accounts/{other.id}/execution-detail", headers=headers
+        )
+        assert hidden_detail.status_code == 404
+
+        hidden_update = seeded_client.patch(
+            f"/api/v1/accounts/{other.id}",
+            json={"note": "不应修改"},
+            headers=headers,
+        )
+        assert hidden_update.status_code == 404
+
+        inventory = seeded_client.get("/api/v1/accounts/inventory", headers=headers)
+        assert inventory.status_code == 200, inventory.text
+        assert [row["account_id"] for row in inventory.json()["items"]] == [mine.id]
+
     def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
         response = seeded_client.post(
             "/api/v1/accounts",

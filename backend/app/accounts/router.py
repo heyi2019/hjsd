@@ -17,6 +17,7 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     CurrentUser,
+    owner_scope_filter,
     require_permissions,
 )
 from app.accounts import service
@@ -202,7 +203,7 @@ def list_accounts(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[AccountOut]:
-    items = service.list_accounts(db, status=status)
+    items = service.list_accounts(db, status=status, user=_user)
     return _account_outputs(db, items)
 
 
@@ -213,6 +214,7 @@ def update_account_profile(
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
 ) -> AccountOut:
+    service.get_account(db, account_id, user)
     item = service.update_account_profile(
         db,
         account_id,
@@ -237,7 +239,7 @@ def inventory(
     _user: CurrentUser = read_access,
 ) -> dict:
     """库存健康表 R1：只统计在库与分期中的真实占用。"""
-    rows = service.inventory(db)
+    rows = service.inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return {"items": rows, "count": len(rows), "total_cost": str(total)}
 
@@ -249,10 +251,12 @@ def execution_detail(
     _user: CurrentUser = read_access,
 ) -> AccountExecutionDetailOut:
     """查询库存账号关联的全部订单、已过账事件和资金流水。"""
-    account = service.get_account(db, account_id)
-    orders = list(
-        db.scalars(select(Order).where(Order.account_id == account_id).order_by(Order.id)).all()
-    )
+    account = service.get_account(db, account_id, _user)
+    order_stmt = select(Order).where(Order.account_id == account_id)
+    order_scope = owner_scope_filter(Order.owner_id, _user, db)
+    if order_scope is not None:
+        order_stmt = order_stmt.where(order_scope)
+    orders = list(db.scalars(order_stmt.order_by(Order.id)).all())
     order_ids = [item.id for item in orders]
     counterparties_by_order: dict[int, list[ExecutionCounterpartyOut]] = {}
     if order_ids:

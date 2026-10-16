@@ -217,21 +217,12 @@ def update_account_profile(
     user: CurrentUser = manage,
 ) -> AccountOut:
     service.get_account(db, account_id, user)
+    changes = {
+        field: getattr(payload, field)
+        for field in payload.model_fields_set
+    }
     item = service.update_account_profile(
-        db,
-        account_id,
-        actor=_actor(user),
-        game_account=payload.game_account,
-        game_type=payload.game_type,
-        game_password=payload.game_password,
-        channel_region=payload.channel_region,
-        bound_phone=payload.bound_phone,
-        has_secondary=payload.has_secondary,
-        platform=payload.platform,
-        account_description=payload.account_description,
-        account_images=payload.account_images,
-        note=payload.note,
-        user=user,
+        db, account_id, actor=_actor(user), user=user, **changes
     )
     return AccountOut.model_validate(item)
 

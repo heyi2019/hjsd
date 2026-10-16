@@ -20,6 +20,7 @@ from app.domain.enums import AccountStatus, AuditAction, SequenceKey
 from app.domain.trade import Account, Order
 
 INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.value)
+_UNSET = object()
 
 
 def create_account(
@@ -131,16 +132,16 @@ def update_account_profile(
     account_id: int,
     *,
     actor: str,
-    game_account: str | None = None,
-    game_type: str | None = None,
-    game_password: str | None = None,
-    channel_region: str | None = None,
-    bound_phone: str | None = None,
-    has_secondary: bool | None = None,
-    platform: str | None = None,
-    account_description: str | None = None,
-    account_images: list[str] | None = None,
-    note: str | None = None,
+    game_account: str | None | object = _UNSET,
+    game_type: str | None | object = _UNSET,
+    game_password: str | None | object = _UNSET,
+    channel_region: str | None | object = _UNSET,
+    bound_phone: str | None | object = _UNSET,
+    has_secondary: bool | None | object = _UNSET,
+    platform: str | None | object = _UNSET,
+    account_description: str | None | object = _UNSET,
+    account_images: list[str] | None | object = _UNSET,
+    note: str | None | object = _UNSET,
     user: CurrentUser | None = None,
 ) -> Account:
     account = get_account(session, account_id, user)
@@ -155,8 +156,8 @@ def update_account_profile(
         "account_images": account.account_images or [],
         "note": account.note,
     }
-    if game_account is not None:
-        identifier = game_account.strip()
+    if game_account is not _UNSET:
+        identifier = (game_account or "").strip()
         if not identifier:
             raise Validation("账号标识必填", details={"field": "game_account"})
         exists = session.scalar(select(Account).where(Account.game_account == identifier, Account.id != account_id))
@@ -175,11 +176,14 @@ def update_account_profile(
         "has_secondary": has_secondary,
         "platform": platform,
         "account_description": account_description,
-        "account_images": account_images[:9] if account_images is not None else None,
+            "account_images": account_images,
         "note": note,
     }.items():
-        if value is not None:
-            setattr(account, field, value)
+        if value is _UNSET:
+            continue
+        if field == "account_images" and value is not None:
+            value = value[:9]
+        setattr(account, field, value)
     account.updated_by = actor
     session.flush()
     record_audit(

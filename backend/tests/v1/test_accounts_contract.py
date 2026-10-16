@@ -68,6 +68,28 @@ class TestCreateAccountGuards:
 
         assert updated.note == "售出后补充说明"
 
+    def test_explicit_null_clears_optional_profile_fields(self, seeded_db):
+        account = _account(
+            seeded_db,
+            "clearable-profile",
+            account_description="旧说明",
+            account_images=["data:image/png;base64,old"],
+            note="旧备注",
+        )
+
+        updated = service.update_account_profile(
+            seeded_db,
+            account.id,
+            actor="pytest",
+            account_description=None,
+            account_images=[],
+            note=None,
+        )
+
+        assert updated.account_description is None
+        assert updated.account_images == []
+        assert updated.note is None
+
     def test_account_profile_update_is_recorded_as_account_audit(self, seeded_db):
         account = _account(seeded_db, "audited-account")
         service.update_account_profile(
@@ -330,6 +352,16 @@ class TestAccountsApi:
         assert updated.json()["game_account"] == "account-with-media-renamed"
         assert updated.json()["game_password"] == "new-secret"
         assert updated.json()["has_secondary"] is True
+
+        cleared = seeded_client.patch(
+            f"/api/v1/accounts/{account_id}",
+            json={"account_description": None, "account_images": [], "note": None},
+            headers=headers,
+        )
+        assert cleared.status_code == 200, cleared.text
+        assert cleared.json()["account_description"] is None
+        assert cleared.json()["account_images"] == []
+        assert cleared.json()["note"] is None
 
     def test_list_accounts_endpoint_with_status(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "api-acc")

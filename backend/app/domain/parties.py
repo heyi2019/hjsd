@@ -36,6 +36,7 @@ from app.domain.enums import (
     CustomerStatus,
     EntityType,
     PolicyStatus,
+    CounterpartyRole,
 )
 
 
@@ -74,6 +75,15 @@ class PolicyVersion(Base, AuditMixin):
         UniqueConstraint(
             "policy_definition_id", "version", "effective_from",
             name="uq_policy_versions_scope",
+        ),
+        CheckConstraint(
+            f"status IN {PolicyStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="policy_version_status_valid",
+        ),
+        CheckConstraint("version > 0", name="version_positive"),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to > effective_from",
+            name="effective_range_valid",
         ),
     )
 
@@ -236,6 +246,10 @@ class OrderCounterpartyRole(Base, TimestampMixin):
 
     __tablename__ = "order_counterparty_roles"
     __table_args__ = (
+        CheckConstraint(
+            f"role IN {CounterpartyRole.values()!r}".replace("[", "(").replace("]", ")"),
+            name="counterparty_role_valid",
+        ),
         UniqueConstraint(
             "order_id", "counterparty_id", "role", name="uq_order_counterparty_role"
         ),

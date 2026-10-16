@@ -13,12 +13,13 @@ from datetime import date
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AuditAction, CounterpartyStatus, CustomerStatus
 from app.domain.foundation import AuditLog
-from app.domain.parties import OrderCustomerRole
+from app.domain.parties import OrderCounterpartyRole, OrderCustomerRole
 from app.orders import service as orders_service
 from app.parties import service
 
@@ -289,6 +290,24 @@ class TestMergeGuards:
 
 # ------------------------------------------------------------------ 合作方
 class TestCounterpartyGuards:
+    def test_order_counterparty_role_is_constrained_in_database(self, seeded_db):
+        order = orders_service.create_order(
+            seeded_db, order_type="TH", trade_date=date(2026, 10, 4), actor="pytest"
+        )
+        counterparty = service.create_counterparty(
+            seeded_db, display_name="同行A", type="PEER", actor="pytest"
+        )
+        seeded_db.add(
+            OrderCounterpartyRole(
+                order_id=order.id,
+                counterparty_id=counterparty.id,
+                role="INVALID",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_empty_display_name_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_counterparty(

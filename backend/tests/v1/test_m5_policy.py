@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.money import to_money
 from app.domain.enums import PolicyStatus, PolicyType
+from app.domain.parties import PolicyVersion
 from app.domain.trade import OrderProfitAllocation
 from app.orders import service as order_service
 from app.policy import service as policy_service
@@ -103,6 +104,24 @@ class TestPolicyDefinition:
 
 class TestPolicyVersion:
     """BAS-06-02：版本 / 生效期 / 审批。"""
+
+    def test_policy_version_state_is_constrained_in_database(self, seeded_db):
+        definition = _make_policy(seeded_db)
+        seeded_db.add(
+            PolicyVersion(
+                policy_definition_id=definition["id"],
+                version=0,
+                effective_from=date(2026, 7, 1),
+                effective_to=date(2026, 1, 1),
+                config={},
+                status=PolicyStatus.DRAFT.value,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
 
     def test_version_increments(self, seeded_db):
         """版本号递增；两个都无失效日的版本必然重叠，必须给前一个封口。"""

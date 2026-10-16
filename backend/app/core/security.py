@@ -36,6 +36,7 @@ ROLE_AUDITOR = "AUDITOR"
 ROLE_VIEWER = "VIEWER"
 
 ALL_ROLES: tuple[str, ...] = (ROLE_ADMIN, ROLE_OPERATOR, ROLE_FINANCE, ROLE_AUDITOR, ROLE_VIEWER)
+OWNER_SCOPES: frozenset[str] = frozenset({"SELF", "TEAM", "ALL"})
 
 PERM_CUSTOMER_READ = "customer.read"
 PERM_CUSTOMER_CONTACT_READ = "customer.contact.read"
@@ -417,6 +418,7 @@ __all__ = [
     "ROLE_OPERATOR",
     "ROLE_PERMISSIONS",
     "ROLE_VIEWER",
+    "OWNER_SCOPES",
     "build_access_token",
     "decode_token",
     "encode_token",

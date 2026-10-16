@@ -12,11 +12,20 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import AuthError, Conflict, Validation
-from app.core.security import ALL_ROLES, hash_password, verify_password
+from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password
 from app.domain.enums import AuditAction
 from app.domain.users import RevokedToken, Team, User
 
 _USER_FIELDS = ("username", "display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active")
+
+
+def _required_text(value: object, *, message: str) -> str:
+    if not isinstance(value, str):
+        raise Validation(message)
+    normalized = value.strip()
+    if not normalized:
+        raise Validation(message)
+    return normalized
 
 
 def _user_snapshot(user: User) -> dict[str, object]:
@@ -60,13 +69,16 @@ def create_user(
 ) -> User:
     if role not in ALL_ROLES:
         raise Validation("无效角色")
-    normalized_username = username.strip()
+    if owner_scope not in OWNER_SCOPES:
+        raise Validation("无效数据范围")
+    normalized_username = _required_text(username, message="用户名不能为空")
+    normalized_display_name = _required_text(display_name, message="显示名称不能为空")
     if session.scalar(select(User).where(User.username == normalized_username)):
         raise Conflict("用户名已存在")
     _check_team_ids(session, team_ids)
     user = User(
         username=normalized_username,
-        display_name=display_name,
+        display_name=normalized_display_name,
         password_hash=hash_password(password),
         role=role,
         owner_scope=owner_scope,
@@ -102,8 +114,15 @@ def update_user(
     _check_team_ids(session, changes.get("team_ids") if "team_ids" in changes else None)  # type: ignore[arg-type]
     if "role" in changes and changes["role"] not in ALL_ROLES:
         raise Validation("无效角色")
+    if "owner_scope" in changes and changes["owner_scope"] not in OWNER_SCOPES:
+        raise Validation("无效数据范围")
+    normalized_changes = dict(changes)
+    if "display_name" in normalized_changes:
+        normalized_changes["display_name"] = _required_text(
+            normalized_changes["display_name"], message="显示名称不能为空"
+        )
     before = _user_snapshot(user)
-    for key, value in changes.items():
+    for key, value in normalized_changes.items():
         setattr(user, key, value)
     session.flush()
     record_audit(
@@ -176,10 +195,11 @@ def create_team(
     description: str | None,
     actor: str,
 ) -> Team:
-    normalized_code = code.strip().upper()
+    normalized_code = _required_text(code, message="团队编码不能为空").upper()
+    normalized_name = _required_text(name, message="团队名称不能为空")
     if session.scalar(select(Team).where(Team.code == normalized_code)):
         raise Conflict("团队编码已存在")
-    team = Team(code=normalized_code, name=name.strip(), description=description)
+    team = Team(code=normalized_code, name=normalized_name, description=description)
     session.add(team)
     session.flush()
     record_audit(
@@ -203,8 +223,13 @@ def update_team(
     team = session.get(Team, team_id)
     if team is None:
         raise Validation("团队不存在")
+    normalized_changes = dict(changes)
+    if "name" in normalized_changes:
+        normalized_changes["name"] = _required_text(
+            normalized_changes["name"], message="团队名称不能为空"
+        )
     before = _team_snapshot(team)
-    for key, value in changes.items():
+    for key, value in normalized_changes.items():
         setattr(team, key, value)
     session.flush()
     record_audit(

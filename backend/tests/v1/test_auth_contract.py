@@ -205,6 +205,35 @@ def test_create_user_invalid_role(client: TestClient):
     assert response.json()["message"] == "无效角色"
 
 
+def test_create_user_invalid_owner_scope_rejected(client: TestClient):
+    response = client.post(
+        "/api/v1/users",
+        json={
+            "username": "scope-user",
+            "display_name": "范围用户",
+            "password": "password123",
+            "owner_scope": "PUBLIC",
+        },
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["message"] == "无效数据范围"
+
+
+def test_create_user_blank_display_name_rejected(client: TestClient):
+    response = client.post(
+        "/api/v1/users",
+        json={
+            "username": "blank-name",
+            "display_name": "   ",
+            "password": "password123",
+        },
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["message"] == "显示名称不能为空"
+
+
 def test_create_user_duplicate_username(client: TestClient):
     _create_user(client)
     response = client.post(
@@ -289,6 +318,28 @@ def test_update_user_invalid_role(client: TestClient):
     assert response.json()["message"] == "无效角色"
 
 
+def test_update_user_invalid_owner_scope_rejected(client: TestClient):
+    created = _create_user(client)
+    response = client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"owner_scope": "PUBLIC"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["message"] == "无效数据范围"
+
+
+def test_update_user_explicit_blank_display_name_rejected(client: TestClient):
+    created = _create_user(client)
+    response = client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"display_name": "   "},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["message"] == "显示名称不能为空"
+
+
 def test_update_user_success(client: TestClient):
     created = _create_user(client)
     response = client.patch(
@@ -360,6 +411,16 @@ def test_create_team_duplicate_code(client: TestClient):
     assert response.json()["message"] == "团队编码已存在"
 
 
+def test_create_team_blank_name_rejected(client: TestClient):
+    response = client.post(
+        "/api/v1/teams",
+        json={"code": "blank-name", "name": "   "},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["message"] == "团队名称不能为空"
+
+
 def test_create_team_non_admin_forbidden(client: TestClient):
     response = client.post(
         "/api/v1/teams",
@@ -395,6 +456,22 @@ def test_update_team_success(client: TestClient):
     body = response.json()
     assert body["name"] == "二组改名"
     assert body["is_active"] is False
+
+
+def test_update_team_explicit_blank_name_rejected(client: TestClient):
+    created = client.post(
+        "/api/v1/teams",
+        json={"code": "t3", "name": "三组"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert created.status_code == 201
+    response = client.patch(
+        f"/api/v1/teams/{created.json()['id']}",
+        json={"name": "   "},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert response.status_code == 422
+    assert response.json()["message"] == "团队名称不能为空"
 
 
 def test_admin_mutations_write_audit(client: TestClient, db: Session):

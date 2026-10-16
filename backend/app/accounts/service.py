@@ -16,7 +16,13 @@ from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser, owner_scope_ids
-from app.domain.enums import AccountStatus, AuditAction, SequenceKey
+from app.domain.enums import (
+    AccountStatus,
+    AuditAction,
+    BusinessMode,
+    InventoryType,
+    SequenceKey,
+)
 from app.domain.trade import Account, Order
 
 INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.value)
@@ -32,6 +38,35 @@ def _validate_account_images(value: list[str] | None) -> list[str] | None:
     if any(not isinstance(image, str) or not image.strip() for image in images):
         raise Validation("账号图片必须为非空文本", details={"field": "account_images"})
     return images
+
+
+def _validate_inventory_context(
+    business_mode: str | None,
+    inventory_type: str | None,
+) -> None:
+    if business_mode is not None and business_mode not in BusinessMode.values():
+        raise Validation("业务模式无效", details={"field": "business_mode"})
+    if inventory_type is not None and inventory_type not in InventoryType.values():
+        raise Validation("库存类型无效", details={"field": "inventory_type"})
+    if business_mode is None or inventory_type is None:
+        return
+
+    allowed_types = {
+        BusinessMode.SELF.value: {InventoryType.RECOVERY.value},
+        BusinessMode.DISTRIBUTION.value: {
+            InventoryType.PICKUP.value,
+            InventoryType.CONSIGNMENT.value,
+        },
+    }[business_mode]
+    if inventory_type not in allowed_types:
+        raise Validation(
+            "业务模式与库存类型不匹配",
+            details={
+                "field": "inventory_type",
+                "business_mode": business_mode,
+                "inventory_type": inventory_type,
+            },
+        )
 
 
 def create_account(
@@ -62,6 +97,7 @@ def create_account(
             code=ErrorCode.DUPLICATE_CODE,
             details={"inventory_no": exists.inventory_no},
         )
+    _validate_inventory_context(business_mode, inventory_type)
     validated_images = _validate_account_images(account_images)
     account = Account(
         inventory_no=allocate_number(session, SequenceKey.ACCOUNT),

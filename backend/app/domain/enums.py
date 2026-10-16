@@ -188,6 +188,21 @@ class AccountStatus(StrEnum):
     VOID = "VOID"  # 取消/失效
 
 
+class BusinessMode(StrEnum):
+    """库存账号所属业务模式。"""
+
+    SELF = "SELF"
+    DISTRIBUTION = "DISTRIBUTION"
+
+
+class InventoryType(StrEnum):
+    """库存账号的业务来源类型。"""
+
+    RECOVERY = "RECOVERY"
+    PICKUP = "PICKUP"
+    CONSIGNMENT = "CONSIGNMENT"
+
+
 class InstallmentContractType(StrEnum):
     """STOCK_SALE 仅已买入 HS；ADVANCE_PURCHASE 仅 DFQ，两者不可混用。"""
 

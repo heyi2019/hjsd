@@ -50,6 +50,31 @@ def _buy(seeded_db, account, amount="500"):
 
 
 class TestCreateAccountGuards:
+    def test_unknown_business_mode_is_rejected(self, seeded_db):
+        with pytest.raises(Validation, match="业务模式无效"):
+            _account(
+                seeded_db,
+                "invalid-business-mode",
+                business_mode="UNKNOWN",
+            )
+
+    def test_unknown_inventory_type_is_rejected(self, seeded_db):
+        with pytest.raises(Validation, match="库存类型无效"):
+            _account(
+                seeded_db,
+                "invalid-inventory-type",
+                inventory_type="UNKNOWN",
+            )
+
+    def test_business_mode_and_inventory_type_must_match(self, seeded_db):
+        with pytest.raises(Validation, match="业务模式与库存类型不匹配"):
+            _account(
+                seeded_db,
+                "invalid-inventory-context",
+                business_mode="SELF",
+                inventory_type="CONSIGNMENT",
+            )
+
     def test_account_creation_rejects_more_than_nine_images(self, seeded_db):
         with pytest.raises(Validation, match="最多 9 张"):
             _account(

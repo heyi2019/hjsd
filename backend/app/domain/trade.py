@@ -305,6 +305,7 @@ class OrderProfitAllocation(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("order_id", "user_id", "role", name="uq_order_profit_alloc"),
         CheckConstraint("allocation_rate >= 0", name="rate_nonneg"),
+        CheckConstraint("allocation_rate <= 100", name="rate_max"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -418,6 +419,10 @@ class Deposit(Base, AuditMixin):
             "paid_amount >= 0 AND returned_amount >= 0 AND lost_amount >= 0",
             name="amount_nonneg",
         ),
+        CheckConstraint(
+            "returned_amount + lost_amount <= paid_amount",
+            name="released_amount_within_paid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -458,6 +463,7 @@ class RebateRecord(Base, AuditMixin):
             "rate >= 0 AND base_amount >= 0",
             name="amount_nonneg",
         ),
+        CheckConstraint("rate <= 100", name="rate_max"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

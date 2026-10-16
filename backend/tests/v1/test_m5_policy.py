@@ -8,9 +8,11 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.core.money import to_money
 from app.domain.enums import PolicyStatus, PolicyType
+from app.domain.trade import OrderProfitAllocation
 from app.orders import service as order_service
 from app.policy import service as policy_service
 
@@ -348,6 +350,19 @@ class TestProfitAllocation:
         return order_service.create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
+
+    def test_allocation_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
+        order = self._order(seeded_db)
+        seeded_db.add(
+            OrderProfitAllocation(
+                order_id=order.id,
+                role="OWNER",
+                allocation_rate=101,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
 
     def test_fifty_fifty(self, seeded_db):
         order = self._order(seeded_db)

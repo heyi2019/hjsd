@@ -42,6 +42,17 @@ def _active_order(seeded_db) -> int:
 
 
 class TestDepositQueries:
+    def test_deposit_returned_and_lost_amount_cannot_exceed_paid_amount(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = service.create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
+            actor="pytest",
+        )
+        deposit.returned_amount = Decimal("101")
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_internal_cashflow_requires_transfer_id(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         seeded_db.add(
@@ -184,6 +195,20 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
+        order_id = _active_order(seeded_db)
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order_id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        record.rate = Decimal("101")
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_rebate_settlement_net_amount_matches_gross_less_fee(self, seeded_db):
         order_id = _active_order(seeded_db)
         record = service.create_rebate(

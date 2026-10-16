@@ -78,6 +78,10 @@ def _rebuild(bind, tname: str) -> None:
         ddl = ddl.replace("\tlost_on DATE, \n", "")
         ddl = ddl.replace("'LOST', ", "")
         ddl = ddl.replace(" AND lost_amount >= 0", "")
+        ddl = ddl.replace(
+            "\tCONSTRAINT ck_deposits_released_amount_within_paid CHECK (returned_amount + lost_amount <= paid_amount), \n",
+            "",
+        )
     # rebate_group_no 在 0022 才统一命名为 rebate_no；0009 必须保留旧列，
     # 避免当前 ORM 重命名后在历史重建阶段提前丢失数据。
     if tname == "rebate_records" and "rebate_group_no" in source_columns:

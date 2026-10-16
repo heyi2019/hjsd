@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from app.accounts import service as account_service
 from app.core.money import to_money
+from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     Direction,
@@ -432,3 +433,35 @@ class TestReportsApiDateParams:
         )
         assert profit.status_code == 200, profit.text
         assert [item["trade_date"] for item in profit.json()["items"]] == ["2026-10-04"]
+
+    def test_reports_follow_owner_and_pool_scope(self, seeded_client, seeded_db):
+        mine = _order(seeded_db)
+        mine.owner_id = 9
+        other = _order(seeded_db)
+        other.owner_id = 8
+        seeded_db.flush()
+        for order, amount in ((mine, "100"), (other, "200")):
+            order_service.post_event(
+                seeded_db, order.id, event_type="BUY", amount=amount,
+                occurred_on=D, actor="pytest",
+            )
+
+        operator = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        operator_headers = {"Authorization": f"Bearer {build_access_token(operator)}"}
+        profit = seeded_client.get("/api/v1/reports/order-profit", headers=operator_headers)
+        assert profit.status_code == 200, profit.text
+        assert [row["order_no"] for row in profit.json()["items"]] == [mine.order_no]
+
+        finance = CurrentUser.build(
+            id=9,
+            username="finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        finance_headers = {"Authorization": f"Bearer {build_access_token(finance)}"}
+        funds = seeded_client.get("/api/v1/reports/daily-funds", headers=finance_headers)
+        assert funds.status_code == 200, funds.text
+        assert {row["pool_code"] for row in funds.json()["items"]} == {"HJ_INVEST"}

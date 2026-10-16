@@ -26,8 +26,7 @@ def inventory_health(
     user: CurrentUser = read_access,
 ) -> dict:
     """R1 库存健康表（回收与提号账号统一纳入库存）。"""
-    del user
-    return service.r1_inventory_health(db)
+    return service.r1_inventory_health(db, user=user)
 
 
 @router.get("/reports/monthly-pnl")
@@ -38,8 +37,7 @@ def monthly_pnl(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> dict:
     """R2 月度经营损益（账号 COST 不进运营费用）。"""
-    del user
-    return service.r2_monthly_pnl(db, from_date=from_date, to_date=to_date)
+    return service.r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/commission")
@@ -50,8 +48,7 @@ def commission(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> dict:
     """R3 提成对账：人员可钻取到每一单。"""
-    del user
-    return service.r3_commission_reconciliation(db, from_date=from_date, to_date=to_date)
+    return service.r3_commission_reconciliation(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/business-pnl")
@@ -62,8 +59,7 @@ def business_pnl(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> dict:
     """R5 业务级损益：未归集返点独立列，不摊给业务。"""
-    del user
-    return service.r5_business_pnl(db, from_date=from_date, to_date=to_date)
+    return service.r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/daily-funds")
@@ -73,8 +69,7 @@ def daily_funds(
     on: date | None = Query(default=None),
 ) -> dict:
     """资金日报：与 FIN-01 同日口径一致。"""
-    del user
-    return service.daily_funds_report(db, on=on)
+    return service.daily_funds_report(db, on=on, user=user)
 
 
 @router.get("/reports/order-profit")
@@ -85,8 +80,7 @@ def order_profit(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> dict:
     """订单利润明细：合计与 R5 对应维度一致。"""
-    del user
-    return service.order_profit_detail(db, from_date=from_date, to_date=to_date)
+    return service.order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
 
 
 __all__ = ["router"]

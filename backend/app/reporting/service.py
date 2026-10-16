@@ -17,6 +17,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
+from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AccountStatus,
     Direction,
@@ -48,8 +49,23 @@ def _month_key(value: date) -> str:
     return f"{value.year:04d}-{value.month:02d}"
 
 
+def _apply_order_scope(stmt, user: CurrentUser | None, session: Session):
+    if user is None:
+        return stmt
+    scope = owner_scope_filter(Order.owner_id, user, session)
+    return stmt.where(scope) if scope is not None else stmt
+
+
+def _visible_pool_ids(user: CurrentUser | None) -> set[int] | None:
+    if user is None or user.is_admin or user.owner_scope == "ALL":
+        return None
+    return set(user.pool_ids)
+
+
 # --------------------------------------------------------------------- R1 库存
-def r1_inventory_health(session: Session) -> dict[str, Any]:
+def r1_inventory_health(
+    session: Session, *, user: CurrentUser | None = None
+) -> dict[str, Any]:
     """R1 库存健康表：统计已采购并处于在库、待售或分期状态的账号。"""
     today = date.today()
     stock_statuses = [
@@ -60,25 +76,36 @@ def r1_inventory_health(session: Session) -> dict[str, Any]:
 
     order_cost: dict[int, Decimal] = defaultdict(lambda: ZERO)
     rows = session.execute(
-        select(OrderEvent.order_id, func.sum(OrderEvent.amount)).where(
-            OrderEvent.event_type.in_(
-                [EventType.BUY.value, EventType.COST.value]
-            )
+        _apply_order_scope(
+            select(OrderEvent.order_id, func.sum(OrderEvent.amount))
+            .join(Order, Order.id == OrderEvent.order_id)
+            .where(
+                OrderEvent.event_type.in_([EventType.BUY.value, EventType.COST.value])
+            ),
+            user,
+            session,
         ).group_by(OrderEvent.order_id)
     ).all()
     for order_id, amount in rows:
         order_cost[order_id] += _money(amount)
 
-    active = session.scalars(
-        select(Order).where(Order.status == OrderStatus.ACTIVE.value)
-    ).all()
+    active_stmt = select(Order).where(Order.status == OrderStatus.ACTIVE.value)
+    active_stmt = _apply_order_scope(active_stmt, user, session)
+    active = session.scalars(active_stmt).all()
     order_by_account: dict[int, list[Order]] = defaultdict(list)
     for order in active:
         if order.account_id is not None:
             order_by_account[order.account_id].append(order)
 
     items = []
-    accounts = session.scalars(select(Account)).all()
+    account_stmt = select(Account)
+    if user is not None and not user.is_admin and user.owner_scope != "ALL":
+        visible_order_ids = select(Order.account_id).where(Order.account_id.is_not(None))
+        visible_order_ids = _apply_order_scope(visible_order_ids, user, session)
+        account_stmt = account_stmt.where(
+            (Account.created_by == user.username) | Account.id.in_(visible_order_ids)
+        )
+    accounts = session.scalars(account_stmt).all()
     for account in accounts:
         if account.status not in stock_statuses:
             continue
@@ -121,19 +148,24 @@ def r1_inventory_health(session: Session) -> dict[str, Any]:
 
 # --------------------------------------------------------------------- R2 月度
 def r2_monthly_pnl(
-    session: Session, *, from_date: date | None = None, to_date: date | None = None
+    session: Session, *, from_date: date | None = None, to_date: date | None = None,
+    user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R2 月度经营损益：账号 COST 归直接成本，不进运营费用。"""
     events = session.execute(
-        select(
-            OrderEvent.event_type,
-            OrderEvent.occurred_on,
-            OrderEvent.amount,
-            Order.order_type,
-            Order.capital_type,
+        _apply_order_scope(
+            select(
+                OrderEvent.event_type,
+                OrderEvent.occurred_on,
+                OrderEvent.amount,
+                Order.order_type,
+                Order.capital_type,
+            )
+            .join(Order, Order.id == OrderEvent.order_id)
+            .where(OrderEvent.is_posted.is_(True)),
+            user,
+            session,
         )
-        .join(Order, Order.id == OrderEvent.order_id)
-        .where(OrderEvent.is_posted.is_(True))
     ).all()
 
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -150,12 +182,14 @@ def r2_monthly_pnl(
             direct_cost[key] += _money(amount)
 
     # 运营费用 = 非订单来源的业务支出流水（账号 COST 走事件，不在此列）
-    op_rows = session.execute(
-        select(Cashflow.occurred_on, Cashflow.amount).where(
-            Cashflow.nature == Nature.BUSINESS_OUT.value,
-            Cashflow.order_event_id.is_(None),
-        )
-    ).all()
+    op_stmt = select(Cashflow.occurred_on, Cashflow.amount).where(
+        Cashflow.nature == Nature.BUSINESS_OUT.value,
+        Cashflow.order_event_id.is_(None),
+    )
+    pool_ids = _visible_pool_ids(user)
+    if pool_ids is not None:
+        op_stmt = op_stmt.where(Cashflow.pool_id.in_(pool_ids))
+    op_rows = session.execute(op_stmt).all()
     operating: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for occurred_on, amount in op_rows:
         if from_date and occurred_on < from_date:
@@ -164,13 +198,17 @@ def r2_monthly_pnl(
             continue
         operating[_month_key(occurred_on)] += _money(amount)
 
-    rebate_rows = session.execute(
+    rebate_stmt = (
         select(
             RebateSettlement.settled_on,
             RebateSettlement.gross_amount,
             RebateSettlement.platform_fee,
         )
-    ).all()
+        .join(RebateRecord, RebateRecord.id == RebateSettlement.rebate_record_id)
+        .join(Order, Order.id == RebateRecord.source_order_id)
+    )
+    rebate_stmt = _apply_order_scope(rebate_stmt, user, session)
+    rebate_rows = session.execute(rebate_stmt).all()
     rebate_net: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for settled_on, gross, fee in rebate_rows:
         if from_date and settled_on < from_date:
@@ -201,21 +239,28 @@ def r2_monthly_pnl(
 
 # --------------------------------------------------------------------- R3 提成
 def r3_commission_reconciliation(
-    session: Session, *, from_date: date | None = None, to_date: date | None = None
+    session: Session, *, from_date: date | None = None, to_date: date | None = None,
+    user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R3 提成对账：按人员钻取到单；无规则版本时提成率为 0（不臆造）。"""
     rows = session.execute(
-        select(OrderProfitAllocation, Order).join(
-            Order, Order.id == OrderProfitAllocation.order_id
-        ).where(
-            Order.status.in_([OrderStatus.COMPLETED.value, OrderStatus.ACTIVE.value])
+        _apply_order_scope(
+            select(OrderProfitAllocation, Order)
+            .join(Order, Order.id == OrderProfitAllocation.order_id)
+            .where(Order.status.in_([OrderStatus.COMPLETED.value, OrderStatus.ACTIVE.value])),
+            user,
+            session,
         )
     ).all()
 
     per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)
     events = session.execute(
-        select(OrderEvent.order_id, OrderEvent.event_type, OrderEvent.amount).where(
-            OrderEvent.is_posted.is_(True)
+        _apply_order_scope(
+            select(OrderEvent.order_id, OrderEvent.event_type, OrderEvent.amount)
+            .join(Order, Order.id == OrderEvent.order_id)
+            .where(OrderEvent.is_posted.is_(True)),
+            user,
+            session,
         )
     ).all()
     for order_id, event_type, amount in events:
@@ -264,18 +309,23 @@ def r3_commission_reconciliation(
 
 # --------------------------------------------------------------------- R5 业务
 def r5_business_pnl(
-    session: Session, *, from_date: date | None = None, to_date: date | None = None
+    session: Session, *, from_date: date | None = None, to_date: date | None = None,
+    user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R5 业务级损益：未归集返点独立列，不摊给业务。"""
     rows = session.execute(
-        select(
-            Order.order_type,
-            OrderEvent.event_type,
-            OrderEvent.amount,
-            OrderEvent.occurred_on,
+        _apply_order_scope(
+            select(
+                Order.order_type,
+                OrderEvent.event_type,
+                OrderEvent.amount,
+                OrderEvent.occurred_on,
+            )
+            .join(OrderEvent, OrderEvent.order_id == Order.id)
+            .where(OrderEvent.is_posted.is_(True)),
+            user,
+            session,
         )
-        .join(OrderEvent, OrderEvent.order_id == Order.id)
-        .where(OrderEvent.is_posted.is_(True))
     ).all()
 
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -292,11 +342,18 @@ def r5_business_pnl(
 
     settled: dict[str, Decimal] = defaultdict(lambda: ZERO)
     unsettled: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    rebates = session.execute(
+    rebate_stmt = (
         select(RebateRecord, RebateSettlement.gross_amount, RebateSettlement.platform_fee, Order.order_type)
         .outerjoin(RebateSettlement, RebateSettlement.rebate_record_id == RebateRecord.id)
         .outerjoin(Order, Order.id == RebateRecord.source_order_id)
-    ).all()
+    )
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            rebate_stmt = rebate_stmt.where(
+                (RebateRecord.source_order_id.is_(None)) | scope
+            )
+    rebates = session.execute(rebate_stmt).all()
     for record, gross, fee, order_type in rebates:
         bucket = order_type or "UNCOLLECTED"
         if gross is None:
@@ -327,13 +384,19 @@ def r5_business_pnl(
 
 
 # --------------------------------------------------------------------- 资金日报
-def daily_funds_report(session: Session, *, on: date | None = None) -> dict[str, Any]:
+def daily_funds_report(
+    session: Session, *, on: date | None = None, user: CurrentUser | None = None
+) -> dict[str, Any]:
     """资金日报：各池期初/收入/支出/押金/可用余额。"""
     from app.orders.service import pool_balance
 
     target = on or date.today()
     items = []
-    for pool in session.scalars(select(Pool)).all():
+    pool_stmt = select(Pool)
+    pool_ids = _visible_pool_ids(user)
+    if pool_ids is not None:
+        pool_stmt = pool_stmt.where(Pool.id.in_(pool_ids))
+    for pool in session.scalars(pool_stmt).all():
         opening = _money(
             session.scalar(
                 select(
@@ -395,10 +458,12 @@ def daily_funds_report(session: Session, *, on: date | None = None) -> dict[str,
 
 # --------------------------------------------------------------------- 订单利润
 def order_profit_detail(
-    session: Session, *, from_date: date | None = None, to_date: date | None = None
+    session: Session, *, from_date: date | None = None, to_date: date | None = None,
+    user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """订单利润明细：合计与 R5 对应维度一致，可导出但不改原始数据。"""
-    orders = session.scalars(select(Order)).all()
+    orders_stmt = _apply_order_scope(select(Order), user, session)
+    orders = session.scalars(orders_stmt).all()
     items = []
     for order in orders:
         if from_date and order.trade_date < from_date:

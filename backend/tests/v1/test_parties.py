@@ -271,6 +271,36 @@ class TestPartiesApi:
         )
         assert disabled.json()["status"] == "DISABLED"
 
+    def test_patch_can_clear_customer_and_counterparty_contacts(self, seeded_client, headers):
+        customer = seeded_client.post(
+            CUSTOMERS,
+            json={"display_name": "客户A", "phone": "13800000000", "wechat": "wx-a", "note": "旧"},
+            headers=headers,
+        ).json()["customer"]
+        customer_updated = seeded_client.patch(
+            f"{CUSTOMERS}/{customer['id']}",
+            json={"phone": None, "wechat": None, "note": None},
+            headers=headers,
+        )
+        assert customer_updated.status_code == 200, customer_updated.text
+        assert customer_updated.json()["phone"] is None
+        assert customer_updated.json()["wechat"] is None
+        assert customer_updated.json()["note"] is None
+
+        counterparty = seeded_client.post(
+            COUNTERPARTIES,
+            json={"display_name": "同行A", "type": "PEER", "phone": "13800000001", "note": "旧"},
+            headers=headers,
+        ).json()
+        counterparty_updated = seeded_client.patch(
+            f"{COUNTERPARTIES}/{counterparty['id']}",
+            json={"phone": None, "note": None},
+            headers=headers,
+        )
+        assert counterparty_updated.status_code == 200, counterparty_updated.text
+        assert counterparty_updated.json()["phone"] is None
+        assert counterparty_updated.json()["note"] is None
+
     def test_field_definition_endpoints(self, seeded_client, headers):
         created = seeded_client.post(
             FIELDS,

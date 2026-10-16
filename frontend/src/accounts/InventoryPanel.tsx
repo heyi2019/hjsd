@@ -476,7 +476,6 @@ export function InventoryPanel() {
               type="link"
               size="small"
               aria-label="编辑"
-              disabled={row.status === "SOLD"}
               onClick={(event) => {
                 event.stopPropagation();
                 openProfile(row, "all");

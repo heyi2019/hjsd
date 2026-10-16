@@ -253,7 +253,7 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
     expect(screen.getByRole("button", { name: "寄售" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "下架" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "编辑" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "编辑" })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: "账号描述" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "账号图片" })).toBeDisabled();
   });

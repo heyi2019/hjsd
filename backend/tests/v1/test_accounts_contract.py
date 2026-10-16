@@ -49,6 +49,20 @@ def _buy(seeded_db, account, amount="500"):
 
 
 class TestCreateAccountGuards:
+    def test_sold_account_profile_remains_editable(self, seeded_db):
+        account = _account(seeded_db, "sold-editable")
+        order = _buy(seeded_db, account, amount="500")
+        orders_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount=Decimal("800"),
+            occurred_on=TODAY, actor="pytest",
+        )
+
+        updated = service.update_account_profile(
+            seeded_db, account.id, actor="pytest", note="售出后补充说明"
+        )
+
+        assert updated.note == "售出后补充说明"
+
     def test_account_profile_update_is_recorded_as_account_audit(self, seeded_db):
         account = _account(seeded_db, "audited-account")
         service.update_account_profile(

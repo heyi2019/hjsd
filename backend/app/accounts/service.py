@@ -99,8 +99,6 @@ def update_account_profile(
     note: str | None = None,
 ) -> Account:
     account = get_account(session, account_id)
-    if account.status == AccountStatus.SOLD.value:
-        raise Conflict("已售账号不可编辑", code=ErrorCode.ORDER_STATUS_CONFLICT)
     before = {
         "game_account": account.game_account,
         "game_type": account.game_type,

@@ -133,6 +133,18 @@ class TestUpdateCustomer:
                 user=_scoped_user(),
             )
 
+    def test_scoped_user_cannot_reassign_customer_to_other_owner(
+        self, seeded_client, seeded_db
+    ):
+        customer = _customer(seeded_db, "归属不可转移", owner_id=9)
+        response = seeded_client.patch(
+            f"{CUSTOMERS}/{customer.id}",
+            json={"owner_id": 1},
+            headers={"Authorization": f"Bearer {build_access_token(_scoped_user())}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["owner_id"] == 9
+
     def test_merged_customer_cannot_be_updated(self, seeded_db):
         source = _customer(seeded_db, "源")
         target = _customer(seeded_db, "目标")

@@ -241,6 +241,9 @@ def update_customer(
             details={"customer_no": customer.customer_no},
         )
 
+    if "owner_id" in fields and user is not None and not user.is_admin and user.owner_scope != "ALL":
+        fields["owner_id"] = user.id
+
     before = {name: getattr(customer, name) for name in CONTACT_FIELDS}
     changed_contacts = False
     for name, value in fields.items():

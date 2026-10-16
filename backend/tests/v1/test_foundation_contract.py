@@ -90,6 +90,18 @@ class TestOrderTypeGuards:
             )
         assert "排序值不能为负数" in str(exc.value)
 
+    def test_duplicate_sequence_prefix_rejected(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.create_order_type(
+                seeded_db,
+                code="TB",
+                name="同行代收",
+                capital_type=CapitalType.PASS_THRU.value,
+                sequence_prefix="HS",
+                actor="pytest",
+            )
+        assert "编号前缀 HS 已存在" in str(exc.value)
+
     def test_negative_sort_order_rejected_on_update(self, seeded_db):
         definition = service.get_order_type_by_code(seeded_db, "DG")
         with pytest.raises(Validation) as exc:
@@ -109,6 +121,22 @@ class TestOrderTypeGuards:
                     sequence_key="ORDER_TB",
                     is_active=False,
                     sort_order=-1,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
+    def test_database_rejects_duplicate_sequence_prefix(self, seeded_db):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                OrderTypeDef.__table__.insert().values(
+                    code="TB",
+                    name="同行代收",
+                    capital_type=CapitalType.PASS_THRU.value,
+                    sequence_prefix="HS",
+                    sequence_key="ORDER_TB",
+                    is_active=False,
+                    sort_order=0,
                     created_by="pytest",
                     updated_by="pytest",
                 )

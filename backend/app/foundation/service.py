@@ -295,9 +295,15 @@ def create_order_type(
             code=ErrorCode.DUPLICATE_CODE,
             details={"code": normalized},
         )
+    prefix = (sequence_prefix or normalized).strip().upper()
+    if not prefix:
+        raise Validation("编号前缀不能为空", details={"field": "sequence_prefix"})
+    if session.scalar(
+        select(OrderTypeDef.id).where(OrderTypeDef.sequence_prefix == prefix)
+    ) is not None:
+        raise Validation(f"编号前缀 {prefix} 已存在", details={"sequence_prefix": prefix})
     # 编号域随业务动态生成（如 TB -> ORDER_TB），不要求进入封闭枚举
     sequence_key = f"ORDER_{normalized}"
-    prefix = (sequence_prefix or normalized).strip().upper()
     order_type = OrderTypeDef(
         code=normalized,
         name=name.strip(),

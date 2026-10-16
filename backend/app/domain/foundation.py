@@ -77,6 +77,7 @@ class OrderTypeDef(Base, AuditMixin):
         ),
         CheckConstraint("sort_order >= 0", name="order_type_sort_order_nonnegative"),
         UniqueConstraint("code", name="uq_order_type_defs_code"),
+        UniqueConstraint("sequence_prefix", name="uq_order_type_defs_sequence_prefix"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

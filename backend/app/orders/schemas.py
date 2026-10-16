@@ -34,6 +34,28 @@ class OrderAccountCreate(BaseModel):
     note: str | None = None
 
 
+class InitialBuyCreate(BaseModel):
+    amount: Decimal = Field(ge=0)
+    occurred_on: date
+    pool_id: int | None = None
+    portion: str = "PRINCIPAL"
+    note: str | None = None
+
+
+class OrderInstallmentCreate(BaseModel):
+    contract_type: str = Field(description="ADVANCE_PURCHASE")
+    principal: Decimal = Field(default=Decimal("0"), ge=0)
+    down_payment: Decimal = Field(default=Decimal("0"), ge=0)
+    service_fee: Decimal = Field(default=Decimal("0"), ge=0)
+    periods: int = Field(gt=0)
+    per_period_service_fee: Decimal = Field(default=Decimal("0"), ge=0)
+    per_period: Decimal = Field(default=Decimal("0"), ge=0)
+    first_due_on: date
+    delivery_mode: str | None = None
+    note: str | None = None
+    schedule: list[dict[str, date | int]] | None = None
+
+
 class OrderCreate(BaseModel):
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
@@ -49,6 +71,8 @@ class OrderCreate(BaseModel):
     note: str | None = None
     customer_roles: list[PartyRole] = Field(default_factory=list)
     counterparty_roles: list[PartyRole] = Field(default_factory=list)
+    initial_buy: InitialBuyCreate | None = None
+    installment: OrderInstallmentCreate | None = None
 
 
 class OrderOut(BaseModel):
@@ -145,8 +169,10 @@ __all__ = [
     "EventCreate",
     "EventOut",
     "EventPostResult",
+    "InitialBuyCreate",
     "OrderAccountCreate",
     "OrderCreate",
+    "OrderInstallmentCreate",
     "OrderOut",
     "OrderListOut",
     "PartyRole",

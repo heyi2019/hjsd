@@ -588,6 +588,87 @@ class TestOrdersApi:
         assert response.json()["commission_payer"] == "CONSIGNOR"
         assert response.json()["expected_settlement_date"] == "2026-10-20"
 
+    def test_dfq_composite_create_persists_buy_and_installment(
+        self, seeded_client, seeded_db, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DFQ",
+                "trade_date": D.isoformat(),
+                "initial_buy": {
+                    "amount": "800.00",
+                    "occurred_on": D.isoformat(),
+                    "pool_id": 1,
+                    "portion": "PRINCIPAL",
+                },
+                "installment": {
+                    "contract_type": "ADVANCE_PURCHASE",
+                    "principal": "800.00",
+                    "down_payment": "0",
+                    "service_fee": "80.00",
+                    "periods": 2,
+                    "per_period_service_fee": "40.00",
+                    "per_period": "440.00",
+                    "first_due_on": "2026-11-01",
+                    "schedule": [
+                        {"period_no": 1, "due_on": "2026-11-01"},
+                        {"period_no": 2, "due_on": "2026-12-01"},
+                    ],
+                },
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 201, response.text
+        order_id = response.json()["id"]
+        assert seeded_db.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order_id,
+                OrderEvent.event_type == "BUY",
+                OrderEvent.is_posted.is_(True),
+            )
+        ) is not None
+        contract = seeded_db.scalar(
+            select(Installment).where(Installment.order_id == order_id)
+        )
+        assert contract is not None
+        assert contract.contract_type == "ADVANCE_PURCHASE"
+
+    def test_dfq_composite_create_rolls_back_when_contract_is_invalid(
+        self, seeded_client, seeded_db, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DFQ",
+                "trade_date": D.isoformat(),
+                "note": "atomic-dfq-failure",
+                "initial_buy": {
+                    "amount": "800.00",
+                    "occurred_on": D.isoformat(),
+                    "pool_id": 1,
+                },
+                "installment": {
+                    "contract_type": "STOCK_SALE",
+                    "principal": "800.00",
+                    "periods": 1,
+                    "first_due_on": "2026-11-01",
+                },
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 422, response.text
+        # 测试夹具将 get_db 替换为只 yield 会话，显式模拟生产依赖的异常回滚。
+        seeded_db.rollback()
+        assert seeded_db.scalar(
+            select(Order.id).where(Order.note == "atomic-dfq-failure")
+        ) is None
+        assert seeded_db.scalar(
+            select(OrderEvent.id).where(OrderEvent.note == "atomic-dfq-failure")
+        ) is None
+
     def test_list_and_get_endpoints(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
         order_service.post_event(

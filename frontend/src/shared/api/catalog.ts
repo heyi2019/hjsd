@@ -379,6 +379,26 @@ export const ordersApi = {
     note?: string;
     customer_roles?: { customer_id: number; role: string }[];
     counterparty_roles?: { counterparty_id: number; role: string }[];
+    initial_buy?: {
+      amount: string;
+      occurred_on: string;
+      pool_id?: number;
+      portion?: string;
+      note?: string;
+    };
+    installment?: {
+      contract_type: string;
+      principal: string;
+      down_payment: string;
+      service_fee: string;
+      periods: number;
+      per_period_service_fee: string;
+      per_period: string;
+      first_due_on: string;
+      delivery_mode?: string;
+      note?: string;
+      schedule?: { period_no: number; due_on: string }[];
+    };
   }) => api.post<Order>("/orders", payload).then((r) => r.data),
   postEvent: (
     orderId: number,

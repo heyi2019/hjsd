@@ -8,7 +8,6 @@ import {
   accountsApi,
   counterpartiesApi,
   customersApi,
-  installmentsApi,
   ordersApi,
   poolsApi,
   orderTypesApi,
@@ -180,30 +179,28 @@ export function CreateBusinessModal(props: {
           trade_date: today(),
           note: values.dfq_note as string,
           customer_roles: [{ customer_id: customer.customer.id, role: "INSTALLMENT_CUSTOMER" }],
-        });
-        await ordersApi.postEvent(order.id, {
-          event_type: "BUY",
-          amount: String(values.dfq_total_amount ?? 0),
-          occurred_on: today(),
-          portion: "PRINCIPAL",
-          pool_id: values.dfq_payment_pool_id as number,
-          note: `代付剩余号款｜付款对象：${String(values.dfq_payment_recipient || "供货方")}${values.dfq_payment_note ? `｜${String(values.dfq_payment_note)}` : ""}`,
-        });
-        await installmentsApi.create({
-          order_id: order.id,
-          contract_type: "ADVANCE_PURCHASE",
-          principal: String(values.dfq_total_amount ?? 0),
-          down_payment: "0",
-          service_fee: String(values.dfq_service_fee ?? 0),
-          periods: Number(values.dfq_periods ?? 1),
-          per_period_service_fee: String(values.dfq_period_service_fee ?? 0),
-          per_period: String(values.dfq_period_amount ?? 0),
-          first_due_on: toDateString((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined)?.[0]?.due_on),
-          schedule: ((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined) ?? []).map((item, index) => ({
-            period_no: index + 1,
-            due_on: toDateString(item.due_on),
-          })),
-          note: values.dfq_note as string,
+          initial_buy: {
+            amount: String(values.dfq_total_amount ?? 0),
+            occurred_on: today(),
+            portion: "PRINCIPAL",
+            pool_id: values.dfq_payment_pool_id as number,
+            note: `代付剩余号款｜付款对象：${String(values.dfq_payment_recipient || "供货方")}${values.dfq_payment_note ? `｜${String(values.dfq_payment_note)}` : ""}`,
+          },
+          installment: {
+            contract_type: "ADVANCE_PURCHASE",
+            principal: String(values.dfq_total_amount ?? 0),
+            down_payment: "0",
+            service_fee: String(values.dfq_service_fee ?? 0),
+            periods: Number(values.dfq_periods ?? 1),
+            per_period_service_fee: String(values.dfq_period_service_fee ?? 0),
+            per_period: String(values.dfq_period_amount ?? 0),
+            first_due_on: toDateString((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined)?.[0]?.due_on),
+            schedule: ((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined) ?? []).map((item, index) => ({
+              period_no: index + 1,
+              due_on: toDateString(item.due_on),
+            })),
+            note: values.dfq_note as string,
+          },
         });
         message.success("代分期订单已创建");
         props.onClose();

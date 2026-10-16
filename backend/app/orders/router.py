@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.errors import Validation
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
@@ -21,6 +22,7 @@ from app.core.security import (
 )
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import Account, Installment, OrderEvent
+from app.installments import service as installments_service
 from app.orders import schemas, service
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
@@ -138,6 +140,11 @@ def create_order(
     db: Session = Depends(get_db),
     user: CurrentUser = create_orders,
 ) -> schemas.OrderOut:
+    if (payload.initial_buy is None) != (payload.installment is None):
+        raise Validation("初始买入和分期合约必须同时提交")
+    normalized_order_type = payload.order_type.strip().upper()
+    if payload.initial_buy is not None and normalized_order_type != "DFQ":
+        raise Validation("只有 DFQ 订单可以在创建时提交初始买入和代分期合约")
     owner_id = (
         payload.owner_id
         if user.is_admin or user.owner_scope == "ALL"
@@ -145,7 +152,7 @@ def create_order(
     )
     order = service.create_order(
         db,
-        order_type=payload.order_type.strip().upper(),
+        order_type=normalized_order_type,
         trade_date=payload.trade_date,
         listing_price=payload.listing_price,
         service_fee=payload.service_fee,
@@ -170,6 +177,35 @@ def create_order(
         ],
         user=user,
     )
+    if payload.initial_buy is not None and payload.installment is not None:
+        service.post_event(
+            db,
+            order.id,
+            event_type="BUY",
+            amount=payload.initial_buy.amount,
+            occurred_on=payload.initial_buy.occurred_on,
+            actor=_actor(user),
+            pool_id=payload.initial_buy.pool_id,
+            portion=payload.initial_buy.portion,
+            note=payload.initial_buy.note,
+        )
+        installments_service.create_installment(
+            db,
+            order_id=order.id,
+            contract_type=payload.installment.contract_type,
+            principal=payload.installment.principal,
+            down_payment=payload.installment.down_payment,
+            service_fee=payload.installment.service_fee,
+            periods=payload.installment.periods,
+            per_period_service_fee=payload.installment.per_period_service_fee,
+            per_period=payload.installment.per_period,
+            first_due_on=payload.installment.first_due_on,
+            delivery_mode=payload.installment.delivery_mode,
+            note=payload.installment.note,
+            schedule=payload.installment.schedule,
+            actor=_actor(user),
+            user=user,
+        )
     return schemas.OrderOut.model_validate(order)
 
 

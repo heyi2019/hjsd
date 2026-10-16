@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, CapitalType, OrderStatus
 from app.parties import service as parties_service
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
@@ -608,6 +608,40 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_scoped_user_cannot_choose_foreign_pool_for_composite_dfq(
+        self, seeded_client, seeded_db
+    ):
+        user = CurrentUser.build(
+            id=9,
+            username="operator",
+            roles=["OPERATOR"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(user)}"}
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DFQ",
+                "trade_date": D.isoformat(),
+                "initial_buy": {
+                    "amount": "800.00",
+                    "occurred_on": D.isoformat(),
+                    "pool_id": 2,
+                    "portion": "PRINCIPAL",
+                },
+                "installment": {
+                    "contract_type": "ADVANCE_PURCHASE",
+                    "principal": "800.00",
+                    "periods": 1,
+                    "first_due_on": "2026-11-01",
+                    "per_period": "800.00",
+                },
+            },
+            headers=headers,
+        )
+        assert response.status_code == 404, response.text
+
     def test_scoped_user_cannot_assign_created_order_to_other_owner(
         self, seeded_client, seeded_db
     ):

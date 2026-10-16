@@ -193,6 +193,7 @@ def create_order(
             pool_id=payload.initial_buy.pool_id,
             portion=payload.initial_buy.portion,
             note=payload.initial_buy.note,
+            user=user,
         )
         installments_service.create_installment(
             db,

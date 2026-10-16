@@ -127,6 +127,18 @@ class TestPolicyDefinitions:
             )
         assert "name" in str(exc.value)
 
+    def test_create_definition_requires_positive_scoped_id(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            policy_service.create_definition(
+                seeded_db,
+                policy_code="SCOPED",
+                name="范围规则",
+                scope_type="ORDER_TYPE",
+                scope_id=0,
+                actor="pytest",
+            )
+        assert "scope_id" in str(exc.value)
+
 
 # ------------------------------------------------------------------ 版本
 class TestPolicyVersions:

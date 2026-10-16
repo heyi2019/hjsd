@@ -30,6 +30,8 @@ from app.domain.enums import (
     PolicyStatus,
 )
 from app.domain.parties import PolicyDefinition, PolicyVersion
+from app.domain.foundation import OrderTypeDef, Pool
+from app.domain.users import User
 from app.domain.trade import Order, OrderProfitAllocation
 from app.core.security import CurrentUser
 from app.policy.schemas import ProfitAllocationItem
@@ -126,6 +128,11 @@ def create_definition(
             f"scope_type 非法：{scope_type}",
             details={"field": "scope_type", "allowed": [s.value for s in PolicyScopeType]},
         ) from exc
+    if scope_id is not None and (isinstance(scope_id, bool) or not isinstance(scope_id, int) or scope_id <= 0):
+        raise Validation(
+            "scope_id 必须为正整数",
+            details={"field": "scope_id", "value": scope_id},
+        )
     if scope is PolicyScopeType.GLOBAL and scope_id is not None:
         raise Validation(
             "GLOBAL 范围不能指定 scope_id",
@@ -136,6 +143,17 @@ def create_definition(
         raise Validation(
             f"{scope.value} 范围必须指定 scope_id",
             details={"field": "scope_id", "scope_type": scope.value},
+        )
+    target_models = {
+        PolicyScopeType.ORDER_TYPE: OrderTypeDef,
+        PolicyScopeType.USER: User,
+        PolicyScopeType.POOL: Pool,
+    }
+    target_model = target_models.get(scope)
+    if target_model is not None and session.get(target_model, scope_id) is None:
+        raise Validation(
+            f"{scope.value} 关联对象不存在",
+            details={"field": "scope_id", "scope_type": scope.value, "scope_id": scope_id},
         )
 
     exists = session.scalar(

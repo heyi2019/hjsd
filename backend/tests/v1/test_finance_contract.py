@@ -941,6 +941,82 @@ class TestFinanceApi:
         assert target_balance["cash_balance"] == Decimal("125.50")
         assert source_balance["cash_balance"] + target_balance["cash_balance"] == Decimal("0.00")
 
+    def test_repair_unpaired_transfer_creates_only_missing_side(
+        self, seeded_db
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        profit = _pool(seeded_db, "HJ_PROFIT")
+        seeded_db.add(
+            Cashflow(
+                flow_no="TR-REPAIR-OUT",
+                pool_id=invest.id,
+                occurred_on=TODAY,
+                nature="INTERNAL",
+                category="TRANSFER",
+                direction="OUT",
+                amount=Decimal("80"),
+                transfer_id="TR-REPAIR",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+
+        result = service.repair_transfer(
+            seeded_db,
+            "TR-REPAIR",
+            counterpart_pool_id=profit.id,
+            actor="finance",
+            reason="补齐历史单边划转",
+        )
+
+        assert len(result["cashflows"]) == 2
+        rows = seeded_db.scalars(
+            select(Cashflow).where(Cashflow.transfer_id == "TR-REPAIR")
+        ).all()
+        assert {row.pool_id for row in rows} == {invest.id, profit.id}
+        assert {row.direction for row in rows} == {"IN", "OUT"}
+        assert {row.amount for row in rows} == {Decimal("80.00")}
+
+        with pytest.raises(Validation, match="已完整"):
+            service.repair_transfer(
+                seeded_db,
+                "TR-REPAIR",
+                counterpart_pool_id=profit.id,
+                actor="finance",
+                reason="重复修复",
+            )
+
+    def test_repair_transfer_endpoint(self, seeded_client, seeded_db, headers):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        profit = _pool(seeded_db, "HJ_PROFIT")
+        seeded_db.add(
+            Cashflow(
+                flow_no="TR-REPAIR-API-OUT",
+                pool_id=invest.id,
+                occurred_on=TODAY,
+                nature="INTERNAL",
+                category="TRANSFER",
+                direction="OUT",
+                amount=Decimal("45"),
+                transfer_id="TR-REPAIR-API",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+
+        response = seeded_client.post(
+            "/api/v1/transfers/TR-REPAIR-API/repair",
+            json={
+                "counterpart_pool_id": profit.id,
+                "reason": "补齐对端流水",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert len(response.json()["cashflows"]) == 2
+
     def test_list_cashflows_exposes_order_traceability(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)

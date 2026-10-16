@@ -297,6 +297,39 @@ def create_transfer(
     )
 
 
+@router.post(
+    "/transfers/{transfer_id}/repair",
+    response_model=schemas.TransferOut,
+)
+def repair_transfer(
+    transfer_id: str,
+    payload: schemas.TransferRepair,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_transfer,
+) -> schemas.TransferOut:
+    if not user.can_see_pool(payload.counterpart_pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": payload.counterpart_pool_id})
+    result = service.repair_transfer(
+        db,
+        transfer_id,
+        counterpart_pool_id=payload.counterpart_pool_id,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.TransferOut(
+        transfer_id=result["transfer_id"],
+        source_pool_id=result["source_pool_id"],
+        target_pool_id=result["target_pool_id"],
+        amount=result["amount"],
+        occurred_on=result["occurred_on"],
+        cashflows=[
+            _cashflow_out(db, flow)
+            for flow in result["cashflows"]
+        ],
+    )
+
+
 # --------------------------------------------------------------------- 押金
 @router.get("/deposits", response_model=list[schemas.DepositOut])
 def list_deposits(

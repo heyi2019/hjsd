@@ -849,6 +849,94 @@ def create_transfer(
     }
 
 
+def repair_transfer(
+    session: Session,
+    transfer_id: str,
+    *,
+    counterpart_pool_id: int,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """只为单边内部划转补齐缺失的一边，禁止把异常静默当成正常新划转。"""
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("划转修复必须填写原因", details={"field": "reason"})
+    transfer = (transfer_id or "").strip()
+    if not transfer:
+        raise Validation("transfer_id 不能为空", details={"field": "transfer_id"})
+    rows = list(
+        session.scalars(
+            select(Cashflow)
+            .where(
+                Cashflow.transfer_id == transfer,
+                Cashflow.nature == Nature.INTERNAL.value,
+            )
+            .order_by(Cashflow.id)
+        ).all()
+    )
+    if not rows:
+        raise NotFound(f"划转 {transfer} 不存在", details={"transfer_id": transfer})
+    if len(rows) == 2:
+        raise Validation("该划转已完整，不能重复修复", details={"transfer_id": transfer})
+    if len(rows) != 1:
+        raise Validation("该划转不是单边记录，不能自动修复", details={"transfer_id": transfer})
+    source = rows[0]
+    if user is not None and (
+        not user.can_see_pool(source.pool_id) or not user.can_see_pool(counterpart_pool_id)
+    ):
+        raise NotFound("资金池不存在", details={"pool_id": counterpart_pool_id})
+    target = foundation_service.assert_pool_usable(session, counterpart_pool_id)
+    if target.id == source.pool_id:
+        raise Validation("修复对端资金池不能与原资金池相同")
+    if source.direction == Direction.OUT.value:
+        direction = Direction.IN.value
+    elif source.direction == Direction.IN.value:
+        direction = Direction.OUT.value
+    else:
+        raise Validation("单边划转方向无效", details={"transfer_id": transfer})
+    flow = Cashflow(
+        flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
+        pool_id=target.id,
+        occurred_on=source.occurred_on,
+        nature=Nature.INTERNAL.value,
+        category="TRANSFER",
+        direction=direction,
+        amount=to_money(source.amount),
+        transfer_id=transfer,
+        status=source.status,
+        reviewed_by=source.reviewed_by,
+        reviewed_at=source.reviewed_at,
+        note=f"修复划转 {transfer}: {text_reason}",
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(flow)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.TRANSFER_REPAIR,
+        entity_type="transfer",
+        entity_id=transfer,
+        actor=actor,
+        after={
+            "source_flow_id": source.id,
+            "repaired_flow_id": flow.id,
+            "counterpart_pool_id": target.id,
+            "amount": str(flow.amount),
+        },
+        reason=text_reason,
+    )
+    return {
+        "transfer_id": transfer,
+        "source_pool_id": source.pool_id if source.direction == Direction.OUT.value else target.id,
+        "target_pool_id": target.id if source.direction == Direction.OUT.value else source.pool_id,
+        "amount": to_money(source.amount),
+        "occurred_on": source.occurred_on,
+        "cashflows": [source, flow],
+    }
+
+
 def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
     stmt = select(
         func.coalesce(
@@ -1237,6 +1325,7 @@ __all__ = [
     "list_deposits",
     "list_rebates",
     "create_transfer",
+    "repair_transfer",
     "return_deposit",
     "lose_deposit",
     "reject_cashflow",

@@ -125,6 +125,11 @@ class TransferCreate(BaseModel):
     note: str | None = None
 
 
+class TransferRepair(BaseModel):
+    counterpart_pool_id: int
+    reason: str
+
+
 class TransferOut(BaseModel):
     transfer_id: str
     source_pool_id: int
@@ -195,6 +200,7 @@ __all__ = [
     "ReconciliationResolve",
     "ReconciliationOut",
     "TransferCreate",
+    "TransferRepair",
     "TransferOut",
     "RebateCreate",
     "RebateOut",

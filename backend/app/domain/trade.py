@@ -258,6 +258,13 @@ class Cashflow(Base, AuditMixin):
             "nature != 'INTERNAL' OR transfer_id IS NOT NULL",
             name="internal_transfer_link_valid",
         ),
+        CheckConstraint(
+            "(nature = 'INTERNAL' AND transfer_id IS NOT NULL) OR "
+            "(direction = 'IN' AND nature IN ('EXTERNAL_IN', 'BUSINESS_IN')) OR "
+            "(direction = 'OUT' AND nature = 'BUSINESS_OUT') OR "
+            "(category = 'CANCEL' AND nature = 'BUSINESS_IN' AND direction IN ('IN', 'OUT'))",
+            name="cashflow_direction_nature_valid",
+        ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),

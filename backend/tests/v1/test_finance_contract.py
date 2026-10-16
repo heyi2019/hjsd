@@ -92,6 +92,26 @@ class TestDepositQueries:
             seeded_db.flush()
         seeded_db.rollback()
 
+    def test_cashflow_direction_and_nature_must_match(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        seeded_db.add(
+            Cashflow(
+                flow_no="CF-INVALID-DIRECTION-NATURE",
+                pool_id=invest.id,
+                occurred_on=TODAY,
+                nature="EXTERNAL_IN",
+                category="INVALID",
+                direction="OUT",
+                amount=Decimal("1.00"),
+                status="APPROVED",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_reconciliation_difference_matches_two_balances_in_database(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         seeded_db.add(

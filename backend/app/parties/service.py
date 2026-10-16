@@ -315,9 +315,10 @@ def merge_customers(
     target_customer_id: int,
     reason: str,
     actor: str,
+    user: CurrentUser | None = None,
 ) -> Customer:
-    source = get_customer(session, source_customer_id)
-    target = get_customer(session, target_customer_id)
+    source = get_customer(session, source_customer_id, user)
+    target = get_customer(session, target_customer_id, user)
     if source.id == target.id:
         raise Validation("来源与目标不能是同一客户", code=ErrorCode.MERGE_TARGET_INVALID)
     if target.status != CustomerStatus.ACTIVE.value:

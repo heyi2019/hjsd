@@ -343,6 +343,25 @@ class TestFinanceApi:
         )
         assert response.status_code == 404
 
+    def test_rebate_service_respects_order_scope_when_user_is_supplied(
+        self, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        foreign_order = orders_service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
+        )
+        with pytest.raises(NotFound):
+            service.create_rebate(
+                seeded_db,
+                source_order_id=foreign_order.id,
+                base_amount=Decimal("10"),
+                collected_on=TODAY,
+                actor="operator",
+                user=scoped,
+            )
+
     def test_scoped_finance_cannot_attach_deposit_to_foreign_order(
         self, seeded_client, seeded_db
     ):

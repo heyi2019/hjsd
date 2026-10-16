@@ -76,7 +76,11 @@ def create_customer(
         wechat=payload.wechat,
         qq=payload.qq,
         source=payload.source,
-        owner_id=user.id if payload.owner_id is None and user.owner_scope != "ALL" else payload.owner_id,
+        owner_id=(
+            user.id
+            if not user.is_admin and user.owner_scope != "ALL"
+            else payload.owner_id
+        ),
         tags=payload.tags,
         note=payload.note,
         extra_values=payload.extra_values,
@@ -165,6 +169,7 @@ def merge_customer(
         target_customer_id=payload.target_customer_id,
         reason=payload.reason,
         actor=_actor(user),
+        user=user,
     )
     return service.to_customer_out(target, reveal_contact=True)
 

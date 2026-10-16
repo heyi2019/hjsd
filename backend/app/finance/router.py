@@ -213,6 +213,7 @@ def create_rebate(
         rate=payload.rate,
         channel=payload.channel,
         note=payload.note,
+        user=user,
     )
     return schemas.RebateOut.model_validate(item)
 
@@ -241,6 +242,7 @@ def settle_rebate(
         actor=_actor(user),
         platform_fee=payload.platform_fee,
         note=payload.note,
+        user=user,
     )
     return schemas.SettlementOut.model_validate(item)
 

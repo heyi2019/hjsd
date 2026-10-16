@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AuditAction, CounterpartyStatus, CustomerStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
@@ -68,6 +68,18 @@ class TestCreateCustomerGuards:
     def test_duplicate_candidates_without_conditions_returns_empty(self, seeded_db):
         # 150：无任何联系方式入参 → 直接返回空候选，不查库
         assert service.duplicate_candidates(seeded_db) == []
+
+    def test_scoped_user_cannot_assign_created_customer_to_other_owner(
+        self, seeded_client, seeded_db
+    ):
+        user = _scoped_user()
+        response = seeded_client.post(
+            CUSTOMERS,
+            json={"display_name": "归属测试", "owner_id": 1},
+            headers={"Authorization": f"Bearer {build_access_token(user)}"},
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["customer"]["owner_id"] == user.id
 
 
 # ------------------------------------------------------------------ 客户查询
@@ -167,6 +179,19 @@ class TestUpdateCustomer:
 
 # ------------------------------------------------------------------ 合并守卫
 class TestMergeGuards:
+    def test_merge_does_not_load_foreign_customer_for_scoped_user(self, seeded_db):
+        source = _customer(seeded_db, "他人来源", owner_id=1)
+        target = _customer(seeded_db, "我的目标", owner_id=9)
+        with pytest.raises(NotFound):
+            service.merge_customers(
+                seeded_db,
+                source_customer_id=source.id,
+                target_customer_id=target.id,
+                reason="越权合并",
+                actor="operator",
+                user=_scoped_user(),
+            )
+
     def test_same_source_and_target_rejected(self, seeded_db):
         customer = _customer(seeded_db, "阿甲")
         with pytest.raises(Validation) as exc:

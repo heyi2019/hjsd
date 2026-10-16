@@ -330,15 +330,19 @@ def create_rebate(
     rate: Any = 0,
     channel: str | None = None,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> RebateRecord:
     """返点记录：来源订单必填且必须已成单（REB-01-02）。"""
-    order = session.get(Order, source_order_id)
-    if order is None:
+    try:
+        order = orders_service.get_order(session, source_order_id, user)
+    except NotFound as exc:
+        if user is not None:
+            raise
         raise Validation(
             f"来源订单 {source_order_id} 不存在",
             code=ErrorCode.RESOURCE_NOT_FOUND,
             details={"source_order_id": source_order_id},
-        )
+        ) from exc
     if order.status not in (OrderStatus.ACTIVE.value, OrderStatus.COMPLETED.value):
         raise Validation(
             f"来源订单 {order.order_no} 状态 {order.status}，不可作为返点来源",
@@ -396,12 +400,20 @@ def settle_rebate(
     actor: str,
     platform_fee: Any = 0,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> RebateSettlement:
     record = session.get(RebateRecord, rebate_record_id)
     if record is None:
         raise NotFound(
             f"返点记录 {rebate_record_id} 不存在", details={"rebate_record_id": rebate_record_id}
         )
+    try:
+        orders_service.get_order(session, record.source_order_id, user)
+    except NotFound as exc:
+        raise NotFound(
+            f"返点记录 {rebate_record_id} 不存在",
+            details={"rebate_record_id": rebate_record_id},
+        ) from exc
     gross = require_positive(gross_amount, field="gross_amount")
     fee = _non_negative(platform_fee, field="platform_fee")
     if fee > gross:

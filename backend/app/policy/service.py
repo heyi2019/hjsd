@@ -29,6 +29,16 @@ from app.domain.enums import (
 )
 from app.domain.parties import PolicyDefinition, PolicyVersion
 from app.domain.trade import Order, OrderProfitAllocation
+from app.core.security import CurrentUser
+
+
+def _scoped_order(
+    session: Session, order_id: int, user: CurrentUser | None = None
+) -> Order:
+    """策略相关订单读写必须复用订单统一的负责人范围规则。"""
+    from app.orders import service as orders_service
+
+    return orders_service.get_order(session, order_id, user)
 
 
 def _def_out(item: PolicyDefinition) -> dict[str, Any]:
@@ -368,10 +378,10 @@ def make_snapshot(
 
 
 def snapshot_for(
-    session: Session, order_id: int
+    session: Session, order_id: int, user: CurrentUser | None = None
 ) -> dict[str, Any] | None:
-    order = session.get(Order, order_id)
-    if order is None or order.policy_snapshot is None:
+    order = _scoped_order(session, order_id, user)
+    if order.policy_snapshot is None:
         return None
     return {
         "policy_version_id": order.policy_version_id,
@@ -387,11 +397,10 @@ def set_allocations(
     *,
     items: list[dict[str, Any]],
     actor: str = "system",
+    user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
     """整单重设利润分配。**有效比例合计必须为 100%**（BAS-06-03）。"""
-    order = session.get(Order, order_id)
-    if order is None:
-        raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
+    order = _scoped_order(session, order_id, user)
     if not items:
         raise Validation("利润分配不能为空", details={"field": "items"})
 
@@ -454,10 +463,13 @@ def set_allocations(
             ]
         },
     )
-    return list_allocations(session, order_id)
+    return list_allocations(session, order_id, user=user)
 
 
-def list_allocations(session: Session, order_id: int) -> list[dict[str, Any]]:
+def list_allocations(
+    session: Session, order_id: int, user: CurrentUser | None = None
+) -> list[dict[str, Any]]:
+    _scoped_order(session, order_id, user)
     rows = session.scalars(
         select(OrderProfitAllocation)
         .where(OrderProfitAllocation.order_id == order_id)

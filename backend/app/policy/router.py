@@ -148,7 +148,7 @@ def list_allocations(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
 ) -> dict[str, Any]:
-    items = service.list_allocations(db, order_id)
+    items = service.list_allocations(db, order_id, user=user)
     return {"items": items, "total": len(items)}
 
 
@@ -161,7 +161,7 @@ def set_allocations(
 ) -> dict[str, Any]:
     """整单设置利润分配。有效比例合计必须为 100%（BAS-06-03）。"""
     items = service.set_allocations(
-        db, order_id, items=payload.get("items") or [], actor=user.username
+        db, order_id, items=payload.get("items") or [], actor=user.username, user=user
     )
     return {"items": items, "total": len(items)}
 
@@ -173,7 +173,7 @@ def order_snapshot(
     user: CurrentUser = read_access,
 ) -> dict[str, Any]:
     """订单实际应用的规则快照（BAS-06-04：可追溯）。"""
-    snapshot = service.snapshot_for(db, order_id)
+    snapshot = service.snapshot_for(db, order_id, user=user)
     return {"found": snapshot is not None, "snapshot": snapshot}
 
 

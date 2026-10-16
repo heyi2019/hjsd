@@ -11,6 +11,7 @@ from datetime import date
 import pytest
 
 from app.core.errors import NotFound, Validation
+from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import PolicyStatus
 from app.orders import service as order_service
 from app.policy import service as policy_service
@@ -295,3 +296,28 @@ class TestPolicyApi:
         assert none.status_code == 200
         assert none.json()["found"] is False
         assert none.json()["snapshot"] is None
+
+    def test_scoped_user_cannot_read_foreign_order_policy_data(
+        self, seeded_client, seeded_db
+    ):
+        foreign = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="other",
+            owner_id=8,
+        )
+        scoped = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+
+        allocations = seeded_client.get(
+            f"/api/v1/orders/{foreign.id}/profit-allocations", headers=headers
+        )
+        snapshot = seeded_client.get(
+            f"/api/v1/orders/{foreign.id}/policy-snapshot", headers=headers
+        )
+
+        assert allocations.status_code == 404
+        assert snapshot.status_code == 404

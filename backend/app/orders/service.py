@@ -37,6 +37,7 @@ from app.domain.enums import (
     Nature,
     OrderStatus,
     PolicyType,
+    Portion,
     PoolStatus,
     SequenceKey,
 )
@@ -491,6 +492,13 @@ def post_event(
         raise Validation(
             f"事件类型必须为 {EventType.values()}",
             details={"field": "event_type", "value": event_type},
+        ) from exc
+    try:
+        portion = Portion(portion).value
+    except ValueError as exc:
+        raise Validation(
+            f"portion 必须为 {Portion.values()}",
+            details={"field": "portion", "value": portion},
         ) from exc
 
     order = get_order(session, order_id, user)

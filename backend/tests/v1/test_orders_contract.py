@@ -319,6 +319,24 @@ class TestGetAndListOrders:
 
 # ------------------------------------------------------------------ 事件入参
 class TestPostEventValidation:
+    def test_invalid_portion_rejected_before_event_write(self, seeded_db):
+        order = _order(seeded_db)
+
+        with pytest.raises(Validation, match="portion"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("100"),
+                occurred_on=D,
+                actor="pytest",
+                portion="INVALID",
+            )
+
+        assert not seeded_db.scalar(
+            select(OrderEvent.id).where(OrderEvent.order_id == order.id)
+        )
+
     def test_invalid_cost_category_leaves_no_event_or_cashflow(self, seeded_db):
         order = _order(seeded_db)
 

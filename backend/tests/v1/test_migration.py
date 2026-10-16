@@ -205,6 +205,68 @@ def test_orders_status_check_dropped_draft(migration_env):
         engine.dispose()
 
 
+def test_order_event_portion_check_matches_domain_enum(migration_env):
+    """事件份额必须与 Portion 枚举一致，非法份额不能进入核算表。"""
+    from app.domain.enums import Portion
+
+    env, db_file = migration_env
+    assert _alembic(env, "upgrade", "head").returncode == 0
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            create_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='order_events'")
+            ).scalar_one()
+            expected = ", ".join(f"'{value}'" for value in Portion.values())
+            assert f"portion IN ({expected})" in create_sql, create_sql
+    finally:
+        engine.dispose()
+
+
+def test_order_event_cost_portion_is_normalized_during_upgrade(migration_env):
+    """旧成本事件的误写值只按确定口径归一，不保留伪份额。"""
+    env, db_file = migration_env
+    assert _alembic(env, "upgrade", "0044_remove_account_risk_level").returncode == 0
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.begin() as connection:
+            # 当前 ORM 已带新 CHECK；用 SQLite 的测试开关模拟 0044 旧库中的历史脏值。
+            connection.execute(text("PRAGMA ignore_check_constraints = ON"))
+            connection.execute(
+                text(
+                    "INSERT INTO orders "
+                    "(order_no, order_type, capital_type, trade_date, status, link_status, created_by, updated_by) "
+                    "VALUES ('HS-MIG-1', 'HS', 'STOCK', '2026-01-01', 'ACTIVE', 'LINKED', 'pytest', 'pytest')"
+                )
+            )
+            order_id = connection.execute(
+                text("SELECT id FROM orders WHERE order_no = 'HS-MIG-1'")
+            ).scalar_one()
+            connection.execute(
+                text(
+                    "INSERT INTO order_events "
+                    "(event_no, order_id, event_type, amount, portion, occurred_on, is_posted, created_by, updated_by) "
+                    "VALUES ('HS-MIG-E1', :order_id, 'COST', 10, 'COST', '2026-01-01', 1, 'pytest', 'pytest')"
+                ),
+                {"order_id": order_id},
+            )
+            connection.execute(text("PRAGMA ignore_check_constraints = OFF"))
+    finally:
+        engine.dispose()
+
+    assert _alembic(env, "upgrade", "head").returncode == 0
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT portion FROM order_events WHERE event_no = 'HS-MIG-E1'")
+            ).scalar_one() == "PRINCIPAL"
+    finally:
+        engine.dispose()
+
+
 def test_accounts_status_check_drops_legacy_pending(migration_env):
     """账号不再保留旧 PENDING/待收状态，迁移后默认直接进入在库。"""
     env, db_file = migration_env

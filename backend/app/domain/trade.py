@@ -150,6 +150,10 @@ class OrderEvent(Base, AuditMixin):
             f"event_type IN {EventType.values()!r}".replace("[", "(").replace("]", ")"),
             name="event_type_valid",
         ),
+        CheckConstraint(
+            f"portion IN {Portion.values()!r}".replace("[", "(").replace("]", ")"),
+            name="portion_valid",
+        ),
         UniqueConstraint("event_no", name="uq_order_events_no"),
         Index("ix_order_events_order", "order_id", "event_type", "occurred_on"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),

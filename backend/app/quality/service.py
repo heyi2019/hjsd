@@ -269,7 +269,8 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     schedule_rows = session.scalars(
         select(InstallmentSchedule).where(
             InstallmentSchedule.due_on < date.today(),
-            InstallmentSchedule.received_amount < InstallmentSchedule.due_amount,
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
+            < InstallmentSchedule.due_amount,
             InstallmentSchedule.status != "PAID",
         )
     ).all()

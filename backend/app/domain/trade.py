@@ -324,7 +324,7 @@ class Installment(Base, AuditMixin):
         UniqueConstraint("order_id", name="uq_installments_order"),
         Index("ix_installments_status", "status", "first_due_on"),
         CheckConstraint(
-            "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0",
+            "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0 AND waived_amount >= 0",
             name="amount_nonneg",
         ),
     )
@@ -347,6 +347,7 @@ class Installment(Base, AuditMixin):
     per_period_service_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     per_period: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    waived_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=InstallmentStatus.PENDING.value
     )
@@ -368,7 +369,7 @@ class InstallmentSchedule(Base, TimestampMixin):
         UniqueConstraint("installment_id", "period_no", name="uq_installment_period"),
         Index("ix_schedules_due", "installment_id", "due_on", "status"),
         CheckConstraint(
-            "due_amount >= 0 AND received_amount >= 0",
+            "due_amount >= 0 AND received_amount >= 0 AND waived_amount >= 0",
             name="amount_nonneg",
         ),
     )
@@ -381,6 +382,7 @@ class InstallmentSchedule(Base, TimestampMixin):
     due_on: Mapped[date] = mapped_column(Date, nullable=False)
     due_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     received_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    waived_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=ScheduleStatus.PENDING.value

@@ -41,6 +41,7 @@ class InstallmentOut(BaseModel):
     per_period_service_fee: Decimal
     per_period: Decimal
     paid_amount: Decimal
+    waived_amount: Decimal
     status: str
     delivery_mode: str | None = None
     delivered_on: date | None = None
@@ -55,6 +56,7 @@ class ScheduleOut(BaseModel):
     due_on: date
     due_amount: Decimal
     received_amount: Decimal
+    waived_amount: Decimal
     status: str
 
 
@@ -73,6 +75,17 @@ class EarlySettlementIn(BaseModel):
 
 
 class DefaultIn(BaseModel):
+    reason: str = Field(min_length=1)
+
+
+class ScheduleWaiveIn(BaseModel):
+    amount: Decimal = Field(gt=0)
+    waived_on: date
+    reason: str = Field(min_length=1)
+
+
+class ScheduleExtendIn(BaseModel):
+    new_due_on: date
     reason: str = Field(min_length=1)
 
 
@@ -95,6 +108,8 @@ __all__ = [
     "InstallmentOut",
     "PaymentIn",
     "PaymentResult",
+    "ScheduleExtendIn",
+    "ScheduleWaiveIn",
     "ScheduleCreate",
     "ScheduleOut",
 ]

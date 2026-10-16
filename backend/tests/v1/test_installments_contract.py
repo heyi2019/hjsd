@@ -401,6 +401,92 @@ class TestMarkOverdue:
                 seeded_db, other_contract.id, actor="risk", reason="未逾期"
             )
 
+    def test_waive_schedule_reduces_receivable_and_keeps_unpaid_history(
+        self, seeded_db
+    ):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, down_payment="100", periods=1, per_period="300"
+        )
+
+        schedule = installment_service.waive_schedule(
+            seeded_db,
+            contract.id,
+            period_no=1,
+            amount=Decimal("300"),
+            waived_on=TODAY,
+            actor="risk",
+            reason="经审批减免",
+        )
+
+        seeded_db.refresh(contract)
+        assert schedule.status == ScheduleStatus.WAIVED.value
+        assert schedule.due_amount == Decimal("300.00")
+        assert schedule.waived_amount == Decimal("300.00")
+        assert contract.waived_amount == Decimal("300.00")
+        assert installment_service.total_receivable(contract) == Decimal("100.00")
+        with pytest.raises(Validation, match="超过剩余应收"):
+            installment_service.pay(
+                seeded_db, contract.id, amount=Decimal("301"), paid_on=TODAY,
+                period_no=1, actor="pytest",
+            )
+
+    def test_waive_received_schedule_is_rejected(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, periods=1, per_period="300")
+        installment_service.pay(
+            seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
+            period_no=0, actor="pytest",
+        )
+        with pytest.raises(Validation, match="已收期"):
+            installment_service.waive_schedule(
+                seeded_db,
+                contract.id,
+                period_no=0,
+                amount=Decimal("1"),
+                waived_on=TODAY,
+                actor="risk",
+                reason="不应修改",
+            )
+
+    def test_extend_schedule_changes_future_date_and_audits_original(
+        self, seeded_db
+    ):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, periods=1, per_period="300", first_due_on=TODAY
+        )
+        schedule = seeded_db.scalar(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == contract.id,
+                InstallmentSchedule.period_no == 1,
+            )
+        )
+        assert schedule is not None
+        original_due_on = schedule.due_on
+
+        extended = installment_service.extend_schedule(
+            seeded_db,
+            contract.id,
+            period_no=1,
+            new_due_on=date(2026, 12, 31),
+            actor="risk",
+            reason="客户申请展期",
+        )
+
+        assert extended.due_on == date(2026, 12, 31)
+        audit = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == AuditAction.INSTALLMENT_EXTEND.value,
+                AuditLog.entity_id == contract.inst_no,
+            )
+            .order_by(AuditLog.id.desc())
+        )
+        assert audit is not None
+        assert audit.before_json["due_on"] == original_due_on.isoformat()
+        assert audit.after_json["due_on"] == "2026-12-31"
+
 
 # ------------------------------------------------------------------ 路由层
 class TestInstallmentsApi:
@@ -543,6 +629,34 @@ class TestInstallmentsApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["marked"] == 2
+
+    def test_waive_and_extend_schedule_endpoints(
+        self, seeded_client, seeded_db, headers
+    ):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, periods=1, per_period="300", first_due_on=TODAY
+        )
+        extended = seeded_client.post(
+            f"/api/v1/installments/{contract.id}/schedules/1/extend",
+            json={"new_due_on": "2026-12-31", "reason": "客户申请展期"},
+            headers=headers,
+        )
+        assert extended.status_code == 200, extended.text
+        assert extended.json()["due_on"] == "2026-12-31"
+
+        waived = seeded_client.post(
+            f"/api/v1/installments/{contract.id}/schedules/1/waive",
+            json={
+                "amount": "300",
+                "waived_on": TODAY.isoformat(),
+                "reason": "审批减免",
+            },
+            headers=headers,
+        )
+        assert waived.status_code == 200, waived.text
+        assert waived.json()["status"] == ScheduleStatus.WAIVED.value
+        assert waived.json()["waived_amount"] == "300.00"
 
     def test_scoped_user_mark_overdue_only_updates_visible_orders(
         self, seeded_client, seeded_db

@@ -62,8 +62,10 @@ def _days_in_month(year: int, month: int) -> int:
 
 
 def total_receivable(installment: Installment) -> Decimal:
-    return to_money(installment.down_payment) + to_money(installment.per_period) * int(
-        installment.periods
+    return (
+        to_money(installment.down_payment)
+        + to_money(installment.per_period) * int(installment.periods)
+        - to_money(installment.waived_amount)
     )
 
 
@@ -199,6 +201,7 @@ def create_installment(
         per_period_service_fee=per_period_service_fee_amount,
         per_period=per_period_amount,
         paid_amount=Decimal("0"),
+        waived_amount=Decimal("0"),
         status=InstallmentStatus.PENDING.value,
         first_due_on=first_due_on,
         delivery_mode=delivery_mode,
@@ -217,6 +220,7 @@ def create_installment(
             due_on=first_due_on,
             due_amount=down_payment_amount,
             received_amount=Decimal("0"),
+            waived_amount=Decimal("0"),
             status=ScheduleStatus.PENDING.value,
         )
     )
@@ -228,6 +232,7 @@ def create_installment(
                 due_on=schedule_dates.get(index, _add_months(first_due_on, index - 1)),
                 due_amount=per_period_amount,
                 received_amount=Decimal("0"),
+                waived_amount=Decimal("0"),
                 status=ScheduleStatus.PENDING.value,
             )
         )
@@ -329,7 +334,11 @@ def pay(
         )
 
     schedule = _pick_schedule(session, installment, period_no, paid_on)
-    outstanding = to_money(schedule.due_amount) - to_money(schedule.received_amount)
+    outstanding = (
+        to_money(schedule.due_amount)
+        - to_money(schedule.received_amount)
+        - to_money(schedule.waived_amount)
+    )
     if money > outstanding:
         raise Validation(
             f"第 {schedule.period_no} 期剩余应收 {outstanding}",
@@ -341,7 +350,7 @@ def pay(
     schedule.received_on = paid_on
     schedule.status = (
         ScheduleStatus.PAID.value
-        if schedule.received_amount >= schedule.due_amount
+        if schedule.received_amount + schedule.waived_amount >= schedule.due_amount
         else ScheduleStatus.PARTIAL.value
     )
     installment.paid_amount = to_money(installment.paid_amount) + money
@@ -383,6 +392,122 @@ def pay(
     return installment, schedule
 
 
+def waive_schedule(
+    session: Session,
+    installment_id: int,
+    *,
+    period_no: int,
+    amount: Any,
+    waived_on: date,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> InstallmentSchedule:
+    """登记经授权的期次减免，不改写原应收金额。"""
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("减免必须填写原因", details={"field": "reason"})
+    installment = get_installment(session, installment_id, user)
+    schedule = session.scalar(
+        select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id == installment.id,
+            InstallmentSchedule.period_no == period_no,
+        )
+    )
+    if schedule is None:
+        raise NotFound(f"期次 {period_no} 不存在", details={"period_no": period_no})
+    if to_money(schedule.received_amount) > 0:
+        raise Validation("已收期不可减免", details={"period_no": period_no})
+    if schedule.status in {ScheduleStatus.PAID.value, ScheduleStatus.WAIVED.value}:
+        raise Validation("已完成期次不可减免", details={"period_no": period_no})
+    money = require_positive(amount, field="amount")
+    outstanding = to_money(schedule.due_amount) - to_money(schedule.waived_amount)
+    if money > outstanding:
+        raise Validation(
+            "减免金额超过未收金额",
+            code=ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE,
+            details={"period_no": period_no, "outstanding": str(outstanding)},
+        )
+    before_waived = to_money(schedule.waived_amount)
+    schedule.waived_amount = before_waived + money
+    if to_money(schedule.received_amount) + to_money(schedule.waived_amount) >= to_money(
+        schedule.due_amount
+    ):
+        schedule.status = ScheduleStatus.WAIVED.value
+    installment.waived_amount = to_money(installment.waived_amount) + money
+    installment.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_WAIVE,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        before={
+            "period_no": period_no,
+            "due_amount": str(schedule.due_amount),
+            "waived_amount": str(before_waived),
+        },
+        after={
+            "period_no": period_no,
+            "due_amount": str(schedule.due_amount),
+            "waived_amount": str(schedule.waived_amount),
+            "status": schedule.status,
+            "waived_on": waived_on.isoformat(),
+        },
+        reason=text_reason,
+    )
+    return schedule
+
+
+def extend_schedule(
+    session: Session,
+    installment_id: int,
+    *,
+    period_no: int,
+    new_due_on: date,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> InstallmentSchedule:
+    """修改未收期次到期日，并通过审计保留原计划日期。"""
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("展期必须填写原因", details={"field": "reason"})
+    installment = get_installment(session, installment_id, user)
+    schedule = session.scalar(
+        select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id == installment.id,
+            InstallmentSchedule.period_no == period_no,
+        )
+    )
+    if schedule is None:
+        raise NotFound(f"期次 {period_no} 不存在", details={"period_no": period_no})
+    if to_money(schedule.received_amount) > 0:
+        raise Validation("已收期不可展期", details={"period_no": period_no})
+    if schedule.status in {ScheduleStatus.PAID.value, ScheduleStatus.WAIVED.value}:
+        raise Validation("已完成期次不可展期", details={"period_no": period_no})
+    if new_due_on <= schedule.due_on:
+        raise Validation("展期后的到期日必须晚于原到期日", details={"field": "new_due_on"})
+    original_due_on = schedule.due_on
+    schedule.due_on = new_due_on
+    if schedule.status == ScheduleStatus.OVERDUE.value:
+        schedule.status = ScheduleStatus.PENDING.value
+    installment.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_EXTEND,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        before={"period_no": period_no, "due_on": original_due_on.isoformat()},
+        after={"period_no": period_no, "due_on": new_due_on.isoformat()},
+        reason=text_reason,
+    )
+    return schedule
+
+
 def _pick_schedule(
     session: Session, installment: Installment, period_no: int | None, paid_on: date
 ) -> InstallmentSchedule:
@@ -403,7 +528,8 @@ def _pick_schedule(
         select(InstallmentSchedule)
         .where(
             InstallmentSchedule.installment_id == installment.id,
-            InstallmentSchedule.received_amount < InstallmentSchedule.due_amount,
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
+            < InstallmentSchedule.due_amount,
         )
         .order_by(InstallmentSchedule.period_no)
     ).first()
@@ -440,14 +566,19 @@ def settle_early(
         select(InstallmentSchedule)
         .where(
             InstallmentSchedule.installment_id == installment.id,
-            InstallmentSchedule.received_amount < InstallmentSchedule.due_amount,
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
+            < InstallmentSchedule.due_amount,
         )
         .order_by(InstallmentSchedule.period_no)
     ).all()
     if not rows:
         raise Validation("合约没有剩余应收，不能重复提前结清")
     for row in rows:
-        outstanding = to_money(row.due_amount) - to_money(row.received_amount)
+        outstanding = (
+            to_money(row.due_amount)
+            - to_money(row.received_amount)
+            - to_money(row.waived_amount)
+        )
         if outstanding <= 0:
             continue
         pay(
@@ -589,7 +720,8 @@ def mark_overdue(
         .join(Order, Order.id == Installment.order_id)
         .where(
             InstallmentSchedule.due_on < as_of,
-            InstallmentSchedule.received_amount < InstallmentSchedule.due_amount,
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
+            < InstallmentSchedule.due_amount,
             InstallmentSchedule.status != ScheduleStatus.OVERDUE.value,
         )
     )
@@ -631,6 +763,7 @@ def mark_overdue(
 __all__ = [
     "create_installment",
     "deliver",
+    "extend_schedule",
     "get_installment",
     "list_installments",
     "mark_default",
@@ -638,4 +771,5 @@ __all__ = [
     "pay",
     "settle_early",
     "total_receivable",
+    "waive_schedule",
 ]

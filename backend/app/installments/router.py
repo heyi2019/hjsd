@@ -84,6 +84,53 @@ def list_schedules(
 
 
 @router.post(
+    "/installments/{installment_id}/schedules/{period_no}/waive",
+    response_model=schemas.ScheduleOut,
+)
+def waive_schedule(
+    installment_id: int,
+    period_no: int,
+    payload: schemas.ScheduleWaiveIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = default_manage,
+) -> schemas.ScheduleOut:
+    item = service.waive_schedule(
+        db,
+        installment_id,
+        period_no=period_no,
+        amount=payload.amount,
+        waived_on=payload.waived_on,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.ScheduleOut.model_validate(item)
+
+
+@router.post(
+    "/installments/{installment_id}/schedules/{period_no}/extend",
+    response_model=schemas.ScheduleOut,
+)
+def extend_schedule(
+    installment_id: int,
+    period_no: int,
+    payload: schemas.ScheduleExtendIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = default_manage,
+) -> schemas.ScheduleOut:
+    item = service.extend_schedule(
+        db,
+        installment_id,
+        period_no=period_no,
+        new_due_on=payload.new_due_on,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.ScheduleOut.model_validate(item)
+
+
+@router.post(
     "/installments/{installment_id}/payments", response_model=schemas.PaymentResult
 )
 def pay_installment(

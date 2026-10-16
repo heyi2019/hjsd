@@ -52,6 +52,12 @@ def _rebuild(bind, tname: str) -> None:
         ddl = ddl.replace("\tservice_fee NUMERIC(18, 2) NOT NULL, \n", "")
         ddl = ddl.replace("\tper_period_service_fee NUMERIC(18, 2) NOT NULL, \n", "")
         ddl = ddl.replace(" AND service_fee >= 0 AND per_period_service_fee >= 0", "")
+        if "waived_amount" not in source_columns:
+            ddl = ddl.replace("\twaived_amount NUMERIC(18, 2) NOT NULL, \n", "")
+            ddl = ddl.replace(" AND waived_amount >= 0", "")
+    if tname == "installment_schedules" and "waived_amount" not in source_columns:
+        ddl = ddl.replace("\twaived_amount NUMERIC(18, 2) NOT NULL, \n", "")
+        ddl = ddl.replace(" AND waived_amount >= 0", "")
     # deposit_no 在 0021 才正式移除；即使当前 ORM 已经去掉它，
     # 0009 仍必须把历史字段带过重建，否则 0021 无法完成正式删除。
     if tname == "deposits" and "deposit_no" in source_columns:

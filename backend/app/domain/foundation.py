@@ -130,7 +130,11 @@ class DocumentSequence(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("sequence_key", name="uq_document_sequences_key"),
         CheckConstraint("padding > 0", name="padding_positive"),
+        CheckConstraint("padding <= 4", name="padding_max"),
         CheckConstraint("current_value >= 0", name="current_value_nonneg"),
+        CheckConstraint("current_value <= 9999", name="current_value_max"),
+        CheckConstraint("length(trim(sequence_key)) > 0", name="sequence_key_nonempty"),
+        CheckConstraint("length(trim(prefix)) > 0", name="prefix_nonempty"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

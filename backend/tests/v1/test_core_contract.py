@@ -59,6 +59,16 @@ class TestNumberingGuards:
 
         seeded_db.add(
             DocumentSequence(
+                sequence_key="OVERFLOW_SEQUENCE", prefix="OF", padding=4,
+                current_value=MAX_SEQUENCE_VALUE + 1,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
+        seeded_db.add(
+            DocumentSequence(
                 sequence_key="INVALID_CURRENT", prefix="IC", padding=4,
                 current_value=-1,
             )

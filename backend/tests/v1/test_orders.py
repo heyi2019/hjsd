@@ -11,7 +11,8 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus, SequenceKey
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
+from app.installments import service as installment_service
 from app.orders import service
 from app.parties import service as parties_service
 
@@ -48,6 +49,37 @@ def _flows(seeded_db, pool_id: int) -> list[Cashflow]:
             select(Cashflow).where(Cashflow.pool_id == pool_id).order_by(Cashflow.id)
         ).all()
     )
+
+
+def _settled_hs_installment(seeded_db):
+    account = _new_account(seeded_db, game_account="delivery-account")
+    order = service.create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+    )
+    service.post_event(
+        seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
+        occurred_on=TODAY, actor="pytest",
+    )
+    contract = installment_service.create_installment(
+        seeded_db,
+        order_id=order.id,
+        contract_type="STOCK_SALE",
+        principal=Decimal("600"),
+        down_payment=Decimal("100"),
+        periods=1,
+        per_period=Decimal("500"),
+        first_due_on=TODAY,
+        actor="pytest",
+    )
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
+        period_no=0, actor="pytest",
+    )
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
+        period_no=1, actor="pytest",
+    )
+    return order
 
 
 class TestA01HsStock:
@@ -152,15 +184,16 @@ class TestA01HsStock:
         assert flow.flow_no == f"{order.order_no}-CF-FEE-01"
 
     def test_duplicate_posting_not_allowed_for_completed_order(self, seeded_db):
-        account = _new_account(seeded_db)
-        seeded_db.commit()
-        order = service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
-        )
-        seeded_db.commit()
-        service.post_event(
-            seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
-            delivery_mode="PLATFORM_OPERATOR", note="换绑截图IMG_01",
+        order = _settled_hs_installment(seeded_db)
+        installment_service.deliver(
+            seeded_db,
+            seeded_db.scalar(
+                select(Installment).where(Installment.order_id == order.id)
+            ).id,
+            delivery_mode="PLATFORM_OPERATOR",
+            delivered_on=TODAY,
+            note="换绑截图IMG_01",
+            actor="pytest",
         )
         seeded_db.commit()
         assert seeded_db.get(Order, order.id).status == OrderStatus.COMPLETED.value
@@ -251,6 +284,82 @@ class TestA03DgZeroCapital:
 
 
 class TestEventRules:
+    def test_dg_cannot_post_buy_or_cost(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
+        )
+
+        for event_type in ("BUY", "COST"):
+            with pytest.raises(Validation) as exc:
+                service.post_event(
+                    seeded_db,
+                    order.id,
+                    event_type=event_type,
+                    amount=Decimal("100"),
+                    occurred_on=TODAY,
+                    actor="pytest",
+                )
+            assert "代挂业务不允许" in str(exc.value)
+
+    def test_th_sell_requires_a_posted_buy(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
+        )
+
+        with pytest.raises(Validation) as exc:
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="SELL",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
+        assert "BUY" in str(exc.value)
+
+    def test_dfq_cannot_post_sell(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
+        )
+        service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("100"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation) as exc:
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="SELL",
+                amount=Decimal("120"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
+        assert "PAYMENT" in str(exc.value)
+
+    def test_payment_requires_a_source_installment(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
+        )
+
+        with pytest.raises(Validation) as exc:
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="PAYMENT",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
+        assert "分期合约" in str(exc.value)
+
     def test_unknown_account_is_rejected_before_database_flush(self, seeded_db):
         with pytest.raises(NotFound) as exc:
             service.create_order(
@@ -277,12 +386,11 @@ class TestEventRules:
         assert exc.value.code == ErrorCode.PARTICIPANT_ROLE_INVALID
 
     def test_deliver_generates_no_cashflow(self, seeded_db):
-        account = _new_account(seeded_db)
-        seeded_db.commit()
-        order = service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+        order = _settled_hs_installment(seeded_db)
+        contract = seeded_db.scalar(
+            select(Installment).where(Installment.order_id == order.id)
         )
-        seeded_db.commit()
+        assert contract is not None
         event, flow = service.post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
             delivery_mode="CUSTOMER_SELF", note="客户自行换绑凭证",
@@ -310,13 +418,13 @@ class TestEventRules:
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
-        # DG 无 PRINCIPAL 路由（零本金业务不需要本金池）
+        # DG 是零本金业务，业务事件组合先于资金路由校验拦截 BUY。
         with pytest.raises(Exception) as exc:
             service.post_event(
                 seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
                 occurred_on=TODAY, actor="pytest", portion="PRINCIPAL",
             )
-        assert exc.value.code == ErrorCode.POOL_ROUTE_MISSING
+        assert exc.value.code == ErrorCode.VALIDATION_ERROR
 
     def test_disabled_participant_rejected(self, seeded_db):
         customer = _customer(seeded_db)
@@ -335,6 +443,31 @@ class TestEventRules:
 
 
 class TestOrdersApi:
+    def test_invalid_money_input_returns_business_422(self, seeded_client, headers):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "HS",
+                "trade_date": TODAY.isoformat(),
+                "account": {"game_account": "api-invalid-money", "platform": "王者"},
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        response = seeded_client.post(
+            f"/api/v1/orders/{created.json()['id']}/events",
+            json={
+                "event_type": "BUY",
+                "amount": "-1.00",
+                "occurred_on": TODAY.isoformat(),
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 422
+        assert response.json()["code"] == ErrorCode.VALIDATION_ERROR
+
     def test_create_order_and_post_event(self, seeded_client, headers):
         created = seeded_client.post(
             "/api/v1/orders",

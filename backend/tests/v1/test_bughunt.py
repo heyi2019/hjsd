@@ -65,6 +65,10 @@ class TestMoneyEdge:
 class TestOrderStateMachine:
     def test_cannot_post_to_cancelled_order(self, seeded_db):
         order = _order(seeded_db, order_type="TH")
+        buy, _ = order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="100.00",
+            occurred_on=D, actor="hunt",
+        )
         order_service.post_event(
             seeded_db,
             order.id,
@@ -72,6 +76,8 @@ class TestOrderStateMachine:
             amount="100.00",
             occurred_on=D,
             actor="hunt",
+            offset_event_id=buy.id,
+            reason="同行未付成功",
         )
         with pytest.raises(Exception):
             order_service.post_event(

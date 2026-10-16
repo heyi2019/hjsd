@@ -51,6 +51,17 @@ def install_exception_handlers(app: FastAPI) -> None:
             },
         )
 
+    @app.exception_handler(ValueError)
+    async def _handle_value_error(_request: Request, exc: ValueError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": ErrorCode.VALIDATION_ERROR,
+                "message": str(exc),
+                "details": {},
+            },
+        )
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()

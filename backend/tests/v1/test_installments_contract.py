@@ -14,7 +14,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.core.errors import Conflict, NotFound, Validation
+from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import (
     DeliveryMode,
     InstallmentContractType,
@@ -119,6 +119,16 @@ class TestCreateInstallmentValidation:
         with pytest.raises(Validation) as exc:
             _contract(seeded_db, order.id, delivery_mode="BOGUS")
         assert "交付方式" in str(exc.value)
+
+    def test_cancelled_order_cannot_create_contract(self, seeded_db):
+        order = _order(seeded_db)
+        order.status = "CANCELLED"
+        seeded_db.flush()
+
+        with pytest.raises(Conflict) as exc:
+            _contract(seeded_db, order.id)
+
+        assert exc.value.code == ErrorCode.ORDER_STATUS_CONFLICT
 
 
 # ------------------------------------------------------------------ 查询与过滤

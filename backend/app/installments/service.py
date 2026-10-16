@@ -85,6 +85,12 @@ def create_installment(
         ) from exc
 
     order = orders_service.get_order(session, order_id)
+    if order.status != "ACTIVE":
+        raise Conflict(
+            f"订单 {order.order_no} 当前状态 {order.status}，不能创建分期合约",
+            code=ErrorCode.ORDER_STATUS_CONFLICT,
+            details={"order_no": order.order_no, "status": order.status},
+        )
     account = session.get(Account, order.account_id) if order.account_id is not None else None
 
     if contract_type == InstallmentContractType.STOCK_SALE.value:

@@ -40,7 +40,7 @@ from app.domain.enums import (
     SequenceKey,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
 
@@ -252,6 +252,10 @@ def post_event(
             details={"order_no": order.order_no, "current_status": order.status},
         )
 
+    _assert_event_allowed(
+        session, order, event_type, offset_event_id=offset_event_id, reason=reason
+    )
+
     if event_type == EventType.DELIVER.value:
         return _post_deliver(
             session,
@@ -270,8 +274,52 @@ def post_event(
     if event_type == EventType.SELL.value:
         _assert_sellable_order(session, order)
 
+    direction, nature, category = EVENT_FLOW_MAP[event_type]
+    if flow_category is not None:
+        if event_type != EventType.COST.value or flow_category not in {"FEE", "DESIGN", "OTHER"}:
+            raise Validation(
+                "仅 COST 事件可使用 FEE、DESIGN 或 OTHER 资金分类",
+                details={"event_type": event_type, "flow_category": flow_category},
+            )
+        category = flow_category
+
     money = require_positive(amount, field="amount")
-    resolved_pool_id = pool_id or _resolve_pool(session, order, portion).id
+    offset = None
+    cancel_fully_consumed = False
+    if event_type == EventType.CANCEL.value and offset_event_id is not None:
+        offset = _get_offset_event(session, offset_event_id, order_id=order.id)
+        if pool_id is not None and pool_id != offset.pool_id:
+            raise Validation(
+                "冲销必须沿用被冲销事件的资金池",
+                details={
+                    "offset_event_id": offset_event_id,
+                    "offset_pool_id": offset.pool_id,
+                    "pool_id": pool_id,
+                },
+            )
+        already_cancelled = session.scalar(
+            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
+                OrderEvent.offset_event_id == offset.id,
+                OrderEvent.event_type == EventType.CANCEL.value,
+                OrderEvent.is_posted.is_(True),
+            )
+        ) or 0
+        remaining = to_money(offset.amount) - to_money(already_cancelled)
+        if money > remaining:
+            raise Validation(
+                f"超过被冲销事件剩余可冲销金额 {remaining}",
+                details={
+                    "offset_event_id": offset_event_id,
+                    "remaining": str(remaining),
+                    "amount": str(money),
+                },
+            )
+        cancel_fully_consumed = money >= remaining
+    resolved_pool_id = (
+        pool_id
+        or (offset.pool_id if offset is not None else None)
+        or _resolve_pool(session, order, portion).id
+    )
     _assert_pool_active(session, resolved_pool_id)
     cancel_direction = Direction.IN.value
     if event_type == EventType.CANCEL.value:
@@ -297,14 +345,6 @@ def post_event(
     session.add(event)
     session.flush()
 
-    direction, nature, category = EVENT_FLOW_MAP[event_type]
-    if flow_category is not None:
-        if event_type != EventType.COST.value or flow_category not in {"FEE", "DESIGN", "OTHER"}:
-            raise Validation(
-                "仅 COST 事件可使用 FEE、DESIGN 或 OTHER 资金分类",
-                details={"event_type": event_type, "flow_category": flow_category},
-            )
-        category = flow_category
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
 
@@ -326,8 +366,17 @@ def post_event(
     )
     session.add(flow)
 
-    _apply_account_effect(session, order, event_type, money)
-    if event_type == EventType.CANCEL.value:
+    _apply_account_effect(
+        session,
+        order,
+        event_type,
+        money,
+        offset_event=offset,
+        cancel_fully_consumed=(offset is None or cancel_fully_consumed),
+    )
+    if event_type == EventType.CANCEL.value and (
+        offset is None or cancel_fully_consumed
+    ):
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件
         order.status = transition(
             ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单"
@@ -355,7 +404,22 @@ def post_event(
 def _assert_sellable_order(session: Session, order: Order) -> None:
     """库存账号售出必须建立在已采购入库之上。"""
     if order.order_type != "HS":
+        if order.order_type == "TH":
+            purchased = session.scalar(
+                select(OrderEvent.id).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event_type == EventType.BUY.value,
+                    OrderEvent.is_posted.is_(True),
+                )
+            )
+            if purchased is None:
+                raise Validation("TH 收款前必须存在已过账的 BUY 事件")
         return
+
+    if session.scalar(
+        select(Installment.id).where(Installment.order_id == order.id)
+    ) is not None:
+        raise Validation("HS 已建立分期合约，必须通过 PAYMENT 收款并在结清后交付")
     if order.account_id is None:
         raise Validation(
             "自营账号售出必须关联已回收账号",
@@ -388,6 +452,38 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
         )
 
 
+def _assert_event_allowed(
+    session: Session,
+    order: Order,
+    event_type: str,
+    *,
+    offset_event_id: int | None = None,
+    reason: str | None = None,
+) -> None:
+    """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
+    if order.order_type == "DG" and event_type in {
+        EventType.BUY.value,
+        EventType.COST.value,
+    }:
+        raise Validation("代挂业务不允许 BUY 或 COST 事件")
+    if order.order_type == "DFQ" and event_type == EventType.SELL.value:
+        raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
+    if event_type == EventType.PAYMENT.value:
+        installment = session.scalar(
+            select(Installment.id).where(Installment.order_id == order.id)
+        )
+        if installment is None:
+            raise Validation("PAYMENT 必须关联分期合约")
+    if event_type == EventType.CANCEL.value:
+        if not (reason or "").strip():
+            raise Validation("CANCEL 必须填写冲销原因", details={"field": "reason"})
+        if order.order_type in {"TH", "DFQ"} and offset_event_id is None:
+            raise Validation(
+                "TH/DFQ 的 CANCEL 必须指定 offset_event_id",
+                details={"field": "offset_event_id"},
+            )
+
+
 def _validate_participant_roles(
     customer_roles: Sequence[tuple[int, str]],
     counterparty_roles: Sequence[tuple[int, str]],
@@ -416,6 +512,13 @@ def _opposite_direction(
 ) -> str:
     if offset_event_id is None:
         return Direction.IN.value
+    offset = _get_offset_event(session, offset_event_id, order_id=order_id)
+    return Direction.IN.value if offset.event_type == EventType.BUY.value else Direction.OUT.value
+
+
+def _get_offset_event(
+    session: Session, offset_event_id: int, *, order_id: int | None = None
+) -> OrderEvent:
     offset = session.get(OrderEvent, offset_event_id)
     if offset is None:
         raise NotFound(
@@ -436,7 +539,17 @@ def _opposite_direction(
             "只能冲销已过账事件",
             details={"offset_event_id": offset_event_id},
         )
-    return Direction.IN.value if offset.event_type == EventType.BUY.value else Direction.OUT.value
+    if offset.event_type not in {
+        EventType.BUY.value,
+        EventType.COST.value,
+        EventType.SELL.value,
+        EventType.PAYMENT.value,
+    }:
+        raise Validation(
+            "只能冲销有金额的业务事件",
+            details={"offset_event_id": offset_event_id, "event_type": offset.event_type},
+        )
+    return offset
 
 
 def _post_deliver(
@@ -461,6 +574,21 @@ def _post_deliver(
             "DELIVER 必须记录交付凭证说明",
             code=ErrorCode.DELIVERY_CONDITION_UNMET,
             details={"field": "note"},
+        )
+    installment = session.scalar(
+        select(Installment).where(Installment.order_id == order.id)
+    )
+    if installment is None:
+        raise Validation(
+            "DELIVER 必须通过分期合约交付",
+            code=ErrorCode.DELIVERY_CONDITION_UNMET,
+            details={"order_no": order.order_no},
+        )
+    if installment.status != "SETTLED":
+        raise Validation(
+            f"分期合约 {installment.inst_no} 未结清，不能 DELIVER",
+            code=ErrorCode.DELIVERY_CONDITION_UNMET,
+            details={"inst_no": installment.inst_no, "status": installment.status},
         )
     event = OrderEvent(
         event_no=next_event_no(
@@ -526,7 +654,13 @@ def _assert_pool_active(session: Session, pool_id: int) -> Pool:
 
 
 def _apply_account_effect(
-    session: Session, order: Order, event_type: str, amount: Decimal
+    session: Session,
+    order: Order,
+    event_type: str,
+    amount: Decimal,
+    *,
+    offset_event: OrderEvent | None = None,
+    cancel_fully_consumed: bool = True,
 ) -> None:
     """账号状态与成本只由事件驱动（ACC-01-03/04）。"""
     if order.account_id is None:
@@ -554,7 +688,12 @@ def _apply_account_effect(
         account.status = transition(ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号")
     elif event_type == EventType.CANCEL.value:
         account.cost_amount = to_money(account.cost_amount) - amount
-        account.status = transition(ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号")
+        if offset_event is None or (
+            offset_event.event_type == EventType.BUY.value and cancel_fully_consumed
+        ):
+            account.status = transition(
+                ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号"
+            )
 
 
 # --------------------------------------------------------------------- 池余额

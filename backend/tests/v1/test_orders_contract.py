@@ -11,12 +11,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, CapitalType, OrderStatus
-from app.domain.trade import Account, Order
+from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.foundation import service as foundation_service
 from app.orders import service as order_service
 
@@ -105,6 +106,27 @@ class TestGetAndListOrders:
 
 # ------------------------------------------------------------------ 事件入参
 class TestPostEventValidation:
+    def test_invalid_cost_category_leaves_no_event_or_cashflow(self, seeded_db):
+        order = _order(seeded_db)
+
+        with pytest.raises(Validation):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="COST",
+                amount="10.00",
+                occurred_on=D,
+                actor="pytest",
+                flow_category="INVALID",
+            )
+
+        assert seeded_db.scalars(
+            select(OrderEvent).where(OrderEvent.order_id == order.id)
+        ).all() == []
+        assert seeded_db.scalars(
+            select(Cashflow).where(Cashflow.order_id == order.id)
+        ).all() == []
+
     def test_invalid_event_type_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
@@ -158,7 +180,7 @@ class TestCancelOffsetDirection:
         )
         cancel_a, _ = order_service.post_event(
             seeded_db, order_a.id, event_type="CANCEL", amount="10.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="pytest", reason="撤回部分买入款",
         )
         assert order_a.status == "CANCELLED"
 
@@ -175,6 +197,7 @@ class TestCancelOffsetDirection:
         cancel_b, _ = order_service.post_event(
             seeded_db, order_b.id, event_type="CANCEL", amount="10.00",
             occurred_on=D, actor="pytest", offset_event_id=sell_event.id,
+            reason="买家部分退款",
         )
 
         # 分支三：offset 指向不存在的事件 → NotFound。FK 全局强制使经 post_event
@@ -189,9 +212,71 @@ class TestCancelOffsetDirection:
         assert flows[cancel_a.id].direction == Direction.IN.value
         assert flows[cancel_b.id].direction == Direction.OUT.value
 
+    def test_cancel_requires_reason_and_th_offset(self, seeded_db):
+        hs = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, hs.id, event_type="BUY", amount="100.00",
+            occurred_on=D, actor="pytest",
+        )
+        with pytest.raises(Validation) as missing_reason:
+            order_service.post_event(
+                seeded_db, hs.id, event_type="CANCEL", amount="10.00",
+                occurred_on=D, actor="pytest",
+            )
+        assert "原因" in str(missing_reason.value)
+
+        th = _order(seeded_db, order_type="TH")
+        order_service.post_event(
+            seeded_db, th.id, event_type="BUY", amount="100.00",
+            occurred_on=D, actor="pytest",
+        )
+        with pytest.raises(Validation) as missing_offset:
+            order_service.post_event(
+                seeded_db, th.id, event_type="CANCEL", amount="10.00",
+                occurred_on=D, actor="pytest", reason="同行未付成功",
+            )
+        assert "offset_event_id" in str(missing_offset.value)
+
+    def test_cancel_cannot_exceed_offset_remaining_or_change_pool(self, seeded_db):
+        order = _order(seeded_db, order_type="TH")
+        buy, _ = order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="100.00",
+            occurred_on=D, actor="pytest", pool_id=1,
+        )
+
+        with pytest.raises(Validation) as wrong_pool:
+            order_service.post_event(
+                seeded_db, order.id, event_type="CANCEL", amount="10.00",
+                occurred_on=D, actor="pytest", offset_event_id=buy.id,
+                pool_id=2, reason="资金池更正",
+            )
+        assert "资金池" in str(wrong_pool.value)
+
+        order_service.post_event(
+            seeded_db, order.id, event_type="CANCEL", amount="60.00",
+            occurred_on=D, actor="pytest", offset_event_id=buy.id,
+            reason="部分退款",
+        )
+        assert order.status == OrderStatus.ACTIVE.value
+        with pytest.raises(Validation) as over_cancel:
+            order_service.post_event(
+                seeded_db, order.id, event_type="CANCEL", amount="50.00",
+                occurred_on=D, actor="pytest", offset_event_id=buy.id,
+                reason="再次退款",
+            )
+        assert "剩余可冲销" in str(over_cancel.value)
+
     def test_cancel_offset_must_belong_to_the_same_order(self, seeded_db):
         first = _order(seeded_db)
         second = _order(seeded_db, order_type="TH")
+        order_service.post_event(
+            seeded_db,
+            second.id,
+            event_type="BUY",
+            amount="100.00",
+            occurred_on=D,
+            actor="pytest",
+        )
         order_event, _ = order_service.post_event(
             seeded_db,
             second.id,
@@ -210,6 +295,7 @@ class TestCancelOffsetDirection:
                 occurred_on=D,
                 actor="pytest",
                 offset_event_id=order_event.id,
+                reason="跨订单冲销测试",
             )
 
         assert exc.value.code == ErrorCode.VALIDATION_ERROR
@@ -238,10 +324,35 @@ class TestAccountEffect:
 
         order_service.post_event(
             seeded_db, order.id, event_type="CANCEL", amount="500.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="pytest", reason="回收退回",
         )
         assert account.cost_amount == 0
         assert account.status == AccountStatus.VOID.value
+
+    def test_partial_buy_cancel_keeps_account_in_stock(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-ORD-PARTIAL",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+        order = _order(seeded_db, account_id=account.id)
+        buy, _ = order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="500.00",
+            occurred_on=D, actor="pytest",
+        )
+
+        order_service.post_event(
+            seeded_db, order.id, event_type="CANCEL", amount="100.00",
+            occurred_on=D, actor="pytest", offset_event_id=buy.id,
+            reason="部分退回",
+        )
+
+        assert account.cost_amount == Decimal("400.00")
+        assert account.status == AccountStatus.IN_STOCK.value
 
     def test_account_none_branch_is_defensive(self, seeded_db):
         # FK 全局强制使 ORM 路径不可达（账号删除是 SET NULL）；直调私有函数覆盖防御分支

@@ -13,6 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
+from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.finance import service
 from app.orders import service as orders_service
@@ -157,6 +158,36 @@ class TestRebateGuards:
 
 
 class TestFinanceApi:
+    def test_pool_scoped_finance_user_cannot_transfer_or_read_other_pool(
+        self, seeded_client, seeded_db
+    ):
+        scoped_finance = CurrentUser.build(
+            id=3,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped_finance)}"}
+
+        transfer = seeded_client.post(
+            "/api/v1/transfers",
+            json={
+                "source_pool_id": 2,
+                "target_pool_id": 1,
+                "amount": "10.00",
+                "occurred_on": TODAY.isoformat(),
+            },
+            headers=scoped_headers,
+        )
+        assert transfer.status_code == 404
+
+        deposits = seeded_client.get(
+            "/api/v1/deposits", params={"pool_id": 2}, headers=scoped_headers
+        )
+        assert deposits.status_code == 200
+        assert deposits.json() == []
+
     def test_create_transfer_posts_symmetric_internal_cashflows(
         self, seeded_client, seeded_db, headers
     ):

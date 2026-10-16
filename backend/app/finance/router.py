@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.errors import NotFound
 from app.core.security import (
     PERM_DEPOSIT_POST,
     PERM_FINANCE_READ,
@@ -86,6 +87,8 @@ def create_transfer(
     db: Session = Depends(get_db),
     user: CurrentUser = post_transfer,
 ) -> schemas.TransferOut:
+    if not user.can_see_pool(payload.source_pool_id) or not user.can_see_pool(payload.target_pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": payload.source_pool_id})
     result = service.create_transfer(
         db,
         source_pool_id=payload.source_pool_id,
@@ -129,8 +132,10 @@ def create_transfer(
 def list_deposits(
     pool_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
+    user: CurrentUser = read_access,
 ) -> list[schemas.DepositOut]:
+    if pool_id is not None and not user.can_see_pool(pool_id):
+        return []
     items = service.list_deposits(db, pool_id=pool_id)
     return [schemas.DepositOut.model_validate(item) for item in items]
 

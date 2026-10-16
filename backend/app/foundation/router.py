@@ -62,7 +62,6 @@ def create_pool(
         ownership=payload.ownership.value,
         note=payload.note,
     )
-    db.commit()
     return schemas.PoolOut.model_validate(pool)
 
 
@@ -82,7 +81,6 @@ def update_pool(
         pool_type=payload.pool_type.value if payload.pool_type else None,
         ownership=payload.ownership.value if payload.ownership else None,
     )
-    db.commit()
     return schemas.PoolOut.model_validate(pool)
 
 
@@ -94,7 +92,6 @@ def set_pool_status(
     user: CurrentUser = manage_pools,
 ) -> schemas.PoolOut:
     pool = service.set_pool_status(db, pool_id, payload.status.value, actor=_actor(user))
-    db.commit()
     return schemas.PoolOut.model_validate(pool)
 
 
@@ -106,7 +103,6 @@ def delete_pool(
 ) -> Response:
     """V17：有流水的池会被 Service 拦下来，此处不提供绕过开关。"""
     service.delete_pool(db, pool_id, actor=_actor(user))
-    db.commit()
     return Response(status_code=204)
 
 
@@ -138,7 +134,6 @@ def create_order_type(
         sort_order=payload.sort_order,
         description=payload.description,
     )
-    db.commit()
     return schemas.OrderTypeOut.model_validate(order_type)
 
 
@@ -157,7 +152,6 @@ def update_order_type(
         description=payload.description,
         sort_order=payload.sort_order,
     )
-    db.commit()
     return schemas.OrderTypeOut.model_validate(order_type)
 
 
@@ -169,7 +163,6 @@ def set_order_type_active(
     user: CurrentUser = manage_order_types,
 ) -> schemas.OrderTypeOut:
     order_type = service.set_order_type_active(db, order_type_id, is_active, actor=_actor(user))
-    db.commit()
     return schemas.OrderTypeOut.model_validate(order_type)
 
 
@@ -210,7 +203,6 @@ def set_route(
         actor=_actor(user),
         priority=payload.priority,
     )
-    db.commit()
     return schemas.RouteOut(
         id=route.id,
         order_type_code=route.order_type.code,

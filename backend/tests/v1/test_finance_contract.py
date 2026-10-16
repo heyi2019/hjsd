@@ -394,6 +394,42 @@ class TestFinanceApi:
 
         assert response.status_code == 404, response.text
 
+    def test_scoped_finance_cannot_settle_rebate_into_foreign_pool(
+        self, seeded_client, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["OPERATOR"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="scoped-finance",
+            owner_id=9,
+        )
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order.id,
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="scoped-finance",
+        )
+        response = seeded_client.post(
+            f"/api/v1/rebates/{record.id}/settlements",
+            json={
+                "gross_amount": "50",
+                "settled_on": TODAY.isoformat(),
+                "pool_id": 2,
+            },
+            headers=headers,
+        )
+        assert response.status_code == 404, response.text
+
     def test_create_transfer_posts_symmetric_internal_cashflows(
         self, seeded_client, seeded_db, headers
     ):

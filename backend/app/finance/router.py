@@ -182,6 +182,7 @@ def return_deposit(
         amount=payload.amount,
         released_on=payload.released_on,
         actor=_actor(user),
+        user=user,
     )
     return schemas.DepositOut.model_validate(item)
 

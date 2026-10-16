@@ -60,6 +60,8 @@ def create_deposit(
     user: CurrentUser | None = None,
 ) -> Deposit:
     money = require_positive(amount, field="amount")
+    if user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
     if source_order_id is not None:
         try:
@@ -113,10 +115,18 @@ def create_deposit(
 
 
 def return_deposit(
-    session: Session, deposit_id: int, *, amount: Any, released_on: date, actor: str
+    session: Session,
+    deposit_id: int,
+    *,
+    amount: Any,
+    released_on: date,
+    actor: str,
+    user: CurrentUser | None = None,
 ) -> Deposit:
     deposit = session.get(Deposit, deposit_id)
     if deposit is None:
+        raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+    if user is not None and not user.can_see_pool(deposit.pool_id):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
     money = require_positive(amount, field="amount")
     outstanding = to_money(deposit.paid_amount) - to_money(deposit.returned_amount)
@@ -414,6 +424,8 @@ def settle_rebate(
             f"返点记录 {rebate_record_id} 不存在",
             details={"rebate_record_id": rebate_record_id},
         ) from exc
+    if user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
     gross = require_positive(gross_amount, field="gross_amount")
     fee = _non_negative(platform_fee, field="platform_fee")
     if fee > gross:

@@ -293,6 +293,15 @@ class TestRollbackAndCorrectionGuards:
                 seeded_db, batch["id"], rows=ROWS, reason="少导一行", actor="pytest"
             )
 
+    def test_rejected_batch_cannot_be_rolled_back_again(self, seeded_db):
+        batch = _batch(seeded_db)
+        item = seeded_db.get(ImportBatch, batch["id"])
+        assert item is not None
+        item.status = ImportBatchStatus.REJECTED.value
+        seeded_db.flush()
+        with pytest.raises(Validation, match="只有未确认批次可回滚"):
+            service.rollback_batch(seeded_db, batch["id"], reason="再次回滚", actor="pytest")
+
 
 # ------------------------------------------------------------------ 路由层
 class TestImportApi:

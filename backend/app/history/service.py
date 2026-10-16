@@ -533,6 +533,14 @@ def rollback_batch(
             "已确认批次不可回滚，请改用更正批次（MIG-01-08）",
             details={"batch_id": batch_id, "status": batch.status},
         )
+    if batch.status not in {
+        ImportBatchStatus.DRAFT.value,
+        ImportBatchStatus.MAPPED.value,
+    }:
+        raise Validation(
+            "只有未确认批次可回滚",
+            details={"batch_id": batch_id, "status": batch.status},
+        )
 
     before = {"status": batch.status}
     rows = session.scalars(select(ImportRow).where(ImportRow.batch_id == batch_id)).all()

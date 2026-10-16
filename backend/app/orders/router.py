@@ -235,6 +235,8 @@ def update_order(
         field: getattr(payload, field)
         for field in payload.model_fields_set
     }
+    if "account_snapshot" in changes and changes["account_snapshot"] is not None:
+        changes["account_snapshot"] = changes["account_snapshot"].model_dump()
     order = service.update_order(
         db, order_id, actor=_actor(user), user=user, **changes
     )

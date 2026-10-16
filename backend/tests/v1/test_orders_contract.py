@@ -672,6 +672,49 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_update_dfq_account_snapshot_uses_order_account_contract(
+        self, seeded_client, headers
+    ):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={"order_type": "DFQ", "trade_date": D.isoformat()},
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+
+        invalid = seeded_client.patch(
+            f"/api/v1/orders/{order_id}",
+            json={"account_snapshot": {"game_type": "王者荣耀"}},
+            headers=headers,
+        )
+        assert invalid.status_code == 422, invalid.text
+
+        unknown = seeded_client.patch(
+            f"/api/v1/orders/{order_id}",
+            json={
+                "account_snapshot": {
+                    "game_account": "dfq-edit-account",
+                    "unknown_field": "不能静默丢弃",
+                }
+            },
+            headers=headers,
+        )
+        assert unknown.status_code == 422, unknown.text
+
+        valid = seeded_client.patch(
+            f"/api/v1/orders/{order_id}",
+            json={
+                "account_snapshot": {
+                    "game_account": "dfq-edit-account",
+                    "game_type": "王者荣耀",
+                }
+            },
+            headers=headers,
+        )
+        assert valid.status_code == 200, valid.text
+        assert valid.json()["account_snapshot"]["game_account"] == "dfq-edit-account"
+
     def test_update_and_cancel_order_api(self, seeded_client, headers):
         created = seeded_client.post(
             "/api/v1/orders",

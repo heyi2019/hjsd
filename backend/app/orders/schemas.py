@@ -19,7 +19,7 @@ class PartyRole(BaseModel):
 class OrderAccountCreate(BaseModel):
     """随订单建档的游戏账号资料；库存编号由服务端生成。"""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     game_account: str = Field(min_length=1, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
@@ -85,7 +85,7 @@ class OrderUpdate(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     expected_settlement_date: date | None = None
-    account_snapshot: dict | None = None
+    account_snapshot: OrderAccountCreate | None = None
     note: str | None = None
 
 

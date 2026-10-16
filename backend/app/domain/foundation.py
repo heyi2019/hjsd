@@ -75,6 +75,7 @@ class OrderTypeDef(Base, AuditMixin):
             f"capital_type IN {CapitalType.values()!r}".replace("[", "(").replace("]", ")"),
             name="capital_type_valid",
         ),
+        CheckConstraint("sort_order >= 0", name="order_type_sort_order_nonnegative"),
         UniqueConstraint("code", name="uq_order_type_defs_code"),
     )
 
@@ -102,6 +103,7 @@ class OrderTypePool(Base, TimestampMixin):
             f"portion IN {Portion.values()!r}".replace("[", "(").replace("]", ")"),
             name="portion_valid",
         ),
+        CheckConstraint("priority >= 0", name="route_priority_nonnegative"),
         UniqueConstraint("order_type_id", "portion", name="uq_order_type_pools_route"),
     )
 

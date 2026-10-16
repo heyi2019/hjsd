@@ -284,6 +284,11 @@ def create_order_type(
             "capital_type 取值非法",
             details={"capital_type": capital_type, "allowed": CapitalType.values()},
         )
+    if sort_order < 0:
+        raise Validation(
+            "排序值不能为负数",
+            details={"field": "sort_order", "value": sort_order},
+        )
     if session.scalar(select(OrderTypeDef).where(OrderTypeDef.code == normalized)) is not None:
         raise Validation(
             f"业务代码 {normalized} 已存在",
@@ -330,6 +335,11 @@ def update_order_type(
 ) -> OrderTypeDef:
     """BAS-02-03：code / capital_type / 编号前缀一旦使用即不可改。"""
     order_type = _get_order_type_or_404(session, order_type_id)
+    if sort_order is not None and sort_order < 0:
+        raise Validation(
+            "排序值不能为负数",
+            details={"field": "sort_order", "value": sort_order},
+        )
     before = _snapshot(order_type, ("name", "description", "sort_order"))
     if name is not None:
         order_type.name = name.strip()
@@ -402,6 +412,11 @@ def set_route(
     if portion not in Portion.values():
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
+        )
+    if priority < 0:
+        raise Validation(
+            "优先级不能为负数",
+            details={"field": "priority", "value": priority},
         )
     order_type = require_order_type_by_code(session, order_type_code)
     pool = require_pool_by_code(session, pool_code)

@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SqlSession
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import PoolOwnership, PoolStatus
-from app.domain.foundation import OrderTypePool
+from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
+from app.domain.foundation import OrderTypeDef, OrderTypePool
 from app.foundation import seeds, service
 
 
@@ -77,6 +78,42 @@ class TestPoolGuards:
 
 
 class TestOrderTypeGuards:
+    def test_negative_sort_order_rejected_on_create(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.create_order_type(
+                seeded_db,
+                code="TB",
+                name="同行代收",
+                capital_type=CapitalType.PASS_THRU.value,
+                sort_order=-1,
+                actor="pytest",
+            )
+        assert "排序值不能为负数" in str(exc.value)
+
+    def test_negative_sort_order_rejected_on_update(self, seeded_db):
+        definition = service.get_order_type_by_code(seeded_db, "DG")
+        with pytest.raises(Validation) as exc:
+            service.update_order_type(
+                seeded_db, definition.id, actor="pytest", sort_order=-1
+            )
+        assert "排序值不能为负数" in str(exc.value)
+
+    def test_database_rejects_negative_order_type_sort_order(self, seeded_db):
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                OrderTypeDef.__table__.insert().values(
+                    code="TB",
+                    name="同行代收",
+                    capital_type=CapitalType.PASS_THRU.value,
+                    sequence_prefix="TB",
+                    sequence_key="ORDER_TB",
+                    is_active=False,
+                    sort_order=-1,
+                    created_by="pytest",
+                    updated_by="pytest",
+                )
+            )
+
     def test_order_type_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             service.update_order_type(seeded_db, 999999, actor="pytest", name="不存在")
@@ -108,6 +145,32 @@ class TestOrderTypeGuards:
 
 
 class TestRouteGuards:
+    def test_negative_priority_rejected(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.set_route(
+                seeded_db,
+                order_type_code="HS",
+                portion=Portion.PRINCIPAL.value,
+                pool_code="HJ_INVEST",
+                priority=-1,
+                actor="pytest",
+            )
+        assert "优先级不能为负数" in str(exc.value)
+
+    def test_database_rejects_negative_route_priority(self, seeded_db):
+        order_type = service.require_order_type_by_code(seeded_db, "HS")
+        pool = service.require_pool_by_code(seeded_db, "HJ_INVEST")
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                OrderTypePool.__table__.insert().values(
+                    order_type_id=order_type.id,
+                    pool_id=pool.id,
+                    portion=Portion.GROSS.value,
+                    priority=-1,
+                    is_active=True,
+                )
+            )
+
     def test_invalid_portion_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.set_route(

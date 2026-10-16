@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from pydantic import ValidationError as PydanticValidationError
 
 from app.core.audit import record_audit
 from app.core.business_numbering import cashflow_no as next_cashflow_no
@@ -47,6 +48,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
+from app.orders.schemas import OrderAccountCreate
 
 # 事件 → 现金流方向 / 性质 / 分类
 EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
@@ -103,6 +105,25 @@ def _validate_existing_account_context(order_type: str, account: Account) -> Non
         )
 
 
+def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return OrderAccountCreate.model_validate(snapshot).model_dump(exclude_none=True)
+    except PydanticValidationError as exc:
+        raise Validation(
+            "订单账号快照字段校验失败",
+            details={
+                "field": "account_snapshot",
+                "errors": [
+                    {
+                        "field": ".".join(str(part) for part in error["loc"]),
+                        "message": error["msg"],
+                    }
+                    for error in exc.errors()
+                ],
+            },
+        ) from exc
+
+
 # --------------------------------------------------------------------- 订单
 def create_order(
     session: Session,
@@ -143,6 +164,8 @@ def create_order(
         )
     if definition.code != "DFQ" and account_snapshot is not None:
         raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+    if account_snapshot is not None:
+        account_snapshot = _normalize_account_snapshot(account_snapshot)
     selected_capital_type = capital_type or definition.capital_type
     if selected_capital_type not in CapitalType.values():
         raise Validation(
@@ -415,6 +438,7 @@ def update_order(
     if account_snapshot is not _UNSET and account_snapshot is not None:
         if order.order_type != "DFQ":
             raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+        account_snapshot = _normalize_account_snapshot(account_snapshot)
 
     before = {
         "trade_date": order.trade_date,

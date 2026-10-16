@@ -271,7 +271,7 @@ class TestCreateOrderValidation:
                 "game_account": "dfq-text-account",
                 "game_password": "secret",
                 "channel_region": "安卓一区",
-                "account_note": "仅订单文本",
+                "note": "仅订单文本",
             },
         )
 
@@ -280,6 +280,19 @@ class TestCreateOrderValidation:
         assert seeded_db.scalar(
             select(Account.id).where(Account.game_account == "dfq-text-account")
         ) is None
+
+    def test_dfq_account_snapshot_rejects_unknown_fields(self, seeded_db):
+        with pytest.raises(Validation, match="订单账号快照字段校验失败"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DFQ",
+                trade_date=D,
+                actor="pytest",
+                account_snapshot={
+                    "game_account": "dfq-invalid-snapshot",
+                    "account_note": "不属于订单账号文本字段",
+                },
+            )
 
 
 # ------------------------------------------------------------------ 查询与作用域

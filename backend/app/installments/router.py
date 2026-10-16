@@ -132,9 +132,9 @@ def deliver_installment(
 def mark_overdue(
     as_of: date = Query(default_factory=date.today),
     db: Session = Depends(get_db),
-    _user: CurrentUser = post_payment,
+    user: CurrentUser = post_payment,
 ) -> dict[str, int]:
-    return {"marked": service.mark_overdue(db, as_of=as_of)}
+    return {"marked": service.mark_overdue(db, as_of=as_of, actor=_actor(user), user=user)}
 
 
 __all__ = ["router"]

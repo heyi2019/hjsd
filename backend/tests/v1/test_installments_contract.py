@@ -395,3 +395,44 @@ class TestInstallmentsApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["marked"] == 2
+
+    def test_scoped_user_mark_overdue_only_updates_visible_orders(
+        self, seeded_client, seeded_db
+    ):
+        own_order = _order(seeded_db, owner_id=9)
+        foreign_order = _order(seeded_db, owner_id=8)
+        own_contract = _contract(
+            seeded_db, own_order.id, down_payment="0", periods=1, per_period="300",
+            first_due_on=PAST,
+        )
+        foreign_contract = _contract(
+            seeded_db, foreign_order.id, down_payment="0", periods=1, per_period="300",
+            first_due_on=PAST,
+        )
+        user = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
+
+        response = seeded_client.post(
+            "/api/v1/installments/mark-overdue",
+            params={"as_of": TODAY.isoformat()},
+            headers=scoped_headers,
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["marked"] == 1
+        own_schedule = seeded_db.scalar(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == own_contract.id,
+                InstallmentSchedule.period_no == 1,
+            )
+        )
+        foreign_schedule = seeded_db.scalar(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == foreign_contract.id,
+                InstallmentSchedule.period_no == 1,
+            )
+        )
+        assert own_schedule.status == ScheduleStatus.OVERDUE.value
+        assert foreign_schedule.status == ScheduleStatus.PENDING.value

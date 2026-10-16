@@ -473,15 +473,29 @@ def deliver(
     return installment
 
 
-def mark_overdue(session: Session, *, as_of: date, actor: str = "system") -> int:
+def mark_overdue(
+    session: Session,
+    *,
+    as_of: date,
+    actor: str = "system",
+    user: CurrentUser | None = None,
+) -> int:
     """按到期日实时标记逾期；已收满的期次不标记（DFQ-01-06）。"""
-    rows = session.scalars(
-        select(InstallmentSchedule).where(
+    stmt = (
+        select(InstallmentSchedule)
+        .join(Installment, Installment.id == InstallmentSchedule.installment_id)
+        .join(Order, Order.id == Installment.order_id)
+        .where(
             InstallmentSchedule.due_on < as_of,
             InstallmentSchedule.received_amount < InstallmentSchedule.due_amount,
             InstallmentSchedule.status != ScheduleStatus.OVERDUE.value,
         )
-    ).all()
+    )
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    rows = session.scalars(stmt).all()
     count = 0
     for row in rows:
         row.status = ScheduleStatus.OVERDUE.value

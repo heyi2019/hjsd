@@ -11,6 +11,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
@@ -74,6 +75,19 @@ class TestCreateAccountGuards:
                 business_mode="SELF",
                 inventory_type="CONSIGNMENT",
             )
+
+    def test_database_rejects_invalid_inventory_context(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-DB-CHECK",
+            game_account="db-invalid-context",
+            business_mode="SELF",
+            inventory_type="CONSIGNMENT",
+            status=AccountStatus.IN_STOCK.value,
+        )
+        seeded_db.add(account)
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
 
     def test_account_creation_rejects_more_than_nine_images(self, seeded_db):
         with pytest.raises(Validation, match="最多 9 张"):

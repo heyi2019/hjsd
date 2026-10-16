@@ -34,10 +34,12 @@ from app.domain.enums import (
     AccountStatus,
     CapitalType,
     CashflowStatus,
+    BusinessMode,
     DepositStatus,
     Direction,
     EventType,
     InstallmentContractType,
+    InventoryType,
     InstallmentStatus,
     LinkStatus,
     Nature,
@@ -63,6 +65,21 @@ class Account(Base, AuditMixin):
         UniqueConstraint("game_account", name="uq_accounts_game_account"),
         Index("ix_accounts_status", "status"),
         CheckConstraint("cost_amount >= 0", name="cost_nonneg"),
+        CheckConstraint(
+            f"business_mode IS NULL OR business_mode IN {BusinessMode.values()!r}",
+            name="account_business_mode_valid",
+        ),
+        CheckConstraint(
+            f"inventory_type IS NULL OR inventory_type IN {InventoryType.values()!r}",
+            name="account_inventory_type_valid",
+        ),
+        CheckConstraint(
+            "business_mode IS NULL OR inventory_type IS NULL OR "
+            "(business_mode = 'SELF' AND inventory_type = 'RECOVERY') OR "
+            "(business_mode = 'DISTRIBUTION' AND inventory_type IN "
+            "('PICKUP', 'CONSIGNMENT'))",
+            name="account_inventory_context_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

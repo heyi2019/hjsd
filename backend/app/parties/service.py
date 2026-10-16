@@ -36,9 +36,25 @@ from app.domain.parties import (
     FieldDefinition,
     OrderCustomerRole,
 )
+from app.domain.users import User
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
+
+
+def _validate_owner_id(session: Session, owner_id: int | None) -> None:
+    if owner_id is None:
+        return
+    if isinstance(owner_id, bool) or not isinstance(owner_id, int) or owner_id <= 0:
+        raise Validation(
+            "客户负责人 ID 必须为正整数",
+            details={"field": "owner_id", "value": owner_id},
+        )
+    if session.get(User, owner_id) is None:
+        raise Validation(
+            "客户负责人不存在",
+            details={"field": "owner_id", "owner_id": owner_id},
+        )
 
 
 # --------------------------------------------------------------------- 脱敏
@@ -113,6 +129,7 @@ def create_customer(
     name = (display_name or "").strip()
     if not name:
         raise Validation("称呼/昵称必填", details={"field": "display_name"})
+    _validate_owner_id(session, owner_id)
 
     extras = dict(extra_values or {})
     _validate_required_extras(session, EntityType.CUSTOMER.value, extras)
@@ -250,6 +267,8 @@ def update_customer(
 
     if "owner_id" in fields and user is not None and not user.is_admin and user.owner_scope != "ALL":
         fields["owner_id"] = user.id
+    if "owner_id" in fields:
+        _validate_owner_id(session, fields["owner_id"])
 
     before = {name: getattr(customer, name) for name in CONTACT_FIELDS}
     allowed_fields = {

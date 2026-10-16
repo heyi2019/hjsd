@@ -71,6 +71,12 @@ class TestCreateCustomerGuards:
             service.create_customer(seeded_db, display_name="   ", actor="pytest")
         assert "称呼/昵称必填" in str(exc.value)
 
+    def test_customer_owner_must_exist(self, seeded_db):
+        with pytest.raises(Validation, match="客户负责人不存在"):
+            service.create_customer(
+                seeded_db, display_name="负责人校验", actor="pytest", owner_id=999999
+            )
+
     def test_duplicate_candidates_without_conditions_returns_empty(self, seeded_db):
         # 150：无任何联系方式入参 → 直接返回空候选，不查库
         assert service.duplicate_candidates(seeded_db) == []

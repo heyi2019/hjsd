@@ -557,9 +557,20 @@ export interface CommissionRow {
   difference: string;
 }
 
+export interface CommissionGroup {
+  user_id: number;
+  order_count: number;
+  profit_base: string;
+  payable: string;
+  paid: string;
+  difference: string;
+  orders: CommissionRow[];
+}
+
 export interface CommissionReport {
   total: { order_count: number; payable: string; paid: string; difference: string };
   items: CommissionRow[];
+  groups?: CommissionGroup[];
 }
 
 export interface BusinessPnlRow {

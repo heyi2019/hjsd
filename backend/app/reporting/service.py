@@ -42,6 +42,10 @@ from app.domain.trade import (
 ZERO = Decimal("0")
 
 
+def _sum_report_field(items: list[dict[str, Any]], field: str) -> Decimal:
+    return sum((item[field] for item in items), ZERO)
+
+
 def _money(value: Any) -> Decimal:
     return to_money(value or 0)
 
@@ -301,7 +305,16 @@ def r2_monthly_pnl(
                 "operating_profit": income - cost - op + rebate,
             }
         )
-    return {"items": items, "total": len(items)}
+    return {
+        "items": items,
+        "total": {
+            "sales_income": _sum_report_field(items, "sales_income"),
+            "account_direct_cost": _sum_report_field(items, "account_direct_cost"),
+            "operating_expense": _sum_report_field(items, "operating_expense"),
+            "rebate_net": _sum_report_field(items, "rebate_net"),
+            "operating_profit": _sum_report_field(items, "operating_profit"),
+        },
+    }
 
 
 # --------------------------------------------------------------------- R3 提成
@@ -348,6 +361,7 @@ def r3_commission_reconciliation(
         base = (profit * rate / Decimal("100")).quantize(Decimal("0.01"))
         grouped[allocation.user_id].append(
             {
+                "user_id": allocation.user_id,
                 "order_no": order.order_no,
                 "order_id": order.id,
                 "profit_base": base,
@@ -358,21 +372,31 @@ def r3_commission_reconciliation(
             }
         )
 
+    groups = []
     items = []
-    for user_id, orders in sorted(grouped.items()):
+    for user_id, orders in sorted(grouped.items(), key=lambda item: item[0] or 0):
         base_total = sum((o["profit_base"] for o in orders), ZERO)
-        items.append(
-            {
-                "user_id": user_id,
-                "order_count": len(orders),
-                "profit_base": base_total,
-                "payable": ZERO,
-                "paid": ZERO,
-                "difference": ZERO,
-                "orders": orders,
-            }
-        )
-    return {"items": items, "total": len(items)}
+        group = {
+            "user_id": user_id,
+            "order_count": len(orders),
+            "profit_base": base_total,
+            "payable": sum((o["payable"] for o in orders), ZERO),
+            "paid": sum((o["paid"] for o in orders), ZERO),
+            "difference": sum((o["difference"] for o in orders), ZERO),
+            "orders": orders,
+        }
+        groups.append(group)
+        items.extend(orders)
+    return {
+        "items": items,
+        "groups": groups,
+        "total": {
+            "order_count": len(items),
+            "payable": _sum_report_field(items, "payable"),
+            "paid": _sum_report_field(items, "paid"),
+            "difference": _sum_report_field(items, "difference"),
+        },
+    }
 
 
 # --------------------------------------------------------------------- R5 业务
@@ -472,7 +496,17 @@ def r5_business_pnl(
                 "full_income": gross_profit + settled[order_type],
             }
         )
-    return {"items": items, "total": len(items)}
+    return {
+        "items": items,
+        "total": {
+            "main_income": _sum_report_field(items, "main_income"),
+            "main_cost": _sum_report_field(items, "main_cost"),
+            "main_profit": _sum_report_field(items, "main_profit"),
+            "settled_rebate": _sum_report_field(items, "settled_rebate"),
+            "uncollected_rebate": _sum_report_field(items, "uncollected_rebate"),
+            "full_income": _sum_report_field(items, "full_income"),
+        },
+    }
 
 
 # --------------------------------------------------------------------- 资金日报
@@ -551,7 +585,19 @@ def daily_funds_report(
                 "available": balance["available"],
             }
         )
-    return {"date": target.isoformat(), "items": items, "total": len(items)}
+    return {
+        "date": target.isoformat(),
+        "items": items,
+        "total": {
+            "opening": _sum_report_field(items, "opening"),
+            "income": _sum_report_field(items, "income"),
+            "expense": _sum_report_field(items, "expense"),
+            "deposit_paid": _sum_report_field(items, "deposit_paid"),
+            "deposit_held": _sum_report_field(items, "deposit_held"),
+            "cash_balance": _sum_report_field(items, "cash_balance"),
+            "available": _sum_report_field(items, "available"),
+        },
+    }
 
 
 # --------------------------------------------------------------------- 订单利润
@@ -599,7 +645,16 @@ def order_profit_detail(
                 "net_profit": income - buy - direct_cost + rebate,
             }
         )
-    return {"items": items, "total": len(items)}
+    return {
+        "items": items,
+        "total": {
+            "income": _sum_report_field(items, "income"),
+            "buy_amount": _sum_report_field(items, "buy_amount"),
+            "direct_cost": _sum_report_field(items, "direct_cost"),
+            "rebate": _sum_report_field(items, "rebate"),
+            "net_profit": _sum_report_field(items, "net_profit"),
+        },
+    }
 
 
 __all__ = [

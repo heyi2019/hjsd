@@ -168,6 +168,8 @@ class TestR2MonthlyPnl:
         # from 过滤：9 月事件被 continue
         gated = reporting_service.r2_monthly_pnl(seeded_db, from_date=MID_GATE)
         assert [i["month"] for i in gated["items"]] == ["2026-10"]
+        assert gated["total"]["sales_income"] == 1300
+        assert gated["total"]["operating_profit"] == 300
         # to 过滤：10 月事件被 continue
         early_only = reporting_service.r2_monthly_pnl(
             seeded_db, to_date=date(2026, 9, 30)
@@ -277,8 +279,10 @@ class TestR3Commission:
         )
 
         data = reporting_service.r3_commission_reconciliation(seeded_db)
-        assert data["total"] == 1
-        person = data["items"][0]
+        assert data["total"]["order_count"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["user_id"] == 7
+        person = data["groups"][0]
         assert person["user_id"] == 7
         assert person["order_count"] == 1
         assert person["profit_base"] == 300
@@ -303,7 +307,7 @@ class TestR3Commission:
         )
 
         data = reporting_service.r3_commission_reconciliation(seeded_db)
-        person = data["items"][0]
+        person = data["groups"][0]
         assert person["order_count"] == 2
         assert {item["order_id"] for item in person["orders"]} == {
             order.id,
@@ -446,7 +450,11 @@ class TestOrderProfitDetail:
         )
 
         data = reporting_service.order_profit_detail(seeded_db)
-        assert data["total"] == 1
+        assert data["total"]["income"] == 1300
+        assert data["total"]["buy_amount"] == 1000
+        assert data["total"]["direct_cost"] == 200
+        assert data["total"]["rebate"] == 90
+        assert data["total"]["net_profit"] == 190
         item = data["items"][0]
         assert item["income"] == 1300
         assert item["buy_amount"] == 1000

@@ -67,6 +67,7 @@ class TestReports:
         assert report["items"]
         for item in report["items"]:
             assert "available" in item and "th_advance" not in item
+        assert report["total"]["available"] == sum(item["available"] for item in report["items"])
 
     def test_order_profit_totals_are_consistent(self, seeded_db):
         data = reporting_service.order_profit_detail(seeded_db)
@@ -77,9 +78,10 @@ class TestReports:
 
     def test_r3_drills_down_to_orders(self, seeded_db):
         data = reporting_service.r3_commission_reconciliation(seeded_db)
-        for person in data["items"]:
+        for person in data["groups"]:
             assert person["orders"]
             assert sum(o["profit_base"] for o in person["orders"]) == person["profit_base"]
+        assert data["total"]["order_count"] == len(data["items"])
 
 
 # --------------------------------------------------------------------- 历史导入

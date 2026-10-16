@@ -299,16 +299,23 @@ class TestSettingsHelpers:
 class TestDatabaseLifecycle:
     def test_build_engine_non_sqlite_uses_pool_ping(self, monkeypatch):
         captured: dict[str, object] = {}
+        created_engines = []
 
         def fake_create_engine(url, **kwargs):
             captured["url"] = url
             captured.update(kwargs)
-            return create_engine("sqlite://")
+            engine = create_engine("sqlite://")
+            created_engines.append(engine)
+            return engine
 
         monkeypatch.setattr(database, "create_engine", fake_create_engine)
-        database.build_engine("postgresql://u:p@h/db")
-        assert captured["url"] == "postgresql://u:p@h/db"
-        assert captured["pool_pre_ping"] is True
+        try:
+            database.build_engine("postgresql://u:p@h/db")
+            assert captured["url"] == "postgresql://u:p@h/db"
+            assert captured["pool_pre_ping"] is True
+        finally:
+            for engine in created_engines:
+                engine.dispose()
 
     def test_sqlite_connect_args_and_engine_cache(self, tmp_path):
         assert database._sqlite_connect_args() == {"check_same_thread": False}
@@ -316,7 +323,11 @@ class TestDatabaseLifecycle:
         first = database.get_engine(url)
         assert first is not None
         # 无 url 时走单例缓存（可能已被其它用例构建过）
-        assert database.get_engine() is not None
+        cached = database.get_engine()
+        assert cached is not None
+        first.dispose()
+        if cached is not first:
+            database.dispose_engine()
 
     def test_foreign_key_pragma_skips_non_sqlite(self):
         # 非 SQLite 方言直接跳过（事件监听对 PG/MySQL 生效但无需 PRAGMA）
@@ -327,23 +338,31 @@ class TestDatabaseLifecycle:
 
     def test_session_factory_defaults_to_engine_singleton(self, tmp_path, monkeypatch):
         engine = create_engine(f"sqlite:///{tmp_path / 'db3.sqlite'}")
-        monkeypatch.setattr(database, "get_engine", lambda url=None: engine)
-        database._session_factory = None
-        factory = database.get_session_factory()
-        assert factory.kw["bind"] is engine
+        try:
+            monkeypatch.setattr(database, "get_engine", lambda url=None: engine)
+            database._session_factory = None
+            factory = database.get_session_factory()
+            assert factory.kw["bind"] is engine
+        finally:
+            engine.dispose()
 
     def test_reset_session_factory_and_create_all(self, tmp_path):
         url = f"sqlite:///{tmp_path / 'db2.sqlite'}"
         engine = database.reset_engine(url)
         assert engine is not None
         factory = database.get_session_factory(url)
+        factory_engine = factory.kw["bind"]
         session = factory()
         assert session.get_bind() is not None
         session.close()
 
-        database.create_all(url)
-        assert (tmp_path / "db2.sqlite").exists()
-        database.dispose_engine()
+        created_engine = database.create_all(url)
+        try:
+            assert (tmp_path / "db2.sqlite").exists()
+        finally:
+            created_engine.dispose()
+            factory_engine.dispose()
+            database.dispose_engine()
         assert database._engine is None
 
     def test_get_db_commits_and_rolls_back(self, v1_engine, monkeypatch):

@@ -31,35 +31,41 @@ def _build_table(name: str) -> Table:
 def test_amount_float_sum_matches_decimal() -> None:
     """合成 2 万行 2 位小数金额：SQL 浮点 SUM 与 Decimal SUM 一致（精确到 2 位）。"""
     eng = create_engine("sqlite://")
-    t = _build_table("money_guard")
-    t.metadata.create_all(eng)
+    try:
+        t = _build_table("money_guard")
+        t.metadata.create_all(eng)
 
-    random.seed(7)
-    rows = [round(random.uniform(0.01, 9999.99), 2) for _ in range(20000)]
-    expected = sum(Decimal(str(v)) for v in rows)
+        random.seed(7)
+        rows = [round(random.uniform(0.01, 9999.99), 2) for _ in range(20000)]
+        expected = sum(Decimal(str(v)) for v in rows)
 
-    with Session(eng) as s:
-        # 写入走真实 Amount 绑定逻辑（Decimal → float）
-        s.execute(insert(t), [{"amt": to_money(v)} for v in rows])
-        s.commit()
-        # SQL 层聚合（与生产 reporting/orders/finance 的 func.sum 同一路径）
-        sql_sum = s.execute(select(func.sum(t.c.amt))).scalar()
+        with Session(eng) as s:
+            # 写入走真实 Amount 绑定逻辑（Decimal → float）
+            s.execute(insert(t), [{"amt": to_money(v)} for v in rows])
+            s.commit()
+            # SQL 层聚合（与生产 reporting/orders/finance 的 func.sum 同一路径）
+            sql_sum = s.execute(select(func.sum(t.c.amt))).scalar()
 
-    # 读出即量化 2 位（与生产路径一致），与 Decimal 求和比对
-    got = to_money(sql_sum)
-    assert got == expected.quantize(Decimal("0.01")), f"SUM 漂移: got={got} expected={expected}"
+        # 读出即量化 2 位（与生产路径一致），与 Decimal 求和比对
+        got = to_money(sql_sum)
+        assert got == expected.quantize(Decimal("0.01")), f"SUM 漂移: got={got} expected={expected}"
+    finally:
+        eng.dispose()
 
 
 def test_amount_roundtrip_no_precision_loss() -> None:
     """单值 Decimal → float → Decimal 必须无损（2 位小数）。"""
     eng = create_engine("sqlite://")
-    t = _build_table("money_roundtrip")
-    t.metadata.create_all(eng)
+    try:
+        t = _build_table("money_roundtrip")
+        t.metadata.create_all(eng)
 
-    vals = [Decimal("123.45"), Decimal("0.01"), Decimal("999999.99"), Decimal("0.00")]
-    with Session(eng) as s:
-        s.execute(insert(t), [{"amt": to_money(v)} for v in vals])
-        s.commit()
-        out = s.execute(select(t.c.amt).order_by(t.c.id)).scalars().all()
+        vals = [Decimal("123.45"), Decimal("0.01"), Decimal("999999.99"), Decimal("0.00")]
+        with Session(eng) as s:
+            s.execute(insert(t), [{"amt": to_money(v)} for v in vals])
+            s.commit()
+            out = s.execute(select(t.c.amt).order_by(t.c.id)).scalars().all()
 
-    assert out == vals, f"往返损失: {out} != {vals}"
+        assert out == vals, f"往返损失: {out} != {vals}"
+    finally:
+        eng.dispose()

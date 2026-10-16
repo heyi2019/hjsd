@@ -207,6 +207,45 @@ class TestAccountsApi:
         assert inventory.status_code == 200, inventory.text
         assert [row["account_id"] for row in inventory.json()["items"]] == [mine.id]
 
+    def test_visible_account_does_not_leak_foreign_source_order(
+        self, seeded_client, seeded_db
+    ):
+        account = service.create_account(
+            seeded_db,
+            game_account="scope-source-account",
+            platform="王者",
+            actor="operator",
+        )
+        foreign_order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="other",
+            account_id=account.id,
+            owner_id=8,
+        )
+        orders_service.post_event(
+            seeded_db,
+            foreign_order.id,
+            event_type="BUY",
+            amount="300",
+            occurred_on=TODAY,
+            actor="other",
+        )
+
+        user = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(user)}"}
+
+        response = seeded_client.get(
+            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["account"]["source_order_no"] is None
+        assert response.json()["orders"] == []
+
     def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
         response = seeded_client.post(
             "/api/v1/accounts",

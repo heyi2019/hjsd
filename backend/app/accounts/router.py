@@ -142,17 +142,17 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
-def _source_orders(db: Session, account_ids: list[int]) -> dict[int, Order]:
+def _source_orders(
+    db: Session, account_ids: list[int], user: CurrentUser | None = None
+) -> dict[int, Order]:
     """解析标准订单数据中的库存来源，优先回收/提号/代挂。"""
     if not account_ids:
         return {}
-    orders = list(
-        db.scalars(
-            select(Order)
-            .where(Order.account_id.in_(account_ids))
-            .order_by(Order.trade_date.desc(), Order.id.desc())
-        ).all()
-    )
+    stmt = select(Order).where(Order.account_id.in_(account_ids))
+    scope = owner_scope_filter(Order.owner_id, user, db)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    orders = list(db.scalars(stmt.order_by(Order.trade_date.desc(), Order.id.desc())).all())
     if not orders:
         return {}
     order_ids = [order.id for order in orders]
@@ -188,9 +188,11 @@ def _account_output(account: Account, source_order: Order | None = None) -> Acco
     return output
 
 
-def _account_outputs(db: Session, accounts: list[Account]) -> list[AccountOut]:
+def _account_outputs(
+    db: Session, accounts: list[Account], user: CurrentUser | None = None
+) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
-    source_orders = _source_orders(db, [account.id for account in accounts])
+    source_orders = _source_orders(db, [account.id for account in accounts], user)
     return [
         _account_output(account, source_orders.get(account.id))
         for account in accounts
@@ -204,7 +206,7 @@ def list_accounts(
     _user: CurrentUser = read_access,
 ) -> list[AccountOut]:
     items = service.list_accounts(db, status=status, user=_user)
-    return _account_outputs(db, items)
+    return _account_outputs(db, items, _user)
 
 
 @router.patch("/accounts/{account_id}", response_model=AccountOut)
@@ -229,6 +231,7 @@ def update_account_profile(
         account_description=payload.account_description,
         account_images=payload.account_images,
         note=payload.note,
+        user=user,
     )
     return AccountOut.model_validate(item)
 
@@ -340,7 +343,7 @@ def execution_detail(
             )
         )
     return AccountExecutionDetailOut(
-        account=_account_outputs(db, [account])[0],
+        account=_account_outputs(db, [account], _user)[0],
         orders=[
             AccountExecutionOrderOut(
                 order_id=order.id,

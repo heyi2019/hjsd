@@ -143,8 +143,9 @@ def update_account_profile(
     account_description: str | None = None,
     account_images: list[str] | None = None,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> Account:
-    account = get_account(session, account_id)
+    account = get_account(session, account_id, user)
     before = {
         "game_account": account.game_account,
         "game_type": account.game_type,

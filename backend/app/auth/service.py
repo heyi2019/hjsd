@@ -18,6 +18,10 @@ from app.domain.foundation import Pool
 from app.domain.users import RevokedToken, Team, User
 
 _USER_FIELDS = ("username", "display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active")
+_USER_MUTABLE_FIELDS = frozenset(
+    {"display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active"}
+)
+_TEAM_MUTABLE_FIELDS = frozenset({"name", "description", "is_active"})
 
 
 def _required_text(value: object, *, message: str) -> str:
@@ -125,6 +129,9 @@ def update_user(
     user = session.get(User, user_id)
     if user is None:
         raise Validation("用户不存在")
+    unsupported = sorted(set(changes) - _USER_MUTABLE_FIELDS)
+    if unsupported:
+        raise Validation("用户更新字段不受支持", details={"fields": unsupported})
     _check_pool_ids(session, changes.get("pool_ids") if "pool_ids" in changes else None)  # type: ignore[arg-type]
     _check_team_ids(session, changes.get("team_ids") if "team_ids" in changes else None)  # type: ignore[arg-type]
     if "role" in changes and changes["role"] not in ALL_ROLES:
@@ -238,6 +245,9 @@ def update_team(
     team = session.get(Team, team_id)
     if team is None:
         raise Validation("团队不存在")
+    unsupported = sorted(set(changes) - _TEAM_MUTABLE_FIELDS)
+    if unsupported:
+        raise Validation("团队更新字段不受支持", details={"fields": unsupported})
     normalized_changes = dict(changes)
     if "name" in normalized_changes:
         normalized_changes["name"] = _required_text(

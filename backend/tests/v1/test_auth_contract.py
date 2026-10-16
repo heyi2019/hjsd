@@ -19,6 +19,8 @@ from app.core.security import hash_password
 from app.domain.users import RevokedToken, User
 from app.core.settings import Settings
 from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
+from app.auth import service
+from app.core.errors import Validation
 
 
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",
@@ -424,6 +426,19 @@ def test_update_user_success(client: TestClient):
     assert body["phone"] == "13800000000"
 
 
+def test_user_service_rejects_unknown_and_immutable_fields(seeded_db):
+    user = seeded_db.get(User, 1)
+    assert user is not None
+    with pytest.raises(Validation):
+        service.update_user(
+            seeded_db, user.id, changes={"unknown_field": "ignored"}, actor="pytest"
+        )
+    with pytest.raises(Validation):
+        service.update_user(
+            seeded_db, user.id, changes={"username": "changed"}, actor="pytest"
+        )
+
+
 def test_reset_password_not_found(client: TestClient):
     response = client.post(
         "/api/v1/users/999/reset-password",
@@ -543,6 +558,16 @@ def test_update_team_explicit_blank_name_rejected(client: TestClient):
     )
     assert response.status_code == 422
     assert response.json()["message"] == "团队名称不能为空"
+
+
+def test_team_service_rejects_unknown_fields(seeded_db):
+    team = service.create_team(
+        seeded_db, code="T-SERVICE", name="服务团队", description=None, actor="pytest"
+    )
+    with pytest.raises(Validation):
+        service.update_team(
+            seeded_db, team.id, changes={"unknown_field": "ignored"}, actor="pytest"
+        )
 
 
 def test_admin_mutations_write_audit(client: TestClient, db: Session):

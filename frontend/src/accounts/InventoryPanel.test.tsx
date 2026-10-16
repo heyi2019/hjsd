@@ -6,12 +6,24 @@ import { InventoryPanel } from "./InventoryPanel";
 
 const accountsList = vi.fn();
 const accountsCreate = vi.fn();
+const accountsExecutionDetail = vi.fn();
+const ordersCreate = vi.fn();
+const ordersPostEvent = vi.fn();
+const customersList = vi.fn();
+const poolsList = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   accountsApi: {
     list: (...a: unknown[]) => accountsList(...a),
     create: (...a: unknown[]) => accountsCreate(...a),
+    executionDetail: (...a: unknown[]) => accountsExecutionDetail(...a),
   },
+  ordersApi: {
+    create: (...a: unknown[]) => ordersCreate(...a),
+    postEvent: (...a: unknown[]) => ordersPostEvent(...a),
+  },
+  customersApi: { list: (...a: unknown[]) => customersList(...a) },
+  poolsApi: { list: (...a: unknown[]) => poolsList(...a) },
 }));
 
 const accounts = [
@@ -22,6 +34,30 @@ const accounts = [
 beforeEach(() => {
   vi.clearAllMocks();
   accountsList.mockResolvedValue(accounts);
+  ordersCreate.mockResolvedValue({ id: 21 });
+  ordersPostEvent.mockResolvedValue({});
+  customersList.mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  poolsList.mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  accountsExecutionDetail.mockResolvedValue({
+    account: accounts[0],
+    orders: [{
+      order_id: 21,
+      order_no: "HS0001",
+      order_type: "HS",
+      trade_date: "2026-10-15",
+      status: "ACTIVE",
+      events: [{
+        id: 31,
+        event_no: "EV0001",
+        event_type: "BUY",
+        amount: "100.00",
+        occurred_on: "2026-10-15",
+        portion: "PRINCIPAL",
+        is_posted: true,
+        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+      }],
+    }],
+  });
 });
 
 describe("InventoryPanel：账号台账", () => {
@@ -54,10 +90,79 @@ describe("InventoryPanel：账号台账", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
+  it("自营在库账号可以售出并登记 HS 售出事件", async () => {
+    renderApp(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("HJACC-0001");
+    await userEvent.click(screen.getByRole("button", { name: /售出/ }));
+    expect(await screen.findByText("售出账号")).toBeInTheDocument();
+
+    const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
+    await userEvent.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await userEvent.click(await screen.findByText("买家A"));
+    await userEvent.type(screen.getByPlaceholderText("请输入金额"), "350");
+    await userEvent.click(modal.querySelectorAll(".ant-select-selector")[1] as Element);
+    const poolOption = await screen.findByText(/利润池（HJ_PROFIT）/);
+    await userEvent.click(poolOption);
+    await userEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+    await waitFor(() => expect(ordersCreate).toHaveBeenCalled());
+    expect(ordersCreate.mock.calls[0][0]).toMatchObject({
+      order_type: "HS",
+      account_id: 1,
+      customer_roles: [{ customer_id: 7, role: "BUYER" }],
+    });
+    expect(ordersPostEvent).toHaveBeenCalledWith(21, expect.objectContaining({
+      event_type: "SELL",
+      amount: "350",
+      pool_id: 3,
+      portion: "PROFIT",
+    }));
+  });
+
+  it("代挂账号售出按货源类型生成 DG 订单", async () => {
+    accountsList.mockResolvedValueOnce([
+      { id: 5, account_no: "HJACC-0005", game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
+    ]);
+    renderApp(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("HJACC-0005");
+    await userEvent.click(screen.getByRole("button", { name: /售出/ }));
+    expect(await screen.findByText("售出账号")).toBeInTheDocument();
+    const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
+    await userEvent.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await userEvent.click(await screen.findByText("买家A"));
+    await userEvent.type(screen.getByPlaceholderText("请输入金额"), "200");
+    await userEvent.click(modal.querySelectorAll(".ant-select-selector")[1] as Element);
+    await userEvent.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+    await userEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+    await waitFor(() => expect(ordersCreate).toHaveBeenCalled());
+    expect(ordersCreate.mock.calls[0][0]).toMatchObject({
+      order_type: "DG",
+      account_id: 5,
+      customer_roles: [{ customer_id: 7, role: "BUYER" }],
+    });
+    expect(ordersPostEvent).toHaveBeenCalledWith(21, expect.objectContaining({
+      event_type: "SELL",
+      amount: "200",
+      pool_id: 3,
+      portion: "PROFIT",
+    }));
+  });
+
   it("无数据时显示「暂无账号」", async () => {
     accountsList.mockResolvedValueOnce([]);
     renderApp(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByText("暂无账号")).toBeInTheDocument();
+  });
+
+  it("展开库存订单可以查询完整执行明细与资金流水", async () => {
+    renderApp(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("HJACC-0001");
+    await userEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
+    expect(await screen.findByText("执行明细")).toBeInTheDocument();
+    expect(await screen.findByText("HS0001")).toBeInTheDocument();
+    expect(screen.getByText(/CF0001/)).toBeInTheDocument();
+    expect(accountsExecutionDetail).toHaveBeenCalledWith(1);
+    await userEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });
 });
 

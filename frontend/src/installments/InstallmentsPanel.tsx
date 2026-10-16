@@ -288,12 +288,12 @@ export function InstallmentsPanel() {
       items={[
         {
           key: "stock",
-          label: "分期出售（HS·STOCK_SALE）",
+          label: "分期出售",
           children: <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey} />,
         },
         {
           key: "advance",
-          label: "代分期（DFQ·ADVANCE_PURCHASE）",
+          label: "代分期",
           children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey} />,
         },
       ]}

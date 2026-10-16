@@ -145,6 +145,18 @@ class TestDepositQueries:
                 source_order_id=999999,
             )
 
+    def test_deposit_counterparty_must_exist(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        with pytest.raises(NotFound, match="合作方"):
+            service.create_deposit(
+                seeded_db,
+                pool_id=invest.id,
+                amount=Decimal("100"),
+                paid_on=TODAY,
+                actor="pytest",
+                counterparty_id=999999,
+            )
+
     def test_return_deposit_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             service.return_deposit(

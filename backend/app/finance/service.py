@@ -43,6 +43,7 @@ from app.domain.trade import (
     RebateSettlement,
     Reconciliation,
 )
+from app.domain.parties import Counterparty
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 
@@ -292,6 +293,11 @@ def create_deposit(
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
+    if counterparty_id is not None and session.get(Counterparty, counterparty_id) is None:
+        raise NotFound(
+            f"合作方 {counterparty_id} 不存在",
+            details={"counterparty_id": counterparty_id},
+        )
     if source_order_id is not None:
         try:
             orders_service.get_order(session, source_order_id, user)

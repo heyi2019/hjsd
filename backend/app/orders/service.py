@@ -95,6 +95,12 @@ def create_order(
         )
     if definition.code != "DFQ" and account_snapshot is not None:
         raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+    selected_capital_type = capital_type or definition.capital_type
+    if selected_capital_type not in CapitalType.values():
+        raise Validation(
+            f"capital_type 必须为 {CapitalType.values()}",
+            details={"field": "capital_type", "value": selected_capital_type},
+        )
     listing_amount = to_money(listing_price) if listing_price is not None else None
     service_fee_amount = to_money(service_fee) if service_fee is not None else None
     if definition.code != "DG" and any(
@@ -180,7 +186,7 @@ def create_order(
     order = Order(
         order_no=foundation_service.next_order_no(session, definition),
         order_type=definition.code,
-        capital_type=capital_type or definition.capital_type,
+        capital_type=selected_capital_type,
         trade_date=trade_date,
         listing_price=listing_amount,
         service_fee=service_fee_amount,
@@ -551,6 +557,7 @@ def _validate_participant_roles(
     customer_roles: Sequence[tuple[int, str]],
     counterparty_roles: Sequence[tuple[int, str]],
 ) -> None:
+    customer_seen: set[tuple[int, str]] = set()
     for _participant_id, role in customer_roles:
         if role not in CustomerRole.values():
             raise Validation(
@@ -558,6 +565,15 @@ def _validate_participant_roles(
                 code=ErrorCode.PARTICIPANT_ROLE_INVALID,
                 details={"role": role},
             )
+        key = (int(_participant_id), role)
+        if key in customer_seen:
+            raise Validation(
+                "同一客户同一角色不可重复",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"customer_id": key[0], "role": role},
+            )
+        customer_seen.add(key)
+    counterparty_seen: set[tuple[int, str]] = set()
     for _participant_id, role in counterparty_roles:
         if role not in CounterpartyRole.values():
             raise Validation(
@@ -565,6 +581,14 @@ def _validate_participant_roles(
                 code=ErrorCode.PARTICIPANT_ROLE_INVALID,
                 details={"role": role},
             )
+        key = (int(_participant_id), role)
+        if key in counterparty_seen:
+            raise Validation(
+                "同一合作方同一角色不可重复",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"counterparty_id": key[0], "role": role},
+            )
+        counterparty_seen.add(key)
 
 
 def _opposite_direction(

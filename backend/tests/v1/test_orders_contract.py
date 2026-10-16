@@ -48,6 +48,34 @@ class TestCreateOrderValidation:
             )
         assert "不存在" in str(exc.value)
 
+    def test_invalid_capital_type_rejected_before_database_constraint(self, seeded_db):
+        with pytest.raises(Validation, match="capital_type"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="pytest",
+                capital_type="NOT_A_CAPITAL_TYPE",
+            )
+
+    def test_duplicate_participant_role_rejected_before_unique_constraint(
+        self, seeded_db
+    ):
+        customer = parties_service.create_customer(
+            seeded_db, display_name="重复角色客户", actor="pytest"
+        )
+        with pytest.raises(Validation, match="不可重复"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="pytest",
+                customer_roles=[
+                    (customer.id, "SELLER"),
+                    (customer.id, "SELLER"),
+                ],
+            )
+
     def test_disabled_order_type_rejected(self, seeded_db):
         definition = foundation_service.get_order_type_by_code(seeded_db, "HS")
         foundation_service.set_order_type_active(

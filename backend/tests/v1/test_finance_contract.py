@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow, RebateSettlement, Reconciliation
+from app.domain.trade import Cashflow, RebateRecord, RebateSettlement, Reconciliation
 from app.finance import service
 from app.orders import service as orders_service
 from app.reporting import service as reporting_service
@@ -39,6 +39,25 @@ def _active_order(seeded_db) -> int:
         occurred_on=TODAY, actor="pytest",
     )
     return order.id
+
+
+class TestRebateValidation:
+    def test_rebate_link_status_is_closed_at_database_boundary(self, seeded_db):
+        seeded_db.add(
+            RebateRecord(
+                rebate_no="RB-INVALID-LINK-STATUS",
+                rate=Decimal("10"),
+                base_amount=Decimal("500"),
+                status="OPEN",
+                link_status="AUTO_MATCHED",
+                collected_on=TODAY,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
 
 
 class TestDepositQueries:

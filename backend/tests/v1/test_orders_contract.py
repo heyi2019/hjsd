@@ -42,6 +42,23 @@ def _scoped_user() -> CurrentUser:
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
+    def test_order_link_status_is_closed_at_database_boundary(self, seeded_db):
+        seeded_db.add(
+            Order(
+                order_no="HS-INVALID-LINK-STATUS",
+                order_type="HS",
+                capital_type=CapitalType.STOCK.value,
+                trade_date=D,
+                status=OrderStatus.ACTIVE.value,
+                link_status="AUTO_MATCHED",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_order_amounts_cannot_be_negative_in_database(self, seeded_db):
         seeded_db.add(
             Order(

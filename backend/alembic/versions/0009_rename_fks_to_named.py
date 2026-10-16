@@ -90,6 +90,18 @@ def _rebuild(bind, tname: str) -> None:
     # 避免当前 ORM 重命名后在历史重建阶段提前丢失数据。
     if tname == "rebate_records" and "rebate_group_no" in source_columns:
         ddl = ddl.replace("rebate_no", "rebate_group_no")
+    # link_status 的封闭校验分别在 0061 才正式加入；0009 位于该迁移之前，
+    # 不能在历史重建阶段提前创建，否则后续迁移会重复添加同名约束。
+    if tname == "orders":
+        ddl = ddl.replace(
+            "\tCONSTRAINT ck_orders_order_link_status_valid CHECK (link_status IN ('LINKED', 'UNLINKED', 'ORPHAN', 'UNLINKED_TRANSFER')), \n",
+            "",
+        )
+    if tname == "rebate_records":
+        ddl = ddl.replace(
+            "\tCONSTRAINT ck_rebate_records_rebate_link_status_valid CHECK (link_status IN ('LINKED', 'UNLINKED', 'ORPHAN', 'UNLINKED_TRANSFER')), \n",
+            "",
+        )
     # reversal_of_id 属于 0040 才新增的返点结算字段；0009 使用当前 ORM
     # 编译 DDL，但历史表此时还没有该列，必须把未来字段及其自引用约束移除。
     if tname == "rebate_settlements" and "reversal_of_id" not in source_columns:

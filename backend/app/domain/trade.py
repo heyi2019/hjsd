@@ -113,6 +113,10 @@ class Order(Base, AuditMixin):
             "service_fee IS NULL OR service_fee >= 0",
             name="service_fee_nonneg",
         ),
+        CheckConstraint(
+            f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="order_link_status_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -477,6 +481,10 @@ class RebateRecord(Base, AuditMixin):
             name="amount_nonneg",
         ),
         CheckConstraint("rate <= 100", name="rate_max"),
+        CheckConstraint(
+            f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="rebate_link_status_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

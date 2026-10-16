@@ -497,6 +497,7 @@ def set_allocations(
     normalized_items = [_normalize_allocation_item(item) for item in items]
     total = Decimal("0")
     seen: set[tuple[int, str]] = set()
+    user_ids: set[int] = set()
     for item in normalized_items:
         try:
             rate = to_money(item.get("allocation_rate"))
@@ -521,6 +522,18 @@ def set_allocations(
                 details={"user_id": key[0], "role": key[1]},
             )
         seen.add(key)
+        user_ids.add(key[0])
+
+    existing_user_ids = {
+        user_id
+        for user_id in session.scalars(select(User.id).where(User.id.in_(user_ids))).all()
+    }
+    missing_user_ids = sorted(user_ids - existing_user_ids)
+    if missing_user_ids:
+        raise Validation(
+            "利润分配人员不存在",
+            details={"field": "items.user_id", "missing": missing_user_ids},
+        )
 
     if total != Decimal("100.00"):
         raise Validation(

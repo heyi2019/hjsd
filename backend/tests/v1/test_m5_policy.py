@@ -425,6 +425,19 @@ class TestProfitAllocation:
             )
         assert "字段" in str(exc.value) or "校验" in str(exc.value)
 
+    def test_allocation_user_must_exist(self, seeded_db):
+        order = self._order(seeded_db)
+        with pytest.raises(Exception) as exc:
+            policy_service.set_allocations(
+                seeded_db,
+                order.id,
+                items=[
+                    {"user_id": 999999, "role": "OWNER", "allocation_rate": "100"}
+                ],
+                actor="pytest",
+            )
+        assert "人员不存在" in str(exc.value)
+
     def test_fifty_fifty(self, seeded_db):
         order = self._order(seeded_db)
         items = policy_service.set_allocations(

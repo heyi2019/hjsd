@@ -332,12 +332,12 @@
 | `orders` | 订单主表，**只存汇总** | id / **order_no(带业务前缀的业务单号)** / **order_type(引用 `order_type_defs`，首批 HS/TH/DG/DFQ)** / **capital_type** / account_id / **link_status** / owner_id / trade_date / gross_amount / status |
 | ↳ 回款池归属 | — | **不在订单上**，记在 `order_events.pool_id`（池可自由创建，订单层写死会无法扩展） |
 | `order_events` | 动作事件流（核心） | id / **event_no** / order_id / event_type / amount / **portion(PRINCIPAL/PROFIT/GROSS)** / occurred_on / **pool_id** / counterparty / **offset_event_id** |
-| `accounts` | 在途账号 | id / **account_no** / **game_account(唯一, 可空)** / buy_date / cost_amount / sale_amount / status / **channels(JSON多值)** / buyer / bind_phone / **risk_level** |
+| `accounts` | 在途账号 | id / **inventory_no(ACC库存编号)** / **game_account(唯一, 可空)** / buy_date / cost_amount / status / **channels(JSON多值)** / platform / region / bound_phone / **risk_level** |
 | `customers` | 客户主数据 | id / **customer_no** / display_name / contact_name / phone / wechat / qq / source / owner_id / status / tags / note；联系方式不作为唯一键，修改留审计 |
 | `order_customer_roles` | 订单—客户参与关系 | id / order_id / customer_id / **role(SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER)**；同一客户可在不同订单担任不同角色 |
 | `counterparties` | 合作方主数据 | id / **counterparty_no** / display_name / type(PEER/SUPPLIER/PLATFORM) / contact_name / phone / wechat / qq / status / note；同行、供货方、平台不归入客户 |
 | `order_counterparty_roles` | 订单—合作方参与关系 | id / order_id / counterparty_id / **role(PEER/SUPPLIER/PLATFORM)**；TH 同行、DFQ 供货方等从此关联 |
-| `installments` | 分期合约（`HS` 分期出售或 `DFQ` 代分期的订单从表） | id / **inst_no** / **order_id(唯一 FK，新数据必填)** / **contract_type(STOCK_SALE/ADVANCE_PURCHASE)** / account_id / principal / down_payment / periods / paid / status / next_pay_date / **rebind_date** |
+| `installments` | 分期合约（`HS` 分期出售或 `DFQ` 代分期的订单从表） | id / **inst_no** / **order_id(唯一 FK，新数据必填)** / **contract_type(STOCK_SALE/ADVANCE_PURCHASE)** / principal / down_payment / periods / paid / status / next_pay_date / **rebind_date**；账号信息从所属订单取得 |
 | `installment_schedules` | 分期计划明细 | id / installment_id / **period_no** / due_on / due_amount / received_amount / received_on / status；同一合约期次唯一，支持部分收款、逾期、减免与展期留痕 |
 | `rebate_records` | 返点记录（主业务从表） | id / **rebate_no** / source_order_id / channel / rebate_type / rate / base_amount / link_status |
 | `rebate_settlements` | 返点结算明细 | id / **settlement_no** / rebate_record_id / settled_on / gross_amount / platform_fee / net_amount / pool_id / cashflow_id |
@@ -357,11 +357,11 @@ HS 分期出售订单 / DFQ 代分期订单（orders） 1 ─── 1 分期合�
 | 创建 | 新建 `DFQ` 时必须同一提交创建合约；`HS` 仅在“分期出售”时创建合约。未填期数、首付、每期金额、首期应付日、合约总应收不得提交 |
 | 合约类型 | `ADVANCE_PURCHASE` 仅对应 `DFQ`；`STOCK_SALE` 仅对应已买入且在库的 `HS` 订单。类型、订单业务和账号来源不一致时阻断提交 |
 | 唯一性 | 一个订单至多关联一份分期合约；除 `HS` 分期出售和 `DFQ` 外，其他订单不得关联分期合约 |
-| 账号关联 | 合约必须关联订单账号；DFQ 买入后签约，HS 必须已在库后签约。签约后转“分期中”，**仅结清且完成换绑/交付后**转“已售” |
+| 账号关联 | 合约必须关联所属订单；HS 通过订单取得已在库账号，DFQ 订单本身不关联库存账号。签约后转“分期中”，**仅结清且完成换绑/交付后**转“已售” |
 | 生命周期 | DFQ：`BUY` → 签约 → `PAYMENT` → 结清 → 换绑 → `DELIVER`；HS 分期出售：库存 `HS` → 签约 → `PAYMENT` → 结清 → 换绑/交付 → `DELIVER`。`PAYMENT` 是唯一分期收款事实，`DELIVER` 无金额、无现金流，只释放库存并记录交付。`next_pay_date` 逾期未补款自动预警并转“断分期” |
 | 金额勾稽 | `总应收 = 首付 + 期数 × 每期金额`；`剩余应收 = 总应收 − paid`；每笔 `PAYMENT` 必须同步增加 `paid`，累计不得超过总应收 |
 | 断分期处置 | 转“断分期”时必须记录账号控制权、已收款处理方式、后续催收/收回/转售方案；未完成处置前不得将订单标为已售或将剩余应收视为已实现利润 |
-| 历史数据 | 现有 4 条分期合约因缺少可靠关联，允许 `order_id/account_id=NULL` 且标 `ORPHAN`；仅允许人工补链，禁止自动匹配 |
+| 历史数据 | 历史分期按标准导入规则处理；新数据不保存独立 `account_id`，不得通过账号文本反推订单 |
 
 #### 事件类型（7 种，封闭枚举）
 
@@ -452,7 +452,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | `order_events` | `event_no` | 订单号 + `-EV-` + 动作 + 2位流水 | `HS0001-EV-BUY-01` |
 | `rebate_records` | `rebate_no` | 来源订单号 + `-RB` + 2位流水；必须关联 `source_order_id` | `HS0001-RB01` |
 | `rebate_settlements` | `settlement_no` | 返点单号 + `-CF-` + 2位到账流水 | `HS0001-RB01-CF-01` |
-| `accounts` | `account_no` | `ACC` + 4位序号 | `ACC0001` |
+| `accounts` | `inventory_no` | `ACC` + 4位序号 | `ACC0001` |
 | `customers` | `customer_no` | `CUS` + 4位序号 | `CUS0001` |
 | `counterparties` | `counterparty_no` | `CP` + 4位序号 | `CP0001` |
 | `installments` | `inst_no` | 订单号 + `-INS01` | `HS0001-INS01` |
@@ -475,7 +475,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 | 标识 | 字段 | 用途 |
 |---|---|---|
-| 业务编号 | `account_no` | 对外引用、人工沟通 |
+| 业务编号 | `inventory_no` | 对外引用、人工沟通；即 ACC 库存编号 |
 | 账号号 | `game_account`（QQ号等） | 与平台对接、查重唯一键 |
 
 > `game_account` 建唯一索引，但**允许为空**（未取得账号号时先挂单）。
@@ -485,7 +485,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 | 情形 | 处理 |
 |---|---|
-| 89 单无 `account_id` | **不回填**。`account_id` 允许 NULL，标 `link_status=UNLINKED` |
+| 89 单无 `account_id` | **不回填**。订单 `account_id` 允许 NULL，标 `link_status=UNLINKED`；账号字段仅是订单对库存账号的关系 |
 | 关联失败的旧单 | 报表中归入「不可算」区，**不参与**库存周转/呆滞统计 |
 | 3 笔分期无对应账号 | 保留孤立记录，标 `link_status=ORPHAN`；同时 `order_id=NULL`，不得臆造代分期订单 |
 
@@ -497,7 +497,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 | 阶段 | 策略 |
 |---|---|
-| M0–M2 | 新数据强制填 `order_no`；`HS`/`DFQ` 强制填 `account_id`，`TH` 可选，`DG` 不得关联工作室库存账号；历史数据标 `link_status` |
+| M0–M2 | 新数据强制填 `order_no`；HS/TH/DG 订单按实际库存业务关联 `account_id` 或随订单建档，DFQ 不关联库存账号；历史数据按标准导入规则处理 |
 | M3 起 | 库存周转、呆滞清单等报表**仅统计 `link_status=LINKED` 的数据** |
 | 历史部分 | 报表页脚固定标注「2026-07 前的历史订单无账号关联，不计入周转指标」 |
 
@@ -1022,7 +1022,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | V36 | 新建 `DFQ` 必须关联且只关联一份 `ADVANCE_PURCHASE` 合约；HS 仅在分期出售时关联一份 `STOCK_SALE` 合约；合约 `order_id` 必须指向对应来源订单 | 分期合约必须有业务来源，且不得把库存出售与垫资买入混算 |
 | V37 | 活字段不得替代或覆盖固定核算字段；有历史值的活字段只能停用不能删除 | 防止动态配置破坏历史报表、资金流水与审计链 |
 | V19 | **`order_no` 创建后不可修改、不可复用**；`HS` / `TH` / `DG` / `DFQ` 各自唯一递增，**不强制无断号** | 编号用于业务引用；事务失败/撤销允许产生审计可见的号段空洞，禁止复用 |
-| V20 | **`account_no` 创建后不可修改**；`game_account` 建唯一索引但允许 NULL | 账号唯一性 |
+| V20 | **`inventory_no` 创建后不可修改**；`game_account` 建唯一索引但允许 NULL | ACC 库存编号唯一性 |
 | V21 | `绑定手机号` **不得**作为唯一键或关联依据 | 实测 32 条仅 11 个不同值 |
 | V22 | `link_status` 仅允许 `LINKED` / `UNLINKED` / `ORPHAN`，禁止 `AUTO_MATCHED` | 禁止不可靠的自动关联进入生产 |
 | V23 | 周转/呆滞类报表**必须过滤** `link_status=LINKED` | 孤儿数据会污染指标 |
@@ -1106,7 +1106,7 @@ backend/app/
 
 ### 7.3 标识体系
 
-- [ ] `order_no` 在各业务编号域内唯一、不可改、不可复用；`account_no` / `inst_no` / `flow_no` 全局唯一、不可改、不可复用
+- [ ] `order_no` 在各业务编号域内唯一、不可改、不可复用；`inventory_no` / `inst_no` / `flow_no` 全局唯一、不可改、不可复用
 - [ ] 编号为纯顺序号（不含日期）；超9999 时抛错而非静默进位
 - [ ] 现有 89 单历史订单 `link_status` 全部为 `UNLINKED`，**未被自动匹配污染**
 - [ ] 3 笔无对应账号的分期标记为 `ORPHAN`

@@ -143,9 +143,12 @@ class TestFinanceApi:
             seeded_db, record.id, gross_amount=Decimal("120"), settled_on=TODAY,
             pool_id=invest.id, actor="pytest", platform_fee=Decimal("20"),
         )
-        service.create_deposit(
+        deposit = service.create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("80"), paid_on=TODAY,
             actor="pytest", source_order_id=order_id,
+        )
+        service.return_deposit(
+            seeded_db, deposit.id, amount=Decimal("30"), released_on=TODAY, actor="pytest"
         )
 
         response = seeded_client.get("/api/v1/cashflows", headers=headers)
@@ -156,6 +159,8 @@ class TestFinanceApi:
         assert all("order_no" in row for row in rows)
         assert all(row["order_no"] is not None for row in rows)
         assert {row["source"] for row in rows} >= {"ORDER_EVENT", "REBATE_SETTLEMENT", "DEPOSIT"}
+        deposit_rows = [row for row in rows if row["source"] == "DEPOSIT"]
+        assert {row["deposit_id"] for row in deposit_rows} == {deposit.id}
 
     def test_list_deposits_endpoint(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")

@@ -45,6 +45,7 @@ class CashflowOut(BaseModel):
     amount: Decimal
     order_id: int | None = None
     order_no: str | None = None
+    deposit_id: int | None = None
     order_event_id: int | None = None
     source: str
     note: str | None = None

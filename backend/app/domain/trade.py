@@ -188,6 +188,7 @@ class Cashflow(Base, AuditMixin):
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
+        Index("ix_cashflow_deposit", "deposit_id"),
         Index("ix_cashflow_nature", "nature"),
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
@@ -206,6 +207,9 @@ class Cashflow(Base, AuditMixin):
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     order_id: Mapped[int | None] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    deposit_id: Mapped[int | None] = mapped_column(
+        ForeignKey("deposits.id", ondelete="SET NULL"), nullable=True
     )
     order_event_id: Mapped[int | None] = mapped_column(
         ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True

@@ -13,19 +13,19 @@
 | pools | `id`, `code UNIQUE` | ownership: OWNED/CUSTODY/THIRD_PART；有流水禁止删除 |
 | order_type_defs | `id`, `code UNIQUE` | capital_type 为已登记类型 |
 | order_type_pools | `UNIQUE(order_type_id, portion)` | FK 业务、池 |
-| accounts | `id`, `account_no UNIQUE`, `game_account UNIQUE NULL` | channels JSON；手机号非唯一 |
+| accounts | `id`, `inventory_no UNIQUE`, `game_account UNIQUE NULL` | `inventory_no` 是 ACC 库存编号；channels JSON；手机号非唯一 |
 | customers | `id`, `customer_no UNIQUE` | 联系方式非唯一；停用客户不得作为新订单参与方 |
 | order_customer_roles | `id`, `UNIQUE(order_id, customer_id, role)` | FK order/customer；角色为 SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER |
 | counterparties | `id`, `counterparty_no UNIQUE` | type 为 PEER/SUPPLIER/PLATFORM；停用合作方不得作为新订单参与方 |
 | order_counterparty_roles | `id`, `UNIQUE(order_id, counterparty_id, role)` | FK order/counterparty；角色为 PEER/SUPPLIER/PLATFORM |
 | orders | `id`, `order_no UNIQUE` | FK account nullable；order_type 必须存在主数据 |
 | order_events | `id`, `event_no UNIQUE` | FK order/pool/offset_event；金额>0 |
-| cashflow | `id`, `flow_no UNIQUE`, `order_id NULL`, `order_event_id UNIQUE NULL` | pool 必填；来源订单可直接追溯；新 INTERNAL 需 transfer_id |
+| cashflow | `id`, `flow_no UNIQUE`, `order_id NULL`, `order_event_id UNIQUE NULL`, `deposit_id NULL` | pool 必填；来源订单与押金可直接追溯；新 INTERNAL 需 transfer_id |
 | installments | `id`, `inst_no UNIQUE`, `order_id UNIQUE` | `contract_type` 为 STOCK_SALE/ADVANCE_PURCHASE；`delivery_mode` 为 PLATFORM_OPERATOR/CUSTOMER_SELF；前者仅已买入 HS，后者仅 DFQ；总应收勾稽 |
 | installment_schedules | `id`, `UNIQUE(installment_id, period_no)` | FK installments；期次应收/实收/到期日/状态；支持部分收款与逾期 |
 | rebate_records | `id`, `rebate_no UNIQUE` | 新数据 source_order 必填 |
 | rebate_settlements | `id`, `settlement_no UNIQUE`, `cashflow_id UNIQUE` | gross - fee = net |
-| deposits | `id` | paid/returned 金额、关联流水；不单独生成押金编号 |
+| deposits | `id` | paid/returned 金额；占用与每次释放流水通过 `cashflow.deposit_id` 关联；不单独生成押金编号 |
 | policy_definitions | `id`, `policy_code UNIQUE` | 定义规则类型与可用范围；不直接保存业务快照 |
 | policy_versions | `id`, `UNIQUE(policy_definition_id, version, effective_from)` | 生效区间、配置 JSON、状态、审批审计；已被引用不可更新/删除 |
 | order_profit_allocations | `id`, `UNIQUE(order_id, user_id, role)` | FK order/user/policy_version；同订单有效分配比例合计 100% |

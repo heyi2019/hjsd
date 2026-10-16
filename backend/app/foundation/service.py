@@ -29,6 +29,7 @@ from app.domain.foundation import DocumentSequence, OrderTypeDef, OrderTypePool,
 # 池代码允许下划线（HJ_INVEST / HJ_PROFIT）；业务代码为紧凑大写字母数字（HS / TB2）
 POOL_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
+SEQUENCE_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]{0,15}$")
 
 
 # --------------------------------------------------------------------- 内部工具
@@ -58,6 +59,12 @@ def _normalize_pool_code(value: str) -> str:
         pattern=POOL_CODE_PATTERN,
         hint="大写字母开头，可含数字与下划线（如 HJ_INVEST）",
     )
+
+
+def _required_name(value: str, *, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation("名称不能为空", details={"field": field})
+    return value.strip()
 
 
 def _get_pool_or_404(session: Session, pool_id: int) -> Pool:
@@ -107,6 +114,7 @@ def create_pool(
 ) -> Pool:
     """新增资金池：新增池无需改代码（PRD §1.2）。"""
     normalized = _normalize_pool_code(code)
+    normalized_name = _required_name(name, field="name")
     if session.scalar(select(Pool).where(Pool.code == normalized)) is not None:
         raise Validation(
             f"资金池代码 {normalized} 已存在",
@@ -119,7 +127,7 @@ def create_pool(
         )
     pool = Pool(
         code=normalized,
-        name=name.strip(),
+        name=normalized_name,
         pool_type=pool_type,
         ownership=ownership,
         status=PoolStatus.ACTIVE.value,
@@ -154,7 +162,7 @@ def update_pool(
     pool = _get_pool_or_404(session, pool_id)
     before = _snapshot(pool, ("name", "note", "pool_type", "ownership"))
     if name is not None:
-        pool.name = name.strip()
+        pool.name = _required_name(name, field="name")
     if note is not None:
         pool.note = note
     if pool_type is not None:
@@ -279,6 +287,7 @@ def create_order_type(
 ) -> OrderTypeDef:
     """BAS-02-02：新增业务只需建一行主数据，不改代码、不改表。"""
     normalized = _normalize_code(code, field_name="code")
+    normalized_name = _required_name(name, field="name")
     if capital_type not in CapitalType.values():
         raise Validation(
             "capital_type 取值非法",
@@ -296,8 +305,11 @@ def create_order_type(
             details={"code": normalized},
         )
     prefix = (sequence_prefix or normalized).strip().upper()
-    if not prefix:
-        raise Validation("编号前缀不能为空", details={"field": "sequence_prefix"})
+    if not SEQUENCE_PREFIX_PATTERN.fullmatch(prefix):
+        raise Validation(
+            "编号前缀必须为 1-16 位大写字母或数字，且以字母开头",
+            details={"field": "sequence_prefix", "value": sequence_prefix},
+        )
     if session.scalar(
         select(OrderTypeDef.id).where(OrderTypeDef.sequence_prefix == prefix)
     ) is not None:
@@ -306,7 +318,7 @@ def create_order_type(
     sequence_key = f"ORDER_{normalized}"
     order_type = OrderTypeDef(
         code=normalized,
-        name=name.strip(),
+        name=normalized_name,
         capital_type=capital_type,
         sequence_prefix=prefix,
         sequence_key=sequence_key,
@@ -348,7 +360,7 @@ def update_order_type(
         )
     before = _snapshot(order_type, ("name", "description", "sort_order"))
     if name is not None:
-        order_type.name = name.strip()
+        order_type.name = _required_name(name, field="name")
     if description is not None:
         order_type.description = description
     if sort_order is not None:

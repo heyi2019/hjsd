@@ -30,6 +30,10 @@ class TestPoolGuards:
             service.create_pool(seeded_db, code="!", name="坏码池", actor="pytest")
         assert "必须为" in str(exc.value)
 
+    def test_pool_name_is_required(self, seeded_db):
+        with pytest.raises(Validation):
+            service.create_pool(seeded_db, code="TMPNAME", name="   ", actor="pytest")
+
     def test_pool_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             service.update_pool(seeded_db, 999999, actor="pytest", name="不存在")
@@ -78,6 +82,25 @@ class TestPoolGuards:
 
 
 class TestOrderTypeGuards:
+    def test_order_type_name_and_prefix_are_validated(self, seeded_db):
+        with pytest.raises(Validation):
+            service.create_order_type(
+                seeded_db,
+                code="TBN",
+                name="   ",
+                capital_type=CapitalType.PASS_THRU.value,
+                actor="pytest",
+            )
+        with pytest.raises(Validation):
+            service.create_order_type(
+                seeded_db,
+                code="TBP",
+                name="同行代收",
+                capital_type=CapitalType.PASS_THRU.value,
+                sequence_prefix="TB-",
+                actor="pytest",
+            )
+
     def test_negative_sort_order_rejected_on_create(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_order_type(

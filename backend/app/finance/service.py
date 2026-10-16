@@ -59,7 +59,11 @@ def create_deposit(
 ) -> Deposit:
     money = require_positive(amount, field="amount")
     pool = foundation_service.assert_pool_usable(session, pool_id)
-
+    if source_order_id is not None and session.get(Order, source_order_id) is None:
+        raise NotFound(
+            f"来源订单 {source_order_id} 不存在",
+            details={"source_order_id": source_order_id},
+        )
     deposit = Deposit(
         pool_id=pool.id,
         counterparty_id=counterparty_id,

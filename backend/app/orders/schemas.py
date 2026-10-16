@@ -43,6 +43,8 @@ class OrderAccountCreate(BaseModel):
 
 
 class InitialBuyCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: Decimal = Field(ge=0)
     occurred_on: date
     pool_id: int | None = None
@@ -51,6 +53,8 @@ class InitialBuyCreate(BaseModel):
 
 
 class OrderInstallmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     contract_type: str = Field(description="ADVANCE_PURCHASE")
     principal: Decimal = Field(default=Decimal("0"), ge=0)
     down_payment: Decimal = Field(default=Decimal("0"), ge=0)
@@ -65,6 +69,8 @@ class OrderInstallmentCreate(BaseModel):
 
 
 class OrderCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
     listing_price: Decimal | None = Field(default=None, ge=0)
@@ -87,6 +93,8 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     """订单编辑：未传字段保持原值，显式 null 代表清空可空字段。"""
 
+    model_config = ConfigDict(extra="forbid")
+
     trade_date: date | None = None
     listing_price: Decimal | None = Field(default=None, ge=0)
     service_fee: Decimal | None = Field(default=None, ge=0)
@@ -98,6 +106,8 @@ class OrderUpdate(BaseModel):
 
 
 class OrderCancelIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     reason: str = Field(min_length=1, max_length=500)
 
 
@@ -148,6 +158,8 @@ class OrderListOut(OrderOut):
 
 
 class EventCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     event_type: str
     amount: Decimal = Field(default=Decimal("0"))
     occurred_on: date

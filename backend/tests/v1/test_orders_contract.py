@@ -672,6 +672,20 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_order_request_rejects_removed_or_unknown_fields(
+        self, seeded_client, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "HS",
+                "trade_date": D.isoformat(),
+                "risk_level": "HIGH",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 422, response.text
+
     def test_order_role_payload_requires_the_matching_participant_id(
         self, seeded_client, headers
     ):

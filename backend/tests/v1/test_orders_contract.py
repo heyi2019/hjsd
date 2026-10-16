@@ -672,6 +672,20 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_order_role_payload_requires_the_matching_participant_id(
+        self, seeded_client, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "HS",
+                "trade_date": D.isoformat(),
+                "customer_roles": [{"role": "SELLER"}],
+            },
+            headers=headers,
+        )
+        assert response.status_code == 422, response.text
+
     def test_update_dfq_account_snapshot_uses_order_account_contract(
         self, seeded_client, headers
     ):

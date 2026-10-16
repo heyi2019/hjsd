@@ -10,10 +10,18 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class PartyRole(BaseModel):
-    customer_id: int | None = None
-    counterparty_id: int | None = None
-    role: str
+class CustomerRoleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_id: int = Field(gt=0)
+    role: str = Field(min_length=1, max_length=64)
+
+
+class CounterpartyRoleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    counterparty_id: int = Field(gt=0)
+    role: str = Field(min_length=1, max_length=64)
 
 
 class OrderAccountCreate(BaseModel):
@@ -70,8 +78,8 @@ class OrderCreate(BaseModel):
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
-    customer_roles: list[PartyRole] = Field(default_factory=list)
-    counterparty_roles: list[PartyRole] = Field(default_factory=list)
+    customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
+    counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
     initial_buy: InitialBuyCreate | None = None
     installment: OrderInstallmentCreate | None = None
 
@@ -190,6 +198,8 @@ __all__ = [
     "EventCreate",
     "EventOut",
     "EventPostResult",
+    "CounterpartyRoleInput",
+    "CustomerRoleInput",
     "InitialBuyCreate",
     "OrderAccountCreate",
     "OrderCreate",
@@ -198,6 +208,5 @@ __all__ = [
     "OrderOut",
     "OrderListOut",
     "OrderUpdate",
-    "PartyRole",
     "PoolBalanceOut",
 ]

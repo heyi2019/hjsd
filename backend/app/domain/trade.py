@@ -76,7 +76,6 @@ class Account(Base, AuditMixin):
     has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
     region: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    risk_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AccountStatus.IN_STOCK.value
     )

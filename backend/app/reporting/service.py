@@ -185,7 +185,6 @@ def r1_inventory_health(
                 "holding_days": holding_days,
                 "expected_price": expected_price,
                 "expected_profit": expected_price - total_cost,
-                "risk_level": account.risk_level,
                 "owner_id": orders[0].owner_id if orders else None,
             }
         )

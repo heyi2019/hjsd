@@ -332,7 +332,7 @@
 | `orders` | 订单主表，**只存汇总** | id / **order_no(带业务前缀的业务单号)** / **order_type(引用 `order_type_defs`，首批 HS/TH/DG/DFQ)** / **capital_type** / account_id / **link_status** / owner_id / trade_date / gross_amount / status |
 | ↳ 回款池归属 | — | **不在订单上**，记在 `order_events.pool_id`（池可自由创建，订单层写死会无法扩展） |
 | `order_events` | 动作事件流（核心） | id / **event_no** / order_id / event_type / amount / **portion(PRINCIPAL/PROFIT/GROSS)** / occurred_on / **pool_id** / counterparty / **offset_event_id** |
-| `accounts` | 在途账号 | id / **inventory_no(ACC库存编号)** / **game_account(唯一, 可空)** / buy_date / cost_amount / status / **channels(JSON多值)** / platform / region / bound_phone / **risk_level** |
+| `accounts` | 在途账号 | id / **inventory_no(ACC库存编号)** / **game_account(唯一, 可空)** / buy_date / cost_amount / status / **channels(JSON多值)** / platform / region / bound_phone |
 | `customers` | 客户主数据 | id / **customer_no** / display_name / contact_name / phone / wechat / qq / source / owner_id / status / tags / note；联系方式不作为唯一键，修改留审计 |
 | `order_customer_roles` | 订单—客户参与关系 | id / order_id / customer_id / **role(SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER)**；同一客户可在不同订单担任不同角色 |
 | `counterparties` | 合作方主数据 | id / **counterparty_no** / display_name / type(PEER/SUPPLIER/PLATFORM) / contact_name / phone / wechat / qq / status / note；同行、供货方、平台不归入客户 |
@@ -836,8 +836,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | 无二次 | 20 | 约 16% | 低毛利低风险 |
 
 > **业务逻辑**：二次号（号主已找回过）能卖高价但**售后风险与封号风险显著更高**。
-> 现有 PRD 完全未建模此风险维度。建议：`accounts` 增加 `risk_level`（`NORMAL` / `SECOND` / `HIGH_RISK`），
-> R1 库存健康表按风险分层。
+> 本版本不把风险等级作为账号字段保存。库存页只按买入日期计算持有时长：7 天内绿色、超过 7 天至 30 天黄色、超过 30 天红色；这是展示层提示，不参与核算。
 
 ### 4.6 渠道组合规则
 
@@ -936,7 +935,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | 库存周转天数 | **不可算** | 缺买号日期与售出事件的可靠关联 |
 | 呆滞库存数 | **不可算** | 同上 |
 | 库存跌价准备 | 未计提 | 卖不掉即跌价，v1.0 无此概念 |
-| 高风险号（`risk_level=SECOND`） | 16 / 36（44%） | 有二次号平均毛利 45%，高毛利高风险 |
+| 二次号观察 | 16 / 36（44%） | 仅作业务备注/筛选信息，不作为账号风险等级字段 |
 
 > 打通 `order_events` 关联后，本表从「不可算」变为可算，是 v1.0 的首要价值点。
 

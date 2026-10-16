@@ -93,13 +93,13 @@ describe("ReportsPage：各报表渲染与错误态", () => {
           extra_cost: "10.00",
           total_cost: "110.00",
           holding_days: 5,
-          risk_level: "LOW",
         },
       ],
     });
     renderApp(<ReportsPage />, { user: "admin" });
     await screen.findByText("ACC0001");
     expect(screen.getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("5天")).toBeInTheDocument();
   });
 
   it("R1 无数据时显示空态文案", async () => {

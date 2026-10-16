@@ -106,12 +106,16 @@ function InventoryReport() {
       align: "right",
       render: (v: string) => <MoneyText value={v} strong />,
     },
-    { title: "持有天数", dataIndex: "holding_days", align: "right", width: 100 },
     {
-      title: "风险",
-      dataIndex: "risk_level",
-      width: 90,
-      render: (v: string) => <StatusTag status={v} />,
+      title: "持有天数",
+      dataIndex: "holding_days",
+      align: "right",
+      width: 100,
+      render: (days: number | null | undefined, row) => {
+        if (days == null) return "-";
+        const color = days <= 7 ? "green" : days <= 30 ? "orange" : "red";
+        return <StatusTag status={row.status} color={color} label={`${days}天`} />;
+      },
     },
   ];
   return (

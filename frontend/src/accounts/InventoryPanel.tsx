@@ -86,14 +86,15 @@ function readImageData(file: Blob): Promise<string> {
 
 const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
 
-function inventoryAge(row: Pick<Account, "status" | "created_at">, now = new Date()): {
+function inventoryAge(row: Pick<Account, "status" | "buy_date">, now = new Date()): {
   days: number;
   color: "green" | "orange" | "red";
 } | null {
-  if (!["IN_STOCK", "INSTALLMENT", "FOR_SALE"].includes(row.status) || !row.created_at) return null;
-  const createdAt = new Date(row.created_at).getTime();
-  if (!Number.isFinite(createdAt)) return null;
-  const days = Math.max(0, Math.floor((now.getTime() - createdAt) / DAY_IN_MS));
+  if (!["IN_STOCK", "INSTALLMENT", "FOR_SALE"].includes(row.status) || !row.buy_date) return null;
+  const buyDate = new Date(`${row.buy_date}T00:00:00`);
+  if (!Number.isFinite(buyDate.getTime())) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.max(0, Math.floor((today.getTime() - buyDate.getTime()) / DAY_IN_MS));
   return {
     days,
     color: days <= 7 ? "green" : days <= 30 ? "orange" : "red",
@@ -646,7 +647,6 @@ export function InventoryPanel() {
           ) : "-"}
         </Descriptions.Item>
       </> : null}
-      <Descriptions.Item label="风险等级">{row.risk_level || "-"}</Descriptions.Item>
       <Descriptions.Item label="备注">{row.note || "-"}</Descriptions.Item>
     </Descriptions>
     <div className="inventory-execution-list">

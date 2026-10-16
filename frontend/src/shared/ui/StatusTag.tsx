@@ -22,6 +22,7 @@ const LABELS: Record<string, string> = {
   PAID: "已付",
   RETURNED: "已退",
   PARTIALLY_RETURNED: "部分退还",
+  LOST: "已损失",
   RELEASED: "已释放",
   DISABLED: "已停用",
   LINKED: "已关联",

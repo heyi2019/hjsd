@@ -141,9 +141,9 @@ export interface Account {
   account_images?: string[] | null;
   note?: string | null;
   platform?: string | null;
-  risk_level?: string | null;
   status: string;
   cost_amount: string;
+  buy_date?: string | null;
   created_by: string;
   created_at?: string | null;
 }
@@ -522,7 +522,6 @@ export interface InventoryHealthRow {
   total_cost: string;
   holding_days?: number | null;
   owner_id?: number | null;
-  risk_level: string;
 }
 
 export interface InventoryHealthReport {

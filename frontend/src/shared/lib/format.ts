@@ -95,6 +95,7 @@ export function statusColor(status: string): string {
       return "blue";
     case "OVERDUE":
     case "DEFAULTED":
+    case "LOST":
     case "DISABLED":
       return "red";
     case "COMPLETED":

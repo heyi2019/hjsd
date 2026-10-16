@@ -50,6 +50,10 @@ def _buy(seeded_db, account, amount="500"):
 
 
 class TestCreateAccountGuards:
+    def test_risk_level_is_not_part_of_account_domain(self, seeded_db):
+        account = _account(seeded_db, "no-risk-field")
+        assert not hasattr(account, "risk_level")
+
     def test_sold_account_profile_remains_editable(self, seeded_db):
         account = _account(seeded_db, "sold-editable")
         order = _buy(seeded_db, account, amount="500")
@@ -190,6 +194,7 @@ class TestAccountsApi:
         listed = seeded_client.get("/api/v1/accounts", headers=headers)
         assert listed.status_code == 200, listed.text
         assert [row["inventory_no"] for row in listed.json()] == [mine.inventory_no]
+        assert all("risk_level" not in row for row in listed.json())
 
         hidden_detail = seeded_client.get(
             f"/api/v1/accounts/{other.id}/execution-detail", headers=headers

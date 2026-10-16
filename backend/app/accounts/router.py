@@ -47,11 +47,11 @@ class AccountOut(BaseModel):
     has_secondary: bool | None = None
     platform: str | None = None
     note: str | None = None
-    risk_level: str | None = None
     account_description: str | None = None
     account_images: list[str] | None = None
     status: str
     cost_amount: Decimal
+    buy_date: date | None = None
     created_by: str
     created_at: datetime
 

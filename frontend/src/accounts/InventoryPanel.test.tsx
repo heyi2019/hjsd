@@ -32,8 +32,8 @@ vi.mock("../shared/api/catalog", () => ({
 }));
 
 const accounts = [
-  { id: 1, inventory_no: "ACC0001", source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
-  { id: 2, inventory_no: "ACC0002", source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", created_by: "admin", created_at: "2026-10-02T09:30:00" },
+  { id: 1, inventory_no: "ACC0001", source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
+  { id: 2, inventory_no: "ACC0002", source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
 beforeEach(() => {
@@ -230,13 +230,17 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("按未售出时长显示绿色、黄色和红色提醒", async () => {
-    const now = Date.now();
-    const daysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
+    const daysAgo = (days: number) => {
+      const date = new Date();
+      date.setHours(12, 0, 0, 0);
+      date.setDate(date.getDate() - days);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    };
     accountsList.mockResolvedValueOnce([
-      { ...accounts[0], id: 11, game_account: "green-account", created_at: daysAgo(6) },
-      { ...accounts[0], id: 12, game_account: "yellow-account", created_at: daysAgo(14) },
-      { ...accounts[0], id: 13, game_account: "red-account", created_at: daysAgo(31) },
-      { ...accounts[1], id: 14, game_account: "sold-account", created_at: daysAgo(31) },
+      { ...accounts[0], id: 11, game_account: "green-account", buy_date: daysAgo(6) },
+      { ...accounts[0], id: 12, game_account: "yellow-account", buy_date: daysAgo(14) },
+      { ...accounts[0], id: 13, game_account: "red-account", buy_date: daysAgo(31) },
+      { ...accounts[1], id: 14, game_account: "sold-account", buy_date: daysAgo(31) },
     ]);
 
     renderApp(<InventoryPanel />, { user: "admin" });

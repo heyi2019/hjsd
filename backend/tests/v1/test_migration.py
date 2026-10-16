@@ -85,6 +85,8 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 if index["unique"]
             }
             assert "uq_accounts_inventory_no" in inventory_indexes
+            account_columns = {column["name"] for column in inspect(connection).get_columns("accounts")}
+            assert "risk_level" not in account_columns
 
             pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}
             assert pools == {"HJ_INVEST", "HJ_PROFIT"}

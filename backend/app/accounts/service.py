@@ -23,6 +23,17 @@ INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.va
 _UNSET = object()
 
 
+def _validate_account_images(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    images = list(value)
+    if len(images) > 9:
+        raise Validation("账号图片最多 9 张", details={"field": "account_images", "max": 9})
+    if any(not isinstance(image, str) or not image.strip() for image in images):
+        raise Validation("账号图片必须为非空文本", details={"field": "account_images"})
+    return images
+
+
 def create_account(
     session: Session,
     *,
@@ -51,6 +62,7 @@ def create_account(
             code=ErrorCode.DUPLICATE_CODE,
             details={"inventory_no": exists.inventory_no},
         )
+    validated_images = _validate_account_images(account_images)
     account = Account(
         inventory_no=allocate_number(session, SequenceKey.ACCOUNT),
         game_type=game_type,
@@ -65,7 +77,7 @@ def create_account(
         region=region,
         status=AccountStatus.IN_STOCK.value,
         account_description=account_description,
-        account_images=account_images or [],
+        account_images=validated_images or [],
         note=note,
         created_by=actor,
         updated_by=actor,
@@ -168,6 +180,11 @@ def update_account_profile(
                 details={"inventory_no": exists.inventory_no},
             )
         account.game_account = identifier
+    validated_images = (
+        _validate_account_images(account_images)
+        if account_images is not _UNSET
+        else _UNSET
+    )
     for field, value in {
         "game_type": game_type,
         "game_password": game_password,
@@ -176,13 +193,11 @@ def update_account_profile(
         "has_secondary": has_secondary,
         "platform": platform,
         "account_description": account_description,
-            "account_images": account_images,
+        "account_images": validated_images,
         "note": note,
     }.items():
         if value is _UNSET:
             continue
-        if field == "account_images" and value is not None:
-            value = value[:9]
         setattr(account, field, value)
     account.updated_by = actor
     session.flush()

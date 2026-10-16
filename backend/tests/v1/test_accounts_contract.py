@@ -50,6 +50,24 @@ def _buy(seeded_db, account, amount="500"):
 
 
 class TestCreateAccountGuards:
+    def test_account_creation_rejects_more_than_nine_images(self, seeded_db):
+        with pytest.raises(Validation, match="最多 9 张"):
+            _account(
+                seeded_db,
+                "too-many-images",
+                account_images=[f"image-{index}" for index in range(10)],
+            )
+
+    def test_account_update_rejects_more_than_nine_images(self, seeded_db):
+        account = _account(seeded_db, "too-many-update-images")
+        with pytest.raises(Validation, match="最多 9 张"):
+            service.update_account_profile(
+                seeded_db,
+                account.id,
+                actor="pytest",
+                account_images=[f"image-{index}" for index in range(10)],
+            )
+
     def test_risk_level_is_not_part_of_account_domain(self, seeded_db):
         account = _account(seeded_db, "no-risk-field")
         assert not hasattr(account, "risk_level")

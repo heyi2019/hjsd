@@ -26,7 +26,7 @@ def list_audit_logs(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
     entity_type: str | None = Query(default=None),
-    entity_id: int | None = Query(default=None),
+    entity_id: str | None = Query(default=None),
     action: str | None = Query(default=None),
     actor: str | None = Query(default=None),
     from_date: date | None = Query(default=None, alias="from"),

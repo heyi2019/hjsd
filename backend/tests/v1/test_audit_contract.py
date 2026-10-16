@@ -99,3 +99,16 @@ class TestAuditLogApi:
         response = seeded_client.get("/api/v1/audit-logs/actions", headers=headers)
         assert response.status_code == 200, response.text
         assert AuditAction.ORDER_CREATE.value in response.json()["items"]
+
+    def test_entity_id_accepts_business_numbers(self, seeded_client, seeded_db, headers):
+        _audit(
+            seeded_db,
+            action=AuditAction.ORDER_CREATE,
+            actor="numbered-order",
+            entity_id="HS0094",
+        )
+        response = seeded_client.get(
+            "/api/v1/audit-logs", params={"entity_id": "HS0094"}, headers=headers
+        )
+        assert response.status_code == 200, response.text
+        assert [row["actor"] for row in response.json()["items"]] == ["numbered-order"]

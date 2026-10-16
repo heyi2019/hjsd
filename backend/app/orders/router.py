@@ -133,6 +133,11 @@ def create_order(
     db: Session = Depends(get_db),
     user: CurrentUser = create_orders,
 ) -> schemas.OrderOut:
+    owner_id = (
+        payload.owner_id
+        if user.is_admin or user.owner_scope == "ALL"
+        else user.id
+    )
     order = service.create_order(
         db,
         order_type=payload.order_type.strip().upper(),
@@ -140,7 +145,7 @@ def create_order(
         actor=_actor(user),
         account_id=payload.account_id,
         account_profile=payload.account.model_dump() if payload.account else None,
-        owner_id=user.id if payload.owner_id is None and user.owner_scope != "ALL" else payload.owner_id,
+        owner_id=owner_id,
         capital_type=payload.capital_type,
         note=payload.note,
         customer_roles=[

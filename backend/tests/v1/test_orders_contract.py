@@ -441,6 +441,25 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_scoped_user_cannot_assign_created_order_to_other_owner(
+        self, seeded_client, seeded_db
+    ):
+        from app.core.security import build_access_token
+
+        user = _scoped_user()
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "HS",
+                "trade_date": D.isoformat(),
+                "owner_id": 1,
+            },
+            headers=scoped_headers,
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["owner_id"] == user.id
+
     def test_order_creation_persists_embedded_inventory_account(
         self, seeded_client, seeded_db, headers
     ):

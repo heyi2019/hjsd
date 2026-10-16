@@ -225,9 +225,15 @@ def get_customer(session: Session, customer_id: int, user: CurrentUser | None = 
 
 
 def update_customer(
-    session: Session, customer_id: int, *, actor: str, extra_values: Mapping[str, Any] | None = None, **fields: Any
+    session: Session,
+    customer_id: int,
+    *,
+    actor: str,
+    extra_values: Mapping[str, Any] | None = None,
+    user: CurrentUser | None = None,
+    **fields: Any,
 ) -> Customer:
-    customer = get_customer(session, customer_id)
+    customer = get_customer(session, customer_id, user)
     if customer.status == CustomerStatus.MERGED.value:
         raise Conflict(
             "已合并客户不可修改",
@@ -274,9 +280,14 @@ def update_customer(
 
 
 def set_customer_status(
-    session: Session, customer_id: int, status: str, *, actor: str
+    session: Session,
+    customer_id: int,
+    status: str,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
 ) -> Customer:
-    customer = get_customer(session, customer_id)
+    customer = get_customer(session, customer_id, user)
     if status == CustomerStatus.MERGED.value:
         raise Validation(
             "MERGED 只能由合并动作产生", details={"field": "status", "value": status}

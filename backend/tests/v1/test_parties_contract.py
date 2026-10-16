@@ -101,6 +101,26 @@ class TestListAndGetCustomers:
 
 # ------------------------------------------------------------------ 客户更新
 class TestUpdateCustomer:
+    def test_customer_mutations_respect_owner_scope(self, seeded_db):
+        other = _customer(seeded_db, "他人客户", owner_id=1)
+
+        with pytest.raises(NotFound):
+            service.update_customer(
+                seeded_db,
+                other.id,
+                actor="operator",
+                user=_scoped_user(),
+                note="越权修改",
+            )
+        with pytest.raises(NotFound):
+            service.set_customer_status(
+                seeded_db,
+                other.id,
+                CustomerStatus.DISABLED.value,
+                actor="operator",
+                user=_scoped_user(),
+            )
+
     def test_merged_customer_cannot_be_updated(self, seeded_db):
         source = _customer(seeded_db, "源")
         target = _customer(seeded_db, "目标")

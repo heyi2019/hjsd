@@ -36,7 +36,7 @@ def list_installments(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.InstallmentOut]:
-    items = service.list_installments(db, status=status, order_id=order_id)
+    items = service.list_installments(db, status=status, order_id=order_id, user=_user)
     return [schemas.InstallmentOut.model_validate(item) for item in items]
 
 
@@ -58,6 +58,7 @@ def create_installment(
         per_period=payload.per_period,
         first_due_on=payload.first_due_on,
         actor=_actor(user),
+        user=user,
         delivery_mode=payload.delivery_mode,
         note=payload.note,
         schedule=[item.model_dump() for item in payload.schedule] if payload.schedule else None,
@@ -71,6 +72,7 @@ def list_schedules(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.ScheduleOut]:
+    service.get_installment(db, installment_id, _user)
     rows = db.scalars(
         select(InstallmentSchedule)
         .where(InstallmentSchedule.installment_id == installment_id)
@@ -97,6 +99,7 @@ def pay_installment(
         actor=_actor(user),
         pool_id=payload.pool_id,
         note=payload.note,
+        user=user,
     )
     return {
         "installment": schemas.InstallmentOut.model_validate(installment),
@@ -120,6 +123,7 @@ def deliver_installment(
         delivered_on=payload.delivered_on,
         note=payload.note,
         actor=_actor(user),
+        user=user,
     )
     return schemas.InstallmentOut.model_validate(item)
 

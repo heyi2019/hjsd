@@ -19,6 +19,7 @@ from app.core.audit import record_audit
 from app.core.business_numbering import installment_no as order_installment_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import require_non_negative, require_positive, to_money
+from app.core.security import CurrentUser, owner_scope_filter
 from app.core.numbering import allocate_number
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.policy import service as policy_service
@@ -81,6 +82,7 @@ def create_installment(
     delivery_mode: str | None = None,
     note: str | None = None,
     schedule: list[dict[str, Any]] | None = None,
+    user: CurrentUser | None = None,
 ) -> Installment:
     try:
         InstallmentContractType(contract_type)
@@ -91,7 +93,7 @@ def create_installment(
             details={"contract_type": contract_type},
         ) from exc
 
-    order = orders_service.get_order(session, order_id)
+    order = orders_service.get_order(session, order_id, user)
     if order.status != "ACTIVE":
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能创建分期合约",
@@ -241,23 +243,43 @@ def create_installment(
     return installment
 
 
-def get_installment(session: Session, installment_id: int) -> Installment:
+def get_installment(
+    session: Session, installment_id: int, user: CurrentUser | None = None
+) -> Installment:
     item = session.get(Installment, installment_id)
     if item is None:
         raise NotFound(
             f"分期合约 {installment_id} 不存在", details={"installment_id": installment_id}
         )
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        visible = session.scalar(
+            select(Order.id).where(Order.id == item.order_id, scope)
+        ) if scope is not None else True
+        if not visible:
+            raise NotFound(
+                f"分期合约 {installment_id} 不存在",
+                details={"installment_id": installment_id},
+            )
     return item
 
 
 def list_installments(
-    session: Session, *, status: str | None = None, order_id: int | None = None
+    session: Session,
+    *,
+    status: str | None = None,
+    order_id: int | None = None,
+    user: CurrentUser | None = None,
 ) -> list[Installment]:
-    stmt = select(Installment)
+    stmt = select(Installment).join(Order, Order.id == Installment.order_id)
     if status:
         stmt = stmt.where(Installment.status == status)
     if order_id:
         stmt = stmt.where(Installment.order_id == order_id)
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(Installment.id)).all())
 
 
@@ -271,9 +293,10 @@ def pay(
     actor: str,
     pool_id: int | None = None,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
     """收款：`PAYMENT` 是收入事实，派生现金流并累计已收（DFQ-01-04/05）。"""
-    installment = get_installment(session, installment_id)
+    installment = get_installment(session, installment_id, user)
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
@@ -390,9 +413,10 @@ def deliver(
     delivered_on: date,
     note: str,
     actor: str,
+    user: CurrentUser | None = None,
 ) -> Installment:
     """换绑交付：只能从 `SETTLED` 进入，生成无金额 `DELIVER`（DFQ-01-07 / A04 / A05）。"""
-    installment = get_installment(session, installment_id)
+    installment = get_installment(session, installment_id, user)
     if installment.status != InstallmentStatus.SETTLED.value:
         raise Validation(
             f"合约 {installment.inst_no} 未结清（{installment.status}），不可换绑交付",

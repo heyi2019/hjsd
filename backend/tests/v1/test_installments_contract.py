@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
+from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AuditAction,
     DeliveryMode,
@@ -39,10 +40,10 @@ def _account(seeded_db, game_account: str):
     )
 
 
-def _order(seeded_db, *, order_type="DFQ", account_id=None, trade_date=TODAY):
+def _order(seeded_db, *, order_type="DFQ", account_id=None, owner_id=None, trade_date=TODAY):
     return orders_service.create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
-        account_id=account_id,
+        account_id=account_id, owner_id=owner_id,
     )
 
 
@@ -158,6 +159,20 @@ class TestGetAndListInstallments:
         by_order = installment_service.list_installments(seeded_db, order_id=order_b.id)
         assert [c.id for c in by_order] == [contract_b.id]
         assert contract_a.id not in [c.id for c in by_order]
+
+    def test_installment_scope_follows_order_owner(self, seeded_db):
+        scoped_user = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        own_order = _order(seeded_db, owner_id=9)
+        other_order = _order(seeded_db, owner_id=8)
+        own_contract = _contract(seeded_db, own_order.id)
+        other_contract = _contract(seeded_db, other_order.id)
+
+        visible = installment_service.list_installments(seeded_db, user=scoped_user)
+        assert [item.id for item in visible] == [own_contract.id]
+        with pytest.raises(NotFound):
+            installment_service.get_installment(seeded_db, other_contract.id, scoped_user)
 
 
 # ------------------------------------------------------------------ 收款守卫
@@ -304,6 +319,35 @@ class TestMarkOverdue:
 
 # ------------------------------------------------------------------ 路由层
 class TestInstallmentsApi:
+    def test_scoped_user_cannot_read_or_pay_other_order_contract(
+        self, seeded_client, seeded_db
+    ):
+        own_order = _order(seeded_db, owner_id=9)
+        other_order = _order(seeded_db, owner_id=8)
+        own_contract = _contract(seeded_db, own_order.id)
+        other_contract = _contract(seeded_db, other_order.id)
+        user = CurrentUser.build(
+            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+        )
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
+
+        listing = seeded_client.get("/api/v1/installments", headers=scoped_headers)
+        assert listing.status_code == 200
+        assert [row["id"] for row in listing.json()] == [own_contract.id]
+
+        schedules = seeded_client.get(
+            f"/api/v1/installments/{other_contract.id}/schedules",
+            headers=scoped_headers,
+        )
+        assert schedules.status_code == 404
+
+        payment = seeded_client.post(
+            f"/api/v1/installments/{other_contract.id}/payments",
+            json={"amount": "1.00", "paid_on": TODAY.isoformat()},
+            headers=scoped_headers,
+        )
+        assert payment.status_code == 404
+
     def test_list_endpoint(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)

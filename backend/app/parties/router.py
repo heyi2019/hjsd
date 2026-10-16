@@ -125,7 +125,11 @@ def update_customer(
     user: CurrentUser = update_customers,
 ) -> dict:
     customer = service.update_customer(
-        db, customer_id, actor=_actor(user), **payload.model_dump(exclude_unset=True)
+        db,
+        customer_id,
+        actor=_actor(user),
+        user=user,
+        **payload.model_dump(exclude_unset=True),
     )
     extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return service.to_customer_out(customer, reveal_contact=True, extra_values=extras)
@@ -139,7 +143,11 @@ def update_customer_status(
     user: CurrentUser = update_customers,
 ) -> dict:
     customer = service.set_customer_status(
-        db, customer_id, payload.status.value, actor=_actor(user)
+        db,
+        customer_id,
+        payload.status.value,
+        actor=_actor(user),
+        user=user,
     )
     return service.to_customer_out(customer, reveal_contact=True)
 

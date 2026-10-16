@@ -291,20 +291,28 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
 
     rebates = session.scalars(select(RebateRecord)).all()
     for rebate in rebates:
-        if rebate.source_order_id is None or rebate.source_order_id not in order_ids:
+        if rebate.link_status == "LINKED":
             continue
-        if rebate.link_status != "LINKED":
-            issues.append(
-                _issue(
-                    code="REBATE_UNLINKED",
-                    severity="MEDIUM",
-                    title="返点未关联",
-                    entity_type="rebate_record",
-                    entity_id=rebate.rebate_no,
-                    message="返点记录尚未确认有效订单关联。",
-                    details={"source_order_id": rebate.source_order_id},
-                )
+        if rebate.source_order_id is not None and rebate.source_order_id not in order_ids:
+            continue
+        if (
+            rebate.source_order_id is None
+            and user is not None
+            and not user.is_admin
+            and user.owner_scope != "ALL"
+        ):
+            continue
+        issues.append(
+            _issue(
+                code="REBATE_UNLINKED",
+                severity="MEDIUM",
+                title="返点未关联",
+                entity_type="rebate_record",
+                entity_id=rebate.rebate_no,
+                message="返点记录尚未确认有效订单关联。",
+                details={"source_order_id": rebate.source_order_id},
             )
+        )
 
     severity_rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
     return sorted(

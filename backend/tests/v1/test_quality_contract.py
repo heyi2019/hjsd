@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.core.security import CurrentUser, build_access_token
-from app.domain.trade import Cashflow, OrderEvent
+from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.orders import service as orders_service
 from app.quality import service
 
@@ -73,6 +73,26 @@ class TestQualityScan:
         seeded_db.flush()
         codes = {row["code"] for row in service.scan(seeded_db)}
         assert "TRANSFER_UNPAIRED" in codes
+
+    def test_detects_unlinked_rebate_without_source_order(self, seeded_db):
+        seeded_db.add(
+            RebateRecord(
+                rebate_no="RB-UNLINKED-1",
+                source_order_id=None,
+                rate=Decimal("10"),
+                base_amount=Decimal("500"),
+                link_status="UNLINKED",
+                status="OPEN",
+                collected_on=TODAY,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+
+        issues = service.scan(seeded_db)
+        item = next(row for row in issues if row["code"] == "REBATE_UNLINKED")
+        assert item["entity_id"] == "RB-UNLINKED-1"
 
     def test_quality_endpoint_respects_order_scope(self, seeded_client, seeded_db):
         mine = _order(seeded_db, owner_id=9)

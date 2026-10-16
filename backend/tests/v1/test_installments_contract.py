@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
@@ -81,6 +82,30 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    def test_installment_periods_cannot_be_zero_in_database(self, seeded_db):
+        order = _order(seeded_db)
+        seeded_db.add(
+            Installment(
+                inst_no="INS-INVALID-PERIODS",
+                order_id=order.id,
+                contract_type=InstallmentContractType.STOCK_SALE.value,
+                principal=Decimal("0"),
+                down_payment=Decimal("0"),
+                service_fee=Decimal("0"),
+                periods=0,
+                per_period_service_fee=Decimal("0"),
+                per_period=Decimal("0"),
+                paid_amount=Decimal("0"),
+                waived_amount=Decimal("0"),
+                status=InstallmentStatus.PENDING.value,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_negative_amount_is_rejected_before_flush(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="不能为负数"):

@@ -104,6 +104,14 @@ class Order(Base, AuditMixin):
         Index("ix_orders_type_date", "order_type", "trade_date"),
         Index("ix_orders_link_status", "link_status"),
         Index("ix_orders_trade_date", "trade_date"),
+        CheckConstraint(
+            "listing_price IS NULL OR listing_price >= 0",
+            name="listing_price_nonneg",
+        ),
+        CheckConstraint(
+            "service_fee IS NULL OR service_fee >= 0",
+            name="service_fee_nonneg",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -334,6 +342,7 @@ class Installment(Base, AuditMixin):
             "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0 AND waived_amount >= 0",
             name="amount_nonneg",
         ),
+        CheckConstraint("periods > 0", name="periods_positive"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

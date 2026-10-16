@@ -8,8 +8,11 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.enums import AuditAction
+from app.domain.foundation import AuditLog
 from app.core.security import hash_password
 from app.domain.users import User
 
@@ -392,6 +395,46 @@ def test_update_team_success(client: TestClient):
     body = response.json()
     assert body["name"] == "二组改名"
     assert body["is_active"] is False
+
+
+def test_admin_mutations_write_audit(client: TestClient, db: Session):
+    created = _create_user(client)
+    updated = client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"display_name": "Alice Wang"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert updated.status_code == 200, updated.text
+    reset = client.post(
+        f"/api/v1/users/{created['id']}/reset-password",
+        json={"username": "alice", "password": "resetpass1"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert reset.status_code == 200, reset.text
+    team = client.post(
+        "/api/v1/teams",
+        json={"code": "t1", "name": "一组"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert team.status_code == 201, team.text
+    team_update = client.patch(
+        f"/api/v1/teams/{team.json()['id']}",
+        json={"name": "一组改名"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert team_update.status_code == 200, team_update.text
+
+    actions = {
+        row.action
+        for row in db.scalars(select(AuditLog).order_by(AuditLog.id)).all()
+    }
+    assert {
+        AuditAction.USER_CREATE.value,
+        AuditAction.USER_UPDATE.value,
+        AuditAction.PASSWORD_RESET.value,
+        AuditAction.TEAM_CREATE.value,
+        AuditAction.TEAM_UPDATE.value,
+    } <= actions
 
 
 def test_update_user_unknown_team_ids_rejected(client: TestClient, db: Session):

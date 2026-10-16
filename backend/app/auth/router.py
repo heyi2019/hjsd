@@ -6,12 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import AuthError, Conflict, PermissionDenied, Validation
+from app.core.errors import AuthError, PermissionDenied
 from app.core.security import (
-    ALL_ROLES, CurrentUser, build_access_token, get_current_user, hash_password,
-    verify_password, decode_token,
+    CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
 )
 from app.domain.users import RevokedToken, Team, User
+from app.auth import service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/users", tags=["users"])
@@ -78,15 +78,6 @@ def _admin(actor: CurrentUser) -> None:
         raise PermissionDenied("仅系统管理员可管理用户")
 
 
-def _check_team_ids(db: Session, team_ids: list[int] | None) -> None:
-    if team_ids is None:
-        return
-    requested = set(team_ids)
-    actual = {row[0] for row in db.execute(select(Team.id).where(Team.id.in_(requested))).all()}
-    if actual != requested:
-        raise Validation("团队不存在", details={"team_ids": sorted(requested - actual)})
-
-
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
     user = db.scalar(select(User).where(User.username == payload.username.strip()))
@@ -111,11 +102,13 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
 
 @router.post("/change-password")
 def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    record = db.get(User, user.id)
-    if not record or not verify_password(payload.old_password, record.password_hash):
-        raise AuthError("原密码错误")
-    record.password_hash = hash_password(payload.new_password)
-    record.must_change_password = False
+    service.change_password(
+        db,
+        user.id,
+        old_password=payload.old_password,
+        new_password=payload.new_password,
+        actor=user.username,
+    )
     return {"ok": True}
 
 
@@ -140,43 +133,38 @@ def list_users(actor: CurrentUser = Depends(get_current_user), db: Session = Dep
 @admin_router.post("", status_code=201)
 def create_user(payload: UserCreate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _admin(actor)
-    if payload.role not in ALL_ROLES:
-        raise Validation("无效角色")
-    if db.scalar(select(User).where(User.username == payload.username.strip())):
-        raise Conflict("用户名已存在")
-    _check_team_ids(db, payload.team_ids)
-    item = User(username=payload.username.strip(), display_name=payload.display_name,
-                password_hash=hash_password(payload.password), role=payload.role,
-                owner_scope=payload.owner_scope, phone=payload.phone, note=payload.note,
-                pool_ids=payload.pool_ids, team_ids=payload.team_ids,
-                must_change_password=True)
-    db.add(item); db.flush()
+    item = service.create_user(
+        db,
+        username=payload.username,
+        display_name=payload.display_name,
+        password=payload.password,
+        role=payload.role,
+        owner_scope=payload.owner_scope,
+        pool_ids=payload.pool_ids,
+        team_ids=payload.team_ids,
+        phone=payload.phone,
+        note=payload.note,
+        actor=actor.username,
+    )
     return _public(item)
 
 
 @admin_router.patch("/{user_id}")
 def update_user(user_id: int, payload: UserUpdate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _admin(actor)
-    item = db.get(User, user_id)
-    if not item:
-        raise Validation("用户不存在")
-    _check_team_ids(db, payload.team_ids)
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        if key == "role" and value not in ALL_ROLES:
-            raise Validation("无效角色")
-        setattr(item, key, value)
-    db.flush()
+    item = service.update_user(
+        db,
+        user_id,
+        changes=payload.model_dump(exclude_unset=True),
+        actor=actor.username,
+    )
     return _public(item)
 
 
 @admin_router.post("/{user_id}/reset-password")
 def reset_password(user_id: int, payload: LoginRequest, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _admin(actor)
-    item = db.get(User, user_id)
-    if not item:
-        raise Validation("用户不存在")
-    item.password_hash = hash_password(payload.password)
-    item.must_change_password = True
+    service.reset_password(db, user_id, password=payload.password, actor=actor.username)
     return {"ok": True}
 
 
@@ -191,21 +179,23 @@ def list_teams(_user: CurrentUser = Depends(get_current_user), db: Session = Dep
 @teams_router.post("", status_code=201)
 def create_team(payload: TeamCreate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _admin(actor)
-    code = payload.code.strip().upper()
-    if db.scalar(select(Team).where(Team.code == code)):
-        raise Conflict("团队编码已存在")
-    item = Team(code=code, name=payload.name.strip(), description=payload.description)
-    db.add(item); db.flush()
+    item = service.create_team(
+        db,
+        code=payload.code,
+        name=payload.name,
+        description=payload.description,
+        actor=actor.username,
+    )
     return {"id": item.id, "code": item.code, "name": item.name, "description": item.description, "is_active": item.is_active}
 
 
 @teams_router.patch("/{team_id}")
 def update_team(team_id: int, payload: TeamUpdate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _admin(actor)
-    item = db.get(Team, team_id)
-    if not item:
-        raise Validation("团队不存在")
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(item, key, value)
-    db.flush()
+    item = service.update_team(
+        db,
+        team_id,
+        changes=payload.model_dump(exclude_unset=True),
+        actor=actor.username,
+    )
     return {"id": item.id, "code": item.code, "name": item.name, "description": item.description, "is_active": item.is_active}

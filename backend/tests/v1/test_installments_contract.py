@@ -316,6 +316,91 @@ class TestMarkOverdue:
         ).all()
         assert [row.period_no for row in overdue] == [1]
 
+    def test_settle_early_collects_all_remaining_schedules(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="100",
+            periods=2,
+            per_period="300",
+        )
+        installment_service.pay(
+            seeded_db,
+            contract.id,
+            amount=Decimal("100"),
+            paid_on=TODAY,
+            period_no=0,
+            actor="pytest",
+        )
+
+        settled = installment_service.settle_early(
+            seeded_db, contract.id, paid_on=TODAY, actor="pytest"
+        )
+
+        assert settled.status == InstallmentStatus.SETTLED.value
+        assert settled.paid_amount == Decimal("700.00")
+        schedules = seeded_db.scalars(
+            select(InstallmentSchedule)
+            .where(InstallmentSchedule.installment_id == contract.id)
+            .order_by(InstallmentSchedule.period_no)
+        ).all()
+        assert [row.status for row in schedules] == [
+            ScheduleStatus.PAID.value,
+            ScheduleStatus.PAID.value,
+            ScheduleStatus.PAID.value,
+        ]
+
+    def test_default_requires_overdue_and_keeps_unpaid_schedules(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="100",
+            periods=1,
+            per_period="300",
+            first_due_on=PAST,
+        )
+        installment_service.pay(
+            seeded_db,
+            contract.id,
+            amount=Decimal("100"),
+            paid_on=TODAY,
+            period_no=0,
+            actor="pytest",
+        )
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+
+        defaulted = installment_service.mark_default(
+            seeded_db, contract.id, actor="risk", reason="逾期未还"
+        )
+
+        assert defaulted.status == InstallmentStatus.DEFAULTED.value
+        schedule = seeded_db.scalar(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == contract.id,
+                InstallmentSchedule.period_no == 1,
+            )
+        )
+        assert schedule.received_amount == Decimal("0.00")
+        audit = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == AuditAction.INSTALLMENT_DEFAULT.value,
+                AuditLog.entity_id == contract.inst_no,
+            )
+            .order_by(AuditLog.id.desc())
+        )
+        assert audit is not None
+        assert audit.reason == "逾期未还"
+
+        with pytest.raises(Validation, match="逾期"):
+            other_order = _order(seeded_db)
+            other_contract = _contract(seeded_db, other_order.id)
+            installment_service.mark_default(
+                seeded_db, other_contract.id, actor="risk", reason="未逾期"
+            )
+
 
 # ------------------------------------------------------------------ 路由层
 class TestInstallmentsApi:
@@ -381,6 +466,69 @@ class TestInstallmentsApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["status"] == InstallmentStatus.DELIVERED.value
+
+    def test_settle_early_and_default_endpoints(
+        self, seeded_client, seeded_db, headers
+    ):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="100",
+            periods=1,
+            per_period="300",
+        )
+        paid = seeded_client.post(
+            f"/api/v1/installments/{contract.id}/payments",
+            json={
+                "amount": "100",
+                "paid_on": TODAY.isoformat(),
+                "period_no": 0,
+            },
+            headers=headers,
+        )
+        assert paid.status_code == 200, paid.text
+
+        early = seeded_client.post(
+            f"/api/v1/installments/{contract.id}/settle-early",
+            json={"paid_on": TODAY.isoformat(), "note": "一次性结清"},
+            headers=headers,
+        )
+        assert early.status_code == 200, early.text
+        assert early.json()["status"] == InstallmentStatus.SETTLED.value
+
+        overdue_order = _order(seeded_db)
+        overdue_contract = _contract(
+            seeded_db,
+            overdue_order.id,
+            down_payment="100",
+            periods=1,
+            per_period="300",
+            first_due_on=PAST,
+        )
+        overdue_paid = seeded_client.post(
+            f"/api/v1/installments/{overdue_contract.id}/payments",
+            json={
+                "amount": "100",
+                "paid_on": TODAY.isoformat(),
+                "period_no": 0,
+            },
+            headers=headers,
+        )
+        assert overdue_paid.status_code == 200, overdue_paid.text
+        marked = seeded_client.post(
+            "/api/v1/installments/mark-overdue",
+            params={"as_of": TODAY.isoformat()},
+            headers=headers,
+        )
+        assert marked.status_code == 200, marked.text
+        defaulted = seeded_client.post(
+            f"/api/v1/installments/{overdue_contract.id}/default",
+            json={"reason": "超过约定期限"},
+            headers=headers,
+        )
+        assert defaulted.status_code == 200, defaulted.text
+        assert defaulted.json()["status"] == InstallmentStatus.DEFAULTED.value
 
     def test_mark_overdue_endpoint(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)

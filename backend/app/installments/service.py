@@ -369,7 +369,7 @@ def pay(
 
     record_audit(
         session,
-        action=AuditAction.INSTALLMENT_PAYMENT,
+        action=AuditAction.INSTALLMENT_EARLY_SETTLE,
         entity_type="installment",
         entity_id=installment.inst_no,
         actor=actor,
@@ -412,6 +412,108 @@ def _pick_schedule(
             "所有期次已收满", code=ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE
         )
     return schedule
+
+
+def settle_early(
+    session: Session,
+    installment_id: int,
+    *,
+    paid_on: date,
+    actor: str,
+    pool_id: int | None = None,
+    note: str | None = None,
+    user: CurrentUser | None = None,
+) -> Installment:
+    """提前收清剩余应收，逐期生成 PAYMENT 并关闭未来计划（DFQ-01-08）。"""
+    installment = get_installment(session, installment_id, user)
+    if installment.status in (
+        InstallmentStatus.CANCELLED.value,
+        InstallmentStatus.DELIVERED.value,
+        InstallmentStatus.SETTLED.value,
+    ):
+        raise Conflict(
+            f"合约 {installment.inst_no} 状态 {installment.status}，不可提前结清",
+            code=ErrorCode.ORDER_STATUS_CONFLICT,
+            details={"inst_no": installment.inst_no, "status": installment.status},
+        )
+    rows = session.scalars(
+        select(InstallmentSchedule)
+        .where(
+            InstallmentSchedule.installment_id == installment.id,
+            InstallmentSchedule.received_amount < InstallmentSchedule.due_amount,
+        )
+        .order_by(InstallmentSchedule.period_no)
+    ).all()
+    if not rows:
+        raise Validation("合约没有剩余应收，不能重复提前结清")
+    for row in rows:
+        outstanding = to_money(row.due_amount) - to_money(row.received_amount)
+        if outstanding <= 0:
+            continue
+        pay(
+            session,
+            installment.id,
+            amount=outstanding,
+            paid_on=paid_on,
+            period_no=row.period_no,
+            actor=actor,
+            pool_id=pool_id,
+            note=note or f"提前结清 {installment.inst_no} 第 {row.period_no} 期",
+            user=user,
+        )
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_PAYMENT,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        after={
+            "action": "SETTLE_EARLY",
+            "paid_total": str(to_money(installment.paid_amount)),
+            "status": installment.status,
+        },
+    )
+    return installment
+
+
+def mark_default(
+    session: Session,
+    installment_id: int,
+    *,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> Installment:
+    """将逾期合约置为违约，保留未收计划供后续追偿（DFQ-01-08）。"""
+    text_reason = (reason or "").strip()
+    if not text_reason:
+        raise Validation("违约处置必须填写原因", details={"field": "reason"})
+    installment = get_installment(session, installment_id, user)
+    if installment.status != InstallmentStatus.OVERDUE.value:
+        raise Validation(
+            f"合约 {installment.inst_no} 当前不是逾期状态，不能登记违约",
+            code=ErrorCode.ORDER_STATUS_CONFLICT,
+            details={"inst_no": installment.inst_no, "status": installment.status},
+        )
+    installment.status = transition(
+        INSTALLMENT_TRANSITIONS,
+        installment.status,
+        "DEFAULT",
+        entity="分期合约",
+    )
+    installment.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_DEFAULT,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        after={"status": installment.status},
+        reason=text_reason,
+    )
+    return installment
 
 
 def deliver(
@@ -531,7 +633,9 @@ __all__ = [
     "deliver",
     "get_installment",
     "list_installments",
+    "mark_default",
     "mark_overdue",
     "pay",
+    "settle_early",
     "total_receivable",
 ]

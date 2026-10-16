@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
+    PERM_ORDER_EXCEPTION_APPROVE,
     PERM_ORDER_EVENT_POST,
     CurrentUser,
     require_permissions,
@@ -23,6 +24,7 @@ router = APIRouter(tags=["HS-01/DFQ-01 分期合约"])
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
 post_payment = require_permissions(PERM_ORDER_EVENT_POST)
+default_manage = require_permissions(PERM_ORDER_EXCEPTION_APPROVE)
 
 
 def _actor(user: CurrentUser) -> str:
@@ -105,6 +107,46 @@ def pay_installment(
         "installment": schemas.InstallmentOut.model_validate(installment),
         "schedule": schemas.ScheduleOut.model_validate(schedule),
     }
+
+
+@router.post(
+    "/installments/{installment_id}/settle-early", response_model=schemas.InstallmentOut
+)
+def settle_early_installment(
+    installment_id: int,
+    payload: schemas.EarlySettlementIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_payment,
+) -> schemas.InstallmentOut:
+    item = service.settle_early(
+        db,
+        installment_id,
+        paid_on=payload.paid_on,
+        pool_id=payload.pool_id,
+        note=payload.note,
+        actor=_actor(user),
+        user=user,
+    )
+    return schemas.InstallmentOut.model_validate(item)
+
+
+@router.post(
+    "/installments/{installment_id}/default", response_model=schemas.InstallmentOut
+)
+def default_installment(
+    installment_id: int,
+    payload: schemas.DefaultIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = default_manage,
+) -> schemas.InstallmentOut:
+    item = service.mark_default(
+        db,
+        installment_id,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.InstallmentOut.model_validate(item)
 
 
 @router.post(

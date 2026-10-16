@@ -66,6 +66,16 @@ class PaymentIn(BaseModel):
     note: str | None = None
 
 
+class EarlySettlementIn(BaseModel):
+    paid_on: date
+    pool_id: int | None = None
+    note: str | None = None
+
+
+class DefaultIn(BaseModel):
+    reason: str = Field(min_length=1)
+
+
 class DeliverIn(BaseModel):
     delivery_mode: str
     delivered_on: date
@@ -79,6 +89,8 @@ class PaymentResult(BaseModel):
 
 __all__ = [
     "DeliverIn",
+    "DefaultIn",
+    "EarlySettlementIn",
     "InstallmentCreate",
     "InstallmentOut",
     "PaymentIn",

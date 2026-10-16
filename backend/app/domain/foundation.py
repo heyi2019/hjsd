@@ -124,7 +124,11 @@ class DocumentSequence(Base, TimestampMixin):
     """编号序列表：事务内递增，超出 4 位即报 `SEQUENCE_EXHAUSTED`（BAS-02-04）。"""
 
     __tablename__ = "document_sequences"
-    __table_args__ = (UniqueConstraint("sequence_key", name="uq_document_sequences_key"),)
+    __table_args__ = (
+        UniqueConstraint("sequence_key", name="uq_document_sequences_key"),
+        CheckConstraint("padding > 0", name="padding_positive"),
+        CheckConstraint("current_value >= 0", name="current_value_nonneg"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     sequence_key: Mapped[str] = mapped_column(String(64), nullable=False)

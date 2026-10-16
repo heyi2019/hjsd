@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from app.core import database, money, settings as settings_module
@@ -45,6 +46,27 @@ class TestMoneyHelpers:
 
 # ------------------------------------------------------------------ numbering
 class TestNumberingGuards:
+    def test_sequence_padding_and_current_value_are_valid_in_database(self, seeded_db):
+        seeded_db.add(
+            DocumentSequence(
+                sequence_key="INVALID_PADDING", prefix="IP", padding=0,
+                current_value=0,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
+        seeded_db.add(
+            DocumentSequence(
+                sequence_key="INVALID_CURRENT", prefix="IC", padding=4,
+                current_value=-1,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_peek_uninitialized_sequence_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             peek_number(seeded_db, "NO_SUCH_KEY")

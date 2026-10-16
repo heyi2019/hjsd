@@ -279,6 +279,19 @@ class TestRollbackAndCorrectionGuards:
 
 # ------------------------------------------------------------------ 路由层
 class TestImportApi:
+    def test_import_requests_reject_unknown_fields(self, seeded_client, headers):
+        response = seeded_client.post(
+            "/api/v1/imports/batches",
+            json={
+                "source_name": "strict.xlsx",
+                "rows": [{"a": 1}],
+                "legacy_field": "must not be ignored",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "VALIDATION_ERROR"
+
     def test_list_batches_endpoint(self, seeded_client, seeded_db, headers):
         _batch(seeded_db, source_name="第一批")
         response = seeded_client.get("/api/v1/imports/batches", headers=headers)

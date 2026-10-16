@@ -15,7 +15,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.policy import service
+from app.policy import schemas, service
 
 router = APIRouter(tags=["policy"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
@@ -41,17 +41,17 @@ def list_definitions(
 
 @router.post("/policies")
 def create_definition(
-    payload: dict[str, Any],
+    payload: schemas.PolicyDefinitionCreate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> dict[str, Any]:
     return service.create_definition(
         db,
-        policy_code=payload.get("policy_code", ""),
-        name=payload.get("name", ""),
-        scope_type=payload.get("scope_type", "GLOBAL"),
-        scope_id=payload.get("scope_id"),
-        description=payload.get("description"),
+        policy_code=payload.policy_code,
+        name=payload.name,
+        scope_type=payload.scope_type,
+        scope_id=payload.scope_id,
+        description=payload.description,
         actor=user.username,
     )
 
@@ -81,20 +81,18 @@ def list_versions(
 @router.post("/policies/{definition_id}/versions")
 def create_version(
     definition_id: int,
-    payload: dict[str, Any],
+    payload: schemas.PolicyVersionCreate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> dict[str, Any]:
     """新增规则版本。生效期不得与已有版本重叠（BAS-06-02）。"""
-    effective_from: date = date.fromisoformat(str(payload["effective_from"]))
-    effective_to_raw = payload.get("effective_to")
     return service.create_version(
         db,
         definition_id,
-        effective_from=effective_from,
-        effective_to=date.fromisoformat(str(effective_to_raw)) if effective_to_raw else None,
-        config=payload.get("config") or {},
-        note=payload.get("note"),
+        effective_from=payload.effective_from,
+        effective_to=payload.effective_to,
+        config=payload.config,
+        note=payload.note,
         actor=user.username,
     )
 
@@ -102,27 +100,27 @@ def create_version(
 @router.patch("/policy-versions/{version_id}")
 def update_version(
     version_id: int,
-    payload: dict[str, Any],
+    payload: schemas.PolicyVersionUpdate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> dict[str, Any]:
     """只允许改草稿版本；已发布版本必须新建（BAS-06-02）。"""
     return service.update_version_draft(
-        db, version_id, config=payload.get("config") or {}, actor=user.username
+        db, version_id, config=payload.config, actor=user.username
     )
 
 
 @router.post("/policy-versions/{version_id}/approve")
 def approve_version(
     version_id: int,
-    payload: dict[str, Any],
+    payload: schemas.PolicyVersionApprove,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = approve_access,
 ) -> dict[str, Any]:
     """发布规则版本。发布后只影响生效日后的新计算，不重算历史。"""
-    approver = payload.get("approver") or user.username
+    approver = payload.approver or user.username
     return service.approve_version(
-        db, version_id, approver=approver, note=payload.get("note")
+        db, version_id, approver=approver, note=payload.note
     )
 
 
@@ -163,13 +161,17 @@ def list_allocations(
 @router.put("/orders/{order_id}/profit-allocations")
 def set_allocations(
     order_id: int,
-    payload: dict[str, Any],
+    payload: schemas.ProfitAllocationSet,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> dict[str, Any]:
     """整单设置利润分配。有效比例合计必须为 100%（BAS-06-03）。"""
     items = service.set_allocations(
-        db, order_id, items=payload.get("items") or [], actor=user.username, user=user
+        db,
+        order_id,
+        items=[item.model_dump() for item in payload.items],
+        actor=user.username,
+        user=user,
     )
     return {"items": items, "total": len(items)}
 

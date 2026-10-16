@@ -503,6 +503,20 @@ class TestPolicyApi:
     def test_endpoints_require_login(self, seeded_client):
         assert seeded_client.get("/api/v1/policies").status_code == 401
 
+    def test_policy_requests_reject_unknown_fields(self, seeded_client, json_headers):
+        response = seeded_client.post(
+            "/api/v1/policies",
+            headers=json_headers,
+            json={
+                "policy_code": "REBATE",
+                "name": "返点规则",
+                "scope_type": "GLOBAL",
+                "legacy_field": "must not be ignored",
+            },
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "VALIDATION_ERROR"
+
     def test_list_and_create_flow(self, seeded_client, json_headers):
         created = seeded_client.post(
             "/api/v1/policies",

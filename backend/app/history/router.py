@@ -10,11 +10,9 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_IMPORT_MANAGE,
     CurrentUser,
-    get_current_user,
     require_permissions,
 )
-from app.domain.enums import ImportSourceKind
-from app.history import service
+from app.history import schemas, service
 
 router = APIRouter(tags=["imports"])
 import_access = require_permissions(PERM_IMPORT_MANAGE)
@@ -22,18 +20,18 @@ import_access = require_permissions(PERM_IMPORT_MANAGE)
 
 @router.post("/imports/batches")
 def create_batch(
-    payload: dict[str, Any],
+    payload: schemas.ImportBatchCreate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
     """上传标准原始行。系统不做任何自动匹配。"""
     return service.create_batch(
         db,
-        source_name=payload.get("source_name", ""),
-        rows=payload.get("rows", []),
-        source_kind=payload.get("source_kind", ImportSourceKind.ORDER.value),
+        source_name=payload.source_name,
+        rows=payload.rows,
+        source_kind=payload.source_kind,
         actor=user.username,
-        note=payload.get("note"),
+        note=payload.note,
     )
 
 
@@ -60,7 +58,7 @@ def list_rows(
 @router.post("/imports/rows/{row_id}/map")
 def assign_mapping(
     row_id: int,
-    payload: dict[str, Any],
+    payload: schemas.ImportRowMapping,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
@@ -68,9 +66,9 @@ def assign_mapping(
     return service.assign_mapping(
         db,
         row_id,
-        order_id=payload.get("order_id"),
-        account_id=payload.get("account_id"),
-        basis=payload.get("basis", ""),
+        order_id=payload.order_id,
+        account_id=payload.account_id,
+        basis=payload.basis,
         actor=user.username,
     )
 
@@ -78,11 +76,11 @@ def assign_mapping(
 @router.post("/imports/rows/{row_id}/skip")
 def skip_row(
     row_id: int,
-    payload: dict[str, Any],
+    payload: schemas.ImportRowSkip,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
-    return service.skip_row(db, row_id, reason=payload.get("reason", ""), actor=user.username)
+    return service.skip_row(db, row_id, reason=payload.reason, actor=user.username)
 
 
 @router.post("/imports/batches/{batch_id}/commit")
@@ -118,33 +116,33 @@ def reconciliation(
 @router.post("/imports/rows/{row_id}/unlinked-transfer")
 def mark_unlinked(
     row_id: int,
-    payload: dict[str, Any],
+    payload: schemas.ImportRowUnlinkedTransfer,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
     """MIG-01-06 标记历史单边划转未裁决。只打标记 + 开工单，绝不补造配对流水。"""
     return service.mark_unlinked_transfer(
-        db, row_id, note=payload.get("note"), actor=user.username
+        db, row_id, note=payload.note, actor=user.username
     )
 
 
 @router.post("/imports/batches/{batch_id}/rollback")
 def rollback_batch(
     batch_id: int,
-    payload: dict[str, Any],
+    payload: schemas.ImportBatchRollback,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
     """MIG-01-07 整批逻辑回滚（仅未确认批次；已确认须走更正批次）。"""
     return service.rollback_batch(
-        db, batch_id, reason=payload.get("reason", ""), actor=user.username
+        db, batch_id, reason=payload.reason, actor=user.username
     )
 
 
 @router.post("/imports/batches/{batch_id}/corrections")
 def create_correction(
     batch_id: int,
-    payload: dict[str, Any],
+    payload: schemas.ImportCorrectionCreate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
@@ -152,8 +150,8 @@ def create_correction(
     return service.create_correction_batch(
         db,
         batch_id,
-        rows=payload.get("rows", []),
-        reason=payload.get("reason", ""),
+        rows=payload.rows,
+        reason=payload.reason,
         actor=user.username,
     )
 

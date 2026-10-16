@@ -187,6 +187,12 @@ class TestPolicyVersions:
                 actor="pytest",
             )
         assert "参数不能为空" in str(exc.value)
+        with pytest.raises(Validation) as exc:
+            policy_service.create_version(
+                seeded_db, definition["id"], effective_from=D, config=["rate"],
+                actor="pytest",
+            )
+        assert "对象" in str(exc.value)
 
     def test_approve_version_notfound_and_empty_approver(self, seeded_db):
         with pytest.raises(NotFound):
@@ -221,6 +227,11 @@ class TestPolicyVersions:
         with pytest.raises(Validation) as exc:
             policy_service.update_version_draft(seeded_db, version["id"], config={})
         assert "参数不能为空" in str(exc.value)
+        with pytest.raises(Validation) as exc:
+            policy_service.update_version_draft(
+                seeded_db, version["id"], config=["rate"]
+            )
+        assert "对象" in str(exc.value)
 
 
 # ------------------------------------------------------------------ 快照与分配

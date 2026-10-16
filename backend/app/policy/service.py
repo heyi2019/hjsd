@@ -72,6 +72,14 @@ def _ver_out(item: PolicyVersion) -> dict[str, Any]:
     }
 
 
+def _normalize_policy_config(config: Any) -> dict[str, Any]:
+    if not isinstance(config, dict):
+        raise Validation("规则参数必须为对象", details={"field": "config"})
+    if not config:
+        raise Validation("规则参数不能为空", details={"field": "config"})
+    return dict(config)
+
+
 # ── T19 / BAS-06-01：规则定义 ───────────────────────────────────
 
 def list_definitions(
@@ -222,8 +230,7 @@ def create_version(
     definition = session.get(PolicyDefinition, definition_id)
     if definition is None:
         raise NotFound(f"规则 {definition_id} 不存在", details={"definition_id": definition_id})
-    if not config:
-        raise Validation("规则参数不能为空", details={"field": "config"})
+    normalized_config = _normalize_policy_config(config)
     if effective_to is not None and effective_to <= effective_from:
         raise Validation(
             "失效日期必须晚于生效日期",
@@ -254,7 +261,7 @@ def create_version(
         version=next_version,
         effective_from=effective_from,
         effective_to=effective_to,
-        config=config,
+        config=normalized_config,
         status=PolicyStatus.DRAFT.value,
         note=note,
         created_by=actor,
@@ -316,10 +323,9 @@ def update_version_draft(
             "已发布/已失效的版本不可修改，请新建版本",
             details={"version_id": version_id, "status": item.status},
         )
-    if not config:
-        raise Validation("规则参数不能为空", details={"field": "config"})
+    normalized_config = _normalize_policy_config(config)
     before = {"config": item.config}
-    item.config = config
+    item.config = normalized_config
     item.updated_by = actor
     session.flush()
     record_audit(
@@ -329,7 +335,7 @@ def update_version_draft(
         entity_id=item.id,
         actor=actor,
         before=before,
-        after={"config": config},
+        after={"config": normalized_config},
     )
     return _ver_out(item)
 

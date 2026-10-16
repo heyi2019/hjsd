@@ -464,3 +464,42 @@ def test_login_user_created_directly_in_db(client: TestClient, db: Session):
     )
     assert response.status_code == 200, response.text
     assert response.json()["user"]["username"] == "frank"
+
+
+def test_bearer_permissions_refresh_after_user_role_change(
+    seeded_client: TestClient,
+):
+    created = _create_user(seeded_client, username="live-role", role="VIEWER")
+    token = _login(seeded_client, "live-role", "password123")
+
+    updated = seeded_client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"role": "OPERATOR"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    response = seeded_client.post(
+        "/api/v1/customers",
+        json={"display_name": "权限即时生效"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201, response.text
+
+
+def test_bearer_permissions_refresh_after_user_deactivation(client: TestClient):
+    created = _create_user(client, username="live-active", role="OPERATOR")
+    token = _login(client, "live-active", "password123")
+
+    updated = client.patch(
+        f"/api/v1/users/{created['id']}",
+        json={"is_active": False},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 401

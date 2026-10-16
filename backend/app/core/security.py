@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AuthError, PermissionDenied, TokenExpired
 from app.core.database import get_db
 from app.core.settings import Settings, get_settings
-from app.domain.users import RevokedToken
+from app.domain.users import RevokedToken, User
 
 # ------------------------------------------------------------------ 角色与权限点
 ROLE_ADMIN = "ADMIN"
@@ -353,6 +353,21 @@ def get_current_user(
         payload = decode_token(token, settings=settings)
         if payload.get("jti") and db.get(RevokedToken, payload["jti"]):
             raise AuthError("登录已退出，请重新登录")
+        account = db.get(User, int(payload.get("sub", 0)))
+        if account is not None and account.username == payload.get("username"):
+            if not account.is_active:
+                raise AuthError("账号已停用，请联系管理员")
+            # JWT 只证明 token 曾由服务签发；角色、数据范围和池授权以当前
+            # 数据库记录为准，使停用/改权在旧 token 未过期时也立即生效。
+            return CurrentUser.build(
+                id=account.id,
+                username=account.username,
+                display_name=account.display_name,
+                roles=[account.role],
+                pool_ids=frozenset(account.pool_ids or []),
+                team_ids=frozenset(account.team_ids or []),
+                owner_scope=account.owner_scope,
+            )
         return user_from_payload(payload)
 
     if settings.is_development and x_dev_user:

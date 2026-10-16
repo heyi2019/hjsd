@@ -48,6 +48,13 @@ def _non_negative(value: Any, *, field: str) -> Decimal:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
+def _positive(value: Any, *, field: str) -> Decimal:
+    try:
+        return require_positive(value, field=field)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
+
+
 def _normalize_schedule(schedule: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     if not schedule:
         return []
@@ -349,7 +356,7 @@ def pay(
             details={"inst_no": installment.inst_no, "status": installment.status},
         )
 
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     remaining_total = total_receivable(installment) - to_money(installment.paid_amount)
     if money > remaining_total:
         raise Validation(
@@ -449,7 +456,7 @@ def waive_schedule(
         raise Validation("已收期不可减免", details={"period_no": period_no})
     if schedule.status in {ScheduleStatus.PAID.value, ScheduleStatus.WAIVED.value}:
         raise Validation("已完成期次不可减免", details={"period_no": period_no})
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     outstanding = to_money(schedule.due_amount) - to_money(schedule.waived_amount)
     if money > outstanding:
         raise Validation(

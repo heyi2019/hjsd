@@ -145,6 +145,17 @@ class TestDepositQueries:
                 source_order_id=999999,
             )
 
+    def test_positive_amounts_are_business_errors_in_service(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        with pytest.raises(Validation, match="必须大于 0"):
+            service.create_deposit(
+                seeded_db,
+                pool_id=invest.id,
+                amount=Decimal("0"),
+                paid_on=TODAY,
+                actor="pytest",
+            )
+
     def test_deposit_counterparty_must_exist(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(NotFound, match="合作方"):

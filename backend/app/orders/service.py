@@ -63,6 +63,20 @@ MONEY_EVENTS = tuple(EVENT_FLOW_MAP.keys())
 _UNSET = object()
 
 
+def _non_negative_money(value: Any, *, field: str) -> Decimal:
+    try:
+        return require_non_negative(value, field=field)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
+
+
+def _positive_money(value: Any, *, field: str) -> Decimal:
+    try:
+        return require_positive(value, field=field)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
+
+
 def _audit_value(value: Any) -> Any:
     """把订单快照转换为 JSON 可持久化的值。"""
     if isinstance(value, date):
@@ -195,8 +209,16 @@ def create_order(
             f"capital_type 必须为 {CapitalType.values()}",
             details={"field": "capital_type", "value": selected_capital_type},
         )
-    listing_amount = to_money(listing_price) if listing_price is not None else None
-    service_fee_amount = to_money(service_fee) if service_fee is not None else None
+    listing_amount = (
+        _non_negative_money(listing_price, field="listing_price")
+        if listing_price is not None
+        else None
+    )
+    service_fee_amount = (
+        _non_negative_money(service_fee, field="service_fee")
+        if service_fee is not None
+        else None
+    )
     if definition.code != "DG" and any(
         value is not None
         for value in (
@@ -424,12 +446,12 @@ def update_order(
             raise Validation("已有过账事件的订单只能修改备注，核算字段必须通过冲销/更正")
 
     next_listing = (
-        require_non_negative(listing_price, field="listing_price")
+        _non_negative_money(listing_price, field="listing_price")
         if listing_price is not _UNSET and listing_price is not None
         else (None if listing_price is None else order.listing_price)
     )
     next_service_fee = (
-        require_non_negative(service_fee, field="service_fee")
+        _non_negative_money(service_fee, field="service_fee")
         if service_fee is not _UNSET and service_fee is not None
         else (None if service_fee is None else order.service_fee)
     )
@@ -631,7 +653,7 @@ def post_event(
             )
         category = flow_category
 
-    money = require_positive(amount, field="amount")
+    money = _positive_money(amount, field="amount")
     offset = None
     cancel_fully_consumed = False
     if event_type == EventType.CANCEL.value and offset_event_id is not None:

@@ -55,6 +55,13 @@ def _non_negative(value: Any, *, field: str) -> Decimal:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
+def _positive(value: Any, *, field: str) -> Decimal:
+    try:
+        return require_positive(value, field=field)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
+
+
 def _get_cashflow(
     session: Session, cashflow_id: int, user: CurrentUser | None = None
 ) -> Cashflow:
@@ -118,7 +125,7 @@ def create_cashflow(
     pool = foundation_service.assert_pool_usable(session, pool_id)
     if order_id is not None:
         orders_service.get_order(session, order_id, user)
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     flow = Cashflow(
         flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
         pool_id=pool.id,
@@ -289,7 +296,7 @@ def create_deposit(
     note: str | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
@@ -364,7 +371,7 @@ def return_deposit(
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
     if user is not None and not user.can_see_pool(deposit.pool_id):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     outstanding = (
         to_money(deposit.paid_amount)
         - to_money(deposit.returned_amount)
@@ -444,7 +451,7 @@ def lose_deposit(
         raise Validation("押金损失必须填写费用分类", details={"field": "category"})
     if label in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE", "DEPOSIT_LOSS", "TRANSFER"}:
         raise Validation("押金损失费用分类不能使用系统分类", details={"field": "category"})
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     outstanding = (
         to_money(deposit.paid_amount)
         - to_money(deposit.returned_amount)
@@ -803,7 +810,7 @@ def create_transfer(
     """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
     if source_pool_id == target_pool_id:
         raise Validation("转出池与转入池不能相同", details={"pool_id": source_pool_id})
-    money = require_positive(amount, field="amount")
+    money = _positive(amount, field="amount")
     source = foundation_service.assert_pool_usable(session, source_pool_id)
     target = foundation_service.assert_pool_usable(session, target_pool_id)
     # Cashflow.flow_no 长度为 32；保留可读前缀并控制两条流水编号不超列长度。
@@ -986,7 +993,7 @@ def create_rebate(
             details={"order_no": order.order_no, "status": order.status},
         )
 
-    base = require_positive(base_amount, field="base_amount")
+    base = _positive(base_amount, field="base_amount")
     rebate_rate = _non_negative(rate, field="rate")
     if rebate_rate > Decimal("100.00"):
         raise Validation(
@@ -1059,7 +1066,7 @@ def settle_rebate(
         ) from exc
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    gross = require_positive(gross_amount, field="gross_amount")
+    gross = _positive(gross_amount, field="gross_amount")
     fee = _non_negative(platform_fee, field="platform_fee")
     if fee > gross:
         raise Validation(

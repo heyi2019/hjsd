@@ -260,6 +260,18 @@ class TestGetAndListInstallments:
 
 # ------------------------------------------------------------------ 收款守卫
 class TestPayGuards:
+    def test_payment_amount_is_business_error_in_service(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id)
+        with pytest.raises(Validation, match="必须大于 0"):
+            installment_service.pay(
+                seeded_db,
+                contract.id,
+                amount=Decimal("0"),
+                paid_on=TODAY,
+                actor="pytest",
+            )
+
     def _settled_dfq(self, seeded_db, tag: str) -> tuple[Order, Installment]:
         order = _order(seeded_db)
         contract = _contract(

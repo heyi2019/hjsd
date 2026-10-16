@@ -126,6 +126,27 @@ class TestCreateOrderValidation:
                 capital_type="",
             )
 
+    def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
+        with pytest.raises(Validation, match="不能为负数"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DG",
+                trade_date=D,
+                actor="pytest",
+                listing_price=Decimal("-1"),
+            )
+
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match="必须大于 0"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("0"),
+                occurred_on=D,
+                actor="pytest",
+            )
+
     def test_duplicate_participant_role_rejected_before_unique_constraint(
         self, seeded_db
     ):

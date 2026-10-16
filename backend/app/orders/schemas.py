@@ -52,6 +52,13 @@ class InitialBuyCreate(BaseModel):
     note: str | None = None
 
 
+class OrderInstallmentScheduleCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    period_no: int = Field(ge=1)
+    due_on: date
+
+
 class OrderInstallmentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -65,7 +72,7 @@ class OrderInstallmentCreate(BaseModel):
     first_due_on: date
     delivery_mode: str | None = None
     note: str | None = None
-    schedule: list[dict[str, date | int]] | None = None
+    schedule: list[OrderInstallmentScheduleCreate] | None = None
 
 
 class OrderCreate(BaseModel):
@@ -217,6 +224,7 @@ __all__ = [
     "OrderCreate",
     "OrderCancelIn",
     "OrderInstallmentCreate",
+    "OrderInstallmentScheduleCreate",
     "OrderOut",
     "OrderListOut",
     "OrderUpdate",

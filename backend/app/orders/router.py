@@ -208,7 +208,11 @@ def create_order(
             first_due_on=payload.installment.first_due_on,
             delivery_mode=payload.installment.delivery_mode,
             note=payload.installment.note,
-            schedule=payload.installment.schedule,
+            schedule=(
+                [item.model_dump() for item in payload.installment.schedule]
+                if payload.installment.schedule
+                else None
+            ),
             actor=_actor(user),
             user=user,
         )

@@ -961,6 +961,32 @@ class TestOrdersApi:
         assert contract is not None
         assert contract.contract_type == "ADVANCE_PURCHASE"
 
+    def test_embedded_installment_schedule_rejects_unknown_fields(
+        self, seeded_client, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DFQ",
+                "trade_date": D.isoformat(),
+                "installment": {
+                    "contract_type": "ADVANCE_PURCHASE",
+                    "principal": "800.00",
+                    "periods": 1,
+                    "first_due_on": "2026-11-01",
+                    "schedule": [
+                        {
+                            "period_no": 1,
+                            "due_on": "2026-11-01",
+                            "unknown_field": "must be rejected",
+                        }
+                    ],
+                },
+            },
+            headers=headers,
+        )
+        assert response.status_code == 422, response.text
+
     def test_dfq_composite_create_rolls_back_when_contract_is_invalid(
         self, seeded_client, seeded_db, headers
     ):

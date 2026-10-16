@@ -17,6 +17,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,6 +42,10 @@ class ImportBatch(Base, AuditMixin):
             .replace("[", "(")
             .replace("]", ")"),
             name="import_source_kind_valid",
+        ),
+        CheckConstraint(
+            "row_count >= 0 AND unmapped_count >= 0",
+            name="counts_nonneg",
         ),
     )
 
@@ -77,6 +82,8 @@ class ImportRow(Base, TimestampMixin):
             .replace("]", ")"),
             name="import_row_status_valid",
         ),
+        CheckConstraint("row_no > 0", name="row_no_positive"),
+        UniqueConstraint("batch_id", "row_no", name="uq_import_rows_batch_row"),
         Index("ix_import_rows_batch", "batch_id", "status"),
     )
 

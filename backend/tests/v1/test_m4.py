@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.domain.enums import ImportRowStatus
 from app.domain.history import ImportBatch, ImportRow
@@ -86,6 +87,37 @@ class TestReports:
 
 # --------------------------------------------------------------------- 历史导入
 class TestHistoryImport:
+    def test_import_rows_have_unique_positive_row_numbers_in_database(self, seeded_db):
+        batch = history_service.create_batch(
+            seeded_db, source_name="rows.xlsx", rows=[{"value": 1}], actor="pytest"
+        )
+        seeded_db.add(
+            ImportRow(
+                batch_id=batch["id"],
+                row_no=1,
+                raw={"duplicate": True},
+                status=ImportRowStatus.UNMAPPED.value,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
+        batch = history_service.create_batch(
+            seeded_db, source_name="rows-2.xlsx", rows=[{"value": 1}], actor="pytest"
+        )
+        seeded_db.add(
+            ImportRow(
+                batch_id=batch["id"],
+                row_no=0,
+                raw={"invalid": True},
+                status=ImportRowStatus.UNMAPPED.value,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_no_auto_matching_on_create(self, seeded_db):
         batch = history_service.create_batch(
             seeded_db,
@@ -437,8 +469,13 @@ class TestEnumConstraintDrift:
         batch = history_service.create_batch(
             seeded_db, source_name="probe.xlsx", rows=[{"a": 1}], actor="pytest"
         )
-        for status in ImportRowStatus:
-            row = ImportRow(batch_id=batch["id"], row_no=1, raw={"a": 1}, status=status.value)
+        for row_no, status in enumerate(ImportRowStatus, start=2):
+            row = ImportRow(
+                batch_id=batch["id"],
+                row_no=row_no,
+                raw={"a": 1},
+                status=status.value,
+            )
             seeded_db.add(row)
             try:
                 seeded_db.flush()

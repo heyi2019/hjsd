@@ -174,7 +174,11 @@ def create_order(
     primary_version_id: int | None = None
     for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
         version_id, snap = policy_service.make_snapshot(
-            session, policy_code=code, on=trade_date
+            session,
+            policy_code=code,
+            on=trade_date,
+            scope_type="ORDER_TYPE",
+            scope_id=definition.id,
         )
         if snap is None:
             continue

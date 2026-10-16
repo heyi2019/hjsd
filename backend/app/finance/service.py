@@ -370,8 +370,15 @@ def create_rebate(
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
+    order_type_definition = foundation_service.get_order_type_by_code(
+        session, order.order_type
+    )
     policy_version_id, snapshot = policy_service.make_snapshot(
-        session, policy_code=PolicyType.REBATE.value, on=collected_on
+        session,
+        policy_code=PolicyType.REBATE.value,
+        on=collected_on,
+        scope_type="ORDER_TYPE",
+        scope_id=order_type_definition.id if order_type_definition else None,
     )
     record = RebateRecord(
         rebate_no=rebate_no,

@@ -115,6 +115,11 @@ def create_definition(
             f"scope_type 非法：{scope_type}",
             details={"field": "scope_type", "allowed": [s.value for s in PolicyScopeType]},
         ) from exc
+    if scope is PolicyScopeType.GLOBAL and scope_id is not None:
+        raise Validation(
+            "GLOBAL 范围不能指定 scope_id",
+            details={"field": "scope_id", "scope_type": scope.value},
+        )
     # 非全局范围必须指定 scope_id，否则规则会误伤全部业务
     if scope is not PolicyScopeType.GLOBAL and scope_id is None:
         raise Validation(
@@ -123,11 +128,19 @@ def create_definition(
         )
 
     exists = session.scalar(
-        select(PolicyDefinition.id).where(PolicyDefinition.policy_code == code)
+        select(PolicyDefinition.id)
+        .where(PolicyDefinition.policy_code == code)
+        .where(PolicyDefinition.scope_type == scope.value)
+        .where(
+            PolicyDefinition.scope_id.is_(None)
+            if scope_id is None
+            else PolicyDefinition.scope_id == scope_id
+        )
     )
     if exists:
         raise Validation(
-            f"规则编码已存在：{code}", details={"policy_code": code, "id": exists}
+            f"同一适用范围的规则编码已存在：{code}",
+            details={"policy_code": code, "scope_type": scope.value, "scope_id": scope_id, "id": exists},
         )
 
     item = PolicyDefinition(
@@ -333,37 +346,76 @@ def resolve_version(
     优先级：范围越具体越优先（USER > POOL > ORDER_TYPE > GLOBAL），
     同范围内取生效日期最新且不早于 on 的版本。
     """
-    definition = session.scalar(
+    try:
+        requested_scope = PolicyScopeType(scope_type.upper())
+    except ValueError as exc:
+        raise Validation(
+            f"scope_type 非法：{scope_type}",
+            details={"field": "scope_type", "allowed": [s.value for s in PolicyScopeType]},
+        ) from exc
+    if requested_scope is PolicyScopeType.GLOBAL:
+        if scope_id is not None:
+            raise Validation("GLOBAL 范围不能指定 scope_id", details={"field": "scope_id"})
+        scope_candidates = [(PolicyScopeType.GLOBAL.value, None, 0)]
+    else:
+        if scope_id is None:
+            raise Validation(
+                f"{requested_scope.value} 范围必须指定 scope_id",
+                details={"field": "scope_id", "scope_type": requested_scope.value},
+            )
+        scope_candidates = [
+            (requested_scope.value, scope_id, 1),
+            (PolicyScopeType.GLOBAL.value, None, 0),
+        ]
+    definitions = session.scalars(
         select(PolicyDefinition).where(PolicyDefinition.policy_code == policy_code.upper())
-    )
-    if definition is None:
-        return None
+    ).all()
+    definitions_by_scope = {
+        (definition.scope_type, definition.scope_id): definition
+        for definition in definitions
+    }
     far = date(9999, 12, 31)
-    stmt = (
-        select(PolicyVersion)
-        .where(PolicyVersion.policy_definition_id == definition.id)
-        .where(PolicyVersion.status == PolicyStatus.ACTIVE.value)
-        .where(PolicyVersion.effective_from <= on)
-    )
-    rows = [
-        item
-        for item in session.scalars(stmt).all()
-        if (item.effective_to or far) > on
-    ]
+    rows: list[tuple[int, PolicyVersion]] = []
+    for candidate_type, candidate_id, priority in scope_candidates:
+        definition = definitions_by_scope.get((candidate_type, candidate_id))
+        if definition is None:
+            continue
+        stmt = (
+            select(PolicyVersion)
+            .where(PolicyVersion.policy_definition_id == definition.id)
+            .where(PolicyVersion.status == PolicyStatus.ACTIVE.value)
+            .where(PolicyVersion.effective_from <= on)
+        )
+        rows.extend(
+            (priority, item)
+            for item in session.scalars(stmt).all()
+            if (item.effective_to or far) > on
+        )
     if not rows:
         return None
-    rows.sort(key=lambda v: (v.effective_from, v.version), reverse=True)
-    return rows[0]
+    rows.sort(key=lambda item: (item[0], item[1].effective_from, item[1].version), reverse=True)
+    return rows[0][1]
 
 
 def make_snapshot(
-    session: Session, *, policy_code: str, on: date
+    session: Session,
+    *,
+    policy_code: str,
+    on: date,
+    scope_type: str = PolicyScopeType.GLOBAL.value,
+    scope_id: int | None = None,
 ) -> tuple[int | None, dict[str, Any] | None]:
     """生成规则快照：命中已发布版本则固化 version_id + 参数副本；未命中返回 (None, None)。
 
     刻意**深拷贝** config：调用方后续改动内存里的 dict 不能影响已固化的快照。
     """
-    version = resolve_version(session, policy_code=policy_code, on=on)
+    version = resolve_version(
+        session,
+        policy_code=policy_code,
+        on=on,
+        scope_type=scope_type,
+        scope_id=scope_id,
+    )
     if version is None:
         return None, None
     snapshot = {

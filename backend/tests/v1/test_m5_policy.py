@@ -57,6 +57,19 @@ class TestPolicyDefinition:
         with pytest.raises(Exception):
             _make_policy(seeded_db)
 
+    def test_same_code_can_have_different_scopes(self, seeded_db):
+        _make_policy(seeded_db)
+        scoped = policy_service.create_definition(
+            seeded_db,
+            policy_code="REBATE",
+            name="HS 返点规则",
+            scope_type="ORDER_TYPE",
+            scope_id=1,
+            actor="pytest",
+        )
+        assert scoped["policy_code"] == "REBATE"
+        assert scoped["scope_type"] == "ORDER_TYPE"
+
     def test_scoped_requires_scope_id(self, seeded_db):
         """非全局范围必须指定 scope_id，否则规则会误伤全部业务。"""
         with pytest.raises(Exception):
@@ -230,6 +243,33 @@ class TestVersionResolution:
         assert policy_service.resolve_version(
             seeded_db, policy_code="NOT_EXIST", on=date(2026, 6, 1)
         ) is None
+
+    def test_specific_scope_overrides_global_scope(self, seeded_db):
+        global_policy = _make_policy(seeded_db)
+        scoped = policy_service.create_definition(
+            seeded_db,
+            policy_code="REBATE",
+            name="HS 返点规则",
+            scope_type="ORDER_TYPE",
+            scope_id=1,
+            actor="pytest",
+        )
+        _publish(
+            seeded_db, global_policy, frm=date(2026, 1, 1), config={"rate": "5"}
+        )
+        _publish(
+            seeded_db, scoped, frm=date(2026, 1, 1), config={"rate": "8"}
+        )
+
+        resolved = policy_service.resolve_version(
+            seeded_db,
+            policy_code="REBATE",
+            on=date(2026, 6, 1),
+            scope_type="ORDER_TYPE",
+            scope_id=1,
+        )
+        assert resolved is not None
+        assert resolved.config == {"rate": "8"}
 
 
 class TestSnapshotRedline:

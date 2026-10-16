@@ -132,9 +132,17 @@ def resolve(
     user: CurrentUser = read_access,
     policy_code: str = Query(...),
     on: date = Query(...),
+    scope_type: str = Query(default="GLOBAL"),
+    scope_id: int | None = Query(default=None),
 ) -> dict[str, Any]:
-    """取某日生效版本（BAS-06-04 快照固化的依据）。"""
-    version = service.resolve_version(db, policy_code=policy_code, on=on)
+    """取某日某作用域生效版本（BAS-06-04 快照固化的依据）。"""
+    version = service.resolve_version(
+        db,
+        policy_code=policy_code,
+        on=on,
+        scope_type=scope_type,
+        scope_id=scope_id,
+    )
     from app.policy.service import _ver_out  # noqa: PLC0415
 
     return {"found": version is not None, "version": _ver_out(version) if version else None}

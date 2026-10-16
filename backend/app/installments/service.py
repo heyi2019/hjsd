@@ -35,6 +35,7 @@ from app.domain.enums import (
     SequenceKey,
 )
 from app.domain.trade import Account, Installment, InstallmentSchedule, Order, OrderEvent
+from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 
 
@@ -175,8 +176,15 @@ def create_installment(
     per_period_amount = _non_negative(per_period, field="per_period")
 
     # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约
+    order_type_definition = foundation_service.get_order_type_by_code(
+        session, order.order_type
+    )
     policy_version_id, policy_snapshot = policy_service.make_snapshot(
-        session, policy_code=PolicyType.INSTALLMENT.value, on=first_due_on or date.today()
+        session,
+        policy_code=PolicyType.INSTALLMENT.value,
+        on=first_due_on or date.today(),
+        scope_type="ORDER_TYPE",
+        scope_id=order_type_definition.id if order_type_definition else None,
     )
     installment = Installment(
         inst_no=order_installment_no(order.order_no),

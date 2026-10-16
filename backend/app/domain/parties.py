@@ -49,7 +49,10 @@ class PolicyDefinition(Base, AuditMixin):
             f"status IN {PolicyStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="policy_status_valid",
         ),
-        UniqueConstraint("policy_code", name="uq_policy_definitions_code"),
+        UniqueConstraint(
+            "policy_code", "scope_type", "scope_id",
+            name="uq_policy_definitions_scope_code",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

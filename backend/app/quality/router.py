@@ -12,8 +12,8 @@ router = APIRouter(tags=["QLT-01 质量与异常"])
 read_quality = require_permissions(PERM_REPORT_READ)
 
 
-@router.get("/quality/issues")
-def list_quality_issues(
+@router.get("/quality/exceptions")
+def list_quality_exceptions(
     db: Session = Depends(get_db), user: CurrentUser = read_quality
 ) -> dict:
     return service.summary(db, user=user)

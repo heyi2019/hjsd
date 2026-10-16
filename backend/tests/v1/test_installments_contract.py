@@ -282,6 +282,23 @@ class TestDeliverGuards:
 
 # ------------------------------------------------------------------ 逾期升级
 class TestMarkOverdue:
+    def test_overdue_promotes_pending_contract(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="0",
+            periods=1,
+            per_period="300",
+            first_due_on=PAST,
+        )
+
+        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+
+        assert marked == 1  # 零首付期无需逾期，第 1 期进入逾期
+        refreshed = seeded_db.get(Installment, contract.id)
+        assert refreshed.status == InstallmentStatus.OVERDUE.value
+
     def test_overdue_promotes_active_contract(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(

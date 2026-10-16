@@ -738,8 +738,16 @@ def mark_overdue(
         installment_ids = {row.installment_id for row in rows}
         for installment_id in installment_ids:
             installment = session.get(Installment, installment_id)
-            if installment and installment.status == InstallmentStatus.ACTIVE.value:
-                installment.status = InstallmentStatus.OVERDUE.value
+            if installment and installment.status in {
+                InstallmentStatus.PENDING.value,
+                InstallmentStatus.ACTIVE.value,
+            }:
+                installment.status = transition(
+                    INSTALLMENT_TRANSITIONS,
+                    installment.status,
+                    "MARK_OVERDUE",
+                    entity="分期合约",
+                )
                 record_audit(
                     session,
                     action=AuditAction.INSTALLMENT_OVERDUE,

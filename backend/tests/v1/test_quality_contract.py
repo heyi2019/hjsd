@@ -109,7 +109,7 @@ class TestQualityScan:
             id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
         )
         response = seeded_client.get(
-            "/api/v1/quality/issues",
+            "/api/v1/quality/exceptions",
             headers={"Authorization": f"Bearer {build_access_token(user)}"},
         )
         assert response.status_code == 200, response.text
@@ -146,7 +146,7 @@ class TestQualityScan:
         )
 
         response = seeded_client.get(
-            "/api/v1/quality/issues",
+            "/api/v1/quality/exceptions",
             headers={"Authorization": f"Bearer {build_access_token(user)}"},
         )
         assert response.status_code == 200, response.text

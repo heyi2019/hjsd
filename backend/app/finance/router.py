@@ -15,6 +15,7 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
+    PERM_TRANSFER_POST,
     CurrentUser,
     require_permissions,
 )
@@ -25,6 +26,7 @@ router = APIRouter(tags=["FIN-04/REB-01 押金与返点"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
 post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
+post_transfer = require_permissions(PERM_TRANSFER_POST)
 
 
 def _actor(user: CurrentUser) -> str:
@@ -76,6 +78,50 @@ def list_cashflows(
         offset=offset,
     )
     return [schemas.CashflowOut.model_validate(item) for item in items]
+
+
+@router.post("/transfers", response_model=schemas.TransferOut, status_code=201)
+def create_transfer(
+    payload: schemas.TransferCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_transfer,
+) -> schemas.TransferOut:
+    result = service.create_transfer(
+        db,
+        source_pool_id=payload.source_pool_id,
+        target_pool_id=payload.target_pool_id,
+        amount=payload.amount,
+        occurred_on=payload.occurred_on,
+        actor=_actor(user),
+        note=payload.note,
+    )
+    return schemas.TransferOut(
+        transfer_id=result["transfer_id"],
+        source_pool_id=result["source_pool_id"],
+        target_pool_id=result["target_pool_id"],
+        amount=result["amount"],
+        occurred_on=result["occurred_on"],
+        cashflows=[
+            schemas.CashflowOut(
+                id=flow.id,
+                flow_no=flow.flow_no,
+                pool_id=flow.pool_id,
+                occurred_on=flow.occurred_on,
+                nature=flow.nature,
+                category=flow.category,
+                direction=flow.direction,
+                amount=flow.amount,
+                order_id=flow.order_id,
+                order_no=None,
+                deposit_id=flow.deposit_id,
+                order_event_id=flow.order_event_id,
+                transfer_id=flow.transfer_id,
+                source="TRANSFER",
+                note=flow.note,
+            )
+            for flow in result["cashflows"]
+        ],
+    )
 
 
 # --------------------------------------------------------------------- 押金

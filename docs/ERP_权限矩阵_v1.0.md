@@ -26,7 +26,7 @@
 | `order.event.post` | 是 | 本人范围 | 回款/付款按范围 | 否 | 否 | 金额事件必须原子生成现金流 |
 | `order.exception.approve` | 是 | 否 | 否 | 是 | 否 | 包括 DG 混合单、未结清交付、减免/展期 |
 | `finance.read` | 是 | 本人相关 | 按池 | 按范围 | 聚合只读 | 资金详情按资金池范围控制 |
-| `finance.transfer` / `deposit.post` | 是 | 否 | 按池 | 否 | 否 | 双人复核由审批流程实现 |
+| `finance.transfer` / `deposit.post` | 是 | 否 | 按池 | 否 | 否 | 划转必须原子生成一出一入；双人复核由审批流程实现 |
 | `policy.manage` / `policy.approve` | 是 | 否 | 否 | 是 | 否 | 规则只能新版本生效，已用版本不可改 |
 | `field-definition.manage` | 是 | 否 | 否 | 否 | 否 | 不得创建核算字段 |
 | `audit.read` | 是 | 本人操作 | 本池操作 | 审批相关 | 否 | 审计日志不可编辑或删除 |

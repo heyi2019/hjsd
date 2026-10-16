@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -192,6 +193,8 @@ def list_cashflows(
             source = "REBATE_SETTLEMENT"
         elif flow.category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE"}:
             source = "DEPOSIT"
+        elif flow.category == "TRANSFER":
+            source = "TRANSFER"
         else:
             source = "OTHER"
         rows.append(
@@ -208,11 +211,77 @@ def list_cashflows(
                 "order_no": order_no,
                 "deposit_id": flow.deposit_id,
                 "order_event_id": flow.order_event_id,
+                "transfer_id": flow.transfer_id,
                 "source": source,
                 "note": flow.note,
             }
         )
     return rows
+
+
+def create_transfer(
+    session: Session,
+    *,
+    source_pool_id: int,
+    target_pool_id: int,
+    amount: Any,
+    occurred_on: date,
+    actor: str,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
+    if source_pool_id == target_pool_id:
+        raise Validation("转出池与转入池不能相同", details={"pool_id": source_pool_id})
+    money = require_positive(amount, field="amount")
+    source = foundation_service.assert_pool_usable(session, source_pool_id)
+    target = foundation_service.assert_pool_usable(session, target_pool_id)
+    # Cashflow.flow_no 长度为 32；保留可读前缀并控制两条流水编号不超列长度。
+    transfer_id = f"TRF-{uuid4().hex[:20].upper()}"
+    common = {
+        "transfer_id": transfer_id,
+        "occurred_on": occurred_on,
+        "nature": Nature.INTERNAL.value,
+        "category": "TRANSFER",
+        "amount": money,
+        "created_by": actor,
+        "updated_by": actor,
+    }
+    outgoing = Cashflow(
+        flow_no=f"{transfer_id}-OUT",
+        pool_id=source.id,
+        direction=Direction.OUT.value,
+        note=note,
+        **common,
+    )
+    incoming = Cashflow(
+        flow_no=f"{transfer_id}-IN",
+        pool_id=target.id,
+        direction=Direction.IN.value,
+        note=note,
+        **common,
+    )
+    session.add_all([outgoing, incoming])
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.TRANSFER_CREATE,
+        entity_type="transfer",
+        entity_id=transfer_id,
+        actor=actor,
+        after={
+            "source_pool": source.code,
+            "target_pool": target.code,
+            "amount": str(money),
+        },
+    )
+    return {
+        "transfer_id": transfer_id,
+        "source_pool_id": source.id,
+        "target_pool_id": target.id,
+        "amount": money,
+        "occurred_on": occurred_on,
+        "cashflows": [outgoing, incoming],
+    }
 
 
 def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
@@ -412,6 +481,7 @@ __all__ = [
     "list_cashflows",
     "list_deposits",
     "list_rebates",
+    "create_transfer",
     "return_deposit",
     "settle_rebate",
     "settled_net_total",

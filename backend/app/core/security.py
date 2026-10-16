@@ -51,6 +51,7 @@ PERM_ORDER_EVENT_POST = "order.event.post"
 PERM_ORDER_EXCEPTION_APPROVE = "order.exception.approve"
 PERM_FINANCE_READ = "finance.read"
 PERM_DEPOSIT_POST = "deposit.post"
+PERM_TRANSFER_POST = "finance.transfer"
 PERM_POLICY_MANAGE = "policy.manage"
 PERM_POLICY_APPROVE = "policy.approve"
 PERM_FIELD_DEFINITION_MANAGE = "field-definition.manage"
@@ -77,6 +78,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_ORDER_EXCEPTION_APPROVE,
         PERM_FINANCE_READ,
         PERM_DEPOSIT_POST,
+        PERM_TRANSFER_POST,
         PERM_POLICY_MANAGE,
         PERM_POLICY_APPROVE,
         PERM_FIELD_DEFINITION_MANAGE,
@@ -113,6 +115,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_COUNTERPARTY_READ,
             PERM_FINANCE_READ,
             PERM_DEPOSIT_POST,
+            PERM_TRANSFER_POST,
             PERM_AUDIT_READ,
             PERM_REPORT_READ,
         }

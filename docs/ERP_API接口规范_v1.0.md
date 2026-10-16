@@ -27,6 +27,7 @@
 | 返点 | POST `/rebates`, POST `/rebates/{id}/settlements` | 返点记录、分次到账与现金流 |
 | 押金 | GET/POST/PATCH `/deposits` | 缴纳、部分退回、状态 |
 | 流水 | GET `/cashflows` | 查询；订单事件来源流水不可手工修改 |
+| 划转 | POST `/transfers` | 原子生成同一 `transfer_id` 下的 INTERNAL 转出/转入流水 |
 | 报表 | GET `/reports/pools|inventory|operating|business-profitability|commissions` | R1–R5 |
 | 异常 | GET `/quality/exceptions` | 未关联、单边划转、逾期、库存缺失 |
 | 活字段 | GET/POST/PATCH `/field-definitions` | 定义、停用、排序；不允许删除历史字段 |

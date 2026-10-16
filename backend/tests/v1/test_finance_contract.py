@@ -132,6 +132,37 @@ class TestRebateGuards:
 
 
 class TestFinanceApi:
+    def test_create_transfer_posts_symmetric_internal_cashflows(
+        self, seeded_client, seeded_db, headers
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        profit = _pool(seeded_db, "HJ_PROFIT")
+
+        response = seeded_client.post(
+            "/api/v1/transfers",
+            json={
+                "source_pool_id": invest.id,
+                "target_pool_id": profit.id,
+                "amount": "125.50",
+                "occurred_on": TODAY.isoformat(),
+                "note": "补充买号资金",
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 201, response.text
+        payload = response.json()
+        assert payload["amount"] == "125.50"
+        assert len(payload["cashflows"]) == 2
+        assert {row["nature"] for row in payload["cashflows"]} == {"INTERNAL"}
+        assert {row["direction"] for row in payload["cashflows"]} == {"IN", "OUT"}
+        assert len({row["transfer_id"] for row in payload["cashflows"]}) == 1
+        source_balance = orders_service.pool_balance(seeded_db, invest.id)
+        target_balance = orders_service.pool_balance(seeded_db, profit.id)
+        assert source_balance["cash_balance"] == Decimal("-125.50")
+        assert target_balance["cash_balance"] == Decimal("125.50")
+        assert source_balance["cash_balance"] + target_balance["cash_balance"] == Decimal("0.00")
+
     def test_list_cashflows_exposes_order_traceability(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)

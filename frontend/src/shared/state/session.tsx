@@ -19,6 +19,7 @@ export const ALL_PERMISSIONS = [
   "order.exception.approve",
   "finance.read",
   "deposit.post",
+  "finance.transfer",
   "policy.manage",
   "policy.approve",
   "field-definition.manage",
@@ -50,6 +51,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   finance: [
     "finance.read",
     "deposit.post",
+    "finance.transfer",
     "customer.read",
     "counterparty.read",
     "order.event.post",

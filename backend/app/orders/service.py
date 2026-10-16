@@ -524,7 +524,8 @@ def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
 
     income = total(Direction.IN.value, Nature.BUSINESS_IN.value)
     expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value)
-    cash_balance = income - expense
+    # 现金头寸包含 INTERNAL 划转；经营收入/支出仍只统计 BUSINESS_*，避免把划转算进损益。
+    cash_balance = total(Direction.IN.value) - total(Direction.OUT.value)
 
     deposit_held = _deposit_held(session, pool_id)
     return {

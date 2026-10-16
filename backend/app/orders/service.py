@@ -186,7 +186,9 @@ def create_order(
         account_snapshot = _normalize_account_snapshot(account_snapshot)
     if account_profile is not None:
         account_profile = _normalize_account_profile(account_profile)
-    selected_capital_type = capital_type or definition.capital_type
+    selected_capital_type = (
+        definition.capital_type if capital_type is None else capital_type
+    )
     if selected_capital_type not in CapitalType.values():
         raise Validation(
             f"capital_type 必须为 {CapitalType.values()}",

@@ -117,6 +117,14 @@ class TestCreateOrderValidation:
                 actor="pytest",
                 capital_type="NOT_A_CAPITAL_TYPE",
             )
+        with pytest.raises(Validation, match="capital_type"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="pytest",
+                capital_type="",
+            )
 
     def test_duplicate_participant_role_rejected_before_unique_constraint(
         self, seeded_db

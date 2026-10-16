@@ -211,7 +211,6 @@ export interface Installment {
   id: number;
   inst_no: string;
   order_id: number;
-  account_id?: number | null;
   contract_type: string;
   principal: string;
   down_payment: string;

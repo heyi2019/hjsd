@@ -261,9 +261,6 @@ class Installment(Base, AuditMixin):
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
     )
-    account_id: Mapped[int | None] = mapped_column(
-        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
-    )
     contract_type: Mapped[str] = mapped_column(String(24), nullable=False)
     # BAS-06-04 规则快照：分期利率/期数等参数在签约时固化，规则改版不回写历史合约。
     policy_version_id: Mapped[int | None] = mapped_column(

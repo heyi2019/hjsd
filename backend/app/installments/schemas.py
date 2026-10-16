@@ -22,7 +22,6 @@ class InstallmentCreate(BaseModel):
     per_period_service_fee: Decimal = Decimal("0")
     per_period: Decimal = Decimal("0")
     first_due_on: date
-    account_id: int | None = None
     delivery_mode: str | None = None
     note: str | None = None
     schedule: list[ScheduleCreate] | None = None
@@ -34,7 +33,6 @@ class InstallmentOut(BaseModel):
     id: int
     inst_no: str
     order_id: int
-    account_id: int | None = None
     contract_type: str
     principal: Decimal
     down_payment: Decimal

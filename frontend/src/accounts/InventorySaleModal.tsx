@@ -114,7 +114,6 @@ export function InventorySaleModal(props: {
           : today();
         await installmentsApi.create({
           order_id: order.id,
-          account_id: props.account.id,
           contract_type: "STOCK_SALE",
           principal: String(values.amount ?? 0),
           down_payment: String(values.down_payment ?? 0),

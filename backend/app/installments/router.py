@@ -58,7 +58,6 @@ def create_installment(
         per_period=payload.per_period,
         first_due_on=payload.first_due_on,
         actor=_actor(user),
-        account_id=payload.account_id,
         delivery_mode=payload.delivery_mode,
         note=payload.note,
         schedule=[item.model_dump() for item in payload.schedule] if payload.schedule else None,

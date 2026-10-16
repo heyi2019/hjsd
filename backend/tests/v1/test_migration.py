@@ -55,6 +55,10 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
             assert EXPECTED_TABLES <= tables
             deposit_columns = {column["name"] for column in inspect(connection).get_columns("deposits")}
             assert "deposit_no" not in deposit_columns
+            installment_columns = {
+                column["name"] for column in inspect(connection).get_columns("installments")
+            }
+            assert "account_id" not in installment_columns
             rebate_columns = {column["name"] for column in inspect(connection).get_columns("rebate_records")}
             assert "rebate_no" in rebate_columns
             assert "rebate_group_no" not in rebate_columns

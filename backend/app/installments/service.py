@@ -71,7 +71,6 @@ def create_installment(
     per_period: Any = 0,
     first_due_on: date,
     actor: str,
-    account_id: int | None = None,
     delivery_mode: str | None = None,
     note: str | None = None,
     schedule: list[dict[str, Any]] | None = None,
@@ -86,10 +85,7 @@ def create_installment(
         ) from exc
 
     order = orders_service.get_order(session, order_id)
-    resolved_account_id = account_id if account_id is not None else order.account_id
-    account = (
-        session.get(Account, resolved_account_id) if resolved_account_id is not None else None
-    )
+    account = session.get(Account, order.account_id) if order.account_id is not None else None
 
     if contract_type == InstallmentContractType.STOCK_SALE.value:
         # HS 分期出售：账号必须已买入且在库。
@@ -118,6 +114,12 @@ def create_installment(
                 "ADVANCE_PURCHASE 只能用于 DFQ 订单",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "order_type": order.order_type},
+            )
+        if order.account_id is not None:
+            raise Validation(
+                "ADVANCE_PURCHASE 不关联库存账号",
+                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+                details={"order_no": order.order_no, "account_id": order.account_id},
             )
 
     existing = session.scalar(
@@ -156,7 +158,6 @@ def create_installment(
     installment = Installment(
         inst_no=order_installment_no(order.order_no),
         order_id=order.id,
-        account_id=account.id if account else None,
         contract_type=contract_type,
         policy_version_id=policy_version_id,
         policy_snapshot=policy_snapshot,

@@ -99,26 +99,23 @@ class TestCreateInstallmentValidation:
         # DFQ 是独立分销代分期，不关联库存账号。
         order = _order(seeded_db, order_type="DFQ", account_id=None)
         installment = _contract(seeded_db, order.id)
-        assert installment.account_id is None
+        assert order.account_id is None
 
     def test_duplicate_contract_conflicts(self, seeded_db):
-        account = _account(seeded_db, "inst-dup-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         _contract(seeded_db, order.id)
         with pytest.raises(Conflict) as exc:
             _contract(seeded_db, order.id)
         assert "已存在分期合约" in str(exc.value)
 
     def test_periods_must_be_positive(self, seeded_db):
-        account = _account(seeded_db, "inst-zero-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
             _contract(seeded_db, order.id, periods=0)
         assert "期数必须大于 0" in str(exc.value)
 
     def test_invalid_delivery_mode_rejected(self, seeded_db):
-        account = _account(seeded_db, "inst-mode-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
             _contract(seeded_db, order.id, delivery_mode="BOGUS")
         assert "交付方式" in str(exc.value)
@@ -131,10 +128,8 @@ class TestGetAndListInstallments:
             installment_service.get_installment(seeded_db, 999999)
 
     def test_list_filters_by_status_and_order(self, seeded_db):
-        account_a = _account(seeded_db, "inst-list-a")
-        account_b = _account(seeded_db, "inst-list-b")
-        order_a = _order(seeded_db, account_id=account_a.id)
-        order_b = _order(seeded_db, account_id=account_b.id)
+        order_a = _order(seeded_db)
+        order_b = _order(seeded_db)
         contract_a = _contract(seeded_db, order_a.id)
         contract_b = _contract(seeded_db, order_b.id)
 
@@ -151,8 +146,7 @@ class TestGetAndListInstallments:
 # ------------------------------------------------------------------ 收款守卫
 class TestPayGuards:
     def _settled_dfq(self, seeded_db, tag: str) -> tuple[Order, Installment]:
-        account = _account(seeded_db, f"inst-{tag}-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
@@ -180,8 +174,7 @@ class TestPayGuards:
         assert "不可收款" in str(exc.value)
 
     def test_pay_unknown_period_notfound(self, seeded_db):
-        account = _account(seeded_db, "inst-noperiod-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, periods=1)
         with pytest.raises(NotFound) as exc:
             installment_service.pay(
@@ -191,8 +184,7 @@ class TestPayGuards:
         assert "期次" in str(exc.value)
 
     def test_pay_without_period_auto_picks_first_unpaid(self, seeded_db):
-        account = _account(seeded_db, "inst-auto-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=2, per_period="300"
         )
@@ -222,8 +214,7 @@ class TestPayGuards:
 # ------------------------------------------------------------------ 交付守卫
 class TestDeliverGuards:
     def _settled(self, seeded_db, tag: str) -> Installment:
-        account = _account(seeded_db, f"inst-{tag}-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
@@ -260,8 +251,7 @@ class TestDeliverGuards:
 # ------------------------------------------------------------------ 逾期升级
 class TestMarkOverdue:
     def test_overdue_promotes_active_contract(self, seeded_db):
-        account = _account(seeded_db, "inst-overdue-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="300",
             first_due_on=PAST,
@@ -287,8 +277,7 @@ class TestMarkOverdue:
 # ------------------------------------------------------------------ 路由层
 class TestInstallmentsApi:
     def test_list_endpoint(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "inst-api-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)
         response = seeded_client.get(
             "/api/v1/installments", params={"status": "PENDING"}, headers=headers
@@ -297,8 +286,7 @@ class TestInstallmentsApi:
         assert [item["inst_no"] for item in response.json()] == [contract.inst_no]
 
     def test_deliver_endpoint(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "inst-api-deliver-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
@@ -323,8 +311,7 @@ class TestInstallmentsApi:
         assert response.json()["status"] == InstallmentStatus.DELIVERED.value
 
     def test_mark_overdue_endpoint(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "inst-api-overdue-acc")
-        order = _order(seeded_db, account_id=account.id)
+        order = _order(seeded_db)
         _contract(
             seeded_db, order.id, down_payment="0", periods=2, per_period="300",
             first_due_on=PAST,

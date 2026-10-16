@@ -44,6 +44,7 @@ from app.domain.enums import (
     OrderStatus,
     Portion,
     RebateStatus,
+    ReconciliationStatus,
     ScheduleStatus,
 )
 
@@ -239,6 +240,46 @@ class Cashflow(Base, AuditMixin):
     reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reversal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Reconciliation(Base, AuditMixin):
+    """按资金池、账单日和账户固化的日对账快照。"""
+
+    __tablename__ = "reconciliations"
+    __table_args__ = (
+        UniqueConstraint(
+            "pool_id",
+            "reconciled_on",
+            "account_label",
+            name="uq_reconciliations_scope",
+        ),
+        Index("ix_reconciliations_pool_date", "pool_id", "reconciled_on"),
+        CheckConstraint(
+            f"status IN {ReconciliationStatus.values()!r}"
+            .replace("[", "(")
+            .replace("]", ")"),
+            name="reconciliation_status_valid",
+        ),
+        CheckConstraint("statement_balance >= 0", name="reconciliation_statement_nonneg"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pool_id: Mapped[int] = mapped_column(
+        ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
+    )
+    reconciled_on: Mapped[date] = mapped_column(Date, nullable=False)
+    account_label: Mapped[str] = mapped_column(String(128), nullable=False)
+    system_balance: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    statement_balance: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    difference: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=ReconciliationStatus.OPEN.value
+    )
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unmatched_flow_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
+    resolved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

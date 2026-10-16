@@ -76,6 +76,38 @@ class CashflowReverse(BaseModel):
     reason: str
 
 
+class ReconciliationCreate(BaseModel):
+    pool_id: int
+    reconciled_on: date
+    account_label: str
+    statement_balance: Decimal
+    unmatched_flow_ids: list[int] = Field(default_factory=list)
+    reason: str | None = None
+    note: str | None = None
+
+
+class ReconciliationResolve(BaseModel):
+    reason: str
+
+
+class ReconciliationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    pool_id: int
+    reconciled_on: date
+    account_label: str
+    system_balance: Decimal
+    statement_balance: Decimal
+    difference: Decimal
+    status: str
+    reason: str | None = None
+    unmatched_flow_ids: list[int]
+    resolved_by: str | None = None
+    resolved_at: datetime | None = None
+    note: str | None = None
+
+
 class TransferCreate(BaseModel):
     source_pool_id: int
     target_pool_id: int
@@ -149,6 +181,9 @@ __all__ = [
     "CashflowCreate",
     "CashflowReject",
     "CashflowReverse",
+    "ReconciliationCreate",
+    "ReconciliationResolve",
+    "ReconciliationOut",
     "TransferCreate",
     "TransferOut",
     "RebateCreate",

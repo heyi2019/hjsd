@@ -287,6 +287,13 @@ class RebateStatus(StrEnum):
     VOID = "VOID"
 
 
+class ReconciliationStatus(StrEnum):
+    """日对账快照状态：差异处理完成后才可核销。"""
+
+    OPEN = "OPEN"
+    RESOLVED = "RESOLVED"
+
+
 class AuditAction(StrEnum):
     """受控动作清单（BAS-05-03）：这些动作必须写审计日志。"""
 
@@ -320,6 +327,8 @@ class AuditAction(StrEnum):
     REBATE_CREATE = "REBATE_CREATE"
     REBATE_SETTLE = "REBATE_SETTLE"
     REBATE_REVERSE = "REBATE_REVERSE"
+    RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
+    RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
     CASHFLOW_CREATE = "CASHFLOW_CREATE"
     CASHFLOW_APPROVE = "CASHFLOW_APPROVE"
     CASHFLOW_REJECT = "CASHFLOW_REJECT"
@@ -372,6 +381,7 @@ __all__ = [
     "PoolType",
     "Portion",
     "RebateStatus",
+    "ReconciliationStatus",
     "ScheduleStatus",
     "SequenceKey",
     "StrEnum",

@@ -181,6 +181,68 @@ def reverse_cashflow(
     return _cashflow_out(db, flow)
 
 
+@router.get("/reconciliations", response_model=list[schemas.ReconciliationOut])
+def list_reconciliations(
+    pool_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.ReconciliationOut]:
+    if pool_id is not None and not user.can_see_pool(pool_id):
+        return []
+    items = service.list_reconciliations(
+        db,
+        pool_id=pool_id,
+        pool_ids=None
+        if pool_id is not None or user.is_admin or user.owner_scope == "ALL"
+        else sorted(user.pool_ids),
+        user=user,
+    )
+    return [schemas.ReconciliationOut.model_validate(item) for item in items]
+
+
+@router.post("/reconciliations", response_model=schemas.ReconciliationOut, status_code=201)
+def create_reconciliation(
+    payload: schemas.ReconciliationCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.ReconciliationOut:
+    if not user.can_see_pool(payload.pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": payload.pool_id})
+    item = service.create_reconciliation(
+        db,
+        pool_id=payload.pool_id,
+        reconciled_on=payload.reconciled_on,
+        account_label=payload.account_label,
+        statement_balance=payload.statement_balance,
+        unmatched_flow_ids=payload.unmatched_flow_ids,
+        reason=payload.reason,
+        note=payload.note,
+        actor=_actor(user),
+        user=user,
+    )
+    return schemas.ReconciliationOut.model_validate(item)
+
+
+@router.post(
+    "/reconciliations/{reconciliation_id}/resolve",
+    response_model=schemas.ReconciliationOut,
+)
+def resolve_reconciliation(
+    reconciliation_id: int,
+    payload: schemas.ReconciliationResolve,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.ReconciliationOut:
+    item = service.resolve_reconciliation(
+        db,
+        reconciliation_id,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.ReconciliationOut.model_validate(item)
+
+
 @router.post("/transfers", response_model=schemas.TransferOut, status_code=201)
 def create_transfer(
     payload: schemas.TransferCreate,

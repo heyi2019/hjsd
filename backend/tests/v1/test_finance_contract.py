@@ -403,7 +403,118 @@ class TestCashflowLifecycle:
             )
 
 
+class TestReconciliation:
+    def test_reconciliation_snapshots_difference_and_unmatched_flows(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        flow = Cashflow(
+            flow_no="CF-RECON-1",
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            nature="BUSINESS_IN",
+            category="OTHER",
+            direction="IN",
+            amount=Decimal("100.00"),
+            status="APPROVED",
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(flow)
+        seeded_db.flush()
+
+        item = service.create_reconciliation(
+            seeded_db,
+            pool_id=invest.id,
+            reconciled_on=TODAY,
+            account_label="招商银行卡",
+            statement_balance=Decimal("90.00"),
+            unmatched_flow_ids=[flow.id],
+            reason="银行手续费尚未入账",
+            actor="finance",
+        )
+
+        assert item.system_balance == Decimal("100.00")
+        assert item.difference == Decimal("-10.00")
+        assert item.unmatched_flow_ids == [flow.id]
+        assert item.status == "OPEN"
+
+        resolved = service.resolve_reconciliation(
+            seeded_db, item.id, actor="finance", reason="已完成银行核对"
+        )
+        assert resolved.status == "RESOLVED"
+        assert resolved.resolved_by == "finance"
+
+        with pytest.raises(Validation, match="已核销"):
+            service.resolve_reconciliation(
+                seeded_db, item.id, actor="finance", reason="重复核销"
+            )
+
+    def test_reconciliation_requires_reason_for_difference(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        with pytest.raises(Validation, match="差异原因"):
+            service.create_reconciliation(
+                seeded_db,
+                pool_id=invest.id,
+                reconciled_on=TODAY,
+                account_label="银行卡",
+                statement_balance=Decimal("1.00"),
+                actor="finance",
+            )
+
+
 class TestFinanceApi:
+    def test_reconciliation_endpoints_snapshot_and_resolve(
+        self, seeded_client, seeded_db, headers
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        flow = Cashflow(
+            flow_no="CF-RECON-API-1",
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            nature="BUSINESS_IN",
+            category="OTHER",
+            direction="IN",
+            amount=Decimal("100.00"),
+            status="APPROVED",
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(flow)
+        seeded_db.flush()
+
+        created = seeded_client.post(
+            "/api/v1/reconciliations",
+            json={
+                "pool_id": invest.id,
+                "reconciled_on": TODAY.isoformat(),
+                "account_label": "招商银行卡",
+                "statement_balance": "90.00",
+                "unmatched_flow_ids": [flow.id],
+                "reason": "手续费未入账",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        item = created.json()
+        assert item["system_balance"] == "100.00"
+        assert item["difference"] == "-10.00"
+        assert item["unmatched_flow_ids"] == [flow.id]
+
+        listed = seeded_client.get(
+            "/api/v1/reconciliations",
+            params={"pool_id": invest.id},
+            headers=headers,
+        )
+        assert listed.status_code == 200, listed.text
+        assert listed.json()[0]["id"] == item["id"]
+
+        resolved = seeded_client.post(
+            f"/api/v1/reconciliations/{item['id']}/resolve",
+            json={"reason": "已核实银行手续费"},
+            headers=headers,
+        )
+        assert resolved.status_code == 200, resolved.text
+        assert resolved.json()["status"] == "RESOLVED"
+
     def test_manual_cashflow_review_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers
     ):

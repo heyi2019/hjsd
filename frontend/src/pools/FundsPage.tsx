@@ -3,8 +3,10 @@ import { Card, Form, Input, Modal, Select, Tabs, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
+  cashflowsApi,
   depositsApi,
   poolsApi,
+  type Cashflow,
   type Deposit,
   type Pool,
   type PoolBalance,
@@ -25,6 +27,7 @@ export function FundsPage() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [depositOpen, setDepositOpen] = useState(false);
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -42,6 +45,7 @@ export function FundsPage() {
       );
       setBalances(Object.fromEntries(entries));
       setDeposits(await depositsApi.list());
+      setCashflows(await cashflowsApi.list({ limit: 500 }));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -164,6 +168,35 @@ export function FundsPage() {
     },
   ];
 
+  const cashflowColumns: ColumnsType<Cashflow> = [
+    { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
+    { title: "流水号", dataIndex: "flow_no" },
+    { title: "日期", dataIndex: "occurred_on" },
+    { title: "类别", dataIndex: "category" },
+    {
+      title: "收支",
+      dataIndex: "direction",
+      render: (v: string) => (v === "IN" ? "收入" : "支出"),
+    },
+    {
+      title: "金额",
+      dataIndex: "amount",
+      align: "right",
+      render: (v: string) => <MoneyText value={v} />,
+    },
+    { title: "来源", dataIndex: "source" },
+    { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
+  ];
+
+  const totalFlowIncome = cashflows
+    .filter((row) => row.direction === "IN")
+    .reduce((sum, row) => sum + Number(row.amount), 0)
+    .toFixed(2);
+  const totalFlowExpense = cashflows
+    .filter((row) => row.direction === "OUT")
+    .reduce((sum, row) => sum + Number(row.amount), 0)
+    .toFixed(2);
+
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
@@ -190,6 +223,29 @@ export function FundsPage() {
                   pageSize={10}
                   total={pools.length}
                   emptyText="尚未配置资金池"
+                  onPageChange={() => undefined}
+                />
+              </Card>
+            ),
+          },
+          {
+            key: "cashflows",
+            label: "流水",
+            children: (
+              <Card className="glass" title="资金明细">
+                <StatRow
+                  items={[
+                    { label: "总收入", amount: totalFlowIncome },
+                    { label: "总支出", amount: totalFlowExpense },
+                  ]}
+                />
+                <DataTable<Cashflow>
+                  columns={cashflowColumns}
+                  rows={cashflows}
+                  page={1}
+                  pageSize={10}
+                  total={cashflows.length}
+                  emptyText="暂无资金流水"
                   onPageChange={() => undefined}
                 />
               </Card>

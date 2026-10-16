@@ -7,6 +7,7 @@ import { FundsPage } from "./FundsPage";
 const poolsList = vi.fn();
 const poolsBalance = vi.fn();
 const depositsList = vi.fn();
+const cashflowsList = vi.fn();
 const depositsCreate = vi.fn();
 const depositsRelease = vi.fn();
 
@@ -20,6 +21,9 @@ vi.mock("../shared/api/catalog", () => ({
     list: (...a: unknown[]) => depositsList(...a),
     create: (...a: unknown[]) => depositsCreate(...a),
     release: (...a: unknown[]) => depositsRelease(...a),
+  },
+  cashflowsApi: {
+    list: (...a: unknown[]) => cashflowsList(...a),
   },
 }));
 
@@ -37,12 +41,17 @@ const balance = {
 const deposits = [
   { id: 11, pool_id: 1, paid_amount: "500.00", returned_amount: "200.00", status: "HELD" },
 ];
+const cashflows = [
+  { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT" },
+  { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT" },
+];
 
 beforeEach(() => {
   vi.clearAllMocks();
   poolsList.mockResolvedValue(pools);
   poolsBalance.mockResolvedValue(balance);
   depositsList.mockResolvedValue(deposits);
+  cashflowsList.mockResolvedValue(cashflows);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -100,5 +109,19 @@ describe("FundsPage：押金占用", () => {
     await userEvent.click(screen.getByRole("tab", { name: "押金" }));
     await screen.findByText("300.00");
     expect(screen.getAllByRole("button", { name: /释\s*放/ }).length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("FundsPage：资金流水", () => {
+  it("展示订单号、收支明细及总收入/总支出", async () => {
+    renderApp(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await userEvent.click(screen.getByRole("tab", { name: "流水" }));
+    expect(screen.getByText("HS0001-CF-BUY-01")).toBeInTheDocument();
+    expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("总收入")).toBeInTheDocument();
+    expect(screen.getByText("总支出")).toBeInTheDocument();
+    expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -251,6 +251,24 @@ export interface Deposit {
   note?: string | null;
 }
 
+export interface Cashflow {
+  id: number;
+  flow_no: string;
+  pool_id: number;
+  occurred_on: string;
+  nature: string;
+  category: string;
+  direction: "IN" | "OUT" | string;
+  amount: string;
+  order_id?: number | null;
+  order_no?: string | null;
+  deposit_id?: number | null;
+  order_event_id?: number | null;
+  transfer_id?: string | null;
+  source: string;
+  note?: string | null;
+}
+
 export interface Rebate {
   id: number;
   rebate_no: string;
@@ -408,6 +426,18 @@ export const depositsApi = {
     api.post<Deposit>("/deposits", payload).then((r) => r.data),
   release: (id: number, payload: { amount: string; released_on: string }) =>
     api.post<Deposit>(`/deposits/${id}/returns`, payload).then((r) => r.data),
+};
+
+export const cashflowsApi = {
+  list: (params?: {
+    pool_id?: number;
+    order_id?: number;
+    direction?: string;
+    occurred_from?: string;
+    occurred_to?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get<Cashflow[]>("/cashflows", { params }).then((r) => r.data),
 };
 
 export const rebatesApi = {

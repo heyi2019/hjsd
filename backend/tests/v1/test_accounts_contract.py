@@ -394,9 +394,9 @@ class TestAccountsApi:
         assert source_orders[first.inventory_no] == first_order.order_no
         assert source_orders[second.inventory_no] == second_order.order_no
 
-    def test_list_accounts_does_not_use_unposted_order_as_source(self, seeded_client, seeded_db, headers):
+    def test_list_accounts_uses_consignment_order_without_buy(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "unposted-source")
-        orders_service.create_order(
+        order = orders_service.create_order(
             seeded_db,
             order_type="DG",
             trade_date=TODAY,
@@ -408,7 +408,24 @@ class TestAccountsApi:
 
         assert response.status_code == 200, response.text
         item = next(row for row in response.json() if row["inventory_no"] == account.inventory_no)
-        assert item["source_order_no"] is None
+        assert item["source_order_no"] == order.order_no
+
+    def test_order_created_consignment_account_has_source_order(self, seeded_client, headers):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DG",
+                "trade_date": TODAY.isoformat(),
+                "account": {"game_account": "consignment-source", "platform": "寄售平台"},
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        listed = seeded_client.get("/api/v1/accounts", headers=headers)
+        assert listed.status_code == 200, listed.text
+        item = next(row for row in listed.json() if row["game_account"] == "consignment-source")
+        assert item["source_order_no"] == created.json()["order_no"]
 
     def test_execution_detail_includes_source_order(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-acc")

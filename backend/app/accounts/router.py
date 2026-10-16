@@ -145,7 +145,7 @@ def _actor(user: CurrentUser) -> str:
 def _source_orders(
     db: Session, account_ids: list[int], user: CurrentUser | None = None
 ) -> dict[int, Order]:
-    """解析标准订单数据中的库存来源，优先回收/提号/代挂。"""
+    """解析标准订单数据中的库存来源，代挂无需 BUY 也能直接入库。"""
     if not account_ids:
         return {}
     stmt = select(Order).where(Order.account_id.in_(account_ids))
@@ -169,9 +169,10 @@ def _source_orders(
     for order in orders:
         if order.account_id is None:
             continue
-        if order.id in buy_order_ids:
-            if order.order_type in INVENTORY_SOURCE_ORDER_TYPES:
-                inventory_orders.setdefault(order.account_id, order)
+        if order.order_type == "DG" or (
+            order.id in buy_order_ids and order.order_type in INVENTORY_SOURCE_ORDER_TYPES
+        ):
+            inventory_orders.setdefault(order.account_id, order)
     return {
         account_id: inventory_orders[account_id]
         for account_id in account_ids

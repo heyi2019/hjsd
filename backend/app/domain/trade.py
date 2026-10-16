@@ -35,6 +35,9 @@ from app.domain.enums import (
     CapitalType,
     CashflowStatus,
     BusinessMode,
+    CommissionMode,
+    CommissionPayer,
+    DeliveryMode,
     DepositStatus,
     Direction,
     EventType,
@@ -134,6 +137,22 @@ class Order(Base, AuditMixin):
             f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="order_link_status_valid",
         ),
+        CheckConstraint(
+            f"commission_mode IS NULL OR commission_mode IN {CommissionMode.values()!r}",
+            name="order_commission_mode_valid",
+        ),
+        CheckConstraint(
+            f"commission_payer IS NULL OR commission_payer IN {CommissionPayer.values()!r}",
+            name="order_commission_payer_valid",
+        ),
+        CheckConstraint(
+            "(commission_mode IS NULL) = (commission_payer IS NULL)",
+            name="order_commission_pair_valid",
+        ),
+        CheckConstraint(
+            "order_type = 'DG' OR (commission_mode IS NULL AND commission_payer IS NULL)",
+            name="order_commission_type_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -187,6 +206,10 @@ class OrderEvent(Base, AuditMixin):
         UniqueConstraint("event_no", name="uq_order_events_no"),
         Index("ix_order_events_order", "order_id", "event_type", "occurred_on"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
+        CheckConstraint(
+            f"delivery_mode IS NULL OR delivery_mode IN {DeliveryMode.values()!r}",
+            name="event_delivery_mode_valid",
+        ),
         Index("ix_order_events_occurred_on", "occurred_on"),
     )
 
@@ -374,6 +397,10 @@ class Installment(Base, AuditMixin):
             name="amount_nonneg",
         ),
         CheckConstraint("periods > 0", name="periods_positive"),
+        CheckConstraint(
+            f"delivery_mode IS NULL OR delivery_mode IN {DeliveryMode.values()!r}",
+            name="installment_delivery_mode_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

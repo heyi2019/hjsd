@@ -42,6 +42,30 @@ def _scoped_user() -> CurrentUser:
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
+    def test_order_commission_fields_are_closed_at_database_boundary(self, seeded_db):
+        order = _order(seeded_db, order_type="DG")
+        order.commission_mode = "UNKNOWN"
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
+    def test_event_delivery_mode_is_closed_at_database_boundary(self, seeded_db):
+        order = _order(seeded_db)
+        seeded_db.add(
+            OrderEvent(
+                event_no="HS-DB-DELIVERY",
+                order_id=order.id,
+                event_type="BUY",
+                amount=Decimal("0"),
+                portion="GROSS",
+                occurred_on=D,
+                delivery_mode="UNKNOWN",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_order_link_status_is_closed_at_database_boundary(self, seeded_db):
         seeded_db.add(
             Order(

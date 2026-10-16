@@ -215,6 +215,17 @@ class DeliveryMode(StrEnum):
     CUSTOMER_SELF = "CUSTOMER_SELF"
 
 
+class CommissionMode(StrEnum):
+    DEDUCT_FROM_SETTLEMENT = "DEDUCT_FROM_SETTLEMENT"
+    SEPARATE_PAYMENT = "SEPARATE_PAYMENT"
+
+
+class CommissionPayer(StrEnum):
+    BUYER = "BUYER"
+    CONSIGNOR = "CONSIGNOR"
+    PLATFORM = "PLATFORM"
+
+
 class InstallmentStatus(StrEnum):
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"

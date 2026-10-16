@@ -148,7 +148,7 @@ class TestNoInference:
             .all()
         )
         assert logs, "create_batch 应写审计"
-        assert logs[-1].action == AuditAction.HISTORY_LAND.value
+        assert logs[-1].action == AuditAction.IMPORT_LAND.value
         assert logs[-1].action != AuditAction.EXCEPTION_APPROVE.value
 
 

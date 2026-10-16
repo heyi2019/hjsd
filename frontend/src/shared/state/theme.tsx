@@ -8,28 +8,31 @@
  * 暗色双轨：自定义 CSS 由 data-theme 接管；antd 组件内部由 antdTheme.darkAlgorithm
  * 接管（见 antdTheme.ts 的 buildTheme）。两者必须同时切，缺一则半边仍是浅色。
  */
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type ThemeMode = "light" | "dark";
+export type ThemeMode = "system" | "light" | "dark";
+export type ResolvedThemeMode = "light" | "dark";
 
 const STORAGE_KEY = "heijin-theme-mode";
 
 function resolveInitial(): ThemeMode {
   if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "dark" || stored === "light") {
-    document.documentElement.setAttribute("data-theme", stored);
+  if (stored === "dark" || stored === "light" || stored === "system") {
+    document.documentElement.setAttribute("data-theme", stored === "system" ? resolveSystem() : stored);
     return stored;
   }
-  const prefersDark =
-    window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-  const mode: ThemeMode = prefersDark ? "dark" : "light";
-  document.documentElement.setAttribute("data-theme", mode);
-  return mode;
+  document.documentElement.setAttribute("data-theme", resolveSystem());
+  return "system";
+}
+
+function resolveSystem(): ResolvedThemeMode {
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 interface ThemeValue {
   mode: ThemeMode;
+  resolvedMode: ResolvedThemeMode;
   setMode: (mode: ThemeMode) => void;
   toggle: () => void;
 }
@@ -38,17 +41,37 @@ const ThemeContext = createContext<ThemeValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(resolveInitial);
+  const [resolvedMode, setResolvedMode] = useState<ResolvedThemeMode>(() =>
+    mode === "system" ? resolveSystem() : mode,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!media) return undefined;
+    const sync = () => {
+      if (mode === "system") {
+        const next = resolveSystem();
+        setResolvedMode(next);
+        document.documentElement.setAttribute("data-theme", next);
+      }
+    };
+    sync();
+    media.addEventListener?.("change", sync);
+    return () => media.removeEventListener?.("change", sync);
+  }, [mode]);
 
   const setMode = (next: ThemeMode) => {
     setModeState(next);
-    document.documentElement.setAttribute("data-theme", next);
+    const resolved = next === "system" ? resolveSystem() : next;
+    setResolvedMode(resolved);
+    document.documentElement.setAttribute("data-theme", resolved);
     window.localStorage.setItem(STORAGE_KEY, next);
   };
 
   const toggle = () => setMode(mode === "dark" ? "light" : "dark");
 
   return (
-    <ThemeContext.Provider value={{ mode, setMode, toggle }}>
+    <ThemeContext.Provider value={{ mode, resolvedMode, setMode, toggle }}>
       {children}
     </ThemeContext.Provider>
   );

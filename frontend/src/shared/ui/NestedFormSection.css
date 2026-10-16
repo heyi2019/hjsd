@@ -1,0 +1,59 @@
+/* 表中表（NestedFormSection）：主表单中拥有自身标题、说明、字段规则的小型表单区。 */
+.nested-form-section {
+  --nested-form-section-gap: var(--space-2);
+  display: grid;
+  gap: var(--nested-form-section-gap);
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  container-type: inline-size;
+}
+
+.nested-form-section--card {
+  --nested-form-section-gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 78%, transparent);
+  box-sizing: border-box;
+}
+
+.nested-form-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.nested-form-section__title {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.nested-form-section__description {
+  color: var(--color-text-tertiary);
+  font: var(--font-caption-2);
+}
+
+.nested-form-section__field {
+  min-width: 0;
+}
+
+.nested-form-section__field-label {
+  color: var(--color-text-secondary);
+  font: var(--font-caption-2);
+  white-space: nowrap;
+}
+
+@container (max-width: 640px) {
+  .nested-form-section__header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .nested-form-section__description {
+    text-align: start;
+  }
+}

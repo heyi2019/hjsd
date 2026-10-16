@@ -1,4 +1,4 @@
-"""tests/v1/test_orders：订单、事件、现金流派生、划转（A01 / A02 / A03 / A07）。"""
+"""tests/v1/test_orders：订单、事件、现金流派生（A01 / A02 / A03）。"""
 from __future__ import annotations
 
 from datetime import date
@@ -20,10 +20,10 @@ TODAY = date(2026, 10, 4)
 
 def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     account = Account(
-        account_no=allocate_number(seeded_db, SequenceKey.ACCOUNT),
+        inventory_no=allocate_number(seeded_db, SequenceKey.ACCOUNT),
         game_account=game_account,
         platform="王者",
-        status=AccountStatus.PENDING.value,
+        status=AccountStatus.IN_STOCK.value,
         created_by="pytest",
         updated_by="pytest",
     )
@@ -51,6 +51,27 @@ def _flows(seeded_db, pool_id: int) -> list[Cashflow]:
 
 
 class TestA01HsStock:
+    def test_sell_requires_recovered_account(self, seeded_db):
+        account = _new_account(seeded_db, game_account="pending-only")
+        order = service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        with pytest.raises(Exception) as exc:
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="SELL",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+                portion="PROFIT",
+            )
+        assert "采购入库" in str(exc.value)
+
     def test_buy_cost_sell_derives_cost_and_cashflow(self, seeded_db):
         account = _new_account(seeded_db)
         seller = _customer(seeded_db, "卖家甲")
@@ -67,7 +88,7 @@ class TestA01HsStock:
         )
         seeded_db.commit()
         assert order.order_no == "HS0001"
-        assert order.status == OrderStatus.DRAFT.value
+        assert order.status == OrderStatus.ACTIVE.value  # 创建即 ACTIVE（草稿态已移除）
 
         service.post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
@@ -103,6 +124,32 @@ class TestA01HsStock:
         ).all()
         assert len(events) == 3
         assert len({event.event_no for event in events}) == 3
+        assert events[0].event_no == f"{order.order_no}-EV-BUY-01"
+        assert out_flows[0].flow_no == f"{order.order_no}-CF-BUY-01"
+        assert out_flows[1].flow_no == f"{order.order_no}-CF-COST-01"
+        assert in_flows[0].flow_no == f"{order.order_no}-CF-SELL-01"
+
+    def test_cost_cashflow_uses_its_business_category_in_number(self, seeded_db):
+        account = _new_account(seeded_db)
+        seeded_db.commit()
+        order = service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+        )
+        seeded_db.commit()
+
+        _event, flow = service.post_event(
+            seeded_db,
+            order.id,
+            event_type="COST",
+            amount=Decimal("50"),
+            occurred_on=TODAY,
+            actor="pytest",
+            flow_category="FEE",
+        )
+
+        assert flow is not None
+        assert flow.category == "FEE"
+        assert flow.flow_no == f"{order.order_no}-CF-FEE-01"
 
     def test_duplicate_posting_not_allowed_for_completed_order(self, seeded_db):
         account = _new_account(seeded_db)
@@ -126,6 +173,27 @@ class TestA01HsStock:
 
 
 class TestA02ThPassthru:
+    def test_buy_puts_th_account_into_inventory(self, seeded_db):
+        account = _new_account(seeded_db, game_account="th-stock-acc")
+        order = service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("1000"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+        seeded_db.commit()
+
+        assert seeded_db.get(Account, account.id).status == AccountStatus.IN_STOCK.value
+
     def test_advance_then_settle(self, seeded_db):
         peer = parties_service.create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
@@ -147,15 +215,12 @@ class TestA02ThPassthru:
             occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
-        assert service.th_unsettled_advance(seeded_db) == Decimal("1000.00")
-
         service.post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
         seeded_db.commit()
-        assert service.th_unsettled_advance(seeded_db) == Decimal("0.00")
-        # TH 不进库存：无账号也允许过账
+        # 无账号的历史提号单仍可完成过账；新提号单会绑定库存账号。
         assert seeded_db.get(Order, order.id).account_id is None
 
 
@@ -183,47 +248,6 @@ class TestA03DgZeroCapital:
         assert len(flows) == 1
         assert str(flows[0].amount) == "200.00"
         assert flows[0].nature == Nature.BUSINESS_IN.value
-
-
-class TestA07Transfer:
-    def test_transfer_creates_paired_internal_flows(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
-        out_flow, in_flow = service.transfer(
-            seeded_db,
-            source_pool_id=invest.id,
-            target_pool_id=profit.id,
-            amount=Decimal("500"),
-            occurred_on=TODAY,
-            actor="pytest",
-        )
-        seeded_db.commit()
-
-        assert out_flow.transfer_id == in_flow.transfer_id
-        assert out_flow.direction == Direction.OUT.value
-        assert in_flow.direction == Direction.IN.value
-        assert out_flow.amount == in_flow.amount == Decimal("500.00")
-        assert out_flow.nature == Nature.INTERNAL.value
-
-        # 合并现金头寸不变
-        invest_balance = service.pool_balance(seeded_db, invest.id)
-        profit_balance = service.pool_balance(seeded_db, profit.id)
-        assert invest_balance["cash_balance"] == Decimal("-500.00")
-        assert profit_balance["cash_balance"] == Decimal("500.00")
-        assert invest_balance["cash_balance"] + profit_balance["cash_balance"] == 0
-
-    def test_same_pool_transfer_rejected(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        with pytest.raises(Exception) as exc:
-            service.transfer(
-                seeded_db,
-                source_pool_id=invest.id,
-                target_pool_id=invest.id,
-                amount=Decimal("10"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
-        assert exc.value.code == ErrorCode.VALIDATION_ERROR
 
 
 class TestEventRules:
@@ -287,14 +311,41 @@ class TestEventRules:
 
 class TestOrdersApi:
     def test_create_order_and_post_event(self, seeded_client, headers):
+        account = seeded_client.post(
+            "/api/v1/accounts",
+            json={
+                "game_account": "api-sale-account",
+                "business_mode": "SELF",
+                "inventory_type": "RECOVERY",
+            },
+            headers=headers,
+        )
+        assert account.status_code == 201
         created = seeded_client.post(
             "/api/v1/orders",
-            json={"order_type": "HS", "trade_date": TODAY.isoformat()},
+            json={
+                "order_type": "HS",
+                "trade_date": TODAY.isoformat(),
+                "account_id": account.json()["id"],
+            },
             headers=headers,
         )
         assert created.status_code == 201
         order = created.json()
         assert order["order_no"] == "HS0001"
+        assert order["account_id"] == account.json()["id"]
+
+        buy = seeded_client.post(
+            f"/api/v1/orders/{order['id']}/events",
+            json={
+                "event_type": "BUY",
+                "amount": "1000.00",
+                "occurred_on": TODAY.isoformat(),
+                "portion": "PRINCIPAL",
+            },
+            headers=headers,
+        )
+        assert buy.status_code == 201
 
         event = seeded_client.post(
             f"/api/v1/orders/{order['id']}/events",
@@ -308,7 +359,7 @@ class TestOrdersApi:
         )
         assert event.status_code == 201
         body = event.json()
-        assert body["cashflow_no"].startswith("HJF")
+        assert body["cashflow_no"] == "HS0001-CF-SELL-01"
         assert body["event"]["event_type"] == "SELL"
 
     def test_viewer_cannot_post_event(self, seeded_client, headers, viewer_headers):
@@ -329,24 +380,6 @@ class TestOrdersApi:
         )
         assert response.status_code == 403
         assert response.json()["code"] == ErrorCode.PERMISSION_DENIED
-
-    def test_transfer_endpoint(self, seeded_client, headers, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
-        response = seeded_client.post(
-            "/api/v1/transfers",
-            json={
-                "source_pool_id": invest.id,
-                "target_pool_id": profit.id,
-                "amount": "500.00",
-                "occurred_on": TODAY.isoformat(),
-            },
-            headers=headers,
-        )
-        assert response.status_code == 201
-        body = response.json()
-        assert body["out_flow_no"] == body["transfer_id"]
-        assert body["in_flow_no"].endswith("-I")
 
     def test_pool_balance_endpoint(self, seeded_client, headers, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")

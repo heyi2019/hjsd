@@ -29,10 +29,9 @@ const balance = {
   expense: "200.00",
   cash_balance: "800.00",
   deposit_held: "100.00",
-  th_advance: "50.00",
-  available: "650.00",
+  available: "700.00",
 };
-/** 入口卡计数口径：订单总数=2、待处理=1（HS ACTIVE）、提号未闭环=0（TH 已 COMPLETED）。 */
+/** 入口卡计数口径：订单总数=2、进行中=1（HS ACTIVE）、提号未闭环=0（TH 已 COMPLETED）。 */
 const orders = [
   { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" },
   { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
@@ -50,15 +49,15 @@ describe("DataCenterPanel：资金总览", () => {
     renderApp(<DataCenterPanel />, { user: "admin" });
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();
     expect(screen.getByText(/POOL-B/)).toBeInTheDocument();
-    expect(screen.getAllByText("650.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
   it("统计卡：可用余额合计按金额口径（千分位两位小数）", async () => {
     renderApp(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("可用余额合计");
     const card = screen.getByText("可用余额合计").closest(".ui-stat");
-    // 两个池各 650 → 1300.00
-    expect(card?.textContent).toContain("1,300.00");
+    // 两个池各 700 → 1400.00
+    expect(card?.textContent).toContain("1,400.00");
   });
 
   it("统计卡：资金池数量为计数口径（不出现小数）", async () => {
@@ -98,13 +97,17 @@ describe("DataCenterPanel：资金总览", () => {
 });
 
 describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）", () => {
-  it("渲染三张订单统计入口卡：总数/待处理/提号未闭环", async () => {
+  it("渲染三张订单统计入口卡：总数/进行中/提号未闭环", async () => {
     renderApp(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("订单总数");
     const total = screen.getByText("订单总数").closest(".ui-entry-card");
     expect(total?.textContent).toContain("2");
     expect(total?.textContent).not.toContain("2.00");
-    expect(screen.getByText("待处理").closest(".ui-entry-card")?.textContent).toContain("1");
+    const active = screen
+      .getAllByText("进行中")
+      .map((el) => el.closest(".ui-entry-card"))
+      .find(Boolean);
+    expect(active?.textContent).toContain("1");
     expect(screen.getByText("提号未闭环").closest(".ui-entry-card")?.textContent).toContain("0");
   });
 

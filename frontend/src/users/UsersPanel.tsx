@@ -1,7 +1,7 @@
-import { Button, Card, Form, Input, Modal, Select, Space, Table, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, message } from "antd";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../shared/api/client";
-import { PermissionButton } from "../shared/ui";
+import { DataTable, PermissionButton } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 
 type User = { id: number; username: string; display_name: string; role: string; owner_scope: string; team_ids: number[]; is_active: boolean; must_change_password: boolean };
@@ -35,14 +35,31 @@ export function UsersPanel() {
     catch (err) { message.error(errorMessage(err)); }
   };
   return <Card className="glass" title="用户管理">
-    <Table rowKey="id" dataSource={rows} pagination={false} columns={[{ title: "用户名", dataIndex: "username" }, { title: "姓名", dataIndex: "display_name" }, { title: "角色", dataIndex: "role", render: (v: string) => USER_ROLE_LABEL[v] ?? v }, { title: "数据范围", dataIndex: "owner_scope", render: (v: string) => OWNER_SCOPE_LABEL[v] ?? v }, { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" }, { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" }, { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><PermissionButton permission="user.manage" size="small" onClick={() => toggleUser(user)}>{user.is_active ? "停用" : "启用"}</PermissionButton><PermissionButton permission="user.manage" size="small" onClick={() => setResetting(user)}>重置密码</PermissionButton></Space> }]} />
-    <Form form={form} layout="inline" onFinish={submit} style={{ marginTop: 16 }}>
+    <DataTable<User>
+      className="ui-admin-table"
+      rows={rows}
+      page={1}
+      pageSize={20}
+      total={rows.length}
+      onPageChange={() => undefined}
+      emptyText="暂无用户"
+      columns={[
+        { title: "用户名", dataIndex: "username" },
+        { title: "姓名", dataIndex: "display_name" },
+        { title: "角色", dataIndex: "role", render: (v: string) => USER_ROLE_LABEL[v] ?? v },
+        { title: "数据范围", dataIndex: "owner_scope", render: (v: string) => OWNER_SCOPE_LABEL[v] ?? v },
+        { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" },
+        { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" },
+        { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><PermissionButton permission="user.manage" size="small" onClick={() => toggleUser(user)}>{user.is_active ? "停用" : "启用"}</PermissionButton><PermissionButton permission="user.manage" size="small" onClick={() => setResetting(user)}>重置密码</PermissionButton></Space> },
+      ]}
+    />
+    <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced">
       <Form.Item name="username" rules={[{ required: true }]}><Input placeholder="用户名" /></Form.Item>
       <Form.Item name="display_name" rules={[{ required: true }]}><Input placeholder="姓名" /></Form.Item>
       <Form.Item name="password" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
-      <Form.Item name="role" initialValue="VIEWER"><Select options={roles} style={{ width: 140 }} /></Form.Item>
-      <Form.Item name="owner_scope" initialValue="SELF"><Select options={[{ value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" }]} style={{ width: 100 }} /></Form.Item>
-      <Form.Item name="team_ids"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" style={{ minWidth: 180 }} /></Form.Item>
+      <Form.Item name="role" initialValue="VIEWER"><Select options={roles} className="ui-control-width-140" /></Form.Item>
+      <Form.Item name="owner_scope" initialValue="SELF"><Select options={[{ value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" }]} className="ui-control-width-100" /></Form.Item>
+      <Form.Item name="team_ids"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit">新增用户</PermissionButton>
     </Form>
     <Modal title={`编辑用户：${editing?.username ?? ""}`} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>

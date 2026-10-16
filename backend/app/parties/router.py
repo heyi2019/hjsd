@@ -22,6 +22,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
+from app.domain.enums import AuditAction
 from app.parties import schemas, service
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
@@ -106,7 +107,7 @@ def get_customer(
     if show_full:
         record_audit(
             db,
-            action="CONTACT_READ",
+            action=AuditAction.CONTACT_READ,
             entity_type="customer",
             entity_id=customer.customer_no,
             actor=_actor(user),
@@ -182,6 +183,7 @@ def list_counterparties(
                     "phone",
                     "wechat",
                     "qq",
+                    "source",
                     "status",
                     "note",
                     "created_at",
@@ -207,6 +209,7 @@ def create_counterparty(
         phone=payload.phone,
         wechat=payload.wechat,
         qq=payload.qq,
+        source=payload.source,
         note=payload.note,
     )
     return schemas.CounterpartyOut.model_validate(item)
@@ -290,7 +293,7 @@ def set_field_definition_active(
     return schemas.FieldDefinitionOut.model_validate(item)
 
 
-@router.delete("/field-definitions/{definition_id}", status_code=204)
+@router.delete("/field-definitions/{definition_id}", status_code=204, response_model=None)
 def delete_field_definition(
     definition_id: int,
     db: Session = Depends(get_db),

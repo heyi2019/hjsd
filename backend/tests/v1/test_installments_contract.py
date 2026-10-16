@@ -85,7 +85,7 @@ class TestCreateInstallmentValidation:
         assert "合约类型" in str(exc.value)
 
     def test_stock_sale_requires_in_stock_account(self, seeded_db):
-        # HS 订单已建但未 BUY：账号仍 PENDING → 拒绝（不新增 BUY 的 A05 口径）
+        # HS 订单已建但未 BUY：账号虽然已在库，但缺少买入事件 → 拒绝
         account = _account(seeded_db, "inst-pending-acc")
         order = _order(seeded_db, order_type="HS", account_id=account.id)
         with pytest.raises(Validation) as exc:
@@ -95,12 +95,11 @@ class TestCreateInstallmentValidation:
             )
         assert "已在库" in str(exc.value)
 
-    def test_advance_purchase_requires_account(self, seeded_db):
-        # DFQ 订单未绑账号 → 拒绝
+    def test_advance_purchase_does_not_require_account(self, seeded_db):
+        # DFQ 是独立分销代分期，不关联库存账号。
         order = _order(seeded_db, order_type="DFQ", account_id=None)
-        with pytest.raises(Validation) as exc:
-            _contract(seeded_db, order.id)
-        assert "必须绑定账号" in str(exc.value)
+        installment = _contract(seeded_db, order.id)
+        assert installment.account_id is None
 
     def test_duplicate_contract_conflicts(self, seeded_db):
         account = _account(seeded_db, "inst-dup-acc")

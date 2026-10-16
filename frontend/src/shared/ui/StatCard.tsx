@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { MoneyText } from "./MoneyText";
 
-/** 卡面语气：warn 只用于「有风险但不是负数」的场景（如 TH 未闭环代垫）。 */
+/** 卡面语气：warn 只用于有风险但不是负数的场景。 */
 export type StatTone = "plain" | "income" | "expense" | "warn";
 
 export function StatCard(props: {

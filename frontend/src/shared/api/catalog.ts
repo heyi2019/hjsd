@@ -19,7 +19,6 @@ export interface PoolBalance {
   expense: string;
   cash_balance: string;
   deposit_held: string;
-  th_advance: string;
   available: string;
 }
 
@@ -51,6 +50,7 @@ export interface Customer {
   phone?: string | null;
   wechat?: string | null;
   qq?: string | null;
+  source?: string | null;
   note?: string | null;
   status: string;
   contact_masked?: boolean;
@@ -69,6 +69,7 @@ export interface Counterparty {
   phone?: string | null;
   wechat?: string | null;
   qq?: string | null;
+  source?: string | null;
   note?: string | null;
 }
 
@@ -81,6 +82,25 @@ export interface Order {
   account_id?: number | null;
   status: string;
   note?: string | null;
+  account_game_type?: string | null;
+  account_game_account?: string | null;
+  account_channel_region?: string | null;
+  account_business_mode?: string | null;
+  account_platform?: string | null;
+  account_status?: string | null;
+  party_name?: string | null;
+  party_role?: string | null;
+  party_source?: string | null;
+  party_created_by?: string | null;
+  party_created_at?: string | null;
+  event_total?: string | null;
+  last_event_type?: string | null;
+  last_event_amount?: string | null;
+  last_event_on?: string | null;
+  installment_principal?: string | null;
+  installment_paid?: string | null;
+  installment_periods?: number | null;
+  installment_status?: string | null;
 }
 
 export interface OrderEvent {
@@ -102,26 +122,113 @@ export interface EventPostResult {
 
 export interface Account {
   id: number;
-  account_no: string;
+  inventory_no: string;
+  source_order_no?: string | null;
+  game_type?: string | null;
+  business_mode?: string | null;
+  inventory_type?: string | null;
   game_account?: string | null;
+  game_password?: string | null;
+  channel_region?: string | null;
+  bound_phone?: string | null;
+  has_secondary?: boolean | null;
+  account_description?: string | null;
+  account_images?: string[] | null;
+  note?: string | null;
   platform?: string | null;
+  risk_level?: string | null;
   status: string;
   cost_amount: string;
+  created_by: string;
+  created_at?: string | null;
+}
+
+export interface AccountExecutionCashflow {
+  flow_no: string;
+  pool_name?: string | null;
+  occurred_on: string;
+  occurred_at?: string | null;
+  direction: string;
+  nature: string;
+  category: string;
+  amount: string;
+  note?: string | null;
+  operator: string;
+}
+
+export interface AccountExecutionEvent {
+  id: number;
+  event_no: string;
+  event_type: string;
+  amount: string;
+  occurred_on: string;
+  occurred_at?: string | null;
+  portion: string;
+  delivery_mode?: string | null;
+  is_posted: boolean;
+  note?: string | null;
+  cashflow?: AccountExecutionCashflow | null;
+  operator: string;
+}
+
+export interface AccountExecutionCounterparty {
+  id: number;
+  display_name: string;
+  role: string;
+}
+
+export interface AccountExecutionRebate {
+  id: number;
+  rebate_no: string;
+  channel?: string | null;
+  rate: string;
+  base_amount: string;
+  status: string;
+  collected_on: string;
+  collected_at?: string | null;
+}
+
+export interface AccountExecutionOrder {
+  order_id: number;
+  order_no: string;
+  order_type: string;
+  trade_date: string;
+  created_at?: string | null;
+  status: string;
+  note?: string | null;
+  counterparties?: AccountExecutionCounterparty[];
+  rebates?: AccountExecutionRebate[];
+  events: AccountExecutionEvent[];
+  operator: string;
+}
+
+export interface AccountExecutionDetail {
+  account: Account;
+  orders: AccountExecutionOrder[];
 }
 
 export interface Installment {
   id: number;
   inst_no: string;
   order_id: number;
+  account_id?: number | null;
   contract_type: string;
   principal: string;
   down_payment: string;
+  service_fee: string;
   periods: number;
+  per_period_service_fee: string;
   per_period: string;
   paid_amount: string;
   status: string;
   delivery_mode?: string | null;
   delivered_on?: string | null;
+  note?: string | null;
+}
+
+export interface InstallmentScheduleInput {
+  period_no: number;
+  due_on: string;
 }
 
 export interface Schedule {
@@ -136,7 +243,6 @@ export interface Schedule {
 
 export interface Deposit {
   id: number;
-  deposit_no: string;
   pool_id: number;
   paid_amount: string;
   returned_amount: string;
@@ -148,7 +254,7 @@ export interface Deposit {
 
 export interface Rebate {
   id: number;
-  rebate_group_no: string;
+  rebate_no: string;
   source_order_id?: number | null;
   rate: string;
   base_amount: string;
@@ -243,6 +349,7 @@ export const ordersApi = {
       pool_id?: number;
       portion?: string;
       delivery_mode?: string;
+      flow_category?: string;
       note?: string;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
@@ -253,16 +360,20 @@ export const accountsApi = {
     api.get<Account[]>("/accounts", { params }).then((r) => r.data),
   create: (payload: Partial<Account>) =>
     api.post<Account>("/accounts", payload).then((r) => r.data),
+  updateProfile: (id: number, payload: Pick<Account, "account_description" | "account_images">) =>
+    api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api
       .get<{ items: Account[]; count: number; total_cost: string }>("/accounts/inventory")
       .then((r) => r.data),
+  executionDetail: (id: number) =>
+    api.get<AccountExecutionDetail>(`/accounts/${id}/execution-detail`).then((r) => r.data),
 };
 
 export const installmentsApi = {
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
-  create: (payload: Partial<Installment> & { first_due_on: string }) =>
+  create: (payload: Partial<Installment> & { first_due_on: string; schedule?: InstallmentScheduleInput[] }) =>
     api.post<Installment>("/installments", payload).then((r) => r.data),
   schedules: (id: number) =>
     api.get<Schedule[]>(`/installments/${id}/schedules`).then((r) => r.data),
@@ -292,7 +403,13 @@ export const depositsApi = {
 export const rebatesApi = {
   list: (params?: { source_order_id?: number }) =>
     api.get<Rebate[]>("/rebates", { params }).then((r) => r.data),
-  create: (payload: Partial<Rebate> & { source_order_id: number; base_amount: string; collected_on: string }) =>
+  create: (payload: Partial<Rebate> & {
+    source_order_id: number;
+    base_amount: string;
+    collected_on: string;
+    channel?: string;
+    note?: string;
+  }) =>
     api.post<Rebate>("/rebates", payload).then((r) => r.data),
   settle: (
     id: number,
@@ -314,7 +431,7 @@ export const fieldsApi = {
 /* ── M4：报表 / 审计 ─────────────────────────────── */
 
 export interface InventoryHealthRow {
-  account_no: string;
+  inventory_no: string;
   game_account?: string | null;
   platform?: string | null;
   business?: string | null;
@@ -391,7 +508,6 @@ export interface DailyFundsRow {
   expense: string;
   deposit_paid: string;
   deposit_held: string;
-  th_advance: string;
   cash_balance: string;
   available: string;
 }
@@ -533,29 +649,29 @@ export interface ReconciliationReport {
 }
 
 export const historyApi = {
-  batches: () => api.get<{ items: ImportBatch[]; total: number }>("/history/batches").then((r) => r.data),
+  batches: () => api.get<{ items: ImportBatch[]; total: number }>("/imports/batches").then((r) => r.data),
   createBatch: (payload: { source_name: string; rows: Record<string, unknown>[]; source_kind?: string; note?: string }) =>
-    api.post<ImportBatch>("/history/batches", payload).then((r) => r.data),
+    api.post<ImportBatch>("/imports/batches", payload).then((r) => r.data),
   rows: (batchId: number, status?: string) =>
-    api.get<{ items: ImportRow[]; total: number }>(`/history/batches/${batchId}/rows`, { params: { status } }).then((r) => r.data),
+    api.get<{ items: ImportRow[]; total: number }>(`/imports/batches/${batchId}/rows`, { params: { status } }).then((r) => r.data),
   preview: (batchId: number) =>
-    api.get<MappingPreview>(`/history/batches/${batchId}/preview`).then((r) => r.data),
+    api.get<MappingPreview>(`/imports/batches/${batchId}/preview`).then((r) => r.data),
   reconciliation: (batchId: number) =>
-    api.get<ReconciliationReport>(`/history/batches/${batchId}/reconciliation`).then((r) => r.data),
+    api.get<ReconciliationReport>(`/imports/batches/${batchId}/reconciliation`).then((r) => r.data),
   /** basis 必填：补录关联必须有依据（MIG-01-05） */
   map: (rowId: number, payload: { order_id?: number | null; account_id?: number | null; basis: string }) =>
-    api.post<ImportRow>(`/history/rows/${rowId}/map`, payload).then((r) => r.data),
+    api.post<ImportRow>(`/imports/rows/${rowId}/map`, payload).then((r) => r.data),
   skip: (rowId: number, reason: string) =>
-    api.post<ImportRow>(`/history/rows/${rowId}/skip`, { reason }).then((r) => r.data),
+    api.post<ImportRow>(`/imports/rows/${rowId}/skip`, { reason }).then((r) => r.data),
   /** 只打标记 + 开工单，服务端绝不补造配对流水 */
   markUnlinked: (rowId: number, note?: string) =>
-    api.post<ImportRow>(`/history/rows/${rowId}/unlinked-transfer`, { note }).then((r) => r.data),
+    api.post<ImportRow>(`/imports/rows/${rowId}/unlinked-transfer`, { note }).then((r) => r.data),
   commit: (batchId: number) =>
-    api.post<ImportBatch & { imported: number; unmapped: number }>(`/history/batches/${batchId}/commit`).then((r) => r.data),
+    api.post<ImportBatch & { imported: number; unmapped: number }>(`/imports/batches/${batchId}/commit`).then((r) => r.data),
   rollback: (batchId: number, reason: string) =>
-    api.post<ImportBatch>(`/history/batches/${batchId}/rollback`, { reason }).then((r) => r.data),
+    api.post<ImportBatch>(`/imports/batches/${batchId}/rollback`, { reason }).then((r) => r.data),
   createCorrection: (batchId: number, payload: { rows: Record<string, unknown>[]; reason: string }) =>
-    api.post<ImportBatch>(`/history/batches/${batchId}/corrections`, payload).then((r) => r.data),
+    api.post<ImportBatch>(`/imports/batches/${batchId}/corrections`, payload).then((r) => r.data),
 };
 
 /* ── M5：经营规则与订单利润分配（T19 / T20，BAS-06-01~04）───────── */

@@ -10,6 +10,11 @@ describe("StatusTag：文案承载语义，颜色只是辅助", () => {
     expect(screen.getByText("进行中")).toBeInTheDocument();
   });
 
+  it("通用 PENDING 只表示待结算，不再表示账号待入库", () => {
+    render(<StatusTag status="PENDING" />);
+    expect(screen.getByText("待结算")).toBeInTheDocument();
+  });
+
   it("未知状态回落到原始状态码（不显示空白）", () => {
     render(<StatusTag status="SOME_NEW_STATUS" />);
     expect(screen.getByText("SOME_NEW_STATUS")).toBeInTheDocument();

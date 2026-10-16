@@ -1,5 +1,5 @@
 /** 错误条：按错误码给可执行的下一步，而不只是复述报错。 */
-import { Alert } from "antd";
+import { Alert, Button } from "antd";
 import type { NormalizedError } from "../api/client";
 
 const HINTS: Record<string, string> = {
@@ -16,25 +16,32 @@ const HINTS: Record<string, string> = {
 };
 
 export function ErrorBanner(props: {
-  /** 首选：normalizeError() 的对象，自动带 code 查 HINTS。 */
-  error?: NormalizedError | string | null;
-  /** 兼容：裸文案（页面自定义提示，无错误码）。 */
-  message?: string | null;
-  code?: string | null;
+  /** 页面统一传入 normalizeError() 产出的错误对象。 */
+  error?: NormalizedError | null;
+  onRetry?: () => void;
+  retrying?: boolean;
 }) {
-  // 兼容两种传法：normalizeError() 的对象，或裸字符串。
-  const message =
-    typeof props.error === "string" ? props.error : props.error?.message ?? props.message;
-  const code = props.code ?? (typeof props.error === "object" ? props.error?.code : undefined);
+  const message = props.error?.message;
+  const code = props.error?.code;
   if (!message) return null;
   const hint = code ? HINTS[code] : undefined;
+  const canRetry = Boolean(props.onRetry) && !["AUTH_REQUIRED", "TOKEN_EXPIRED", "PERMISSION_DENIED"].includes(code ?? "");
   return (
     <Alert
+      className="ui-error-banner"
       type="error"
       showIcon
-      style={{ marginBottom: 12 }}
+      role="alert"
+      aria-live="assertive"
       message={message}
       description={hint}
+      action={
+        canRetry ? (
+          <Button type="link" size="small" loading={props.retrying} onClick={props.onRetry}>
+            重新加载
+          </Button>
+        ) : undefined
+      }
     />
   );
 }

@@ -1,4 +1,4 @@
-/** 返点：归集、分次结算与未归集治理（REB-01 / A06）。 */
+/** 返点记录：分次到账与来源订单追踪（REB-01 / A06）。 */
 import { Card, Form, Input, Modal, Select, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -12,14 +12,28 @@ import {
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
+import { orderTypeLabel } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
+  MoneyInput,
   MoneyText,
   PermissionButton,
   StatRow,
   StatusTag,
 } from "../shared/ui";
+
+const BUSINESS_MODE_LABEL: Record<string, string> = {
+  SELF: "自营",
+  DISTRIBUTION: "分销",
+};
+
+const ORDER_TYPE_LABEL: Record<string, string> = {
+  HS: "回收",
+  TH: "提号",
+  DG: "代挂",
+  DFQ: "代分期",
+};
 
 export function RebatesPanel() {
   const [rows, setRows] = useState<Rebate[]>([]);
@@ -59,7 +73,7 @@ export function RebatesPanel() {
         rate: (values.rate as string) ?? "0",
         collected_on: values.collected_on as string,
       });
-      message.success("返点归集已创建");
+      message.success("返点记录已创建");
       setCreateOpen(false);
       form.resetFields();
       await load();
@@ -89,10 +103,32 @@ export function RebatesPanel() {
   const pending = rows.filter((row) => row.status !== "SETTLED").length;
 
   const columns: ColumnsType<Rebate> = [
-    { title: "归集号", dataIndex: "rebate_group_no" },
+    { title: "返点单号", dataIndex: "rebate_no" },
     {
       title: "来源订单",
       render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.order_no ?? "-",
+    },
+    {
+      title: "业务",
+      render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.source_order_id)?.account_business_mode ?? ""] || "-",
+    },
+    {
+      title: "类型",
+      render: (_v, row) => {
+        const order = orders.find((item) => item.id === row.source_order_id);
+        return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
+      },
+    },
+    {
+      title: "产品",
+      render: (_v, row) => {
+        const order = orders.find((item) => item.id === row.source_order_id);
+        return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
+      },
+    },
+    {
+      title: "对方",
+      render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.party_name || "-",
     },
     {
       title: "基数",
@@ -100,7 +136,7 @@ export function RebatesPanel() {
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "费率", dataIndex: "rate", align: "right" },
+    { title: "费率", dataIndex: "rate", align: "right", render: (v: string) => `${v}%` },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
     {
       title: "操作",
@@ -122,25 +158,25 @@ export function RebatesPanel() {
 
   return (
     <section className="ui-stack">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
 
       <StatRow
         items={[
-          { label: "归集总数", kind: "count", amount: String(rows.length) },
+          { label: "返点记录数", kind: "count", amount: String(rows.length) },
           { label: "待结算", kind: "count", amount: String(pending), tone: pending ? "warn" : "plain" },
         ]}
       />
 
       <Card
         className="glass"
-        title="返点归集"
+        title="返点记录"
         extra={
           <PermissionButton
             permission="order.event.post"
             type="primary"
             onClick={() => setCreateOpen(true)}
           >
-            新增归集
+            新增返点记录
           </PermissionButton>
         }
       >
@@ -150,12 +186,12 @@ export function RebatesPanel() {
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-          emptyText="暂无返点归集"
+          emptyText="暂无返点记录"
           onPageChange={() => undefined}
         />
       </Card>
 
-      <Modal title="新增返点归集" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <Form form={form} layout="vertical" onFinish={submitCreate} initialValues={{ collected_on: today() }}>
           <Form.Item name="source_order_id" label="来源订单" rules={[{ required: true }]}>
             <Select
@@ -164,13 +200,13 @@ export function RebatesPanel() {
                 .map((order) => ({ value: order.id, label: order.order_no }))}
             />
           </Form.Item>
-          <Form.Item name="base_amount" label="返点基数" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="base_amount" label="返点金额" rules={[{ required: true }]}>
+            <MoneyInput />
           </Form.Item>
-          <Form.Item name="rate" label="返点率">
-            <Input placeholder="例如 0.10" />
+          <Form.Item name="rate" label="返点比例">
+            <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
           </Form.Item>
-          <Form.Item name="collected_on" label="归集日期" rules={[{ required: true }]}>
+          <Form.Item name="collected_on" label="返点日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
           <Typography.Paragraph type="secondary">
@@ -183,7 +219,7 @@ export function RebatesPanel() {
       </Modal>
 
       <Modal
-        title={settleTarget ? `分次结算 · ${settleTarget.rebate_group_no}` : "分次结算"}
+        title={settleTarget ? `返点到账 · ${settleTarget.rebate_no}` : "返点到账"}
         open={Boolean(settleTarget)}
         onCancel={() => setSettleTarget(null)}
         footer={null}

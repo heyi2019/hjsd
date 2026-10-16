@@ -73,11 +73,7 @@ class SequenceKey(StrEnum):
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
     ACCOUNT = "ACCOUNT"
-    INSTALLMENT = "INSTALLMENT"
-    EVENT = "EVENT"
     CASHFLOW = "CASHFLOW"
-    REBATE = "REBATE"
-    DEPOSIT = "DEPOSIT"
     IMPORT = "IMPORT"
 
 
@@ -128,11 +124,9 @@ class CounterpartyRole(StrEnum):
 
 
 class EntityType(StrEnum):
-    """活字段实体域。"""
+    """当前活字段实体域：只承载客户辅助信息。"""
 
     CUSTOMER = "customer"
-    ACCOUNT = "account"
-    ORDER = "order"
 
 
 # ---------------------------------------------------------------- 订单 / 事件
@@ -167,7 +161,6 @@ class Direction(StrEnum):
 class AccountStatus(StrEnum):
     """账号状态（ACC-01-03）：只由订单事件驱动。"""
 
-    PENDING = "PENDING"  # 待收
     IN_STOCK = "IN_STOCK"  # 在库
     INSTALLMENT = "INSTALLMENT"  # 分期中
     FOR_SALE = "FOR_SALE"  # 待售
@@ -249,7 +242,7 @@ class AllocationRole(StrEnum):
 
 
 class ImportBatchStatus(StrEnum):
-    """P2 历史导入批次：导入只落「原始行 + 映射」，绝不自动匹配（MIG-01）。"""
+    """标准导入批次：导入只落「原始行 + 映射」，绝不自动匹配（MIG-01）。"""
 
     DRAFT = "DRAFT"
     MAPPED = "MAPPED"
@@ -257,6 +250,16 @@ class ImportBatchStatus(StrEnum):
     REJECTED = "REJECTED"
     ROLLED_BACK = "ROLLED_BACK"  # 整批逻辑回滚（MIG-01-07），原始文件与日志保留
     CORRECTED = "CORRECTED"  # 已确认批次的冲销/更正（MIG-01-08），不删原始记录
+
+
+class ImportSourceKind(StrEnum):
+    """标准导入来源类型；不再接受 LEGACY_* 或任意自定义值。"""
+
+    ORDER = "STANDARD_ORDER"
+    ACCOUNT = "STANDARD_ACCOUNT"
+    CASHFLOW = "STANDARD_CASHFLOW"
+    INSTALLMENT = "STANDARD_INSTALLMENT"
+    LEAD = "STANDARD_LEAD"
 
 
 class ImportRowStatus(StrEnum):
@@ -291,6 +294,7 @@ class AuditAction(StrEnum):
     CONTACT_READ = "CONTACT_READ"
     CONTACT_WRITE = "CONTACT_WRITE"
     CUSTOMER_MERGE = "CUSTOMER_MERGE"
+    ACCOUNT_UPDATE = "ACCOUNT_UPDATE"
     ORDER_CREATE = "ORDER_CREATE"
     ORDER_UPDATE = "ORDER_UPDATE"
     EVENT_CREATE = "EVENT_CREATE"
@@ -305,14 +309,14 @@ class AuditAction(StrEnum):
     FIELD_DEFINITION_CHANGE = "FIELD_DEFINITION_CHANGE"
     POLICY_CHANGE = "POLICY_CHANGE"
     EXCEPTION_APPROVE = "EXCEPTION_APPROVE"
-    # 历史导入（MIG-01）：与 EXCEPTION_APPROVE 分开，避免「导入」被误读为「异常审批」。
+    # 标准导入（MIG-01）：与 EXCEPTION_APPROVE 分开，避免「导入」被误读为「异常审批」。
     # audit_logs.action 无 CHECK 约束，新增枚举值不需要迁移。
-    HISTORY_LAND = "HISTORY_LAND"  # 原始行落地（只存原文，不做字段推断）
-    HISTORY_COMMIT = "HISTORY_COMMIT"  # 映射确认后生成业务实体
-    HISTORY_MAP = "HISTORY_MAP"  # 人工指派某行的订单/账号映射
-    HISTORY_MARK_UNLINKED = "HISTORY_MARK_UNLINKED"  # 标记为未关联划转
-    HISTORY_ROLLBACK = "HISTORY_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
-    HISTORY_CORRECTION = "HISTORY_CORRECTION"  # 建冲销/更正批次
+    IMPORT_LAND = "IMPORT_LAND"  # 原始行落地（只存原文，不做字段推断）
+    IMPORT_COMMIT = "IMPORT_COMMIT"  # 映射确认后生成业务实体
+    IMPORT_MAP = "IMPORT_MAP"  # 人工指派某行的订单/账号映射
+    IMPORT_MARK_UNLINKED = "IMPORT_MARK_UNLINKED"  # 标记为未关联划转
+    IMPORT_ROLLBACK = "IMPORT_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
+    IMPORT_CORRECTION = "IMPORT_CORRECTION"  # 建冲销/更正批次
 
 
 __all__ = [

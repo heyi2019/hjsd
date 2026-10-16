@@ -76,10 +76,9 @@
   --card-elevation: 0 10px 28px rgba(28, 28, 30, 0.07), 0 2px 8px rgba(28, 28, 30, 0.05);
   --card-top-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --accent-grad: linear-gradient(135deg, #0757c7 0%, #0a63d8 52%, #0c68d9 100%); /* 品牌蓝实底：白字在整段均保持可读对比 */
-  /* 登录门面固定品牌色（2026-10-13 用户裁决：登录页不随主题切换——白底 + 渐变蓝卡）。
-     刻意不设 dark 覆盖：登录页是品牌门面，dark 主题下同样保持白底蓝卡。 */
-  --login-canvas: #ffffff; /* 登录页背景 / 卡内输入框底色，恒白 */
-  --login-ink: #1c1c1e;    /* 白底输入框内的固定深色文字 */
+  /* 登录页专用兼容令牌：登录门面使用浅色画布与中性输入文字。 */
+  --login-canvas: #ffffff;
+  --login-ink: #1c1c1e;
 
   /* 圆角（规范名 --radius-*；旧名 --r-* / --card-radius / --ui-radius-* 已全量迁移并删除，无兼容 alias） */
   --radius-sm: 9px;
@@ -388,6 +387,7 @@
   --accent-deep: color-mix(in srgb, var(--color-primary) 90%, #000); /* 蓝底白字实底达标 */
   --color-primary-text: color-mix(in srgb, var(--color-primary) 70%, #000);
   --color-info: #0a84ff;
+  --color-service: #7c3aed;
   --color-success: #14724b;
   --color-warning: #b45309;
   --color-error: #b23b3b;
@@ -568,6 +568,7 @@
   --color-error: #f87171;
   --danger-solid: #d0343a; /* 实底 danger 按钮底：error(#f87171) 白字仅 2.77，压深到 4.93 达标（error 文字色不变） */
   --color-info: #64a8ff;
+  --color-service: #a78bfa;
   /* 状态柔和色深色覆盖：由 --color-success / --color-error 派生，自动跟随主色、不新增字面量 */
   --status-success-border: color-mix(in srgb, var(--color-success) 50%, transparent);
   --status-success-soft: color-mix(in srgb, var(--color-success) 12%, transparent);

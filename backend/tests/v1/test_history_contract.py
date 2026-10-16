@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import ImportBatchStatus, ImportRowStatus
+from app.domain.enums import ImportBatchStatus, ImportRowStatus, ImportSourceKind
 from app.domain.history import ImportBatch
 from app.history import service
 
@@ -43,6 +43,28 @@ class TestCreateBatchGuards:
         with pytest.raises(Validation) as exc:
             service.create_batch(seeded_db, source_name="orders.xlsx", rows=[])
         assert "导入内容为空" in str(exc.value)
+
+    def test_source_kind_is_closed_to_standard_values(self, seeded_db):
+        with pytest.raises(Validation) as exc:
+            service.create_batch(
+                seeded_db,
+                source_name="orders.xlsx",
+                rows=ROWS,
+                source_kind="LEGACY_ORDER",
+            )
+        assert exc.value.details == {
+            "field": "source_kind",
+            "value": "LEGACY_ORDER",
+        }
+
+        batch = service.create_batch(
+            seeded_db,
+            source_name="accounts.xlsx",
+            rows=ROWS,
+            source_kind=ImportSourceKind.ACCOUNT.value,
+            actor="pytest",
+        )
+        assert batch["source_kind"] == ImportSourceKind.ACCOUNT.value
 
 
 # ------------------------------------------------------------------ 批次/行查询
@@ -191,7 +213,7 @@ class TestPreviewGuards:
         empty = ImportBatch(
             batch_no="IMP-EMPTY",
             source_name="empty.xlsx",
-            source_kind="LEGACY_ORDER",
+            source_kind="STANDARD_ORDER",
             status=ImportBatchStatus.DRAFT.value,
             row_count=0,
             unmapped_count=0,
@@ -256,10 +278,10 @@ class TestRollbackAndCorrectionGuards:
 
 
 # ------------------------------------------------------------------ 路由层
-class TestHistoryApi:
+class TestImportApi:
     def test_list_batches_endpoint(self, seeded_client, seeded_db, headers):
         _batch(seeded_db, source_name="第一批")
-        response = seeded_client.get("/api/v1/history/batches", headers=headers)
+        response = seeded_client.get("/api/v1/imports/batches", headers=headers)
         assert response.status_code == 200, response.text
         assert response.json()["total"] == 1
 
@@ -267,7 +289,7 @@ class TestHistoryApi:
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         response = seeded_client.post(
-            f"/api/v1/history/rows/{row_id}/map",
+            f"/api/v1/imports/rows/{row_id}/map",
             json={"order_id": None, "account_id": None, "basis": "人工核对"},
             headers=headers,
         )
@@ -278,7 +300,7 @@ class TestHistoryApi:
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         response = seeded_client.post(
-            f"/api/v1/history/rows/{row_id}/skip",
+            f"/api/v1/imports/rows/{row_id}/skip",
             json={"reason": "口径不明"},
             headers=headers,
         )
@@ -288,7 +310,7 @@ class TestHistoryApi:
     def test_preview_endpoint(self, seeded_client, seeded_db, headers):
         batch = _batch(seeded_db)
         response = seeded_client.get(
-            f"/api/v1/history/batches/{batch['id']}/preview", headers=headers
+            f"/api/v1/imports/batches/{batch['id']}/preview", headers=headers
         )
         assert response.status_code == 200, response.text
         assert response.json()["total_rows"] == len(ROWS)
@@ -296,7 +318,7 @@ class TestHistoryApi:
     def test_reconciliation_endpoint(self, seeded_client, seeded_db, headers):
         batch = _batch(seeded_db)
         response = seeded_client.get(
-            f"/api/v1/history/batches/{batch['id']}/reconciliation", headers=headers
+            f"/api/v1/imports/batches/{batch['id']}/reconciliation", headers=headers
         )
         assert response.status_code == 200, response.text
         assert response.json()["rows"]["source_total"] == len(ROWS)
@@ -305,7 +327,7 @@ class TestHistoryApi:
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         response = seeded_client.post(
-            f"/api/v1/history/rows/{row_id}/unlinked-transfer",
+            f"/api/v1/imports/rows/{row_id}/unlinked-transfer",
             json={"note": "单边划转待裁决"},
             headers=headers,
         )
@@ -315,7 +337,7 @@ class TestHistoryApi:
     def test_rollback_endpoint(self, seeded_client, seeded_db, headers):
         batch = _batch(seeded_db)
         response = seeded_client.post(
-            f"/api/v1/history/batches/{batch['id']}/rollback",
+            f"/api/v1/imports/batches/{batch['id']}/rollback",
             json={"reason": "导错文件"},
             headers=headers,
         )
@@ -325,9 +347,13 @@ class TestHistoryApi:
     def test_correction_endpoint(self, seeded_client, seeded_db, headers):
         batch = _batch(seeded_db)
         response = seeded_client.post(
-            f"/api/v1/history/batches/{batch['id']}/corrections",
+            f"/api/v1/imports/batches/{batch['id']}/corrections",
             json={"rows": ROWS, "reason": "少导一行"},
             headers=headers,
         )
         assert response.status_code == 200, response.text
         assert response.json()["corrects_batch_id"] == batch["id"]
+
+    def test_legacy_history_path_is_not_exposed(self, seeded_client, headers):
+        response = seeded_client.get("/api/v1/history/batches", headers=headers)
+        assert response.status_code == 404

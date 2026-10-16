@@ -6,7 +6,7 @@
  * 此处随 mode 切换这两项为暗色令牌值（与 tokens.css --color-antd-bg-container 对齐）。
  */
 import { theme as antdTheme, type ThemeConfig } from "antd";
-import type { ThemeMode } from "./theme";
+import type { ResolvedThemeMode } from "./theme";
 
 const BRAND = {
   colorPrimary: "#0a63d8",
@@ -18,7 +18,7 @@ const BRAND = {
     '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif',
 } as const;
 
-export function buildTheme(mode: ThemeMode): ThemeConfig {
+export function buildTheme(mode: ResolvedThemeMode): ThemeConfig {
   if (mode === "dark") {
     return {
       algorithm: antdTheme.darkAlgorithm,

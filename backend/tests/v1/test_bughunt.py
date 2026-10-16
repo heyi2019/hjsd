@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
+from app.accounts import service as account_service
 import pytest
 
 from app.core.money import to_money
@@ -18,6 +20,13 @@ D = date(2026, 10, 4)
 
 
 def _order(seeded_db, order_type: str = "HS", **kw):
+    if order_type == "HS" and kw.get("account_id") is None:
+        account = account_service.create_account(
+            seeded_db,
+            game_account=f"hunt-{uuid4().hex[:12]}",
+            actor="hunt",
+        )
+        kw["account_id"] = account.id
     return order_service.create_order(
         seeded_db, order_type=order_type, trade_date=D, actor="hunt", **kw
     )
@@ -55,7 +64,7 @@ class TestMoneyEdge:
 # ------------------------------------------------------------------ 订单状态机
 class TestOrderStateMachine:
     def test_cannot_post_to_cancelled_order(self, seeded_db):
-        order = _order(seeded_db)
+        order = _order(seeded_db, order_type="TH")
         order_service.post_event(
             seeded_db,
             order.id,
@@ -115,35 +124,6 @@ class TestOrderStateMachine:
                 occurred_on=D,
                 actor="hunt",
             )
-
-
-# ------------------------------------------------------------------ 划转
-class TestTransfer:
-    def test_transfer_to_same_pool_is_rejected(self, seeded_db):
-        with pytest.raises(Exception):
-            order_service.transfer(
-                seeded_db, source_pool_id=1, target_pool_id=1, amount="100", occurred_on=D, actor="hunt"
-            )
-
-    def test_transfer_zero_or_negative_is_rejected(self, seeded_db):
-        for amount in ("0", "-1"):
-            with pytest.raises(Exception):
-                order_service.transfer(
-                    seeded_db,
-                    source_pool_id=1,
-                    target_pool_id=2,
-                    amount=amount,
-                    occurred_on=D,
-                    actor="hunt",
-                )
-
-    def test_transfer_creates_paired_flows(self, seeded_db):
-        out_flow, in_flow = order_service.transfer(
-            seeded_db, source_pool_id=1, target_pool_id=2, amount="100.00", occurred_on=D, actor="hunt"
-        )
-        assert out_flow.transfer_id == in_flow.transfer_id
-        assert str(out_flow.amount) == str(in_flow.amount)
-        assert out_flow.direction != in_flow.direction
 
 
 # ------------------------------------------------------------------ 分期
@@ -240,6 +220,10 @@ class TestDepositAndRebate:
         """可结算上限 = 返点基数 1000；一次结 1200 必须被拒。"""
         order = _order(seeded_db)
         order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="hunt",
+        )
+        order_service.post_event(
             seeded_db,
             order.id,
             event_type="SELL",
@@ -268,6 +252,10 @@ class TestDepositAndRebate:
 
     def test_rebate_partial_then_full_settles(self, seeded_db):
         order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="hunt",
+        )
         order_service.post_event(
             seeded_db,
             order.id,

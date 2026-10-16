@@ -25,7 +25,7 @@ def inventory_health(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
 ) -> dict:
-    """R1 库存健康表（TH 永不入库存）。"""
+    """R1 库存健康表（回收与提号账号统一纳入库存）。"""
     del user
     return service.r1_inventory_health(db)
 

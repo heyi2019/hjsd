@@ -173,8 +173,8 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-4);
   border-right: var(--border-w) solid var(--glass-border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
   overflow: hidden;
@@ -224,13 +224,36 @@
 .nav-item:hover { background: var(--soft); color: var(--color-text-primary); }
 .nav-item--active,
 .nav-item--active:hover {
-  background: var(--violet-soft);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 13%, var(--glass)), var(--violet-soft));
   color: var(--primary-ink);
+  font-weight: 650;
   /* Apple 侧栏选中态：圆角染色胶囊 + 轻投影浮起，替代生硬的左描边条。 */
-  box-shadow: var(--shadow-soft);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--color-primary) 72%, transparent), var(--shadow-soft);
 }
 .nav-item__icon { display: inline-flex; font-size: var(--fs-subheadline); line-height: 1; }
 .nav-item__label { font: inherit; }
+.mobile-more-button { display: none; }
+
+.mobile-more-list {
+  display: grid;
+  gap: var(--space-2);
+}
+.mobile-more-list button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--ui-control-height);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: start;
+  font: var(--font-body-s);
+}
+.mobile-more-list button:hover,
+.mobile-more-list button.is-active { background: var(--soft); color: var(--color-primary-text); }
 .sidebar-foot {
   margin-top: auto;
   padding-top: var(--space-2);
@@ -245,7 +268,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-4) max(var(--space-5), env(safe-area-inset-right)) var(--space-3)
+    max(var(--space-5), env(safe-area-inset-left));
   flex-wrap: wrap;
 }
 .topbar__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -297,11 +321,27 @@
     border-right: 0;
     border-bottom: var(--border-w) solid var(--glass-border);
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .sidebar::-webkit-scrollbar { display: none; }
   .app-brand { padding: var(--space-2) var(--space-3); white-space: nowrap; }
-  .nav-list { flex-direction: row; margin-top: 0; }
-  .nav-item { width: auto; white-space: nowrap; box-shadow: none !important; }
+  .nav-list { flex: 1 0 auto; flex-direction: row; margin-top: 0; }
+  .nav-item {
+    width: auto;
+    min-height: var(--ui-control-height);
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+    box-shadow: none !important;
+  }
   .nav-item--active { box-shadow: inset 0 -3px 0 var(--color-primary) !important; }
   .sidebar-foot { display: none; }
-  .page-content { padding: var(--space-3); }
+  .page-content {
+    padding: var(--space-3) max(var(--space-3), env(safe-area-inset-right))
+      max(var(--space-5), env(safe-area-inset-bottom))
+      max(var(--space-3), env(safe-area-inset-left));
+  }
+  .topbar-action,
+  .theme-switch button { min-height: var(--ui-control-height); }
 }

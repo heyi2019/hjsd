@@ -1,0 +1,59 @@
+.resizable-modal__drag-shell {
+  position: relative;
+  z-index: 1;
+  cursor: grab;
+}
+
+.resizable-modal__drag-handle {
+  display: block;
+  user-select: none;
+}
+
+.resizable-modal__drag-shell:active { cursor: grabbing; }
+.resizable-modal__drag-shell :is(input, textarea, button, .ant-select, .ant-picker) { cursor: auto; }
+
+.resizable-modal__resize-handle {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.resizable-modal__resize-handle--n,
+.resizable-modal__resize-handle--s {
+  left: 18px;
+  right: 18px;
+  height: 12px;
+}
+
+.resizable-modal__resize-handle--n { top: 0; cursor: ns-resize; }
+.resizable-modal__resize-handle--s { bottom: 0; cursor: ns-resize; }
+
+.resizable-modal__resize-handle--e,
+.resizable-modal__resize-handle--w {
+  top: 18px;
+  bottom: 18px;
+  width: 12px;
+}
+
+.resizable-modal__resize-handle--e { right: 0; cursor: ew-resize; }
+.resizable-modal__resize-handle--w { left: 0; cursor: ew-resize; }
+
+.resizable-modal__resize-handle--nw,
+.resizable-modal__resize-handle--ne,
+.resizable-modal__resize-handle--sw,
+.resizable-modal__resize-handle--se {
+  width: 18px;
+  height: 18px;
+}
+
+.resizable-modal__resize-handle--nw { inset: 0 auto auto 0; cursor: nwse-resize; }
+.resizable-modal__resize-handle--se { inset: auto 0 0 auto; cursor: nwse-resize; }
+.resizable-modal__resize-handle--ne { inset: 0 0 auto auto; cursor: nesw-resize; }
+.resizable-modal__resize-handle--sw { inset: auto auto 0 0; cursor: nesw-resize; }
+
+@media (max-width: 640px) {
+  .resizable-modal__drag-shell { transform: none; }
+  .resizable-modal__resize-handle { display: none; }
+  .resizable-modal__drag-handle { cursor: default; }
+}

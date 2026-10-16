@@ -23,9 +23,9 @@
 | cashflow | `id`, `flow_no UNIQUE`, `order_event_id UNIQUE NULL` | pool 必填；新 INTERNAL 需 transfer_id |
 | installments | `id`, `inst_no UNIQUE`, `order_id UNIQUE` | `contract_type` 为 STOCK_SALE/ADVANCE_PURCHASE；`delivery_mode` 为 PLATFORM_OPERATOR/CUSTOMER_SELF；前者仅已买入 HS，后者仅 DFQ；总应收勾稽 |
 | installment_schedules | `id`, `UNIQUE(installment_id, period_no)` | FK installments；期次应收/实收/到期日/状态；支持部分收款与逾期 |
-| rebate_records | `id`, `rebate_group_no UNIQUE` | 新数据 source_order 必填 |
+| rebate_records | `id`, `rebate_no UNIQUE` | 新数据 source_order 必填 |
 | rebate_settlements | `id`, `settlement_no UNIQUE`, `cashflow_id UNIQUE` | gross - fee = net |
-| deposits | `id`, `deposit_no UNIQUE` | paid/returned 金额、关联流水 |
+| deposits | `id` | paid/returned 金额、关联流水；不单独生成押金编号 |
 | policy_definitions | `id`, `policy_code UNIQUE` | 定义规则类型与可用范围；不直接保存业务快照 |
 | policy_versions | `id`, `UNIQUE(policy_definition_id, version, effective_from)` | 生效区间、配置 JSON、状态、审批审计；已被引用不可更新/删除 |
 | order_profit_allocations | `id`, `UNIQUE(order_id, user_id, role)` | FK order/user/policy_version；同订单有效分配比例合计 100% |

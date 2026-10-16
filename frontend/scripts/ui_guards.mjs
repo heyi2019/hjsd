@@ -45,6 +45,7 @@ const BANNED = [
   ["no-antd-statistic", (t) => t.includes("<Statistic"), "须用 StatCard / StatRow"],
   ["no-antd-tag", (t) => /<Tag[ >]/.test(t), "须用 StatusTag"],
   ["no-raw-button", (t) => /<Button[ >]/.test(t), "写操作须用 PermissionButton 权限门控"],
+  ["no-raw-table", (t) => /<Table(?:<[^>]+>)?[ >]/.test(t), "须用 DataTable 统一列表壳"],
 ];
 for (const [rule, probe, hint] of BANNED) {
   for (const file of pages()) {
@@ -225,11 +226,21 @@ if (definedKf.size === 0) {
   fail("css-keyframes", "全项目未找到任何 @keyframes，规则 10 的解析正则可能已失效");
 }
 
+// 规则 11：页面与共享 UI 不得使用 JSX 内联 style。
+// 统一样式必须进入令牌 / 共享 CSS，避免同一控件在不同页面出现不可追踪的局部变体。
+// 测试 motion stub 是 React style 转发夹具，属于测试基础设施，明确排除。
+for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")))) {
+  const text = readFileSync(file, "utf8");
+  if (/<[A-Za-z][^>]*\bstyle\s*=/.test(text)) {
+    fail("no-inline-style", `${relative(process.cwd(), file)} → 样式必须迁移到共享 CSS / 设计令牌`);
+  }
+}
+
 if (failures.length) {
   console.error(`UI 守卫未通过（${failures.length} 项）：`);
   console.error(failures.join("\n"));
   process.exit(1);
 }
 console.log(
-  `UI 守卫通过：${pages().length} 个页面文件，10 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧引用完整性）。`,
+  `UI 守卫通过：${pages().length} 个页面文件，12 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧 + 无内联样式/原生表格）。`,
 );

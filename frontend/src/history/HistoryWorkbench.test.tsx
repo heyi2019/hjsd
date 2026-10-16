@@ -93,7 +93,7 @@ it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {
   expect(screen.getByRole("tab", { name: "迁移对账" })).toBeInTheDocument();
 });
 
-it("viewer 角色无 history.import：看不到指派/确认批次/回滚按钮", async () => {
+it("viewer 角色无 import.manage：看不到指派/确认批次/回滚按钮", async () => {
   renderApp(<HistoryWorkbench />, { user: "viewer" });
   await screen.findByText("历史迁移工作台");
   expect(screen.queryByRole("button", { name: /指派/ })).toBeNull();

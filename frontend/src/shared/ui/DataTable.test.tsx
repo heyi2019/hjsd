@@ -25,10 +25,13 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
   });
 
   it("空数据渲染空态与自定义文案", () => {
-    render(
+    const { container } = render(
       <DataTable columns={columns} rows={[]} page={1} pageSize={10} total={0} emptyText="暂无订单" onPageChange={() => {}} />,
     );
     expect(screen.getByText("暂无订单")).toBeInTheDocument();
+    const headers = [...container.querySelectorAll("th")].map((header) => header.textContent);
+    expect(headers).toContain("编号");
+    expect(headers).toContain("名称");
   });
 
   it("空数据未传文案时回落「暂无数据」", () => {

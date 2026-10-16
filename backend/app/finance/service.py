@@ -1,7 +1,7 @@
 """finance.service：押金与返点（FIN-04 / REB-01）。
 
 - 押金不进损益，只改变可用余额；缴退都必须有现金流（A08）；
-- 返点归集必须关联来源订单，分次结算 `REBHS0001-01/-02`，净额 = 毛额 − 手续费（A06）。
+- 返点记录必须关联来源订单，分次到账使用订单从属号，净额 = 毛额 − 手续费（A06）。
 """
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.business_numbering import rebate_no as order_rebate_no
+from app.core.business_numbering import rebate_settlement_no
 from app.core.errors import NotFound, Validation
 from app.core.errors import ErrorCode
 from app.core.money import require_positive, to_money
@@ -49,7 +51,6 @@ def create_deposit(
     pool = foundation_service.assert_pool_usable(session, pool_id)
 
     deposit = Deposit(
-        deposit_no=allocate_number(session, SequenceKey.DEPOSIT),
         pool_id=pool.id,
         counterparty_id=counterparty_id,
         source_order_id=source_order_id,
@@ -73,7 +74,7 @@ def create_deposit(
             category="DEPOSIT_HOLD",
             direction=Direction.OUT.value,
             amount=money,
-            note=f"押金占用 {deposit.deposit_no}",
+            note="押金占用",
             created_by=actor,
             updated_by=actor,
         )
@@ -83,7 +84,7 @@ def create_deposit(
         session,
         action=AuditAction.DEPOSIT_CREATE,
         entity_type="deposit",
-        entity_id=deposit.deposit_no,
+        entity_id=str(deposit.id),
         actor=actor,
         after={"pool": pool.code, "amount": str(money)},
     )
@@ -102,7 +103,7 @@ def return_deposit(
         raise Validation(
             "退还金额超过未释放余额",
             code=ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE,
-            details={"deposit_no": deposit.deposit_no, "outstanding": str(outstanding)},
+            details={"deposit_id": deposit.id, "outstanding": str(outstanding)},
         )
 
     deposit.returned_amount = to_money(deposit.returned_amount) + money
@@ -122,7 +123,7 @@ def return_deposit(
             category="DEPOSIT_RELEASE",
             direction=Direction.IN.value,
             amount=money,
-            note=f"押金释放 {deposit.deposit_no}",
+            note="押金释放",
             created_by=actor,
             updated_by=actor,
         )
@@ -132,7 +133,7 @@ def return_deposit(
         session,
         action=AuditAction.DEPOSIT_RELEASE,
         entity_type="deposit",
-        entity_id=deposit.deposit_no,
+        entity_id=str(deposit.id),
         actor=actor,
         after={
             "returned": str(to_money(deposit.returned_amount)),
@@ -168,7 +169,7 @@ def create_rebate(
     channel: str | None = None,
     note: str | None = None,
 ) -> RebateRecord:
-    """返点归集：来源订单必填且必须已成单（REB-01-02）。"""
+    """返点记录：来源订单必填且必须已成单（REB-01-02）。"""
     order = session.get(Order, source_order_id)
     if order is None:
         raise Validation(
@@ -183,14 +184,13 @@ def create_rebate(
             details={"order_no": order.order_no, "status": order.status},
         )
 
-    seq = allocate_number(session, SequenceKey.REBATE)
-    number = seq.split("REB")[-1]
-    # BAS-06-04：按归集日固化返点规则版本，改版不影响历史归集
+    rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
+    # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
     policy_version_id, snapshot = policy_service.make_snapshot(
         session, policy_code=PolicyType.REBATE.value, on=collected_on
     )
     record = RebateRecord(
-        rebate_group_no=f"REB{order.order_type}{number}",
+        rebate_no=rebate_no,
         source_order_id=order.id,
         channel=channel,
         rate=to_money(rate),
@@ -209,7 +209,7 @@ def create_rebate(
         session,
         action=AuditAction.REBATE_CREATE,
         entity_type="rebate_record",
-        entity_id=record.rebate_group_no,
+        entity_id=record.rebate_no,
         actor=actor,
         after={"source_order": order.order_no, "base_amount": str(to_money(base_amount))},
     )
@@ -230,7 +230,7 @@ def settle_rebate(
     record = session.get(RebateRecord, rebate_record_id)
     if record is None:
         raise NotFound(
-            f"返点归集 {rebate_record_id} 不存在", details={"rebate_record_id": rebate_record_id}
+            f"返点记录 {rebate_record_id} 不存在", details={"rebate_record_id": rebate_record_id}
         )
     gross = require_positive(gross_amount, field="gross_amount")
     fee = to_money(platform_fee)
@@ -255,7 +255,7 @@ def settle_rebate(
             "累计结算金额超过可结算上限",
             code=ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE,
             details={
-                "rebate_group_no": record.rebate_group_no,
+                "rebate_no": record.rebate_no,
                 "receivable": str(receivable),
                 "settled": str(already_gross),
                 "this_time": str(gross),
@@ -263,15 +263,12 @@ def settle_rebate(
         )
     pool = foundation_service.assert_pool_usable(session, pool_id)
 
-    count = session.scalar(
-        select(func.count(RebateSettlement.id)).where(
-            RebateSettlement.rebate_record_id == record.id
-        )
-    ) or 0
-    settlement_no = f"{record.rebate_group_no}-{count + 1:02d}"
+    settlement_no = rebate_settlement_no(
+        session, rebate_no=record.rebate_no, rebate_record_id=record.id
+    )
 
     flow = Cashflow(
-        flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+        flow_no=settlement_no,
         pool_id=pool.id,
         occurred_on=settled_on,
         nature=Nature.BUSINESS_IN.value,

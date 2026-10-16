@@ -61,11 +61,10 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     rows.reduce((acc, row) => acc + Number(pick(row.balance) ?? 0), 0).toFixed(2);
 
   const totalAvailable = sum((b) => b?.available);
-  const totalThAdvance = sum((b) => b?.th_advance);
   const totalDeposit = sum((b) => b?.deposit_held);
 
-  // 业务计数口径：与业务中心同口径（ACTIVE 为待处理；提号单 ACTIVE 为未闭环）。
-  const pendingCount = orders.filter((o) => o.status === "ACTIVE").length;
+  // 业务计数口径：ACTIVE 表示进行中；提号单 ACTIVE 表示未闭环。
+  const activeCount = orders.filter((o) => o.status === "ACTIVE").length;
   const thOpenCount = orders.filter((o) => o.order_type === "TH" && o.status === "ACTIVE").length;
 
   const columns: ColumnsType<PoolRow> = [
@@ -96,11 +95,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       render: (_value, row) => <MoneyText value={row.balance?.deposit_held} />,
     },
     {
-      title: "TH 代垫",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.th_advance} />,
-    },
-    {
       title: "可用余额",
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.available} strong />,
@@ -109,30 +103,30 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
 
   return (
     <section className="ui-stack">
-      <ErrorBanner error={loadError} />
+      <ErrorBanner error={loadError} onRetry={() => void load()} retrying={loading} />
 
       <Typography.Paragraph type="secondary" className="muted">
-        现金头寸、可用余额、押金与提号代垫分列展示，禁止混用（FIN-01-03）。
+        现金头寸、可用余额与押金分列展示，禁止混用（FIN-01-03）。
       </Typography.Paragraph>
 
       <EntryRow>
         <EntryCard
           title="订单总数"
           value={String(orders.length)}
-          description="点击进入业务中心 · 订单台账"
+          description="点击进入业务中心 · 业务台账"
           onClick={() => onNavigate?.("business")}
         />
         <EntryCard
-          title="待处理"
-          value={String(pendingCount)}
-          description="点击进入业务中心 · 业务作业"
+          title="进行中"
+          value={String(activeCount)}
+          description="点击进入业务中心 · 业务台账"
           onClick={() => onNavigate?.("business")}
         />
         <EntryCard
           title="提号未闭环"
           value={String(thOpenCount)}
           tone={thOpenCount ? "warn" : "plain"}
-          description="点击进入业务中心 · 业务作业"
+          description="点击进入业务中心 · 业务台账"
           onClick={() => onNavigate?.("business")}
         />
       </EntryRow>
@@ -140,7 +134,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       <StatRow
         items={[
           { label: "可用余额合计", amount: totalAvailable },
-          { label: "提号未闭环代垫", amount: totalThAdvance, tone: "warn" },
           { label: "押金占用", amount: totalDeposit },
         ]}
       />
@@ -167,7 +160,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       </PermissionGate>
 
       <Space className="muted" size="small">
-        数据口径与 FIN-01 一致；提号订单永不进入库存。
+        数据口径与 FIN-01 一致；提号账号进入库存后参与库存与成本统计。
       </Space>
     </section>
   );

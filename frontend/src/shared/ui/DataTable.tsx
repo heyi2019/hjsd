@@ -33,8 +33,22 @@ export function DataTable<T>(props: {
   emptyText?: string;
   /** 需要展开行（如分期期次明细）时透传，其余场景不必传。 */
   expandable?: TableProps<T>["expandable"];
+  /** 横向内容超出时启用 antd 固定列/滚动能力。 */
+  scroll?: TableProps<T>["scroll"];
+  /** 需要隐藏或自定义分页时透传给 antd；未传时保持统一默认分页。 */
+  pagination?: TableProps<T>["pagination"];
+  className?: string;
   size?: TableProps<T>["size"];
 }) {
+  const defaultRowKey = (row: T) => {
+    const candidate = row as T & {
+      id?: string | number;
+      key?: string | number;
+      code?: string | number;
+      no?: string | number;
+    };
+    return String(candidate.id ?? candidate.key ?? candidate.code ?? candidate.no ?? JSON.stringify(row));
+  };
   // 前端分页自管状态：默认开启；显式 controlledPaging 时交回调用方做服务端分页。
   const [innerPage, setInnerPage] = useState(1);
   const [innerSize, setInnerSize] = useState(props.pageSize ?? 10);
@@ -48,16 +62,12 @@ export function DataTable<T>(props: {
 
   if (props.loading) {
     return (
-      <div className="ui-table-loading">
+      <div className="ui-table-loading" role="status" aria-live="polite" aria-busy="true" aria-label="正在加载数据">
         <Spin />
       </div>
     );
   }
-  if (!props.rows.length) {
-    return <Empty description={props.emptyText ?? "暂无数据"} />;
-  }
-
-  const pagination = controlled
+  const defaultPagination = controlled
     ? {
         current: props.page,
         pageSize: props.pageSize,
@@ -75,16 +85,21 @@ export function DataTable<T>(props: {
           setInnerSize(s);
         },
       };
+  const pagination = props.pagination !== undefined ? props.pagination : defaultPagination;
 
   return (
-    <div className="ui-table-wrap">
+    <div className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}>
       <Table<T>
         size={props.size ?? "small"}
         columns={props.columns}
         dataSource={props.rows}
-        rowKey={props.rowKey ?? ("id" as never)}
+        rowKey={props.rowKey ?? defaultRowKey}
         expandable={props.expandable}
+        scroll={props.scroll}
         pagination={pagination}
+        locale={{
+          emptyText: <Empty description={props.emptyText ?? "暂无数据"} />,
+        }}
       />
     </div>
   );

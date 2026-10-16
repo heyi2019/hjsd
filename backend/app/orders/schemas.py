@@ -43,6 +43,30 @@ class OrderOut(BaseModel):
     created_at: datetime
 
 
+class OrderListOut(OrderOut):
+    """工作台列表摘要：主订单之外只带列表需要的可读业务信息。"""
+
+    account_game_type: str | None = None
+    account_game_account: str | None = None
+    account_channel_region: str | None = None
+    account_business_mode: str | None = None
+    account_platform: str | None = None
+    account_status: str | None = None
+    party_name: str | None = None
+    party_role: str | None = None
+    party_source: str | None = None
+    party_created_by: str | None = None
+    party_created_at: datetime | None = None
+    event_total: Decimal | None = None
+    last_event_type: str | None = None
+    last_event_amount: Decimal | None = None
+    last_event_on: date | None = None
+    installment_principal: Decimal | None = None
+    installment_paid: Decimal | None = None
+    installment_periods: int | None = None
+    installment_status: str | None = None
+
+
 class EventCreate(BaseModel):
     event_type: str
     amount: Decimal = Field(default=Decimal("0"))
@@ -52,6 +76,9 @@ class EventCreate(BaseModel):
     delivery_mode: str | None = None
     offset_event_id: int | None = None
     reason: str | None = None
+    flow_category: str | None = Field(
+        default=None, description="COST 时可填 FEE / DESIGN / OTHER"
+    )
     note: str | None = None
 
 
@@ -75,31 +102,13 @@ class EventPostResult(BaseModel):
     cashflow_no: str | None = None
 
 
-class TransferCreate(BaseModel):
-    source_pool_id: int
-    target_pool_id: int
-    amount: Decimal
-    occurred_on: date
-    note: str | None = None
-
-
-class TransferOut(BaseModel):
-    transfer_id: str
-    out_flow_no: str
-    in_flow_no: str
-    amount: Decimal
-
-
 class PoolBalanceOut(BaseModel):
     pool_id: int
     pool_code: str
     income: Decimal
     expense: Decimal
-    transfer_in: Decimal
-    transfer_out: Decimal
     cash_balance: Decimal
     deposit_held: Decimal
-    th_advance: Decimal
     available: Decimal
 
 
@@ -109,8 +118,7 @@ __all__ = [
     "EventPostResult",
     "OrderCreate",
     "OrderOut",
+    "OrderListOut",
     "PartyRole",
     "PoolBalanceOut",
-    "TransferCreate",
-    "TransferOut",
 ]

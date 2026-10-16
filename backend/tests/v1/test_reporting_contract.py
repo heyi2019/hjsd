@@ -8,12 +8,15 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
+from app.accounts import service as account_service
 from app.core.money import to_money
 from app.domain.enums import (
     AccountStatus,
     Direction,
     Nature,
+    OrderStatus,
     RebateStatus,
 )
 from app.domain.trade import Account, Cashflow, RebateRecord
@@ -28,6 +31,12 @@ MID_GATE = date(2026, 10, 1)  # 月份闸门
 
 
 def _order(seeded_db, *, trade_date: date = D, account_id: int | None = None):
+    if account_id is None:
+        account_id = account_service.create_account(
+            seeded_db,
+            game_account=f"report-{uuid4().hex[:12]}",
+            actor="pytest",
+        ).id
     return order_service.create_order(
         seeded_db, order_type="HS", trade_date=trade_date, actor="pytest",
         account_id=account_id,
@@ -70,7 +79,7 @@ def _month_item(data: dict, month: str) -> dict:
 class TestR1Inventory:
     def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
         in_stock = Account(
-            account_no="ACC-R1-1",
+                inventory_no="ACC-R1-1",
             status=AccountStatus.IN_STOCK.value,
             buy_date=D,
             cost_amount=to_money("0"),
@@ -78,14 +87,14 @@ class TestR1Inventory:
             updated_by="pytest",
         )
         sold = Account(
-            account_no="ACC-R1-2",
+                inventory_no="ACC-R1-2",
             status=AccountStatus.SOLD.value,
             cost_amount=to_money("800.00"),
             created_by="pytest",
             updated_by="pytest",
         )
         no_buy_date = Account(
-            account_no="ACC-R1-3",
+                inventory_no="ACC-R1-3",
             status=AccountStatus.FOR_SALE.value,
             cost_amount=to_money("500.00"),
             created_by="pytest",
@@ -111,7 +120,7 @@ class TestR1Inventory:
         )
 
         data = reporting_service.r1_inventory_health(seeded_db)
-        items = {item["account_no"]: item for item in data["items"]}
+        items = {item["inventory_no"]: item for item in data["items"]}
 
         # 非库存状态账号被 continue 排除
         assert "ACC-R1-2" not in items
@@ -172,12 +181,12 @@ class TestR2MonthlyPnl:
         )
         # 运营费用：非订单来源的业务支出流水
         _cashflow(
-            seeded_db, flow_no="HJF-R2-1", occurred_on=D,
+            seeded_db, flow_no="CF-R2-1", occurred_on=D,
             nature=Nature.BUSINESS_OUT.value, direction=Direction.OUT.value,
             amount="500.00",
         )
         _cashflow(
-            seeded_db, flow_no="HJF-R2-2", occurred_on=EARLY,
+            seeded_db, flow_no="CF-R2-2", occurred_on=EARLY,
             nature=Nature.BUSINESS_OUT.value, direction=Direction.OUT.value,
             amount="100.00",
         )
@@ -236,6 +245,31 @@ class TestR3Commission:
         assert person["orders"][0]["profit_base"] == 300
         assert person["orders"][0]["rate"] == 100
 
+        # 已完成订单与进行中订单都属于有效提成对账范围。
+        completed = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, completed.id, event_type="BUY", amount="500.00",
+            occurred_on=D, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, completed.id, event_type="SELL", amount="800.00",
+            occurred_on=D, actor="pytest",
+        )
+        completed.status = OrderStatus.COMPLETED.value
+        policy_service.set_allocations(
+            seeded_db, completed.id,
+            items=[{"user_id": 7, "role": "SALES", "allocation_rate": 100}],
+            actor="pytest",
+        )
+
+        data = reporting_service.r3_commission_reconciliation(seeded_db)
+        person = data["items"][0]
+        assert person["order_count"] == 2
+        assert {item["order_id"] for item in person["orders"]} == {
+            order.id,
+            completed.id,
+        }
+
         # 日期过滤：交易日在区间外 → continue，无数据
         assert (
             reporting_service.r3_commission_reconciliation(
@@ -275,7 +309,7 @@ class TestR5BusinessPnl:
         # 未归集返点：create_rebate 强制要来源订单，UNCOLLECTED 桶只能直插模型
         seeded_db.add(
             RebateRecord(
-                rebate_group_no="RGU-R5-1",
+                rebate_no="RB-R5-1",
                 source_order_id=None,
                 rate=to_money("10"),
                 base_amount=to_money("500.00"),

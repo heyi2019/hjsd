@@ -4,7 +4,7 @@
 口径红线：
 - 账号 COST 属直接成本，**不进运营费用**（R2 验收「作图费不会使运营费用重复增加」）。
 - 未归集返点**独立成列，不摊给业务**（R5）。
-- TH 永不进入库存（R1）。
+- 回收与提号账号统一纳入库存（R1）。
 """
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 from app.core.money import to_money
 from app.domain.enums import (
     AccountStatus,
-    CapitalType,
     Direction,
     EventType,
     Nature,
@@ -51,7 +50,7 @@ def _month_key(value: date) -> str:
 
 # --------------------------------------------------------------------- R1 库存
 def r1_inventory_health(session: Session) -> dict[str, Any]:
-    """R1 库存健康表：只统计在库与分期中真实占用（TH 永不入库存）。"""
+    """R1 库存健康表：统计已采购并处于在库、待售或分期状态的账号。"""
     today = date.today()
     stock_statuses = [
         AccountStatus.IN_STOCK.value,
@@ -71,10 +70,7 @@ def r1_inventory_health(session: Session) -> dict[str, Any]:
         order_cost[order_id] += _money(amount)
 
     active = session.scalars(
-        select(Order).where(
-            Order.capital_type != CapitalType.PASS_THRU.value,
-            Order.status.in_([OrderStatus.DRAFT.value, OrderStatus.ACTIVE.value]),
-        )
+        select(Order).where(Order.status == OrderStatus.ACTIVE.value)
     ).all()
     order_by_account: dict[int, list[Order]] = defaultdict(list)
     for order in active:
@@ -103,7 +99,7 @@ def r1_inventory_health(session: Session) -> dict[str, Any]:
         total_cost = _money(account.cost_amount)
         items.append(
             {
-                "account_no": account.account_no,
+                "inventory_no": account.inventory_no,
                 "game_account": account.game_account,
                 "platform": account.platform,
                 "business": ",".join({o.order_type for o in orders}) or None,
@@ -213,8 +209,6 @@ def r3_commission_reconciliation(
             Order, Order.id == OrderProfitAllocation.order_id
         ).where(
             Order.status.in_([OrderStatus.COMPLETED.value, OrderStatus.ACTIVE.value])
-            if hasattr(OrderStatus, "COMPLETED")
-            else Order.status == OrderStatus.ACTIVE.value
         )
     ).all()
 
@@ -334,8 +328,8 @@ def r5_business_pnl(
 
 # --------------------------------------------------------------------- 资金日报
 def daily_funds_report(session: Session, *, on: date | None = None) -> dict[str, Any]:
-    """资金日报：各池期初/收入/支出/划转/押金/可用余额/TH 未闭环代垫。"""
-    from app.orders.service import pool_balance, th_unsettled_advance
+    """资金日报：各池期初/收入/支出/押金/可用余额。"""
+    from app.orders.service import pool_balance
 
     target = on or date.today()
     items = []
@@ -375,26 +369,6 @@ def daily_funds_report(session: Session, *, on: date | None = None) -> dict[str,
                 )
             )
         )
-        transfer_in = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on == target,
-                    Cashflow.direction == Direction.IN.value,
-                    Cashflow.nature == Nature.INTERNAL.value,
-                )
-            )
-        )
-        transfer_out = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on == target,
-                    Cashflow.direction == Direction.OUT.value,
-                    Cashflow.nature == Nature.INTERNAL.value,
-                )
-            )
-        )
         deposit_paid = _money(
             session.scalar(
                 select(func.coalesce(func.sum(Deposit.paid_amount), 0)).where(
@@ -410,12 +384,9 @@ def daily_funds_report(session: Session, *, on: date | None = None) -> dict[str,
                 "opening": opening,
                 "income": day_in,
                 "expense": day_out,
-                "transfer_in": transfer_in,
-                "transfer_out": transfer_out,
                 "deposit_paid": deposit_paid,
                 "deposit_held": balance["deposit_held"],
                 "cash_balance": balance["cash_balance"],
-                "th_advance": th_unsettled_advance(session),
                 "available": balance["available"],
             }
         )

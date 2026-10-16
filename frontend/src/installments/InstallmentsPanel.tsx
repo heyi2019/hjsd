@@ -1,6 +1,6 @@
 /** 分期：分期出售（STOCK_SALE）与代分期（ADVANCE_PURCHASE）分列（页面原型 §3.4）。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Card, Form, Input, Modal, Select, Space, Table, Tabs, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -11,7 +11,8 @@ import {
   type Schedule,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
-import { today } from "../shared/lib/format";
+import { INSTALLMENT_STATUS_LABEL, today } from "../shared/lib/format";
+import { orderTypeLabel } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
@@ -20,6 +21,18 @@ import {
   StatRow,
   StatusTag,
 } from "../shared/ui";
+
+const BUSINESS_MODE_LABEL: Record<string, string> = {
+  SELF: "自营",
+  DISTRIBUTION: "分销",
+};
+
+const ORDER_TYPE_LABEL: Record<string, string> = {
+  HS: "回收",
+  TH: "提号",
+  DG: "代挂",
+  DFQ: "代分期",
+};
 
 function ContractTable({
   contractType,
@@ -82,7 +95,7 @@ function ContractTable({
         delivered_on: values.delivered_on as string,
         note: values.note as string,
       });
-      message.success("已生成无金额 DELIVER，不新增现金流");
+      message.success("已完成交付，不新增现金流");
       setDeliverTarget(null);
       deliverForm.resetFields();
       await load();
@@ -105,9 +118,43 @@ function ContractTable({
       render: (_v, row) => orders.find((order) => order.id === row.order_id)?.order_no ?? row.order_id,
     },
     {
+      title: "业务",
+      render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.order_id)?.account_business_mode ?? ""] || "-",
+    },
+    {
+      title: "类型",
+      render: (_v, row) => {
+        const order = orders.find((item) => item.id === row.order_id);
+        return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
+      },
+    },
+    {
+      title: "产品",
+      render: (_v, row) => {
+        const order = orders.find((item) => item.id === row.order_id);
+        return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
+      },
+    },
+    {
+      title: "对方",
+      render: (_v, row) => orders.find((order) => order.id === row.order_id)?.party_name || "-",
+    },
+    {
       title: "总应收",
       align: "right",
       render: (_v, row) => <MoneyText value={receivable(row).toFixed(2)} />,
+    },
+    {
+      title: "服务费",
+      dataIndex: "service_fee",
+      align: "right",
+      render: (v: string) => <MoneyText value={v ?? "0"} />,
+    },
+    {
+      title: "每期服务费",
+      dataIndex: "per_period_service_fee",
+      align: "right",
+      render: (v: string) => <MoneyText value={v ?? "0"} />,
     },
     {
       title: "已收",
@@ -122,7 +169,7 @@ function ContractTable({
         <MoneyText value={(receivable(row) - Number(row.paid_amount)).toFixed(2)} />
       ),
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={INSTALLMENT_STATUS_LABEL[v] ?? v} /> },
     {
       title: "操作",
       render: (_v, row) => (
@@ -170,12 +217,12 @@ function ContractTable({
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={INSTALLMENT_STATUS_LABEL[v] ?? v} /> },
   ];
 
   return (
     <section className="ui-stack">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
 
       <StatRow
         items={[
@@ -202,11 +249,13 @@ function ContractTable({
           onPageChange={() => undefined}
           expandable={{
             expandedRowRender: (row) => (
-              <Table<Schedule>
-                size="small"
-                rowKey="id"
-                pagination={false}
-                dataSource={schedules[row.id] ?? []}
+              <DataTable<Schedule>
+                rows={schedules[row.id] ?? []}
+                page={1}
+                pageSize={20}
+                total={(schedules[row.id] ?? []).length}
+                onPageChange={() => undefined}
+                emptyText="暂无期次"
                 columns={scheduleColumns}
               />
             ),

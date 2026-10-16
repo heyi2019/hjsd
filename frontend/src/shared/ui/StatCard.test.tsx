@@ -37,7 +37,7 @@ describe("StatRow：金额与计数不能混", () => {
 
   it("tone=warn 不改变金额格式，只换卡片语气", () => {
     const { container } = render(
-      <StatRow items={[{ label: "TH 代垫", amount: "88.8", tone: "warn" }]} />,
+      <StatRow items={[{ label: "风险提示", amount: "88.8", tone: "warn" }]} />,
     );
     expect(screen.getByText("88.80")).toBeInTheDocument();
     expect(container.querySelector(".ui-stat--warn")).toBeTruthy();

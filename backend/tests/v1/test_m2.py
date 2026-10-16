@@ -78,6 +78,7 @@ class TestA04DfqAdvancePurchase:
             actor="pytest",
         )
         seeded_db.commit()
+        assert contract.inst_no == f"{order.order_no}-INS01"
         assert installment_service.total_receivable(contract) == Decimal("1200.00")
 
         installment_service.pay(
@@ -350,7 +351,7 @@ class TestA06Rebate:
             actor="pytest",
         )
         seeded_db.commit()
-        assert record.rebate_group_no == "REBHS0001"
+        assert record.rebate_no == f"{order.order_no}-RB01"
 
         profit = _pool(seeded_db, "HJ_PROFIT")
         first = finance_service.settle_rebate(
@@ -363,8 +364,8 @@ class TestA06Rebate:
         )
         seeded_db.commit()
 
-        assert first.settlement_no == "REBHS0001-01"
-        assert second.settlement_no == "REBHS0001-02"
+        assert first.settlement_no == f"{order.order_no}-RB01-CF-01"
+        assert second.settlement_no == f"{order.order_no}-RB01-CF-02"
         assert first.net_amount == Decimal("180.00")
         assert second.net_amount == Decimal("90.00")
         assert finance_service.settled_net_total(seeded_db, record.id) == Decimal("270.00")
@@ -373,6 +374,8 @@ class TestA06Rebate:
         order = orders_service.create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
+        # 新规则：订单创建即 ACTIVE；用取消态验证返利仍拒绝非活动来源单。
+        order.status = "CANCELLED"
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
             finance_service.create_rebate(
@@ -388,7 +391,13 @@ class TestA06Rebate:
 class TestM2Api:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):
         account = seeded_client.post(
-            "/api/v1/accounts", json={"game_account": "api-acc", "platform": "王者"},
+            "/api/v1/accounts",
+            json={
+                "game_account": "api-acc",
+                "platform": "王者",
+                "business_mode": "SELF",
+                "inventory_type": "RECOVERY",
+            },
             headers=headers,
         ).json()
         order = seeded_client.post(
@@ -453,8 +462,14 @@ class TestM2Api:
 
     def test_inventory_endpoint(self, seeded_client, headers):
         seeded_client.post(
-            "/api/v1/accounts", json={"game_account": "inv-acc", "platform": "王者"},
+            "/api/v1/accounts",
+            json={
+                "game_account": "inv-acc",
+                "platform": "王者",
+                "business_mode": "SELF",
+                "inventory_type": "RECOVERY",
+            },
             headers=headers,
         )
         inventory = seeded_client.get("/api/v1/accounts/inventory", headers=headers).json()
-        assert inventory["count"] == 0  # 待收状态不计入库存
+        assert inventory["count"] == 1  # 新建账号即在库，代挂等零本金业务也不例外

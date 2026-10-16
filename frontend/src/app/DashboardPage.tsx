@@ -5,8 +5,9 @@ import { ordersApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
+import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
-export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?: string) => void }) {
+export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState("HS");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -31,11 +32,11 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
       />
       <EntryRow>
       <PermissionGate permission="order.create">
-        <section className="dashboard-sell-group dashboard-card-group--sell dashboard-card-group--equal-height" aria-labelledby="dashboard-sell-title">
-          <div className="dashboard-business-group__heading">
+        <section className="dashboard-entry-group dashboard-entry-group--no-accent dashboard-entry-group--sell" aria-labelledby="dashboard-sell-title">
+          <div className="dashboard-entry-group__heading">
             <h2 id="dashboard-sell-title">售出</h2>
           </div>
-          <div className="dashboard-sell-group__items">
+          <div className="dashboard-entry-group__items">
             <EntryCard
               tone="primary"
               eyebrow="主推入口"
@@ -44,11 +45,11 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
             />
           </div>
         </section>
-        <section className="dashboard-business-group dashboard-self-owned-group dashboard-card-group--self-owned dashboard-card-group--equal-height" aria-labelledby="dashboard-self-owned-title">
-          <div className="dashboard-business-group__heading">
+        <section className="dashboard-entry-group dashboard-entry-group--no-accent dashboard-entry-group--self-owned" aria-labelledby="dashboard-self-owned-title">
+          <div className="dashboard-entry-group__heading">
             <h2 id="dashboard-self-owned-title">自营</h2>
           </div>
-          <div className="dashboard-business-group__items">
+          <div className="dashboard-entry-group__items">
             <EntryCard
               eyebrow="高频业务"
               title="自营·回收"
@@ -56,11 +57,11 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
             />
           </div>
         </section>
-          <section className="dashboard-distribution-group dashboard-card-group--distribution dashboard-card-group--equal-height" aria-labelledby="dashboard-distribution-title">
-            <div className="dashboard-distribution-group__heading">
+          <section className="dashboard-entry-group dashboard-entry-group--no-accent dashboard-entry-group--neutral dashboard-entry-group--distribution" aria-labelledby="dashboard-distribution-title">
+            <div className="dashboard-entry-group__heading">
               <h2 id="dashboard-distribution-title">分销</h2>
             </div>
-            <div className="dashboard-distribution-group__items">
+            <div className="dashboard-entry-group__items">
               <EntryCard
                 title="提号"
                 onClick={() => openCreate("TH")}
@@ -71,14 +72,16 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
               />
             </div>
           </section>
-          <section className="dashboard-value-service-group dashboard-card-group--service dashboard-card-group--equal-height" aria-labelledby="dashboard-value-service-title">
-            <div className="dashboard-business-group__heading">
+          <section className="dashboard-entry-group dashboard-entry-group--no-accent dashboard-entry-group--neutral dashboard-entry-group--service" aria-labelledby="dashboard-value-service-title">
+            <div className="dashboard-entry-group__heading">
               <h2 id="dashboard-value-service-title">增值服务</h2>
             </div>
-            <EntryCard
-              title="代分期服务"
-              onClick={() => openCreate("DFQ")}
-            />
+            <div className="dashboard-entry-group__items">
+              <EntryCard
+                title="代分期服务"
+                onClick={() => openCreate("DFQ")}
+              />
+            </div>
           </section>
         </PermissionGate>
       </EntryRow>
@@ -87,7 +90,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
         <h2 id="dashboard-summary-title" className="dashboard-summary__title">今日关注</h2>
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
         <StatRow items={[
-          { label: "待处理业务", kind: "count", amount: String(orders.filter((order) => order.status === "ACTIVE").length) },
+          { label: "进行中业务", kind: "count", amount: String(orders.filter((order) => order.status === "ACTIVE").length) },
           { label: "已完成业务", kind: "count", amount: String(orders.filter((order) => order.status !== "ACTIVE").length) },
         ]} />
       </section>

@@ -17,7 +17,7 @@ from app.core.settings import Settings, get_settings
 from app.foundation.router import router as foundation_router
 from app.accounts.router import router as accounts_router
 from app.audit.router import router as audit_router
-from app.history.router import router as history_router
+from app.history.router import router as imports_router
 from app.policy.router import router as policy_router
 from app.reporting.router import router as reporting_router
 from app.finance.router import router as finance_router
@@ -79,7 +79,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(accounts_router, prefix=settings.api_prefix)
     app.include_router(reporting_router, prefix=settings.api_prefix)
     app.include_router(policy_router, prefix=settings.api_prefix)
-    app.include_router(history_router, prefix=settings.api_prefix)
+    app.include_router(imports_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)
     app.include_router(auth_router, prefix=settings.api_prefix)
     app.include_router(users_router, prefix=settings.api_prefix)

@@ -24,7 +24,7 @@
 | 账号 | GET/POST/PATCH `/accounts` | 账号、渠道、风险、状态；HS/DFQ 关联校验 |
 | 分期 | GET/POST/PATCH `/installments`，POST `/installments/{id}/payments` | `contract_type`=STOCK_SALE/ADVANCE_PURCHASE；HS 分期出售或 DFQ 代分期的计划、收款、逾期、换绑 |
 | 人员/权限 | GET/POST/PATCH `/users`、`/roles` | 人员、角色、数据范围与停用 |
-| 返点 | POST `/rebates`, POST `/rebates/{id}/settlements` | 返点归集、分次结算与现金流 |
+| 返点 | POST `/rebates`, POST `/rebates/{id}/settlements` | 返点记录、分次到账与现金流 |
 | 押金 | GET/POST/PATCH `/deposits` | 缴纳、部分退回、状态 |
 | 流水 | GET `/cashflows` | 查询；订单事件来源流水不可手工修改 |
 | 报表 | GET `/reports/pools|inventory|operating|business-profitability|commissions` | R1–R5 |

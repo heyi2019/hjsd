@@ -388,6 +388,7 @@ def create_counterparty(
     phone: str | None = None,
     wechat: str | None = None,
     qq: str | None = None,
+    source: str | None = None,
     note: str | None = None,
 ) -> Counterparty:
     name = (display_name or "").strip()
@@ -409,6 +410,7 @@ def create_counterparty(
         phone=phone,
         wechat=wechat,
         qq=qq,
+        source=source,
         note=note,
         status=CounterpartyStatus.ACTIVE.value,
         created_by=actor,

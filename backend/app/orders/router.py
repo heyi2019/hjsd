@@ -1,22 +1,26 @@
-"""orders.router：订单、事件、划转与资金池余额 API（ORD-01/02、FIN-01/03）。
+"""orders.router：订单、事件与资金池余额 API（ORD-01/02、FIN-01）。
 
 金额类动作全部走 Service 事务；列表页只提供查询，不做直接过账。
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_READ,
-    PERM_FINANCE_TRANSFER,
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
     PERM_ORDER_UPDATE,
     CurrentUser,
     require_permissions,
 )
+from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
+from app.domain.trade import Account, Installment, OrderEvent
 from app.orders import schemas, service
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
@@ -25,7 +29,6 @@ read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_
 create_orders = require_permissions(PERM_ORDER_CREATE)
 post_events = require_permissions(PERM_ORDER_EVENT_POST)
 update_orders = require_permissions(PERM_ORDER_UPDATE)
-do_transfer = require_permissions(PERM_FINANCE_TRANSFER)
 read_finance = require_permissions(PERM_FINANCE_READ)
 
 
@@ -33,15 +36,95 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
-@router.get("/orders", response_model=list[schemas.OrderOut])
+def _order_list_payload(db: Session, orders: list) -> list[dict]:
+    """组装工作台摘要，避免列表页为每一行再请求详情。"""
+    order_ids = [item.id for item in orders]
+    account_ids = [item.account_id for item in orders if item.account_id is not None]
+    accounts = (
+        {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
+        if account_ids else {}
+    )
+
+    parties: dict[int, tuple[str, str, str | None, str, datetime]] = {}
+    if order_ids:
+        for role, customer in db.execute(
+            select(OrderCustomerRole, Customer)
+            .join(Customer, Customer.id == OrderCustomerRole.customer_id)
+            .where(OrderCustomerRole.order_id.in_(order_ids))
+        ).all():
+            parties.setdefault(role.order_id, (customer.display_name, role.role, customer.source, customer.created_by, customer.created_at))
+        for role, counterparty in db.execute(
+            select(OrderCounterpartyRole, Counterparty)
+            .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
+            .where(OrderCounterpartyRole.order_id.in_(order_ids))
+        ).all():
+            parties.setdefault(role.order_id, (counterparty.display_name, role.role, counterparty.source, counterparty.created_by, counterparty.created_at))
+
+    events_by_order: dict[int, list[OrderEvent]] = {}
+    if order_ids:
+        for event in db.scalars(
+            select(OrderEvent)
+            .where(OrderEvent.order_id.in_(order_ids), OrderEvent.is_posted.is_(True))
+            .order_by(OrderEvent.occurred_on.desc(), OrderEvent.id.desc())
+        ).all():
+            events_by_order.setdefault(event.order_id, []).append(event)
+
+    installments = (
+        {item.order_id: item for item in db.scalars(select(Installment).where(Installment.order_id.in_(order_ids))).all()}
+        if order_ids else {}
+    )
+
+    payloads: list[dict] = []
+    for order in orders:
+        account = accounts.get(order.account_id)
+        events = events_by_order.get(order.id, [])
+        installment = installments.get(order.id)
+        latest = events[0] if events else None
+        party = parties.get(order.id)
+        payloads.append({
+            "id": order.id,
+            "order_no": order.order_no,
+            "order_type": order.order_type,
+            "capital_type": order.capital_type,
+            "trade_date": order.trade_date,
+            "account_id": order.account_id,
+            "status": order.status,
+            "link_status": order.link_status,
+            "owner_id": order.owner_id,
+            "note": order.note,
+            "created_at": order.created_at,
+            "account_game_type": account.game_type if account else None,
+            "account_game_account": account.game_account if account else None,
+            "account_channel_region": account.channel_region if account else None,
+            "account_business_mode": account.business_mode if account else None,
+            "account_platform": account.platform if account else None,
+            "account_status": account.status if account else None,
+            "party_name": party[0] if party else None,
+            "party_role": party[1] if party else None,
+            "party_source": party[2] if party else None,
+            "party_created_by": party[3] if party else None,
+            "party_created_at": party[4] if party else None,
+            "event_total": sum((event.amount for event in events), 0),
+            "last_event_type": latest.event_type if latest else None,
+            "last_event_amount": latest.amount if latest else None,
+            "last_event_on": latest.occurred_on if latest else None,
+            "installment_principal": installment.principal if installment else None,
+            "installment_paid": installment.paid_amount if installment else None,
+            "installment_periods": installment.periods if installment else None,
+            "installment_status": installment.status if installment else None,
+        })
+    return payloads
+
+
+@router.get("/orders", response_model=list[schemas.OrderListOut])
 def list_orders(
     order_type: str | None = Query(default=None),
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
-) -> list[schemas.OrderOut]:
+) -> list[schemas.OrderListOut]:
     orders = service.list_orders(db, order_type=order_type, status=status, user=_user)
-    return [schemas.OrderOut.model_validate(item) for item in orders]
+    return [schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders)]
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)
@@ -102,34 +185,12 @@ def post_event(
         delivery_mode=payload.delivery_mode,
         offset_event_id=payload.offset_event_id,
         reason=payload.reason,
+        flow_category=payload.flow_category,
         note=payload.note,
     )
     return {
         "event": schemas.EventOut.model_validate(event),
         "cashflow_no": flow.flow_no if flow else None,
-    }
-
-
-@router.post("/transfers", response_model=schemas.TransferOut, status_code=201)
-def create_transfer(
-    payload: schemas.TransferCreate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = do_transfer,
-) -> dict:
-    out_flow, in_flow = service.transfer(
-        db,
-        source_pool_id=payload.source_pool_id,
-        target_pool_id=payload.target_pool_id,
-        amount=payload.amount,
-        occurred_on=payload.occurred_on,
-        actor=_actor(user),
-        note=payload.note,
-    )
-    return {
-        "transfer_id": out_flow.transfer_id,
-        "out_flow_no": out_flow.flow_no,
-        "in_flow_no": in_flow.flow_no,
-        "amount": out_flow.amount,
     }
 
 

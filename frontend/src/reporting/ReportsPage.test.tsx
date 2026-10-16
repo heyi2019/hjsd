@@ -50,7 +50,6 @@ beforeEach(() => {
     expense: "0.00",
     cash_balance: "0.00",
     deposit_held: "0.00",
-    th_advance: "0.00",
     available: "0.00",
   });
   ordersList.mockResolvedValue([]);
@@ -86,7 +85,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       total_cost: "100.00",
       items: [
         {
-          account_no: "HJACC-0001",
+          inventory_no: "ACC0001",
           game_account: "acc-1",
           platform: "A",
           status: "IN_STOCK",
@@ -99,7 +98,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       ],
     });
     renderApp(<ReportsPage />, { user: "admin" });
-    await screen.findByText("HJACC-0001");
+    await screen.findByText("ACC0001");
     expect(screen.getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
   });
 

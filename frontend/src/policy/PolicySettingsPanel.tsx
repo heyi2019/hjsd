@@ -142,7 +142,7 @@ export function PolicySettingsPanel() {
         actions={
           <Space className="ui-filter-bar">
             <Select
-              style={{ width: 240 }}
+              className="ui-control-width-policy"
               placeholder="选择规则"
               value={definitionId ?? undefined}
               options={definitions.map((d) => ({ value: d.id, label: `${d.name}（${d.policy_code}）` }))}
@@ -168,7 +168,11 @@ export function PolicySettingsPanel() {
         }
       />
 
-      <ErrorBanner error={error} />
+      <ErrorBanner
+        error={error}
+        onRetry={() => void (definitionId === null ? loadDefinitions() : loadVersions())}
+        retrying={loading}
+      />
 
       <StatRow
         items={[

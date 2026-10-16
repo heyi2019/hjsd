@@ -298,7 +298,7 @@
    ⚠ 只允许覆盖「入场态」（*-enter-active 类）：rc-motion 靠离场动画的 animationend
    才给弹层加 hidden；若把根容器动画整条 !important 钉死，关闭时动画名不变、
    浏览器不重播、animationend 永不到来 → 下拉关不掉、两个下拉同时展开
-   （2026-10-13 真机复现，CreateOrderModal 账号/客户双下拉同屏）。
+   （2026-10-13 真机复现，CreateBusinessModal 账号/客户双下拉同屏）。
    离场保持 antd 原生 slide-up/down-out。 */
 /* Apple 弹簧入场（覆盖 antd 默认 zoom/slide 动效）。
    ⚠ 真机复验（2026-10-13）修正：本构建 antd v5.29 的弹层**不发出 enter-active /
@@ -318,9 +318,8 @@
     animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
   }
   /* 业务下拉（Select 封装 ui-select-pop）入场收敛为极短淡入、无位移缩放（设计裁决）。
-     直接作用于下拉根：本构建 motion 关闭，随挂载播一次、关闭即卸载，不会关不掉。 */
+     不再强制覆盖 animation-name：离场必须交还给 antd，才能正常触发卸载。 */
   :where(.ant-select-dropdown.ui-select-pop) {
-    animation-name: none !important;
     transition: opacity 0.12s linear !important;
   }
 }

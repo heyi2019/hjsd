@@ -11,7 +11,7 @@ app/
 ├── orders/           # 订单、事件、编号
 ├── accounts/         # 账号库存和成本
 ├── installments/     # 分期合约与收款
-├── rebates/          # 返点归集与结算
+├── rebates/          # 返点记录与到账
 ├── reporting/        # 只读报表
 ├── migration/        # 历史迁移与审计
 ├── auth/             # 登录、令牌与用户认证

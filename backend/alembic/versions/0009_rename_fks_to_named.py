@@ -44,10 +44,39 @@ TABLES = [
 def _rebuild(bind, tname: str) -> None:
     orm_t = Base.metadata.tables[tname]
     ddl = str(CreateTable(orm_t).compile(dialect=bind.dialect))
+    # 0009 位于 0015 之前；当前 ORM 已包含后来新增的分期服务费字段。
+    # 只在迁移当时的真实字段集合上重建，避免把未来字段提前写进临时表，
+    # 随后 0015 再次 add_column 时发生重复列错误。
+    source_columns = [row[1] for row in bind.execute(text(f"PRAGMA table_info({tname})"))]
+    if tname == "installments":
+        ddl = ddl.replace("\tservice_fee NUMERIC(18, 2) NOT NULL, \n", "")
+        ddl = ddl.replace("\tper_period_service_fee NUMERIC(18, 2) NOT NULL, \n", "")
+        ddl = ddl.replace(" AND service_fee >= 0 AND per_period_service_fee >= 0", "")
+    # deposit_no 在 0021 才正式移除；即使当前 ORM 已经去掉它，
+    # 0009 仍必须把历史字段带过重建，否则 0021 无法完成正式删除。
+    if tname == "deposits" and "deposit_no" in source_columns:
+        ddl = ddl.replace(
+            "CREATE TABLE deposits (",
+            "CREATE TABLE deposits (\n\tdeposit_no VARCHAR(32) NOT NULL,",
+            1,
+        )
+        ddl = ddl.replace(
+            "CONSTRAINT pk_deposits PRIMARY KEY (id),",
+            "CONSTRAINT pk_deposits PRIMARY KEY (id),\n\tCONSTRAINT uq_deposits_no UNIQUE (deposit_no),",
+            1,
+        )
+    # rebate_group_no 在 0022 才统一命名为 rebate_no；0009 必须保留旧列，
+    # 避免当前 ORM 重命名后在历史重建阶段提前丢失数据。
+    if tname == "rebate_records" and "rebate_group_no" in source_columns:
+        ddl = ddl.replace("rebate_no", "rebate_group_no")
     ddl = ddl.replace(f"CREATE TABLE {tname} (", f"CREATE TABLE _new_{tname} (", 1)
     bind.execute(text(f"DROP TABLE IF EXISTS _new_{tname}"))
     bind.execute(text(ddl))
-    cols = [c.name for c in orm_t.columns]
+    cols = [c.name for c in orm_t.columns if c.name in source_columns]
+    if tname == "deposits" and "deposit_no" in source_columns:
+        cols.insert(0, "deposit_no")
+    if tname == "rebate_records" and "rebate_group_no" in source_columns:
+        cols = ["rebate_group_no" if column == "rebate_no" else column for column in cols]
     col_sql = ", ".join(cols)
     bind.execute(
         text(f"INSERT INTO _new_{tname} ({col_sql}) SELECT {col_sql} FROM {tname}")

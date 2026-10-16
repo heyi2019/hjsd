@@ -16,9 +16,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.business_numbering import installment_no as order_installment_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
+from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.policy import service as policy_service
 from app.domain.enums import (
     AccountStatus,
@@ -31,7 +33,7 @@ from app.domain.enums import (
     ScheduleStatus,
     SequenceKey,
 )
-from app.domain.trade import Account, Installment, InstallmentSchedule, Order
+from app.domain.trade import Account, Installment, InstallmentSchedule, Order, OrderEvent
 from app.orders import service as orders_service
 
 
@@ -63,13 +65,16 @@ def create_installment(
     contract_type: str,
     principal: Any = 0,
     down_payment: Any = 0,
+    service_fee: Any = 0,
     periods: int,
+    per_period_service_fee: Any = 0,
     per_period: Any = 0,
     first_due_on: date,
     actor: str,
     account_id: int | None = None,
     delivery_mode: str | None = None,
     note: str | None = None,
+    schedule: list[dict[str, Any]] | None = None,
 ) -> Installment:
     try:
         InstallmentContractType(contract_type)
@@ -87,14 +92,21 @@ def create_installment(
     )
 
     if contract_type == InstallmentContractType.STOCK_SALE.value:
-        # HS 分期出售：账号必须已买入且在库（HS-01-06）
+        # HS 分期出售：账号必须已买入且在库。
         if order.order_type != "HS":
             raise Validation(
                 "STOCK_SALE 只能用于 HS 订单",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "order_type": order.order_type},
             )
-        if account is None or account.status != AccountStatus.IN_STOCK.value:
+        has_buy_event = account is not None and session.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.BUY.value,
+                OrderEvent.is_posted.is_(True),
+            )
+        ) is not None
+        if account is None or account.status != AccountStatus.IN_STOCK.value or not has_buy_event:
             raise Validation(
                 "STOCK_SALE 要求账号已在库（已买入 HS）",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
@@ -106,10 +118,6 @@ def create_installment(
                 "ADVANCE_PURCHASE 只能用于 DFQ 订单",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "order_type": order.order_type},
-            )
-        if account is None:
-            raise Validation(
-                "DFQ 代分期必须绑定账号", details={"order_no": order.order_no}
             )
 
     existing = session.scalar(
@@ -123,6 +131,13 @@ def create_installment(
         )
     if periods <= 0:
         raise Validation("期数必须大于 0", details={"field": "periods", "value": periods})
+
+    schedule_dates: dict[int, date] = {}
+    for item in schedule or []:
+        period_no = int(item["period_no"])
+        if period_no < 1 or period_no > periods or period_no in schedule_dates:
+            raise Validation("分期计划期次必须从 1 开始且不能重复", details={"period_no": period_no})
+        schedule_dates[period_no] = item["due_on"]
 
     if delivery_mode is not None:
         try:
@@ -139,7 +154,7 @@ def create_installment(
         session, policy_code=PolicyType.INSTALLMENT.value, on=first_due_on or date.today()
     )
     installment = Installment(
-        inst_no=allocate_number(session, SequenceKey.INSTALLMENT),
+        inst_no=order_installment_no(order.order_no),
         order_id=order.id,
         account_id=account.id if account else None,
         contract_type=contract_type,
@@ -147,7 +162,9 @@ def create_installment(
         policy_snapshot=policy_snapshot,
         principal=to_money(principal),
         down_payment=to_money(down_payment),
+        service_fee=to_money(service_fee),
         periods=periods,
+        per_period_service_fee=to_money(per_period_service_fee),
         per_period=to_money(per_period),
         paid_amount=Decimal("0"),
         status=InstallmentStatus.PENDING.value,
@@ -176,7 +193,7 @@ def create_installment(
             InstallmentSchedule(
                 installment_id=installment.id,
                 period_no=index,
-                due_on=_add_months(first_due_on, index - 1),
+                due_on=schedule_dates.get(index, _add_months(first_due_on, index - 1)),
                 due_amount=to_money(per_period),
                 received_amount=Decimal("0"),
                 status=ScheduleStatus.PENDING.value,
@@ -289,7 +306,9 @@ def pay(
     )
 
     if installment.status == InstallmentStatus.PENDING.value:
-        installment.status = InstallmentStatus.ACTIVE.value
+        installment.status = transition(
+            INSTALLMENT_TRANSITIONS, installment.status, "PAYMENT", entity="分期合约"
+        )
     if to_money(installment.paid_amount) >= total_receivable(installment):
         installment.status = InstallmentStatus.SETTLED.value
     session.flush()
@@ -381,7 +400,9 @@ def deliver(
         delivery_mode=delivery_mode,
         note=note,
     )
-    installment.status = InstallmentStatus.DELIVERED.value
+    installment.status = transition(
+        INSTALLMENT_TRANSITIONS, installment.status, "DELIVER", entity="分期合约"
+    )
     installment.delivery_mode = delivery_mode
     installment.delivered_on = delivered_on
     session.flush()

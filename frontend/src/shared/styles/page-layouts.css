@@ -47,22 +47,16 @@
 .sidebar .nav-level-two.active {
   font-weight: 600;
 }/* Authentication has one clear primary action. */
-.login-card > * + button[type="submit"] {
-  margin-block-start:var(--space-5);
-}
-/* Authentication has one clear primary action. */
 .login-card button[type="submit"] {
   width: 100%;
   min-height: var(--ui-control-height-lg);
   font: var(--font-card-title);
-  /* 卡面已是渐变蓝（见 .login-card.ant-card），按钮反白构成单视觉焦点；
-     color 显式配 --accent-deep 保证白底上蓝字达标。 */
-  background: var(--on-accent);
-  color: var(--accent-deep);
+  background: var(--color-primary);
+  color: var(--on-accent);
 }
 .login-card button[type="submit"]:hover {
-  background: color-mix(in srgb, var(--on-accent) 88%, var(--accent-deep));
-  color: var(--accent-deep);
+  background: var(--accent-deep);
+  color: var(--on-accent);
 }
 
 /* 品牌锁定（2026-09-19 第二十二轮放大）：标记原为 18×18px、字号 10px，
@@ -91,25 +85,20 @@
   font: 700 var(--fs-title-3)/1 var(--font-sans);
 }
 
-/* 卡已是固定品牌面（渐变蓝），输入框底色/文字用 --login-canvas/--login-ink，不随主题反转。
-   高度统一交还 antd-adapter 全局 36px 托管：此前这里写死 min-height:44px，
-   用户名（裸 input）被撑到 44、密码框内嵌 input 也 44 但外层 wrapper 仍 36 →
-   内层撑出外层、文字不居中且两字段不等高——「密码要上下居中和用户名一样」的根因之一。 */
+/* 输入框保持统一的中性表面和明确的聚焦状态。 */
 .login-card input,
-/* dark 主题下压过 hierarchy 的 :root[data-theme="dark"] .ant-input（0,2,1 + !important）。
-   此处用 0,3,1 + !important 才能盖过它——hierarchy 给所有暗色 antd 输入框铺 --color-surface。 */
 :root[data-theme="dark"] .login-card input {
-  border-color: transparent !important;
-  background: var(--login-canvas) !important;
-  color: var(--login-ink) !important;
+  border-color: var(--color-border) !important;
+  background: var(--color-antd-bg-container) !important;
+  color: var(--color-text-primary) !important;
 }
 .login-card input::placeholder {
-  color: color-mix(in srgb, var(--login-ink) 45%, transparent);
+  color: var(--color-text-tertiary);
 }
 
 .login-card input:focus {
   border-color: var(--color-primary);
-  box-shadow: var(--ring);
+  box-shadow: var(--focus-glow);
   outline: none;
 }
 
@@ -118,7 +107,7 @@
   padding: var(--space-2) var(--space-3);
   border: var(--border-w) solid color-mix(in srgb, var(--color-error) 40%, transparent);
   border-radius: var(--radius-sm);
-  background: var(--login-canvas); /* 蓝卡上错误信息落白底药丸，保证红字对比 */
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-antd-bg-container));
   color: var(--color-error);
   font: var(--font-body-s);
 }
@@ -130,64 +119,251 @@
    不再依赖已失效的 .login-card > * / > p 直接子代选择器。 */
 .login-shell {
   display: grid;
-  place-items: center;
+  /* 1.618:1 让品牌叙事区与登录任务区形成黄金比例。 */
+  grid-template-columns: minmax(0, 1.618fr) minmax(360px, 1fr);
+  align-items: stretch;
   min-height: 100vh;
   min-height: 100dvh; /* 移动端地址栏动态高度，避免卡被顶出视口 */
-  padding: var(--space-6);
-  /* 用户裁决（2026-10-13）：登录页背景恒白，不随主题切换。 */
-  background: var(--login-canvas);
+  gap: clamp(48px, 8vw, 136px);
+  padding: clamp(28px, 6vw, 96px) clamp(28px, 8vw, 128px);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 16% 20%, rgba(50, 112, 255, 0.22), transparent 32%),
+    radial-gradient(circle at 86% 78%, rgba(116, 73, 255, 0.18), transparent 30%),
+    linear-gradient(135deg, #07101f 0%, #0d1729 48%, #11152b 100%);
 }
 
-/* 渐变蓝卡：品牌门面（用户裁决 2026-10-13），dark 主题下同样保持。
-   选择器带 .ant-card 压过 antd 运行时注入的 .ant-card 底色（同为类选择器，靠特异性取胜）。 */
+.login-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.22;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+/* 登录页是品牌入口：左侧表达业务气质，右侧只承载登录任务。 */
+.login-aside {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-2);
+  color: #f7f9ff;
+}
+
+.login-aside__topline,
+.login-aside__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-footnote);
+  letter-spacing: 0.04em;
+}
+
+.login-aside__topline .login-brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.94);
+  color: #132039;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  font-size: 21px;
+}
+
+.login-aside__content {
+  max-width: 620px;
+  padding-block: var(--space-6);
+}
+
+.login-kicker {
+  margin-block-end: var(--space-4);
+  color: #81adff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.login-aside h1 {
+  max-width: 600px;
+  color: #fff;
+  max-width: 680px;
+  font-size: clamp(46px, 5.4vw, 82px);
+  font-weight: 650;
+  letter-spacing: -0.065em;
+  line-height: 1.02;
+}
+
+.login-aside h1 em {
+  color: #76a7ff;
+  font-style: normal;
+}
+
+.login-aside__copy {
+  max-width: 360px;
+  margin-block-start: var(--space-5);
+  color: rgba(227, 235, 255, 0.62);
+  font-size: var(--fs-body);
+  line-height: 1.7;
+}
+
+.login-aside__footer {
+  color: rgba(227, 235, 255, 0.48);
+}
+
+.login-aside__footer i {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: #78a8ff;
+}
+
+/* 深色玻璃登录卡：保留 Apple 的克制，用材质和光晕建立科技感。 */
 .login-card.ant-card {
-  width: min(420px, 92vw);
-  border: 0; /* variant=borderless 之外再显式归零，防 antd 运行时兜底描边 */
-  border-radius: var(--radius-lg);
+  align-self: center;
+  position: relative;
+  top: clamp(-34px, -3.2vh, -16px);
+  width: 100%;
+  max-width: 440px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
   overflow: hidden;
-  background: var(--accent-grad);
-  background-color: var(--accent-deep); /* 渐变不可用时的纯色兜底 */
-  color: var(--on-accent);
+  background: rgba(21, 31, 50, 0.72);
+  color: #f7f9ff;
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  backdrop-filter: blur(28px) saturate(145%);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(104, 151, 255, 0.05), 0 18px 50px rgba(43, 87, 220, 0.12);
+}
+
+.login-card.ant-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, #3c8bff, #8b76ff);
 }
 
 .login-card .ant-card-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 24px;
+  padding: clamp(28px, 3.2vw, 34px);
 }
 
-/* 渐变蓝卡内的固定配色：白字 + 品牌标反白 + 白底输入，整卡不随主题反转。 */
+.login-card-head { display: grid; gap: var(--space-2); }
+.login-card-head .login-kicker { margin: 0; color: #82afff; }
+.login-card-head h2 {
+  font-size: 29px;
+  font-weight: 650;
+  color: #f7f9ff;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+}
+.login-card .ant-form { display: grid; gap: var(--space-1); }
+.login-card .ant-form-item { margin-block-end: var(--space-3); }
+.login-card .ant-form > .ant-btn-primary { margin-block-start: var(--space-2); }
+.login-card .ant-form-item .ant-form-item-label { padding-block-end: var(--space-1); }
+.login-card .ant-form-item .ant-form-item-label > label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(240, 245, 255, 0.72) !important;
+}
+.login-card .ant-input,
+.login-card .ant-input-affix-wrapper {
+  min-height: 46px;
+  border-radius: var(--radius-control);
+  background: rgba(5, 13, 27, 0.42) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #f7f9ff !important;
+}
+.login-card .ant-input {
+  height: 46px;
+  padding-block: 0;
+  line-height: 44px;
+}
+.login-card .ant-input-affix-wrapper {
+  height: 46px;
+  padding-block: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.login-card .ant-input-affix-wrapper-focused,
+.login-card .ant-input:focus {
+  background: rgba(17, 30, 56, 0.72) !important;
+  box-shadow: var(--focus-glow) !important;
+}
+/* 密码框由外层 affix wrapper 承担聚焦光晕，内部 input 保持透明，避免出现横向黑色投影块。 */
+.login-card .ant-input-affix-wrapper .ant-input,
+.login-card .ant-input-affix-wrapper .ant-input:focus {
+  height: 44px;
+  min-height: 0;
+  padding-block: 0;
+  line-height: 44px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.login-card .ant-input::placeholder { color: rgba(226, 235, 255, 0.38); }
+.login-card-foot {
+  color: rgba(226, 235, 255, 0.42);
+  font-size: 12px;
+  text-align: center;
+}
+
 .login-card .login-sub {
-  color: color-mix(in srgb, var(--on-accent) 75%, transparent);
+  color: rgba(226, 235, 255, 0.62);
 }
 .login-card .ant-form-item .ant-form-item-label > label {
-  /* adapter 的 :where(.ant-form-item-label > label) 带 !important（全站 label 灰），
-     此处同为 !important 但特异性更高（0,3,1 > :where 的 0）→ 卡内 label 反白。 */
-  color: var(--on-accent) !important;
+  color: rgba(240, 245, 255, 0.72) !important;
 }
 .login-card .ant-input-suffix .anticon {
-  color: var(--login-ink);
-  opacity: 0.45;
+  color: rgba(226, 235, 255, 0.64);
+  opacity: 0.7;
 }
 .login-card .login-brand-mark {
-  background: var(--on-accent);
-  color: var(--accent-deep);
+  background: var(--accent-grad);
+  color: var(--on-accent);
 }
-/* adapter 把全站主按钮映射为渐变蓝 !important；卡面本身已是渐变蓝，
-   按钮必须反白才构成单焦点（白底蓝字对整卡对比最强）。 */
 .login-card .ant-btn-primary {
-  background: var(--on-accent) !important;
-  color: var(--accent-deep) !important;
+  min-height: 52px;
+  border-radius: var(--radius-control);
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  background: linear-gradient(135deg, #2478f2, #5c63e8) !important;
+  color: var(--on-accent) !important;
 }
 .login-card .ant-btn-primary:not(:disabled):hover {
-  background: color-mix(in srgb, var(--on-accent) 88%, var(--accent-deep)) !important;
-  color: var(--accent-deep) !important;
+  background: linear-gradient(135deg, #3c8dff, #7772ff) !important;
+  color: var(--on-accent) !important;
 }
 
 .login-hero {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+}
+
+@media (max-width: 800px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    padding: 24px 20px 28px;
+  }
+  .login-aside { min-height: auto; }
+  .login-aside__content { padding-block: 22px 12px; }
+  .login-aside h1 { font-size: clamp(34px, 9vw, 50px); }
+  .login-aside__copy { margin-block-start: var(--space-3); font-size: 14px; }
+  .login-aside__footer { display: none; }
+  .login-card.ant-card {
+    top: -10px;
+    max-width: 520px;
+  }
 }
 
 .login-sub {

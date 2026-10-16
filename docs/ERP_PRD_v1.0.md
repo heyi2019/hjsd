@@ -98,8 +98,8 @@
 | 含义 | 说明 |
 |---|---|
 | 返点不占 `order_type` 主枚举 | 它是**主业务的附加属性**，不是第五类业务 |
-| 返点归集必须挂 `source_order_id` | 指向产生它的那笔主业务订单 |
-| 返点结算可分次 | 一笔归集可有多笔结算，分别记录到账日期、手续费和净额 |
+| 返点记录必须挂 `source_order_id` | 指向产生它的那笔主业务订单 |
+| 返点到账可分次 | 一笔返点记录可有多笔到账明细，分别记录到账日期、手续费和净额 |
 | 单笔业务的完整收益 = 主业务利润 + 附加返点 | 报表须合并呈现，否则低估业务收益 |
 | 跨期返点需支持 | 平台可能事后结算，返点日期 ≠ 成单日期 |
 
@@ -112,7 +112,7 @@
 | 阶段 | 策略 |
 |---|---|
 | M0–M2 | 19 笔全部标 `link_status=UNLINKED`，`source_order_id=NULL`；R5 报表中归入「未归集」行 |
-| M3 起 | 新增返点归集**强制必填** `source_order_id`；每次实际到账新增一笔结算明细 |
+| M3 起 | 新增返点记录**强制必填** `source_order_id`；每次实际到账新增一笔到账明细 |
 | 补录期 | 人工补齐 19 笔，补齐后 R5 自动纳入对应业务 |
 
 > 补录前 R5 报表的「附加返点」列显示 `UNLINKED 1,264.98`，
@@ -339,7 +339,7 @@
 | `order_counterparty_roles` | 订单—合作方参与关系 | id / order_id / counterparty_id / **role(PEER/SUPPLIER/PLATFORM)**；TH 同行、DFQ 供货方等从此关联 |
 | `installments` | 分期合约（`HS` 分期出售或 `DFQ` 代分期的订单从表） | id / **inst_no** / **order_id(唯一 FK，新数据必填)** / **contract_type(STOCK_SALE/ADVANCE_PURCHASE)** / account_id / principal / down_payment / periods / paid / status / next_pay_date / **rebind_date** |
 | `installment_schedules` | 分期计划明细 | id / installment_id / **period_no** / due_on / due_amount / received_amount / received_on / status；同一合约期次唯一，支持部分收款、逾期、减免与展期留痕 |
-| `rebate_records` | 返点归集（主业务从表） | id / **rebate_group_no** / source_order_id / channel / rebate_type / rate / base_amount / link_status |
+| `rebate_records` | 返点记录（主业务从表） | id / **rebate_no** / source_order_id / channel / rebate_type / rate / base_amount / link_status |
 | `rebate_settlements` | 返点结算明细 | id / **settlement_no** / rebate_record_id / settled_on / gross_amount / platform_fee / net_amount / pool_id / cashflow_id |
 
 #### 分期出售、代分期与分期合约（一对一从属）
@@ -449,20 +449,21 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | `orders`·提号 | `order_no` | `TH` + 4位序号 | `TH0001` |
 | `orders`·代挂 | `order_no` | `DG` + 4位序号 | `DG0001` |
 | `orders`·代分期 | `order_no` | `DFQ` + 4位序号 | `DFQ0001` |
-| `order_events` | `event_no` | 订单号 + 事件码（同一动作拆分资金部分时追加部分码） | `HS0001-BUY` / `HS0001-SELL-PROFIT` |
-| `rebate_records` | `rebate_group_no` | `REB` + 来源业务单号；**不是订单号**，必须关联 `source_order_id` | `REBHS0001` |
-| `rebate_settlements` | `settlement_no` | 返点归集号 + 2位结算流水 | `REBHS0001-01` |
-| `accounts` | `account_no` | `HJACC` + 4位序号 | `HJACC0001` |
+| `order_events` | `event_no` | 订单号 + `-EV-` + 动作 + 2位流水 | `HS0001-EV-BUY-01` |
+| `rebate_records` | `rebate_no` | 来源订单号 + `-RB` + 2位流水；必须关联 `source_order_id` | `HS0001-RB01` |
+| `rebate_settlements` | `settlement_no` | 返点单号 + `-CF-` + 2位到账流水 | `HS0001-RB01-CF-01` |
+| `accounts` | `account_no` | `ACC` + 4位序号 | `ACC0001` |
 | `customers` | `customer_no` | `CUS` + 4位序号 | `CUS0001` |
 | `counterparties` | `counterparty_no` | `CP` + 4位序号 | `CP0001` |
-| `installments` | `inst_no` | `HJINS` + 4位序号 | `HJINS0001` |
-| `cashflow` | `flow_no` | `HJF` + 4位序号 | `HJF0001` |
+| `installments` | `inst_no` | 订单号 + `-INS01` | `HS0001-INS01` |
+| `cashflow` | `flow_no` | 订单号 + 资金类型 + 流水 | `HS0001-CF-BUY-01` |
 | `pools` | `code` | 大写英文 | `HJ_INVEST` |
 
 **编号规则**：
 - 纯顺序号，**不含日期**；`HS` / `TH` / `DG` / `DFQ` **分别递增**，均不按天重置。不同业务允许拥有相同数字部分，如 `HS0028` 与 `TH0028`
 - `CUS`、`CP` 由各自独立序列在首次保存成功时分配；创建后不可修改、不可复用。客户联系方式仅作重复提示，不作为唯一键；管理员合并时保留目标客户号，来源客户标记 `MERGED` 并保留审计。
-- 返点归集编号必须携带来源业务单号：`REBHS0001` / `REBTH0015` / `REBDG0008` / `REBDFQ0003`；同一主订单可有一份归集记录，每次到账生成结算编号，如 `REBHS0001-01`、`REBHS0001-02`。没有来源订单的历史返点暂不生成正式归集编号，仅保留 `link_status=UNLINKED`
+- 返点记录使用订单从属号：`HS0001-RB01`、`HS0001-RB02`；每次到账生成到账编号，如 `HS0001-RB01-CF-01`、`HS0001-RB01-CF-02`。
+- 订单资金按资金类型独立递增：买号款 `HS0001-CF-BUY-01`、中介费 `HS0001-CF-FEE-01`、作图费 `HS0001-CF-DESIGN-01`、其他成本 `HS0001-CF-OTHER-01`、卖号回款 `HS0001-CF-SELL-01`。
 - 统一 4 位（上限 9999），**超出即报错，禁止静默进位**
 - 同一编号域内必须唯一，创建后**永不修改、永不复用**；业务编号用于人工沟通、检索和审计，不替代数据库主键
 - 数据库自增 `id` 仅作内部外键，不对外暴露、不参与业务关联
@@ -583,7 +584,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 > **押金现金流规则**：缴纳可退押金记 `BUSINESS_OUT + category=押金`，退回记 `BUSINESS_IN + category=押金退回`；两者均排除运营消耗和业务利润。`deposits` 记录押金权利状态，`cashflow` 记录实际收付，两者必须关联；一笔押金允许多次部分退回。
 
-> **数据模型补充**：新增 `deposits` 表（`deposit_no` / pool_id / counterparty / paid_amount / returned_amount / status / paid_on / expected_return_on / returned_on / linked_cashflow_id / remark`）。`deposit_no` 格式为 `DEP0001`；押金流水必须关联一条 `deposits` 记录，防止“已退押金”仍占用可动用余额。
+> **数据模型补充**：新增 `deposits` 表（pool_id / counterparty / paid_amount / returned_amount / status / paid_on / expected_return_on / returned_on / linked_cashflow_id / remark）。押金不单独生成业务编号；押金流水必须关联一条 `deposits` 记录，防止“已退押金”仍占用可动用余额。
 
 ### 2.3 薪资板块
 
@@ -644,7 +645,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 | 可配置规则 | 配置维度 | 应用时点 | 快照对象 |
 |---|---|---|---|
-| 渠道返点率、平台手续费率 | 渠道 / 返点类型 / 生效区间 | 创建返点归集 | `rebate_records` |
+| 渠道返点率、平台手续费率 | 渠道 / 返点类型 / 生效区间 | 创建返点记录 | `rebate_records` |
 | 员工提成率 | 人员或岗位 / 业务类型 / 生效区间 | 生成提成对账 | `payroll_commissions` |
 | 分期标准规则 | 合约类型 / 渠道 / 期数区间 / 利率或服务费规则 | 创建 HS 分期出售或 DFQ 代分期合约 | `installments` |
 | 库存跌价规则 | 业务类型 / 库龄区间 / 比例 | 生成库存报表或计提 | `inventory_policy_snapshot` |
@@ -939,7 +940,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 > 打通 `order_events` 关联后，本表从「不可算」变为可算，是 v1.0 的首要价值点。
 
-### 5.1.1 R5 业务级损益表（返点归集后的真实收益）
+### 5.1.1 R5 业务级损益表（返点到账后的真实收益）
 
 **这是返点建模为附属收入后最核心的一张表。**
 
@@ -997,12 +998,12 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | V2 | 跨池划转（`INTERNAL`）改变单池余额，但不得影响合并现金头寸或经营损益；同池账户划转不改变池余额 | 历史“八月利润转入”待凭证确认 |
 | V3 | 金额 = 0 的行不得入库（除作废标记） | 3 处 |
 | V4 | 结余递推：`本期 = 上期 + 本期变化` | 4 处违反 |
-| V5 | 每笔返点结算须满足 `gross_amount − platform_fee = net_amount`，且关联有效返点归集 | 源数据仅有净额，19 笔均需补结算结构 |
+| V5 | 每笔返点到账须满足 `gross_amount − platform_fee = net_amount`，且关联有效返点记录 | 源数据仅有净额，19 笔均需补到账结构 |
 | V6 | `capital_type IN ('STOCK','CREDIT')` 的 `BUY` 事件必须有对应 `accounts` 记录；`PASS_THRU` 的 `TH.BUY` 不要求库存账号 | 当前 36 个账号零关联 |
 | V7 | 账号入库 7 日内须被 `SELL` 引用 | 无法校验（缺关联） |
 | V8 | `accounts.channel` 须为**多值集合**（JSONB/ARRAY），非单字符串 | 现有 models.py 定义 `String(32)`，**建模错误**；真实数据 9 条单渠道、27 条多渠道 |
 | V9 | 多人订单的利润须按规则拆分到各参与人 | 现有 `orders` 把利润全部记在 `recycler`，`seller` 未参与计算 |
-| V10 | 返点归集须记录 `rate`（标称费率）；每笔结算须记录 `platform_fee`（平台手续费） | 当前只记净额，费率与手续费混在利润里 |
+| V10 | 返点记录须记录 `rate`（标称费率）；每笔到账须记录 `platform_fee`（平台手续费） | 当前只记净额，费率与手续费混在利润里 |
 | V11 | 分期须校验 `首付 ≤ 本金 ≤ 首付 + 期数×每期` | 8/15 那笔首付 900 > 本金 762，违反 |
 | V12 | `capital_type IN ('STOCK','CREDIT')` 的 BUY 须有对应 `accounts` 记录；`COST` 必须累加至该账号 `cost_amount` | 库存型/垫资型买号必须有账号实体，账号附加成本不可丢失 |
 | V13 | `capital_type=PASS_THRU` 的 BUY/SELL **不得计入库存占用**，但未被 `SELL`/`CANCEL` 核销的 BUY 必须计入「提号垫资未核销」 | 提号不形成库存资产，但买家未回款前真实占用可动用现金 |
@@ -1027,7 +1028,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | V23 | 周转/呆滞类报表**必须过滤** `link_status=LINKED` | 孤儿数据会污染指标 |
 | V24 | `orders.order_type` 须存在于 `order_type_defs`；**返点不得作为业务类型** | 返点是附加收入，误入会污染业务结构分析 |
 | V25 | `rebate_records.source_order_id`：**新录入必填**且须指向真实 `orders.id`；历史 19 笔允许 NULL 但 `link_status=UNLINKED` | 历史返点后续人工补录（Q20 已裁决）|
-| V26 | 返点归集须带 `rebate_type`（首保/续保/收号）与 `rate`；每笔 `rebate_settlements` 须记录到账日、手续费、净额及现金流关联 | 仅有金额无法核算费率准确性或跨期到账 |
+| V26 | 返点记录须带 `rebate_type`（首保/续保/收号）与 `rate`；每笔 `rebate_settlements` 须记录到账日、手续费、净额及现金流关联 | 仅有金额无法核算费率准确性或跨期到账 |
 | V27 | **同义写法须归一**：`蹭点`→`DG`、`氪金提号`→`TH`、`小荷包/经营池`→`HJ_INVEST` | 源数据 6 种写法混用 |
 | V28 | `DG` 代挂的 `principal` **应为 0**；非 0 时须为 `ZERO` 之外的显式例外并注明原因 | 24 单中 4 单本金非 0（670 / 13,700 / 4,740 / 564） |
 

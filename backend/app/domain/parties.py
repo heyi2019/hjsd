@@ -97,7 +97,7 @@ class FieldDefinition(Base, AuditMixin):
     __tablename__ = "field_definitions"
     __table_args__ = (
         CheckConstraint(
-            f"entity_type IN {EntityType.values()!r}".replace("[", "(").replace("]", ")"),
+            f"entity_type = '{EntityType.CUSTOMER.value}'",
             name="field_entity_valid",
         ),
         UniqueConstraint("entity_type", "field_key", name="uq_field_definitions_key"),
@@ -198,6 +198,7 @@ class Counterparty(Base, AuditMixin):
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     wechat: Mapped[str | None] = mapped_column(String(128), nullable=True)
     qq: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=CounterpartyStatus.ACTIVE.value
     )

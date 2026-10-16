@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ACCOUNT_STATUS_LABEL,
   EVENT_TYPE_LABEL,
+  executionActionLabel,
   INSTALLMENT_STATUS_LABEL,
   ORDER_STATUS_LABEL,
   money,
@@ -61,7 +62,7 @@ describe("today：本地日期字符串", () => {
 describe("状态枚举标签：与后端枚举一一对应", () => {
   it("订单状态覆盖后端 OrderStatus", () => {
     expect(Object.keys(ORDER_STATUS_LABEL).sort()).toEqual(
-      ["ACTIVE", "CANCELLED", "COMPLETED", "DRAFT"].sort(),
+      ["ACTIVE", "CANCELLED", "COMPLETED"].sort(),
     );
   });
 
@@ -73,14 +74,20 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
 
   it("账号状态覆盖后端 AccountStatus", () => {
     expect(Object.keys(ACCOUNT_STATUS_LABEL).sort()).toEqual(
-      ["FOR_SALE", "IN_STOCK", "INSTALLMENT", "PENDING", "SOLD", "VOID"].sort(),
+      ["FOR_SALE", "IN_STOCK", "INSTALLMENT", "SOLD", "VOID"].sort(),
     );
   });
 
   it("事件类型覆盖后端 EventType", () => {
     expect(Object.keys(EVENT_TYPE_LABEL).sort()).toEqual(
-      ["BUY", "CANCEL", "COST", "DELIVER", "PAYMENT", "SELL", "TRANSFER"].sort(),
+      ["BUY", "CANCEL", "COST", "DELIVER", "PAYMENT", "SELL"].sort(),
     );
+  });
+
+  it("交付动作按订单类型区分买入交付与卖号交付", () => {
+    expect(executionActionLabel("DELIVER", "DFQ")).toBe("卖号交付");
+    expect(executionActionLabel("DELIVER", "HS")).toBe("买入交付");
+    expect(executionActionLabel("PAYMENT", "DFQ")).toBe("回款（分期）");
   });
 });
 
@@ -91,7 +98,7 @@ describe("statusColor：颜色只做辅助", () => {
     }
   });
 
-  it("进行中/待处理为蓝", () => {
+  it("进行中/待结算为蓝", () => {
     for (const s of ["DRAFT", "PENDING", "PARTIALLY_RETURNED", "PARTIALLY_SETTLED", "INSTALLMENT"]) {
       expect(statusColor(s)).toBe("blue");
     }

@@ -57,13 +57,12 @@ SENSITIVE_FIELDS: frozenset[str] = frozenset(
 )
 
 # 每份源文件 → (source_kind, 人类可读来源名)
-# source_kind 无 CHECK 约束，取值沿用既有惯例 LEGACY_*。
 SOURCE_FILES: dict[str, tuple[str, str]] = {
-    "sheet3_cashflow": ("LEGACY_CASHFLOW", "金山文档·资金流水"),
-    "sheet9_orders": ("LEGACY_ORDER", "金山文档·订单"),
-    "sheet16_accounts": ("LEGACY_ACCOUNT", "金山文档·账号"),
-    "sheet17_installments": ("LEGACY_INSTALLMENT", "金山文档·分期"),
-    "sheet21_leads": ("LEGACY_LEAD", "金山文档·需求线索"),
+    "sheet3_cashflow": ("STANDARD_CASHFLOW", "金山文档·资金流水"),
+    "sheet9_orders": ("STANDARD_ORDER", "金山文档·订单"),
+    "sheet16_accounts": ("STANDARD_ACCOUNT", "金山文档·账号"),
+    "sheet17_installments": ("STANDARD_INSTALLMENT", "金山文档·分期"),
+    "sheet21_leads": ("STANDARD_LEAD", "金山文档·需求线索"),
 }
 
 
@@ -190,8 +189,8 @@ def main() -> int:
             created += 1
         session.commit()
         print(f"\n完成：新建 {created} 个批次，跳过 {skipped} 个已存在批次。")
-        print("下一步：在页面按批次逐行指派映射（/history/batches/{id}/rows），")
-        print("或等口径裁决后用 commit_batch 生成业务实体。")
+        print("下一步：在页面按批次逐行指派映射（/imports/batches/{id}/rows），")
+        print("或等口径裁决后提交导入批次，保留标准导入记录。")
     except Exception:
         session.rollback()
         raise

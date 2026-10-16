@@ -57,6 +57,14 @@ it("渲染四个主数据 Tab，默认业务类型列表可见", async () => {
   expect(await screen.findByText("HS")).toBeInTheDocument();
 });
 
+it("业务分类明确分期归自营、代分期归分销", async () => {
+  renderApp(<SettingsPage />, { user: "admin" });
+  await userEvent.click(screen.getByRole("tab", { name: "业务分类" }));
+  expect(await screen.findByText(/分期：本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
+  expect(screen.getByText(/代分期：他人账号售出，本方提供代付或分期服务/)).toBeInTheDocument();
+  expect(screen.getByText(/生成 DFQ 业务订单号/)).toBeInTheDocument();
+});
+
 it("资金池 Tab：admin 可见「新增资金池」，viewer 走 fallback 且无按钮", async () => {
   renderApp(<SettingsPage />, { user: "admin" });
   await screen.findByText("HS");

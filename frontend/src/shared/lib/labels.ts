@@ -50,8 +50,6 @@ export const OWNER_SCOPE_LABEL: Record<string, string> = {
 
 export const ENTITY_TYPE_LABEL: Record<string, string> = {
   customer: "客户",
-  account: "账号",
-  order: "订单",
 };
 
 export const FIELD_TYPE_LABEL: Record<string, string> = {

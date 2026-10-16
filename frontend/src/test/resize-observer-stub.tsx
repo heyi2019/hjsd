@@ -22,12 +22,16 @@ type ResizeObserverChildren =
   | React.ReactNode
   | ((ref: React.RefObject<any>) => React.ReactNode);
 
-function ResizeObserverStub({ children }: { children?: ResizeObserverChildren }): React.ReactNode {
-  if (typeof children === "function") {
-    return <>{children(React.createRef()) ?? null}</>;
-  }
-  return <>{children ?? null}</>;
-}
+const ResizeObserverStub = React.forwardRef<any, { children?: ResizeObserverChildren }>(
+  function ResizeObserverStub({ children }, forwardedRef): React.ReactNode {
+    const ref: React.RefObject<any> =
+      typeof forwardedRef === "function" ? React.createRef<any>() : (forwardedRef ?? React.createRef<any>());
+    if (typeof children === "function") {
+      return <>{children(ref) ?? null}</>;
+    }
+    return <>{children ?? null}</>;
+  },
+);
 
 // rc-table 的部分路径使用 <ResizeObserver.Collection>，一并导出。
 const Collection = ({ children }: { children?: React.ReactNode }): React.ReactNode => (

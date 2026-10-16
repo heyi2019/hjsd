@@ -1,7 +1,7 @@
 """orders 订单/事件契约测试（ORD-01/02、FIN-01/03）。
 
 与 test_orders.py / test_bughunt.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
-BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 过账、状态机、划转成对、路由缺失等主路径；
+BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 过账、状态机、路由缺失等主路径；
 本文件补NotFound/越权/过滤/非法入参分支、`_opposite_direction` 三分支、
 `_apply_account_effect` 防御与 CANCEL 分支、以及 3 个未测路由端点。
 """
@@ -78,8 +78,8 @@ class TestGetAndListOrders:
 
         by_type = order_service.list_orders(seeded_db, order_type="HS")
         assert [o.id for o in by_type] == [mine.id]
-        by_status = order_service.list_orders(seeded_db, status="DRAFT")
-        assert mine.id not in [o.id for o in by_status]  # BUY 后已转 ACTIVE
+        by_status = order_service.list_orders(seeded_db, status="ACTIVE")
+        assert mine.id in [o.id for o in by_status]  # 创建即 ACTIVE，过账不翻转状态
 
         scoped = order_service.list_orders(seeded_db, user=_scoped_user())
         assert [o.id for o in scoped] == [mine.id]
@@ -98,14 +98,15 @@ class TestPostEventValidation:
             )
         assert "事件类型" in str(exc.value)
 
-    def test_transfer_is_not_money_event(self, seeded_db):
+    def test_transfer_removed_from_event_types(self, seeded_db):
+        """划转已从 EventType 移除：不再是「可枚举但不可过账」，而是非法事件类型。"""
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
             order_service.post_event(
                 seeded_db, order.id, event_type="TRANSFER", amount="1.00",
                 occurred_on=D, actor="pytest",
             )
-        assert "不是可过账的金额事件" in str(exc.value)
+        assert "事件类型" in str(exc.value)
 
     def test_deliver_requires_note(self, seeded_db):
         order = _order(seeded_db)
@@ -146,7 +147,7 @@ class TestCancelOffsetDirection:
         assert order_a.status == "CANCELLED"
 
         # 分支二：offset 指向 SELL → 方向取反为 OUT
-        order_b = _order(seeded_db)
+        order_b = _order(seeded_db, order_type="TH")
         order_service.post_event(
             seeded_db, order_b.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
@@ -177,8 +178,8 @@ class TestCancelOffsetDirection:
 class TestAccountEffect:
     def test_cancel_reverses_cost_and_voids_account(self, seeded_db):
         account = Account(
-            account_no="ACC-ORD-1",
-            status=AccountStatus.PENDING.value,
+            inventory_no="ACC-ORD-1",
+            status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -207,7 +208,7 @@ class TestAccountEffect:
             order_type="HS",
             capital_type=CapitalType.STOCK.value,
             trade_date=D,
-            status=OrderStatus.DRAFT.value,
+            status=OrderStatus.ACTIVE.value,
             account_id=999999,
             created_by="pytest",
             updated_by="pytest",

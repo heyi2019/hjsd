@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../../test/render";
 import { DEV_USER_KEY } from "../api/client";
 import { ALL_PERMISSIONS, ROLE_PERMISSIONS, type Permission, useSession } from "./session";
@@ -77,8 +77,17 @@ describe("switchUser：切换角色", () => {
 
 describe("useSession 边界", () => {
   it("脱离 Provider 使用会明确报错（而不是静默给空权限）", () => {
-    // React 会同时输出 error 边界日志，这里只断言抛错本身
-    expect(() => render(<Probe />)).toThrow(/SessionProvider/);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const errorEvent = (event: ErrorEvent) => {
+      if (event.error instanceof Error && /SessionProvider/.test(event.error.message)) event.preventDefault();
+    };
+    window.addEventListener("error", errorEvent);
+    try {
+      expect(() => render(<Probe />)).toThrow(/SessionProvider/);
+    } finally {
+      window.removeEventListener("error", errorEvent);
+      consoleError.mockRestore();
+    }
   });
 
   it("权限码类型收窄：不存在的权限调用不抛错，返回 false", () => {

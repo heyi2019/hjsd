@@ -9,7 +9,6 @@ const poolsBalance = vi.fn();
 const depositsList = vi.fn();
 const depositsCreate = vi.fn();
 const depositsRelease = vi.fn();
-const ordersTransfer = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   poolsApi: {
@@ -22,7 +21,6 @@ vi.mock("../shared/api/catalog", () => ({
     create: (...a: unknown[]) => depositsCreate(...a),
     release: (...a: unknown[]) => depositsRelease(...a),
   },
-  ordersApi: { transfer: (...a: unknown[]) => ordersTransfer(...a), list: vi.fn() },
 }));
 
 const pools = [
@@ -32,15 +30,12 @@ const pools = [
 const balance = {
   income: "1000.00",
   expense: "200.00",
-  transfer_in: "0.00",
-  transfer_out: "0.00",
   cash_balance: "800.00",
   deposit_held: "100.00",
-  th_advance: "50.00",
-  available: "650.00",
+  available: "700.00",
 };
 const deposits = [
-  { id: 11, deposit_no: "DEP-0001", pool_id: 1, paid_amount: "500.00", returned_amount: "200.00", status: "HELD" },
+  { id: 11, pool_id: 1, paid_amount: "500.00", returned_amount: "200.00", status: "HELD" },
 ];
 
 beforeEach(() => {
@@ -49,15 +44,6 @@ beforeEach(() => {
   poolsBalance.mockResolvedValue(balance);
   depositsList.mockResolvedValue(deposits);
 });
-
-async function openTransferModal() {
-  // antd Tabs 懒渲染：未激活过的 Tab 内容不在 DOM 里，必须先切 Tab
-  await userEvent.click(screen.getByRole("tab", { name: "划转" }));
-  await userEvent.click(await screen.findByRole("button", { name: /发起划转/ }));
-  await waitFor(() => expect(screen.getByText("发起池间划转")).toBeInTheDocument());
-  const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-  return modal;
-}
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await userEvent.click(modal.querySelectorAll(".ant-select-selector")[index] as Element);
@@ -72,7 +58,7 @@ describe("FundsPage：资金池卡片", () => {
   it("渲染资金池与可用余额", async () => {
     renderApp(<FundsPage />, { user: "admin" });
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();
-    expect(screen.getAllByText("650.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
   it("后端不可达 → 错误条落地", async () => {
@@ -82,64 +68,12 @@ describe("FundsPage：资金池卡片", () => {
   });
 });
 
-describe("FundsPage：池间划转（写路径）", () => {
-  it("提交后按 (源池, 目标池, 金额字符串, 日期) 过账", async () => {
-    ordersTransfer.mockResolvedValueOnce({ out_flow_no: "OUT-1", in_flow_no: "IN-1" });
-    renderApp(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-
-    const modal = await openTransferModal();
-    await pickSelect(modal, 0, /POOL-A/);
-    await pickSelect(modal, 1, /POOL-B/);
-    await userEvent.type(modal.querySelector("#amount") ?? modal, "100.00");
-    await userEvent.click(screen.getByRole("button", { name: /提\s*交/ }));
-
-    await waitFor(() => expect(ordersTransfer).toHaveBeenCalled());
-    const payload = ordersTransfer.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.source_pool_id).toBe(1);
-    expect(payload.target_pool_id).toBe(2);
-    expect(payload.amount).toBe("100.00");
-    expect(typeof payload.amount).toBe("string");
-    expect(payload.occurred_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it("缺少必填时不提交（金额为空被拦下）", async () => {
-    renderApp(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await openTransferModal();
-    await userEvent.click(screen.getByRole("button", { name: /提\s*交/ }));
-    await waitFor(() => expect(ordersTransfer).not.toHaveBeenCalled());
-  });
-
-  it("划转失败（缺资金路由）→ 错误条给出处置提示", async () => {
-    ordersTransfer.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金池路由" } },
-      message: "Request failed",
-    });
-    renderApp(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    const modal = await openTransferModal();
-    await pickSelect(modal, 0, /POOL-A/);
-    await pickSelect(modal, 1, /POOL-B/);
-    await userEvent.type(modal.querySelector("#amount") ?? modal, "100.00");
-    await userEvent.click(screen.getByRole("button", { name: /提\s*交/ }));
-    expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
-  });
-
-  it("viewer 无 finance.transfer → 发起划转入口不渲染", async () => {
-    renderApp(<FundsPage />, { user: "viewer" });
-    await screen.findByText(/POOL-A/);
-    expect(screen.queryByRole("button", { name: /发起划转/ })).toBeNull();
-  });
-});
-
 describe("FundsPage：押金占用", () => {
-  it("押金列表渲染编号与剩余（占用-已释放）", async () => {
+  it("押金列表渲染金额与剩余（占用-已释放）", async () => {
     renderApp(<FundsPage />, { user: "admin" });
     await screen.findByText(/POOL-A/);
     await userEvent.click(screen.getByRole("tab", { name: "押金" }));
-    expect(await screen.findByText("DEP-0001")).toBeInTheDocument();
+    expect(screen.queryByText("押金编号")).not.toBeInTheDocument();
     expect(screen.getAllByText("300.00").length).toBeGreaterThanOrEqual(1); // 500-200
   });
 
@@ -164,7 +98,7 @@ describe("FundsPage：押金占用", () => {
     renderApp(<FundsPage />, { user: "finance" });
     await screen.findByText(/POOL-A/);
     await userEvent.click(screen.getByRole("tab", { name: "押金" }));
-    await screen.findByText("DEP-0001");
+    await screen.findByText("300.00");
     expect(screen.getAllByRole("button", { name: /释\s*放/ }).length).toBeGreaterThanOrEqual(1);
   });
 });

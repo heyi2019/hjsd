@@ -23,7 +23,7 @@ vi.mock("../shared/api/catalog", () => ({
 const installments = [
   {
     id: 1,
-    inst_no: "HJINS-0001",
+    inst_no: "HS0001-INS01",
     contract_type: "STOCK_SALE",
     order_id: 10,
     down_payment: "100.00",
@@ -34,7 +34,7 @@ const installments = [
   },
   {
     id: 2,
-    inst_no: "HJINS-0002",
+    inst_no: "DFQ0001-INS01",
     contract_type: "STOCK_SALE",
     order_id: 10,
     down_payment: "0.00",
@@ -57,13 +57,13 @@ beforeEach(() => {
 describe("InstallmentsPanel：分期合约", () => {
   it("渲染合约号并把 order_id 映射成订单号", async () => {
     renderApp(<InstallmentsPanel />, { user: "admin" });
-    expect(await screen.findByText("HJINS-0001")).toBeInTheDocument();
+    expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();
     expect(screen.getAllByText("HS-2026-0010").length).toBeGreaterThanOrEqual(1);
   });
 
   it("总应收 = 首付 + 每期 × 期数（前端只做展示，不参与过账）", async () => {
     renderApp(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HJINS-0001");
+    await screen.findByText("HS0001-INS01");
     // 100 + 50*4 = 300.00
     expect(screen.getAllByText("300.00").length).toBeGreaterThanOrEqual(1);
     // 剩余 = 300 - 150 = 150.00
@@ -88,7 +88,7 @@ describe("InstallmentsPanel：分期合约", () => {
 
   it("已交付合约禁用「登记收款」，未结清合约禁用「换绑交付」", async () => {
     renderApp(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HJINS-0001");
+    await screen.findByText("HS0001-INS01");
     const payButtons = screen.getAllByRole("button", { name: /登记收款/ });
     const deliverButtons = screen.getAllByRole("button", { name: /换绑交付/ });
     expect((payButtons[0] as HTMLButtonElement).disabled).toBe(false); // ACTIVE
@@ -99,7 +99,7 @@ describe("InstallmentsPanel：分期合约", () => {
   it("SCHEDULED 合约已结清时「换绑交付」可点", async () => {
     installmentsList.mockResolvedValueOnce([{ ...installments[0], status: "SETTLED" }]);
     renderApp(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HJINS-0001");
+    await screen.findByText("HS0001-INS01");
     const deliverButtons = screen.getAllByRole("button", { name: /换绑交付/ });
     expect(deliverButtons.some((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
   });
@@ -109,7 +109,7 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
   it("登记收款提交后回传金额字符串与收款日期", async () => {
     pay.mockResolvedValueOnce({ id: 1 });
     renderApp(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HJINS-0001");
+    await screen.findByText("HS0001-INS01");
     await userEvent.click(screen.getAllByRole("button", { name: /登记收款/ })[0] as Element);
     // 两行合约都有「登记收款」按钮 → 弹窗标题另找：直接等 Modal 出现
     await waitFor(() =>
@@ -129,7 +129,7 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
   it("换绑交付：SETTLED 合约可打开弹窗，必填缺失时不提交", async () => {
     installmentsList.mockResolvedValueOnce([{ ...installments[0], status: "SETTLED" }]);
     renderApp(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HJINS-0001");
+    await screen.findByText("HS0001-INS01");
     await userEvent.click(screen.getAllByRole("button", { name: /换绑交付/ })[0] as Element);
     await waitFor(() =>
       expect(document.querySelectorAll(".ant-modal-content").length).toBeGreaterThan(0),
@@ -141,7 +141,7 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
 
   it("viewer 无 order.event.post → 收款/交付入口全部不渲染", async () => {
     renderApp(<InstallmentsPanel />, { user: "viewer" });
-    await screen.findByText("HJINS-0001");
+    await screen.findByText("HS0001-INS01");
     expect(screen.queryByRole("button", { name: /登记收款/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /换绑交付/ })).toBeNull();
   });

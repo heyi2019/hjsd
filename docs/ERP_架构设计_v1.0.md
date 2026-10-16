@@ -83,7 +83,7 @@ erDiagram
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注等复购资料；客户可跨订单多角色；联系方式非唯一 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台；与客户分离，按业务角色关联 |
 | 分期 | installments / installment_schedules | `installments` 支持 HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE；一单一合约一账号；`installment_schedules` 为期次计划明细；PAYMENT→换绑→DELIVER |
-| 返点 | rebate_records / rebate_settlements | REBHS0001 归集，REBHS0001-01 分次到账 |
+| 返点 | rebate_records / rebate_settlements | HS0001-RB01 返点记录，HS0001-RB01-CF-01 分次到账 |
 | 经营规则 | policy_definitions / policy_versions / order_profit_allocations | 费率、提成、分期、跌价等版本化；已发生业务保存快照 |
 | 活字段 | field_definitions / entity_extra_values | 可增、停用、排序；历史值不可删除 |
 
@@ -95,7 +95,7 @@ erDiagram
 | LedgerService | 池余额、库存、经营损益、权益、划转对称性 |
 | TransferService | 新跨池划转一次生成两条流水和同一 transfer_id |
 | InstallmentService | HS 分期出售和 DFQ 代分期合约、应收/已收/剩余、逾期及断分期处置；结清后生成无现金流 DELIVER 释放库存 |
-| RebateService | 返点归集、手续费、分次结算和来源订单 |
+| RebateService | 返点记录、手续费、分次到账和来源订单 |
 | QualityService | 未关联、单边划转、库存缺账号、呆滞、断分期异常 |
 | PolicyService（P1） | 经营规则版本、生效区间、快照、多人利润分配与手工覆盖审计 |
 | MigrationService（P2） | 历史文件只读导入、异常保留、人工补录与对账；不参与新业务流程 |

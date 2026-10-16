@@ -266,6 +266,17 @@ class TestFieldDefinitionGuards:
             )
         assert "实体类型必须为" in str(exc.value)
 
+    @pytest.mark.parametrize("entity_type", ["account", "order"])
+    def test_business_entities_cannot_define_live_fields(self, seeded_db, entity_type):
+        with pytest.raises(Validation):
+            service.create_field_definition(
+                seeded_db,
+                entity_type=entity_type,
+                field_key="custom_note",
+                label="自定义备注",
+                actor="pytest",
+            )
+
     def test_invalid_field_key_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_field_definition(

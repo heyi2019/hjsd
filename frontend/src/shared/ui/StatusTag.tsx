@@ -7,7 +7,7 @@ const LABELS: Record<string, string> = {
   ACTIVE: "进行中",
   COMPLETED: "已完成",
   CANCELLED: "已取消",
-  PENDING: "待处理",
+  PENDING: "待结算",
   IN_STOCK: "在库",
   INSTALLMENT: "分期中",
   FOR_SALE: "待售",

@@ -24,7 +24,7 @@
 2. 建 `pools`、`order_type_defs`、`order_type_pools`、`customers`、`counterparties` 等主数据；客户与合作方分别按 `CUS`、`CP` 编号。
 3. 建 `accounts`、`orders`、`order_customer_roles`、`order_counterparty_roles`、`order_events`、`cashflow`，实现订单客户/合作方多角色关联与事件→现金流一对一。
 4. 建 `installments` 与 `installment_schedules`：以 `contract_type` 区分 HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE；一单一合约，期次计划支持 PAYMENT、逾期、换绑、断分期处置，结清交付以无现金流 DELIVER 记录。
-5. 建 `rebate_records`、`rebate_settlements`，支持 `REBHS0001` 与分次到账。
+5. 建 `rebate_records`、`rebate_settlements`，支持 `HS0001-RB01` 与分次到账。
 6. 建 `deposits`，关联押金缴纳、退回的现金流。
 7. 建 `field_definitions`、`entity_extra_values`，实现非核算活字段。
 8. 建报表所需索引与新业务质量校验。
@@ -46,7 +46,7 @@
 ## 5. 历史迁移与异常处理（P2）
 
 - 89 笔主业务订单：迁入但标 `UNLINKED`，不自动关联账号。
-- 19 笔返点：迁为无来源返点归集，待人工补 `source_order_id` 后生成正式 REB 编号。
+- 19 笔返点：迁为无来源返点记录，待人工补 `source_order_id` 后生成正式 RB 编号。
 - 无可靠订单/账号的分期：标 `ORPHAN`。
 - 八月利润转入：标 `UNLINKED_TRANSFER`，无原始凭证不得补造双边 INTERNAL。
 - 介绍费、作图费：标待关联 `COST`，不计运营消耗。

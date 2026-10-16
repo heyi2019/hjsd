@@ -46,10 +46,27 @@ describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
   it("业务入口按场景使用独立的卡片视觉层级", async () => {
     renderApp(<DashboardPage />, { user: "admin" });
     await screen.findByRole("button", { name: /自营·回收/ });
-    expect(document.querySelector(".dashboard-card-group--sell")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-card-group--self-owned")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-card-group--distribution")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-card-group--service")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-entry-group--sell")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-entry-group--self-owned")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-entry-group--distribution")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-entry-group--service")).toBeInTheDocument();
+  });
+
+  it("所有业务分组都不显示顶部装饰条", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: "提号" });
+    const groups = document.querySelectorAll(".dashboard-entry-group");
+    expect(groups).toHaveLength(4);
+    groups.forEach((group) => {
+      expect(group).toHaveClass("dashboard-entry-group--no-accent");
+    });
+  });
+
+  it("右侧两个业务分组使用中性白色视觉", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: "代分期服务" });
+    expect(document.querySelector(".dashboard-entry-group--distribution.dashboard-entry-group--neutral")).toBeInTheDocument();
+    expect(document.querySelector(".dashboard-entry-group--service.dashboard-entry-group--neutral")).toBeInTheDocument();
   });
 
   it("主入口展示短标签，强化业务转化层级", async () => {
@@ -67,10 +84,26 @@ describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
     expect(screen.queryByRole("button", { name: "分销·代挂" })).toBeNull();
   });
 
-  it("所有业务分组使用统一的等高卡片布局", async () => {
+  it("所有业务入口使用同一套标准化分组结构", async () => {
     renderApp(<DashboardPage />, { user: "admin" });
     await screen.findByRole("button", { name: "提号" });
-    expect(document.querySelectorAll(".dashboard-card-group--equal-height")).toHaveLength(4);
+    const groups = document.querySelectorAll(".dashboard-entry-group");
+    expect(groups).toHaveLength(4);
+    groups.forEach((group) => {
+      expect(group.querySelector(":scope > .dashboard-entry-group__items")).toBeInTheDocument();
+    });
+  });
+
+  it("增值服务入口使用与分销入口一致的紧凑卡片尺寸", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: "代分期服务" });
+    expect(document.querySelector(".dashboard-entry-group--service")).toBeInTheDocument();
+  });
+
+  it("增值服务卡复用回收卡的内容容器结构", async () => {
+    renderApp(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: "代分期服务" });
+    expect(document.querySelector(".dashboard-entry-group--service > .dashboard-entry-group__items")).toBeInTheDocument();
   });
 
   it("viewer 无 order.create → 看不到新建业务卡", async () => {

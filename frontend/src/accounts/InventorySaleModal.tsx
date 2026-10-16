@@ -158,7 +158,7 @@ export function InventorySaleModal(props: {
       }
     >
       <ErrorBanner error={error} />
-      <p className="muted">{props.account?.account_no} · {props.account?.game_account ?? "未填写账号"}</p>
+      <p className="muted">{props.account?.inventory_no} · {props.account?.game_account ?? "未填写账号"}</p>
       <Form form={form} layout="vertical" onFinish={submit}>
         <Form.Item name="customer_id" label="买家" rules={[{ required: true, message: "请选择买家" }]}>
           <Select

@@ -41,11 +41,6 @@ def to_money(value: Any, *, field: str = "amount") -> Decimal:
     return quantized
 
 
-def parse_amount(value: Any) -> Decimal:
-    """向后兼容的别名（legacy 代码在用），语义同 to_money。"""
-    return to_money(value)
-
-
 def require_positive(value: Any, *, field: str = "amount") -> Decimal:
     """V3：金额为 0 不得入库。"""
     amount = to_money(value, field=field)
@@ -108,7 +103,6 @@ __all__ = [
     "ZERO",
     "Amount",
     "money_equal",
-    "parse_amount",
     "require_non_negative",
     "require_positive",
     "sum_amounts",

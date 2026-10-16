@@ -1,4 +1,4 @@
-"""history.router：P2 历史参考导入（MIG-01，只读参考 + 人工映射）。"""
+"""history.router：P2 标准导入（MIG-01，只读参考 + 人工映射）。"""
 from __future__ import annotations
 
 from typing import Annotated, Any
@@ -8,35 +8,36 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import (
-    PERM_HISTORY_IMPORT,
+    PERM_IMPORT_MANAGE,
     CurrentUser,
     get_current_user,
     require_permissions,
 )
+from app.domain.enums import ImportSourceKind
 from app.history import service
 
-router = APIRouter(tags=["history"])
-import_access = require_permissions(PERM_HISTORY_IMPORT)
+router = APIRouter(tags=["imports"])
+import_access = require_permissions(PERM_IMPORT_MANAGE)
 
 
-@router.post("/history/batches")
+@router.post("/imports/batches")
 def create_batch(
     payload: dict[str, Any],
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> dict[str, Any]:
-    """上传历史原始行。系统不做任何自动匹配。"""
+    """上传标准原始行。系统不做任何自动匹配。"""
     return service.create_batch(
         db,
         source_name=payload.get("source_name", ""),
         rows=payload.get("rows", []),
-        source_kind=payload.get("source_kind", "LEGACY_ORDER"),
+        source_kind=payload.get("source_kind", ImportSourceKind.ORDER.value),
         actor=user.username,
         note=payload.get("note"),
     )
 
 
-@router.get("/history/batches")
+@router.get("/imports/batches")
 def list_batches(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
@@ -45,7 +46,7 @@ def list_batches(
     return {"items": items, "total": len(items)}
 
 
-@router.get("/history/batches/{batch_id}/rows")
+@router.get("/imports/batches/{batch_id}/rows")
 def list_rows(
     batch_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -56,7 +57,7 @@ def list_rows(
     return {"items": items, "total": len(items)}
 
 
-@router.post("/history/rows/{row_id}/map")
+@router.post("/imports/rows/{row_id}/map")
 def assign_mapping(
     row_id: int,
     payload: dict[str, Any],
@@ -74,7 +75,7 @@ def assign_mapping(
     )
 
 
-@router.post("/history/rows/{row_id}/skip")
+@router.post("/imports/rows/{row_id}/skip")
 def skip_row(
     row_id: int,
     payload: dict[str, Any],
@@ -84,7 +85,7 @@ def skip_row(
     return service.skip_row(db, row_id, reason=payload.get("reason", ""), actor=user.username)
 
 
-@router.post("/history/batches/{batch_id}/commit")
+@router.post("/imports/batches/{batch_id}/commit")
 def commit_batch(
     batch_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -94,7 +95,7 @@ def commit_batch(
     return service.commit_batch(db, batch_id, actor=user.username)
 
 
-@router.get("/history/batches/{batch_id}/preview")
+@router.get("/imports/batches/{batch_id}/preview")
 def preview_mapping(
     batch_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -104,7 +105,7 @@ def preview_mapping(
     return service.preview_mapping(db, batch_id)
 
 
-@router.get("/history/batches/{batch_id}/reconciliation")
+@router.get("/imports/batches/{batch_id}/reconciliation")
 def reconciliation(
     batch_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -114,7 +115,7 @@ def reconciliation(
     return service.reconciliation_report(db, batch_id)
 
 
-@router.post("/history/rows/{row_id}/unlinked-transfer")
+@router.post("/imports/rows/{row_id}/unlinked-transfer")
 def mark_unlinked(
     row_id: int,
     payload: dict[str, Any],
@@ -127,7 +128,7 @@ def mark_unlinked(
     )
 
 
-@router.post("/history/batches/{batch_id}/rollback")
+@router.post("/imports/batches/{batch_id}/rollback")
 def rollback_batch(
     batch_id: int,
     payload: dict[str, Any],
@@ -140,7 +141,7 @@ def rollback_batch(
     )
 
 
-@router.post("/history/batches/{batch_id}/corrections")
+@router.post("/imports/batches/{batch_id}/corrections")
 def create_correction(
     batch_id: int,
     payload: dict[str, Any],

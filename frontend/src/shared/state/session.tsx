@@ -26,7 +26,7 @@ export const ALL_PERMISSIONS = [
   "pool.manage",
   "order-type.manage",
   "report.read",
-  "history.import",
+  "import.manage",
   "user.manage",
 ] as const;
 

@@ -7,17 +7,25 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ScheduleCreate(BaseModel):
+    period_no: int = Field(ge=1)
+    due_on: date
+
+
 class InstallmentCreate(BaseModel):
     order_id: int
     contract_type: str = Field(description="STOCK_SALE / ADVANCE_PURCHASE")
     principal: Decimal = Decimal("0")
     down_payment: Decimal = Decimal("0")
+    service_fee: Decimal = Decimal("0")
     periods: int = Field(gt=0)
+    per_period_service_fee: Decimal = Decimal("0")
     per_period: Decimal = Decimal("0")
     first_due_on: date
     account_id: int | None = None
     delivery_mode: str | None = None
     note: str | None = None
+    schedule: list[ScheduleCreate] | None = None
 
 
 class InstallmentOut(BaseModel):
@@ -30,7 +38,9 @@ class InstallmentOut(BaseModel):
     contract_type: str
     principal: Decimal
     down_payment: Decimal
+    service_fee: Decimal
     periods: int
+    per_period_service_fee: Decimal
     per_period: Decimal
     paid_amount: Decimal
     status: str
@@ -75,5 +85,6 @@ __all__ = [
     "InstallmentOut",
     "PaymentIn",
     "PaymentResult",
+    "ScheduleCreate",
     "ScheduleOut",
 ]

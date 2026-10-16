@@ -1,4 +1,4 @@
-"""domain.history：P2 历史导入批次与原始行（MIG-01）。
+"""domain.history：标准导入批次与原始行（MIG-01）。
 
 设计红线（MIG-01）：历史导入**只落原始行与人工映射结果**，
 禁止自动匹配订单/账号/返点，禁止补造历史单边划转。
@@ -22,11 +22,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.domain.base import AuditMixin, TimestampMixin
-from app.domain.enums import ImportBatchStatus, ImportRowStatus
+from app.domain.enums import ImportBatchStatus, ImportRowStatus, ImportSourceKind
 
 
 class ImportBatch(Base, AuditMixin):
-    """历史导入批次：整批只读参考，提交后不覆盖新单（MIG-01-01/02）。"""
+    """标准导入批次：整批只读参考，提交后不覆盖业务单（MIG-01-01/02）。"""
 
     __tablename__ = "import_batches"
     __table_args__ = (
@@ -36,13 +36,19 @@ class ImportBatch(Base, AuditMixin):
             .replace("]", ")"),
             name="import_batch_status_valid",
         ),
+        CheckConstraint(
+            f"source_kind IN {ImportSourceKind.values()!r}"
+            .replace("[", "(")
+            .replace("]", ")"),
+            name="import_source_kind_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     batch_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     source_name: Mapped[str] = mapped_column(String(128), nullable=False)
     source_kind: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="LEGACY_ORDER"
+        String(32), nullable=False, default=ImportSourceKind.ORDER.value
     )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=ImportBatchStatus.DRAFT.value
@@ -61,7 +67,7 @@ class ImportBatch(Base, AuditMixin):
 
 
 class ImportRow(Base, TimestampMixin):
-    """历史原始行：保留原文与异常，映射必须由人工指派（MIG-01-03/04）。"""
+    """导入原始行：保留原文与异常，映射必须由人工指派（MIG-01-03/04）。"""
 
     __tablename__ = "import_rows"
     __table_args__ = (

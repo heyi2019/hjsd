@@ -66,7 +66,7 @@ class TestReports:
         report = reporting_service.daily_funds_report(seeded_db, on=date(2026, 10, 4))
         assert report["items"]
         for item in report["items"]:
-            assert "available" in item and "th_advance" in item
+            assert "available" in item and "th_advance" not in item
 
     def test_order_profit_totals_are_consistent(self, seeded_db):
         data = reporting_service.order_profit_detail(seeded_db)
@@ -168,16 +168,16 @@ class TestM4Api:
 
     def test_history_endpoints(self, seeded_client, headers):
         created = seeded_client.post(
-            "/api/v1/history/batches",
+            "/api/v1/imports/batches",
             json={"source_name": "api-legacy.xlsx", "rows": [{"a": 1}]},
             headers=headers,
         )
         assert created.status_code == 200
         batch_id = created.json()["id"]
-        assert seeded_client.get(f"/api/v1/history/batches/{batch_id}/rows", headers=headers).status_code == 200
+        assert seeded_client.get(f"/api/v1/imports/batches/{batch_id}/rows", headers=headers).status_code == 200
         assert (
             seeded_client.post(
-                f"/api/v1/history/batches/{batch_id}/commit", headers=headers
+                f"/api/v1/imports/batches/{batch_id}/commit", headers=headers
             ).status_code
             == 200
         )

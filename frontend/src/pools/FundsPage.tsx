@@ -1,11 +1,10 @@
-/** 资金中心：总览 / 划转 / 押金（页面原型 §5，FIN-01/03/04）。 */
-import { Card, Form, Input, Modal, Select, Tabs, Typography, message } from "antd";
+/** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
+import { Card, Form, Input, Modal, Select, Tabs, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
   depositsApi,
   poolsApi,
-  ordersApi,
   type Deposit,
   type Pool,
   type PoolBalance,
@@ -26,15 +25,15 @@ export function FundsPage() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [deposits, setDeposits] = useState<Deposit[]>([]);
-  const [transferOpen, setTransferOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [transferForm] = Form.useForm();
+  const [loading, setLoading] = useState(false);
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const list = await poolsApi.list();
       setPools(list);
@@ -46,29 +45,14 @@ export function FundsPage() {
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  const submitTransfer = async (values: Record<string, unknown>) => {
-    try {
-      const result = await ordersApi.transfer({
-        source_pool_id: Number(values.source_pool_id),
-        target_pool_id: Number(values.target_pool_id),
-        amount: values.amount as string,
-        occurred_on: values.occurred_on as string,
-      });
-      message.success(`划转已过账：${result.out_flow_no} / ${result.in_flow_no}`);
-      setTransferOpen(false);
-      transferForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
-  };
 
   const submitDeposit = async (values: Record<string, unknown>) => {
     try {
@@ -134,11 +118,6 @@ export function FundsPage() {
       render: (_v, row) => <MoneyText value={balances[row.id]?.deposit_held} />,
     },
     {
-      title: "TH 代垫",
-      align: "right",
-      render: (_v, row) => <MoneyText value={balances[row.id]?.th_advance} />,
-    },
-    {
       title: "可用余额",
       align: "right",
       render: (_v, row) => <MoneyText value={balances[row.id]?.available} strong />,
@@ -146,7 +125,6 @@ export function FundsPage() {
   ];
 
   const depositColumns: ColumnsType<Deposit> = [
-    { title: "押金编号", dataIndex: "deposit_no" },
     {
       title: "占用金额",
       dataIndex: "paid_amount",
@@ -188,7 +166,7 @@ export function FundsPage() {
 
   return (
     <section className="ui-stack">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
 
       <Tabs
         defaultActiveKey="overview"
@@ -209,34 +187,11 @@ export function FundsPage() {
                   columns={poolColumns}
                   rows={pools}
                   page={1}
-                  pageSize={Math.max(pools.length, 10)}
+                  pageSize={10}
                   total={pools.length}
                   emptyText="尚未配置资金池"
                   onPageChange={() => undefined}
                 />
-              </Card>
-            ),
-          },
-          {
-            key: "transfer",
-            label: "划转",
-            children: (
-              <Card
-                className="glass"
-                title="池间划转"
-                extra={
-                  <PermissionButton
-                    permission="finance.transfer"
-                    type="primary"
-                    onClick={() => setTransferOpen(true)}
-                  >
-                    发起划转
-                  </PermissionButton>
-                }
-              >
-                <Typography.Paragraph type="secondary">
-                  一次划转原子生成两条 INTERNAL 流水，同 transfer_id、金额相等、日期一致（A07）。
-                </Typography.Paragraph>
               </Card>
             ),
           },
@@ -261,7 +216,7 @@ export function FundsPage() {
                   columns={depositColumns}
                   rows={deposits}
                   page={1}
-                  pageSize={Math.max(deposits.length, 10)}
+                  pageSize={10}
                   total={deposits.length}
                   emptyText="暂无押金占用"
                   onPageChange={() => undefined}
@@ -271,26 +226,6 @@ export function FundsPage() {
           },
         ]}
       />
-
-      <Modal title="发起池间划转" open={transferOpen} onCancel={() => setTransferOpen(false)} footer={null}>
-        <Form form={transferForm} layout="vertical" onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
-          <Form.Item name="source_pool_id" label="转出池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
-          </Form.Item>
-          <Form.Item name="target_pool_id" label="转入池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
-          </Form.Item>
-          <Form.Item name="amount" label="金额" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="occurred_on" label="日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <PermissionButton permission="finance.transfer" type="primary" htmlType="submit">
-            提交
-          </PermissionButton>
-        </Form>
-      </Modal>
 
       <Modal title="新增押金占用" open={depositOpen} onCancel={() => setDepositOpen(false)} footer={null}>
         <Form form={depositForm} layout="vertical" onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
@@ -313,7 +248,7 @@ export function FundsPage() {
       </Modal>
 
       <Modal
-        title={returnTarget ? `押金释放 · ${returnTarget.deposit_no}` : "押金释放"}
+        title="押金释放"
         open={Boolean(returnTarget)}
         onCancel={() => setReturnTarget(null)}
         footer={null}

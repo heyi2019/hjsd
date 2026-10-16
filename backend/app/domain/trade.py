@@ -6,7 +6,6 @@ ORD-01/02、ACC-01、HS-01、TH-01、DG-01、DFQ-01、REB-01、FIN-01~04。
 不可突破的口径：
 - 订单汇总金额、账号成本、分期已收**均由事件派生**，不允许直接写（ORD-02-02）；
 - 一个事件最多派生一条有效现金流（FIN-02-03），`DELIVER` 无金额、无现金流；
-- 新 `INTERNAL` 划转必须成对且同 `transfer_id`（A07）；
 - 所有金额列 `DECIMAL(18,2)`，禁止 float。
 """
 from __future__ import annotations
@@ -57,29 +56,38 @@ class Account(Base, AuditMixin):
             f"status IN {AccountStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="account_status_valid",
         ),
-        UniqueConstraint("account_no", name="uq_accounts_no"),
+        Index("uq_accounts_inventory_no", "inventory_no", unique=True),
         UniqueConstraint("game_account", name="uq_accounts_game_account"),
         Index("ix_accounts_status", "status"),
         CheckConstraint("cost_amount >= 0", name="cost_nonneg"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    account_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    inventory_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    game_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    business_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    inventory_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
     game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    game_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    bound_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
     region: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    risk_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=AccountStatus.PENDING.value
+        String(16), nullable=False, default=AccountStatus.IN_STOCK.value
     )
     buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    risk_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
     channels: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    account_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    account_images: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Order(Base, AuditMixin):
-    """订单主表：编号按业务前缀分配（HS0001/TH0001/DG0001/DFQ0001）。"""
+    """订单主表：编号按业务前缀分配（HS/TH/DG/DFQ）。"""
 
     __tablename__ = "orders"
     __table_args__ = (
@@ -106,7 +114,7 @@ class Order(Base, AuditMixin):
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=OrderStatus.DRAFT.value
+        String(16), nullable=False, default=OrderStatus.ACTIVE.value
     )
     # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
     # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
@@ -164,7 +172,7 @@ class OrderEvent(Base, AuditMixin):
 
 
 class Cashflow(Base, AuditMixin):
-    """现金流：必属池；订单事件来源流水一对一；新 INTERNAL 成对。"""
+    """现金流：必属池；订单事件来源流水一对一。"""
 
     __tablename__ = "cashflow"
     __table_args__ = (
@@ -243,7 +251,7 @@ class Installment(Base, AuditMixin):
         UniqueConstraint("order_id", name="uq_installments_order"),
         Index("ix_installments_status", "status", "first_due_on"),
         CheckConstraint(
-            "principal >= 0 AND down_payment >= 0 AND per_period >= 0 AND paid_amount >= 0",
+            "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0",
             name="amount_nonneg",
         ),
     )
@@ -264,7 +272,9 @@ class Installment(Base, AuditMixin):
     policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     principal: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     down_payment: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    service_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     periods: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    per_period_service_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     per_period: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     status: Mapped[str] = mapped_column(
@@ -316,7 +326,6 @@ class Deposit(Base, AuditMixin):
             f"status IN {DepositStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="deposit_status_valid",
         ),
-        UniqueConstraint("deposit_no", name="uq_deposits_no"),
         CheckConstraint(
             "paid_amount >= 0 AND returned_amount >= 0",
             name="amount_nonneg",
@@ -324,7 +333,6 @@ class Deposit(Base, AuditMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    deposit_no: Mapped[str] = mapped_column(String(32), nullable=False)
     pool_id: Mapped[int] = mapped_column(
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
@@ -346,7 +354,7 @@ class Deposit(Base, AuditMixin):
 
 
 class RebateRecord(Base, AuditMixin):
-    """返点归集：新数据 source_order 必填，编号 `REBHS0001`（REB-01）。"""
+    """返点记录：新数据 source_order 必填，编号为订单从属号（REB-01）。"""
 
     __tablename__ = "rebate_records"
     __table_args__ = (
@@ -354,7 +362,7 @@ class RebateRecord(Base, AuditMixin):
             f"status IN {RebateStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="rebate_status_valid",
         ),
-        UniqueConstraint("rebate_group_no", name="uq_rebate_records_no"),
+        UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
         Index("ix_rebate_source_order", "source_order_id"),
         CheckConstraint(
             "rate >= 0 AND base_amount >= 0",
@@ -363,7 +371,7 @@ class RebateRecord(Base, AuditMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    rebate_group_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    rebate_no: Mapped[str] = mapped_column(String(32), nullable=False)
     source_order_id: Mapped[int | None] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
     )

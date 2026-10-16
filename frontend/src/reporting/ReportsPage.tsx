@@ -79,9 +79,9 @@ function useRange() {
   if (to) params.to = to;
   const picker = (
     <Space size="small">
-      <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 160 }} />
+      <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="ui-control-width-date" />
       <span className="muted">至</span>
-      <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 160 }} />
+      <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="ui-control-width-date" />
     </Space>
   );
   return { params, picker };
@@ -89,12 +89,12 @@ function useRange() {
 
 
 function InventoryReport() {
-  const { data, loading, error } = useReport<InventoryHealthReport>(
+  const { data, loading, error, reload } = useReport<InventoryHealthReport>(
     () => reportsApi.inventoryHealth(),
     [],
   );
   const columns: ColumnsType<InventoryHealthRow> = [
-    { title: "账号编号", dataIndex: "account_no", width: 140 },
+    { title: "库存编号", dataIndex: "inventory_no", width: 140 },
     { title: "游戏账号", dataIndex: "game_account" },
     { title: "平台", dataIndex: "platform", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
@@ -116,8 +116,8 @@ function InventoryReport() {
   ];
   return (
     <Card className="glass" title="库存健康表 R1">
-      <ErrorBanner error={error} />
-      <Note>只统计在库与分期中的真实占用；TH 永不进入库存（RPT-01-01）。</Note>
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
+      <Note>只统计已采购并进入在库、待售或分期状态的真实占用（RPT-01-01）。</Note>
       <StatRow
         items={[
           { label: "在库账号", kind: "count", amount: String(data?.items.length ?? 0) },
@@ -129,7 +129,7 @@ function InventoryReport() {
         rows={data?.items ?? []}
         loading={loading}
         page={1}
-        pageSize={Math.max(data?.items.length ?? 0, 10)}
+        pageSize={10}
         total={data?.items.length ?? 0}
         emptyText="暂无在库账号"
         onPageChange={() => undefined}
@@ -140,7 +140,7 @@ function InventoryReport() {
 
 function MonthlyPnl() {
   const { params, picker } = useRange();
-  const { data, loading, error } = useReport<MonthlyPnlReport>(
+  const { data, loading, error, reload } = useReport<MonthlyPnlReport>(
     () => reportsApi.monthlyPnl(params),
     [params.from, params.to],
   );
@@ -159,7 +159,7 @@ function MonthlyPnl() {
   ];
   return (
     <Card className="glass" title="月度经营损益 R2">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>账号采购成本属直接成本，不计入运营费用，避免双重扣减（RPT-01-02）。</Note>
       <StatRow
@@ -173,7 +173,7 @@ function MonthlyPnl() {
         rows={data?.items ?? []}
         loading={loading}
         page={1}
-        pageSize={Math.max(data?.items.length ?? 0, 10)}
+        pageSize={10}
         total={data?.items.length ?? 0}
         emptyText="所选区间无数据"
         onPageChange={() => undefined}
@@ -184,7 +184,7 @@ function MonthlyPnl() {
 
 function Commission() {
   const { params, picker } = useRange();
-  const { data, loading, error } = useReport<CommissionReport>(
+  const { data, loading, error, reload } = useReport<CommissionReport>(
     () => reportsApi.commission(params),
     [params.from, params.to],
   );
@@ -204,7 +204,7 @@ function Commission() {
   ];
   return (
     <Card className="glass" title="提成对账 R3">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>人员维度可钻取到每一单；应付与已付差异即为待追补金额（RPT-01-03）。</Note>
       <StatRow
@@ -220,7 +220,7 @@ function Commission() {
         rows={data?.items ?? []}
         loading={loading}
         page={1}
-        pageSize={Math.max(data?.items.length ?? 0, 10)}
+        pageSize={10}
         total={data?.items.length ?? 0}
         emptyText="所选区间无提成记录"
         onPageChange={() => undefined}
@@ -230,7 +230,7 @@ function Commission() {
 }
 
 function DailyFunds() {
-  const { data, loading, error } = useReport<DailyFundsReport>(
+  const { data, loading, error, reload } = useReport<DailyFundsReport>(
     () => reportsApi.dailyFunds(),
     [],
   );
@@ -240,10 +240,7 @@ function DailyFunds() {
     { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "划入", dataIndex: "transfer_in", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "划出", dataIndex: "transfer_out", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "TH 代垫", dataIndex: "th_advance", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} /> },
     {
       title: "可用余额",
@@ -254,13 +251,12 @@ function DailyFunds() {
   ];
   return (
     <Card className="glass" title={`资金日报 R4 · ${data?.date ?? ""}`}>
-      <ErrorBanner error={error} />
-      <Note>与 FIN-01 同日口径一致：押金与 TH 代垫单列，不并入可用余额（RPT-01-04）。</Note>
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
+      <Note>与 FIN-01 同日口径一致：押金单列，不并入经营收支。</Note>
       <StatRow
         items={[
           { label: "现金余额", amount: data?.total.cash_balance ?? "-" },
           { label: "押金占用", amount: data?.total.deposit_held ?? "-" },
-          { label: "TH 代垫", amount: data?.total.th_advance ?? "-" },
           { label: "可用余额", amount: data?.total.available ?? "-", tone: "auto" },
         ]}
       />
@@ -269,7 +265,7 @@ function DailyFunds() {
         rows={data?.items ?? []}
         loading={loading}
         page={1}
-        pageSize={Math.max(data?.items.length ?? 0, 10)}
+        pageSize={10}
         total={data?.items.length ?? 0}
         emptyText="当日无资金流水"
         onPageChange={() => undefined}
@@ -280,7 +276,7 @@ function DailyFunds() {
 
 function BusinessPnl() {
   const { params, picker } = useRange();
-  const { data, loading, error } = useReport<BusinessPnlReport>(
+  const { data, loading, error, reload } = useReport<BusinessPnlReport>(
     () => reportsApi.businessPnl(params),
     [params.from, params.to],
   );
@@ -305,7 +301,7 @@ function BusinessPnl() {
   ];
   return (
     <Card className="glass" title="业务级损益 R5">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>
         完整收益 = 主营毛利 + 已结算净返点；未归集返点独立列示，不摊给业务（REB-01-06）。
@@ -323,7 +319,7 @@ function BusinessPnl() {
         rows={data?.items ?? []}
         loading={loading}
         page={1}
-        pageSize={Math.max(data?.items.length ?? 0, 10)}
+        pageSize={10}
         total={data?.items.length ?? 0}
         emptyText="所选区间无业务数据"
         onPageChange={() => undefined}
@@ -334,7 +330,7 @@ function BusinessPnl() {
 
 function OrderProfit() {
   const { params, picker } = useRange();
-  const { data, loading, error } = useReport<OrderProfitReport>(
+  const { data, loading, error, reload } = useReport<OrderProfitReport>(
     () => reportsApi.orderProfit(params),
     [params.from, params.to],
   );
@@ -355,7 +351,7 @@ function OrderProfit() {
   ];
   return (
     <Card className="glass" title="订单利润明细">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow
         items={[
@@ -370,7 +366,7 @@ function OrderProfit() {
         rows={data?.items ?? []}
         loading={loading}
         page={1}
-        pageSize={Math.max(data?.items.length ?? 0, 10)}
+        pageSize={10}
         total={data?.items.length ?? 0}
         emptyText="所选区间无订单"
         onPageChange={() => undefined}

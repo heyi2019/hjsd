@@ -1,9 +1,9 @@
-"""history.service：P2 历史参考导入（MIG-01）。
+"""history.service：P2 标准导入（MIG-01）。
 
 红线（开发任务清单「阻断规则」）：
-1. **禁止自动匹配**历史订单/账号/返点 —— 映射只能由人工指派 `assign_mapping`；
-2. **禁止补造历史单边划转** —— 本模块不写任何 cashflow / order_event；
-3. 历史行**不覆盖新单** —— 导入只落 `import_rows.raw`，不 upsert 业务表；
+1. **禁止自动匹配**订单/账号/返点 —— 映射只能由人工指派 `assign_mapping`；
+2. **禁止补造单边划转** —— 本模块不写任何 cashflow / order_event；
+3. 导入行**不覆盖业务单** —— 导入只落 `import_rows.raw`，不 upsert 业务表；
 4. 未映射行提交时保持 `UNMAPPED` 状态并在 `issue_note` 留痕，可见但不阻塞新业务。
 """
 from __future__ import annotations
@@ -22,13 +22,11 @@ from app.domain.enums import (
     AuditAction,
     ImportBatchStatus,
     ImportRowStatus,
+    ImportSourceKind,
     SequenceKey,
 )
 from app.domain.history import ImportBatch, ImportRow
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
-
-COMMITTABLE = (ImportBatchStatus.MAPPED.value, ImportBatchStatus.DRAFT.value)
-
 
 def _batch_out(batch: ImportBatch) -> dict[str, Any]:
     return {
@@ -71,7 +69,7 @@ def create_batch(
     *,
     source_name: str,
     rows: list[dict[str, Any]],
-    source_kind: str = "LEGACY_ORDER",
+    source_kind: str = ImportSourceKind.ORDER.value,
     actor: str = "system",
     note: str | None = None,
 ) -> dict[str, Any]:
@@ -81,6 +79,13 @@ def create_batch(
         raise Validation("source_name 不能为空", details={"field": "source_name"})
     if not rows:
         raise Validation("导入内容为空", details={"field": "rows"})
+    try:
+        source_kind = ImportSourceKind(source_kind).value
+    except ValueError as exc:
+        raise Validation(
+            f"source_kind 必须为 {ImportSourceKind.values()}",
+            details={"field": "source_kind", "value": source_kind},
+        ) from exc
 
     batch = ImportBatch(
         batch_no=allocate_number(session, SequenceKey.IMPORT.value),
@@ -107,7 +112,7 @@ def create_batch(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.HISTORY_LAND,
+        action=AuditAction.IMPORT_LAND,
         entity_type="import_batch",
         entity_id=batch.id,
         actor=actor,
@@ -187,7 +192,7 @@ def assign_mapping(
     _refresh_counts(session, row.batch_id)
     record_audit(
         session,
-        action=AuditAction.HISTORY_MAP,
+        action=AuditAction.IMPORT_MAP,
         entity_type="import_row",
         entity_id=row.id,
         actor=actor,
@@ -218,7 +223,7 @@ def skip_row(
 
 
 def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> dict[str, Any]:
-    """提交批次：已映射行标记 IMPORTED；未映射行生成 HISTORY_UNMAPPED 异常（不阻塞）。
+    """提交批次：已映射行标记 IMPORTED；未映射行生成导入异常（不阻塞）。
 
     这里**不写任何业务数据**——历史只作为参考记录与回归样本。
     """
@@ -251,7 +256,7 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
     session.flush()
     record_audit(
         session,
-        action=AuditAction.HISTORY_COMMIT,
+        action=AuditAction.IMPORT_COMMIT,
         entity_type="import_batch",
         entity_id=batch.id,
         actor=actor,
@@ -299,7 +304,7 @@ def mark_unlinked_transfer(
 
     record_audit(
         session,
-        action=AuditAction.HISTORY_MARK_UNLINKED,
+        action=AuditAction.IMPORT_MARK_UNLINKED,
         entity_type="import_row",
         entity_id=row.id,
         actor=actor,
@@ -312,7 +317,7 @@ def mark_unlinked_transfer(
 # ── MIG-01-02 字段映射预览 ────────────────────────────────────
 
 # 源列 → 标准字段的**建议**映射。仅用于给人看，系统不据此自动指派。
-LEGACY_COLUMN_HINTS: dict[str, str] = {
+SOURCE_COLUMN_HINTS: dict[str, str] = {
     "日期": "occurred_on",
     "月份": "occurred_on",
     "交易金额": "gross_amount",
@@ -373,7 +378,7 @@ def preview_mapping(
     columns = []
     blockers = []
     for key, item in sorted(stats.items(), key=lambda kv: -kv[1]["present"]):
-        target = LEGACY_COLUMN_HINTS.get(key)
+        target = SOURCE_COLUMN_HINTS.get(key)
         rate = round(item["filled"] / max(rows.__len__(), 1) * 100, 1)
         columns.append(
             {
@@ -536,7 +541,7 @@ def rollback_batch(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.HISTORY_ROLLBACK,
+        action=AuditAction.IMPORT_ROLLBACK,
         entity_type="import_batch",
         entity_id=batch.id,
         actor=actor,
@@ -598,7 +603,7 @@ def create_correction_batch(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.HISTORY_CORRECTION,
+        action=AuditAction.IMPORT_CORRECTION,
         entity_type="import_batch",
         entity_id=new_batch.id,
         actor=actor,
@@ -609,7 +614,7 @@ def create_correction_batch(
 
 
 __all__ = [
-    "LEGACY_COLUMN_HINTS",
+    "SOURCE_COLUMN_HINTS",
     "assign_mapping",
     "commit_batch",
     "create_batch",

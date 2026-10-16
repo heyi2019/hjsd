@@ -23,7 +23,7 @@ vi.mock("../shared/api/catalog", () => ({
 const rebates = [
   {
     id: 1,
-    rebate_group_no: "REB-0001",
+    rebate_no: "HS0001-RB01",
     source_order_id: 10,
     rate: "0.10",
     base_amount: "1000.00",
@@ -32,7 +32,7 @@ const rebates = [
   },
   {
     id: 2,
-    rebate_group_no: "REB-0002",
+    rebate_no: "HS0001-RB02",
     source_order_id: 10,
     rate: "0.05",
     base_amount: "2000.00",
@@ -42,7 +42,7 @@ const rebates = [
 ];
 const orders = [
   { id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" },
-  { id: 11, order_no: "HS-2026-0011", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-03", status: "DRAFT" },
+  { id: 11, order_no: "HS-2026-0011", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-03", status: "CANCELLED" },
 ];
 const pools = [{ id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" }];
 
@@ -60,26 +60,26 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await userEvent.click(await within(current).findByTitle(title));
 }
 
-describe("RebatesPanel：返点归集列表", () => {
-  it("渲染归集号、基数与费率", async () => {
+describe("RebatesPanel：返点记录列表", () => {
+  it("渲染返点单号、基数与费率", async () => {
     renderApp(<RebatesPanel />, { user: "admin" });
-    expect(await screen.findByText("REB-0001")).toBeInTheDocument();
-    expect(screen.getByText("REB-0002")).toBeInTheDocument();
+    expect(await screen.findByText("HS0001-RB01")).toBeInTheDocument();
+    expect(screen.getByText("HS0001-RB02")).toBeInTheDocument();
     expect(screen.getAllByText("1,000.00").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("0.10").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("0.10%").length).toBeGreaterThanOrEqual(1);
   });
 
   it("统计卡：待结算为计数口径，有未结算时给 warn 语气", async () => {
     renderApp(<RebatesPanel />, { user: "admin" });
     await screen.findByText("待结算");
     const card = screen.getAllByText("待结算").map((el) => el.closest(".ui-stat")).find(Boolean);
-    expect(card?.textContent).toContain("1"); // REB-0001 PENDING
+    expect(card?.textContent).toContain("1"); // HS0001-RB01 PENDING
     expect(card?.className).toContain("ui-stat--warn");
   });
 
   it("已 SETTLED 的返点禁用「登记结算」", async () => {
     renderApp(<RebatesPanel />, { user: "admin" });
-    await screen.findByText("REB-0001");
+    await screen.findByText("HS0001-RB01");
     const buttons = screen.getAllByRole("button", { name: /登记结算/ });
     expect((buttons[0] as HTMLButtonElement).disabled).toBe(false); // PENDING
     expect((buttons[1] as HTMLButtonElement).disabled).toBe(true); // SETTLED
@@ -92,12 +92,12 @@ describe("RebatesPanel：返点归集列表", () => {
   });
 });
 
-describe("RebatesPanel：新增归集 / 登记结算", () => {
-  it("新增归集：来源订单只列 ACTIVE/COMPLETED（草稿订单不出现）", async () => {
+describe("RebatesPanel：新增返点记录 / 登记到账", () => {
+  it("新增返点记录：来源订单只列 ACTIVE/COMPLETED（非 ACTIVE/COMPLETED 态不出现）", async () => {
     renderApp(<RebatesPanel />, { user: "admin" });
-    await screen.findByText("REB-0001");
-    await userEvent.click(screen.getByRole("button", { name: /新增归集/ }));
-    await waitFor(() => expect(screen.getByText("新增返点归集")).toBeInTheDocument());
+    await screen.findByText("HS0001-RB01");
+    await userEvent.click(screen.getByRole("button", { name: /新增返点记录/ }));
+    await waitFor(() => expect(screen.getAllByText("新增返点记录").length).toBeGreaterThan(0));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await userEvent.click(modal.querySelector(".ant-select-selector") as Element);
     const dropdowns = document.querySelectorAll(".ant-select-dropdown");
@@ -105,15 +105,15 @@ describe("RebatesPanel：新增归集 / 登记结算", () => {
       ".ant-select-item-option",
     )].map((o) => o.getAttribute("title"));
     expect(options).toContain("HS-2026-0010");
-    expect(options).not.toContain("HS-2026-0011"); // DRAFT
+    expect(options).not.toContain("HS-2026-0011"); // CANCELLED
   });
 
-  it("新增归集提交后回传基数字符串与归集日期", async () => {
+  it("新增返点记录提交后回传基数字符串与返点日期", async () => {
     rebatesCreate.mockResolvedValueOnce({ id: 3 });
     renderApp(<RebatesPanel />, { user: "admin" });
-    await screen.findByText("REB-0001");
-    await userEvent.click(screen.getByRole("button", { name: /新增归集/ }));
-    await waitFor(() => expect(screen.getByText("新增返点归集")).toBeInTheDocument());
+    await screen.findByText("HS0001-RB01");
+    await userEvent.click(screen.getByRole("button", { name: /新增返点记录/ }));
+    await waitFor(() => expect(screen.getAllByText("新增返点记录").length).toBeGreaterThan(0));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /HS-2026-0010/);
     await userEvent.type(modal.querySelector("#base_amount") as Element, "1000.00");
@@ -128,7 +128,7 @@ describe("RebatesPanel：新增归集 / 登记结算", () => {
   it("登记结算提交后回传到账金额与回款池", async () => {
     rebatesSettle.mockResolvedValueOnce({ id: 9 });
     renderApp(<RebatesPanel />, { user: "admin" });
-    await screen.findByText("REB-0001");
+    await screen.findByText("HS0001-RB01");
     await userEvent.click(screen.getAllByRole("button", { name: /登记结算/ })[0] as Element);
     await waitFor(() =>
       expect(document.querySelectorAll(".ant-modal-content").length).toBeGreaterThan(0),
@@ -144,10 +144,10 @@ describe("RebatesPanel：新增归集 / 登记结算", () => {
     expect(payload.pool_id).toBe(1);
   });
 
-  it("viewer 无 order.event.post → 归集与结算入口不渲染", async () => {
+  it("viewer 无 order.event.post → 返点与到账入口不渲染", async () => {
     renderApp(<RebatesPanel />, { user: "viewer" });
-    await screen.findByText("REB-0001");
-    expect(screen.queryByRole("button", { name: /新增归集/ })).toBeNull();
+    await screen.findByText("HS0001-RB01");
+    expect(screen.queryByRole("button", { name: /新增返点记录/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /登记结算/ })).toBeNull();
   });
 });

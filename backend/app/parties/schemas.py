@@ -96,6 +96,7 @@ class CounterpartyCreate(BaseModel):
     phone: str | None = None
     wechat: str | None = None
     qq: str | None = None
+    source: str | None = Field(default=None, max_length=64)
     note: str | None = None
 
 
@@ -107,6 +108,7 @@ class CounterpartyUpdate(BaseModel):
     phone: str | None = None
     wechat: str | None = None
     qq: str | None = None
+    source: str | None = None
     note: str | None = None
 
 
@@ -121,6 +123,7 @@ class CounterpartyOut(BaseModel):
     phone: str | None = None
     wechat: str | None = None
     qq: str | None = None
+    source: str | None = None
     status: str
     note: str | None = None
     created_at: datetime

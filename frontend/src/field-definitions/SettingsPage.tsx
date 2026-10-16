@@ -1,5 +1,5 @@
 /** 设置：主数据（业务类型 / 资金池）/ 活字段（页面原型 §7）。 */
-import { Card, Form, Input, InputNumber, Popconfirm, Select, Switch, Tabs, Typography, message } from "antd";
+import { Card, Descriptions, Form, Input, InputNumber, Popconfirm, Select, Switch, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -28,22 +28,70 @@ import { CAPITAL_TYPE_LABEL, ENTITY_TYPE_LABEL, FIELD_TYPE_LABEL, POOL_OWNERSHIP
 
 export function SettingsPage() {
   const { can } = useSession();
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 960px)");
+    if (!media) return undefined;
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener?.("change", sync);
+    return () => media.removeEventListener?.("change", sync);
+  }, []);
   const items = [
+    { key: "business-dictionary", label: "业务字典", children: <BusinessDictionaryPanel /> },
     { key: "order-types", label: "业务类型", children: <OrderTypesPanel /> },
     { key: "pools", label: "资金池", children: <PoolsPanel /> },
     { key: "fields", label: "活字段", children: <FieldsPanel /> },
     { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
-    ...(can("history.import") ? [{ key: "history", label: "历史迁移", children: <HistoryWorkbench embedded /> }] : []),
+    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", children: <HistoryWorkbench embedded /> }] : []),
     ...(can("user.manage") ? [{ key: "users", label: "人员与权限", children: <UsersPanel /> }, { key: "teams", label: "团队管理", children: <TeamsPanel /> }] : []),
     { key: "appearance", label: "外观", children: <AppearancePanel /> },
   ];
   return (
     <section className="ui-stack">
       <Tabs
-        defaultActiveKey="order-types"
+        className="settings-tabs"
+        tabPosition={compact ? "top" : "left"}
+        defaultActiveKey="business-dictionary"
         items={items}
       />
     </section>
+  );
+}
+
+function BusinessDictionaryPanel() {
+  return (
+    <Card className="glass" title="业务分类口径">
+      <Typography.Paragraph type="secondary">
+          活字段只承载客户辅助信息；库存和订单字段由固定业务模型管理，不允许通过活字段覆盖。
+      </Typography.Paragraph>
+      <Descriptions bordered size="small" column={1}>
+        <Descriptions.Item label="业务">
+          自营：本方承担资金、库存和利润；分销：向供货方拿货或提号后销售，也可使用本方资金。
+        </Descriptions.Item>
+        <Descriptions.Item label="类型">
+          回收：自营买入账号；提号：分销取得账号；代挂：受委托挂售账号，是否产生资金占用取决于是否垫付。
+        </Descriptions.Item>
+        <Descriptions.Item label="产品类型">
+          游戏类型，是产品的分类，例如王者荣耀、原神。新建订单或账号中的“游戏类型”字段保存此信息；它不是某一个具体账号。
+        </Descriptions.Item>
+        <Descriptions.Item label="产品">
+          具体的游戏账号，是可以进入库存、售卖或交付的产品实例，包含游戏账号、账号密码、渠道/区服等信息。
+        </Descriptions.Item>
+        <Descriptions.Item label="库存账号">
+          产品进入库存后的管理对象；库存中心展示其业务归属、入库类型、产品类型和账号状态，并承接全款或分期付款售卖。
+        </Descriptions.Item>
+        <Descriptions.Item label="增值服务">
+          分期：本方账号售出，买家分期支付售卖款，归自营售出，不单独产生业务编号。代分期：他人账号售出，本方提供代付或分期服务并收取服务收益，归分销业务，生成 DFQ 业务订单号。
+        </Descriptions.Item>
+        <Descriptions.Item label="分期（自营售出）">
+          售出方是本方，账号归本方库存；售出金额属于本方销售收入。买家按期回款，收齐后完成交付；每笔回款都归集到原售出订单及其分期合约。
+        </Descriptions.Item>
+        <Descriptions.Item label="代分期（分销服务）">
+          售出方和账号所有权属于客户/合作方，本方不把账号计入库存或销售收入；创建时生成 DFQ 业务订单号。本方仅代付剩余款项、跟进分期回收，并以服务费、佣金或约定返点确认收益。代付本金与回收款须分别记录，不能混作本方售出收入。
+        </Descriptions.Item>
+      </Descriptions>
+    </Card>
   );
 }
 
@@ -77,7 +125,7 @@ function OrderTypesPanel() {
 
   return (
     <Card className="glass" title="业务类型主数据">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
         新增业务无需改代码：配置编号前缀与资金路由后即可开单（BAS-02）。
       </Typography.Paragraph>
@@ -146,7 +194,7 @@ function PoolsPanel() {
 
   return (
     <Card className="glass" title="资金池主数据">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
       <DataTable<Pool>
         columns={columns}
         rows={rows}
@@ -157,7 +205,7 @@ function PoolsPanel() {
         onPageChange={() => undefined}
       />
       <PermissionGate permission="pool.manage">
-        <Form form={form} layout="inline" onFinish={submit} style={{ marginTop: 16 }}>
+        <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced">
           <Form.Item name="code" rules={[{ required: true }]}>
             <Input placeholder="池代码，如 HJ_CUSTODY" />
           </Form.Item>
@@ -285,7 +333,7 @@ function FieldsPanel() {
 
   return (
     <Card className="glass" title="活字段">
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
         活字段仅承载辅助信息，不得覆盖核算字段；有历史值只能停用，无历史值可删除（BAS-04）。
       </Typography.Paragraph>
@@ -303,11 +351,11 @@ function FieldsPanel() {
           form={form}
           layout="inline"
           onFinish={submit}
-          style={{ marginTop: 16 }}
+          className="ui-form-spaced"
           initialValues={{ entity_type: "customer", field_type: "TEXT", sort_order: 0 }}
         >
           <Form.Item name="entity_type" label="实体">
-            <Select options={ENTITY_TYPE_OPTIONS} style={{ width: 120 }} />
+            <Select options={ENTITY_TYPE_OPTIONS} className="ui-control-width-120" disabled />
           </Form.Item>
           <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
             <Input placeholder="小写下划线，如 credit_level" />
@@ -316,18 +364,18 @@ function FieldsPanel() {
             <Input placeholder="页面显示名" />
           </Form.Item>
           <Form.Item name="field_type" label="类型">
-            <Select options={FIELD_TYPE_OPTIONS} style={{ width: 110 }} />
+            <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" />
           </Form.Item>
           {needsOptions && (
             <Form.Item name="options" label="选项">
-              <Input placeholder="逗号分隔，如 优质,观察,黑名单" style={{ width: 200 }} />
+              <Input placeholder="逗号分隔，如 优质,观察,黑名单" className="ui-control-width-200" />
             </Form.Item>
           )}
           <Form.Item name="required" label="必填" valuePropName="checked">
             <Switch />
           </Form.Item>
           <Form.Item name="sort_order" label="排序">
-            <InputNumber min={0} style={{ width: 90 }} />
+            <InputNumber min={0} className="ui-control-width-90" />
           </Form.Item>
           <Form.Item>
             <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">

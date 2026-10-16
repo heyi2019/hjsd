@@ -1,5 +1,5 @@
 /** 资金操作抽屉：金额类动作必须走抽屉/弹窗提交，禁止列表内直接过账。 */
-import { Button, Drawer, Form, Input, InputNumber, Space } from "antd";
+import { Button, Drawer, Form, Input, InputNumber, Select, Space } from "antd";
 import type { ReactNode } from "react";
 
 export interface DrawerField {
@@ -26,13 +26,14 @@ export function FormDrawer(props: {
   const [form] = Form.useForm();
   return (
     <Drawer
+      className="form-drawer"
       title={props.title}
       open={props.open}
       onClose={props.onClose}
       width={460}
-      destroyOnClose
+      destroyOnHidden
       footer={
-        <Space style={{ justifyContent: "flex-end", width: "100%" }}>
+        <Space className="ui-drawer-actions">
           <Button onClick={props.onClose}>取消</Button>
           <Button
             type="primary"
@@ -70,11 +71,15 @@ export function FormDrawer(props: {
             {field.kind === "money" ? (
               <Input placeholder={field.placeholder ?? "0.00"} inputMode="decimal" />
             ) : field.kind === "number" ? (
-              <InputNumber style={{ width: "100%" }} />
+              <InputNumber className="ui-control-full" />
             ) : field.kind === "textarea" ? (
               <Input.TextArea rows={3} placeholder={field.placeholder} />
             ) : field.kind === "select" ? (
-              <Input placeholder={field.placeholder ?? "请输入编码"} />
+              <Select
+                allowClear
+                placeholder={field.placeholder ?? "请选择"}
+                options={field.options}
+              />
             ) : (
               <Input placeholder={field.placeholder} />
             )}

@@ -7,6 +7,8 @@ export type EntryTone = "plain" | "primary" | "warn";
 
 export function EntryCard(props: {
   title: string;
+  /** 极短的场景标签：用于主入口层级，不承载说明段落。 */
+  eyebrow?: string;
   /** 主数值（计数/金额字符串）；动作卡可省略。 */
   value?: ReactNode;
   /** 说明文案：动作卡写清点击后发生什么；统计卡写清点击后去哪里。 */
@@ -29,6 +31,7 @@ export function EntryCard(props: {
         }
       }}
     >
+      {props.eyebrow ? <span className="ui-entry-card__eyebrow">{props.eyebrow}</span> : null}
       <span className="ui-entry-card__title">{props.title}</span>
       {props.value !== undefined && props.value !== null ? (
         <span className="ui-entry-card__value">{props.value}</span>

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 
 from alembic import op
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 revision = "0012_seed_account_merchant_fields"
 down_revision = "0011_orders_drop_draft_status"
@@ -134,9 +134,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     keys = [f["field_key"] for f in _SEED_FIELDS]
-    bind.execute(
-        text(
-            "DELETE FROM field_definitions "
-            "WHERE entity_type = 'customer' AND field_key IN :keys"
-        ).bindparams(keys=tuple(keys)),
-    )
+    statement = text(
+        "DELETE FROM field_definitions "
+        "WHERE entity_type = 'customer' AND field_key IN :keys"
+    ).bindparams(bindparam("keys", expanding=True))
+    bind.execute(statement, {"keys": keys})

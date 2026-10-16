@@ -42,7 +42,7 @@ def _seed_order_rows(session, rows):
         session,
         source_name="金山文档·订单",
         rows=rows,
-        source_kind="LEGACY_ORDER",
+        source_kind="STANDARD_ORDER",
         actor="pytest",
     )
     from app.domain.history import ImportRow

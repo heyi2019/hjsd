@@ -20,7 +20,6 @@ export function today(): string {
 }
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "草稿",
   ACTIVE: "进行中",
   COMPLETED: "已完成",
   CANCELLED: "已取消",
@@ -37,7 +36,6 @@ export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
 };
 
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
-  PENDING: "待收",
   IN_STOCK: "在库",
   INSTALLMENT: "分期中",
   FOR_SALE: "待售",
@@ -46,14 +44,40 @@ export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
 };
 
 export const EVENT_TYPE_LABEL: Record<string, string> = {
-  BUY: "买入/付同行",
+  BUY: "买号",
   COST: "附加成本",
-  SELL: "售出/收款",
-  PAYMENT: "分期收款",
-  DELIVER: "换绑交付",
-  TRANSFER: "划转",
+  SELL: "卖号",
+  PAYMENT: "回款（分期）",
+  DELIVER: "交付",
   CANCEL: "冲销",
 };
+
+/**
+ * 执行动作统一文案：底层事件编码保持稳定，页面不再直接暴露 BUY/SELL/DELIVER。
+ * 买入交付和卖号交付结合订单类型判断：代分期是向客户完成卖号交付，其余交付语义归入买入交付。
+ */
+export const EXECUTION_ACTION_LABEL: Record<string, string> = {
+  BUY: "买号",
+  COST: "费用支出",
+  SELL: "卖号",
+  PAYMENT: "回款（分期）",
+  DELIVER: "交付",
+  CANCEL: "取消",
+};
+
+/** 跨业务复用的能力，不作为买卖资金事件落账。 */
+export const COMMON_CAPABILITY_LABEL: Record<string, string> = {
+  ACQUISITION: "获客",
+};
+
+export function executionActionLabel(
+  eventType: string | null | undefined,
+  orderType?: string | null,
+): string {
+  if (!eventType) return "-";
+  if (eventType === "DELIVER") return orderType === "DFQ" ? "卖号交付" : "买入交付";
+  return EXECUTION_ACTION_LABEL[eventType] ?? eventType;
+}
 
 /** 状态 → antd Tag 颜色；不使用颜色单独承载紧急程度。 */
 export function statusColor(status: string): string {

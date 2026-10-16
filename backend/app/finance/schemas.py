@@ -26,7 +26,6 @@ class DepositOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    deposit_no: str
     pool_id: int
     paid_amount: Decimal
     returned_amount: Decimal
@@ -48,7 +47,7 @@ class RebateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    rebate_group_no: str
+    rebate_no: str
     source_order_id: int | None = None
     rate: Decimal
     base_amount: Decimal

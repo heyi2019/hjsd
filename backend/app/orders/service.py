@@ -1,9 +1,8 @@
-"""orders.service：订单、业务事件、现金流派生与池间划转（ORD-01/02、FIN-02/03、HS/TH/DG/DFQ）。
+"""orders.service：订单、业务事件与现金流派生（ORD-01/02、HS/TH/DG/DFQ）。
 
 不可突破的口径：
 - 订单汇总、账号成本、分期已收一律**由事件派生**，禁止直接写（ORD-02-02）；
 - 一个事件最多派生一条有效现金流；`DELIVER` 无金额、无现金流；
-- 新 `INTERNAL` 划转必须成对、同 `transfer_id`、金额相等、日期一致（A07）；
 - 资金池优先级：事件显式池 > 业务默认路由 > 阻断 `POOL_ROUTE_MISSING`（ORD-02-04）。
 """
 from __future__ import annotations
@@ -17,10 +16,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.business_numbering import cashflow_no as next_cashflow_no
+from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
 from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
+from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.policy import service as policy_service
 from app.domain.enums import (
     AccountStatus,
@@ -76,6 +78,7 @@ def create_order(
             details={"order_type": order_type},
         )
 
+
     # BAS-06-04 规则快照：按成交日固化当时生效的返点/提成规则。
     # 规则改版不回写这里，历史订单永远按当时口径计算。
     snapshot: dict[str, Any] = {}
@@ -97,7 +100,7 @@ def create_order(
         capital_type=capital_type or definition.capital_type,
         trade_date=trade_date,
         account_id=account_id,
-        status=OrderStatus.DRAFT.value,
+        status=OrderStatus.ACTIVE.value,
         policy_version_id=primary_version_id,
         policy_snapshot=snapshot or None,
         owner_id=owner_id,
@@ -191,6 +194,7 @@ def post_event(
     delivery_mode: str | None = None,
     offset_event_id: int | None = None,
     reason: str | None = None,
+    flow_category: str | None = None,
     note: str | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """过账：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
@@ -203,7 +207,7 @@ def post_event(
         ) from exc
 
     order = get_order(session, order_id)
-    if order.status not in (OrderStatus.DRAFT.value, OrderStatus.ACTIVE.value):
+    if order.status != OrderStatus.ACTIVE.value:
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
@@ -225,11 +229,16 @@ def post_event(
             f"{event_type} 不是可过账的金额事件", details={"event_type": event_type}
         )
 
+    if event_type == EventType.SELL.value:
+        _assert_sellable_order(session, order)
+
     money = require_positive(amount, field="amount")
     resolved_pool_id = pool_id or _resolve_pool(session, order, portion).id
     _assert_pool_active(session, resolved_pool_id)
     event = OrderEvent(
-        event_no=allocate_number(session, SequenceKey.EVENT),
+        event_no=next_event_no(
+            session, order_no=order.order_no, order_id=order.id, event_type=event_type
+        ),
         order_id=order.id,
         event_type=event_type,
         amount=money,
@@ -247,11 +256,20 @@ def post_event(
     session.flush()
 
     direction, nature, category = EVENT_FLOW_MAP[event_type]
+    if flow_category is not None:
+        if event_type != EventType.COST.value or flow_category not in {"FEE", "DESIGN", "OTHER"}:
+            raise Validation(
+                "仅 COST 事件可使用 FEE、DESIGN 或 OTHER 资金分类",
+                details={"event_type": event_type, "flow_category": flow_category},
+            )
+        category = flow_category
     if event_type == EventType.CANCEL.value:
         direction = _opposite_direction(offset_event_id, session)
 
     flow = Cashflow(
-        flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+        flow_no=next_cashflow_no(
+            session, order_no=order.order_no, order_id=order.id, category=category
+        ),
         pool_id=event.pool_id,
         occurred_on=occurred_on,
         nature=nature,
@@ -268,9 +286,9 @@ def post_event(
     _apply_account_effect(session, order, event_type, money)
     if event_type == EventType.CANCEL.value:
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件
-        order.status = OrderStatus.CANCELLED.value
-    elif order.status == OrderStatus.DRAFT.value:
-        order.status = OrderStatus.ACTIVE.value
+        order.status = transition(
+            ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单"
+        )
     session.flush()
 
     record_audit(
@@ -289,6 +307,42 @@ def post_event(
         reason=reason,
     )
     return event, flow
+
+
+def _assert_sellable_order(session: Session, order: Order) -> None:
+    """库存账号售出必须建立在已采购入库之上。"""
+    if order.order_type != "HS":
+        return
+    if order.account_id is None:
+        raise Validation(
+            "自营账号售出必须关联已回收账号",
+            details={"order_type": order.order_type, "account_id": None},
+        )
+
+    account = session.get(Account, order.account_id)
+    if account is None:
+        raise NotFound(f"账号 {order.account_id} 不存在", details={"account_id": order.account_id})
+    if account.status not in (AccountStatus.IN_STOCK.value, AccountStatus.FOR_SALE.value):
+        raise Validation(
+            "账号必须先完成回收并进入库存后才能售出",
+            details={"account_status": account.status, "account_id": account.id},
+        )
+
+    purchased = session.scalar(
+        select(OrderEvent.id)
+        .join(Order, Order.id == OrderEvent.order_id)
+        .where(
+            Order.account_id == account.id,
+            OrderEvent.event_type == EventType.BUY.value,
+            OrderEvent.is_posted.is_(True),
+        )
+        .limit(1)
+    )
+    if purchased is None:
+        raise Validation(
+            "账号缺少已过账的采购入库记录，不能售出",
+            details={"account_id": account.id},
+        )
 
 
 def _opposite_direction(offset_event_id: int | None, session: Session) -> str:
@@ -327,7 +381,12 @@ def _post_deliver(
             details={"field": "note"},
         )
     event = OrderEvent(
-        event_no=allocate_number(session, SequenceKey.EVENT),
+        event_no=next_event_no(
+            session,
+            order_no=order.order_no,
+            order_id=order.id,
+            event_type=EventType.DELIVER.value,
+        ),
         order_id=order.id,
         event_type=EventType.DELIVER.value,
         amount=Decimal("0"),
@@ -344,7 +403,9 @@ def _post_deliver(
         account = session.get(Account, order.account_id)
         if account is not None:
             account.status = AccountStatus.SOLD.value
-    order.status = OrderStatus.COMPLETED.value
+    order.status = transition(
+        ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
+    )
     session.flush()
     record_audit(
         session,
@@ -391,90 +452,32 @@ def _apply_account_effect(
     account = session.get(Account, order.account_id)
     if account is None:
         return
-    stock_type = order.capital_type == CapitalType.STOCK.value
+    # HS 与 TH 都会把账号带入库存；TH 仍保持 PASS_THRU 资金口径，
+    # 这里只单独决定账号状态，不改变订单的资金核算类型。
+    stock_type = order.order_type in ("HS", "TH") or order.capital_type == CapitalType.STOCK.value
     credit_type = order.capital_type == CapitalType.CREDIT.value
 
     if event_type == EventType.BUY.value:
         account.cost_amount = to_money(account.cost_amount) + amount
         account.buy_date = order.trade_date
-        account.status = (
-            AccountStatus.IN_STOCK.value if stock_type else AccountStatus.INSTALLMENT.value
+        account.status = transition(
+            ACCOUNT_TRANSITIONS,
+            account.status,
+            "BUY_STOCK" if stock_type else "BUY_CREDIT",
+            entity="账号",
         )
     elif event_type == EventType.COST.value:
         account.cost_amount = to_money(account.cost_amount) + amount
     elif event_type == EventType.SELL.value:
-        account.status = AccountStatus.SOLD.value
+        account.status = transition(ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号")
     elif event_type == EventType.CANCEL.value:
         account.cost_amount = to_money(account.cost_amount) - amount
-        account.status = AccountStatus.VOID.value
+        account.status = transition(ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号")
 
 
-# --------------------------------------------------------------------- 划转
-def transfer(
-    session: Session,
-    *,
-    source_pool_id: int,
-    target_pool_id: int,
-    amount: Any,
-    occurred_on: date,
-    actor: str,
-    note: str | None = None,
-) -> tuple[Cashflow, Cashflow]:
-    """跨池划转：原子生成两条 INTERNAL，同 transfer_id（A07）。"""
-    if source_pool_id == target_pool_id:
-        raise Validation("转出池与转入池不得相同", details={"pool_id": source_pool_id})
-    money = require_positive(amount, field="amount")
-    source = foundation_service.assert_pool_usable(session, source_pool_id)
-    target = foundation_service.assert_pool_usable(session, target_pool_id)
-
-    transfer_id = allocate_number(session, SequenceKey.CASHFLOW)
-    out_flow = Cashflow(
-        flow_no=transfer_id,
-        pool_id=source.id,
-        occurred_on=occurred_on,
-        nature=Nature.INTERNAL.value,
-        category="TRANSFER_OUT",
-        direction=Direction.OUT.value,
-        amount=money,
-        transfer_id=transfer_id,
-        note=note,
-        created_by=actor,
-        updated_by=actor,
-    )
-    in_flow = Cashflow(
-        flow_no=f"{transfer_id}-I",
-        pool_id=target.id,
-        occurred_on=occurred_on,
-        nature=Nature.INTERNAL.value,
-        category="TRANSFER_IN",
-        direction=Direction.IN.value,
-        amount=money,
-        transfer_id=transfer_id,
-        note=note,
-        created_by=actor,
-        updated_by=actor,
-    )
-    session.add(out_flow)
-    session.add(in_flow)
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.TRANSFER_CREATE,
-        entity_type="transfer",
-        entity_id=transfer_id,
-        actor=actor,
-        after={
-            "source_pool": source.code,
-            "target_pool": target.code,
-            "amount": str(money),
-        },
-    )
-    return out_flow, in_flow
-
-
-# --------------------------------------------------------------------- 池与代垫
+# --------------------------------------------------------------------- 池余额
 def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
-    """资金池卡片：现金余额、押金占用、TH 未闭环代垫与可用余额（FIN-01）。"""
+    """资金池卡片：现金余额、押金占用与可用余额。"""
     pool = session.get(Pool, pool_id)
     if pool is None:
         raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
@@ -489,23 +492,17 @@ def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
 
     income = total(Direction.IN.value, Nature.BUSINESS_IN.value)
     expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value)
-    transfer_in = total(Direction.IN.value, Nature.INTERNAL.value)
-    transfer_out = total(Direction.OUT.value, Nature.INTERNAL.value)
-    cash_balance = income - expense + transfer_in - transfer_out
+    cash_balance = income - expense
 
     deposit_held = _deposit_held(session, pool_id)
-    th_advance = th_unsettled_advance(session)
     return {
         "pool_id": pool.id,
         "pool_code": pool.code,
         "income": income,
         "expense": expense,
-        "transfer_in": transfer_in,
-        "transfer_out": transfer_out,
         "cash_balance": cash_balance,
         "deposit_held": deposit_held,
-        "th_advance": th_advance,
-        "available": cash_balance - deposit_held - th_advance,
+        "available": cash_balance - deposit_held,
     }
 
 
@@ -518,32 +515,11 @@ def _deposit_held(session: Session, pool_id: int) -> Decimal:
     return to_money(session.scalar(stmt) or 0)
 
 
-def th_unsettled_advance(session: Session) -> Decimal:
-    """TH 未闭环代垫：付同行金额 − 已收买家金额，按事件派生，不落库（TH-01-05）。"""
-    from app.domain.trade import Order as OrderModel
-
-    paid = select(func.coalesce(func.sum(OrderEvent.amount), 0)).join(
-        OrderModel, OrderModel.id == OrderEvent.order_id
-    ).where(
-        OrderModel.capital_type == CapitalType.PASS_THRU.value,
-        OrderEvent.event_type == EventType.BUY.value,
-    )
-    received = select(func.coalesce(func.sum(OrderEvent.amount), 0)).join(
-        OrderModel, OrderModel.id == OrderEvent.order_id
-    ).where(
-        OrderModel.capital_type == CapitalType.PASS_THRU.value,
-        OrderEvent.event_type == EventType.SELL.value,
-    )
-    value = to_money(session.scalar(paid) or 0) - to_money(session.scalar(received) or 0)
-    return value if value > 0 else Decimal("0")
-
-
 __all__ = [
     "create_order",
     "get_order",
     "list_orders",
     "pool_balance",
     "post_event",
-    "th_unsettled_advance",
     "transfer",
 ]

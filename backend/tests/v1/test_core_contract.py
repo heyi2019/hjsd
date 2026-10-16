@@ -10,9 +10,9 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.core import database, settings as settings_module
+from app.core import database, money, settings as settings_module
 from app.core.errors import AppError, NotFound, Validation, require_condition
-from app.core.money import Amount, parse_amount, to_money
+from app.core.money import Amount, to_money
 from app.core.numbering import MAX_SEQUENCE_VALUE, current_value, peek_number
 from app.core.security import (
     ROLE_ADMIN,
@@ -32,8 +32,9 @@ from app.domain.foundation import DocumentSequence
 
 # ------------------------------------------------------------------ money
 class TestMoneyHelpers:
-    def test_parse_amount_is_alias_of_to_money(self):
-        assert parse_amount("12.345") == to_money("12.345")
+    def test_money_exposes_one_public_parser(self):
+        assert not hasattr(money, "parse_amount")
+        assert money.to_money("12.345") == to_money("12.345")
 
     def test_amount_type_decorator_edges(self):
         column_type = Amount()

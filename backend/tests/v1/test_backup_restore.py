@@ -54,7 +54,7 @@ def _seed(engine) -> dict[str, int]:
         s.flush()
         order = Order(
             order_no="TEST0001", order_type="HS", capital_type=CapitalType.STOCK.value,
-            trade_date=__import__("datetime").date.today(), status=OrderStatus.DRAFT.value,
+            trade_date=__import__("datetime").date.today(), status=OrderStatus.ACTIVE.value,
             owner_id=1,
         )
         s.add(order)

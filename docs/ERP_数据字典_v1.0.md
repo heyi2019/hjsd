@@ -35,9 +35,9 @@
 | accounts | account_no, game_account, buy_date, cost_amount, status, channels, risk_level | HS/DFQ 必联；账号号可空唯一；手机号不可作键 |
 | installments | inst_no, order_id, contract_type, account_id, principal, down_payment, periods, per_period, paid, status | 分期合约主表；`ADVANCE_PURCHASE` 仅 DFQ，`STOCK_SALE` 仅已买入 HS；一单一合约；总应收=首付+期数×每期 |
 | installment_schedules | installment_id, period_no, due_on, due_amount, received_amount, received_on, status | 分期计划明细；`UNIQUE(installment_id, period_no)`；支持部分收款、逾期、减免与展期留痕 |
-| rebate_records | rebate_group_no, source_order_id, rate, base_amount, link_status | REBHS0001；新记录来源订单必填 |
-| rebate_settlements | settlement_no, rebate_record_id, settled_on, gross_amount, platform_fee, net_amount, cashflow_id | REBHS0001-01；毛额−手续费=净额 |
-| deposits | deposit_no, pool_id, paid_amount, returned_amount, status, dates | 可退押金不进损益，必须关联现金流 |
+| rebate_records | rebate_no, source_order_id, rate, base_amount, link_status | HS0001-RB01；新记录来源订单必填 |
+| rebate_settlements | settlement_no, rebate_record_id, settled_on, gross_amount, platform_fee, net_amount, cashflow_id | HS0001-RB01-CF-01；毛额−手续费=净额 |
+| deposits | pool_id, paid_amount, returned_amount, status, dates | 可退押金不进损益，必须关联现金流；不单独生成押金编号 |
 | field_definitions / entity_extra_values | entity_type, field_key, type, options, active, value(JSON) | 活字段仅业务辅助信息；`entity_type=customer` 可新增客户偏好、来源细分、预算、常用平台、跟进备注等；有历史值只能停用 |
 | policy_definitions / policy_versions | policy_code, scope_type, scope_id, effective_from/to, config(JSON), version, status | 经营规则受控配置；已引用版本不可修改或删除，只能新建版本 |
 | order_profit_allocations | order_id, user_id, role, allocation_rate, policy_version_id | 多人订单利润分配固定结构化记录；比例合计必须为 100% |
@@ -45,8 +45,8 @@
 ## 编号与历史参考迁移（P2）
 
 - 主业务按类型独立递增：HS / TH / DG / DFQ + 4 位；客户为 `CUS0001`、合作方为 `CP0001`；所有编号唯一、不可改、不可复用，不强制无断号。
-- 返点归集号为 `REBHS0001`，分次结算号为 `REBHS0001-01`。
-- 历史 89 单可按需要标 UNLINKED；19 笔返点可迁为未关联返点归集；不得自动匹配。该项不阻塞新单上线。
+- 返点记录号为 `HS0001-RB01`，分次到账号为 `HS0001-RB01-CF-01`。
+- 历史 89 单可按需要标 UNLINKED；19 笔返点保留未关联状态，待人工补齐来源订单；不得自动匹配。该项不阻塞新单上线。
 - 蹭点→DG；氪金联盟提号/氪金提号/提号→TH；小荷包/经营池→HJ_INVEST。
 - 介绍费、作图费为账号附加 COST，待人工关联订单/账号；不计运营消耗。
 - 八月利润转入标 UNLINKED_TRANSFER；无原始凭证不得补另一侧划转。

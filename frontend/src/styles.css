@@ -1,5 +1,6 @@
 @import "antd/dist/reset.css";
 html, body, #root { min-height: 100%; margin: 0; }
+html { scroll-behavior: smooth; }
 /* 亮色背景景深：纯色 #f2f2f7 上玻璃卡片无处可模糊、退化成半透明白塑料。
    加两层极淡径向光晕（品牌蓝 + info），让 .glass 真正呈现液态玻璃质感。
    背景固定贴附，滚动时不移动。 */
@@ -11,4 +12,14 @@ body {
   background-attachment: fixed;
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+::selection {
+  color: var(--on-accent);
+  background: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }

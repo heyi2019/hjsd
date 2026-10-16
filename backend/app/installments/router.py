@@ -52,13 +52,16 @@ def create_installment(
         contract_type=payload.contract_type,
         principal=payload.principal,
         down_payment=payload.down_payment,
+        service_fee=payload.service_fee,
         periods=payload.periods,
+        per_period_service_fee=payload.per_period_service_fee,
         per_period=payload.per_period,
         first_due_on=payload.first_due_on,
         actor=_actor(user),
         account_id=payload.account_id,
         delivery_mode=payload.delivery_mode,
         note=payload.note,
+        schedule=[item.model_dump() for item in payload.schedule] if payload.schedule else None,
     )
     return schemas.InstallmentOut.model_validate(item)
 

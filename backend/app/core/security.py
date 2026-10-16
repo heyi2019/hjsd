@@ -58,7 +58,7 @@ PERM_AUDIT_READ = "audit.read"
 PERM_POOL_MANAGE = "pool.manage"
 PERM_ORDER_TYPE_MANAGE = "order-type.manage"
 PERM_REPORT_READ = "report.read"
-PERM_HISTORY_IMPORT = "history.import"
+PERM_IMPORT_MANAGE = "import.manage"
 PERM_USER_MANAGE = "user.manage"
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(
@@ -84,7 +84,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_POOL_MANAGE,
         PERM_ORDER_TYPE_MANAGE,
         PERM_REPORT_READ,
-        PERM_HISTORY_IMPORT,
+        PERM_IMPORT_MANAGE,
         PERM_USER_MANAGE,
     }
 )

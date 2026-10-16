@@ -30,6 +30,58 @@ function formatExtraValue(value: unknown): string {
   return String(value);
 }
 
+function MobileCustomerList(props: {
+  rows: Customer[];
+  onDetail: (row: Customer) => void;
+  onMerge: (row: Customer) => void;
+  onDisable: (row: Customer) => void;
+}) {
+  if (!props.rows.length) return <div className="customers-mobile-empty muted">暂无客户档案</div>;
+  return (
+    <div className="customers-mobile-list" aria-label="客户列表">
+      {props.rows.map((row) => (
+        <article className="customers-mobile-card" key={row.id}>
+          <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} /></div>
+          <dl><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div><div><dt>手机</dt><dd>{row.phone || "-"}</dd></div></dl>
+          <Space size="small">
+            <PermissionButton permission="customer.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
+            <PermissionButton permission="customer.merge" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onMerge(row)}>合并</PermissionButton>
+            <PermissionButton permission="customer.update" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onDisable(row)}>停用</PermissionButton>
+          </Space>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function MobileCounterpartyList(props: { rows: Counterparty[]; onToggle: (row: Counterparty) => void }) {
+  if (!props.rows.length) return <div className="customers-mobile-empty muted">暂无合作方</div>;
+  return (
+    <div className="customers-mobile-list" aria-label="合作方列表">
+      {props.rows.map((row) => (
+        <article className="customers-mobile-card" key={row.id}>
+          <div className="customers-mobile-card__topline"><strong>{row.counterparty_no} · {row.display_name}</strong><StatusTag status={row.status} /></div>
+          <dl><div><dt>类型</dt><dd>{COUNTERPARTY_TYPE_LABEL[row.type] ?? row.type}</dd></div><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div></dl>
+          <PermissionButton permission="counterparty.manage" size="small" onClick={() => props.onToggle(row)}>{row.status === "ACTIVE" ? "停用" : "启用"}</PermissionButton>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function useCompactLayout() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 640px)");
+    if (!media) return undefined;
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener?.("change", sync);
+    return () => media.removeEventListener?.("change", sync);
+  }, []);
+  return compact;
+}
+
 /** DatePicker 值是 dayjs 对象；不引入 dayjs 依赖，按鸭子类型取 format。 */
 function toDateText(value: unknown): string | null {
   const candidate = value as { format?: (pattern: string) => string } | null;
@@ -61,9 +113,9 @@ function ExtraFieldControl({ def, ...controlProps }: { def: FieldDefinition; [ke
   const options = (def.options ?? []).map((option) => ({ value: option, label: option }));
   switch (def.field_type) {
     case "NUMBER":
-      return <InputNumber {...controlProps} style={{ width: "100%" }} />;
+      return <InputNumber {...controlProps} className="ui-control-full" />;
     case "DATE":
-      return <DatePicker {...controlProps} style={{ width: "100%" }} />;
+      return <DatePicker {...controlProps} className="ui-control-full" />;
     case "BOOLEAN":
       return <Switch {...controlProps} />;
     case "SELECT":
@@ -90,6 +142,7 @@ export function CustomersPage() {
 }
 
 function CustomerPanel() {
+  const compact = useCompactLayout();
   const [rows, setRows] = useState<Customer[]>([]);
   const [fieldDefs, setFieldDefs] = useState<FieldDefinition[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -261,7 +314,7 @@ function CustomerPanel() {
         </PermissionButton>
       }
     >
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
         联系方式默认脱敏；完整联系方式按权限展示并记录读取审计。停用/已合并客户不可作为新订单参与方。
       </Typography.Paragraph>
@@ -272,18 +325,28 @@ function CustomerPanel() {
           { label: "已停用", kind: "count", amount: String(rows.filter((r) => r.status === "DISABLED").length) },
         ]}
       />
-      <DataTable<Customer>
+      {!compact ? <DataTable<Customer>
         columns={columns}
         rows={rows}
         page={page}
         pageSize={pageSize}
         total={rows.length}
+        className="customer-table"
         emptyText="暂无客户档案"
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
           setPageSize(nextSize);
         }}
-      />
+      /> : <MobileCustomerList
+        rows={rows}
+        onDetail={setDetailTarget}
+        onMerge={setMergeTarget}
+        onDisable={async (row) => {
+          await customersApi.setStatus(row.id, "DISABLED");
+          message.success("客户已停用，历史关系保留");
+          await load();
+        }}
+      />}
 
       <Modal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submitCreate}>
@@ -432,7 +495,7 @@ function CustomerPanel() {
               </Descriptions.Item>
               <Descriptions.Item label="备注">{detailTarget.note || "-"}</Descriptions.Item>
             </Descriptions>
-            <Typography.Title level={5} style={{ marginTop: 16 }}>
+            <Typography.Title level={5} className="ui-title-spaced">
               活字段
             </Typography.Title>
             {fieldDefs.length === 0 ? (
@@ -485,6 +548,7 @@ function CustomerPanel() {
 }
 
 function CounterpartyPanel() {
+  const compact = useCompactLayout();
   const [rows, setRows] = useState<Counterparty[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -553,19 +617,25 @@ function CounterpartyPanel() {
         </PermissionButton>
       }
     >
-      <ErrorBanner error={error} />
+      <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可停用。
       </Typography.Paragraph>
-      <DataTable<Counterparty>
+      {!compact ? <DataTable<Counterparty>
         columns={columns}
         rows={rows}
         page={1}
-        pageSize={Math.max(rows.length, 10)}
+        pageSize={10}
         total={rows.length}
         emptyText="暂无合作方"
         onPageChange={() => undefined}
-      />
+      /> : <MobileCounterpartyList
+        rows={rows}
+        onToggle={async (row) => {
+          await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
+          await load();
+        }}
+      />}
       <Modal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
         <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
           <Form.Item name="display_name" label="名称" rules={[{ required: true }]}>

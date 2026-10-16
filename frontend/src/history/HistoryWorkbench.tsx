@@ -5,7 +5,8 @@
  * - 系统**不做自动匹配**，映射必须人工指派且留依据
  * - **不补造历史单边划转**，未裁决的只打 UNLINKED_TRANSFER 标记
  */
-import { Card, Select, Space, Tabs, Typography } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, Upload, message } from "antd";
+import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -32,6 +33,53 @@ import {
  *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
 const RED_LINE_DESC = "历史数据仅作参考与回归样本：不覆盖新单、不自动匹配、不补造历史划转。";
 
+function parseImportText(text: string, filename: string): Record<string, unknown>[] {
+  if (filename.toLowerCase().endsWith(".json")) {
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed) || parsed.some((row) => row === null || typeof row !== "object" || Array.isArray(row))) {
+      throw new Error("JSON 文件必须是对象数组");
+    }
+    return parsed as Record<string, unknown>[];
+  }
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) throw new Error("CSV 文件至少需要一行表头和一行数据");
+  const headers = lines[0].split(",").map((item) => item.trim());
+  return lines.slice(1).map((line) => {
+    const values = line.split(",");
+    return Object.fromEntries(headers.map((header, index) => [header, values[index]?.trim() ?? ""]));
+  });
+}
+
+const IMPORT_TEMPLATES: Record<string, { filename: string; content: string }> = {
+  STANDARD_ORDER: {
+    filename: "订单导入模板.csv",
+    content: "订单日期,订单类型,订单金额,本金,利润,经办人,备注\n2026-01-31,HS,0.00,0.00,0.00,,",
+  },
+  STANDARD_ACCOUNT: {
+    filename: "账号导入模板.csv",
+    content: "账号标识,平台,区服,状态,买入日期,买入成本,预计售价,备注\n,, ,IN_STOCK,2026-01-31,0.00,0.00,",
+  },
+  STANDARD_CASHFLOW: {
+    filename: "资金流水导入模板.csv",
+    content: "发生日期,金额,收支方向,资金池,业务类型,订单号,说明\n2026-01-31,0.00,IN,,HS,,",
+  },
+  STANDARD_INSTALLMENT: {
+    filename: "分期导入模板.csv",
+    content: "合同日期,合同类型,本金,首付,期数,每期金额,已收金额,状态,备注\n2026-01-31,ADVANCE_PURCHASE,0.00,0.00,1,0.00,0.00,PENDING,",
+  },
+};
+
+function downloadImportTemplate(sourceKind: string) {
+  const template = IMPORT_TEMPLATES[sourceKind] ?? IMPORT_TEMPLATES.STANDARD_ORDER;
+  const blob = new Blob([`\uFEFF${template.content}\n`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = template.filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchId, setBatchId] = useState<number | null>(null);
@@ -45,6 +93,10 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
   const [unlinkedTarget, setUnlinkedTarget] = useState<ImportRow | null>(null);
   const [skipTarget, setSkipTarget] = useState<ImportRow | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<ImportBatch | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<UploadFile | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importForm] = Form.useForm();
 
   const current = batches.find((b) => b.id === batchId) ?? null;
 
@@ -145,7 +197,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
       render: (_v, row) => (
         <Space size="small" wrap>
           <PermissionButton
-            permission="history.import"
+            permission="import.manage"
             size="small"
             disabled={row.status === "ROLLED_BACK"}
             onClick={() => setMapTarget(row)}
@@ -153,7 +205,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
             指派
           </PermissionButton>
           <PermissionButton
-            permission="history.import"
+            permission="import.manage"
             size="small"
             disabled={row.unlinked_transfer || row.status === "ROLLED_BACK"}
             onClick={() => setUnlinkedTarget(row)}
@@ -161,7 +213,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
             标单边划转
           </PermissionButton>
           <PermissionButton
-            permission="history.import"
+            permission="import.manage"
             size="small"
             danger
             disabled={row.status === "ROLLED_BACK"}
@@ -176,8 +228,15 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
 
   const headerActions = (
     <Space className="ui-filter-bar">
+      <PermissionButton
+        permission="import.manage"
+        type="primary"
+        onClick={() => setImportOpen(true)}
+      >
+        新建导入
+      </PermissionButton>
       <Select
-        style={{ width: 280 }}
+        className="ui-control-width-history"
         value={batchId ?? undefined}
         placeholder="选择导入批次"
         options={batches.map((b) => ({
@@ -187,7 +246,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
         onChange={setBatchId}
       />
       <PermissionButton
-        permission="history.import"
+        permission="import.manage"
         type="primary"
         loading={acting}
         disabled={!canRollback}
@@ -196,7 +255,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
         确认批次
       </PermissionButton>
       <PermissionButton
-        permission="history.import"
+        permission="import.manage"
         danger
         disabled={!canRollback}
         onClick={() => current && setRollbackTarget(current)}
@@ -271,7 +330,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
                   <>
                     {preview.blockers.length ? (
                       <ErrorBanner
-                        message={`以下源列未识别，阻断确认：${preview.blockers.join("、")}`}
+                        error={{ message: `以下源列未识别，阻断确认：${preview.blockers.join("、")}` }}
                       />
                     ) : null}
                     <DataTable
@@ -373,7 +432,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
                       rowKey="key"
                     />
                     {report.requires_adjudication ? (
-                      <ErrorBanner message="存在未映射、未裁决或未平项：差异须裁决后方可上线。" />
+                      <ErrorBanner error={{ message: "存在未映射、未裁决或未平项：差异须裁决后方可上线。" }} />
                     ) : null}
                   </>
                 ) : (
@@ -408,6 +467,89 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           });
         }}
       />
+
+      <Modal
+        open={importOpen}
+        title="导入历史数据"
+        okText="开始导入"
+        cancelText="取消"
+        confirmLoading={importing}
+        destroyOnHidden
+        onCancel={() => {
+          setImportOpen(false);
+          setImportFile(null);
+          importForm.resetFields();
+        }}
+        onOk={() => {
+          void importForm.validateFields().then(async (values) => {
+            if (!importFile?.originFileObj) {
+              message.error("请选择 JSON 或 CSV 文件");
+              return;
+            }
+            setImporting(true);
+            try {
+              const text = await importFile.originFileObj.text();
+              const rows = parseImportText(text, importFile.name);
+              const created = await historyApi.createBatch({
+                source_name: String(values.source_name),
+                source_kind: String(values.source_kind),
+                rows,
+                note: values.note ? String(values.note) : undefined,
+              });
+              setImportOpen(false);
+              setImportFile(null);
+              importForm.resetFields();
+              await loadBatches();
+              setBatchId(created.id);
+              message.success(`已导入 ${rows.length} 行数据`);
+            } catch (err) {
+              setError(normalizeError(err));
+            } finally {
+              setImporting(false);
+            }
+          }).catch(() => undefined);
+        }}
+      >
+        <Form form={importForm} layout="vertical">
+          <Form.Item name="source_name" label="数据名称" rules={[{ required: true, message: "请输入数据名称" }]}>
+            <Input placeholder="例如：2026年10月订单导入" />
+          </Form.Item>
+          <Form.Item name="source_kind" label="数据类型" initialValue="STANDARD_ORDER" rules={[{ required: true }]}>
+            <Select options={[
+              { value: "STANDARD_ORDER", label: "订单" },
+              { value: "STANDARD_ACCOUNT", label: "账号" },
+              { value: "STANDARD_CASHFLOW", label: "资金流水" },
+              { value: "STANDARD_INSTALLMENT", label: "分期" },
+            ]} />
+          </Form.Item>
+          <PermissionButton
+            permission="import.manage"
+            type="link"
+            className="ui-drawer-hint"
+            onClick={() => downloadImportTemplate(String(importForm.getFieldValue("source_kind") ?? "STANDARD_ORDER"))}
+          >
+            下载当前类型导入模板
+          </PermissionButton>
+          <Form.Item label="数据文件" required>
+            <Upload
+              accept=".json,.csv"
+              maxCount={1}
+              beforeUpload={() => false}
+              fileList={importFile ? [importFile] : []}
+              onChange={({ fileList }) => setImportFile(fileList[0] ?? null)}
+              onRemove={() => { setImportFile(null); return true; }}
+            >
+              <PermissionButton permission="import.manage">选择 JSON / CSV 文件</PermissionButton>
+            </Upload>
+            <Typography.Paragraph type="secondary" className="ui-drawer-hint">
+              文件只会作为原始行保存，不会自动匹配、覆盖业务单或生成现金流。
+            </Typography.Paragraph>
+          </Form.Item>
+          <Form.Item name="note" label="导入说明">
+            <Input.TextArea rows={3} placeholder="可填写来源、日期范围或对账依据" />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <FormDrawer
         open={unlinkedTarget !== null}

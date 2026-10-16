@@ -1,0 +1,213 @@
+/*
+ * 开发服务器兼容的响应式兜底。
+ * 项目原有的 @custom-media 令牌在部分 Vite 开发路径中不会被浏览器展开，
+ * 这里用标准媒体查询覆盖关键壳层，确保实时预览与生产构建一致。
+ */
+@media (max-width: 960px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .sidebar {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    border-right: 0;
+    border-bottom: var(--border-w) solid var(--glass-border);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .app-brand { flex: 0 0 auto; padding: var(--space-2) var(--space-3); }
+  .nav-list { flex: 1 0 auto; flex-direction: row; margin-top: 0; }
+  .nav-item { width: auto; min-height: var(--ui-control-height); white-space: nowrap; box-shadow: none !important; }
+  .nav-item--active { box-shadow: inset 0 -3px 0 var(--color-primary) !important; }
+  .sidebar-foot { display: none; }
+  .main { width: 100%; min-width: 0; }
+  .page-content {
+    padding: var(--space-3) max(var(--space-3), env(safe-area-inset-right))
+      max(var(--space-5), env(safe-area-inset-bottom))
+      max(var(--space-3), env(safe-area-inset-left));
+  }
+  .topbar-action, .theme-switch button { min-height: var(--ui-control-height); }
+  .dashboard-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.orders-mobile-list,
+.orders-mobile-empty,
+.customers-mobile-list,
+.customers-mobile-empty { display: none; }
+
+@media (max-width: 640px) {
+  .app-shell { display: block; }
+  .sidebar {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-start: auto;
+    inset-block-end: 0;
+    z-index: 20;
+    width: 100%;
+    min-height: calc(60px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: var(--border-w) solid var(--glass-border);
+    border-bottom: 0;
+    border-radius: 0;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+    backdrop-filter: blur(18px) saturate(150%);
+  }
+  .app-brand, .sidebar-foot { display: none; }
+  .nav-list {
+    width: 100%;
+    margin: 0;
+    justify-content: space-around;
+    overflow: hidden;
+  }
+  .sidebar .nav-item--secondary { display: none; }
+  .mobile-more-button {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 60px;
+    padding: var(--space-1);
+    border: 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font: var(--font-caption-2);
+  }
+  .mobile-more-button:focus-visible { outline: var(--border-w-2) solid var(--color-primary); outline-offset: -3px; }
+  .nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 60px;
+    padding: var(--space-1) var(--space-1);
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .nav-item__icon { font-size: 17px; }
+  .nav-item--active { box-shadow: inset 0 3px 0 var(--color-primary) !important; }
+  .main { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .page-content { padding-bottom: calc(var(--space-5) + 68px + env(safe-area-inset-bottom)); }
+  .dashboard-page .ui-entry-row { grid-template-columns: 1fr; }
+  .dashboard-note { padding: var(--space-4); }
+  .topbar {
+    align-content: flex-start;
+    padding-inline: var(--space-3);
+    overflow: visible;
+  }
+  .topbar__title { flex: 0 0 100%; }
+  .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
+  .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
+  .ant-table-wrapper .ant-table { min-width: var(--sz-680); }
+  /* 业务台账移动端保留核心字段，详情信息进入卡片，避免核心动作被推到屏外。 */
+  .orders-ledger .ant-table { min-width: 0 !important; width: 100%; }
+  .orders-ledger .ant-table-thead > tr > th:nth-child(4),
+  .orders-ledger .ant-table-tbody > tr > td:nth-child(4) { display: none; }
+  .orders-ledger .ant-table-thead > tr > th.ant-table-cell-fix-right,
+  .orders-ledger .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+    position: static !important;
+    inset-inline-end: auto !important;
+  }
+  .orders-ledger { display: none; }
+  .orders-mobile-list { display: grid; gap: var(--space-2); }
+  .orders-mobile-card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: var(--border-w) solid var(--glass-border);
+    border-radius: var(--radius-md);
+    background: var(--glass);
+  }
+  .orders-mobile-card__topline,
+  .orders-mobile-card__meta > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .orders-mobile-card__meta {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    font: var(--font-caption);
+  }
+  .orders-mobile-card__meta dt { color: var(--color-text-secondary); }
+  .orders-mobile-card__meta dd { margin: 0; color: var(--color-text-primary); }
+  .orders-mobile-card .ant-btn { justify-self: start; min-height: var(--ui-control-height); padding-inline: 0; }
+  .orders-mobile-empty {
+    padding: var(--space-5) var(--space-3);
+    text-align: center;
+    border: var(--border-w) dashed var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  /* 客户档案移动端优先保留编号、名字、状态和操作；联系方式与活字段在详情中查看。 */
+  .customer-table .ant-table { min-width: 0 !important; width: 100%; }
+  .customer-table .ant-table table { table-layout: fixed !important; width: 100% !important; }
+  .customer-table .ant-table-thead > tr > th:nth-child(3),
+  .customer-table .ant-table-tbody > tr > td:nth-child(3),
+  .customer-table .ant-table-thead > tr > th:nth-child(4),
+  .customer-table .ant-table-tbody > tr > td:nth-child(4),
+  .customer-table .ant-table-thead > tr > th:nth-child(5),
+  .customer-table .ant-table-tbody > tr > td:nth-child(5),
+  .customer-table .ant-table-thead > tr > th:nth-child(7),
+  .customer-table .ant-table-tbody > tr > td:nth-child(7) { display: none; }
+  .customer-table .ant-table-thead > tr > th.ant-table-cell-fix-right,
+  .customer-table .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+    position: static !important;
+    inset-inline-end: auto !important;
+  }
+  .customer-table .ant-table-thead > tr > th,
+  .customer-table .ant-table-tbody > tr > td { overflow: hidden; text-overflow: ellipsis; }
+  .customer-table .ant-table-thead > tr > th:last-child,
+  .customer-table .ant-table-tbody > tr > td:last-child { width: 96px; white-space: nowrap; overflow: visible; }
+  .customer-table { display: none; }
+  .customers-mobile-list { display: grid; gap: var(--space-2); }
+  .customers-mobile-card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: var(--border-w) solid var(--glass-border);
+    border-radius: var(--radius-md);
+    background: var(--glass);
+  }
+  .customers-mobile-card__topline,
+  .customers-mobile-card dl > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .customers-mobile-card dl { display: grid; gap: var(--space-1); margin: 0; font: var(--font-caption); }
+  .customers-mobile-card dt { color: var(--color-text-secondary); }
+  .customers-mobile-card dd { margin: 0; color: var(--color-text-primary); }
+  .customers-mobile-card .ant-space { flex-wrap: wrap; }
+  .customers-mobile-empty { padding: var(--space-5) var(--space-3); text-align: center; border: var(--border-w) dashed var(--color-border); border-radius: var(--radius-md); }
+}
+
+@media (max-width: 640px) {
+  /* 移动端只保留页面标题与用户中心；主题、角色和退出登录收进用户中心，降低顶栏噪音。 */
+  .topbar .theme-switch,
+  .topbar .topbar-role,
+  .topbar .topbar-action--logout { display: none; }
+  .topbar .topbar-actions { justify-content: flex-end; }
+
+  /* 移动端账户与管理入口使用底部 Sheet 语义，减少遮挡并贴合单手操作区域。 */
+  .user-center-modal,
+  .mobile-more-modal { top: auto; margin: 0; padding-bottom: 0; }
+  .user-center-modal .ant-modal-content,
+  .mobile-more-modal .ant-modal-content {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  }
+  .user-center-modal .ant-modal-header,
+  .mobile-more-modal .ant-modal-header { margin-bottom: var(--space-3); }
+}

@@ -1,7 +1,7 @@
 """finance 押金与返点契约测试（DEP-01 / REB-01）。
 
 与 test_m2.py / test_bughunt.py 的分工：既有文件已覆盖押金占用/部分退回、
-超退校验、返点归集与结算主路径；本文件补押金退还 404、押金列表与持有合计、
+超退校验、返点记录与到账主路径；本文件补押金退还 404、押金列表与持有合计、
 来源订单不存在、结算 404 与手续费超额、返点列表过滤，以及 4 个未测路由端点。
 """
 from __future__ import annotations
@@ -141,6 +141,7 @@ class TestFinanceApi:
         response = seeded_client.get("/api/v1/deposits", headers=headers)
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
+        assert "deposit_no" not in response.json()[0]
 
     def test_list_rebates_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
@@ -151,6 +152,8 @@ class TestFinanceApi:
         response = seeded_client.get("/api/v1/rebates", headers=headers)
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
+        assert response.json()[0]["rebate_no"].startswith("HS")
+        assert "rebate_group_no" not in response.json()[0]
 
     def test_create_rebate_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)

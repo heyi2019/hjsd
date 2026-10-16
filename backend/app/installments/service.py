@@ -113,6 +113,9 @@ def create_installment(
     schedule: list[dict[str, Any]] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
+    if first_due_on is None:
+        raise Validation("首期应还日期必填", details={"field": "first_due_on"})
+
     try:
         InstallmentContractType(contract_type)
     except ValueError as exc:
@@ -210,7 +213,7 @@ def create_installment(
     policy_version_id, policy_snapshot = policy_service.make_snapshot(
         session,
         policy_code=PolicyType.INSTALLMENT.value,
-        on=first_due_on or date.today(),
+        on=first_due_on,
         scope_type="ORDER_TYPE",
         scope_id=order_type_definition.id if order_type_definition else None,
     )

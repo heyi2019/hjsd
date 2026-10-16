@@ -185,6 +185,11 @@ class TestCreateInstallmentValidation:
             _contract(seeded_db, order.id, periods=0)
         assert "期数必须大于 0" in str(exc.value)
 
+    def test_first_due_on_is_required_in_service(self, seeded_db):
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match="首期应还日期必填"):
+            _contract(seeded_db, order.id, first_due_on=None)
+
     def test_invalid_delivery_mode_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:

@@ -110,6 +110,12 @@ class Order(Base, AuditMixin):
     order_type: Mapped[str] = mapped_column(String(16), nullable=False)
     capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # DG 代挂结算条款：寄售登记可为空，成交前由业务补齐并固化在订单上。
+    listing_price: Mapped[object | None] = mapped_column(Amount, nullable=True)
+    service_fee: Mapped[object | None] = mapped_column(Amount, nullable=True)
+    commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    expected_settlement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
     )

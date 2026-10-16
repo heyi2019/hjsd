@@ -37,6 +37,11 @@ class OrderAccountCreate(BaseModel):
 class OrderCreate(BaseModel):
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
+    listing_price: Decimal | None = Field(default=None, ge=0)
+    service_fee: Decimal | None = Field(default=None, ge=0)
+    commission_mode: str | None = None
+    commission_payer: str | None = None
+    expected_settlement_date: date | None = None
     account_id: int | None = None
     account: OrderAccountCreate | None = None
     owner_id: int | None = None
@@ -54,6 +59,11 @@ class OrderOut(BaseModel):
     order_type: str
     capital_type: str
     trade_date: date
+    listing_price: Decimal | None = None
+    service_fee: Decimal | None = None
+    commission_mode: str | None = None
+    commission_payer: str | None = None
+    expected_settlement_date: date | None = None
     account_id: int | None = None
     status: str
     link_status: str

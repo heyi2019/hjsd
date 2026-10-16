@@ -15,7 +15,7 @@ const COMMISSION_PAYER_OPTIONS = [
   { value: "PLATFORM", label: "平台" },
 ];
 
-/** 代挂前端表单：先收口委托账号、委托客户与抽成规则，提交接口后续接入。 */
+/** 代挂前端表单：委托账号、委托客户与抽成规则统一写入 DG 订单。 */
 export function DgOrderSection() {
   const customerSource = Form.useWatch("dg_customer_source");
   const isOtherSource = customerSource === "其他";

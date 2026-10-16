@@ -61,6 +61,11 @@ def create_order(
     *,
     order_type: str,
     trade_date: date,
+    listing_price: Any = None,
+    service_fee: Any = None,
+    commission_mode: str | None = None,
+    commission_payer: str | None = None,
+    expected_settlement_date: date | None = None,
     actor: str,
     account_id: int | None = None,
     account_profile: dict[str, Any] | None = None,
@@ -87,6 +92,39 @@ def create_order(
             "DFQ 代分期订单不关联库存账号",
             details={"order_type": definition.code, "account_id": account_id},
         )
+    listing_amount = to_money(listing_price) if listing_price is not None else None
+    service_fee_amount = to_money(service_fee) if service_fee is not None else None
+    if definition.code != "DG" and any(
+        value is not None
+        for value in (
+            listing_amount,
+            service_fee_amount,
+            commission_mode,
+            commission_payer,
+            expected_settlement_date,
+        )
+    ):
+        raise Validation("只有 DG 代挂订单可以填写代挂结算条款")
+    if definition.code == "DG":
+        if commission_mode is not None and commission_mode not in {
+            "DEDUCT_FROM_SETTLEMENT",
+            "SEPARATE_PAYMENT",
+        }:
+            raise Validation("代挂抽成方式无效", details={"field": "commission_mode"})
+        if commission_payer is not None and commission_payer not in {
+            "BUYER",
+            "CONSIGNOR",
+            "PLATFORM",
+        }:
+            raise Validation("代挂付款方无效", details={"field": "commission_payer"})
+        if (commission_mode is None) != (commission_payer is None):
+            raise Validation("代挂抽成方式和付款方必须同时填写")
+        if (
+            listing_amount is not None
+            and service_fee_amount is not None
+            and service_fee_amount > listing_amount
+        ):
+            raise Validation("服务费不能超过挂售价")
     if account_id is not None and account_profile is not None:
         raise Validation(
             "订单不能同时关联已有库存账号和新建账号资料",
@@ -138,6 +176,11 @@ def create_order(
         order_type=definition.code,
         capital_type=capital_type or definition.capital_type,
         trade_date=trade_date,
+        listing_price=listing_amount,
+        service_fee=service_fee_amount,
+        commission_mode=commission_mode,
+        commission_payer=commission_payer,
+        expected_settlement_date=expected_settlement_date,
         account_id=account_id,
         status=OrderStatus.ACTIVE.value,
         policy_version_id=primary_version_id,

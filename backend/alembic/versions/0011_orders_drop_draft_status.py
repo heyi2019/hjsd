@@ -47,7 +47,13 @@ def _rebuild_orders(bind, status_check: str) -> None:
     bind.execute(text("DROP TABLE IF EXISTS _new_orders"))
     bind.execute(text("PRAGMA foreign_keys=OFF"))
     bind.execute(text(ddl))
-    cols = ", ".join(c.name for c in orm_t.columns)
+    # 这里使用当前 ORM 生成临时表，但降级路径上的旧 orders 表可能还没有
+    # 后续迁移新增的字段；只复制实际存在的交集，避免历史回滚被未来字段绑死。
+    source_columns = {
+        row[1]
+        for row in bind.execute(text("PRAGMA table_info(orders)"))
+    }
+    cols = ", ".join(c.name for c in orm_t.columns if c.name in source_columns)
     bind.execute(text(f"INSERT INTO _new_orders ({cols}) SELECT {cols} FROM orders"))
     bind.execute(text("DROP TABLE orders"))
     bind.execute(text("ALTER TABLE _new_orders RENAME TO orders"))

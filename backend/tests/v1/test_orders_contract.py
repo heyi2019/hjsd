@@ -113,6 +113,36 @@ class TestCreateOrderValidation:
                 user=_scoped_user(),
             )
 
+    def test_dg_commission_terms_are_persisted(self, seeded_db):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="DG",
+            trade_date=D,
+            actor="pytest",
+            listing_price="1200.00",
+            service_fee="120.00",
+            commission_mode="DEDUCT_FROM_SETTLEMENT",
+            commission_payer="CONSIGNOR",
+            expected_settlement_date=date(2026, 10, 20),
+        )
+
+        assert order.listing_price == Decimal("1200.00")
+        assert order.service_fee == Decimal("120.00")
+        assert order.commission_mode == "DEDUCT_FROM_SETTLEMENT"
+        assert order.commission_payer == "CONSIGNOR"
+        assert order.expected_settlement_date == date(2026, 10, 20)
+
+    def test_dg_service_fee_cannot_exceed_listing_price(self, seeded_db):
+        with pytest.raises(Validation, match="服务费不能超过挂售价"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DG",
+                trade_date=D,
+                actor="pytest",
+                listing_price="100.00",
+                service_fee="100.01",
+            )
+
 
 # ------------------------------------------------------------------ 查询与作用域
 class TestGetAndListOrders:
@@ -533,6 +563,30 @@ class TestOrdersApi:
         assert account.inventory_type == "RECOVERY"
         assert account.account_description == "订单内建档"
         assert account.account_images == ["data:image/png;base64,one"]
+
+    def test_dg_creation_returns_settlement_terms(
+        self, seeded_client, seeded_db, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DG",
+                "trade_date": D.isoformat(),
+                "listing_price": "1200.00",
+                "service_fee": "120.00",
+                "commission_mode": "DEDUCT_FROM_SETTLEMENT",
+                "commission_payer": "CONSIGNOR",
+                "expected_settlement_date": "2026-10-20",
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["listing_price"] == "1200.00"
+        assert response.json()["service_fee"] == "120.00"
+        assert response.json()["commission_mode"] == "DEDUCT_FROM_SETTLEMENT"
+        assert response.json()["commission_payer"] == "CONSIGNOR"
+        assert response.json()["expected_settlement_date"] == "2026-10-20"
 
     def test_list_and_get_endpoints(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)

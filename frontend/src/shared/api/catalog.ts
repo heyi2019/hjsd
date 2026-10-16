@@ -79,6 +79,11 @@ export interface Order {
   order_type: string;
   capital_type: string;
   trade_date: string;
+  listing_price?: string | null;
+  service_fee?: string | null;
+  commission_mode?: string | null;
+  commission_payer?: string | null;
+  expected_settlement_date?: string | null;
   account_id?: number | null;
   status: string;
   note?: string | null;
@@ -350,6 +355,11 @@ export const ordersApi = {
   create: (payload: {
     order_type: string;
     trade_date: string;
+    listing_price?: string;
+    service_fee?: string;
+    commission_mode?: string;
+    commission_payer?: string;
+    expected_settlement_date?: string;
     account_id?: number;
     account?: {
       game_account: string;

@@ -277,6 +277,13 @@ export function CreateBusinessModal(props: {
       const order = await ordersApi.create({
         order_type: props.initialOrderType ?? values.order_type as string,
         trade_date: today(),
+        listing_price: isDg && values.dg_listing_price != null ? String(values.dg_listing_price) : undefined,
+        service_fee: isDg && values.dg_service_fee != null ? String(values.dg_service_fee) : undefined,
+        commission_mode: isDg ? values.dg_commission_mode as string : undefined,
+        commission_payer: isDg ? values.dg_commission_payer as string : undefined,
+        expected_settlement_date: isDg && values.dg_expected_settlement_date
+          ? toDateString(values.dg_expected_settlement_date)
+          : undefined,
         account: accountProfile,
         note,
         customer_roles: customerRoles,

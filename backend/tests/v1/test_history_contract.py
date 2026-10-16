@@ -286,6 +286,13 @@ class TestRollbackAndCorrectionGuards:
                 seeded_db, 999999, rows=ROWS, reason="少导一行", actor="pytest"
             )
 
+    def test_draft_batch_cannot_be_corrected(self, seeded_db):
+        batch = _batch(seeded_db)
+        with pytest.raises(Validation, match="只有已提交批次可更正"):
+            service.create_correction_batch(
+                seeded_db, batch["id"], rows=ROWS, reason="少导一行", actor="pytest"
+            )
+
 
 # ------------------------------------------------------------------ 路由层
 class TestImportApi:
@@ -369,6 +376,7 @@ class TestImportApi:
 
     def test_correction_endpoint(self, seeded_client, seeded_db, headers):
         batch = _batch(seeded_db)
+        service.commit_batch(seeded_db, batch["id"], actor="pytest")
         response = seeded_client.post(
             f"/api/v1/imports/batches/{batch['id']}/corrections",
             json={"rows": ROWS, "reason": "少导一行"},

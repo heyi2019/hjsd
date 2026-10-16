@@ -576,8 +576,11 @@ def create_correction_batch(
     origin = session.get(ImportBatch, batch_id)
     if origin is None:
         raise NotFound(f"导入批次 {batch_id} 不存在", details={"batch_id": batch_id})
-    if origin.status == ImportBatchStatus.ROLLED_BACK.value:
-        raise Validation("已回滚批次不可更正", details={"batch_id": batch_id})
+    if origin.status != ImportBatchStatus.COMMITTED.value:
+        raise Validation(
+            "只有已提交批次可更正",
+            details={"batch_id": batch_id, "status": origin.status},
+        )
     if not rows:
         raise Validation("更正内容为空", details={"field": "rows"})
     invalid_rows = [index for index, raw in enumerate(rows, start=1) if not isinstance(raw, dict)]

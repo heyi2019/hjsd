@@ -17,7 +17,8 @@ class PoolCreate(RequestModel):
 
     code: str = Field(min_length=2, max_length=64, description="池代码，创建后不可修改")
     name: str = Field(min_length=1, max_length=128)
-    pool_type: PoolType = PoolType.OTHER
+    # pool_type 是可扩展注册值，不锁死在首批枚举。
+    pool_type: str = Field(default=PoolType.OTHER.value, min_length=1, max_length=32)
     ownership: PoolOwnership = PoolOwnership.OWNED
     note: str | None = None
 
@@ -27,7 +28,8 @@ class PoolUpdate(RequestModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=128)
     note: str | None = None
-    pool_type: PoolType | None = None
+    # pool_type 是可扩展注册值，不锁死在首批枚举。
+    pool_type: str | None = Field(default=None, min_length=1, max_length=32)
     ownership: PoolOwnership | None = None
 
 

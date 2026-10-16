@@ -58,7 +58,7 @@ def create_pool(
         code=payload.code,
         name=payload.name,
         actor=_actor(user),
-        pool_type=payload.pool_type.value,
+        pool_type=payload.pool_type,
         ownership=payload.ownership.value,
         note=payload.note,
     )
@@ -78,7 +78,7 @@ def update_pool(
         actor=_actor(user),
         name=payload.name,
         note=payload.note,
-        pool_type=payload.pool_type.value if payload.pool_type else None,
+        pool_type=payload.pool_type,
         ownership=payload.ownership.value if payload.ownership else None,
     )
     return schemas.PoolOut.model_validate(pool)

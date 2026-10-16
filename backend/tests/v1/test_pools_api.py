@@ -42,6 +42,16 @@ def test_create_and_list_pool(client, headers):
     assert any(item["code"] == "HJ_CUSTODY" for item in listed)
 
 
+def test_custom_pool_type_is_supported_as_registry_value(client, headers):
+    response = client.post(
+        POOLS,
+        json={"code": "HJ_DEPOSIT", "name": "押金池", "pool_type": "DEPOSIT"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["pool_type"] == "DEPOSIT"
+
+
 def test_duplicate_pool_code_returns_422(client, headers):
     first = client.post(POOLS, json={"code": "DUP1", "name": "一号"}, headers=headers)
     assert first.status_code == 201

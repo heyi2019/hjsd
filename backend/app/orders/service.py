@@ -24,6 +24,7 @@ from app.core.money import require_positive, to_money
 from app.core.numbering import allocate_number
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.policy import service as policy_service
+from app.accounts import service as accounts_service
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
@@ -60,6 +61,7 @@ def create_order(
     trade_date: date,
     actor: str,
     account_id: int | None = None,
+    account_profile: dict[str, Any] | None = None,
     owner_id: int | None = None,
     capital_type: str | None = None,
     note: str | None = None,
@@ -77,11 +79,35 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    if definition.code == "DFQ" and account_id is not None:
+    if definition.code == "DFQ" and (account_id is not None or account_profile is not None):
         raise Validation(
             "DFQ 代分期订单不关联库存账号",
             details={"order_type": definition.code, "account_id": account_id},
         )
+    if account_id is not None and account_profile is not None:
+        raise Validation(
+            "订单不能同时关联已有库存账号和新建账号资料",
+            details={"order_type": definition.code},
+        )
+    if account_profile is not None:
+        inventory_context = {
+            "HS": ("SELF", "RECOVERY"),
+            "TH": ("DISTRIBUTION", "PICKUP"),
+            "DG": ("DISTRIBUTION", "CONSIGNMENT"),
+        }.get(definition.code)
+        if inventory_context is None:
+            raise Validation(
+                f"业务 {definition.code} 不允许随订单建档库存账号",
+                details={"order_type": definition.code},
+            )
+        account = accounts_service.create_account(
+            session,
+            actor=actor,
+            business_mode=inventory_context[0],
+            inventory_type=inventory_context[1],
+            **account_profile,
+        )
+        account_id = account.id
 
 
     # BAS-06-04 规则快照：按成交日固化当时生效的返点/提成规则。

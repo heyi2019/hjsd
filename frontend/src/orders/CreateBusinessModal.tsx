@@ -211,11 +211,9 @@ export function CreateBusinessModal(props: {
         await props.onCreated();
         return;
       }
-      let accountId = (values.account_id as number) ?? undefined;
-      if (needsAccountCreation) {
-        const account = await accountsApi.create(getAccountValues(values, orderType as AccountCreationOrderType));
-        accountId = account.id;
-      }
+      const accountProfile = needsAccountCreation
+        ? getAccountValues(values, orderType as AccountCreationOrderType)
+        : undefined;
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
       const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
@@ -279,7 +277,7 @@ export function CreateBusinessModal(props: {
       const order = await ordersApi.create({
         order_type: props.initialOrderType ?? values.order_type as string,
         trade_date: today(),
-        account_id: accountId,
+        account: accountProfile,
         note,
         customer_roles: customerRoles,
         counterparty_roles: counterpartyId
@@ -411,7 +409,7 @@ export function CreateBusinessModal(props: {
             <Select
               allowClear
               placeholder="请选择账号"
-              notFoundContent="暂无账号：请先到「库存」页签新增账号后再回到此处关联"
+              notFoundContent="暂无可关联库存账号；新账号请从对应业务订单创建"
               options={accounts.map((account) => ({
                 value: account.id,
                 label: `${account.inventory_no} ${account.game_account ?? ""}`,

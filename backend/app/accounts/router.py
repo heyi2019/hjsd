@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,25 +28,6 @@ router = APIRouter(tags=["ACC-01 账号台账"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
-
-
-class AccountCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    game_account: str = Field(min_length=1, max_length=128)
-    game_type: str | None = Field(default=None, max_length=64)
-    business_mode: Literal["SELF", "DISTRIBUTION"]
-    inventory_type: Literal["RECOVERY", "PICKUP", "CONSIGNMENT"]
-    game_password: str | None = Field(default=None, max_length=256)
-    channel_region: str | None = Field(default=None, max_length=128)
-    bound_phone: str | None = Field(default=None, max_length=64)
-    has_secondary: bool | None = None
-    platform: str | None = None
-    region: str | None = None
-    risk_level: str | None = None
-    account_description: str | None = Field(default=None, max_length=2000)
-    account_images: list[str] = Field(default_factory=list, max_length=9)
-    note: str | None = None
 
 
 class AccountOut(BaseModel):
@@ -224,33 +204,6 @@ def list_accounts(
 ) -> list[AccountOut]:
     items = service.list_accounts(db, status=status)
     return _account_outputs(db, items)
-
-
-@router.post("/accounts", response_model=AccountOut, status_code=201)
-def create_account(
-    payload: AccountCreate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage,
-) -> AccountOut:
-    item = service.create_account(
-        db,
-        game_account=payload.game_account,
-        game_type=payload.game_type,
-        business_mode=payload.business_mode,
-        inventory_type=payload.inventory_type,
-        game_password=payload.game_password,
-        channel_region=payload.channel_region,
-        bound_phone=payload.bound_phone,
-        has_secondary=payload.has_secondary,
-        actor=_actor(user),
-        platform=payload.platform,
-        region=payload.region,
-        risk_level=payload.risk_level,
-        account_description=payload.account_description,
-        account_images=payload.account_images,
-        note=payload.note,
-    )
-    return AccountOut.model_validate(item)
 
 
 @router.patch("/accounts/{account_id}", response_model=AccountOut)

@@ -243,6 +243,39 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_order_creation_persists_embedded_inventory_account(
+        self, seeded_client, seeded_db, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "HS",
+                "trade_date": D.isoformat(),
+                "account": {
+                    "game_account": "embedded-account",
+                    "game_type": "王者荣耀",
+                    "game_password": "secret",
+                    "channel_region": "安卓一区",
+                    "bound_phone": "13800000000",
+                    "has_secondary": True,
+                    "account_description": "订单内建档",
+                    "account_images": ["data:image/png;base64,one"],
+                    "note": "随订单创建",
+                },
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 201, response.text
+        payload = response.json()
+        account = seeded_db.get(Account, payload["account_id"])
+        assert account is not None
+        assert account.game_account == "embedded-account"
+        assert account.business_mode == "SELF"
+        assert account.inventory_type == "RECOVERY"
+        assert account.account_description == "订单内建档"
+        assert account.account_images == ["data:image/png;base64,one"]
+
     def test_list_and_get_endpoints(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
         order_service.post_event(

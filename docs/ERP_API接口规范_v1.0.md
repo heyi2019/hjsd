@@ -21,7 +21,7 @@
 | 订单 | GET/POST `/orders`, GET `/orders/{id}` | 创建订单及读取事件时间线 |
 | 事件 | POST `/orders/{id}/events` | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL；有资金影响的事件自动生成 cashflow，DELIVER 不生成 |
 | 划转 | POST `/transfers` | source_pool、target_pool、amount；原子生成成对 INTERNAL |
-| 账号 | GET/POST/PATCH `/accounts` | 账号、渠道、风险、状态；HS/DFQ 关联校验 |
+| 账号 | GET/PATCH `/accounts` | 查看与维护库存账号；新账号只随工作台订单创建，不提供独立新增接口 |
 | 分期 | GET/POST/PATCH `/installments`，POST `/installments/{id}/payments` | `contract_type`=STOCK_SALE/ADVANCE_PURCHASE；HS 分期出售或 DFQ 代分期的计划、收款、逾期、换绑 |
 | 人员/权限 | GET/POST/PATCH `/users`、`/roles` | 人员、角色、数据范围与停用 |
 | 返点 | POST `/rebates`, POST `/rebates/{id}/settlements` | 返点记录、分次到账与现金流 |

@@ -333,6 +333,19 @@ export const ordersApi = {
     order_type: string;
     trade_date: string;
     account_id?: number;
+    account?: {
+      game_account: string;
+      game_type?: string;
+      game_password?: string;
+      channel_region?: string;
+      bound_phone?: string;
+      has_secondary?: boolean;
+      platform?: string;
+      region?: string;
+      account_description?: string;
+      account_images?: string[];
+      note?: string;
+    };
     owner_id?: number;
     capital_type?: string;
     note?: string;
@@ -357,8 +370,6 @@ export const ordersApi = {
 export const accountsApi = {
   list: (params?: { status?: string }) =>
     api.get<Account[]>("/accounts", { params }).then((r) => r.data),
-  create: (payload: Partial<Account>) =>
-    api.post<Account>("/accounts", payload).then((r) => r.data),
   updateProfile: (id: number, payload: Pick<Account, "account_description" | "account_images">) =>
     api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
   inventory: () =>

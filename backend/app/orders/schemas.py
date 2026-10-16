@@ -16,10 +16,29 @@ class PartyRole(BaseModel):
     role: str
 
 
+class OrderAccountCreate(BaseModel):
+    """随订单建档的游戏账号资料；库存编号由服务端生成。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    game_account: str = Field(min_length=1, max_length=128)
+    game_type: str | None = Field(default=None, max_length=64)
+    game_password: str | None = Field(default=None, max_length=256)
+    channel_region: str | None = Field(default=None, max_length=128)
+    bound_phone: str | None = Field(default=None, max_length=64)
+    has_secondary: bool | None = None
+    platform: str | None = Field(default=None, max_length=64)
+    region: str | None = Field(default=None, max_length=64)
+    account_description: str | None = Field(default=None, max_length=2000)
+    account_images: list[str] = Field(default_factory=list, max_length=9)
+    note: str | None = None
+
+
 class OrderCreate(BaseModel):
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
     account_id: int | None = None
+    account: OrderAccountCreate | None = None
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
@@ -116,6 +135,7 @@ __all__ = [
     "EventCreate",
     "EventOut",
     "EventPostResult",
+    "OrderAccountCreate",
     "OrderCreate",
     "OrderOut",
     "OrderListOut",

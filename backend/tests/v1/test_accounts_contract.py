@@ -15,6 +15,7 @@ from sqlalchemy import select
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
+from app.domain.trade import Account
 from app.accounts import service
 from app.finance import service as finance_service
 from app.orders import service as orders_service
@@ -118,54 +119,65 @@ class TestAccountQueries:
 
 
 class TestAccountsApi:
-    def test_create_account_requires_standard_inventory_context(
-        self, seeded_client, headers
-    ):
-        missing_context = seeded_client.post(
-            "/api/v1/accounts",
-            json={"game_account": "missing-context", "platform": "王者"},
-            headers=headers,
-        )
-        assert missing_context.status_code == 422, missing_context.text
-
-        created = seeded_client.post(
+    def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
+        response = seeded_client.post(
             "/api/v1/accounts",
             json={
-                "game_account": "standard-context",
-                "platform": "王者",
+                "game_account": "standalone-account",
                 "business_mode": "SELF",
                 "inventory_type": "RECOVERY",
             },
             headers=headers,
         )
+        assert response.status_code == 405, response.text
+
+    def test_order_creation_provides_standard_inventory_context(
+        self, seeded_client, seeded_db, headers
+    ):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "HS",
+                "trade_date": TODAY.isoformat(),
+                "account": {"game_account": "standard-context", "platform": "王者"},
+            },
+            headers=headers,
+        )
         assert created.status_code == 201, created.text
-        assert created.json()["business_mode"] == "SELF"
-        assert created.json()["inventory_type"] == "RECOVERY"
+        account = seeded_db.get(Account, created.json()["account_id"])
+        assert account is not None
+        assert account.business_mode == "SELF"
+        assert account.inventory_type == "RECOVERY"
 
     def test_create_account_persists_description_and_at_most_nine_images(
-        self, seeded_client, headers
+        self, seeded_client, seeded_db, headers
     ):
         images = [f"data:image/png;base64,image-{index}" for index in range(9)]
         created = seeded_client.post(
-            "/api/v1/accounts",
+            "/api/v1/orders",
             json={
-                "game_account": "account-with-media",
-                "platform": "王者",
-                "business_mode": "SELF",
-                "inventory_type": "RECOVERY",
-                "account_description": "高段位，未绑定二次验证",
-                "account_images": images,
+                "order_type": "HS",
+                "trade_date": TODAY.isoformat(),
+                "account": {
+                    "game_account": "account-with-media",
+                    "platform": "王者",
+                    "account_description": "高段位，未绑定二次验证",
+                    "account_images": images,
+                },
             },
             headers=headers,
         )
 
         assert created.status_code == 201, created.text
-        assert created.json()["account_description"] == "高段位，未绑定二次验证"
-        assert created.json()["account_images"] == images
+        account_id = created.json()["account_id"]
+        account = seeded_db.get(Account, account_id)
+        assert account is not None
+        assert account.account_description == "高段位，未绑定二次验证"
+        assert account.account_images == images
 
         updated_images = [f"data:image/jpeg;base64,updated-{index}" for index in range(9)]
         updated = seeded_client.patch(
-            f"/api/v1/accounts/{created.json()['id']}",
+            f"/api/v1/accounts/{account_id}",
             json={
                 "account_description": "已补充平台与资源说明",
                 "game_type": "王者荣耀",

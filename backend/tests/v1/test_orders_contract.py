@@ -143,6 +143,27 @@ class TestCreateOrderValidation:
                 service_fee="100.01",
             )
 
+    def test_dfq_account_snapshot_does_not_create_inventory_account(self, seeded_db):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="DFQ",
+            trade_date=D,
+            actor="pytest",
+            account_snapshot={
+                "game_type": "王者荣耀",
+                "game_account": "dfq-text-account",
+                "game_password": "secret",
+                "channel_region": "安卓一区",
+                "account_note": "仅订单文本",
+            },
+        )
+
+        assert order.account_id is None
+        assert order.account_snapshot["game_account"] == "dfq-text-account"
+        assert seeded_db.scalar(
+            select(Account.id).where(Account.game_account == "dfq-text-account")
+        ) is None
+
 
 # ------------------------------------------------------------------ 查询与作用域
 class TestGetAndListOrders:

@@ -64,6 +64,7 @@ class OrderCreate(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     expected_settlement_date: date | None = None
+    account_snapshot: OrderAccountCreate | None = None
     account_id: int | None = None
     account: OrderAccountCreate | None = None
     owner_id: int | None = None
@@ -88,6 +89,7 @@ class OrderOut(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     expected_settlement_date: date | None = None
+    account_snapshot: dict | None = None
     account_id: int | None = None
     status: str
     link_status: str

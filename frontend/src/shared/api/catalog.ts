@@ -360,6 +360,15 @@ export const ordersApi = {
     commission_mode?: string;
     commission_payer?: string;
     expected_settlement_date?: string;
+    account_snapshot?: {
+      game_account: string;
+      game_type?: string;
+      game_password?: string;
+      channel_region?: string;
+      bound_phone?: string;
+      has_secondary?: boolean;
+      note?: string;
+    };
     account_id?: number;
     account?: {
       game_account: string;

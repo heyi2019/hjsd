@@ -159,6 +159,11 @@ def create_order(
         commission_mode=payload.commission_mode,
         commission_payer=payload.commission_payer,
         expected_settlement_date=payload.expected_settlement_date,
+        account_snapshot=(
+            payload.account_snapshot.model_dump(exclude_none=True)
+            if payload.account_snapshot is not None
+            else None
+        ),
         actor=_actor(user),
         account_id=payload.account_id,
         account_profile=payload.account.model_dump() if payload.account else None,

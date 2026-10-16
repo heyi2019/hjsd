@@ -178,6 +178,15 @@ export function CreateBusinessModal(props: {
           order_type: "DFQ",
           trade_date: today(),
           note: values.dfq_note as string,
+          account_snapshot: {
+            game_type: values.dfq_game_type as string,
+            game_account: values.dfq_game_account as string,
+            game_password: values.dfq_game_password as string,
+            channel_region: values.dfq_channel_region as string,
+            bound_phone: values.dfq_bound_phone as string,
+            has_secondary: values.dfq_has_secondary ? values.dfq_has_secondary === "有" : undefined,
+            note: values.dfq_account_note as string,
+          },
           customer_roles: [{ customer_id: customer.customer.id, role: "INSTALLMENT_CUSTOMER" }],
           initial_buy: {
             amount: String(values.dfq_total_amount ?? 0),

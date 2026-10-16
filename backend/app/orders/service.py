@@ -66,6 +66,7 @@ def create_order(
     commission_mode: str | None = None,
     commission_payer: str | None = None,
     expected_settlement_date: date | None = None,
+    account_snapshot: dict[str, Any] | None = None,
     actor: str,
     account_id: int | None = None,
     account_profile: dict[str, Any] | None = None,
@@ -92,6 +93,8 @@ def create_order(
             "DFQ 代分期订单不关联库存账号",
             details={"order_type": definition.code, "account_id": account_id},
         )
+    if definition.code != "DFQ" and account_snapshot is not None:
+        raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
     listing_amount = to_money(listing_price) if listing_price is not None else None
     service_fee_amount = to_money(service_fee) if service_fee is not None else None
     if definition.code != "DG" and any(
@@ -181,6 +184,7 @@ def create_order(
         commission_mode=commission_mode,
         commission_payer=commission_payer,
         expected_settlement_date=expected_settlement_date,
+        account_snapshot=account_snapshot,
         account_id=account_id,
         status=OrderStatus.ACTIVE.value,
         policy_version_id=primary_version_id,

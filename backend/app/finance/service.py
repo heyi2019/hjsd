@@ -35,6 +35,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit, Order, RebateRecord, RebateSettlement
 from app.foundation import service as foundation_service
+from app.orders import service as orders_service
 
 
 def _non_negative(value: Any, *, field: str) -> Decimal:
@@ -56,14 +57,18 @@ def create_deposit(
     source_order_id: int | None = None,
     expected_release_on: date | None = None,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> Deposit:
     money = require_positive(amount, field="amount")
     pool = foundation_service.assert_pool_usable(session, pool_id)
-    if source_order_id is not None and session.get(Order, source_order_id) is None:
-        raise NotFound(
-            f"来源订单 {source_order_id} 不存在",
-            details={"source_order_id": source_order_id},
-        )
+    if source_order_id is not None:
+        try:
+            orders_service.get_order(session, source_order_id, user)
+        except NotFound as exc:
+            raise NotFound(
+                f"来源订单 {source_order_id} 不存在",
+                details={"source_order_id": source_order_id},
+            ) from exc
     deposit = Deposit(
         pool_id=pool.id,
         counterparty_id=counterparty_id,

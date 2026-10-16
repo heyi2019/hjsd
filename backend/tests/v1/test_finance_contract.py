@@ -343,6 +343,38 @@ class TestFinanceApi:
         )
         assert response.status_code == 404
 
+    def test_scoped_finance_cannot_attach_deposit_to_foreign_order(
+        self, seeded_client, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        foreign_order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="other",
+            owner_id=8,
+        )
+
+        response = seeded_client.post(
+            "/api/v1/deposits",
+            json={
+                "pool_id": 1,
+                "amount": "20",
+                "paid_on": TODAY.isoformat(),
+                "source_order_id": foreign_order.id,
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 404, response.text
+
     def test_create_transfer_posts_symmetric_internal_cashflows(
         self, seeded_client, seeded_db, headers
     ):

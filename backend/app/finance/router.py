@@ -161,6 +161,7 @@ def create_deposit(
         source_order_id=payload.source_order_id,
         expected_release_on=payload.expected_release_on,
         note=payload.note,
+        user=user,
     )
     return schemas.DepositOut.model_validate(item)
 

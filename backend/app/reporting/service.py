@@ -45,6 +45,54 @@ def _money(value: Any) -> Decimal:
     return to_money(value or 0)
 
 
+def _event_contribution(
+    event: OrderEvent, event_types: dict[int, str]
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Return (income, buy_amount, direct_cost) for one posted event.
+
+    CANCEL is an accounting reversal only when it explicitly points at the
+    event it offsets.  A bare order cancellation changes workflow state, but
+    does not provide enough information to rewrite historical P&L.
+    """
+    amount = _money(event.amount)
+    if event.event_type == EventType.SELL.value:
+        return amount, ZERO, ZERO
+    if event.event_type == EventType.BUY.value:
+        return ZERO, amount, ZERO
+    if event.event_type == EventType.COST.value:
+        return ZERO, ZERO, amount
+    if event.event_type == EventType.CANCEL.value and event.offset_event_id is not None:
+        offset_type = event_types.get(event.offset_event_id)
+        if offset_type == EventType.SELL.value:
+            return -amount, ZERO, ZERO
+        if offset_type == EventType.BUY.value:
+            return ZERO, -amount, ZERO
+        if offset_type == EventType.COST.value:
+            return ZERO, ZERO, -amount
+    return ZERO, ZERO, ZERO
+
+
+def _event_totals(
+    events: list[OrderEvent], *, from_date: date | None = None, to_date: date | None = None
+) -> tuple[Decimal, Decimal, Decimal]:
+    event_types = {event.id: event.event_type for event in events}
+    income = ZERO
+    buy_amount = ZERO
+    direct_cost = ZERO
+    for event in events:
+        if not event.is_posted:
+            continue
+        if from_date and event.occurred_on < from_date:
+            continue
+        if to_date and event.occurred_on > to_date:
+            continue
+        event_income, event_buy, event_cost = _event_contribution(event, event_types)
+        income += event_income
+        buy_amount += event_buy
+        direct_cost += event_cost
+    return income, buy_amount, direct_cost
+
+
 def _month_key(value: date) -> str:
     return f"{value.year:04d}-{value.month:02d}"
 
@@ -75,19 +123,23 @@ def r1_inventory_health(
     ]
 
     order_cost: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    rows = session.execute(
+    order_income: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    event_rows = session.scalars(
         _apply_order_scope(
-            select(OrderEvent.order_id, func.sum(OrderEvent.amount))
+            select(OrderEvent)
             .join(Order, Order.id == OrderEvent.order_id)
-            .where(
-                OrderEvent.event_type.in_([EventType.BUY.value, EventType.COST.value])
-            ),
+            .where(OrderEvent.is_posted.is_(True)),
             user,
             session,
-        ).group_by(OrderEvent.order_id)
+        )
     ).all()
-    for order_id, amount in rows:
-        order_cost[order_id] += _money(amount)
+    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
+    for event in event_rows:
+        events_by_order[event.order_id].append(event)
+    for order_id, events in events_by_order.items():
+        income, buy_amount, direct_cost = _event_totals(events)
+        order_income[order_id] = income
+        order_cost[order_id] = buy_amount + direct_cost
 
     active_stmt = select(Order).where(Order.status == OrderStatus.ACTIVE.value)
     active_stmt = _apply_order_scope(active_stmt, user, session)
@@ -115,14 +167,7 @@ def r1_inventory_health(
         )
         expected_price = ZERO
         for order in orders:
-            expected_price += _money(
-                session.scalar(
-                    select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
-                        OrderEvent.order_id == order.id,
-                        OrderEvent.event_type == EventType.SELL.value,
-                    )
-                )
-            )
+            expected_price += order_income[order.id]
         total_cost = _money(account.cost_amount)
         items.append(
             {
@@ -152,15 +197,9 @@ def r2_monthly_pnl(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R2 月度经营损益：账号 COST 归直接成本，不进运营费用。"""
-    events = session.execute(
+    events = session.scalars(
         _apply_order_scope(
-            select(
-                OrderEvent.event_type,
-                OrderEvent.occurred_on,
-                OrderEvent.amount,
-                Order.order_type,
-                Order.capital_type,
-            )
+            select(OrderEvent)
             .join(Order, Order.id == OrderEvent.order_id)
             .where(OrderEvent.is_posted.is_(True)),
             user,
@@ -170,16 +209,16 @@ def r2_monthly_pnl(
 
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
     direct_cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    for event_type, occurred_on, amount, _order_type, capital_type in events:
-        if from_date and occurred_on < from_date:
+    event_types = {event.id: event.event_type for event in events}
+    for event in events:
+        if from_date and event.occurred_on < from_date:
             continue
-        if to_date and occurred_on > to_date:
+        if to_date and event.occurred_on > to_date:
             continue
-        key = _month_key(occurred_on)
-        if event_type == EventType.SELL.value:
-            revenue[key] += _money(amount)
-        elif event_type in (EventType.BUY.value, EventType.COST.value):
-            direct_cost[key] += _money(amount)
+        key = _month_key(event.occurred_on)
+        income, buy_amount, event_cost = _event_contribution(event, event_types)
+        revenue[key] += income
+        direct_cost[key] += buy_amount + event_cost
 
     # 运营费用 = 非订单来源的业务支出流水（账号 COST 走事件，不在此列）
     op_stmt = select(Cashflow.occurred_on, Cashflow.amount).where(
@@ -254,20 +293,21 @@ def r3_commission_reconciliation(
     ).all()
 
     per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    events = session.execute(
+    events = session.scalars(
         _apply_order_scope(
-            select(OrderEvent.order_id, OrderEvent.event_type, OrderEvent.amount)
+            select(OrderEvent)
             .join(Order, Order.id == OrderEvent.order_id)
             .where(OrderEvent.is_posted.is_(True)),
             user,
             session,
         )
     ).all()
-    for order_id, event_type, amount in events:
-        if event_type == EventType.SELL.value:
-            per_order_profit[order_id] += _money(amount)
-        elif event_type in (EventType.BUY.value, EventType.COST.value):
-            per_order_profit[order_id] -= _money(amount)
+    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
+    for event in events:
+        events_by_order[event.order_id].append(event)
+    for order_id, order_events in events_by_order.items():
+        income, buy_amount, direct_cost = _event_totals(order_events)
+        per_order_profit[order_id] = income - buy_amount - direct_cost
 
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for allocation, order in rows:
@@ -315,12 +355,7 @@ def r5_business_pnl(
     """R5 业务级损益：未归集返点独立列，不摊给业务。"""
     rows = session.execute(
         _apply_order_scope(
-            select(
-                Order.order_type,
-                OrderEvent.event_type,
-                OrderEvent.amount,
-                OrderEvent.occurred_on,
-            )
+            select(Order, OrderEvent)
             .join(OrderEvent, OrderEvent.order_id == Order.id)
             .where(OrderEvent.is_posted.is_(True)),
             user,
@@ -330,15 +365,18 @@ def r5_business_pnl(
 
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
     cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    for order_type, event_type, amount, occurred_on in rows:
-        if from_date and occurred_on < from_date:
-            continue
-        if to_date and occurred_on > to_date:
-            continue
-        if event_type == EventType.SELL.value:
-            revenue[order_type] += _money(amount)
-        elif event_type in (EventType.BUY.value, EventType.COST.value):
-            cost[order_type] += _money(amount)
+    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
+    order_types: dict[int, str] = {}
+    for order, event in rows:
+        events_by_order[order.id].append(event)
+        order_types[order.id] = order.order_type
+    for order_id, order_events in events_by_order.items():
+        order_type = order_types[order_id]
+        income, buy_amount, direct_cost = _event_totals(
+            order_events, from_date=from_date, to_date=to_date
+        )
+        revenue[order_type] += income
+        cost[order_type] += buy_amount + direct_cost
 
     settled: dict[str, Decimal] = defaultdict(lambda: ZERO)
     unsettled: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -470,20 +508,10 @@ def order_profit_detail(
             continue
         if to_date and order.trade_date > to_date:
             continue
-        income = ZERO
-        buy = ZERO
-        direct_cost = ZERO
         events = session.scalars(
             select(OrderEvent).where(OrderEvent.order_id == order.id)
         ).all()
-        for event in events:
-            amount = _money(event.amount)
-            if event.event_type == EventType.SELL.value:
-                income += amount
-            elif event.event_type == EventType.BUY.value:
-                buy += amount
-            elif event.event_type == EventType.COST.value:
-                direct_cost += amount
+        income, buy, direct_cost = _event_totals(events)
         rebate = ZERO
         settlements = session.execute(
             select(RebateSettlement.gross_amount, RebateSettlement.platform_fee)

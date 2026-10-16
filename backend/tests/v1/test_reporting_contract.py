@@ -174,6 +174,45 @@ class TestR2MonthlyPnl:
         )
         assert [i["month"] for i in early_only["items"]] == ["2026-09"]
 
+    def test_cancelled_sell_is_reversed_in_reports(self, seeded_db):
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount="500.00",
+            occurred_on=D,
+            actor="pytest",
+        )
+        sell, _ = order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="SELL",
+            amount="800.00",
+            occurred_on=D,
+            actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="CANCEL",
+            amount="800.00",
+            occurred_on=D,
+            actor="pytest",
+            offset_event_id=sell.id,
+            reason="售出撤销",
+        )
+
+        monthly = reporting_service.r2_monthly_pnl(seeded_db)
+        oct_item = _month_item(monthly, "2026-10")
+        assert oct_item["sales_income"] == 0
+        assert oct_item["account_direct_cost"] == 500
+
+        detail = reporting_service.order_profit_detail(seeded_db)["items"][0]
+        assert detail["income"] == 0
+        assert detail["buy_amount"] == 500
+        assert detail["net_profit"] == -500
+
     def test_operating_expense_and_rebate_net_loops(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(

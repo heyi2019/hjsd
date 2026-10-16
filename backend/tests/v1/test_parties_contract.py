@@ -81,6 +81,25 @@ class TestCreateCustomerGuards:
         assert response.status_code == 201, response.text
         assert response.json()["customer"]["owner_id"] == user.id
 
+    def test_duplicate_candidates_respect_owner_scope(
+        self, seeded_client, seeded_db
+    ):
+        other = _customer(
+            seeded_db, "他人同名联系方式", wechat="wx-scope", owner_id=1
+        )
+        user = _scoped_user()
+        response = seeded_client.post(
+            CUSTOMERS,
+            json={"display_name": "我的客户", "wechat": "wx-scope"},
+            headers={"Authorization": f"Bearer {build_access_token(user)}"},
+        )
+
+        assert response.status_code == 201, response.text
+        assert all(
+            item["customer_id"] != other.id
+            for item in response.json()["duplicate_candidates"]
+        )
+
 
 # ------------------------------------------------------------------ 客户查询
 class TestListAndGetCustomers:

@@ -158,6 +158,7 @@ def duplicate_candidates(
     wechat: str | None = None,
     qq: str | None = None,
     exclude_customer_id: int | None = None,
+    user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
     conditions = []
     for value, column in ((phone, Customer.phone), (wechat, Customer.wechat), (qq, Customer.qq)):
@@ -166,7 +167,12 @@ def duplicate_candidates(
     if not conditions:
         return []
 
-    rows = session.scalars(select(Customer).where(or_(*conditions))).all()
+    stmt = select(Customer).where(or_(*conditions))
+    if user is not None:
+        scope = owner_scope_filter(Customer.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    rows = session.scalars(stmt).all()
     candidates: list[dict[str, Any]] = []
     for customer in rows:
         if exclude_customer_id is not None and customer.id == exclude_customer_id:

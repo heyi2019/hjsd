@@ -91,6 +91,7 @@ def create_customer(
         wechat=payload.wechat,
         qq=payload.qq,
         exclude_customer_id=customer.id,
+        user=user,
     )
     extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return {

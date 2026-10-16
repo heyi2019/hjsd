@@ -167,6 +167,10 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     ).all():
         transfer_rows[flow.transfer_id].append(flow)
     for transfer_id, rows in transfer_rows.items():
+        if user is not None and not user.is_admin and user.owner_scope != "ALL":
+            visible_pool_ids = user.pool_ids
+            if not visible_pool_ids or any(row.pool_id not in visible_pool_ids for row in rows):
+                continue
         amounts = {to_money(row.amount) for row in rows}
         directions = {row.direction for row in rows}
         if len(rows) != 2 or len(amounts) != 1 or directions != {

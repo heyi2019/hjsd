@@ -98,3 +98,36 @@ class TestQualityScan:
             for row in response.json()["items"]
             if row["entity_type"] == "order"
         )
+
+    def test_quality_endpoint_does_not_leak_cross_pool_transfer(
+        self, seeded_client, seeded_db
+    ):
+        seeded_db.add(
+            Cashflow(
+                flow_no="TR-HIDDEN-OUT",
+                pool_id=2,
+                occurred_on=TODAY,
+                nature="INTERNAL",
+                category="TRANSFER",
+                direction="OUT",
+                amount=Decimal("100"),
+                transfer_id="TR-HIDDEN",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+        user = CurrentUser.build(
+            id=9,
+            username="finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+
+        response = seeded_client.get(
+            "/api/v1/quality/issues",
+            headers={"Authorization": f"Bearer {build_access_token(user)}"},
+        )
+        assert response.status_code == 200, response.text
+        assert all(row["entity_id"] != "TR-HIDDEN" for row in response.json()["items"])

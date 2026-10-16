@@ -596,7 +596,7 @@ export interface AuditLogRow {
   actor?: string | null;
   action?: string | null;
   entity_type?: string | null;
-  entity_id?: number | null;
+  entity_id?: string | null;
   reason?: string | null;
   before?: unknown;
   after?: unknown;
@@ -604,9 +604,9 @@ export interface AuditLogRow {
 }
 
 export const auditApi = {
-  list: (params?: { entity_type?: string; entity_id?: number; limit?: number; offset?: number }) =>
+  list: (params?: { entity_type?: string; entity_id?: string; limit?: number; offset?: number }) =>
     api.get<{ items: AuditLogRow[]; total: number }>("/audit-logs", { params }).then((r) => r.data),
-  actions: () => api.get<string[]>("/audit-logs/actions").then((r) => r.data),
+  actions: () => api.get<{ items: string[] }>("/audit-logs/actions").then((r) => r.data.items),
 };
 
 /* ── M4 补齐：P2 历史参考导入（MIG-01）───────────────────────

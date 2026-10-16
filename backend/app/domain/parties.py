@@ -148,6 +148,10 @@ class EntityExtraValue(Base, TimestampMixin):
 
     __tablename__ = "entity_extra_values"
     __table_args__ = (
+        CheckConstraint(
+            f"entity_type = '{EntityType.CUSTOMER.value}'",
+            name="extra_value_entity_valid",
+        ),
         UniqueConstraint(
             "entity_type", "entity_id", "field_definition_id",
             name="uq_entity_extra_values_unique",

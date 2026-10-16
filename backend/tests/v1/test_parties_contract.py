@@ -19,7 +19,12 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AuditAction, CounterpartyStatus, CustomerStatus
 from app.domain.foundation import AuditLog
-from app.domain.parties import FieldDefinition, OrderCounterpartyRole, OrderCustomerRole
+from app.domain.parties import (
+    EntityExtraValue,
+    FieldDefinition,
+    OrderCounterpartyRole,
+    OrderCustomerRole,
+)
 from app.orders import service as orders_service
 from app.parties import service
 
@@ -353,6 +358,24 @@ class TestCounterpartyGuards:
 
 # ------------------------------------------------------------------ 活字段
 class TestFieldDefinitionGuards:
+    def test_database_rejects_non_customer_extra_value(self, seeded_db):
+        definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="database_guard",
+            label="数据库校验",
+            actor="pytest",
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.execute(
+                EntityExtraValue.__table__.insert().values(
+                    entity_type="order",
+                    entity_id=1,
+                    field_definition_id=definition.id,
+                    value={"value": "invalid"},
+                )
+            )
+
     @pytest.mark.parametrize("field_type", ["UNKNOWN", "JSON", "number"])
     def test_invalid_field_type_rejected(self, seeded_db, field_type):
         with pytest.raises(Validation) as exc:

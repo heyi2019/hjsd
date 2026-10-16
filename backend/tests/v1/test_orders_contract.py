@@ -161,6 +161,22 @@ class TestCreateOrderValidation:
 
         assert "DFQ 代分期订单不关联库存账号" in str(exc.value)
 
+    def test_order_rejects_mismatched_existing_account_context(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-WRONG-CONTEXT",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
+            _order(seeded_db, order_type="DG", account_id=account.id)
+
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(
             inventory_no="ACC-SCOPE-1",

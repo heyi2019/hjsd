@@ -20,7 +20,7 @@ from app.core.business_numbering import cashflow_no as next_cashflow_no
 from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
-from app.core.money import require_positive, to_money
+from app.core.money import require_non_negative, require_positive, to_money
 from app.core.numbering import allocate_number
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.policy import service as policy_service
@@ -54,6 +54,20 @@ EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
     EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
 }
 MONEY_EVENTS = tuple(EVENT_FLOW_MAP.keys())
+_UNSET = object()
+
+
+def _audit_value(value: Any) -> Any:
+    """把订单快照转换为 JSON 可持久化的值。"""
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _audit_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_audit_value(item) for item in value]
+    return value
 
 
 # --------------------------------------------------------------------- 订单
@@ -278,6 +292,178 @@ def list_orders(
         if scope is not None:
             stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(Order.id)).all())
+
+
+def update_order(
+    session: Session,
+    order_id: int,
+    *,
+    actor: str,
+    trade_date: date | None | object = _UNSET,
+    listing_price: Any = _UNSET,
+    service_fee: Any = _UNSET,
+    commission_mode: str | None | object = _UNSET,
+    commission_payer: str | None | object = _UNSET,
+    expected_settlement_date: date | None | object = _UNSET,
+    account_snapshot: dict[str, Any] | None | object = _UNSET,
+    note: str | None | object = _UNSET,
+    user: CurrentUser | None = None,
+) -> Order:
+    """受控编辑订单主字段。
+
+    订单一旦存在已过账事件，核算字段只能通过事件冲销/更正处理；备注仍可补充。
+    订单编号、业务类型、库存账号关联和状态属于不可编辑的身份字段。
+    """
+    order = get_order(session, order_id, user)
+    accounting_changes = (
+        trade_date,
+        listing_price,
+        service_fee,
+        commission_mode,
+        commission_payer,
+        expected_settlement_date,
+        account_snapshot,
+    )
+    if any(value is not _UNSET for value in accounting_changes):
+        posted = session.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.is_posted.is_(True),
+            )
+        )
+        if posted is not None:
+            raise Validation("已有过账事件的订单只能修改备注，核算字段必须通过冲销/更正")
+
+    next_listing = (
+        require_non_negative(listing_price, field="listing_price")
+        if listing_price is not _UNSET and listing_price is not None
+        else (None if listing_price is None else order.listing_price)
+    )
+    next_service_fee = (
+        require_non_negative(service_fee, field="service_fee")
+        if service_fee is not _UNSET and service_fee is not None
+        else (None if service_fee is None else order.service_fee)
+    )
+    next_mode = order.commission_mode if commission_mode is _UNSET else commission_mode
+    next_payer = order.commission_payer if commission_payer is _UNSET else commission_payer
+
+    if order.order_type != "DG" and any(
+        value is not _UNSET and value is not None
+        for value in (
+            listing_price,
+            service_fee,
+            commission_mode,
+            commission_payer,
+            expected_settlement_date,
+        )
+    ):
+        raise Validation("只有 DG 代挂订单可以填写代挂结算条款")
+    if order.order_type == "DG":
+        if next_mode is not None and next_mode not in {
+            "DEDUCT_FROM_SETTLEMENT",
+            "SEPARATE_PAYMENT",
+        }:
+            raise Validation("代挂抽成方式无效", details={"field": "commission_mode"})
+        if next_payer is not None and next_payer not in {
+            "BUYER",
+            "CONSIGNOR",
+            "PLATFORM",
+        }:
+            raise Validation("代挂付款方无效", details={"field": "commission_payer"})
+        if (next_mode is None) != (next_payer is None):
+            raise Validation("代挂抽成方式和付款方必须同时填写")
+        if (
+            next_listing is not None
+            and next_service_fee is not None
+            and next_service_fee > next_listing
+        ):
+            raise Validation("服务费不能超过挂售价")
+    if account_snapshot is not _UNSET and account_snapshot is not None:
+        if order.order_type != "DFQ":
+            raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+
+    before = {
+        "trade_date": order.trade_date,
+        "listing_price": order.listing_price,
+        "service_fee": order.service_fee,
+        "commission_mode": order.commission_mode,
+        "commission_payer": order.commission_payer,
+        "expected_settlement_date": order.expected_settlement_date,
+        "account_snapshot": order.account_snapshot,
+        "note": order.note,
+    }
+    if trade_date is not _UNSET:
+        order.trade_date = trade_date
+    if listing_price is not _UNSET:
+        order.listing_price = next_listing
+    if service_fee is not _UNSET:
+        order.service_fee = next_service_fee
+    if commission_mode is not _UNSET:
+        order.commission_mode = commission_mode
+    if commission_payer is not _UNSET:
+        order.commission_payer = commission_payer
+    if expected_settlement_date is not _UNSET:
+        order.expected_settlement_date = expected_settlement_date
+    if account_snapshot is not _UNSET:
+        order.account_snapshot = account_snapshot
+    if note is not _UNSET:
+        order.note = note
+    order.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.ORDER_UPDATE,
+        entity_type="order",
+        entity_id=order.order_no,
+        actor=actor,
+        before=_audit_value(before),
+        after=_audit_value({
+            "trade_date": order.trade_date,
+            "listing_price": order.listing_price,
+            "service_fee": order.service_fee,
+            "commission_mode": order.commission_mode,
+            "commission_payer": order.commission_payer,
+            "expected_settlement_date": order.expected_settlement_date,
+            "account_snapshot": order.account_snapshot,
+            "note": order.note,
+        }),
+    )
+    return order
+
+
+def cancel_order(
+    session: Session,
+    order_id: int,
+    *,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> Order:
+    """作废尚未过账的订单；已产生业务事实的订单必须走事件冲销。"""
+    if not reason or not reason.strip():
+        raise Validation("订单作废必须填写原因")
+    order = get_order(session, order_id, user)
+    posted = session.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.is_posted.is_(True),
+        )
+    )
+    if posted is not None:
+        raise Validation("订单已有过账事件，不能直接作废，请先冲销")
+    order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+    order.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.ORDER_CANCEL,
+        entity_type="order",
+        entity_id=order.order_no,
+        actor=actor,
+        after={"status": order.status},
+        reason=reason.strip(),
+    )
+    return order
 
 
 # --------------------------------------------------------------------- 事件
@@ -844,9 +1030,11 @@ def _deposit_held(session: Session, pool_id: int) -> Decimal:
 
 
 __all__ = [
+    "cancel_order",
     "create_order",
     "get_order",
     "list_orders",
     "pool_balance",
     "post_event",
+    "update_order",
 ]

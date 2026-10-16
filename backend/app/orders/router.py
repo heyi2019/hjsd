@@ -224,6 +224,40 @@ def get_order(
     return schemas.OrderOut.model_validate(service.get_order(db, order_id, _user))
 
 
+@router.patch("/orders/{order_id}", response_model=schemas.OrderOut)
+def update_order(
+    order_id: int,
+    payload: schemas.OrderUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> schemas.OrderOut:
+    changes = {
+        field: getattr(payload, field)
+        for field in payload.model_fields_set
+    }
+    order = service.update_order(
+        db, order_id, actor=_actor(user), user=user, **changes
+    )
+    return schemas.OrderOut.model_validate(order)
+
+
+@router.post("/orders/{order_id}/cancel", response_model=schemas.OrderOut)
+def cancel_order(
+    order_id: int,
+    payload: schemas.OrderCancelIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> schemas.OrderOut:
+    order = service.cancel_order(
+        db,
+        order_id,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.OrderOut.model_validate(order)
+
+
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)
 def post_event(
     order_id: int,

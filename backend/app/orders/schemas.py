@@ -76,6 +76,23 @@ class OrderCreate(BaseModel):
     installment: OrderInstallmentCreate | None = None
 
 
+class OrderUpdate(BaseModel):
+    """订单编辑：未传字段保持原值，显式 null 代表清空可空字段。"""
+
+    trade_date: date | None = None
+    listing_price: Decimal | None = Field(default=None, ge=0)
+    service_fee: Decimal | None = Field(default=None, ge=0)
+    commission_mode: str | None = None
+    commission_payer: str | None = None
+    expected_settlement_date: date | None = None
+    account_snapshot: dict | None = None
+    note: str | None = None
+
+
+class OrderCancelIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class OrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -174,9 +191,11 @@ __all__ = [
     "InitialBuyCreate",
     "OrderAccountCreate",
     "OrderCreate",
+    "OrderCancelIn",
     "OrderInstallmentCreate",
     "OrderOut",
     "OrderListOut",
+    "OrderUpdate",
     "PartyRole",
     "PoolBalanceOut",
 ]

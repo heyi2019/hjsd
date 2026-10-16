@@ -212,6 +212,52 @@ class TestGetAndListOrders:
         with pytest.raises(NotFound):
             order_service.get_order(seeded_db, 999999)
 
+    def test_active_order_can_update_note_before_posting(self, seeded_db):
+        order = _order(seeded_db)
+        updated = order_service.update_order(
+            seeded_db, order.id, actor="operator", note="补充客户备注"
+        )
+        assert updated.note == "补充客户备注"
+
+    def test_posted_order_cannot_update_accounting_fields_but_can_update_note(
+        self, seeded_db
+    ):
+        order = _order(seeded_db, order_type="DG")
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="SELL",
+            amount=Decimal("200"),
+            occurred_on=D,
+            actor="pytest",
+            portion="GROSS",
+        )
+        with pytest.raises(Validation, match="过账事件"):
+            order_service.update_order(
+                seeded_db, order.id, actor="operator", listing_price=Decimal("300")
+            )
+        updated = order_service.update_order(
+            seeded_db, order.id, actor="operator", note="仅改备注"
+        )
+        assert updated.note == "仅改备注"
+
+    def test_order_cancel_requires_no_posted_events(self, seeded_db):
+        order = _order(seeded_db)
+        cancelled = order_service.cancel_order(
+            seeded_db, order.id, actor="operator", reason="客户撤单"
+        )
+        assert cancelled.status == "CANCELLED"
+
+        posted = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, posted.id, event_type="BUY", amount=Decimal("100"),
+            occurred_on=D, actor="pytest"
+        )
+        with pytest.raises(Validation, match="过账事件"):
+            order_service.cancel_order(
+                seeded_db, posted.id, actor="operator", reason="不能直接作废"
+            )
+
     def test_get_order_owner_scope_forbidden(self, seeded_db):
         # 他人 owner 的订单对 SELF 作用域用户同样 404（不泄露存在性）
         order = _order(seeded_db, owner_id=1)
@@ -608,6 +654,31 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_update_and_cancel_order_api(self, seeded_client, headers):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={"order_type": "HS", "trade_date": D.isoformat()},
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        order_id = created.json()["id"]
+
+        updated = seeded_client.patch(
+            f"/api/v1/orders/{order_id}",
+            json={"note": "接口补充备注"},
+            headers=headers,
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["note"] == "接口补充备注"
+
+        cancelled = seeded_client.post(
+            f"/api/v1/orders/{order_id}/cancel",
+            json={"reason": "接口撤单"},
+            headers=headers,
+        )
+        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.json()["status"] == "CANCELLED"
+
     def test_scoped_user_cannot_choose_foreign_pool_for_composite_dfq(
         self, seeded_client, seeded_db
     ):

@@ -17,6 +17,7 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, CapitalType, OrderStatus
+from app.parties import service as parties_service
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.foundation import service as foundation_service
 from app.orders import service as order_service
@@ -71,6 +72,46 @@ class TestCreateOrderValidation:
             _order(seeded_db, order_type="DFQ", account_id=account.id)
 
         assert "DFQ 代分期订单不关联库存账号" in str(exc.value)
+
+    def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-SCOPE-1",
+            game_account="scope-account",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="another-operator",
+            updated_by="another-operator",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        with pytest.raises(NotFound):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="operator",
+                account_id=account.id,
+                user=_scoped_user(),
+            )
+
+    def test_scoped_user_cannot_attach_foreign_customer(self, seeded_db):
+        customer = parties_service.create_customer(
+            seeded_db,
+            display_name="foreign-customer",
+            actor="another-operator",
+            owner_id=8,
+        )
+
+        with pytest.raises(NotFound):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="operator",
+                customer_roles=[(customer.id, "SELLER")],
+                user=_scoped_user(),
+            )
 
 
 # ------------------------------------------------------------------ 查询与作用域

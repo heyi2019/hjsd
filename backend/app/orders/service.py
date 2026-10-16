@@ -69,6 +69,7 @@ def create_order(
     note: str | None = None,
     customer_roles: Sequence[tuple[int, str]] = (),
     counterparty_roles: Sequence[tuple[int, str]] = (),
+    user: CurrentUser | None = None,
 ) -> Order:
     definition = foundation_service.get_order_type_by_code(session, order_type)
     if definition is None:
@@ -92,7 +93,7 @@ def create_order(
             details={"order_type": definition.code},
         )
     if account_id is not None:
-        accounts_service.get_account(session, account_id)
+        accounts_service.get_account(session, account_id, user)
 
     _validate_participant_roles(customer_roles, counterparty_roles)
 
@@ -151,7 +152,7 @@ def create_order(
 
     role_records: list[dict[str, Any]] = []
     for customer_id, role in customer_roles:
-        customer = parties_service.assert_customer_usable(session, customer_id)
+        customer = parties_service.assert_customer_usable(session, customer_id, user=user)
         role_records.append({"kind": "customer", "id": customer.customer_no, "role": role})
         session.add(
             _customer_role(order.id, customer_id, role)

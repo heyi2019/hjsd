@@ -158,6 +158,7 @@ def create_order(
             for role in payload.counterparty_roles
             if role.counterparty_id is not None
         ],
+        user=user,
     )
     return schemas.OrderOut.model_validate(order)
 

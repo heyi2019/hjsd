@@ -376,9 +376,11 @@ def merge_customers(
     return target
 
 
-def assert_customer_usable(session: Session, customer_id: int) -> Customer:
+def assert_customer_usable(
+    session: Session, customer_id: int, *, user: CurrentUser | None = None
+) -> Customer:
     """新订单参与方校验：停用/已合并一律拒绝（CUS-01-04、A11）。"""
-    customer = get_customer(session, customer_id)
+    customer = get_customer(session, customer_id, user)
     if customer.status != CustomerStatus.ACTIVE.value:
         raise Validation(
             f"客户 {customer.customer_no} 状态为 {customer.status}，不可作为新订单参与方",

@@ -16,6 +16,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +32,7 @@ from app.domain.enums import (
 from app.domain.parties import PolicyDefinition, PolicyVersion
 from app.domain.trade import Order, OrderProfitAllocation
 from app.core.security import CurrentUser
+from app.policy.schemas import ProfitAllocationItem
 
 
 def _scoped_order(
@@ -444,6 +446,17 @@ def snapshot_for(
 
 # ── T20 / BAS-06-03：订单多人利润分配 ────────────────────────────
 
+def _normalize_allocation_item(value: Any) -> dict[str, Any]:
+    try:
+        return ProfitAllocationItem.model_validate(value).model_dump()
+    except PydanticValidationError as exc:
+        errors = exc.errors()
+        has_rate_error = any("allocation_rate" in error.get("loc", ()) for error in errors)
+        raise Validation(
+            "分配比例必须是数值" if has_rate_error else "利润分配字段校验失败",
+            details={"field": "items", "errors": errors},
+        ) from exc
+
 def set_allocations(
     session: Session,
     order_id: int,
@@ -457,9 +470,10 @@ def set_allocations(
     if not items:
         raise Validation("利润分配不能为空", details={"field": "items"})
 
+    normalized_items = [_normalize_allocation_item(item) for item in items]
     total = Decimal("0")
     seen: set[tuple[int, str]] = set()
-    for item in items:
+    for item in normalized_items:
         try:
             rate = to_money(item.get("allocation_rate"))
         except (ValueError, ArithmeticError) as exc:
@@ -498,7 +512,7 @@ def set_allocations(
     session.flush()
 
     created = []
-    for item in items:
+    for item in normalized_items:
         row = OrderProfitAllocation(
             order_id=order_id,
             user_id=int(item["user_id"]),

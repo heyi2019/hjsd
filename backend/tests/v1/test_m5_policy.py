@@ -407,6 +407,24 @@ class TestProfitAllocation:
             )
         assert "角色" in str(exc.value)
 
+    def test_unknown_allocation_field_rejected_by_service(self, seeded_db):
+        order = self._order(seeded_db)
+        with pytest.raises(Exception) as exc:
+            policy_service.set_allocations(
+                seeded_db,
+                order.id,
+                items=[
+                    {
+                        "user_id": 1,
+                        "role": "OWNER",
+                        "allocation_rate": "100",
+                        "legacy_field": "must not be ignored",
+                    }
+                ],
+                actor="pytest",
+            )
+        assert "字段" in str(exc.value) or "校验" in str(exc.value)
+
     def test_fifty_fifty(self, seeded_db):
         order = self._order(seeded_db)
         items = policy_service.set_allocations(

@@ -37,7 +37,18 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    inspector = sa.inspect(op.get_bind())
+    foreign_key_name = next(
+        (
+            foreign_key.get("name")
+            for foreign_key in inspector.get_foreign_keys("cashflow")
+            if foreign_key.get("constrained_columns") == ["order_id"]
+        ),
+        None,
+    )
     with op.batch_alter_table("cashflow") as batch:
-        batch.drop_index("ix_cashflow_order")
-        batch.drop_constraint("fk_cashflow_order_id_orders", type_="foreignkey")
+        if "ix_cashflow_order" in {index["name"] for index in inspector.get_indexes("cashflow")}:
+            batch.drop_index("ix_cashflow_order")
+        if foreign_key_name:
+            batch.drop_constraint(foreign_key_name, type_="foreignkey")
         batch.drop_column("order_id")

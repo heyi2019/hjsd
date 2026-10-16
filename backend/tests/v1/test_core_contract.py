@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from app.core import database, money, settings as settings_module
+from app import api_v1
 from app.core.errors import AppError, NotFound, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.numbering import MAX_SEQUENCE_VALUE, current_value, peek_number
@@ -406,3 +407,18 @@ class TestApiV1Health:
         health = client.get("/api/v1/health")
         assert health.status_code == 200, health.text
         assert health.json()["status"] == "ok"
+        assert health.json()["database_status"] == "ok"
+
+    def test_health_reports_database_unavailable(self, client, monkeypatch):
+        class BrokenEngine:
+            def connect(self):
+                raise RuntimeError("database unavailable")
+
+        monkeypatch.setattr(api_v1, "get_engine", lambda: BrokenEngine())
+        response = client.get("/api/v1/health")
+
+        assert response.status_code == 503
+        assert response.json() == {
+            "status": "error",
+            "database_status": "unavailable",
+        }

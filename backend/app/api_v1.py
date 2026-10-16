@@ -10,8 +10,9 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
-from app.core.database import describe_engine
+from app.core.database import describe_engine, get_engine
 from app.core.errors import AppError, ErrorCode
 from app.core.settings import Settings, get_settings
 from app.foundation.router import router as foundation_router
@@ -105,8 +106,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return info
 
     @app.get(f"{settings.api_prefix}/health", tags=["health"])
-    def health() -> dict[str, str]:
-        return {"status": "ok", **describe_engine(settings)}
+    def health() -> JSONResponse:
+        try:
+            with get_engine().connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except Exception:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "database_status": "unavailable"},
+            )
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ok", "database_status": "ok", **describe_engine(settings)},
+        )
 
     return app
 

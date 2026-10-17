@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import pytest
+from datetime import date
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SqlSession
@@ -18,6 +19,7 @@ from app.core.errors import NotFound, Validation
 from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
 from app.domain.foundation import OrderTypeDef, OrderTypePool
 from app.foundation import seeds, service
+from app.orders import service as order_service
 
 
 def _pool(seeded_db, code: str, **kwargs):
@@ -383,3 +385,25 @@ class TestFoundationApi:
         response = seeded_client.get("/api/v1/sequences", headers=headers)
         assert response.status_code == 200, response.text
         assert response.json()[0]["next_number"].startswith("<已达上限")
+
+    def test_route_impact_preview_does_not_change_history(
+        self, seeded_client, seeded_db, headers
+    ):
+        order_service.create_order(
+            seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
+        )
+        response = seeded_client.get(
+            "/api/v1/order-types/HS/routes/impact-preview",
+            params={
+                "portion": "PRINCIPAL",
+                "pool_code": "HJ_PROFIT",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["changed"] is True
+        assert payload["current_route"]["pool_code"] == "HJ_INVEST"
+        assert payload["proposed_route"]["pool_code"] == "HJ_PROFIT"
+        assert payload["historical_impact"]["order_count"] == 1
+        assert payload["historical_impact"]["unchanged"] is True

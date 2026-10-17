@@ -104,6 +104,16 @@ class RouteOut(BaseModel):
     is_active: bool
 
 
+class RouteImpactPreviewOut(BaseModel):
+    order_type: str
+    portion: str
+    current_route: dict | None = None
+    proposed_route: dict
+    changed: bool
+    historical_impact: dict
+    future_effect: str
+
+
 class SequenceOut(BaseModel):
     sequence_key: str
     prefix: str
@@ -121,6 +131,7 @@ __all__ = [
     "PoolStatusUpdate",
     "PoolUpdate",
     "RouteIn",
+    "RouteImpactPreviewOut",
     "RouteOut",
     "SequenceOut",
 ]

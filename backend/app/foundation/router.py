@@ -214,6 +214,27 @@ def set_route(
     )
 
 
+@router.get(
+    "/order-types/{code}/routes/impact-preview",
+    response_model=schemas.RouteImpactPreviewOut,
+)
+def route_impact_preview(
+    code: str,
+    portion: schemas.Portion = Query(...),
+    pool_code: str = Query(..., min_length=2, max_length=64),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_order_types,
+) -> schemas.RouteImpactPreviewOut:
+    return schemas.RouteImpactPreviewOut.model_validate(
+        service.route_impact_preview(
+            db,
+            order_type_code=code,
+            portion=portion.value,
+            pool_code=pool_code,
+        )
+    )
+
+
 # ----------------------------------------------------------------------- 编号
 @router.get("/sequences", response_model=list[schemas.SequenceOut])
 def list_sequences(

@@ -9,7 +9,7 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import inspect, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -25,6 +25,7 @@ from app.domain.enums import (
     Portion,
 )
 from app.domain.foundation import DocumentSequence, OrderTypeDef, OrderTypePool, Pool
+from app.domain.trade import Cashflow, Order, OrderEvent
 
 # 池代码允许下划线（HJ_INVEST / HJ_PROFIT）；业务代码为紧凑大写字母数字（HS / TB2）
 POOL_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
@@ -527,6 +528,78 @@ def set_route(
     return route
 
 
+def route_impact_preview(
+    session: Session,
+    *,
+    order_type_code: str,
+    portion: str,
+    pool_code: str,
+) -> dict[str, Any]:
+    """预览路由变更影响；只读，不改写历史订单或流水。"""
+    if portion not in Portion.values():
+        raise Validation(
+            "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
+        )
+    order_type = require_order_type_by_code(session, order_type_code)
+    pool = require_pool_by_code(session, pool_code)
+    if pool.status != PoolStatus.ACTIVE.value:
+        raise Validation(
+            f"资金池 {pool.code} 已停用，不可作为路由目标",
+            code=ErrorCode.POOL_DISABLED,
+            details={"pool_code": pool.code},
+        )
+    current = session.scalar(
+        select(OrderTypePool)
+        .where(
+            OrderTypePool.order_type_id == order_type.id,
+            OrderTypePool.portion == portion,
+        )
+    )
+    order_ids = list(
+        session.scalars(
+            select(Order.id).where(Order.order_type == order_type.code)
+        ).all()
+    )
+    event_count = (
+        session.scalar(
+            select(func.count(OrderEvent.id)).where(OrderEvent.order_id.in_(order_ids))
+        )
+        if order_ids
+        else 0
+    )
+    cashflow_count = (
+        session.scalar(
+            select(func.count(Cashflow.id)).where(Cashflow.order_id.in_(order_ids))
+        )
+        if order_ids
+        else 0
+    )
+    return {
+        "order_type": order_type.code,
+        "portion": portion,
+        "current_route": {
+            "pool_code": current.pool.code,
+            "pool_name": current.pool.name,
+            "priority": current.priority,
+            "is_active": current.is_active,
+        }
+        if current is not None
+        else None,
+        "proposed_route": {
+            "pool_code": pool.code,
+            "pool_name": pool.name,
+        },
+        "changed": current is None or current.pool_id != pool.id,
+        "historical_impact": {
+            "order_count": len(order_ids),
+            "event_count": int(event_count or 0),
+            "cashflow_count": int(cashflow_count or 0),
+            "unchanged": True,
+        },
+        "future_effect": "仅影响变更提交后按该业务和份额新解析的默认资金池，历史记录保留实际 pool_id",
+    }
+
+
 def resolve_default_pool(session: Session, order_type_code: str, portion: str) -> Pool | None:
     """读取默认资金池（不抛错），供上层决定是否需要显式覆盖。"""
     if portion not in Portion.values():
@@ -602,6 +675,7 @@ __all__ = [
     "require_order_type_by_code",
     "require_pool_by_code",
     "resolve_default_pool",
+    "route_impact_preview",
     "set_order_type_active",
     "set_pool_status",
     "set_route",

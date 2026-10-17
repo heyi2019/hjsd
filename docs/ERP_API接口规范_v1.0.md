@@ -16,7 +16,7 @@
 |---|---|---|
 | 认证 | POST `/auth/login`、GET `/auth/me`、POST `/auth/change-password`、POST `/auth/logout` | 登录、当前用户、改密、会话注销 |
 | 池/业务 | GET/POST `/pools`，PATCH `/pools/{id}`、PATCH `/pools/{id}/status`、GET `/pools/{id}/balance` | 创建、停用、查看池及余额；有流水池禁止删除 |
-| 业务主数据 | GET/POST `/order-types`，PATCH `/order-types/{id}`、PATCH `/order-types/{id}/active`，GET `/order-types/{id}/routes`、POST `/order-types/{code}/routes` | 业务类型和资金路由；业务类型可扩展 |
+| 业务主数据 | GET/POST `/order-types`，PATCH `/order-types/{id}`、PATCH `/order-types/{id}/active`，GET `/order-types/{id}/routes`、POST `/order-types/{code}/routes`，GET `/order-types/{code}/routes/impact-preview` | 业务类型和资金路由；变更前可预览历史影响，历史记录不重算；业务类型可扩展 |
 | 客户 | GET/POST `/customers`，GET `/customers/{id}/detail`，GET/PATCH `/customers/{id}`，PATCH `/customers/{id}/status`，POST `/customers/{id}/merge` | 客户档案、业务/分期/审计详情聚合、重复候选、状态、合并与订单参与关系 |
 | 客户需求 | GET/POST `/leads`，GET/PATCH `/leads/{id}`，POST `/leads/{id}/convert`、`/close` | 代蹲、代出、定找需求池；转单只关联已有订单，不自动生成订单或资金流水 |
 | 合作方 | GET/POST `/counterparties`，GET/PATCH `/counterparties/{id}`，PATCH `/counterparties/{id}/status` | 同行、供货方、平台等非客户对手方主数据 |

@@ -52,6 +52,7 @@ class TestRebateValidation:
         seeded_db.add(
             RebateRecord(
                 rebate_no="RB-INVALID-LINK-STATUS",
+                source_order_id=_active_order(seeded_db),
                 rate=Decimal("10"),
                 base_amount=Decimal("500"),
                 status="OPEN",

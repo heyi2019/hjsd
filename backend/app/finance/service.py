@@ -1387,14 +1387,7 @@ def list_rebate_settlements(
             f"返点记录 {rebate_record_id} 不存在",
             details={"rebate_record_id": rebate_record_id},
         )
-    if record.source_order_id is None:
-        if user is not None and not (user.is_admin or user.owner_scope == "ALL"):
-            raise NotFound(
-                f"返点记录 {rebate_record_id} 不存在",
-                details={"rebate_record_id": rebate_record_id},
-            )
-    else:
-        orders_service.get_order(session, record.source_order_id, user)
+    orders_service.get_order(session, record.source_order_id, user)
     return list(
         session.scalars(
             select(RebateSettlement)
@@ -1423,7 +1416,7 @@ def reverse_rebate_settlement(
     )
     assert_period_open(session, reversed_on, operation="创建返点冲销")
     record = session.get(RebateRecord, rebate_record_id)
-    if record is None or record.source_order_id is None:
+    if record is None:
         raise NotFound(
             f"返点记录 {rebate_record_id} 不存在",
             details={"rebate_record_id": rebate_record_id},
@@ -1568,7 +1561,7 @@ def sync_overdue_rebate_notifications(
     existing = 0
     skipped = 0
     for rebate, overdue_days in list_overdue_rebates(session, as_of=as_of):
-        order = session.get(Order, rebate.source_order_id) if rebate.source_order_id else None
+        order = session.get(Order, rebate.source_order_id)
         if order is None or order.owner_id is None:
             skipped += 1
             continue

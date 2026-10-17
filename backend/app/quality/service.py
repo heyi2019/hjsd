@@ -369,14 +369,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     for rebate in rebates:
         if rebate.link_status == "LINKED":
             continue
-        if rebate.source_order_id is not None and rebate.source_order_id not in order_ids:
-            continue
-        if (
-            rebate.source_order_id is None
-            and user is not None
-            and not user.is_admin
-            and user.owner_scope != "ALL"
-        ):
+        if rebate.source_order_id not in order_ids:
             continue
         issues.append(
             _issue(
@@ -478,14 +471,13 @@ def metrics(
         rebates = [
             rebate
             for rebate in rebates
-            if rebate.source_order_id is not None
-            and rebate.source_order_id in order_ids
+            if rebate.source_order_id in order_ids
         ]
     else:
         rebates = [
             rebate
             for rebate in rebates
-            if rebate.source_order_id is None or rebate.source_order_id in order_ids
+            if rebate.source_order_id in order_ids
         ]
 
     reconciliations = list(session.scalars(select(Reconciliation)).all())
@@ -557,7 +549,7 @@ def metrics(
         linked_rebates = sum(
             1
             for rebate in month_rebates
-            if rebate.link_status == "LINKED" and rebate.source_order_id is not None
+            if rebate.link_status == "LINKED"
         )
 
         month_reconciliations = [

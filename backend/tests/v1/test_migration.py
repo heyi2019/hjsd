@@ -62,6 +62,11 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
             rebate_columns = {column["name"] for column in inspect(connection).get_columns("rebate_records")}
             assert "rebate_no" in rebate_columns
             assert "rebate_group_no" not in rebate_columns
+            rebate_source = next(
+                column for column in inspect(connection).get_columns("rebate_records")
+                if column["name"] == "source_order_id"
+            )
+            assert rebate_source["nullable"] is False
             import_source = next(
                 column for column in inspect(connection).get_columns("import_batches")
                 if column["name"] == "source_kind"

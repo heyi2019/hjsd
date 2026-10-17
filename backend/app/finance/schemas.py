@@ -188,7 +188,7 @@ class RebateOut(BaseModel):
 
     id: int
     rebate_no: str
-    source_order_id: int | None = None
+    source_order_id: int
     rebate_type: str
     channel: str | None = None
     rate: Decimal

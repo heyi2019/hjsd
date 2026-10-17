@@ -592,8 +592,8 @@ class RebateRecord(Base, AuditMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     rebate_no: Mapped[str] = mapped_column(String(32), nullable=False)
-    source_order_id: Mapped[int | None] = mapped_column(
-        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    source_order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
     )
     rebate_type: Mapped[str] = mapped_column(
         String(16), nullable=False

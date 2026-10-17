@@ -42,7 +42,7 @@ def test_quality_metrics_expose_definitions_and_monthly_trend(
             ),
             RebateRecord(
                 rebate_no="TH-METRIC-RB02",
-                source_order_id=None,
+                source_order_id=th_order.id,
                 rebate_type="BUY",
                 rate=to_money("1"),
                 base_amount=to_money("100"),

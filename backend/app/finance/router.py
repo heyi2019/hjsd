@@ -521,8 +521,6 @@ def settle_rebate(
     rebate = db.get(RebateRecord, rebate_id)
     if rebate is None:
         raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
-    if rebate.source_order_id is None:
-        raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
     orders_service.get_order(db, rebate.source_order_id, user)
     item = service.settle_rebate(
         db,

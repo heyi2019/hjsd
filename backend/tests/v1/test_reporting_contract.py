@@ -3,7 +3,7 @@
 与 test_m4.py::TestReports 的分工：m4 已覆盖无数据冒烟、账号 COST 不进运营费用、
 未归集返点独立列、日报与池余额一致、利润合计自洽、R3 空数据钻取；本文件补
 日期过滤边界（from/to 双向 continue）、SELL 收入、运营费用/返点结算循环、
-提成分配、UNCOLLECTED 返点桶、订单明细事件分类与返点 join、?from=&to= API 路径。
+提成分配、订单归属返点、订单明细事件分类与返点 join、?from=&to= API 路径。
 """
 from __future__ import annotations
 
@@ -456,11 +456,14 @@ class TestR5BusinessPnl:
             seeded_db, record.id, gross_amount="100.00", settled_on=D, pool_id=2,
             actor="pytest", platform_fee="10.00",
         )
-        # 未归集返点：create_rebate 强制要来源订单，UNCOLLECTED 桶只能直插模型
+        # 未归集返点仍必须归属于具体订单。
+        dg_order = order_service.create_order(
+            seeded_db, order_type="DG", trade_date=D, actor="pytest"
+        )
         seeded_db.add(
             RebateRecord(
                 rebate_no="RB-R5-1",
-                source_order_id=None,
+                source_order_id=dg_order.id,
                 rebate_type="SELL",
                 rate=to_money("10"),
                 base_amount=to_money("500.00"),
@@ -482,7 +485,7 @@ class TestR5BusinessPnl:
         assert hs["uncollected_rebate"] == 0
         assert hs["full_income"] == 390
         # 未归集独立成桶，不摊给 HS
-        uncollected = by_type["UNCOLLECTED"]
+        uncollected = by_type["DG"]
         assert uncollected["uncollected_rebate"] == 50
         assert uncollected["main_profit"] == 0
         assert uncollected["full_income"] == 0
@@ -494,7 +497,7 @@ class TestR5BusinessPnl:
         assert gated_by_type["HS"]["main_profit"] == 0
         assert gated_by_type["HS"]["settled_rebate"] == 0
         assert gated_by_type["HS"]["uncollected_rebate"] == 100
-        assert gated_by_type["UNCOLLECTED"]["uncollected_rebate"] == 50
+        assert gated_by_type["DG"]["uncollected_rebate"] == 50
 
         # to 过滤：occurred_on 和 settled_on=D 的数据均在区间外
         gated_to = reporting_service.r5_business_pnl(seeded_db, to_date=date(2026, 10, 1))
@@ -502,7 +505,7 @@ class TestR5BusinessPnl:
         assert to_by_type["HS"]["main_income"] == 0
         assert to_by_type["HS"]["settled_rebate"] == 0
         assert to_by_type["HS"]["uncollected_rebate"] == 100
-        assert to_by_type["UNCOLLECTED"]["uncollected_rebate"] == 50
+        assert to_by_type["DG"]["uncollected_rebate"] == 50
 
 
 # --------------------------------------------------------------------- 订单利润明细
@@ -641,13 +644,14 @@ class TestReportsApiDateParams:
         )
         assert denied.status_code == 403
 
-    def test_scoped_business_pnl_hides_unlinked_rebates(
-        self, seeded_db
-    ):
+    def test_scoped_business_pnl_hides_foreign_rebates(self, seeded_db):
+        foreign_order = _order(seeded_db)
+        foreign_order.owner_id = 8
+        seeded_db.flush()
         seeded_db.add(
             RebateRecord(
                 rebate_no="RB-R5-SCOPE",
-                source_order_id=None,
+                source_order_id=foreign_order.id,
                 rebate_type="SELL",
                 rate=to_money("10"),
                 base_amount=to_money("500"),
@@ -664,4 +668,4 @@ class TestReportsApiDateParams:
         )
 
         data = reporting_service.r5_business_pnl(seeded_db, user=scoped)
-        assert all(row["order_type"] != "UNCOLLECTED" for row in data["items"])
+        assert all(row["order_type"] != foreign_order.order_type for row in data["items"])

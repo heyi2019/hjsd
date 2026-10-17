@@ -539,17 +539,16 @@ def r5_business_pnl(
             Order.order_type,
         )
         .outerjoin(RebateSettlement, RebateSettlement.rebate_record_id == RebateRecord.id)
-        .outerjoin(Order, Order.id == RebateRecord.source_order_id)
+        .join(Order, Order.id == RebateRecord.source_order_id)
     )
     if user is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:
             rebate_stmt = rebate_stmt.where(
-                RebateRecord.source_order_id.is_not(None),
                 scope,
             )
     rebates = session.execute(rebate_stmt).all()
-    rebate_totals: dict[int, tuple[RebateRecord, str | None, Decimal, Decimal]] = {}
+    rebate_totals: dict[int, tuple[RebateRecord, str, Decimal, Decimal]] = {}
     for record, gross, fee, reversal_of_id, settled_on, order_type in rebates:
         previous = rebate_totals.get(record.id)
         if previous is None:
@@ -573,7 +572,7 @@ def r5_business_pnl(
             )
 
     for record, order_type, settled_gross, settled_fee in rebate_totals.values():
-        bucket = order_type or "UNCOLLECTED"
+        bucket = order_type
         expected = (
             _money(record.base_amount) * _money(record.rate) / Decimal("100")
         ).quantize(Decimal("0.01"))

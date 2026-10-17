@@ -349,8 +349,6 @@ def execution_detail(
                     )
                 )
         for rebate in rebates:
-            if rebate.source_order_id is None:
-                continue
             rebates_by_order.setdefault(rebate.source_order_id, []).append(
                 ExecutionRebateOut(
                     id=rebate.id,

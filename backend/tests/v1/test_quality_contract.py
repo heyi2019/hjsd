@@ -128,11 +128,12 @@ class TestQualityScan:
             "available": "-120.00",
         }
 
-    def test_detects_unlinked_rebate_without_source_order(self, seeded_db):
+    def test_detects_unlinked_rebate_with_source_order(self, seeded_db):
+        order = _order(seeded_db, order_type="DG")
         seeded_db.add(
             RebateRecord(
                 rebate_no="RB-UNLINKED-1",
-                source_order_id=None,
+                source_order_id=order.id,
                 rebate_type="SELL",
                 rate=Decimal("10"),
                 base_amount=Decimal("500"),
@@ -148,6 +149,7 @@ class TestQualityScan:
         issues = service.scan(seeded_db)
         item = next(row for row in issues if row["code"] == "REBATE_UNLINKED")
         assert item["entity_id"] == "RB-UNLINKED-1"
+        assert item["details"]["source_order_id"] == order.id
 
     def test_quality_endpoint_respects_order_scope(self, seeded_client, seeded_db):
         mine = _order(seeded_db, owner_id=9)

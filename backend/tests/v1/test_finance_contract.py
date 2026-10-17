@@ -156,6 +156,45 @@ class TestDepositQueries:
                 actor="pytest",
             )
 
+    def test_text_inputs_are_business_errors_in_service(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        with pytest.raises(Validation, match="category 必须为文本"):
+            service.create_cashflow(
+                seeded_db,
+                pool_id=invest.id,
+                occurred_on=TODAY,
+                direction="IN",
+                nature="BUSINESS_IN",
+                category=123,
+                amount=Decimal("1"),
+                actor="finance",
+            )
+
+        deposit = service.create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
+            actor="pytest",
+        )
+        with pytest.raises(Validation, match="押金损失必须填写原因"):
+            service.lose_deposit(
+                seeded_db,
+                deposit.id,
+                amount=Decimal("1"),
+                lost_on=TODAY,
+                category="OPERATING_COST",
+                reason=123,
+                actor="finance",
+            )
+
+        with pytest.raises(Validation, match="对账账户必须为文本"):
+            service.create_reconciliation(
+                seeded_db,
+                pool_id=invest.id,
+                reconciled_on=TODAY,
+                account_label=123,
+                statement_balance=Decimal("0"),
+                actor="finance",
+            )
+
     def test_deposit_counterparty_must_exist(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(NotFound, match="合作方"):

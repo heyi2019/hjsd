@@ -62,6 +62,25 @@ def _positive(value: Any, *, field: str) -> Decimal:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
+def _text(
+    value: Any,
+    *,
+    field: str,
+    message: str,
+    required: bool = True,
+    uppercase: bool = False,
+    type_message: str | None = None,
+) -> str:
+    if value is None and not required:
+        return ""
+    if not isinstance(value, str):
+        raise Validation(type_message or f"{field} 必须为文本", details={"field": field})
+    text = value.strip()
+    if required and not text:
+        raise Validation(message, details={"field": field})
+    return text.upper() if uppercase else text
+
+
 def _get_cashflow(
     session: Session, cashflow_id: int, user: CurrentUser | None = None
 ) -> Cashflow:
@@ -115,10 +134,16 @@ def create_cashflow(
         raise Validation("收入流水的 nature 不匹配", details={"direction": direction, "nature": nature})
     if direction == Direction.OUT.value and nature != Nature.BUSINESS_OUT.value:
         raise Validation("支出流水的 nature 不匹配", details={"direction": direction, "nature": nature})
-    label = (category or "").strip().upper()
-    if not label:
-        raise Validation("category 不能为空", details={"field": "category"})
-    if nature == Nature.EXTERNAL_IN.value and not (note or "").strip():
+    label = _text(
+        category,
+        field="category",
+        message="category 不能为空",
+        uppercase=True,
+        type_message="category 必须为文本",
+    )
+    if nature == Nature.EXTERNAL_IN.value and (
+        not isinstance(note, str) or not note.strip()
+    ):
         raise Validation("独立收款必须填写摘要", details={"field": "note"})
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
@@ -196,9 +221,12 @@ def reject_cashflow(
     reason: str,
     user: CurrentUser | None = None,
 ) -> Cashflow:
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("驳回流水必须填写原因", details={"field": "reason"})
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="驳回流水必须填写原因",
+        type_message="驳回流水必须填写原因",
+    )
     flow = _get_cashflow(session, cashflow_id, user)
     if flow.status != CashflowStatus.PENDING.value:
         raise Validation(
@@ -231,9 +259,12 @@ def reverse_cashflow(
     reason: str,
     user: CurrentUser | None = None,
 ) -> Cashflow:
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("冲销流水必须填写原因", details={"field": "reason"})
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="冲销流水必须填写原因",
+        type_message="冲销流水必须填写原因",
+    )
     flow = _get_cashflow(session, cashflow_id, user)
     if flow.status != CashflowStatus.APPROVED.value:
         raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
@@ -443,12 +474,19 @@ def lose_deposit(
     deposit = session.get(Deposit, deposit_id)
     if deposit is None or (user is not None and not user.can_see_pool(deposit.pool_id)):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("押金损失必须填写原因", details={"field": "reason"})
-    label = (category or "").strip().upper()
-    if not label:
-        raise Validation("押金损失必须填写费用分类", details={"field": "category"})
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="押金损失必须填写原因",
+        type_message="押金损失必须填写原因",
+    )
+    label = _text(
+        category,
+        field="category",
+        message="押金损失必须填写费用分类",
+        uppercase=True,
+        type_message="押金损失必须填写费用分类",
+    )
     if label in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE", "DEPOSIT_LOSS", "TRANSFER"}:
         raise Validation("押金损失费用分类不能使用系统分类", details={"field": "category"})
     money = _positive(amount, field="amount")
@@ -658,9 +696,12 @@ def create_reconciliation(
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
-    label = (account_label or "").strip()
-    if not label:
-        raise Validation("对账账户不能为空", details={"field": "account_label"})
+    label = _text(
+        account_label,
+        field="account_label",
+        message="对账账户不能为空",
+        type_message="对账账户必须为文本",
+    )
     statement = _non_negative(statement_balance, field="statement_balance")
     duplicate = session.scalar(
         select(Reconciliation.id).where(
@@ -699,7 +740,13 @@ def create_reconciliation(
 
     system_balance = _system_balance_as_of(session, pool.id, reconciled_on)
     difference = to_money(statement - system_balance)
-    text_reason = (reason or "").strip()
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="存在差异时必须填写差异原因",
+        required=difference != 0,
+        type_message="存在差异时必须填写差异原因",
+    )
     if difference != 0 and not text_reason:
         raise Validation("存在差异时必须填写差异原因", details={"field": "reason"})
     item = Reconciliation(
@@ -773,9 +820,12 @@ def resolve_reconciliation(
     reason: str,
     user: CurrentUser | None = None,
 ) -> Reconciliation:
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("核销对账必须填写处理说明", details={"field": "reason"})
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="核销对账必须填写处理说明",
+        type_message="核销对账必须填写处理说明",
+    )
     item = _get_reconciliation(session, reconciliation_id, user)
     if item.status != ReconciliationStatus.OPEN.value:
         raise Validation("该对账记录已核销", details={"reconciliation_id": item.id})
@@ -872,12 +922,18 @@ def repair_transfer(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """只为单边内部划转补齐缺失的一边，禁止把异常静默当成正常新划转。"""
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("划转修复必须填写原因", details={"field": "reason"})
-    transfer = (transfer_id or "").strip()
-    if not transfer:
-        raise Validation("transfer_id 不能为空", details={"field": "transfer_id"})
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="划转修复必须填写原因",
+        type_message="划转修复必须填写原因",
+    )
+    transfer = _text(
+        transfer_id,
+        field="transfer_id",
+        message="transfer_id 不能为空",
+        type_message="transfer_id 必须为文本",
+    )
     rows = list(
         session.scalars(
             select(Cashflow)
@@ -1208,9 +1264,12 @@ def reverse_rebate_settlement(
     user: CurrentUser | None = None,
 ) -> RebateSettlement:
     """以反向结算和反向流水更正一笔已发生的返点到账。"""
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("返点冲销必须填写原因", details={"field": "reason"})
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="返点冲销必须填写原因",
+        type_message="返点冲销必须填写原因",
+    )
     record = session.get(RebateRecord, rebate_record_id)
     if record is None or record.source_order_id is None:
         raise NotFound(

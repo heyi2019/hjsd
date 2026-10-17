@@ -42,6 +42,7 @@ from app.domain.trade import (
     RebateRecord,
     RebateSettlement,
 )
+from app.parties import service as parties_service
 
 ZERO = Decimal("0")
 REPORT_NAMES = frozenset(
@@ -735,6 +736,9 @@ def order_profit_detail(
     _validate_date_range(from_date, to_date)
     orders_stmt = _apply_order_scope(select(Order), user, session)
     orders = session.scalars(orders_stmt).all()
+    extra_values = parties_service.get_extra_values_bulk(
+        session, entity_type="order", entity_ids=[order.id for order in orders]
+    )
     items = []
     for order in orders:
         if from_date and order.trade_date < from_date:
@@ -770,6 +774,7 @@ def order_profit_detail(
                 "direct_cost": direct_cost,
                 "rebate": rebate,
                 "net_profit": income - buy - direct_cost + rebate,
+                "extra_values": extra_values.get(order.id, {}),
             }
         )
     return {

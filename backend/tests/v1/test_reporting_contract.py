@@ -27,6 +27,7 @@ from app.domain.trade import Account, Cashflow, RebateRecord
 from app.finance import service as finance_service
 from app.orders import service as order_service
 from app.policy import service as policy_service
+from app.parties import service as parties_service
 from app.reporting import service as reporting_service
 
 D = date(2026, 10, 4)        # 主测试日（与 m4 一致）
@@ -643,6 +644,32 @@ class TestReportsApiDateParams:
             "/api/v1/reports/order-profit/export.csv", headers=viewer_headers
         )
         assert denied.status_code == 403
+
+    def test_order_profit_export_includes_order_extra_values(
+        self, seeded_client, seeded_db, headers
+    ):
+        definition = parties_service.create_field_definition(
+            seeded_db,
+            entity_type="order",
+            field_key="export_note",
+            label="导出备注",
+            actor="pytest",
+        )
+        order = _order(seeded_db)
+        parties_service.set_extra_values(
+            seeded_db,
+            entity_type="order",
+            entity_id=order.id,
+            values=[(definition.field_key, "应导出")],
+        )
+
+        exported = seeded_client.get(
+            "/api/v1/reports/order-profit/export.csv", headers=headers
+        )
+        assert exported.status_code == 200, exported.text
+        csv_text = exported.content.decode("utf-8-sig")
+        assert "extra_values" in csv_text.splitlines()[0]
+        assert "应导出" in csv_text
 
     def test_scoped_business_pnl_hides_foreign_rebates(self, seeded_db):
         foreign_order = _order(seeded_db)

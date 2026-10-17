@@ -828,6 +828,30 @@ class TestCancelOffsetDirection:
         assert exc.value.code == ErrorCode.VALIDATION_ERROR
         assert "同一订单" in str(exc.value)
 
+    def test_cancel_cost_reverses_cashflow_to_income(self, seeded_db):
+        order = _order(seeded_db)
+        cost, _ = order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="COST",
+            amount="30.00",
+            occurred_on=D,
+            actor="pytest",
+        )
+
+        _cancel, flow = order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="CANCEL",
+            amount="30.00",
+            occurred_on=D,
+            actor="pytest",
+            offset_event_id=cost.id,
+            reason="费用退回",
+        )
+
+        assert flow.direction == "IN"
+
 
 # ------------------------------------------------------------------ 账号效果
 class TestAccountEffect:

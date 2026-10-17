@@ -952,7 +952,9 @@ def _opposite_direction(
     if offset_event_id is None:
         return Direction.IN.value
     offset = _get_offset_event(session, offset_event_id, order_id=order_id)
-    return Direction.IN.value if offset.event_type == EventType.BUY.value else Direction.OUT.value
+    if offset.event_type in {EventType.BUY.value, EventType.COST.value}:
+        return Direction.IN.value
+    return Direction.OUT.value
 
 
 def _get_offset_event(

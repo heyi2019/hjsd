@@ -81,13 +81,6 @@ const BUSINESS_CREATE_ITEMS = [
   { key: "DFQ", label: "新建代分期订单" },
 ];
 
-const FALLBACK_TYPE_NAMES: Record<string, string> = {
-  HS: "回收",
-  TH: "提号",
-  DG: "代挂",
-  DFQ: "代分期",
-};
-
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
   DISTRIBUTION: "分销",
@@ -166,7 +159,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     void load();
   }, [load]);
 
-  const typeNames = { ...FALLBACK_TYPE_NAMES, ...Object.fromEntries(types.map((type) => [type.code, type.name])) };
+  const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword);
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
     initialTab === "inventory" ? "inventory" : DEFAULT_BUSINESS_CENTER_TAB,

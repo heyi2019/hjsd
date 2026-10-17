@@ -618,6 +618,8 @@ class TestAccountsApi:
         assert order_payload["order_no"] == order.order_no
         assert datetime.fromisoformat(order_payload["created_at"])
         assert datetime.fromisoformat(event_payload["occurred_at"])
+        assert datetime.fromisoformat(event_payload["created_at"])
+        assert datetime.fromisoformat(event_payload["posted_at"])
         assert event_payload["reason"] == "核验回收成本"
         assert event_payload["offset_event_id"] is None
         assert event_payload["id"] == event.id

@@ -99,6 +99,8 @@ class ExecutionEventOut(BaseModel):
     amount: Decimal
     occurred_on: date
     occurred_at: datetime
+    created_at: datetime
+    posted_at: datetime | None = None
     offset_event_id: int | None = None
     portion: str
     delivery_mode: str | None = None
@@ -397,6 +399,8 @@ def execution_detail(
                 amount=event.amount,
                 occurred_on=event.occurred_on,
                 occurred_at=event.posted_at or event.created_at,
+                created_at=event.created_at,
+                posted_at=event.posted_at,
                 offset_event_id=event.offset_event_id,
                 portion=event.portion,
                 delivery_mode=event.delivery_mode,

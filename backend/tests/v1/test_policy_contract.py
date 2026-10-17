@@ -127,6 +127,31 @@ class TestPolicyDefinitions:
             )
         assert "name" in str(exc.value)
 
+    def test_definition_and_approval_text_inputs_are_business_errors(self, seeded_db):
+        with pytest.raises(Validation, match="policy_code 不能为空"):
+            policy_service.create_definition(
+                seeded_db, policy_code=123, name="规则", scope_type="GLOBAL",
+                actor="pytest",
+            )
+        with pytest.raises(Validation, match="name 不能为空"):
+            policy_service.create_definition(
+                seeded_db, policy_code="TEXT_NAME", name=123, scope_type="GLOBAL",
+                actor="pytest",
+            )
+        with pytest.raises(Validation, match="scope_type 非法"):
+            policy_service.create_definition(
+                seeded_db, policy_code="TEXT_SCOPE", name="规则", scope_type=123,
+                actor="pytest",
+            )
+
+        definition = _make_policy(seeded_db, code="TEXT_APPROVER")
+        version = policy_service.create_version(
+            seeded_db, definition["id"], effective_from=D,
+            config={"rate": "5"}, actor="pytest",
+        )
+        with pytest.raises(Validation, match="必须记录审批人"):
+            policy_service.approve_version(seeded_db, version["id"], approver=123)
+
     def test_create_definition_requires_positive_scoped_id(self, seeded_db):
         with pytest.raises(Validation) as exc:
             policy_service.create_definition(

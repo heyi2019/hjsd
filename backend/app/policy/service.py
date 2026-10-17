@@ -37,6 +37,15 @@ from app.core.security import CurrentUser
 from app.policy.schemas import ProfitAllocationItem
 
 
+def _required_text(
+    value: Any, *, field: str, message: str, uppercase: bool = False
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation(message, details={"field": field})
+    text = value.strip()
+    return text.upper() if uppercase else text
+
+
 def _scoped_order(
     session: Session, order_id: int, user: CurrentUser | None = None
 ) -> Order:
@@ -115,14 +124,14 @@ def create_definition(
     description: str | None = None,
     actor: str = "system",
 ) -> dict[str, Any]:
-    code = (policy_code or "").strip().upper()
-    label = (name or "").strip()
-    if not code:
-        raise Validation("policy_code 不能为空", details={"field": "policy_code"})
-    if not label:
-        raise Validation("name 不能为空", details={"field": "name"})
+    code = _required_text(
+        policy_code, field="policy_code", message="policy_code 不能为空", uppercase=True
+    )
+    label = _required_text(name, field="name", message="name 不能为空")
     try:
-        scope = PolicyScopeType(scope_type.upper())
+        scope = PolicyScopeType(
+            _required_text(scope_type, field="scope_type", message="scope_type 非法", uppercase=True)
+        )
     except ValueError as exc:
         raise Validation(
             f"scope_type 非法：{scope_type}",
@@ -307,8 +316,9 @@ def approve_version(
         raise NotFound(f"规则版本 {version_id} 不存在", details={"version_id": version_id})
     if item.status == PolicyStatus.ACTIVE.value:
         raise Validation("版本已发布，不可重复发布", details={"version_id": version_id})
-    if not (approver or "").strip():
-        raise Validation("必须记录审批人", details={"field": "approver"})
+    approver = _required_text(
+        approver, field="approver", message="必须记录审批人"
+    )
 
     before = {"status": item.status}
     item.status = PolicyStatus.ACTIVE.value

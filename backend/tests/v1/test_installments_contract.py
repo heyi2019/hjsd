@@ -534,6 +534,33 @@ class TestMarkOverdue:
                 seeded_db, other_contract.id, actor="risk", reason="未逾期"
             )
 
+    def test_payment_after_default_does_not_rewrite_default_status(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="0",
+            periods=1,
+            per_period="300",
+            first_due_on=PAST,
+        )
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        installment_service.mark_default(
+            seeded_db, contract.id, actor="risk", reason="逾期未还"
+        )
+
+        paid, _schedule = installment_service.pay(
+            seeded_db,
+            contract.id,
+            amount=Decimal("300"),
+            paid_on=TODAY,
+            period_no=1,
+            actor="collector",
+        )
+
+        assert paid.paid_amount == Decimal("300.00")
+        assert paid.status == InstallmentStatus.DEFAULTED.value
+
     def test_installment_action_reasons_require_text_values(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, first_due_on=PAST)

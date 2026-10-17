@@ -418,7 +418,13 @@ def pay(
             INSTALLMENT_TRANSITIONS, installment.status, "PAYMENT", entity="分期合约"
         )
     if to_money(installment.paid_amount) >= total_receivable(installment):
-        installment.status = InstallmentStatus.SETTLED.value
+        if installment.status != InstallmentStatus.DEFAULTED.value:
+            installment.status = transition(
+                INSTALLMENT_TRANSITIONS,
+                installment.status,
+                "SETTLE",
+                entity="分期合约",
+            )
     session.flush()
 
     record_audit(

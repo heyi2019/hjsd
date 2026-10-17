@@ -4,10 +4,24 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.domain.trade import Cashflow, OrderEvent, RebateRecord, RebateSettlement
+from app.domain.trade import (
+    Cashflow,
+    Order,
+    OrderEvent,
+    RebateRecord,
+    RebateSettlement,
+)
+
+
+def _lock_row(session: Session, model, row_id: int) -> None:
+    """锁住编号所属主记录，避免并发事务同时生成同一个从属编号。"""
+    session.execute(
+        select(model.id).where(model.id == row_id).with_for_update()
+    ).first()
 
 
 def event_no(session: Session, *, order_no: str, order_id: int, event_type: str) -> str:
+    _lock_row(session, Order, order_id)
     count = session.scalar(
         select(func.count(OrderEvent.id)).where(
             OrderEvent.order_id == order_id,
@@ -20,6 +34,7 @@ def event_no(session: Session, *, order_no: str, order_id: int, event_type: str)
 def cashflow_no(
     session: Session, *, order_no: str, order_id: int, category: str
 ) -> str:
+    _lock_row(session, Order, order_id)
     count = session.scalar(
         select(func.count(Cashflow.id))
         .join(OrderEvent, Cashflow.order_event_id == OrderEvent.id)
@@ -36,6 +51,7 @@ def installment_no(order_no: str) -> str:
 
 
 def rebate_no(session: Session, *, order_no: str, order_id: int) -> str:
+    _lock_row(session, Order, order_id)
     count = session.scalar(
         select(func.count(RebateRecord.id)).where(RebateRecord.source_order_id == order_id)
     ) or 0
@@ -43,6 +59,7 @@ def rebate_no(session: Session, *, order_no: str, order_id: int) -> str:
 
 
 def rebate_settlement_no(session: Session, *, rebate_no: str, rebate_record_id: int) -> str:
+    _lock_row(session, RebateRecord, rebate_record_id)
     count = session.scalar(
         select(func.count(RebateSettlement.id)).where(
             RebateSettlement.rebate_record_id == rebate_record_id

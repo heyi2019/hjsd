@@ -76,6 +76,42 @@ class TestCreateAccountGuards:
                 inventory_type="CONSIGNMENT",
             )
 
+    def test_description_and_images_only_belong_to_recovery_or_consignment(
+        self, seeded_db
+    ):
+        with pytest.raises(Validation, match="账号描述和图片仅适用于回收或代挂"):
+            _account(
+                seeded_db,
+                "pickup-profile",
+                business_mode="DISTRIBUTION",
+                inventory_type="PICKUP",
+                account_description="提号不应有账号描述",
+            )
+
+        consignment = _account(
+            seeded_db,
+            "consignment-profile",
+            business_mode="DISTRIBUTION",
+            inventory_type="CONSIGNMENT",
+            account_description="代挂账号描述",
+            account_images=["image-1"],
+        )
+        assert consignment.account_description == "代挂账号描述"
+
+        pickup = _account(
+            seeded_db,
+            "pickup-update-profile",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+        )
+        with pytest.raises(Validation, match="账号描述和图片仅适用于回收或代挂"):
+            service.update_account_profile(
+                seeded_db,
+                pickup.id,
+                actor="pytest",
+                account_images=["image-1"],
+            )
+
     def test_database_rejects_invalid_inventory_context(self, seeded_db):
         account = Account(
             inventory_no="ACC-DB-CHECK",

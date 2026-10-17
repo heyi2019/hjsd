@@ -291,7 +291,7 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
                 text("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'")
             ).scalar_one()
             assert "'PENDING'" not in create_sql
-            expected = "status IN ('IN_STOCK', 'INSTALLMENT', 'FOR_SALE', 'SOLD', 'VOID')"
+            expected = "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')"
             assert expected in create_sql
     finally:
         engine.dispose()

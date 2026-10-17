@@ -38,7 +38,6 @@ export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
   IN_STOCK: "在库",
   INSTALLMENT: "分期中",
-  FOR_SALE: "待售",
   SOLD: "已售",
   VOID: "失效",
 };

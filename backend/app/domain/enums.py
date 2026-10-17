@@ -221,7 +221,6 @@ class AccountStatus(StrEnum):
 
     IN_STOCK = "IN_STOCK"  # 在库
     INSTALLMENT = "INSTALLMENT"  # 分期中
-    FOR_SALE = "FOR_SALE"  # 待售
     SOLD = "SOLD"  # 已售
     VOID = "VOID"  # 取消/失效
 

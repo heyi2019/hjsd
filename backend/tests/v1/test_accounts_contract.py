@@ -316,14 +316,13 @@ class TestAccountQueries:
         # total_inventory_cost 复用同一库存口径
         assert service.total_inventory_cost(seeded_db) == Decimal("500.00")
 
-    def test_inventory_includes_for_sale_accounts(self, seeded_db):
-        for_sale = _account(seeded_db, "for-sale-acc")
-        for_sale.status = AccountStatus.FOR_SALE.value
-        seeded_db.flush()
+    def test_inventory_rejects_removed_for_sale_status(self, seeded_db):
+        account = _account(seeded_db, "removed-for-sale-acc")
+        account.status = "FOR_SALE"
 
-        inventory = service.inventory(seeded_db)
-
-        assert [row["account_id"] for row in inventory] == [for_sale.id]
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
 
     def test_pickup_accounts_are_not_inventory_assets(self, seeded_db):
         pickup = Account(

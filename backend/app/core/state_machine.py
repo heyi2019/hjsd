@@ -19,7 +19,6 @@ ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
 ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     # 同一账号允许再次买入，作为重新入库事件保留历史轨迹。
     "IN_STOCK": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "INSTALLMENT", "SELL": "SOLD", "INSTALLMENT": "INSTALLMENT", "VOID": "VOID"},
-    "FOR_SALE": {"SELL": "SOLD", "VOID": "VOID"},
     "INSTALLMENT": {"DELIVER": "SOLD", "VOID": "VOID"},
     "SOLD": {
         "BUY_STOCK": "IN_STOCK",

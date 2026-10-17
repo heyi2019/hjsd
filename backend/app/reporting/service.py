@@ -212,12 +212,11 @@ def _visible_pool_ids(user: CurrentUser | None) -> set[int] | None:
 def r1_inventory_health(
     session: Session, *, user: CurrentUser | None = None
 ) -> dict[str, Any]:
-    """R1 库存健康表：统计回收/代挂账号中处于在库、待售或分期状态的账号。"""
+    """R1 库存健康表：统计回收/代挂账号中处于在库或分期状态的账号。"""
     today = date.today()
     stock_statuses = [
         AccountStatus.IN_STOCK.value,
         AccountStatus.INSTALLMENT.value,
-        AccountStatus.FOR_SALE.value,
     ]
 
     order_cost: dict[int, Decimal] = defaultdict(lambda: ZERO)

@@ -10,7 +10,6 @@ const LABELS: Record<string, string> = {
   PENDING: "待结算",
   IN_STOCK: "在库",
   INSTALLMENT: "分期中",
-  FOR_SALE: "待售",
   SOLD: "已售",
   VOID: "失效",
   OVERDUE: "逾期",

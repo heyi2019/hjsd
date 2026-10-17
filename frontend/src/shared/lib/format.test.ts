@@ -74,7 +74,7 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
 
   it("账号状态覆盖后端 AccountStatus", () => {
     expect(Object.keys(ACCOUNT_STATUS_LABEL).sort()).toEqual(
-      ["FOR_SALE", "IN_STOCK", "INSTALLMENT", "SOLD", "VOID"].sort(),
+      ["IN_STOCK", "INSTALLMENT", "SOLD", "VOID"].sort(),
     );
   });
 

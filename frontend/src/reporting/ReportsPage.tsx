@@ -121,7 +121,7 @@ function InventoryReport() {
   return (
     <Card className="glass" title="库存健康表 R1">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Note>只统计已采购并进入在库、待售或分期状态的真实占用（RPT-01-01）。</Note>
+      <Note>只统计已采购并进入在库或分期状态的真实占用（RPT-01-01）。</Note>
       <StatRow
         items={[
           { label: "在库账号", kind: "count", amount: String(data?.items.length ?? 0) },

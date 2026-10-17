@@ -1,4 +1,4 @@
-/** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收与代挂账号从这里进入待售流程。 */
+/** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收与代挂账号从这里进入在库流程。 */
 import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Descriptions, Image, Input, Modal, Select, Space, Spin, Typography, Upload, message } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
@@ -22,7 +22,6 @@ import { executionActionLabel } from "../shared/lib/format";
 const STATUS_OPTIONS = [
   { value: "IN_STOCK", label: "在库" },
   { value: "INSTALLMENT", label: "分期中" },
-  { value: "FOR_SALE", label: "待售" },
   { value: "SOLD", label: "已售" },
   { value: "VOID", label: "下架" },
 ];
@@ -100,7 +99,7 @@ function inventoryAge(row: Pick<Account, "status" | "buy_date">, now = new Date(
   days: number;
   color: "green" | "orange" | "red";
 } | null {
-  if (!["IN_STOCK", "INSTALLMENT", "FOR_SALE"].includes(row.status) || !row.buy_date) return null;
+  if (!["IN_STOCK", "INSTALLMENT"].includes(row.status) || !row.buy_date) return null;
   const buyDate = new Date(`${row.buy_date}T00:00:00`);
   if (!Number.isFinite(buyDate.getTime())) return null;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -433,7 +432,7 @@ export function InventoryPanel() {
             type="link"
             size="small"
             aria-label="售出"
-            disabled={!['IN_STOCK', 'FOR_SALE'].includes(row.status)}
+            disabled={row.status !== 'IN_STOCK'}
             onClick={(event) => {
               event.stopPropagation();
               setSaleTarget(row);

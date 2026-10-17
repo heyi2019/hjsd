@@ -152,7 +152,7 @@ class TestR1Inventory:
         )
         no_buy_date = Account(
                 inventory_no="ACC-R1-3",
-            status=AccountStatus.FOR_SALE.value,
+            status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("500.00"),
             created_by="pytest",
             updated_by="pytest",

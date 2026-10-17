@@ -746,15 +746,16 @@ class TestCancelOffsetDirection:
         from app.domain.enums import Direction
         from app.domain.trade import Cashflow
 
-        # 分支一：无 offset → 默认 IN（CANCEL 后订单即 CANCELLED，每分支独立建单）
+        # 分支一：offset 指向 BUY → 方向取反为 IN（每分支独立建单）
         order_a = _order(seeded_db)
-        _, _ = order_service.post_event(
+        buy_a, _ = order_service.post_event(
             seeded_db, order_a.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
         cancel_a, _ = order_service.post_event(
-            seeded_db, order_a.id, event_type="CANCEL", amount="10.00",
-            occurred_on=D, actor="pytest", reason="撤回部分买入款",
+            seeded_db, order_a.id, event_type="CANCEL", amount="100.00",
+            occurred_on=D, actor="pytest", offset_event_id=buy_a.id,
+            reason="撤回全部买入款",
         )
         assert order_a.status == "CANCELLED"
 
@@ -788,7 +789,7 @@ class TestCancelOffsetDirection:
 
     def test_cancel_requires_reason_and_th_offset(self, seeded_db):
         hs = _order(seeded_db)
-        order_service.post_event(
+        _hs_buy, _ = order_service.post_event(
             seeded_db, hs.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
@@ -798,6 +799,12 @@ class TestCancelOffsetDirection:
                 occurred_on=D, actor="pytest",
             )
         assert "原因" in str(missing_reason.value)
+
+        with pytest.raises(Validation, match="offset_event_id"):
+            order_service.post_event(
+                seeded_db, hs.id, event_type="CANCEL", amount="10.00",
+                occurred_on=D, actor="pytest", reason="回收退回",
+            )
 
         th = _order(seeded_db, order_type="TH")
         order_service.post_event(
@@ -933,7 +940,7 @@ class TestAccountEffect:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, account_id=account.id)
-        order_service.post_event(
+        buy, _ = order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="500.00",
             occurred_on=D, actor="pytest",
         )
@@ -942,7 +949,8 @@ class TestAccountEffect:
 
         order_service.post_event(
             seeded_db, order.id, event_type="CANCEL", amount="500.00",
-            occurred_on=D, actor="pytest", reason="回收退回",
+            occurred_on=D, actor="pytest", offset_event_id=buy.id,
+            reason="回收退回",
         )
         assert account.cost_amount == 0
         assert account.status == AccountStatus.VOID.value

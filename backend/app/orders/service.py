@@ -942,9 +942,9 @@ def _assert_event_allowed(
             raise Validation("PAYMENT 必须通过分期收款流程")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
-        if order.order_type in {"TH", "DFQ"} and offset_event_id is None:
+        if offset_event_id is None:
             raise Validation(
-                "TH/DFQ 的 CANCEL 必须指定 offset_event_id",
+                "事件型 CANCEL 必须指定 offset_event_id",
                 details={"field": "offset_event_id"},
             )
         if offset_event_id is not None:

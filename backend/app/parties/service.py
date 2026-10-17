@@ -55,6 +55,7 @@ from app.domain.trade import (
 from app.domain.users import User
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
 _UNSET = object()
 
@@ -1246,6 +1247,87 @@ def _normalize_field_options(
     return normalized
 
 
+def _normalize_applicable_order_types(
+    value: Sequence[str] | None,
+) -> list[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, (str, bytes)):
+        raise Validation(
+            "适用业务类型必须为字符串数组",
+            details={"field": "applicable_order_types"},
+        )
+    normalized = []
+    for item in value:
+        code = item.strip().upper() if isinstance(item, str) else ""
+        if not ORDER_TYPE_CODE_PATTERN.fullmatch(code):
+            raise Validation(
+                "适用业务类型必须为 2-10 位大写字母或数字",
+                details={"field": "applicable_order_types", "value": item},
+            )
+        normalized.append(code)
+    if len(set(normalized)) != len(normalized):
+        raise Validation(
+            "适用业务类型不能重复",
+            details={"field": "applicable_order_types"},
+        )
+    return normalized
+
+
+def _normalize_validation_rule(
+    field_type: str, value: Mapping[str, Any] | None
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise Validation("校验规则必须为对象", details={"field": "validation_rule"})
+    allowed = {"min", "max", "min_length", "max_length", "pattern"}
+    unknown = set(value) - allowed
+    if unknown:
+        raise Validation(
+            "校验规则包含不支持的键",
+            details={"field": "validation_rule", "keys": sorted(unknown)},
+        )
+    rule = dict(value)
+    if field_type == FieldType.NUMBER.value:
+        for key in ("min", "max"):
+            if key in rule and (
+                isinstance(rule[key], bool) or not isinstance(rule[key], (int, float))
+            ):
+                raise Validation(
+                    f"校验规则 {key} 必须为数字",
+                    details={"field": f"validation_rule.{key}"},
+                )
+        if "min" in rule and "max" in rule and rule["min"] > rule["max"]:
+            raise Validation("校验规则最小值不能大于最大值")
+    for key in ("min_length", "max_length"):
+        if key in rule and (
+            isinstance(rule[key], bool)
+            or not isinstance(rule[key], int)
+            or rule[key] < 0
+        ):
+            raise Validation(
+                f"校验规则 {key} 必须为非负整数",
+                details={"field": f"validation_rule.{key}"},
+            )
+    if "min_length" in rule and "max_length" in rule and rule["min_length"] > rule["max_length"]:
+        raise Validation("校验规则最小长度不能大于最大长度")
+    if "pattern" in rule:
+        if not isinstance(rule["pattern"], str) or not rule["pattern"]:
+            raise Validation("校验规则 pattern 必须为非空字符串")
+        try:
+            re.compile(rule["pattern"])
+        except re.error as exc:
+            raise Validation("校验规则 pattern 不是有效正则表达式") from exc
+    if field_type != FieldType.NUMBER.value and any(key in rule for key in ("min", "max")):
+        raise Validation("只有数字字段可以配置 min/max")
+    if field_type != FieldType.TEXT.value and any(
+        key in rule for key in ("min_length", "max_length", "pattern")
+    ):
+        raise Validation("只有文本字段可以配置长度或 pattern 校验")
+    return rule
+
+
 def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
     """按字段类型校验活字段值；SELECT/MULTI_SELECT 必须在选项内（BAS-04）。"""
     if value is None:
@@ -1256,6 +1338,17 @@ def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
             raise Validation(
                 f"字段 {definition.label} 必须为数字",
                 details={"field_key": definition.field_key, "value": str(value)[:64]},
+            )
+        rule = definition.validation_rule or {}
+        if "min" in rule and value < rule["min"]:
+            raise Validation(
+                f"字段 {definition.label} 不能小于 {rule['min']}",
+                details={"field_key": definition.field_key},
+            )
+        if "max" in rule and value > rule["max"]:
+            raise Validation(
+                f"字段 {definition.label} 不能大于 {rule['max']}",
+                details={"field_key": definition.field_key},
             )
         return value
     if kind == "BOOLEAN":
@@ -1322,6 +1415,22 @@ def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
                 f"字段 {definition.label} 必须为字符串",
                 details={"field_key": definition.field_key},
             )
+        rule = definition.validation_rule or {}
+        if "min_length" in rule and len(value) < rule["min_length"]:
+            raise Validation(
+                f"字段 {definition.label} 长度不能少于 {rule['min_length']}",
+                details={"field_key": definition.field_key},
+            )
+        if "max_length" in rule and len(value) > rule["max_length"]:
+            raise Validation(
+                f"字段 {definition.label} 长度不能超过 {rule['max_length']}",
+                details={"field_key": definition.field_key},
+            )
+        if "pattern" in rule and re.fullmatch(rule["pattern"], value) is None:
+            raise Validation(
+                f"字段 {definition.label} 格式不符合要求",
+                details={"field_key": definition.field_key},
+            )
         return value
     return str(value)
 
@@ -1346,7 +1455,8 @@ def _validate_extra_values(
             details={"field": "entity_id", "entity_type": entity_type, "entity_id": entity_id},
         )
     model = _EXTRA_ENTITY_MODELS[entity_type]
-    if entity_id is not None and session.get(model, entity_id) is None:
+    entity = session.get(model, entity_id) if entity_id is not None else None
+    if entity_id is not None and entity is None:
         raise NotFound(
             f"{_ENTITY_LABELS[entity_type]} {entity_id} 不存在",
             details={"entity_type": entity_type, "entity_id": entity_id},
@@ -1366,6 +1476,31 @@ def _validate_extra_values(
                 f"字段 {field_key} 未启用或不存在",
                 details={"entity_type": entity_type, "field_key": field_key},
             )
+        applicable = definition.applicable_order_types or []
+        if applicable and entity is not None:
+            order_type = None
+            if entity_type == EntityType.ORDER.value:
+                order_type = entity.order_type
+            elif entity_type == EntityType.INSTALLMENT.value:
+                order = session.get(Order, entity.order_id)
+                order_type = order.order_type if order is not None else None
+            elif entity_type == EntityType.ACCOUNT.value:
+                order = session.scalar(
+                    select(Order)
+                    .where(Order.account_id == entity.id)
+                    .order_by(Order.id.desc())
+                )
+                order_type = order.order_type if order is not None else None
+            if order_type is not None and order_type not in applicable:
+                raise Validation(
+                    f"字段 {definition.label} 不适用于业务 {order_type}",
+                    details={
+                        "entity_type": entity_type,
+                        "field_key": field_key,
+                        "order_type": order_type,
+                        "applicable_order_types": applicable,
+                    },
+                )
         validated.append(
             (field_key, definition, _validate_extra_value(definition, value))
         )
@@ -1415,6 +1550,9 @@ def create_field_definition(
     actor: str,
     field_type: str = "TEXT",
     options: Sequence[str] | None = None,
+    default_value: Any = None,
+    applicable_order_types: Sequence[str] | None = None,
+    validation_rule: Mapping[str, Any] | None = None,
     required: bool = False,
     sort_order: int = 0,
 ) -> FieldDefinition:
@@ -1442,6 +1580,8 @@ def create_field_definition(
             details={"field": "sort_order", "value": sort_order},
         )
     normalized_options = _normalize_field_options(field_type, options)
+    normalized_applicable = _normalize_applicable_order_types(applicable_order_types)
+    normalized_rule = _normalize_validation_rule(field_type, validation_rule)
     key = _required_text(
         field_key,
         message="字段键必须为小写字母开头，仅含小写字母、数字与下划线",
@@ -1474,12 +1614,17 @@ def create_field_definition(
         label=normalized_label,
         field_type=field_type,
         options=normalized_options,
+        default_value=default_value,
+        applicable_order_types=normalized_applicable,
+        validation_rule=normalized_rule,
         required=required,
         sort_order=sort_order,
         is_active=True,
         created_by=actor,
         updated_by=actor,
     )
+    if default_value is not None:
+        definition.default_value = _validate_extra_value(definition, default_value)
     session.add(definition)
     session.flush()
     record_audit(
@@ -1489,6 +1634,109 @@ def create_field_definition(
         entity_id=f"{entity}.{key}",
         actor=actor,
         after={"label": label, "is_active": True},
+    )
+    return definition
+
+
+def update_field_definition(
+    session: Session,
+    definition_id: int,
+    *,
+    actor: str,
+    label: str | None = None,
+    options: Sequence[str] | None | object = _UNSET,
+    default_value: Any = _UNSET,
+    applicable_order_types: Sequence[str] | None | object = _UNSET,
+    validation_rule: Mapping[str, Any] | None | object = _UNSET,
+    required: bool | None = None,
+    sort_order: int | None = None,
+) -> FieldDefinition:
+    """编辑活字段定义；键、实体和类型固定，避免历史值失去语义。"""
+    definition = session.get(FieldDefinition, definition_id)
+    if definition is None:
+        raise NotFound(
+            f"字段定义 {definition_id} 不存在",
+            details={"field_definition_id": definition_id},
+        )
+    next_label = (
+        _required_text(label, message="字段名称不能为空", field="label")
+        if label is not None
+        else definition.label
+    )
+    next_options = (
+        _normalize_field_options(definition.field_type, options)
+        if options is not _UNSET
+        else list(definition.options or [])
+    )
+    next_applicable = (
+        _normalize_applicable_order_types(applicable_order_types)
+        if applicable_order_types is not _UNSET
+        else definition.applicable_order_types
+    )
+    next_rule = (
+        _normalize_validation_rule(definition.field_type, validation_rule)
+        if validation_rule is not _UNSET
+        else definition.validation_rule
+    )
+    next_default = definition.default_value if default_value is _UNSET else default_value
+    candidate = FieldDefinition(
+        entity_type=definition.entity_type,
+        field_key=definition.field_key,
+        label=next_label,
+        field_type=definition.field_type,
+        options=next_options,
+        default_value=next_default,
+        applicable_order_types=next_applicable,
+        validation_rule=next_rule,
+        required=definition.required if required is None else required,
+        sort_order=definition.sort_order if sort_order is None else sort_order,
+        is_active=definition.is_active,
+    )
+    if candidate.default_value is not None:
+        candidate.default_value = _validate_extra_value(candidate, candidate.default_value)
+    if candidate.required and candidate.default_value is None:
+        # 继续允许无默认值的必填字段，表单创建时统一校验缺失。
+        pass
+    before = {
+        "label": definition.label,
+        "options": definition.options,
+        "default_value": definition.default_value,
+        "applicable_order_types": definition.applicable_order_types,
+        "validation_rule": definition.validation_rule,
+        "required": definition.required,
+        "sort_order": definition.sort_order,
+    }
+    definition.label = candidate.label
+    definition.options = candidate.options
+    definition.default_value = candidate.default_value
+    definition.applicable_order_types = candidate.applicable_order_types
+    definition.validation_rule = candidate.validation_rule
+    if required is not None:
+        if not isinstance(required, bool):
+            raise Validation("required 必须为布尔值", details={"field": "required"})
+        definition.required = required
+    if sort_order is not None:
+        if isinstance(sort_order, bool) or not isinstance(sort_order, int) or sort_order < 0:
+            raise Validation("排序值必须为非负整数", details={"field": "sort_order"})
+        definition.sort_order = sort_order
+    definition.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.FIELD_DEFINITION_CHANGE,
+        entity_type="field_definition",
+        entity_id=f"{definition.entity_type}.{definition.field_key}",
+        actor=actor,
+        before=before,
+        after={
+            "label": definition.label,
+            "options": definition.options,
+            "default_value": definition.default_value,
+            "applicable_order_types": definition.applicable_order_types,
+            "validation_rule": definition.validation_rule,
+            "required": definition.required,
+            "sort_order": definition.sort_order,
+        },
     )
     return definition
 
@@ -1551,6 +1799,16 @@ def set_extra_values(
             details={"field": "extra_values"},
         )
     if require_all:
+        definitions = session.scalars(
+            select(FieldDefinition).where(
+                FieldDefinition.entity_type == entity_type,
+                FieldDefinition.is_active.is_(True),
+            )
+        ).all()
+        for definition in definitions:
+            if definition.field_key not in values_map and definition.default_value is not None:
+                values_map[definition.field_key] = definition.default_value
+        values = list(values_map.items())
         _validate_required_extras(
             session, entity_type, values_map, partial=False
         )

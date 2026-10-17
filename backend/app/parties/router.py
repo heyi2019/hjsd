@@ -457,8 +457,30 @@ def create_field_definition(
         actor=_actor(user),
         field_type=payload.field_type,
         options=payload.options,
+        default_value=payload.default_value,
+        applicable_order_types=payload.applicable_order_types,
+        validation_rule=payload.validation_rule,
         required=payload.required,
         sort_order=payload.sort_order,
+    )
+    return schemas.FieldDefinitionOut.model_validate(item)
+
+
+@router.patch(
+    "/field-definitions/{definition_id}",
+    response_model=schemas.FieldDefinitionOut,
+)
+def update_field_definition(
+    definition_id: int,
+    payload: schemas.FieldDefinitionUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_fields,
+) -> dict:
+    item = service.update_field_definition(
+        db,
+        definition_id,
+        actor=_actor(user),
+        **payload.model_dump(exclude_unset=True),
     )
     return schemas.FieldDefinitionOut.model_validate(item)
 

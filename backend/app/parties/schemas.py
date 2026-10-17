@@ -251,8 +251,23 @@ class FieldDefinitionCreate(RequestModel):
     label: str = Field(min_length=1, max_length=128)
     field_type: str = "TEXT"
     options: list[str] | None = None
+    default_value: Any = None
+    applicable_order_types: list[str] | None = None
+    validation_rule: dict[str, Any] | None = None
     required: bool = False
     sort_order: int = 0
+
+
+class FieldDefinitionUpdate(RequestModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    label: str | None = Field(default=None, min_length=1, max_length=128)
+    options: list[str] | None = None
+    default_value: Any = None
+    applicable_order_types: list[str] | None = None
+    validation_rule: dict[str, Any] | None = None
+    required: bool | None = None
+    sort_order: int | None = Field(default=None, ge=0)
 
 
 class FieldDefinitionOut(BaseModel):
@@ -264,6 +279,9 @@ class FieldDefinitionOut(BaseModel):
     label: str
     field_type: str
     options: list[str] | None = None
+    default_value: Any = None
+    applicable_order_types: list[str] | None = None
+    validation_rule: dict[str, Any] | None = None
     required: bool
     sort_order: int
     is_active: bool
@@ -291,6 +309,7 @@ __all__ = [
     "DuplicateCandidate",
     "ExtraValueIn",
     "FieldDefinitionCreate",
+    "FieldDefinitionUpdate",
     "FieldDefinitionOut",
     "MergeRequest",
     "LeadClose",

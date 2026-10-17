@@ -982,12 +982,13 @@ def _post_deliver(
             code=ErrorCode.DELIVERY_CONDITION_UNMET,
             details={"field": "delivery_mode", "value": delivery_mode},
         )
-    if not note:
+    if not isinstance(note, str) or not note.strip():
         raise Validation(
             "DELIVER 必须记录交付凭证说明",
             code=ErrorCode.DELIVERY_CONDITION_UNMET,
             details={"field": "note"},
         )
+    note = note.strip()
     installment = session.scalar(
         select(Installment).where(Installment.order_id == order.id)
     )

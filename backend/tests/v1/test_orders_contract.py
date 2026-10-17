@@ -530,6 +530,12 @@ class TestPostEventValidation:
                 occurred_on=D, actor="pytest", delivery_mode="CUSTOMER_SELF",
             )
         assert "凭证" in str(exc.value)
+        with pytest.raises(Validation, match="凭证"):
+            order_service.post_event(
+                seeded_db, order.id, event_type="DELIVER",
+                occurred_on=D, actor="pytest", delivery_mode="CUSTOMER_SELF",
+                note=123,
+            )
 
     def test_post_event_to_inactive_pool_rejected(self, seeded_db):
         order = _order(seeded_db)

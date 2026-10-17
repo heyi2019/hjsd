@@ -629,6 +629,7 @@ def list_cashflows(
                 "flow_no": flow.flow_no,
                 "pool_id": flow.pool_id,
                 "occurred_on": flow.occurred_on,
+                "occurred_at": flow.created_at,
                 "nature": flow.nature,
                 "category": flow.category,
                 "direction": flow.direction,
@@ -644,6 +645,7 @@ def list_cashflows(
                 "transfer_id": flow.transfer_id,
                 "source": source,
                 "note": flow.note,
+                "operator": flow.created_by,
             }
         )
     return rows

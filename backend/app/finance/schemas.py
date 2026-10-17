@@ -54,6 +54,7 @@ class CashflowOut(BaseModel):
     flow_no: str
     pool_id: int
     occurred_on: date
+    occurred_at: datetime
     nature: str
     category: str
     direction: str
@@ -69,6 +70,7 @@ class CashflowOut(BaseModel):
     transfer_id: str | None = None
     source: str
     note: str | None = None
+    operator: str
 
 
 class CashflowCreate(RequestModel):

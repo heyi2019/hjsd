@@ -57,6 +57,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         flow_no=flow.flow_no,
         pool_id=flow.pool_id,
         occurred_on=flow.occurred_on,
+        occurred_at=flow.created_at,
         nature=flow.nature,
         category=flow.category,
         direction=flow.direction,
@@ -72,6 +73,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         transfer_id=flow.transfer_id,
         source=source,
         note=flow.note,
+        operator=flow.created_by,
     )
 
 
@@ -276,6 +278,7 @@ def create_transfer(
                 flow_no=flow.flow_no,
                 pool_id=flow.pool_id,
                 occurred_on=flow.occurred_on,
+                occurred_at=flow.created_at,
                 nature=flow.nature,
                 category=flow.category,
                 direction=flow.direction,
@@ -291,6 +294,7 @@ def create_transfer(
                 transfer_id=flow.transfer_id,
                 source="TRANSFER",
                 note=flow.note,
+                operator=flow.created_by,
             )
             for flow in result["cashflows"]
         ],

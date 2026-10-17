@@ -1291,6 +1291,8 @@ class TestFinanceApi:
         assert {row["category"] for row in rows} >= {"BUY", "REBATE", "DEPOSIT_HOLD"}
         assert all("order_no" in row for row in rows)
         assert all(row["order_no"] is not None for row in rows)
+        assert all("occurred_at" in row and row["occurred_at"] for row in rows)
+        assert all("operator" in row and row["operator"] for row in rows)
         assert {row["source"] for row in rows} >= {"ORDER_EVENT", "REBATE_SETTLEMENT", "DEPOSIT"}
         deposit_rows = [row for row in rows if row["source"] == "DEPOSIT"]
         assert {row["deposit_id"] for row in deposit_rows} == {deposit.id}

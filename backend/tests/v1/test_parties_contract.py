@@ -17,7 +17,12 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
-from app.domain.enums import AuditAction, CounterpartyStatus, CustomerStatus
+from app.domain.enums import (
+    AuditAction,
+    CounterpartyStatus,
+    CustomerStatus,
+    ScheduleStatus,
+)
 from app.domain.foundation import AuditLog
 from app.domain.parties import (
     EntityExtraValue,
@@ -25,6 +30,8 @@ from app.domain.parties import (
     OrderCounterpartyRole,
     OrderCustomerRole,
 )
+from app.domain.trade import InstallmentSchedule
+from app.installments import service as installment_service
 from app.orders import service as orders_service
 from app.parties import service
 
@@ -168,6 +175,58 @@ class TestListAndGetCustomers:
         other = _customer(seeded_db, "阿丙", owner_id=1)
         with pytest.raises(NotFound):
             service.get_customer(seeded_db, other.id, _scoped_user())
+
+    def test_customer_detail_aggregates_business_installments_and_audit(self, seeded_db):
+        customer = _customer(seeded_db, "详情客户", owner_id=9)
+        dfq = orders_service.create_order(
+            seeded_db,
+            order_type="DFQ",
+            trade_date=date(2026, 10, 10),
+            customer_roles=[(customer.id, "INSTALLMENT_CUSTOMER")],
+            actor="pytest",
+        )
+        th = orders_service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=date(2026, 10, 11),
+            customer_roles=[(customer.id, "BUYER")],
+            actor="pytest",
+        )
+        installment = installment_service.create_installment(
+            seeded_db,
+            order_id=dfq.id,
+            contract_type="ADVANCE_PURCHASE",
+            principal=500,
+            down_payment=100,
+            periods=1,
+            per_period=400,
+            first_due_on=date(2026, 9, 1),
+            actor="pytest",
+        )
+        overdue = seeded_db.scalar(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == installment.id,
+                InstallmentSchedule.period_no == 1,
+            )
+        )
+        overdue.status = ScheduleStatus.OVERDUE.value
+        seeded_db.flush()
+
+        detail = service.get_customer_detail(seeded_db, customer.id)
+
+        assert detail["overview"]["order_count"] == 2
+        assert detail["overview"]["active_order_count"] == 2
+        assert detail["overview"]["last_trade_date"] == date(2026, 10, 11)
+        assert detail["overview"]["installment_paid_total"] == 0
+        assert detail["overview"]["installment_receivable_total"] == 500
+        assert detail["overview"]["overdue_period_count"] == 1
+        assert {item["order_no"] for item in detail["business"]} == {
+            dfq.order_no, th.order_no,
+        }
+        assert detail["business"][0]["roles"]
+        assert detail["installments"][0]["inst_no"] == installment.inst_no
+        assert detail["installments"][0]["remaining_amount"] == 500
+        assert any(item["action"] == AuditAction.CUSTOMER_CREATE.value for item in detail["audit"])
 
 
 # ------------------------------------------------------------------ 客户更新
@@ -865,6 +924,38 @@ class TestPartiesApi:
         # admin 具备 customer.contact.read → 不脱敏
         assert response.json()[0]["contact_masked"] is False
         assert response.json()[0]["id"] == customer.id
+
+    def test_customer_detail_endpoint_returns_four_tabs(self, seeded_client, seeded_db, headers):
+        customer = _customer(seeded_db, "详情接口客户", owner_id=9)
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="DFQ",
+            trade_date=date(2026, 10, 12),
+            customer_roles=[(customer.id, "INSTALLMENT_CUSTOMER")],
+            actor="pytest",
+        )
+        installment_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type="ADVANCE_PURCHASE",
+            principal=300,
+            down_payment=100,
+            periods=1,
+            per_period=200,
+            first_due_on=date(2026, 10, 12),
+            actor="pytest",
+        )
+
+        response = seeded_client.get(
+            f"{CUSTOMERS}/{customer.id}/detail", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert set(body) == {"customer", "overview", "business", "installments", "audit"}
+        assert body["customer"]["id"] == customer.id
+        assert body["business"][0]["order_no"] == order.order_no
+        assert body["installments"][0]["total_receivable"] == "300.00"
 
     def test_update_customer_endpoint(self, seeded_client, seeded_db, headers):
         customer = _customer(seeded_db, "阿甲")

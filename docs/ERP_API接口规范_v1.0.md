@@ -17,7 +17,7 @@
 | 认证 | POST `/auth/login`、GET `/auth/me`、POST `/auth/change-password`、POST `/auth/logout` | 登录、当前用户、改密、会话注销 |
 | 池/业务 | GET/POST `/pools`，PATCH `/pools/{id}`、PATCH `/pools/{id}/status`、GET `/pools/{id}/balance` | 创建、停用、查看池及余额；有流水池禁止删除 |
 | 业务主数据 | GET/POST `/order-types`，PATCH `/order-types/{id}`、PATCH `/order-types/{id}/active`，GET `/order-types/{id}/routes`、POST `/order-types/{code}/routes` | 业务类型和资金路由；业务类型可扩展 |
-| 客户 | GET/POST `/customers`，GET/PATCH `/customers/{id}`，PATCH `/customers/{id}/status`，POST `/customers/{id}/merge` | 客户档案、重复候选、状态、合并与订单参与关系 |
+| 客户 | GET/POST `/customers`，GET `/customers/{id}/detail`，GET/PATCH `/customers/{id}`，PATCH `/customers/{id}/status`，POST `/customers/{id}/merge` | 客户档案、业务/分期/审计详情聚合、重复候选、状态、合并与订单参与关系 |
 | 合作方 | GET/POST `/counterparties`，PATCH `/counterparties/{id}`，PATCH `/counterparties/{id}/status` | 同行、供货方、平台等非客户对手方主数据 |
 | 订单 | GET/POST `/orders`，GET/PATCH `/orders/{id}`，POST `/orders/{id}/cancel` | 创建、编辑、作废订单及读取事件时间线 |
 | 事件 | POST `/orders/{id}/events` | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL；动钱事件自动生成 cashflow，DELIVER 不生成 |

@@ -122,6 +122,32 @@ def get_customer(
     return service.to_customer_out(customer, reveal_contact=show_full, extra_values=extras)
 
 
+@router.get("/customers/{customer_id}/detail", response_model=schemas.CustomerDetailOut)
+def get_customer_detail(
+    customer_id: int,
+    reveal: bool = Query(default=False, description="读取完整联系方式，写审计"),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> dict:
+    customer = service.get_customer(db, customer_id, user)
+    show_full = reveal and user.has(PERM_CUSTOMER_CONTACT_READ)
+    if show_full:
+        record_audit(
+            db,
+            action=AuditAction.CONTACT_READ,
+            entity_type="customer",
+            entity_id=customer.customer_no,
+            actor=_actor(user),
+        )
+    extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
+    return {
+        "customer": service.to_customer_out(
+            customer, reveal_contact=show_full, extra_values=extras
+        ),
+        **service.get_customer_detail(db, customer_id, user),
+    }
+
+
 @router.patch("/customers/{customer_id}", response_model=schemas.CustomerOut)
 def update_customer(
     customer_id: int,

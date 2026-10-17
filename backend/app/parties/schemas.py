@@ -4,7 +4,8 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -81,6 +82,64 @@ class CustomerOut(BaseModel):
 class CustomerWithCandidates(BaseModel):
     customer: CustomerOut
     duplicate_candidates: list[DuplicateCandidate] = Field(default_factory=list)
+
+
+class CustomerOverviewOut(BaseModel):
+    order_count: int
+    active_order_count: int
+    completed_order_count: int
+    cancelled_order_count: int
+    last_trade_date: date | None = None
+    installment_paid_total: Decimal
+    installment_receivable_total: Decimal
+    installment_remaining_total: Decimal
+    overdue_period_count: int
+
+
+class CustomerBusinessOut(BaseModel):
+    order_id: int
+    order_no: str
+    order_type: str
+    capital_type: str
+    status: str
+    trade_date: date
+    owner_id: int | None = None
+    roles: list[str]
+
+
+class CustomerInstallmentOut(BaseModel):
+    id: int
+    inst_no: str
+    order_id: int
+    order_no: str | None = None
+    contract_type: str
+    status: str
+    principal: Decimal
+    total_receivable: Decimal
+    paid_amount: Decimal
+    remaining_amount: Decimal
+    overdue_periods: int
+    first_due_on: date | None = None
+
+
+class CustomerAuditOut(BaseModel):
+    id: int
+    action: str
+    entity_type: str
+    entity_id: str
+    actor: str
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    reason: str | None = None
+    occurred_at: datetime
+
+
+class CustomerDetailOut(BaseModel):
+    customer: CustomerOut
+    overview: CustomerOverviewOut
+    business: list[CustomerBusinessOut]
+    installments: list[CustomerInstallmentOut]
+    audit: list[CustomerAuditOut]
 
 
 class MergeRequest(RequestModel):
@@ -166,7 +225,12 @@ __all__ = [
     "CounterpartyOut",
     "CounterpartyUpdate",
     "CustomerCreate",
+    "CustomerAuditOut",
+    "CustomerBusinessOut",
+    "CustomerDetailOut",
     "CustomerOut",
+    "CustomerOverviewOut",
+    "CustomerInstallmentOut",
     "CustomerStatusUpdate",
     "CustomerUpdate",
     "CustomerWithCandidates",

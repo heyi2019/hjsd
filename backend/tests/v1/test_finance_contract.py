@@ -335,9 +335,35 @@ class TestRebateGuards:
             )
 
     def test_rebate_type_must_match_source_order_event(self, seeded_db):
-        order_id = _active_order(seeded_db)
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="DG",
+            trade_date=TODAY,
+            actor="pytest",
+        )
 
         with pytest.raises(Validation, match="卖号返点必须关联已过账的 SELL"):
+            service.create_rebate(
+                seeded_db,
+                source_order_id=order.id,
+                rebate_type="SELL",
+                base_amount=Decimal("100"),
+                collected_on=TODAY,
+                actor="pytest",
+            )
+
+    def test_sell_rebate_only_accepts_distribution_order(self, seeded_db):
+        order_id = _active_order(seeded_db)
+        orders_service.post_event(
+            seeded_db,
+            order_id,
+            event_type="SELL",
+            amount=Decimal("800"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation, match="卖号返点只能关联分销（DG）订单"):
             service.create_rebate(
                 seeded_db,
                 source_order_id=order_id,

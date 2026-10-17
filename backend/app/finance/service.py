@@ -1080,6 +1080,11 @@ def create_rebate(
             "买号返点只能关联回收（HS）订单",
             details={"rebate_type": rebate_type, "order_type": order.order_type},
         )
+    if rebate_type == RebateType.SELL.value and order.order_type != "DG":
+        raise Validation(
+            "卖号返点只能关联分销（DG）订单",
+            details={"rebate_type": rebate_type, "order_type": order.order_type},
+        )
     required_event = {
         RebateType.BUY.value: EventType.BUY.value,
         RebateType.SELL.value: EventType.SELL.value,

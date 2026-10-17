@@ -321,24 +321,29 @@ def update_customer(
             values=extras.items(),
         )
 
+    allowed_fields = {
+        "display_name", "contact_name", "phone", "wechat", "qq", "source",
+        "owner_id", "tags", "note",
+    }
+    for name in fields:
+        if name not in allowed_fields:
+            raise Validation("客户更新字段不受支持", details={"field": name})
     if "owner_id" in fields and user is not None and not user.is_admin and user.owner_scope != "ALL":
         fields["owner_id"] = user.id
     if "owner_id" in fields:
         _validate_owner_id(session, fields["owner_id"])
 
-    before = {name: getattr(customer, name) for name in CONTACT_FIELDS}
-    allowed_fields = {
-        "display_name", "contact_name", "phone", "wechat", "qq", "source",
-        "owner_id", "tags", "note",
-    }
-    changed_contacts = False
+    normalized_fields: dict[str, Any] = {}
     for name, value in fields.items():
-        if name not in allowed_fields:
-            raise Validation("客户更新字段不受支持", details={"field": name})
         if name == "display_name":
             if not isinstance(value, str) or not value.strip():
                 raise Validation("称呼/昵称不能清空", details={"field": name})
             value = value.strip()
+        normalized_fields[name] = value
+
+    before = {name: getattr(customer, name) for name in CONTACT_FIELDS}
+    changed_contacts = False
+    for name, value in normalized_fields.items():
         if getattr(customer, name, None) != value:
             setattr(customer, name, value)
             if name in CONTACT_FIELDS:
@@ -610,13 +615,18 @@ def update_counterparty(
     allowed_fields = {
         "display_name", "contact_name", "phone", "wechat", "qq", "source", "note",
     }
-    for name, value in fields.items():
+    for name in fields:
         if name not in allowed_fields:
             raise Validation("合作方更新字段不受支持", details={"field": name})
+
+    normalized_fields: dict[str, Any] = {}
+    for name, value in fields.items():
         if name == "display_name":
             if not isinstance(value, str) or not value.strip():
                 raise Validation("合作方名称不能清空", details={"field": name})
             value = value.strip()
+        normalized_fields[name] = value
+    for name, value in normalized_fields.items():
         setattr(item, name, value)
     item.updated_by = actor
     session.flush()

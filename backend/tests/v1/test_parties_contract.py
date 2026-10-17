@@ -172,6 +172,23 @@ class TestListAndGetCustomers:
 
 # ------------------------------------------------------------------ 客户更新
 class TestUpdateCustomer:
+    def test_customer_update_validates_all_fields_before_mutating(self, seeded_db):
+        customer = _customer(seeded_db, "原客户")
+
+        with pytest.raises(Validation, match="客户更新字段不受支持"):
+            service.update_customer(
+                seeded_db,
+                customer.id,
+                actor="operator",
+                display_name="不应保存的新名称",
+                unsupported_field="invalid",
+            )
+
+        seeded_db.commit()
+        seeded_db.refresh(customer)
+        assert customer.display_name == "原客户"
+        assert customer.updated_by == "pytest"
+
     def test_customer_and_counterparty_names_cannot_be_blank_on_update(self, seeded_db):
         customer = _customer(seeded_db, "客户名")
         with pytest.raises(Validation, match="称呼/昵称不能清空"):
@@ -460,6 +477,25 @@ class TestCounterpartyGuards:
         assert _audit_actions(seeded_db, AuditAction.CUSTOMER_UPDATE) == [
             peer.counterparty_no
         ]
+
+    def test_counterparty_update_validates_all_fields_before_mutating(self, seeded_db):
+        peer = service.create_counterparty(
+            seeded_db, display_name="原合作方", type="PEER", actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="合作方更新字段不受支持"):
+            service.update_counterparty(
+                seeded_db,
+                peer.id,
+                actor="operator",
+                display_name="不应保存的新合作方",
+                unsupported_field="invalid",
+            )
+
+        seeded_db.commit()
+        seeded_db.refresh(peer)
+        assert peer.display_name == "原合作方"
+        assert peer.updated_by == "pytest"
 
 
 # ------------------------------------------------------------------ 活字段

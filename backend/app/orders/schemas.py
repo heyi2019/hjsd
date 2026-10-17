@@ -126,6 +126,16 @@ class OrderUpdate(BaseModel):
     note: str | None = None
 
 
+class OrderLinkCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    related_order_id: int = Field(gt=0)
+    relation_type: str = Field(min_length=1, max_length=16)
+    split_ratio: Decimal | None = Field(default=None, gt=0, le=100)
+    split_amount: Decimal | None = Field(default=None, gt=0)
+    note: str | None = None
+
+
 class OrderCancelIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -220,6 +230,21 @@ class OrderDetailOut(OrderOut):
     """订单详情：主订单字段 + 按发生时间排列的执行事件时间线。"""
 
     events: list[EventOut] = Field(default_factory=list)
+    links: list["OrderLinkOut"] = Field(default_factory=list)
+
+
+class OrderLinkOut(BaseModel):
+    id: int
+    source_order_id: int
+    source_order_no: str
+    target_order_id: int
+    target_order_no: str
+    relation_type: str
+    direction: str
+    split_ratio: Decimal | None = None
+    split_amount: Decimal | None = None
+    note: str | None = None
+    created_at: datetime
 
 
 class EventPostResult(BaseModel):
@@ -251,10 +276,12 @@ __all__ = [
     "OrderCreate",
     "OrderCancelIn",
     "OrderInstallmentCreate",
+    "OrderLinkCreate",
     "OrderInstallmentScheduleCreate",
     "OrderOut",
     "OrderDetailOut",
     "OrderListOut",
+    "OrderLinkOut",
     "OrderUpdate",
     "PoolBalanceOut",
 ]

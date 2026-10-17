@@ -92,6 +92,10 @@ def _order_detail_output(
         .order_by(OrderEvent.occurred_on, OrderEvent.id)
     ).all()
     output.events = [_event_output(event) for event in events]
+    output.links = [
+        schemas.OrderLinkOut.model_validate(item)
+        for item in service.list_order_links(db, order.id, user)
+    ]
     return output
 
 
@@ -286,6 +290,46 @@ def get_order(
     _user: CurrentUser = read_orders,
 ) -> schemas.OrderDetailOut:
     return _order_detail_output(db, service.get_order(db, order_id, _user), _user)
+
+
+@router.get("/orders/{order_id}/links", response_model=list[schemas.OrderLinkOut])
+def list_order_links(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_orders,
+) -> list[schemas.OrderLinkOut]:
+    return [
+        schemas.OrderLinkOut.model_validate(item)
+        for item in service.list_order_links(db, order_id, user)
+    ]
+
+
+@router.post(
+    "/orders/{order_id}/links",
+    response_model=schemas.OrderLinkOut,
+    status_code=201,
+)
+def create_order_link(
+    order_id: int,
+    payload: schemas.OrderLinkCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> schemas.OrderLinkOut:
+    link = service.create_order_link(
+        db,
+        order_id,
+        related_order_id=payload.related_order_id,
+        relation_type=payload.relation_type,
+        split_ratio=payload.split_ratio,
+        split_amount=payload.split_amount,
+        note=payload.note,
+        actor=_actor(user),
+        user=user,
+    )
+    item = next(
+        item for item in service.list_order_links(db, order_id, user) if item["id"] == link.id
+    )
+    return schemas.OrderLinkOut.model_validate(item)
 
 
 @router.patch("/orders/{order_id}", response_model=schemas.OrderOut)

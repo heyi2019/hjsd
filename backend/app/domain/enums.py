@@ -149,6 +149,13 @@ class OrderStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class OrderLinkType(StrEnum):
+    """订单关联方向：当前订单的来源单或后续单。"""
+
+    SOURCE = "SOURCE"
+    FOLLOW_UP = "FOLLOW_UP"
+
+
 class EventType(StrEnum):
     BUY = "BUY"
     COST = "COST"
@@ -360,6 +367,7 @@ class AuditAction(StrEnum):
     ORDER_CREATE = "ORDER_CREATE"
     ORDER_UPDATE = "ORDER_UPDATE"
     ORDER_CANCEL = "ORDER_CANCEL"
+    ORDER_LINK_CREATE = "ORDER_LINK_CREATE"
     EVENT_CREATE = "EVENT_CREATE"
     EVENT_POST = "EVENT_POST"
     DEPOSIT_CREATE = "DEPOSIT_CREATE"
@@ -427,6 +435,7 @@ __all__ = [
     "InstallmentStatus",
     "LinkStatus",
     "Nature",
+    "OrderLinkType",
     "OrderStatus",
     "PolicyStatus",
     "PoolOwnership",

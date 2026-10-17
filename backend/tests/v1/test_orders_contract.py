@@ -28,7 +28,7 @@ from app.domain.enums import (
 from app.accounts import service as accounts_service
 from app.installments import service as installments_service
 from app.parties import service as parties_service
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import service as order_service
@@ -71,6 +71,56 @@ class TestCreateOrderValidation:
                 order_type="DFQ",
                 trade_date=D,
                 owner_id=owner.id,
+                actor="pytest",
+            )
+
+    def test_order_links_record_source_follow_up_and_split_share(self, seeded_db):
+        source = _order(seeded_db, order_type="DFQ")
+        follow_up = _order(seeded_db, order_type="HS")
+
+        link = order_service.create_order_link(
+            seeded_db,
+            follow_up.id,
+            related_order_id=source.id,
+            relation_type="SOURCE",
+            split_ratio=Decimal("50"),
+            split_amount=Decimal("400"),
+            note="来源订单",
+            actor="pytest",
+        )
+
+        assert link.source_order_id == source.id
+        assert link.target_order_id == follow_up.id
+        listed = order_service.list_order_links(seeded_db, follow_up.id)
+        assert listed[0]["direction"] == "SOURCE"
+        assert listed[0]["source_order_no"] == source.order_no
+        assert listed[0]["split_ratio"] == Decimal("50.00")
+
+        with pytest.raises(Validation, match="订单关联已存在"):
+            order_service.create_order_link(
+                seeded_db,
+                source.id,
+                related_order_id=follow_up.id,
+                relation_type="FOLLOW_UP",
+                actor="pytest",
+            )
+
+    def test_order_link_rejects_self_and_invalid_relation(self, seeded_db):
+        order = _order(seeded_db, order_type="DFQ")
+        with pytest.raises(Validation, match="不能关联自身"):
+            order_service.create_order_link(
+                seeded_db,
+                order.id,
+                related_order_id=order.id,
+                relation_type="SOURCE",
+                actor="pytest",
+            )
+        with pytest.raises(Validation, match="关联方向无效"):
+            order_service.create_order_link(
+                seeded_db,
+                order.id,
+                related_order_id=999999,
+                relation_type="UNKNOWN",
                 actor="pytest",
             )
 
@@ -1684,6 +1734,34 @@ class TestOrdersApi:
 
         missing = seeded_client.get("/api/v1/orders/999999", headers=headers)
         assert missing.status_code == 404
+
+    def test_order_link_endpoints_and_detail_links(self, seeded_client, seeded_db, headers):
+        source = _order(seeded_db, order_type="DFQ")
+        target = _order(seeded_db, order_type="HS")
+
+        created = seeded_client.post(
+            f"/api/v1/orders/{target.id}/links",
+            json={
+                "related_order_id": source.id,
+                "relation_type": "SOURCE",
+                "split_ratio": "50",
+                "split_amount": "400",
+                "note": "来源单",
+            },
+            headers=headers,
+        )
+
+        assert created.status_code == 201, created.text
+        assert created.json()["source_order_no"] == source.order_no
+        assert created.json()["direction"] == "SOURCE"
+        listed = seeded_client.get(
+            f"/api/v1/orders/{target.id}/links", headers=headers
+        )
+        assert listed.status_code == 200, listed.text
+        assert listed.json()[0]["target_order_no"] == target.order_no
+        detail = seeded_client.get(f"/api/v1/orders/{target.id}", headers=headers)
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["links"][0]["id"] == created.json()["id"]
 
     def test_pool_balance_endpoint_scope_forbidden(self, seeded_client, viewer_headers):
         # viewer 有 finance.read 但无池授权 → 越权池返回 404（不泄露存在性）

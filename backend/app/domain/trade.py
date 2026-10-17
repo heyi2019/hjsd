@@ -53,6 +53,7 @@ from app.domain.enums import (
     ReconciliationStatus,
     ScheduleStatus,
     AllocationRole,
+    OrderLinkType,
 )
 
 
@@ -187,6 +188,44 @@ class Order(Base, AuditMixin):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OrderLink(Base, TimestampMixin):
+    """订单上下游关联与拆分份额（ORD-01-05）。"""
+
+    __tablename__ = "order_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_order_id", "target_order_id", name="uq_order_links_pair"
+        ),
+        CheckConstraint("source_order_id <> target_order_id", name="order_link_not_self"),
+        CheckConstraint(
+            f"relation_type IN {OrderLinkType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="order_link_type_valid",
+        ),
+        CheckConstraint(
+            "split_ratio IS NULL OR (split_ratio > 0 AND split_ratio <= 100)",
+            name="order_link_ratio_valid",
+        ),
+        CheckConstraint("split_amount IS NULL OR split_amount > 0", name="order_link_amount_valid"),
+        Index("ix_order_links_source", "source_order_id"),
+        Index("ix_order_links_target", "target_order_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
+    )
+    target_order_id: Mapped[int] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
+    )
+    # 保留创建时的方向语义，查询时也会按当前订单返回 direction。
+    relation_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    split_ratio: Mapped[object | None] = mapped_column(Amount, nullable=True)
+    split_amount: Mapped[object | None] = mapped_column(Amount, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
+    updated_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
 
 
 class OrderEvent(Base, AuditMixin):
@@ -625,6 +664,7 @@ __all__ = [
     "Installment",
     "InstallmentSchedule",
     "Order",
+    "OrderLink",
     "OrderEvent",
     "OrderProfitAllocation",
     "RebateRecord",

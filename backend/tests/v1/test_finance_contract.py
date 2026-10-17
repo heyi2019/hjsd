@@ -1312,6 +1312,8 @@ class TestFinanceApi:
         assert response.json()[0]["source_order_id"] == order_id
         assert response.json()[0]["expected_release_on"] == "2026-10-20"
         assert response.json()[0]["note"] == "押金业务备注"
+        assert response.json()[0]["operator"] == "pytest"
+        assert response.json()[0]["created_at"]
 
     def test_deposit_loss_endpoint_returns_operating_cashflow(
         self, seeded_client, seeded_db, headers
@@ -1349,6 +1351,8 @@ class TestFinanceApi:
         assert response.json()[0]["channel"] == "买号返点"
         assert response.json()[0]["link_status"] == "LINKED"
         assert response.json()[0]["note"] == "回收买号返点"
+        assert response.json()[0]["operator"] == "pytest"
+        assert response.json()[0]["created_at"]
 
     def test_create_rebate_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
@@ -1388,6 +1392,8 @@ class TestFinanceApi:
         assert response.status_code == 201, response.text
         assert response.json()["net_amount"] == "100.00"
         assert response.json()["note"] == "返点到账"
+        assert response.json()["operator"] == "admin"
+        assert response.json()["created_at"]
 
     def test_rebate_settlement_list_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers

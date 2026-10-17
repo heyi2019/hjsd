@@ -77,6 +77,24 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
     )
 
 
+def _deposit_out(item: Deposit) -> schemas.DepositOut:
+    return schemas.DepositOut.model_validate(
+        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+    )
+
+
+def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
+    return schemas.RebateOut.model_validate(
+        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+    )
+
+
+def _settlement_out(item) -> schemas.SettlementOut:
+    return schemas.SettlementOut.model_validate(
+        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+    )
+
+
 @router.get("/cashflows", response_model=list[schemas.CashflowOut])
 def list_cashflows(
     pool_id: int | None = Query(default=None),
@@ -350,7 +368,7 @@ def list_deposits(
         if pool_id is not None or user.is_admin or user.owner_scope == "ALL"
         else sorted(user.pool_ids),
     )
-    return [schemas.DepositOut.model_validate(item) for item in items]
+    return [_deposit_out(item) for item in items]
 
 
 @router.post("/deposits", response_model=schemas.DepositOut, status_code=201)
@@ -373,7 +391,7 @@ def create_deposit(
         note=payload.note,
         user=user,
     )
-    return schemas.DepositOut.model_validate(item)
+    return _deposit_out(item)
 
 
 @router.post("/deposits/{deposit_id}/returns", response_model=schemas.DepositOut)
@@ -394,7 +412,7 @@ def return_deposit(
         actor=_actor(user),
         user=user,
     )
-    return schemas.DepositOut.model_validate(item)
+    return _deposit_out(item)
 
 
 @router.post("/deposits/{deposit_id}/losses", response_model=schemas.CashflowOut)
@@ -428,7 +446,7 @@ def list_rebates(
     _user: CurrentUser = read_access,
 ) -> list[schemas.RebateOut]:
     items = service.list_rebates(db, source_order_id=source_order_id, user=_user)
-    return [schemas.RebateOut.model_validate(item) for item in items]
+    return [_rebate_out(item) for item in items]
 
 
 @router.post("/rebates", response_model=schemas.RebateOut, status_code=201)
@@ -449,7 +467,7 @@ def create_rebate(
         note=payload.note,
         user=user,
     )
-    return schemas.RebateOut.model_validate(item)
+    return _rebate_out(item)
 
 
 @router.post(
@@ -478,7 +496,7 @@ def settle_rebate(
         note=payload.note,
         user=user,
     )
-    return schemas.SettlementOut.model_validate(item)
+    return _settlement_out(item)
 
 
 @router.get(
@@ -490,7 +508,7 @@ def list_rebate_settlements(
     user: CurrentUser = read_access,
 ) -> list[schemas.SettlementOut]:
     items = service.list_rebate_settlements(db, rebate_id, user=user)
-    return [schemas.SettlementOut.model_validate(item) for item in items]
+    return [_settlement_out(item) for item in items]
 
 
 @router.post(
@@ -513,7 +531,7 @@ def reverse_rebate_settlement(
         reason=payload.reason,
         user=user,
     )
-    return schemas.SettlementOut.model_validate(item)
+    return _settlement_out(item)
 
 
 __all__ = ["router"]

@@ -47,6 +47,8 @@ class DepositOut(BaseModel):
     released_on: date | None = None
     lost_on: date | None = None
     note: str | None = None
+    created_at: datetime
+    operator: str
 
 
 class CashflowOut(BaseModel):
@@ -169,6 +171,8 @@ class RebateOut(BaseModel):
     status: str
     collected_on: date
     note: str | None = None
+    created_at: datetime
+    operator: str
 
 
 class SettlementCreate(RequestModel):
@@ -192,6 +196,8 @@ class SettlementOut(BaseModel):
     cashflow_id: int | None = None
     reversal_of_id: int | None = None
     note: str | None = None
+    created_at: datetime
+    operator: str
 
 
 class SettlementReverse(RequestModel):

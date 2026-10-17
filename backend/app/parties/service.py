@@ -439,6 +439,37 @@ def merge_customers(
         role.customer_id = target.id
         migrated += 1
 
+    # 活字段是客户资料的一部分：目标已有同一字段时保留目标值，
+    # 目标缺失时复制一份；来源行不删除，保证合并前的历史值仍可审计。
+    source_extras = session.scalars(
+        select(EntityExtraValue).where(
+            EntityExtraValue.entity_type == EntityType.CUSTOMER.value,
+            EntityExtraValue.entity_id == source.id,
+        )
+    ).all()
+    target_extra_definition_ids = set(
+        session.scalars(
+            select(EntityExtraValue.field_definition_id).where(
+                EntityExtraValue.entity_type == EntityType.CUSTOMER.value,
+                EntityExtraValue.entity_id == target.id,
+            )
+        ).all()
+    )
+    migrated_extras = 0
+    for extra in source_extras:
+        if extra.field_definition_id in target_extra_definition_ids:
+            continue
+        session.add(
+            EntityExtraValue(
+                entity_type=extra.entity_type,
+                entity_id=target.id,
+                field_definition_id=extra.field_definition_id,
+                value=dict(extra.value or {}),
+            )
+        )
+        target_extra_definition_ids.add(extra.field_definition_id)
+        migrated_extras += 1
+
     before = {"status": source.status, "merged_into_id": source.merged_into_id}
     source.status = CustomerStatus.MERGED.value
     source.merged_into_id = target.id
@@ -457,6 +488,7 @@ def merge_customers(
             "status": source.status,
             "merged_into": target.customer_no,
             "migrated_roles": migrated,
+            "migrated_extra_values": migrated_extras,
         },
         reason=reason,
     )

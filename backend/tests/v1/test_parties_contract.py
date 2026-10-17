@@ -354,6 +354,38 @@ class TestMergeGuards:
         ).all()
         assert [r.customer_id for r in roles] == [target.id]
 
+    def test_merge_copies_missing_extra_values_to_target(self, seeded_db):
+        definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="preferred_platform",
+            label="常用平台",
+            actor="pytest",
+        )
+        source = _customer(seeded_db, "带活字段的源")
+        target = _customer(seeded_db, "没有活字段的目标")
+        service.set_extra_values(
+            seeded_db,
+            entity_type="customer",
+            entity_id=source.id,
+            values=[(definition.field_key, "王者荣耀")],
+        )
+
+        service.merge_customers(
+            seeded_db,
+            source_customer_id=source.id,
+            target_customer_id=target.id,
+            reason="资料合并",
+            actor="admin",
+        )
+
+        assert service.get_extra_values(
+            seeded_db, entity_type="customer", entity_id=target.id
+        ) == {"preferred_platform": "王者荣耀"}
+        assert service.get_extra_values(
+            seeded_db, entity_type="customer", entity_id=source.id
+        ) == {"preferred_platform": "王者荣耀"}
+
 
 # ------------------------------------------------------------------ 合作方
 class TestCounterpartyGuards:

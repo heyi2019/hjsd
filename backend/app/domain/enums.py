@@ -73,6 +73,7 @@ class SequenceKey(StrEnum):
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
     LEAD = "LEAD"
+    QUALITY_ISSUE = "QUALITY_ISSUE"
     ACCOUNT = "ACCOUNT"
     CASHFLOW = "CASHFLOW"
     IMPORT = "IMPORT"
@@ -107,6 +108,12 @@ class LeadType(StrEnum):
 class LeadStatus(StrEnum):
     OPEN = "OPEN"
     CONVERTED = "CONVERTED"
+    CLOSED = "CLOSED"
+
+
+class QualityIssueStatus(StrEnum):
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
     CLOSED = "CLOSED"
 
 
@@ -406,6 +413,9 @@ class AuditAction(StrEnum):
     RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
     RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
     PERIOD_LOCK = "PERIOD_LOCK"
+    QUALITY_ISSUE_CREATE = "QUALITY_ISSUE_CREATE"
+    QUALITY_ISSUE_UPDATE = "QUALITY_ISSUE_UPDATE"
+    QUALITY_ISSUE_CLOSE = "QUALITY_ISSUE_CLOSE"
     CASHFLOW_CREATE = "CASHFLOW_CREATE"
     CASHFLOW_APPROVE = "CASHFLOW_APPROVE"
     CASHFLOW_REJECT = "CASHFLOW_REJECT"
@@ -464,6 +474,7 @@ __all__ = [
     "PoolStatus",
     "PoolType",
     "Portion",
+    "QualityIssueStatus",
     "RebateStatus",
     "RebateType",
     "ReconciliationStatus",

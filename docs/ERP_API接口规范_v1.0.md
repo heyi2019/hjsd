@@ -31,7 +31,7 @@
 | 月结 | GET/POST `/period-locks` | 按 `YYYY-MM` 锁定会计期间；锁定后禁止新增、审核或修改该月事实，次月冲销仍可作为更正 |
 | 划转 | POST `/transfers`、POST `/transfers/{transfer_id}/repair` | 原子生成同一 `transfer_id` 下的 INTERNAL 转出/转入流水；异常修复须走修复接口 |
 | 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/daily-funds`、`/order-profit` | R1–R5；当前返回 JSON，库存 CSV 导出由前端基于当前权限数据生成 |
-| 异常 | GET `/quality/exceptions` | 未路由、单边划转、负可用余额、逾期、库存缺失、未关联返点等质量异常 |
+| 异常 | GET `/quality/exceptions`；GET/POST `/quality/issues`，GET/PATCH `/quality/issues/{id}`，POST `/quality/issues/{id}/close` | 扫描异常、负责人分派、处理中状态、解决方式与关闭证据 |
 | 全局搜索 | GET `/search?q=...` | 按当前权限检索订单、库存、客户、合作方和返点，结果只返回可跳转摘要 |
 | 活字段 | GET/POST `/field-definitions`，PATCH `/field-definitions/{id}/active`，DELETE `/field-definitions/{id}` | 定义、停用、排序；有历史值的字段不可删除 |
 | 经营规则 | GET/POST `/policies`，GET `/policies/{id}/versions`，POST `/policies/{id}/versions`，PATCH/POST `/policy-versions/{id}`、`/approve` | 规则版本、审批、快照与多人利润分配；订单分配使用 `/orders/{id}/profit-allocations` |

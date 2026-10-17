@@ -347,6 +347,7 @@ def list_deposits(
         pool_ids=None
         if pool_id is not None or user.is_admin or user.owner_scope == "ALL"
         else sorted(user.pool_ids),
+        user=user,
     )
     return [_deposit_out(item) for item in items]
 

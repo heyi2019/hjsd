@@ -979,6 +979,7 @@ class TestFinanceApi:
             owner_scope="SELF",
             pool_ids=frozenset({1}),
         )
+
         scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
 
         service.create_deposit(
@@ -1034,6 +1035,31 @@ class TestFinanceApi:
             headers=scoped_headers,
         )
         assert create_other_pool.status_code == 404
+
+    def test_scoped_finance_services_enforce_pool_visibility_without_router_filters(
+        self, seeded_db
+    ):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        service.create_deposit(
+            seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
+        )
+        service.create_deposit(
+            seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
+        )
+
+        deposits = service.list_deposits(seeded_db, user=scoped)
+        cashflows = service.list_cashflows(seeded_db, user=scoped)
+
+        assert deposits
+        assert {item.pool_id for item in deposits} == {1}
+        assert cashflows
+        assert {item["pool_id"] for item in cashflows} == {1}
 
     def test_scoped_cashflow_pagination_is_global_across_allowed_pools(
         self, seeded_client, seeded_db

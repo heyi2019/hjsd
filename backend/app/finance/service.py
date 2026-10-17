@@ -550,12 +550,20 @@ def list_deposits(
     *,
     pool_id: int | None = None,
     pool_ids: Iterable[int] | None = None,
+    user: CurrentUser | None = None,
 ) -> list[Deposit]:
     stmt = select(Deposit)
     if pool_id is not None:
+        if user is not None and not user.can_see_pool(pool_id):
+            return []
         stmt = stmt.where(Deposit.pool_id == pool_id)
     elif pool_ids is not None:
-        stmt = stmt.where(Deposit.pool_id.in_(list(pool_ids)))
+        visible_pool_ids = list(pool_ids)
+        if user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+            visible_pool_ids = [pool for pool in visible_pool_ids if user.can_see_pool(pool)]
+        stmt = stmt.where(Deposit.pool_id.in_(visible_pool_ids))
+    elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+        stmt = stmt.where(Deposit.pool_id.in_(sorted(user.pool_ids)))
     return list(session.scalars(stmt.order_by(Deposit.id)).all())
 
 
@@ -582,9 +590,16 @@ def list_cashflows(
         .offset(offset)
     )
     if pool_id is not None:
+        if user is not None and not user.can_see_pool(pool_id):
+            return []
         stmt = stmt.where(Cashflow.pool_id == pool_id)
     elif pool_ids is not None:
-        stmt = stmt.where(Cashflow.pool_id.in_(list(pool_ids)))
+        visible_pool_ids = list(pool_ids)
+        if user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+            visible_pool_ids = [pool for pool in visible_pool_ids if user.can_see_pool(pool)]
+        stmt = stmt.where(Cashflow.pool_id.in_(visible_pool_ids))
+    elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+        stmt = stmt.where(Cashflow.pool_id.in_(sorted(user.pool_ids)))
     if order_id is not None:
         stmt = stmt.where(Cashflow.order_id == order_id)
     if user is not None:

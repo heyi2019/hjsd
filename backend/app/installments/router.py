@@ -158,7 +158,7 @@ def pay_installment(
     payload: schemas.PaymentIn,
     db: Session = Depends(get_db),
     user: CurrentUser = post_payment,
-) -> dict:
+) -> schemas.PaymentResult:
     installment, schedule = service.pay(
         db,
         installment_id,
@@ -170,10 +170,10 @@ def pay_installment(
         note=payload.note,
         user=user,
     )
-    return {
-        "installment": _installment_output(db, installment),
-        "schedule": schemas.ScheduleOut.model_validate(schedule),
-    }
+    return schemas.PaymentResult(
+        installment=_installment_output(db, installment),
+        schedule=schemas.ScheduleOut.model_validate(schedule),
+    )
 
 
 @router.post(
@@ -237,13 +237,19 @@ def deliver_installment(
     return _installment_output(db, item)
 
 
-@router.post("/installments/mark-overdue", status_code=200)
+@router.post(
+    "/installments/mark-overdue",
+    response_model=schemas.MarkOverdueOut,
+    status_code=200,
+)
 def mark_overdue(
     as_of: date = Query(default_factory=date.today),
     db: Session = Depends(get_db),
     user: CurrentUser = post_delivery,
-) -> dict[str, int]:
-    return {"marked": service.mark_overdue(db, as_of=as_of, actor=_actor(user), user=user)}
+) -> schemas.MarkOverdueOut:
+    return schemas.MarkOverdueOut(
+        marked=service.mark_overdue(db, as_of=as_of, actor=_actor(user), user=user)
+    )
 
 
 __all__ = ["router"]

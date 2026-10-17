@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import get_type_hints
 
 import pytest
 from sqlalchemy import select
@@ -28,10 +29,17 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Installment, InstallmentSchedule, Order
 from app.domain.users import User
 from app.installments import service as installment_service
+from app.installments import router as installments_router
+from app.installments import schemas
 from app.orders import service as orders_service
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
+
+
+def test_installment_action_routes_use_declared_response_types():
+    assert get_type_hints(installments_router.pay_installment)["return"] == schemas.PaymentResult
+    assert get_type_hints(installments_router.mark_overdue)["return"] == schemas.MarkOverdueOut
 
 
 def _account(seeded_db, game_account: str):

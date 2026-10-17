@@ -107,12 +107,17 @@ class PaymentResult(BaseModel):
     schedule: ScheduleOut
 
 
+class MarkOverdueOut(BaseModel):
+    marked: int
+
+
 __all__ = [
     "DeliverIn",
     "DefaultIn",
     "EarlySettlementIn",
     "InstallmentCreate",
     "InstallmentOut",
+    "MarkOverdueOut",
     "PaymentIn",
     "PaymentResult",
     "ScheduleExtendIn",

@@ -399,12 +399,20 @@ class TestA06Rebate:
 
 class TestM2Api:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="api-acc",
+            platform="王者",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
         order_response = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "api-acc", "platform": "王者"},
+                "account_id": account.id,
             },
             headers=headers,
         )
@@ -461,16 +469,24 @@ class TestM2Api:
         )
         assert returned.json()["status"] == "PARTIALLY_RETURNED"
 
-    def test_inventory_endpoint(self, seeded_client, headers):
+    def test_inventory_endpoint(self, seeded_client, seeded_db, headers):
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="inv-acc",
+            platform="王者",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
         created = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "inv-acc", "platform": "王者"},
+                "account_id": account.id,
             },
             headers=headers,
         )
         assert created.status_code == 201, created.text
         inventory = seeded_client.get("/api/v1/accounts/inventory", headers=headers).json()
-        assert inventory["count"] == 1  # 库存账号随订单建档，直接进入在库
+        assert inventory["count"] == 1

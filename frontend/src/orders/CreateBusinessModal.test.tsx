@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../test/render";
-import { CreateBusinessModal, getAccountValues } from "./CreateBusinessModal";
+import { CreateBusinessModal } from "./CreateBusinessModal";
 
 const ordersCreate = vi.fn();
 const orderEvents = vi.fn();
@@ -10,7 +10,6 @@ const typesList = vi.fn();
 const customersList = vi.fn();
 const counterpartiesList = vi.fn();
 const accountsList = vi.fn();
-const accountsCreate = vi.fn();
 const poolsList = vi.fn();
 const ordersList = vi.fn();
 
@@ -25,7 +24,6 @@ vi.mock("../shared/api/catalog", () => ({
   counterpartiesApi: { list: (...a: unknown[]) => counterpartiesList(...a) },
   accountsApi: {
     list: (...a: unknown[]) => accountsList(...a),
-    create: (...a: unknown[]) => accountsCreate(...a),
   },
   poolsApi: { list: (...a: unknown[]) => poolsList(...a) },
 }));
@@ -37,8 +35,10 @@ beforeEach(() => {
   typesList.mockResolvedValue(types);
   customersList.mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
   counterpartiesList.mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
-  accountsList.mockResolvedValue([{ id: 9, inventory_no: "ACC0001", status: "IN_STOCK", cost_amount: "0.00" }]);
-  accountsCreate.mockResolvedValue({ id: 11, inventory_no: "ACC0011", status: "IN_STOCK", cost_amount: "0.00" });
+  accountsList.mockResolvedValue([
+    { id: 9, inventory_no: "ACC0001", game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
+    { id: 10, inventory_no: "ACC0002", game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
+  ]);
   poolsList.mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   ordersList.mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
   orderEvents.mockResolvedValue({ event: { id: 1 }, cashflow_no: "FLOW-0001" });
@@ -58,42 +58,20 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
-  it("业务入口不再加载通用账号兼容数据", async () => {
+  it("回收入口只加载已有库存账号，不提供随订单建档", async () => {
     const { container } = await openTypedModal("HS");
 
-    expect(container.textContent).not.toContain("关联账号（必填）");
-    expect(accountsList).not.toHaveBeenCalled();
+    expect(await screen.findByLabelText("库存账号")).toBeInTheDocument();
+    expect(accountsList).toHaveBeenCalledWith({ status: "IN_STOCK" });
     expect(ordersList).not.toHaveBeenCalled();
     expect(typesList).not.toHaveBeenCalled();
   });
 
-  it("代挂账号字段使用 dg 前缀，不复用提号字段", () => {
-    expect(getAccountValues({
-      dg_game_type: "王者荣耀",
-      dg_game_account: "dg-account",
-      dg_game_password: "secret",
-      dg_channel_region: "安卓一区",
-      dg_bound_phone: "13800000000",
-      dg_has_secondary: "有",
-      dg_account_note: "代挂账号",
-    }, "DG")).toMatchObject({
-      game_type: "王者荣耀",
-      game_account: "dg-account",
-      game_password: "secret",
-      channel_region: "安卓一区",
-      bound_phone: "13800000000",
-      has_secondary: true,
-      inventory_type: "CONSIGNMENT",
-      business_mode: "DISTRIBUTION",
-      note: "代挂账号",
-    });
-  });
-
   it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
-    expect(await screen.findByLabelText("游戏类型")).toBeInTheDocument();
+    expect(await screen.findByLabelText("库存账号")).toBeInTheDocument();
     expect(typesList).not.toHaveBeenCalled();
-    expect(accountsList).not.toHaveBeenCalled();
+    expect(accountsList).toHaveBeenCalledWith({ status: "IN_STOCK" });
     expect(ordersList).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });

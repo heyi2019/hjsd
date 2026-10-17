@@ -359,7 +359,6 @@ def create_order(
         ),
         actor=_actor(user),
         account_id=payload.account_id,
-        account_profile=payload.account.model_dump() if payload.account else None,
         owner_id=owner_id,
         capital_type=payload.capital_type,
         note=payload.note,

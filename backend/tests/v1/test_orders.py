@@ -7,6 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
+from app.accounts import service as accounts_service
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus, SequenceKey
@@ -611,13 +612,20 @@ class TestEventRules:
 
 
 class TestOrdersApi:
-    def test_invalid_money_input_returns_business_422(self, seeded_client, headers):
+    def test_invalid_money_input_returns_business_422(self, seeded_client, seeded_db, headers):
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="api-invalid-money",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
         created = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "api-invalid-money", "platform": "王者"},
+                "account_id": account.id,
             },
             headers=headers,
         )
@@ -636,16 +644,20 @@ class TestOrdersApi:
         assert response.status_code == 422
         assert response.json()["code"] == ErrorCode.VALIDATION_ERROR
 
-    def test_create_order_and_post_event(self, seeded_client, headers):
+    def test_create_order_and_post_event(self, seeded_client, seeded_db, headers):
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="api-sale-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
         created = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
-                "account": {
-                    "game_account": "api-sale-account",
-                    "platform": "王者",
-                },
+                "account_id": account.id,
             },
             headers=headers,
         )

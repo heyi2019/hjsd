@@ -1,4 +1,5 @@
 import { DatePicker, Form, Input } from "antd";
+import type { Account } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CUSTOMER_SOURCE_OPTIONS } from "../recovery/recoveryConfig";
@@ -16,20 +17,12 @@ const COMMISSION_PAYER_OPTIONS = [
 ];
 
 /** 代挂前端表单：委托账号、委托客户与抽成规则统一写入 DG 订单。 */
-export function DgOrderSection() {
+export function DgOrderSection(props: { inventoryAccounts: Account[] }) {
   const customerSource = Form.useWatch("dg_customer_source");
   const isOtherSource = customerSource === "其他";
   return (
     <>
-      <RecoveryAccountSection fieldNames={{
-        gameType: "dg_game_type",
-        gameAccount: "dg_game_account",
-        gamePassword: "dg_game_password",
-        channelRegion: "dg_channel_region",
-        boundPhone: "dg_bound_phone",
-        hasSecondary: "dg_has_secondary",
-        accountNote: "dg_account_note",
-      }}>
+      <RecoveryAccountSection inventoryAccounts={props.inventoryAccounts}>
         <NestedFormSection className="nested-form-section--card dg-service-section" title="代挂信息">
           <AdaptiveFormGrid>
             <NestedFormField label="挂售价"><Form.Item noStyle name="dg_listing_price"><MoneyInput placeholder="可选填" /></Form.Item></NestedFormField>

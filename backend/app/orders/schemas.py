@@ -26,24 +26,6 @@ class CounterpartyRoleInput(BaseModel):
     role: str = Field(min_length=1, max_length=64)
 
 
-class OrderAccountCreate(BaseModel):
-    """随订单建档的游戏账号资料；库存编号由服务端生成。"""
-
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-
-    game_account: str = Field(min_length=1, max_length=128)
-    game_type: str | None = Field(default=None, max_length=64)
-    game_password: str | None = Field(default=None, max_length=256)
-    channel_region: str | None = Field(default=None, max_length=128)
-    bound_phone: str | None = Field(default=None, max_length=64)
-    has_secondary: bool | None = None
-    platform: str | None = Field(default=None, max_length=64)
-    account_description: str | None = Field(default=None, max_length=2000)
-    account_images: list[str] = Field(default_factory=list, max_length=9)
-    note: str | None = None
-    extra_values: dict[str, object] = Field(default_factory=dict)
-
-
 class OrderAccountSnapshot(BaseModel):
     """DFQ / TH 订单内的账号文本快照，不承载库存营销资料或库存字段。"""
 
@@ -104,7 +86,6 @@ class OrderCreate(BaseModel):
     expected_settlement_date: date | None = None
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
-    account: OrderAccountCreate | None = None
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
@@ -365,7 +346,6 @@ __all__ = [
     "CounterpartyRoleInput",
     "CustomerRoleInput",
     "InitialBuyCreate",
-    "OrderAccountCreate",
     "OrderAccountSnapshot",
     "OrderCreate",
     "OrderCancelIn",

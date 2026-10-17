@@ -96,6 +96,14 @@ class TestCreateOrderValidation:
             label="账号卖点",
             actor="pytest",
         )
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="api-live-field-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            extra_values={"selling_point": "稀有皮肤"},
+            actor="pytest",
+        )
 
         created = seeded_client.post(
             "/api/v1/orders",
@@ -103,11 +111,8 @@ class TestCreateOrderValidation:
             json={
                 "order_type": "HS",
                 "trade_date": "2026-10-04",
+                "account_id": account.id,
                 "extra_values": {"origin_note": "朋友转介绍"},
-                "account": {
-                    "game_account": "api-live-field-account",
-                    "extra_values": {"selling_point": "稀有皮肤"},
-                },
             },
         )
         assert created.status_code == 201, created.text
@@ -276,7 +281,7 @@ class TestCreateOrderValidation:
         assert cost.status_code == 403, cost.text
         assert cost.json()["code"] == ErrorCode.PERMISSION_DENIED
 
-    def test_order_creation_validates_participants_before_creating_account(self, seeded_db):
+    def test_order_creation_validates_participants_before_creating_order(self, seeded_db):
         customer = parties_service.create_customer(
             seeded_db, display_name="已停用客户", actor="pytest"
         )
@@ -290,18 +295,26 @@ class TestCreateOrderValidation:
                 order_type="HS",
                 trade_date=D,
                 actor="operator",
-                account_profile={"game_account": "should-not-be-created"},
                 customer_roles=[(customer.id, "SELLER")],
                 note="atomic-participant-validation",
             )
 
         seeded_db.commit()
         assert seeded_db.scalar(
-            select(Account.id).where(Account.game_account == "should-not-be-created")
-        ) is None
-        assert seeded_db.scalar(
             select(Order.id).where(Order.note == "atomic-participant-validation")
         ) is None
+
+    def test_order_api_rejects_inline_account_creation(self, seeded_client, headers):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            headers=headers,
+            json={
+                "order_type": "HS",
+                "trade_date": "2026-10-04",
+                "account": {"game_account": "inline-account-must-be-rejected"},
+            },
+        )
+        assert response.status_code == 422, response.text
 
     def test_hs_buy_requires_inventory_account(self, seeded_db):
         order = order_service.create_order(
@@ -553,19 +566,6 @@ class TestCreateOrderValidation:
 
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="HS", account_id=account.id)
-
-    def test_order_account_profile_rejects_unknown_fields_in_service(self, seeded_db):
-        with pytest.raises(Validation, match="订单账号资料字段校验失败"):
-            order_service.create_order(
-                seeded_db,
-                order_type="HS",
-                trade_date=D,
-                actor="pytest",
-                account_profile={
-                    "game_account": "profile-invalid",
-                    "unknown": "不应写入",
-                },
-            )
 
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(
@@ -1616,8 +1616,8 @@ class TestOrdersApi:
         assert response.status_code == 201, response.text
         assert response.json()["owner_id"] == user.id
 
-    def test_order_creation_persists_embedded_inventory_account(
-        self, seeded_client, seeded_db, headers
+    def test_order_creation_rejects_embedded_inventory_account(
+        self, seeded_client, headers
     ):
         response = seeded_client.post(
             "/api/v1/orders",
@@ -1639,15 +1639,7 @@ class TestOrdersApi:
             headers=headers,
         )
 
-        assert response.status_code == 201, response.text
-        payload = response.json()
-        account = seeded_db.get(Account, payload["account_id"])
-        assert account is not None
-        assert account.game_account == "embedded-account"
-        assert account.business_mode == "SELF"
-        assert account.inventory_type == "RECOVERY"
-        assert account.account_description == "订单内建档"
-        assert account.account_images == ["data:image/png;base64,one"]
+        assert response.status_code == 422, response.text
 
     def test_dg_creation_returns_settlement_terms(
         self, seeded_client, seeded_db, headers

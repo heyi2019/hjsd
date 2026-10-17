@@ -17,7 +17,6 @@ from typing import Any
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from pydantic import ValidationError as PydanticValidationError
-
 from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
@@ -49,7 +48,7 @@ from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, 
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
-from app.orders.schemas import OrderAccountCreate, OrderAccountSnapshot
+from app.orders.schemas import OrderAccountSnapshot
 
 _UNSET = object()
 
@@ -98,27 +97,6 @@ def _validate_existing_account_context(order_type: str, account: Account) -> Non
         )
 
 
-def _normalize_account_data(
-    value: dict[str, Any], *, field: str, message: str
-) -> dict[str, Any]:
-    try:
-        return OrderAccountCreate.model_validate(value).model_dump(exclude_none=True)
-    except PydanticValidationError as exc:
-        raise Validation(
-            message,
-            details={
-                "field": field,
-                "errors": [
-                    {
-                        "field": ".".join(str(part) for part in error["loc"]),
-                        "message": error["msg"],
-                    }
-                    for error in exc.errors()
-                ],
-            },
-        ) from exc
-
-
 def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     try:
         return OrderAccountSnapshot.model_validate(snapshot).model_dump(exclude_none=True)
@@ -137,13 +115,6 @@ def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
             },
         ) from exc
 
-
-def _normalize_account_profile(profile: dict[str, Any]) -> dict[str, Any]:
-    return _normalize_account_data(
-        profile,
-        field="account_profile",
-        message="订单账号资料字段校验失败",
-    )
 
 _CUSTOMER_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
     "HS": frozenset({"SELLER", "BUYER", "INSTALLMENT_CUSTOMER"}),
@@ -238,7 +209,6 @@ def create_order(
     account_snapshot: dict[str, Any] | None = None,
     actor: str,
     account_id: int | None = None,
-    account_profile: dict[str, Any] | None = None,
     owner_id: int | None = None,
     capital_type: str | None = None,
     note: str | None = None,
@@ -258,9 +228,7 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    if definition.code in {"DFQ", "TH"} and (
-        account_id is not None or account_profile is not None
-    ):
+    if definition.code in {"DFQ", "TH"} and account_id is not None:
         raise Validation(
             "提号订单不关联库存账号" if definition.code == "TH" else "DFQ 代分期订单不关联库存账号",
             details={"order_type": definition.code, "account_id": account_id},
@@ -269,8 +237,6 @@ def create_order(
         raise Validation("只有 DFQ 代分期和 TH 提号订单可以填写订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
-    if account_profile is not None:
-        account_profile = _normalize_account_profile(account_profile)
     selected_capital_type = (
         definition.capital_type if capital_type is None else capital_type
     )
@@ -326,11 +292,6 @@ def create_order(
             and service_fee_amount > listing_amount
         ):
             raise Validation("服务费不能超过挂售价")
-    if account_id is not None and account_profile is not None:
-        raise Validation(
-            "订单不能同时关联已有库存账号和新建账号资料",
-            details={"order_type": definition.code},
-        )
     if account_id is not None:
         account = accounts_service.get_account(session, account_id, user)
         _validate_existing_account_context(definition.code, account)
@@ -374,26 +335,6 @@ def create_order(
                 "订单负责人必须是启用用户",
                 details={"field": "owner_id", "owner_id": owner_id},
             )
-
-    if account_profile is not None:
-        inventory_context = {
-            "HS": ("SELF", "RECOVERY"),
-            "DG": ("DISTRIBUTION", "CONSIGNMENT"),
-        }.get(definition.code)
-        if inventory_context is None:
-            raise Validation(
-                f"业务 {definition.code} 不允许随订单建档库存账号",
-                details={"order_type": definition.code},
-            )
-        account = accounts_service.create_account(
-            session,
-            actor=actor,
-            business_mode=inventory_context[0],
-            inventory_type=inventory_context[1],
-            **account_profile,
-        )
-        account_id = account.id
-
 
     # BAS-06-04 规则快照：按成交日固化当时生效的返点/提成规则。
     # 规则改版不回写这里，历史订单永远按当时口径计算。

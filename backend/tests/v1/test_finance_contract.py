@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.accounts import service as accounts_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
@@ -33,12 +34,19 @@ def _pool(seeded_db, code: str) -> Pool:
 
 
 def _active_order(seeded_db) -> int:
+    account = accounts_service.create_account(
+        seeded_db,
+        game_account=f"finance-active-{uuid4().hex[:10]}",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
+    )
     order = orders_service.create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
         actor="pytest",
-        account_profile={"game_account": f"finance-active-{uuid4().hex[:10]}"},
+        account_id=account.id,
     )
     orders_service.post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
@@ -989,13 +997,27 @@ class TestFinanceApi:
         service.create_deposit(
             seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
         )
+        own_account = accounts_service.create_account(
+            seeded_db,
+            game_account="finance-own-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="scoped-finance",
+        )
         own_order = orders_service.create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
             actor="scoped-finance",
             owner_id=9,
-            account_profile={"game_account": "finance-own-account"},
+            account_id=own_account.id,
+        )
+        other_account = accounts_service.create_account(
+            seeded_db,
+            game_account="finance-other-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="other",
         )
         other_order = orders_service.create_order(
             seeded_db,
@@ -1003,7 +1025,7 @@ class TestFinanceApi:
             trade_date=TODAY,
             actor="other",
             owner_id=8,
-            account_profile={"game_account": "finance-other-account"},
+            account_id=other_account.id,
         )
         orders_service.post_event(
             seeded_db, own_order.id, event_type="BUY", amount=Decimal("10"),
@@ -1258,13 +1280,20 @@ class TestFinanceApi:
             pool_ids=frozenset({1}),
         )
         headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="finance-settlement-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="scoped-finance",
+        )
         order = orders_service.create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
             actor="scoped-finance",
             owner_id=9,
-            account_profile={"game_account": "finance-settlement-account"},
+            account_id=account.id,
         )
         orders_service.post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("100"),

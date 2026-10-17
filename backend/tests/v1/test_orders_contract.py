@@ -927,6 +927,31 @@ class TestCancelOffsetDirection:
 
 # ------------------------------------------------------------------ 账号效果
 class TestAccountEffect:
+    def test_event_updates_account_operator(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-ORD-OPERATOR",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+        order = _order(seeded_db, account_id=account.id)
+
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount="500.00",
+            occurred_on=D,
+            actor="buyer",
+        )
+
+        assert account.updated_by == "buyer"
+
     def test_cancel_reverses_cost_and_voids_account(self, seeded_db):
         account = Account(
             inventory_no="ACC-ORD-1",

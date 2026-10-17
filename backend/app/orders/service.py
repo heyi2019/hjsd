@@ -789,6 +789,7 @@ def post_event(
         money,
         offset_event=offset,
         cancel_fully_consumed=(offset is None or cancel_fully_consumed),
+        actor=actor,
     )
     if event_type == EventType.CANCEL.value and (
         offset is None or cancel_fully_consumed
@@ -1199,6 +1200,7 @@ def _apply_account_effect(
     *,
     offset_event: OrderEvent | None = None,
     cancel_fully_consumed: bool = True,
+    actor: str | None = None,
 ) -> None:
     """账号状态与成本只由事件驱动（ACC-01-03/04）。"""
     if order.account_id is None:
@@ -1231,6 +1233,8 @@ def _apply_account_effect(
                     "CANCEL_SELL",
                     entity="账号",
                 )
+            if actor is not None:
+                account.updated_by = actor
             return
         account.cost_amount = to_money(account.cost_amount) - amount
         if offset_event is None or (
@@ -1239,6 +1243,8 @@ def _apply_account_effect(
             account.status = transition(
                 ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号"
             )
+    if actor is not None:
+        account.updated_by = actor
 
 
 # --------------------------------------------------------------------- 池余额

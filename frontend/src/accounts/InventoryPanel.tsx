@@ -789,7 +789,7 @@ export function InventoryPanel() {
               value={keyword}
               placeholder="搜索账号 / 产品 / 平台"
               aria-label="搜索库存账号"
-              className="ui-control-width-history"
+              className="ui-control-width-inventory"
               onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
             />
           </Space>

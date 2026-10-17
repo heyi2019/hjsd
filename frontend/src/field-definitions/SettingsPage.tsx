@@ -20,7 +20,7 @@ import {
 } from "../shared/ui";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
 import { AppearancePanel } from "../app/AppearancePanel";
-import { HistoryWorkbench } from "../history/HistoryWorkbench";
+import { ImportWorkbench } from "../imports/ImportWorkbench";
 import { UsersPanel } from "../users/UsersPanel";
 import { TeamsPanel } from "../users/TeamsPanel";
 import { useSession } from "../shared/state/session";
@@ -43,7 +43,7 @@ export function SettingsPage() {
     { key: "pools", label: "资金池", children: <PoolsPanel /> },
     { key: "fields", label: "活字段", children: <FieldsPanel /> },
     { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
-    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", children: <HistoryWorkbench embedded /> }] : []),
+    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", children: <ImportWorkbench embedded /> }] : []),
     ...(can("user.manage") ? [{ key: "users", label: "人员与权限", children: <UsersPanel /> }, { key: "teams", label: "团队管理", children: <TeamsPanel /> }] : []),
     { key: "appearance", label: "外观", children: <AppearancePanel /> },
   ];

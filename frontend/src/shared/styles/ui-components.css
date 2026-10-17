@@ -1067,7 +1067,7 @@
 .ui-control-full { width: 100%; }
 .ui-control-width-policy { width: var(--control-filter-select-width); }
 .ui-control-width-inventory { width: var(--col-w-180); }
-.ui-control-width-history { width: var(--col-w-280); }
+.ui-control-width-import { width: var(--col-w-280); }
 .orders-ledger-search { width: var(--col-w-280); }
 .ui-control-width-date { width: var(--control-date-width); }
 .ui-control-width-90 { width: var(--col-w-90); }

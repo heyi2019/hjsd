@@ -35,7 +35,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
   const OBJECT_SHAPED = new Set([
     "reportsApi",
     "auditApi",
-    "historyApi",
+    "importsApi",
     "policyApi",
   ]);
   return { deepStub, OBJECT_SHAPED };

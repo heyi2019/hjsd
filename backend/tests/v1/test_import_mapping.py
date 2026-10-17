@@ -1,4 +1,4 @@
-"""历史导入的映射口径与幂等测试（MIG-01 第 2/3 步）。
+"""导入的映射口径与幂等测试（MIG-01 第 2/3 步）。
 
 守护三件事：
 1. **只导口径明确的类型**——返点/蹭点必须被跳过，且跳过理由可见（不静默漏导）。
@@ -22,8 +22,8 @@ from app.domain.trade import Order, OrderEvent
 
 
 def _load_script():
-    path = Path(__file__).resolve().parents[2] / "scripts" / "map_history_to_entities.py"
-    spec = importlib.util.spec_from_file_location("map_history_to_entities", path)
+    path = Path(__file__).resolve().parents[2] / "scripts" / "map_import_to_entities.py"
+    spec = importlib.util.spec_from_file_location("map_import_to_entities", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -36,16 +36,16 @@ def mapper():
 
 def _seed_order_rows(session, rows):
     """把订单原始行灌进 import_rows（复用真实落地链路）。"""
-    from app.history import service as history_service
+    from app.imports import service as import_service
 
-    batch = history_service.create_batch(
+    batch = import_service.create_batch(
         session,
         source_name="金山文档·订单",
         rows=rows,
         source_kind="STANDARD_ORDER",
         actor="pytest",
     )
-    from app.domain.history import ImportRow
+    from app.domain.imports import ImportRow
 
     # 测试会话是 autoflush=False（见 conftest「savepoint 挡不住 commit」的说明），
     # 所以必须显式 flush，否则被测代码的查询看不到刚落库的 ImportRow。
@@ -219,7 +219,7 @@ class TestIdempotency:
         mapper.map_orders(seeded_db, dry_run=False)
         seeded_db.commit()
         # 手工把 status 拨回 UNMAPPED，模拟「幂等判断被绕过」
-        from app.domain.history import ImportRow
+        from app.domain.imports import ImportRow
 
         seeded_db.query(ImportRow).update({"status": ImportRowStatus.UNMAPPED.value})
         seeded_db.commit()
@@ -233,7 +233,7 @@ class TestIdempotency:
 
 
 class TestNoAutoMatch:
-    """历史实体一律 UNLINKED，绝不自动关联。"""
+    """导入实体一律 UNLINKED，绝不自动关联。"""
 
     def test_orders_are_unlinked_with_null_account(self, mapper, seeded_db):
         _seed_order_rows(
@@ -247,7 +247,7 @@ class TestNoAutoMatch:
         assert order.owner_id is None
 
     def test_events_not_posted(self, mapper, seeded_db):
-        """历史事件默认未过账——池余额不受历史数据影响。"""
+        """导入事件默认未过账——池余额不受导入数据影响。"""
         _seed_order_rows(
             seeded_db,
             [{"订单类型": "回收", "日期": "2026-06-01", "本金": 1000, "利润": 200, "交易金额": 1200}],

@@ -22,7 +22,7 @@ from app.core.schemas import EngineInfoOut, HealthOut
 from app.foundation.router import router as foundation_router
 from app.accounts.router import router as accounts_router
 from app.audit.router import router as audit_router
-from app.history.router import router as imports_router
+from app.imports.router import router as imports_router
 from app.policy.router import router as policy_router
 from app.quality.router import router as quality_router
 from app.notifications.router import router as notifications_router

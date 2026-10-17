@@ -1,4 +1,4 @@
-"""M4：R1-R5 报表 / 审计查询 / P2 历史导入。
+"""M4：R1-R5 报表 / 审计查询 / P2 导入。
 
 功能编号：RPT-01-01~06、MIG-01-01~08、BAS-05-03
 """
@@ -10,8 +10,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.domain.enums import ImportRowStatus
-from app.domain.history import ImportBatch, ImportRow
-from app.history import service as history_service
+from app.domain.imports import ImportBatch, ImportRow
+from app.imports import service as import_service
 from app.orders import service as order_service
 from app.reporting import service as reporting_service
 
@@ -89,10 +89,10 @@ class TestReports:
         assert data["total"]["order_count"] == len(data["items"])
 
 
-# --------------------------------------------------------------------- 历史导入
-class TestHistoryImport:
+# --------------------------------------------------------------------- 导入
+class TestImport:
     def test_import_rows_have_unique_positive_row_numbers_in_database(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="rows.xlsx", rows=[{"value": 1}], actor="pytest"
         )
         seeded_db.add(
@@ -107,7 +107,7 @@ class TestHistoryImport:
             seeded_db.flush()
         seeded_db.rollback()
 
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="rows-2.xlsx", rows=[{"value": 1}], actor="pytest"
         )
         seeded_db.add(
@@ -123,14 +123,14 @@ class TestHistoryImport:
         seeded_db.rollback()
 
     def test_no_auto_matching_on_create(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db,
-            source_name="legacy-orders.xlsx",
+            source_name="source-orders.xlsx",
             rows=[{"order_no": "OLD-1", "amount": "100"}, {"order_no": "OLD-2"}],
             actor="pytest",
         )
         assert batch["unmapped_count"] == 2
-        rows = history_service.list_rows(seeded_db, batch["id"])
+        rows = import_service.list_rows(seeded_db, batch["id"])
         assert all(r["mapped_order_id"] is None for r in rows)
         assert all(r["status"] == ImportRowStatus.UNMAPPED.value for r in rows)
 
@@ -140,16 +140,16 @@ class TestHistoryImport:
         order = order_service.create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
-        batch = history_service.create_batch(
-            seeded_db, source_name="legacy.xlsx", rows=[{"order_no": "OLD-9"}], actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="source.xlsx", rows=[{"order_no": "OLD-9"}], actor="pytest"
         )
-        row = history_service.list_rows(seeded_db, batch["id"])[0]
-        mapped = history_service.assign_mapping(
+        row = import_service.list_rows(seeded_db, batch["id"])[0]
+        mapped = import_service.assign_mapping(
             seeded_db, row["id"], order_id=order.id, basis="对账单第 9 行", actor="pytest"
         )
         assert mapped["status"] == ImportRowStatus.MAPPED.value
 
-        committed = history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        committed = import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
         assert committed["imported"] == 1
         assert committed["unmapped"] == 0
 
@@ -161,28 +161,28 @@ class TestHistoryImport:
         before_flows = len(seeded_db.scalars(select(Cashflow)).all())
         before_events = len(seeded_db.scalars(select(OrderEvent)).all())
 
-        batch = history_service.create_batch(
-            seeded_db, source_name="legacy.xlsx", rows=[{"x": 1}, {"y": 2}], actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="source.xlsx", rows=[{"x": 1}, {"y": 2}], actor="pytest"
         )
-        committed = history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        committed = import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
         assert committed["unmapped"] == 2
 
-        # 红线：历史导入不写任何业务数据，不补造划转
+        # 红线：导入不写任何业务数据，不补造划转
         assert len(seeded_db.scalars(select(Cashflow)).all()) == before_flows
         assert len(seeded_db.scalars(select(OrderEvent)).all()) == before_events
 
         # 未映射行保持 UNMAPPED 并在 issue_note 留痕，可见但不阻塞新业务
-        rows = history_service.list_rows(seeded_db, batch["id"])
+        rows = import_service.list_rows(seeded_db, batch["id"])
         assert all(r["status"] == ImportRowStatus.UNMAPPED.value for r in rows)
         assert all(r["issue_note"] for r in rows)
 
     def test_commit_is_not_repeatable(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="legacy.xlsx", rows=[{"x": 1}], actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="source.xlsx", rows=[{"x": 1}], actor="pytest"
         )
-        history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
         with pytest.raises(Exception):
-            history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+            import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
 
 
 # --------------------------------------------------------------------- API 层
@@ -204,10 +204,10 @@ class TestM4Api:
         assert response.status_code == 200
         assert "items" in response.json()
 
-    def test_history_endpoints(self, seeded_client, headers):
+    def test_import_endpoints(self, seeded_client, headers):
         created = seeded_client.post(
             "/api/v1/imports/batches",
-            json={"source_name": "api-legacy.xlsx", "rows": [{"a": 1}]},
+            json={"source_name": "api-import.xlsx", "rows": [{"a": 1}]},
             headers=headers,
         )
         assert created.status_code == 200
@@ -221,15 +221,15 @@ class TestM4Api:
         )
 
 
-class TestHistoryClosure:
+class TestImportClosure:
     """MIG-01 补齐验收：预览 / 对账 / 回滚 / 更正 / 补录依据 / UNLINKED 标记。
 
-    红线复验：全流程**不得写入任何 cashflow**，历史只作参考。
+    红线复验：全流程**不得写入任何 cashflow**，导入行只作参考。
     """
 
     @staticmethod
-    def _legacy_rows() -> list[dict[str, object]]:
-        """按 rawdata/真实历史表结构造行（sheet9_orders 字段名）。"""
+    def _source_rows() -> list[dict[str, object]]:
+        """按 rawdata/源表结构造行（sheet9_orders 字段名）。"""
         return [
             {"日期": "2026/07/14", "交易金额": 13888, "利润": 429, "订单类型": "代挂", "本金": 0},
             {"日期": "2026/07/15", "交易金额": 20000, "利润": 1200, "订单类型": "回收", "本金": 18800},
@@ -238,10 +238,10 @@ class TestHistoryClosure:
 
     # ── MIG-01-02 字段映射预览 ──
     def test_preview_reports_columns_samples_and_missing(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        preview = history_service.preview_mapping(seeded_db, batch["id"])
+        preview = import_service.preview_mapping(seeded_db, batch["id"])
         assert preview["total_rows"] == 3
         cols = {c["source_column"]: c for c in preview["columns"]}
         assert cols["交易金额"]["target_field"] == "gross_amount"
@@ -252,28 +252,28 @@ class TestHistoryClosure:
         assert preview["blockers"] is not None
 
     def test_preview_does_not_persist_anything(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        before = len(history_service.list_rows(seeded_db, batch["id"]))
-        history_service.preview_mapping(seeded_db, batch["id"])
-        after = history_service.list_rows(seeded_db, batch["id"])
+        before = len(import_service.list_rows(seeded_db, batch["id"]))
+        import_service.preview_mapping(seeded_db, batch["id"])
+        after = import_service.list_rows(seeded_db, batch["id"])
         assert len(after) == before
         assert all(r["status"] == ImportRowStatus.UNMAPPED.value for r in after)
 
     def test_preview_empty_batch(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="empty.xlsx", rows=[{"a": 1}], actor="pytest"
         )
-        preview = history_service.preview_mapping(seeded_db, batch["id"])
+        preview = import_service.preview_mapping(seeded_db, batch["id"])
         assert preview["total_rows"] == 1
 
-    # ── MIG-01-04 迁移对账报告 ──
+    # ── MIG-01-04 导入对账报告 ──
     def test_reconciliation_counts_and_amounts(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        report = history_service.reconciliation_report(seeded_db, batch["id"])
+        report = import_service.reconciliation_report(seeded_db, batch["id"])
         assert report["rows"]["source_total"] == 3
         assert report["amounts"]["before"]["交易金额"] == "38888.00"
         assert report["amounts"]["before"]["利润"] == "1929.00"
@@ -283,16 +283,16 @@ class TestHistoryClosure:
     def test_reconciliation_writes_no_cashflow(self, seeded_db):
         from app.domain.trade import Cashflow
 
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
         before = seeded_db.query(Cashflow).count()
-        history_service.reconciliation_report(seeded_db, batch["id"])
-        history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-        assert seeded_db.query(Cashflow).count() == before, "历史导入绝不能写现金流"
+        import_service.reconciliation_report(seeded_db, batch["id"])
+        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        assert seeded_db.query(Cashflow).count() == before, "导入绝不能写现金流"
 
-    def test_reconciliation_does_not_scan_unrelated_history_notes(self, seeded_db):
-        batch = history_service.create_batch(
+    def test_reconciliation_does_not_scan_unrelated_source_notes(self, seeded_db):
+        batch = import_service.create_batch(
             seeded_db, source_name="orders.xlsx", rows=[{"交易金额": 100}], actor="pytest"
         )
         order = order_service.create_order(
@@ -300,7 +300,7 @@ class TestHistoryClosure:
             order_type="HS",
             trade_date=date(2026, 10, 4),
             actor="pytest",
-            account_profile={"game_account": "m4-unrelated-history-note"},
+            account_profile={"game_account": "m4-unrelated-source-note"},
         )
         order_service.post_event(
             seeded_db,
@@ -309,28 +309,28 @@ class TestHistoryClosure:
             amount="100",
             occurred_on=date(2026, 10, 4),
             actor="pytest",
-            note="历史订单说明，但不属于导入批次",
+            note="源订单说明，但不属于导入批次",
         )
 
-        report = history_service.reconciliation_report(seeded_db, batch["id"])
+        report = import_service.reconciliation_report(seeded_db, batch["id"])
 
         assert report["funds"]["linked_event_cashflow"] == 0
 
     # ── MIG-01-05 补录依据必填 + 前后状态留存 ──
     def test_mapping_requires_basis(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        row = history_service.list_rows(seeded_db, batch["id"])[0]
+        row = import_service.list_rows(seeded_db, batch["id"])[0]
         with pytest.raises(Exception):
-            history_service.assign_mapping(seeded_db, row["id"], basis="  ", actor="pytest")
+            import_service.assign_mapping(seeded_db, row["id"], basis="  ", actor="pytest")
 
     def test_mapping_keeps_before_snapshot(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        row = history_service.list_rows(seeded_db, batch["id"])[0]
-        mapped = history_service.assign_mapping(
+        row = import_service.list_rows(seeded_db, batch["id"])[0]
+        mapped = import_service.assign_mapping(
             seeded_db, row["id"], account_id=None, order_id=None, basis="无", actor="pytest"
         )
         # 首次指派留存前态：原始状态是 UNMAPPED
@@ -341,12 +341,12 @@ class TestHistoryClosure:
     def test_mark_unlinked_without_pairing(self, seeded_db):
         from app.domain.trade import Cashflow
 
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        row = history_service.list_rows(seeded_db, batch["id"])[0]
+        row = import_service.list_rows(seeded_db, batch["id"])[0]
         flows_before = seeded_db.query(Cashflow).count()
-        marked = history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
+        marked = import_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
         assert marked["unlinked_transfer"] is True
         # 关键红线：打了标记但绝不能凭空补出配对流水
         assert seeded_db.query(Cashflow).count() == flows_before
@@ -354,68 +354,68 @@ class TestHistoryClosure:
         assert marked["issue_note"]
 
     def test_mark_unlinked_is_idempotent(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        row = history_service.list_rows(seeded_db, batch["id"])[0]
-        first = history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
-        second = history_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
+        row = import_service.list_rows(seeded_db, batch["id"])[0]
+        first = import_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
+        second = import_service.mark_unlinked_transfer(seeded_db, row["id"], actor="pytest")
         assert first["issue_note"] == second["issue_note"], "重复标记不得改写留痕"
 
     # ── MIG-01-07 回滚 ──
     def test_rollback_draft_batch(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        rolled = history_service.rollback_batch(
+        rolled = import_service.rollback_batch(
             seeded_db, batch["id"], reason="源文件有误", actor="pytest"
         )
         assert rolled["status"] == "ROLLED_BACK"
         assert rolled["rolled_back_by"] == "pytest"
         assert rolled["rolled_back_at"] is not None
-        rows = history_service.list_rows(seeded_db, batch["id"])
+        rows = import_service.list_rows(seeded_db, batch["id"])
         assert all(r["status"] == ImportRowStatus.ROLLED_BACK.value for r in rows)
 
     def test_rollback_keeps_raw_data(self, seeded_db):
         """回滚不得删除原始行内容（只读保护 + 可追溯）。"""
-        batch = history_service.create_batch(
-            seeded_db, source_name="orders.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        history_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
-        rows = history_service.list_rows(seeded_db, batch["id"])
+        import_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
+        rows = import_service.list_rows(seeded_db, batch["id"])
         assert len(rows) == 3
         assert rows[0]["raw"]["交易金额"] == 13888
 
     def test_rollback_requires_reason(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="o.xlsx", rows=[{"a": 1}], actor="pytest"
         )
         with pytest.raises(Exception):
-            history_service.rollback_batch(seeded_db, batch["id"], reason="", actor="pytest")
+            import_service.rollback_batch(seeded_db, batch["id"], reason="", actor="pytest")
 
     def test_committed_batch_cannot_rollback(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="o.xlsx", rows=[{"a": 1}], actor="pytest"
         )
-        history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
         with pytest.raises(Exception):
-            history_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
+            import_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
 
     def test_rollback_twice_is_rejected(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="o.xlsx", rows=[{"a": 1}], actor="pytest"
         )
-        history_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
+        import_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
         with pytest.raises(Exception):
-            history_service.rollback_batch(seeded_db, batch["id"], reason="y", actor="pytest")
+            import_service.rollback_batch(seeded_db, batch["id"], reason="y", actor="pytest")
 
     # ── MIG-01-08 更正批次 ──
     def test_correction_batch_links_to_origin(self, seeded_db):
-        batch = history_service.create_batch(
-            seeded_db, source_name="o.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="o.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-        correction = history_service.create_correction_batch(
+        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        correction = import_service.create_correction_batch(
             seeded_db,
             batch["id"],
             rows=[{"日期": "2026/07/14", "交易金额": 13888, "利润": 400}],
@@ -427,41 +427,41 @@ class TestHistoryClosure:
 
     def test_correction_does_not_touch_origin_rows(self, seeded_db):
         """只读保护：更正批次不得改动原批次的原始行。"""
-        batch = history_service.create_batch(
-            seeded_db, source_name="o.xlsx", rows=self._legacy_rows(), actor="pytest"
+        batch = import_service.create_batch(
+            seeded_db, source_name="o.xlsx", rows=self._source_rows(), actor="pytest"
         )
-        history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-        origin_rows_before = history_service.list_rows(seeded_db, batch["id"])
-        history_service.create_correction_batch(
+        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        origin_rows_before = import_service.list_rows(seeded_db, batch["id"])
+        import_service.create_correction_batch(
             seeded_db,
             batch["id"],
             rows=[{"交易金额": 1}],
             reason="更正",
             actor="pytest",
         )
-        assert history_service.list_rows(seeded_db, batch["id"]) == origin_rows_before
+        assert import_service.list_rows(seeded_db, batch["id"]) == origin_rows_before
 
     def test_correction_requires_reason_and_rows(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="o.xlsx", rows=[{"a": 1}], actor="pytest"
         )
-        history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
         with pytest.raises(Exception):
-            history_service.create_correction_batch(
+            import_service.create_correction_batch(
                 seeded_db, batch["id"], rows=[{"a": 1}], reason="", actor="pytest"
             )
         with pytest.raises(Exception):
-            history_service.create_correction_batch(
+            import_service.create_correction_batch(
                 seeded_db, batch["id"], rows=[], reason="r", actor="pytest"
             )
 
     def test_rolled_back_batch_cannot_be_corrected(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="o.xlsx", rows=[{"a": 1}], actor="pytest"
         )
-        history_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
+        import_service.rollback_batch(seeded_db, batch["id"], reason="x", actor="pytest")
         with pytest.raises(Exception):
-            history_service.create_correction_batch(
+            import_service.create_correction_batch(
                 seeded_db, batch["id"], rows=[{"a": 2}], reason="r", actor="pytest"
             )
 
@@ -495,7 +495,7 @@ class TestEnumConstraintDrift:
     def test_every_row_status_passes_db_check(self, seeded_db):
         from app.domain.enums import ImportRowStatus
 
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db, source_name="probe.xlsx", rows=[{"a": 1}], actor="pytest"
         )
         for row_no, status in enumerate(ImportRowStatus, start=2):

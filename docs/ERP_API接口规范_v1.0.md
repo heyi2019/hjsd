@@ -2,7 +2,7 @@
 
 > 基础路径：`/api/v1`。金额以字符串传输，如 `"1234.50"`；时间使用 ISO 日期；所有写接口由 Service 事务执行。
 
-> **实现优先级**：接口必须先满足 PRD 与功能规格。历史导入属于 P2，不得为兼容旧数据改变新单请求结构、状态机或核算规则。
+> **实现优先级**：接口必须先满足 PRD 与功能规格。导入属于 P2，不得为兼容旧数据改变新单请求结构、状态机或核算规则。
 
 ## 1. 公共约定
 
@@ -37,7 +37,7 @@
 | 附件 | GET `/attachments`、POST `/attachments`、GET `/attachments/{id}/download`、DELETE `/attachments/{id}` | 关联订单、事件、资金、分期或质量异常；Base64 内容最大 20MB；删除为软删除并保留审计 |
 | 活字段 | GET/POST `/field-definitions`，PATCH `/field-definitions/{id}`、`/field-definitions/{id}/active`，DELETE `/field-definitions/{id}` | 定义、编辑、停用、排序；键/实体/类型不可改，有历史值的字段不可删除 |
 | 经营规则 | GET/POST `/policies`，GET `/policies/{id}/versions`，POST `/policies/{id}/versions`，PATCH/POST `/policy-versions/{id}`、`/approve` | 规则版本、审批、快照与多人利润分配；订单分配使用 `/orders/{id}/profit-allocations` |
-| 历史导入 | POST/GET `/imports/batches`，GET `/imports/batches/{id}/rows|preview|reconciliation`，POST 映射、跳过、提交、回滚、更正 | P2 标准导入与复核，不改变新单模型 |
+| 导入 | POST/GET `/imports/batches`，GET `/imports/batches/{id}/rows|preview|reconciliation`，POST 映射、跳过、提交、回滚、更正 | P2 标准导入与复核，不改变新单模型 |
 | 审计 | GET `/audit-logs`、`/audit-logs/actions` | 按对象、人员、日期查询受控操作记录 |
 
 ## 3. 关键请求

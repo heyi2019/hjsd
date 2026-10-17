@@ -11,7 +11,7 @@ app/
 ├── orders/           # 订单、事件、编号
 ├── accounts/         # 账号库存和成本
 ├── installments/     # 分期合约与收款
-├── history/          # 历史数据导入、映射、对账与迁移审计
+├── imports/          # 导入、映射、对账与审计
 ├── quality/          # 数据质量扫描与异常检查
 ├── reporting/        # 只读报表
 ├── auth/             # 登录、令牌与用户认证
@@ -22,4 +22,4 @@ app/
 
 每个业务领域通常由 `router.py`、`service.py`、`schemas.py` 和测试组成；写路径统一经过 Service 事务和审计记录。
 
-返点记录、返点结算属于资金域，由 `finance` 统一维护，不再保留独立运行域；历史导入与迁移审计属于 `history`，数据质量检查属于 `quality`。
+返点记录、返点结算属于资金域，由 `finance` 统一维护，不再保留独立运行域；导入与对账属于 `imports`，数据质量检查属于 `quality`。

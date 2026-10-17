@@ -1,6 +1,6 @@
 """把 rawdata/原始数据/ 的 5 份金山文档导出 JSON 落成 import_batches/import_rows。
 
-对应「历史数据导入映射草案 v0.1」的实施顺序第 1 步：**只落原始行，不做任何字段推断、
+对应「数据导入映射草案 v0.1」的实施顺序第 1 步：**只落原始行，不做任何字段推断、
 不自动匹配、不生成任何业务实体**。后续映射由人工在页面指派（assign_mapping），
 或由 commit_batch 在口径裁决后执行。
 
@@ -13,14 +13,14 @@
    理由是业务口径——v1 的 26 张表没有任何列能承载游戏账号登录凭据，
    写进 `import_rows.raw` 等于把凭据复制进一个新系统。
 3. **原始值逐字保留**：`房租/日用` 这类类别值原样写入 `raw`，
-   不做任何归一化或改写（历史上写成「房租日用」曾导致 ¥11,989.90 漏计）。
+   不做任何归一化或改写（曾写成「房租日用」会导致 ¥11,989.90 漏计）。
 
 用法：
 ```bash
 cd backend
-python3 scripts/land_raw_history.py               # 落地全部 5 份
-python3 scripts/land_raw_history.py --dry-run     # 只报告不写库
-python3 scripts/land_raw_history.py --only sheet9_orders
+python3 scripts/land_raw_import.py               # 落地全部 5 份
+python3 scripts/land_raw_import.py --dry-run     # 只报告不写库
+python3 scripts/land_raw_import.py --only sheet9_orders
 ```
 
 脚本幂等：同一份文件重复执行不会产生重复批次（按 source_name 查重）。
@@ -119,13 +119,13 @@ def _load(stem: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
 
 
 def _existing_batches(session: Any) -> set[str]:
-    from app.domain.history import ImportBatch
+    from app.domain.imports import ImportBatch
 
     return {row.source_name for row in session.query(ImportBatch).all()}
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="把历史 JSON 落成 import_rows（只存原文，零推断）")
+    parser = argparse.ArgumentParser(description="把源 JSON 落成 import_rows（只存原文，零推断）")
     parser.add_argument("--dry-run", action="store_true", help="只报告不写库")
     parser.add_argument("--only", help=f"只处理指定文件，逗号分隔。可选：{', '.join(SOURCE_FILES)}")
     args = parser.parse_args()
@@ -165,7 +165,7 @@ def main() -> int:
         return 0
 
     from app.core.database import get_session_factory
-    from app.history import service as history_service
+    from app.imports import service as import_service
 
     session = get_session_factory()()
     try:
@@ -177,13 +177,13 @@ def main() -> int:
                 print(f"  跳过 {stem}：批次「{source_name}」已存在（幂等）")
                 skipped += 1
                 continue
-            batch = history_service.create_batch(
+            batch = import_service.create_batch(
                 session,
                 source_name=source_name,
                 rows=rows,
                 source_kind=source_kind,
-                actor="land_raw_history",
-                note=f"由 land_raw_history.py 从 {stem}.json 落地；仅存原文，凭据字段已脱敏",
+                actor="land_raw_import",
+                note=f"由 land_raw_import.py 从 {stem}.json 落地；仅存原文，凭据字段已脱敏",
             )
             print(f"  落地 {stem}：批次 {batch['batch_no']}（{batch['id']}）")
             created += 1

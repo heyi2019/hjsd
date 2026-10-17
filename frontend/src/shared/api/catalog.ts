@@ -695,8 +695,8 @@ export const auditApi = {
   actions: () => api.get<{ items: string[] }>("/audit-logs/actions").then((r) => r.data.items),
 };
 
-/* ── M4 补齐：P2 历史参考导入（MIG-01）───────────────────────
- * 红线：只落原始行 + 人工映射，系统绝不自动匹配、绝不补造历史划转。 */
+/* ── M4 补齐：标准导入（MIG-01）──────────────────────────────
+ * 红线：只落原始行 + 人工映射，系统绝不自动匹配、绝不补造单边划转。 */
 
 export interface ImportBatch {
   id: number;
@@ -774,7 +774,7 @@ export interface ReconciliationReport {
   requires_adjudication: boolean;
 }
 
-export const historyApi = {
+export const importsApi = {
   batches: () => api.get<{ items: ImportBatch[]; total: number }>("/imports/batches").then((r) => r.data),
   createBatch: (payload: { source_name: string; rows: Record<string, unknown>[]; source_kind?: string; note?: string }) =>
     api.post<ImportBatch>("/imports/batches", payload).then((r) => r.data),

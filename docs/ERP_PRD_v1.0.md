@@ -732,7 +732,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 ### 3.7 历史参考映射：源数据 → 双池模型
 
-> 本表只规定历史资料进入参考区时的归类方式，不是新业务录入的字段来源；新单必须按第 1、2 章和功能规格直接录入。
+> 本表只规定导入资料进入参考区时的归类方式，不是新业务录入的字段来源；新单必须按第 1、2 章和功能规格直接录入。
 
 | 源数据「类别」 | 目标 `nature` | 目标 `pool_id` |
 |---|---|---|
@@ -1153,7 +1153,7 @@ backend/app/
 | Q21 | 返点结算周期是多久？（成单即到账 / 月结 / 季度结） | 决定 `settled_on` 与 `trade_date` 的正常间隔，影响现金流预测 |
 | Q22 | 代挂里4 单混合单（本金非 0，合计 19,674）该归 `HS` 还是保留 `DG` 但标 `STOCK`？ | 影响库存占用是否重复计算 |
 
-> **v1.0 开发默认处理（不等待口头裁决）**：Q1/Q3/Q5/Q6/Q7/Q9/Q10/Q15/Q21 通过版本化经营规则或订单级快照处理；Q2/Q4/Q14/Q18 仅影响历史迁移，统一保留参考状态且不自动补账；Q8 同时保留 R2 经营损益和 R5 业务收益，不强行选其一；Q11 已改为 `counterparties` P0 主数据；Q12 订单合约必须选择 `delivery_mode=PLATFORM_OPERATOR/CUSTOMER_SELF` 并留凭证；Q13 代挂必须选择 `commission_mode=DEDUCT_FROM_SETTLEMENT/SEPARATE_PAYMENT` 与 `commission_payer=BUYER/CONSIGNOR/PLATFORM`；Q17 为 P1 的 `pool_accounts` 能力；Q19 为 P1 重复手机号提示；Q22 按 DG 混合单政策版本 + 管理员审批确定资本性质。所有默认处理均可后续通过规则版本或迁移裁决调整，且不重写已发生事实。
+> **v1.0 开发默认处理（不等待口头裁决）**：Q1/Q3/Q5/Q6/Q7/Q9/Q10/Q15/Q21 通过版本化经营规则或订单级快照处理；Q2/Q4/Q14/Q18 仅影响数据导入，统一保留参考状态且不自动补账；Q8 同时保留 R2 经营损益和 R5 业务收益，不强行选其一；Q11 已改为 `counterparties` P0 主数据；Q12 订单合约必须选择 `delivery_mode=PLATFORM_OPERATOR/CUSTOMER_SELF` 并留凭证；Q13 代挂必须选择 `commission_mode=DEDUCT_FROM_SETTLEMENT/SEPARATE_PAYMENT` 与 `commission_payer=BUYER/CONSIGNOR/PLATFORM`；Q17 为 P1 的 `pool_accounts` 能力；Q19 为 P1 重复手机号提示；Q22 按 DG 混合单政策版本 + 管理员审批确定资本性质。所有默认处理均可后续通过规则版本或迁移裁决调整，且不重写已发生事实。
 
 ---
 

@@ -1,6 +1,6 @@
-"""history 历史导入契约测试（MIG-01 守卫分支）。
+"""导入契约测试（MIG-01 守卫分支）。
 
-与 test_m4.py / test_history_mapping.py / test_history_landing.py 的分工：
+与 test_m4.py / test_import_mapping.py / test_import_landing.py 的分工：
 既有文件已覆盖建批、映射依据必填、前态留存、提交转未映射留痕、
 预览/对账主路径、回滚与更正主路径；本文件补各函数的 NotFound/空入参守卫、
 `list_batches`、跳过行、提交时 SKIPPED 跳过、
@@ -14,8 +14,8 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus, ImportSourceKind
 from app.domain.foundation import AuditLog
-from app.domain.history import ImportBatch, ImportRow
-from app.history import service
+from app.domain.imports import ImportBatch, ImportRow
+from app.imports import service
 
 ROWS = [
     {"日期": "2026/07/14", "交易金额": 13888, "利润": 429, "订单类型": "代挂", "本金": 0},
@@ -23,7 +23,7 @@ ROWS = [
 ]
 
 
-def test_history_routes_publish_typed_response_models(app):
+def test_import_routes_publish_typed_response_models(app):
     paths = app.openapi()["paths"]
 
     assert paths["/api/v1/imports/batches"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
@@ -169,20 +169,20 @@ class TestAssignMappingGuards:
             service.assign_mapping(
                 seeded_db, row_id, order_id=order.id, basis="改一次", actor="pytest"
             )
-        assert "已导入的历史行不可再改映射" in str(exc.value)
+        assert "已导入的导入行不可再改映射" in str(exc.value)
 
     def test_committed_unmapped_row_is_read_only(self, seeded_db):
         batch = _batch(seeded_db, rows=[{"订单号": "待人工确认"}])
         row_id = _first_row_id(seeded_db, batch["id"])
         service.commit_batch(seeded_db, batch["id"], actor="pytest")
 
-        with pytest.raises(Validation, match="已确认批次的历史行不可修改"):
+        with pytest.raises(Validation, match="已确认批次的导入行不可修改"):
             service.assign_mapping(
                 seeded_db, row_id, basis="提交后补录", actor="pytest"
             )
-        with pytest.raises(Validation, match="已确认批次的历史行不可修改"):
+        with pytest.raises(Validation, match="已确认批次的导入行不可修改"):
             service.skip_row(seeded_db, row_id, reason="提交后跳过", actor="pytest")
-        with pytest.raises(Validation, match="已确认批次的历史行不可修改"):
+        with pytest.raises(Validation, match="已确认批次的导入行不可修改"):
             service.mark_unlinked_transfer(seeded_db, row_id, actor="pytest")
 
     def test_unknown_order_rejected(self, seeded_db):
@@ -211,7 +211,7 @@ class TestSkipRow:
         row_id = _first_row_id(seeded_db, batch["id"])
         with pytest.raises(Validation) as exc:
             service.skip_row(seeded_db, row_id, reason="  ", actor="pytest")
-        assert "跳过历史行必须填写理由" in str(exc.value)
+        assert "跳过导入行必须填写理由" in str(exc.value)
 
     def test_row_notfound(self, seeded_db):
         with pytest.raises(NotFound):
@@ -243,7 +243,7 @@ class TestSkipRow:
         )
         service.commit_batch(seeded_db, batch["id"], actor="pytest")
 
-        with pytest.raises(Validation, match="已导入的历史行不可跳过"):
+        with pytest.raises(Validation, match="已导入的导入行不可跳过"):
             service.skip_row(seeded_db, row_id, reason="再次核对", actor="pytest")
 
         row = seeded_db.get(ImportRow, row_id)
@@ -419,7 +419,7 @@ class TestImportApi:
             json={
                 "source_name": "strict.xlsx",
                 "rows": [{"a": 1}],
-                "legacy_field": "must not be ignored",
+                "source_field": "must not be ignored",
             },
             headers=headers,
         )
@@ -501,7 +501,3 @@ class TestImportApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["corrects_batch_id"] == batch["id"]
-
-    def test_legacy_history_path_is_not_exposed(self, seeded_client, headers):
-        response = seeded_client.get("/api/v1/history/batches", headers=headers)
-        assert response.status_code == 404

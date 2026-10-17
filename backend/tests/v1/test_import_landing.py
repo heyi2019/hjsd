@@ -1,6 +1,6 @@
-"""历史导入的脱敏与「只落原文」红线测试（MIG-01）。
+"""导入的脱敏与「只落原文」红线测试（MIG-01）。
 
-这些用例守护的是 PRD §23 与历史回归锁死项，**不是**覆盖率：
+这些用例守护的是 PRD §23 与导入回归锁死项，**不是**覆盖率：
 删掉脱敏逻辑，测试必须变红。
 """
 
@@ -14,13 +14,13 @@ from pathlib import Path
 import pytest
 
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus
-from app.history import service as history_service
+from app.imports import service as import_service
 
 
 def _load_script():
-    """按路径加载 scripts/land_raw_history.py（脚本目录不在包内）。"""
-    path = Path(__file__).resolve().parents[2] / "scripts" / "land_raw_history.py"
-    spec = importlib.util.spec_from_file_location("land_raw_history", path)
+    """按路径加载 scripts/land_raw_import.py（脚本目录不在包内）。"""
+    path = Path(__file__).resolve().parents[2] / "scripts" / "land_raw_import.py"
+    spec = importlib.util.spec_from_file_location("land_raw_import", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -115,7 +115,7 @@ class TestNoInference:
     """落地只写原文，绝不推断或自动匹配。"""
 
     def test_create_batch_writes_no_mapping(self, seeded_db):
-        batch = history_service.create_batch(
+        batch = import_service.create_batch(
             seeded_db,
             source_name="测试批次",
             rows=[{"日期": "2026-01-01", "本金": 100}],
@@ -125,7 +125,7 @@ class TestNoInference:
         assert batch["unmapped_count"] == 1
         assert batch["status"] == ImportBatchStatus.DRAFT.value
 
-        from app.domain.history import ImportRow
+        from app.domain.imports import ImportRow
 
         row = seeded_db.query(ImportRow).filter_by(batch_id=batch["id"]).one()
         assert row.status == ImportRowStatus.UNMAPPED.value
@@ -134,7 +134,7 @@ class TestNoInference:
 
     def test_land_audit_uses_dedicated_action(self, seeded_db):
         """导入审计不得借用 EXCEPTION_APPROVE（否则日志被误读为异常审批）。"""
-        history_service.create_batch(
+        import_service.create_batch(
             seeded_db,
             source_name="审计动作测试",
             rows=[{"日期": "2026-01-01"}],
@@ -159,9 +159,9 @@ class TestIdempotency:
         src.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
 
-        from app.domain.history import ImportBatch
+        from app.domain.imports import ImportBatch
 
-        history_service.create_batch(
+        import_service.create_batch(
             seeded_db,
             source_name=lander.SOURCE_FILES["sheet9_orders"][1],
             rows=[{"日期": "2026-01-01"}],

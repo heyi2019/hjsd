@@ -1,4 +1,4 @@
-"""history.service：P2 标准导入（MIG-01）。
+"""imports.service：标准导入（MIG-01）。
 
 红线（开发任务清单「阻断规则」）：
 1. **禁止自动匹配**订单/账号/返点 —— 映射只能由人工指派 `assign_mapping`；
@@ -25,7 +25,7 @@ from app.domain.enums import (
     ImportSourceKind,
     SequenceKey,
 )
-from app.domain.history import ImportBatch, ImportRow
+from app.domain.imports import ImportBatch, ImportRow
 from app.domain.trade import Account, Order
 
 
@@ -55,7 +55,7 @@ def _assert_batch_editable(session: Session, batch_id: int) -> ImportBatch:
         ImportBatchStatus.MAPPED.value,
     }:
         raise Validation(
-            "已确认批次的历史行不可修改，请使用更正批次",
+            "已确认批次的导入行不可修改，请使用更正批次",
             details={"batch_id": batch.id, "status": batch.status},
         )
     return batch
@@ -197,7 +197,7 @@ def assign_mapping(
     if row is None:
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
     if row.status == ImportRowStatus.IMPORTED.value:
-        raise Validation("已导入的历史行不可再改映射", details={"row_id": row_id})
+        raise Validation("已导入的导入行不可再改映射", details={"row_id": row_id})
     _assert_batch_editable(session, row.batch_id)
     order_id = _validate_optional_id(order_id, field="订单")
     account_id = _validate_optional_id(account_id, field="账号")
@@ -252,18 +252,18 @@ def skip_row(
     session: Session, row_id: int, *, reason: str, actor: str = "system"
 ) -> dict[str, Any]:
     text = _required_text(
-        reason, field="reason", message="跳过历史行必须填写理由"
+        reason, field="reason", message="跳过导入行必须填写理由"
     )
     row = session.get(ImportRow, row_id)
     if row is None:
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
     if row.status == ImportRowStatus.IMPORTED.value:
         raise Validation(
-            "已导入的历史行不可跳过", details={"row_id": row_id}
+            "已导入的导入行不可跳过", details={"row_id": row_id}
         )
     if row.status == ImportRowStatus.ROLLED_BACK.value:
         raise Validation(
-            "已回滚的历史行不可跳过", details={"row_id": row_id}
+            "已回滚的导入行不可跳过", details={"row_id": row_id}
         )
     _assert_batch_editable(session, row.batch_id)
     before = {"status": row.status, "issue_note": row.issue_note}
@@ -287,7 +287,7 @@ def skip_row(
 def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> dict[str, Any]:
     """提交批次：已映射行标记 IMPORTED；未映射行生成导入异常（不阻塞）。
 
-    这里**不写任何业务数据**——历史只作为参考记录与回归样本。
+    这里**不写任何业务数据**——导入行只作为参考记录与回归样本。
     """
     batch = session.get(ImportBatch, batch_id)
     if batch is None:
@@ -317,7 +317,7 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
         else:
             row.status = ImportRowStatus.UNMAPPED.value
             unmapped += 1
-            row.issue_note = row.issue_note or f"历史行未映射：{batch.source_name} 第 {row.row_no} 行"
+            row.issue_note = row.issue_note or f"导入行未映射：{batch.source_name} 第 {row.row_no} 行"
 
     batch.status = ImportBatchStatus.COMMITTED.value
     batch.committed_at = datetime.now()
@@ -356,7 +356,7 @@ def mark_unlinked_transfer(
     actor: str = "system",
     note: str | None = None,
 ) -> dict[str, Any]:
-    """MIG-01-06：标记「历史单边划转未裁决」。
+    """MIG-01-06：标记「单边划转未裁决」。
 
     红线：只打标记 + 留痕，**绝不生成配对流水**。Q14 类未裁决记录
     必须在系统里可见（row.issue_note），但不得凭空补出对手方。
@@ -370,7 +370,7 @@ def mark_unlinked_transfer(
 
     before = {"unlinked_transfer": False, "issue_note": row.issue_note}
     row.unlinked_transfer = True
-    row.issue_note = note or row.issue_note or "历史单边划转未裁决：已标记，不自动配对"
+    row.issue_note = note or row.issue_note or "单边划转未裁决：已标记，不自动配对"
     session.flush()
 
     record_audit(
@@ -481,14 +481,14 @@ def preview_mapping(
     }
 
 
-# ── MIG-01-04 迁移对账报告 ────────────────────────────────────
+# ── MIG-01-04 导入对账报告 ────────────────────────────────────
 
-# 源文件里表示金额的列（用于汇总迁移前后差异）
+# 源文件里表示金额的列（用于汇总导入前后差异）
 _AMOUNT_KEYS = ("交易金额", "本金", "利润", "amount", "principal", "profit")
 
 
 def _raw_amount_sum(rows: list[ImportRow]) -> dict[str, str]:
-    """按源列汇总原始金额。历史文件里「利润/本金/交易金额」各自独立，不能混算。"""
+    """按源列汇总原始金额。源文件里「利润/本金/交易金额」各自独立，不能混算。"""
     from app.core.money import to_money
 
     totals: dict[str, Decimal] = {}
@@ -508,9 +508,9 @@ def _raw_amount_sum(rows: list[ImportRow]) -> dict[str, str]:
 
 
 def reconciliation_report(session: Session, batch_id: int) -> dict[str, Any]:
-    """MIG-01-04：迁移前后对账（行数 / 金额 / 池余额 / 损益 / 权益）。
+    """MIG-01-04：导入前后对账（行数 / 金额 / 池余额 / 损益 / 权益）。
 
-    关键约束：历史导入**不写任何业务数据**，所以「迁移后」侧的
+    关键约束：导入**不写任何业务数据**，所以「导入后」侧的
     池余额/损益/权益只应反映本批次带来的**参考映射**，不产生资金变动。
     差异不为零时必须裁决或阻断上线。
     """
@@ -530,7 +530,7 @@ def reconciliation_report(session: Session, batch_id: int) -> dict[str, Any]:
     before_amounts = _raw_amount_sum(rows)
     after_amounts = _raw_amount_sum(imported)
 
-    # 历史模块没有业务流水外键，也不写 order_event/cashflow；
+    # 导入模块没有业务流水外键，也不写 order_event/cashflow；
     # 不能用全库备注文本推断本批次是否写入资金，否则会把无关订单误报为本批次结果。
     linked_flows = 0
 
@@ -563,13 +563,13 @@ def reconciliation_report(session: Session, batch_id: int) -> dict[str, Any]:
         "funds": {
             "cashflow_written": 0,
             "linked_event_cashflow": linked_flows,
-            "note": "历史导入不写任何现金流，池余额/损益/权益迁移前后必须一致",
+            "note": "导入不写任何现金流，池余额/损益/权益导入前后必须一致",
         },
         "requires_adjudication": bool(unlinked or unmapped or diff_rows != 0),
     }
 
 
-# ── MIG-01-07 迁移回滚 / MIG-01-08 更正批次 ───────────────────
+# ── MIG-01-07 导入回滚 / MIG-01-08 更正批次 ───────────────────
 
 def rollback_batch(
     session: Session, batch_id: int, *, reason: str, actor: str = "system"

@@ -1,16 +1,16 @@
-/** 历史迁移工作台（MIG-01）：导入 → 映射预览 → 人工指派 → 对账 → 提交 / 回滚 / 更正。
+/** 导入工作台（MIG-01）：导入 → 映射预览 → 人工指派 → 对账 → 提交 / 回滚 / 更正。
  *
  * 页面必须持续强调的红线（对应任务清单「阻断规则」）：
- * - 历史行只作参考，**不覆盖新单**
+ * - 导入行只作参考，**不覆盖新单**
  * - 系统**不做自动匹配**，映射必须人工指派且留依据
- * - **不补造历史单边划转**，未裁决的只打 UNLINKED_TRANSFER 标记
+ * - **不补造单边划转**，未裁决的只打 UNLINKED_TRANSFER 标记
  */
 import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, Upload, message } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
-  historyApi,
+  importsApi,
   type ImportBatch,
   type ImportRow,
   type MappingPreview,
@@ -31,7 +31,7 @@ import {
 
 /** 嵌入模式：作为「设置」页内的 Tab 渲染时，不再重复输出 PageHeader 大标题，
  *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
-const RED_LINE_DESC = "历史数据仅作参考与回归样本：不覆盖新单、不自动匹配、不补造历史划转。";
+const RED_LINE_DESC = "导入数据只保留原文与人工映射：不覆盖新单、不自动匹配、不补造单边划转。";
 
 function parseImportText(text: string, filename: string): Record<string, unknown>[] {
   if (filename.toLowerCase().endsWith(".json")) {
@@ -80,7 +80,7 @@ function downloadImportTemplate(sourceKind: string) {
   URL.revokeObjectURL(url);
 }
 
-export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
+export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchId, setBatchId] = useState<number | null>(null);
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -102,7 +102,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
 
   const loadBatches = useCallback(async () => {
     try {
-      const data = await historyApi.batches();
+      const data = await importsApi.batches();
       setBatches(data.items);
       setBatchId((prev) => prev ?? data.items[0]?.id ?? null);
       setError(null);
@@ -125,9 +125,9 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
     setLoading(true);
     try {
       const [rowData, previewData, reportData] = await Promise.all([
-        historyApi.rows(batchId),
-        historyApi.preview(batchId),
-        historyApi.reconciliation(batchId),
+        importsApi.rows(batchId),
+        importsApi.preview(batchId),
+        importsApi.reconciliation(batchId),
       ]);
       setRows(rowData.items);
       setPreview(previewData);
@@ -236,7 +236,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
         新建导入
       </PermissionButton>
       <Select
-        className="ui-control-width-history"
+        className="ui-control-width-import"
         value={batchId ?? undefined}
         placeholder="选择导入批次"
         options={batches.map((b) => ({
@@ -250,7 +250,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
         type="primary"
         loading={acting}
         disabled={!canRollback}
-        onClick={() => current && act(() => historyApi.commit(current.id))}
+        onClick={() => current && act(() => importsApi.commit(current.id))}
       >
         确认批次
       </PermissionButton>
@@ -273,7 +273,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           {headerActions}
         </>
       ) : (
-        <PageHeader title="历史迁移工作台" description={RED_LINE_DESC} actions={headerActions} />
+        <PageHeader title="导入工作台" description={RED_LINE_DESC} actions={headerActions} />
       )}
 
       <ErrorBanner error={error} />
@@ -301,7 +301,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
             key: "rows",
             label: "原始行与指派",
             children: (
-              <Card className="glass" title="历史原始行">
+              <Card className="glass" title="导入原始行">
                 <Typography.Paragraph type="secondary">
                   映射只能人工指派且必须留依据；系统不提供任何候选推断。
                 </Typography.Paragraph>
@@ -368,12 +368,12 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           },
           {
             key: "recon",
-            label: "迁移对账",
+            label: "导入对账",
             children: (
-              <Card className="glass" title="迁移前后对账报告">
+              <Card className="glass" title="导入前后对账报告">
                 <Typography.Paragraph type="secondary">
                   {report?.funds.note ??
-                    "历史导入不写任何现金流，池余额/损益/权益迁移前后必须一致。"}
+                    "导入不写任何现金流，池余额/损益/权益导入前后必须一致。"}
                 </Typography.Paragraph>
                 {report ? (
                   <>
@@ -397,7 +397,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
                       columns={[
                         { title: "金额项", dataIndex: "key", width: 160 },
                         {
-                          title: "迁移前",
+                          title: "导入前",
                           dataIndex: "before",
                           align: "right",
                           render: (v: Record<string, string>, row) => (
@@ -405,7 +405,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
                           ),
                         },
                         {
-                          title: "迁移后",
+                          title: "导入后",
                           dataIndex: "after",
                           align: "right",
                           render: (_v: unknown, row) => <MoneyText value={row.after} />,
@@ -462,7 +462,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           const accountId =
             values.account_id === undefined || values.account_id === null ? null : Number(values.account_id);
           void act(async () => {
-            await historyApi.map(target.id, { order_id: orderId, account_id: accountId, basis });
+            await importsApi.map(target.id, { order_id: orderId, account_id: accountId, basis });
             setMapTarget(null);
           });
         }}
@@ -470,7 +470,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
 
       <Modal
         open={importOpen}
-        title="导入历史数据"
+        title="导入导入数据"
         okText="开始导入"
         cancelText="取消"
         confirmLoading={importing}
@@ -490,7 +490,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
             try {
               const text = await importFile.originFileObj.text();
               const rows = parseImportText(text, importFile.name);
-              const created = await historyApi.createBatch({
+              const created = await importsApi.createBatch({
                 source_name: String(values.source_name),
                 source_kind: String(values.source_kind),
                 rows,
@@ -561,7 +561,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           const target = unlinkedTarget;
           if (!target) return;
           void act(async () => {
-            await historyApi.markUnlinked(target.id, values.note ? String(values.note) : undefined);
+            await importsApi.markUnlinked(target.id, values.note ? String(values.note) : undefined);
             setUnlinkedTarget(null);
           });
         }}
@@ -582,7 +582,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           const target = skipTarget;
           if (!target) return;
           void act(async () => {
-            await historyApi.skip(target.id, String(values.reason ?? ""));
+            await importsApi.skip(target.id, String(values.reason ?? ""));
             setSkipTarget(null);
           });
         }}
@@ -598,7 +598,7 @@ export function HistoryWorkbench({ embedded = false }: { embedded?: boolean }) {
           const target = rollbackTarget;
           if (!target) return;
           void act(async () => {
-            await historyApi.rollback(target.id, String(values.reason ?? ""));
+            await importsApi.rollback(target.id, String(values.reason ?? ""));
             setRollbackTarget(null);
           });
         }}

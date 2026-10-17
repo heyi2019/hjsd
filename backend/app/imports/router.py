@@ -1,4 +1,4 @@
-"""history.router：P2 标准导入（MIG-01，只读参考 + 人工映射）。"""
+"""imports.router：标准导入（MIG-01，只读原始行 + 人工映射）。"""
 from __future__ import annotations
 
 from typing import Annotated
@@ -12,7 +12,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.history import schemas, service
+from app.imports import schemas, service
 
 router = APIRouter(tags=["imports"])
 import_access = require_permissions(PERM_IMPORT_MANAGE)
@@ -126,7 +126,7 @@ def reconciliation(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> schemas.ImportReconciliationOut:
-    """MIG-01-04 迁移对账报告：行数 / 金额 / 资金侧前后差异。"""
+    """MIG-01-04 导入对账报告：行数 / 金额 / 资金侧前后差异。"""
     return schemas.ImportReconciliationOut.model_validate(
         service.reconciliation_report(db, batch_id)
     )
@@ -142,7 +142,7 @@ def mark_unlinked(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> schemas.ImportRowOut:
-    """MIG-01-06 标记历史单边划转未裁决。只打标记 + 开工单，绝不补造配对流水。"""
+    """MIG-01-06 标记单边划转未裁决。只打标记 + 开工单，绝不补造配对流水。"""
     return schemas.ImportRowOut.model_validate(
         service.mark_unlinked_transfer(
             db, row_id, note=payload.note, actor=user.username

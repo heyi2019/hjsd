@@ -1,4 +1,4 @@
-"""history 请求契约：标准导入与人工映射。"""
+"""imports 请求契约：标准导入与人工映射。"""
 from __future__ import annotations
 
 from typing import Any

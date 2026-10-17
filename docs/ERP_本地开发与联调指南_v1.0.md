@@ -60,7 +60,7 @@ cd frontend && npm run check && npm run build
 
 ## 4. 数据与迁移纪律
 
-- 新业务库与旧 `heijin.db` 分离；历史导入是 P2，只能写参考记录。
+- 新业务库与旧 `heijin.db` 分离；导入是 P2，只能写参考记录。
 - 金额全程 `Decimal` / `DECIMAL(18,2)`，禁止 float。
 - 任何写入必须走 Service 事务，写审计，并在失败时整体回滚。
 - 禁止手工修改余额、补造划转另一边或自动匹配历史关系。

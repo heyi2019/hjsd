@@ -5,17 +5,17 @@ import { type Page, type Locator } from "@playwright/test";
  *
  * 设计要点（来自组件测试的踩坑经验）：
  *  - 列表类接口（orders / pools / customers / accounts / funds / installments /
- *    rebates / history/batches / history/rows）返回 `{ items: [], total: 0 }`，
+ *    rebates / imports/batches / imports/rows）返回 `{ items: [], total: 0 }`，
  *    让页面走正常空态渲染，而不是因缺字段崩溃。
- *  - 对象类接口（reports / history/reconciliation / policy /
+ *  - 对象类接口（reports / imports/reconciliation / policy /
  *    audit）返回 `{ items: [], total: 0, result: {}, data: {} }` 兜底，
  *    避免读深层字段（如 reconciliation.funds.note）时抛 undefined。
  *
- * E2E 不激活会崩的 Tab（如历史迁移的「迁移对账」），所以即便 stub 不完整也不会触发深层字段求值。
+ * E2E 不激活会崩的 Tab（如导入对账），所以即便 stub 不完整也不会触发深层字段求值。
  */
 const OBJECT_PATHS = [
   "/reports/",
-  "/history/reconciliation",
+  "/imports/batches/1/reconciliation",
   "/policy",
   "/audit",
 ];

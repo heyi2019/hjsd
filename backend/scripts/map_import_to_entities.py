@@ -1,4 +1,4 @@
-"""把已落地的历史原始行映射为 v1 正式实体（导入第 2/3 步）。
+"""把已落地的导入原始行映射为 v1 正式实体（导入第 2/3 步）。
 
 只做**口径已明确**的部分，对「需要业务裁决」的类别一律拒绝导入并说明原因，
 绝不猜测补齐（PRD §23：禁止自动匹配、不得要求开发猜测补齐）。
@@ -42,8 +42,8 @@
 用法：
 ```bash
 cd backend
-python3 scripts/map_history_to_entities.py --dry-run
-python3 scripts/map_history_to_entities.py --only orders
+python3 scripts/map_import_to_entities.py --dry-run
+python3 scripts/map_import_to_entities.py --only orders
 ```
 
 幂等：已 MAPPED 的行跳过；已存在同 source_name 批次的订单不重复生成。
@@ -72,7 +72,7 @@ from app.domain.enums import (  # noqa: E402
     OrderStatus,
     Portion,
 )
-from app.history import service as history_service  # noqa: E402
+from app.imports import service as import_service  # noqa: E402
 from app.orders import service as order_service  # noqa: E402
 
 # 源「订单类型」→ v1 order_type_defs.code
@@ -108,7 +108,7 @@ CASHFLOW_CATEGORY_NATURE: dict[str, str] = {
     "房租/日用": "BUSINESS_OUT",
 }
 
-ACTOR = "map_history"
+ACTOR = "map_import"
 
 
 def _num(value: Any) -> Decimal:
@@ -141,7 +141,7 @@ def _pools_in(row: dict[str, Any]) -> set[str]:
 
 
 def _order_rows(session: Any) -> list[Any]:
-    from app.domain.history import ImportBatch, ImportRow
+    from app.domain.imports import ImportBatch, ImportRow
 
     batch = (
         session.query(ImportBatch).filter_by(source_name="金山文档·订单").one_or_none()
@@ -227,12 +227,12 @@ def map_orders(session: Any, *, dry_run: bool) -> dict[str, Any]:
             account_id=None,  # 无可靠关联键 → 留空（PRD 允许）
             owner_id=None,  # 源数据是中文姓名，v1 用整数 id，不可自动映射
             note=(
-                f"历史导入：源类型={src_type}，源行 {row.row_no}，"
+                f"导入：源类型={src_type}，源行 {row.row_no}，"
                 f"售卖员={raw.get('售卖员')}，回收员={raw.get('回收员')}"
             ),
             actor=ACTOR,
         )
-        # 历史数据一律标 UNLINKED：没有任何自动匹配
+        # 导入数据一律标 UNLINKED：没有任何自动匹配
         order.link_status = LinkStatus.UNLINKED.value
 
         # 份额事件：源「回款账户」决定哪些份额落哪个池
@@ -260,8 +260,8 @@ def map_orders(session: Any, *, dry_run: bool) -> dict[str, Any]:
                     portion=portion,
                     occurred_on=trade_date,
                     pool_id=pool_id,
-                    is_posted=False,  # 历史数据默认未过账，池余额不受影响
-                    reason="历史导入",
+                    is_posted=False,  # 导入数据默认未过账，池余额不受影响
+                    reason="标准导入",
                     created_by=ACTOR,
                     updated_by=ACTOR,
                 )
@@ -290,7 +290,7 @@ def map_orders(session: Any, *, dry_run: bool) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="把历史原始行映射为 v1 实体（只做口径已明确的部分）"
+        description="把导入原始行映射为 v1 实体（只做口径已明确的部分）"
     )
     parser.add_argument("--dry-run", action="store_true", help="只报告不写库")
     parser.add_argument("--only", default="orders", help="当前支持：orders")
@@ -328,7 +328,7 @@ def main() -> int:
         if args.dry_run:
             print("\n[dry-run] 未写库。去掉 --dry-run 实际落地。")
         else:
-            print("\n完成。注意：历史事件的 is_posted=False，池余额不受影响。")
+            print("\n完成。注意：导入事件的 is_posted=False，池余额不受影响。")
     except Exception:
         session.rollback()
         raise

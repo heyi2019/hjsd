@@ -35,6 +35,7 @@
 | cashflow | flow_no, pool_id, occurred_on, nature, category, direction, amount, order_id, order_event_id, deposit_id, transfer_id | 必属池；直接关联来源订单或押金；事件派生流水一对一；新 INTERNAL 成对 |
 | period_locks | period, locked_at, locked_by, note | `YYYY-MM` 唯一；锁定后禁止该月新增/审核业务事实，修正必须使用后续期间冲销 |
 | quality_issues | issue_no, code, severity, entity_type, entity_id, status, assignee_id, resolution, evidence | 异常工单不直接修改业务事实；关闭必须留解决方式，保留负责人和审计链 |
+| notifications | notification_no, recipient_user_id, notification_type, title, message, entity_type, entity_id, read_at | 系统跟进通知；按接收人隔离；来源对象只用于定位，不替代业务状态；标记已读保留通知记录 |
 | accounts | inventory_no, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, business_mode, inventory_type, buy_date, cost_amount, status, account_description, account_images, note | `inventory_no` 为 ACC 库存编号；HS/TH/DG 可关联库存账号，DFQ 不关联库存账号；`game_account` 只是游戏账号文本，库存主键始终是 `inventory_no`；手机号不可作键；滞销颜色由前端按买入日期计算，不落库风险等级；不再保留 `region`、`channels` 遗留字段。 |
 | installments | inst_no, order_id, contract_type, principal, down_payment, periods, per_period, paid, status | 分期合约通过所属订单取得账号信息，不单独保存 account_id；`ADVANCE_PURCHASE` 仅 DFQ，`STOCK_SALE` 仅已买入 HS；一单一合约；总应收=首付+期数×每期 |
 | installment_schedules | installment_id, period_no, due_on, due_amount, received_amount, received_on, status | 分期计划明细；`UNIQUE(installment_id, period_no)`；支持部分收款、逾期、减免与展期留痕 |

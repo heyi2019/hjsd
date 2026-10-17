@@ -38,6 +38,7 @@ from app.domain.trade import (
 )
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
+from app.notifications import service as notifications_service
 
 
 MONEY_EVENT_TYPES = frozenset(
@@ -468,6 +469,17 @@ def create_issue(
         actor=actor,
         after={"code": issue.code, "entity_id": issue.entity_id},
     )
+    if assignee_id is not None:
+        notifications_service.create_notification(
+            session,
+            recipient_user_id=assignee_id,
+            notification_type="QUALITY_ISSUE_ASSIGNED",
+            title="质量异常待处理",
+            message=f"{issue.issue_no}：{issue.title}",
+            entity_type="quality_issue",
+            entity_id=issue.issue_no,
+            actor=actor,
+        )
     return issue
 
 
@@ -508,6 +520,17 @@ def update_issue(
         before=before,
         after={"assignee_id": issue.assignee_id, "status": issue.status},
     )
+    if issue.assignee_id is not None and issue.assignee_id != before["assignee_id"]:
+        notifications_service.create_notification(
+            session,
+            recipient_user_id=issue.assignee_id,
+            notification_type="QUALITY_ISSUE_ASSIGNED",
+            title="质量异常待处理",
+            message=f"{issue.issue_no}：{issue.title}",
+            entity_type="quality_issue",
+            entity_id=issue.issue_no,
+            actor=actor,
+        )
     return issue
 
 

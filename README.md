@@ -15,13 +15,13 @@ cp .env.example .env
 #   生产环境务必替换 JWT_SECRET_KEY（≥32 位随机串）
 
 # 2) 建库 + 种子（迁移到 head 并写入基础种子）
-cd backend && python3 scripts/v1_init_db.py && cd ..
+cd backend && .venv/bin/python scripts/v1_init_db.py && cd ..
 
 # 2.1) 初始化正式管理员（首次部署必须执行；密码不会写入脚本）
-cd backend && ADMIN_PASSWORD='请替换为强密码' python3 scripts/create_admin.py && cd ..
+cd backend && ADMIN_PASSWORD='请替换为强密码' .venv/bin/python scripts/create_admin.py && cd ..
 
 # 3) 起后端（:8123）
-cd backend && python3 -m uvicorn app.main:app --reload --port 8123
+cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
 
 # 4) 起前端（:5173，新终端）
 cd frontend && npm run dev
@@ -49,12 +49,12 @@ cd frontend && npm run dev
 ## 开发命令
 
 ```bash
-# 后端测试（220 条）
-cd backend && python3 -m pytest tests -q
+# 后端测试
+cd backend && .venv/bin/python -m pytest tests -q
 
 # 迁移
-cd backend && python3 -m alembic upgrade head
-cd backend && python3 -m alembic check          # 应为「无新差异」
+cd backend && .venv/bin/python -m alembic upgrade head
+cd backend && .venv/bin/python -m alembic check          # 应为「无新差异」
 
 # 前端：守卫 + 类型 + 构建（build 自带前两步）
 cd frontend && npm run check
@@ -71,7 +71,7 @@ cd frontend && npm run build
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | ORM 模型（**不叫 models**，与 legacy 命名冲突） |
 | `backend/app/foundation` `finance` `orders` `installments` `policy` `reporting` | 领域服务与路由，每个含 `service.py` + `router.py` |
-| `backend/alembic/versions` | 迁移（0001 M0 … 0005 M5 规则快照、0006 用户认证、0007 团队范围、…、0010 移除异常工单） |
+| `backend/alembic/versions` | 迁移（0001 M0 … 当前至 0071，持续收紧业务字段与金额不变量） |
 | `backend/tests/v1` | v1 测试 |
 | `frontend/src` | `shared/`（UI 与 API）、各领域页面目录 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |

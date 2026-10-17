@@ -21,10 +21,11 @@
 ```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
 ```
+
+如果未手动激活虚拟环境，启动时使用 `.venv/bin/python -m uvicorn ...`；不要使用系统 Python 直接执行后端脚本。
 
 健康检查：`GET http://127.0.0.1:8123/`；接口文档：`http://127.0.0.1:8123/docs`。v1 新接口统一挂载 `/api/v1`；新增业务不得继续扩展旧路由。
 
@@ -41,7 +42,7 @@ npm run dev
 ### 测试与构建
 
 ```bash
-cd backend && pytest
+cd backend && .venv/bin/python -m pytest
 cd frontend && npm run check && npm run build
 ```
 

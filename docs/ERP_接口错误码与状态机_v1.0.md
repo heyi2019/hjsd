@@ -13,6 +13,7 @@
 | 401 | `AUTH_REQUIRED` / `TOKEN_EXPIRED` | 跳转登录并保存当前页面 |
 | 403 | `PERMISSION_DENIED` | 提示无权限，不展示重试写入 |
 | 404 | `RESOURCE_NOT_FOUND` | 返回列表并刷新 |
+| 405 | `METHOD_NOT_ALLOWED` | 检查当前接口动作 |
 | 409 | `ORDER_STATUS_CONFLICT` / `VERSION_CONFLICT` | 刷新详情后重新操作 |
 | 422 | `VALIDATION_ERROR` | 标记具体字段 |
 | 422 | `POOL_ROUTE_MISSING` | 提示管理员补资金池路由 |

@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core import database, money, settings as settings_module
 from app import api_v1
-from app.core.errors import AppError, NotFound, Validation, require_condition
+from app.core.errors import AppError, ErrorCode, NotFound, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.numbering import MAX_SEQUENCE_VALUE, current_value, peek_number
 from app.core.security import (
@@ -120,6 +120,20 @@ class TestErrorHelpers:
         assert require_condition(True, "条件成立") is None
         with pytest.raises(NotFound):
             require_condition(False, "找不到", error_cls=NotFound)
+
+    def test_framework_http_errors_use_v1_error_shape(self, seeded_client):
+        for response, expected_code in (
+            (
+                seeded_client.get("/api/v1/does-not-exist"),
+                ErrorCode.RESOURCE_NOT_FOUND,
+            ),
+            (seeded_client.post("/api/v1/health"), ErrorCode.METHOD_NOT_ALLOWED),
+        ):
+            payload = response.json()
+            assert payload["code"] == expected_code
+            assert payload["message"]
+            assert payload["details"] == {}
+            assert "detail" not in payload
 
 
 # ------------------------------------------------------------------ security

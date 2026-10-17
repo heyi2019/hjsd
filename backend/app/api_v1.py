@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from uuid import uuid4
 
 from app.core.database import describe_engine, get_engine
@@ -36,6 +37,30 @@ from app.attachments.router import router as attachments_router
 
 def install_exception_handlers(app: FastAPI) -> None:
     """业务异常 → 文档约定的错误结构；参数校验 → 422 并标记具体字段。"""
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _handle_framework_http_error(
+        _request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        code_by_status = {
+            401: ErrorCode.AUTH_REQUIRED,
+            403: ErrorCode.PERMISSION_DENIED,
+            404: ErrorCode.RESOURCE_NOT_FOUND,
+            405: ErrorCode.METHOD_NOT_ALLOWED,
+        }
+        detail = exc.detail
+        if isinstance(detail, dict):
+            message = str(detail.get("message") or detail.get("detail") or "请求失败")
+            code = str(detail.get("code") or code_by_status.get(exc.status_code, ErrorCode.VALIDATION_ERROR))
+            details = detail.get("details") or {}
+        else:
+            message = str(detail or "请求失败")
+            code = code_by_status.get(exc.status_code, ErrorCode.VALIDATION_ERROR)
+            details = {}
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"code": code, "message": message, "details": details},
+        )
 
     @app.exception_handler(AppError)
     async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:

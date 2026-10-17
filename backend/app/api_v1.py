@@ -26,6 +26,7 @@ from app.finance.router import router as finance_router
 from app.installments.router import router as installments_router
 from app.orders.router import router as orders_router
 from app.parties.router import router as parties_router
+from app.search.router import router as search_router
 from app.auth.router import router as auth_router, admin_router as users_router, teams_router
 
 
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_exception_handlers(app)
     app.include_router(foundation_router, prefix=settings.api_prefix)
     app.include_router(parties_router, prefix=settings.api_prefix)
+    app.include_router(search_router, prefix=settings.api_prefix)
     app.include_router(orders_router, prefix=settings.api_prefix)
     app.include_router(installments_router, prefix=settings.api_prefix)
     app.include_router(finance_router, prefix=settings.api_prefix)

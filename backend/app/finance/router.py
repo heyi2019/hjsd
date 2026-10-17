@@ -430,6 +430,15 @@ def list_rebates(
     return [_rebate_out(item) for item in items]
 
 
+@router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)
+def get_rebate(
+    rebate_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> schemas.RebateOut:
+    return _rebate_out(service.get_rebate(db, rebate_id, user=user))
+
+
 @router.post("/rebates", response_model=schemas.RebateOut, status_code=201)
 def create_rebate(
     payload: schemas.RebateCreate,

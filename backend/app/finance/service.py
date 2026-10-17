@@ -1456,6 +1456,30 @@ def list_rebates(
     return list(session.scalars(stmt.order_by(RebateRecord.id)).all())
 
 
+def get_rebate(
+    session: Session,
+    rebate_id: int,
+    *,
+    user: CurrentUser | None = None,
+) -> RebateRecord:
+    record = session.get(RebateRecord, rebate_id)
+    if record is None:
+        raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
+    if user is not None:
+        from app.domain.trade import Order
+
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            visible = session.scalar(
+                select(RebateRecord.id)
+                .join(Order, Order.id == RebateRecord.source_order_id)
+                .where(RebateRecord.id == rebate_id, scope)
+            )
+            if visible is None:
+                raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
+    return record
+
+
 def settled_net_total(session: Session, rebate_record_id: int) -> Decimal:
     _, _, net = _effective_rebate_totals(session, rebate_record_id)
     return net
@@ -1473,6 +1497,7 @@ __all__ = [
     "resolve_reconciliation",
     "list_deposits",
     "list_rebates",
+    "get_rebate",
     "create_transfer",
     "repair_transfer",
     "return_deposit",

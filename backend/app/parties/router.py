@@ -242,6 +242,16 @@ def list_counterparties(
     ]
 
 
+@router.get("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)
+def get_counterparty(
+    counterparty_id: int,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_counterparties,
+) -> dict:
+    item = service.get_counterparty(db, counterparty_id)
+    return schemas.CounterpartyOut.model_validate(item)
+
+
 @router.post("/counterparties", response_model=schemas.CounterpartyOut, status_code=201)
 def create_counterparty(
     payload: schemas.CounterpartyCreate,

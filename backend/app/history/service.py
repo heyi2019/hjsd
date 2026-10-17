@@ -28,6 +28,18 @@ from app.domain.enums import (
 from app.domain.history import ImportBatch, ImportRow
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 
+
+def _validate_optional_id(value: object, *, field: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise Validation(
+            f"{field} ID 必须为正整数",
+            details={"field": field, "value": value},
+        )
+    return value
+
+
 def _batch_out(batch: ImportBatch) -> dict[str, Any]:
     return {
         "id": batch.id,
@@ -165,6 +177,8 @@ def assign_mapping(
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
     if row.status == ImportRowStatus.IMPORTED.value:
         raise Validation("已导入的历史行不可再改映射", details={"row_id": row_id})
+    order_id = _validate_optional_id(order_id, field="订单")
+    account_id = _validate_optional_id(account_id, field="账号")
     text_basis = (basis or "").strip()
     if not text_basis:
         raise Validation("补录关联必须填写依据", details={"field": "basis", "row_id": row_id})

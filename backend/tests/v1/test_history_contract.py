@@ -111,6 +111,18 @@ class TestAssignMappingGuards:
         with pytest.raises(NotFound):
             service.assign_mapping(seeded_db, 999999, basis="人工核对", actor="pytest")
 
+    def test_mapping_ids_must_be_positive_in_service(self, seeded_db):
+        batch = _batch(seeded_db, rows=[{"订单号": "HS0001"}])
+        row_id = _first_row_id(seeded_db, batch["id"])
+        with pytest.raises(Validation, match="订单 ID 必须为正整数"):
+            service.assign_mapping(
+                seeded_db,
+                row_id,
+                order_id=0,
+                basis="人工核对",
+                actor="pytest",
+            )
+
     def test_imported_row_cannot_be_remapped(self, seeded_db):
         from app.orders import service as orders_service
         from datetime import date

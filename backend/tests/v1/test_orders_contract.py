@@ -59,6 +59,29 @@ def _scoped_user() -> CurrentUser:
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
+    def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
+        order = _order(seeded_db, order_type="HS")
+        with pytest.raises(Validation, match="allow_installment_payment 必须为布尔值"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("100"),
+                occurred_on=D,
+                actor="pytest",
+                allow_installment_payment="false",
+            )
+        with pytest.raises(Validation, match="allow_installment_delivery 必须为布尔值"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("100"),
+                occurred_on=D,
+                actor="pytest",
+                allow_installment_delivery="false",
+            )
+
     def test_order_creation_validates_participants_before_creating_account(self, seeded_db):
         customer = parties_service.create_customer(
             seeded_db, display_name="已停用客户", actor="pytest"

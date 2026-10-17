@@ -84,6 +84,12 @@ def _required_text(value: Any, *, field: str, message: str) -> str:
     return value.strip()
 
 
+def _required_bool(value: object, *, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise Validation(f"{field} 必须为布尔值", details={"field": field})
+    return value
+
+
 def _audit_value(value: Any) -> Any:
     """把订单快照转换为 JSON 可持久化的值。"""
     if isinstance(value, date):
@@ -644,6 +650,12 @@ def post_event(
     allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """过账：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
+    allow_installment_payment = _required_bool(
+        allow_installment_payment, field="allow_installment_payment"
+    )
+    allow_installment_delivery = _required_bool(
+        allow_installment_delivery, field="allow_installment_delivery"
+    )
     try:
         EventType(event_type)
     except ValueError as exc:

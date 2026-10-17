@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from app.api_v1 import create_app
 from app.core.settings import (
     BACKEND_DIR,
     PROJECT_ROOT,
@@ -84,6 +86,22 @@ def test_dev_allows_any_local_port():
     assert settings.cors_origin_regex is not None
     assert "localhost" in settings.cors_origin_regex
     assert "127" in settings.cors_origin_regex
+
+
+def test_dev_cors_middleware_accepts_frontend_port():
+    settings = Settings(
+        app_env="development",
+        database_url="sqlite:///:memory:",
+    )
+    response = TestClient(create_app(settings)).options(
+        "/api/v1/orders",
+        headers={
+            "Origin": "http://127.0.0.1:5188",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5188"
 
 
 def test_production_never_widens_cors():

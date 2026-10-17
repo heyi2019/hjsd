@@ -937,7 +937,7 @@ def set_extra_values(
     values: Iterable[tuple[str, Any]],
 ) -> dict[str, Any]:
     """按启用的字段定义写入活字段值；未启用字段拒绝写入（BAS-04-04）。"""
-    saved: dict[str, Any] = {}
+    validated: list[tuple[str, FieldDefinition, Any]] = []
     for field_key, value in values:
         definition = session.scalar(
             select(FieldDefinition).where(
@@ -951,6 +951,12 @@ def set_extra_values(
                 f"字段 {field_key} 未启用或不存在",
                 details={"entity_type": entity_type, "field_key": field_key},
             )
+        validated.append(
+            (field_key, definition, _validate_extra_value(definition, value))
+        )
+
+    saved: dict[str, Any] = {}
+    for field_key, definition, normalized_value in validated:
         row = session.scalar(
             select(EntityExtraValue).where(
                 EntityExtraValue.entity_type == entity_type,
@@ -963,12 +969,12 @@ def set_extra_values(
                 entity_type=entity_type,
                 entity_id=entity_id,
                 field_definition_id=definition.id,
-                value={"value": _validate_extra_value(definition, value)},
+                value={"value": normalized_value},
             )
             session.add(row)
         else:
-            row.value = {"value": _validate_extra_value(definition, value)}
-        saved[field_key] = value
+            row.value = {"value": normalized_value}
+        saved[field_key] = normalized_value
     session.flush()
     return saved
 

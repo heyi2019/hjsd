@@ -464,6 +464,40 @@ class TestCounterpartyGuards:
 
 # ------------------------------------------------------------------ 活字段
 class TestFieldDefinitionGuards:
+    def test_extra_values_validate_as_a_batch_before_mutating(self, seeded_db):
+        text_definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="batch_note",
+            label="批量备注",
+            actor="pytest",
+        )
+        number_definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="batch_amount",
+            label="批量金额",
+            field_type="NUMBER",
+            actor="pytest",
+        )
+        customer = service.create_customer(seeded_db, display_name="批量字段客户", actor="pytest")
+
+        with pytest.raises(Validation, match="字段 批量金额 必须为数字"):
+            service.set_extra_values(
+                seeded_db,
+                entity_type="customer",
+                entity_id=customer.id,
+                values=[
+                    (text_definition.field_key, "应该回滚"),
+                    (number_definition.field_key, "不是数字"),
+                ],
+            )
+
+        seeded_db.commit()
+        assert service.get_extra_values(
+            seeded_db, entity_type="customer", entity_id=customer.id
+        ) == {}
+
     def test_database_rejects_non_customer_extra_value(self, seeded_db):
         definition = service.create_field_definition(
             seeded_db,

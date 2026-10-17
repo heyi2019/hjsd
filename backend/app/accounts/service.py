@@ -77,9 +77,12 @@ def _validate_account_profile_scope(
     account_images: list[str] | None | object,
 ) -> None:
     """账号描述/图片只属于回收与代挂，提号账号不承载营销资料。"""
-    if inventory_type in {
-        InventoryType.PICKUP.value,
-    } and (account_description is not None or account_images is not None):
+    has_description = account_description is not _UNSET and account_description not in (
+        None,
+        "",
+    )
+    has_images = account_images is not _UNSET and account_images not in (None, [])
+    if inventory_type == InventoryType.PICKUP.value and (has_description or has_images):
         raise Validation(
             "账号描述和图片仅适用于回收或代挂",
             details={"field": "account_description/account_images", "inventory_type": inventory_type},

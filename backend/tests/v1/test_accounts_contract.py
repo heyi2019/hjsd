@@ -104,6 +104,15 @@ class TestCreateAccountGuards:
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
         )
+        empty_pickup = _account(
+            seeded_db,
+            "pickup-empty-profile",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            account_description=None,
+            account_images=[],
+        )
+        assert empty_pickup.account_images == []
         with pytest.raises(Validation, match="账号描述和图片仅适用于回收或代挂"):
             service.update_account_profile(
                 seeded_db,

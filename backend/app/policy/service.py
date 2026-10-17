@@ -314,8 +314,11 @@ def approve_version(
     item = session.get(PolicyVersion, version_id)
     if item is None:
         raise NotFound(f"规则版本 {version_id} 不存在", details={"version_id": version_id})
-    if item.status == PolicyStatus.ACTIVE.value:
-        raise Validation("版本已发布，不可重复发布", details={"version_id": version_id})
+    if item.status != PolicyStatus.DRAFT.value:
+        raise Validation(
+            "只能发布草稿版本，已发布/已失效版本不可重复发布",
+            details={"version_id": version_id, "status": item.status},
+        )
     approver = _required_text(
         approver, field="approver", message="必须记录审批人"
     )

@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import PolicyScopeType, PolicyStatus
-from app.domain.parties import PolicyDefinition
+from app.domain.parties import PolicyDefinition, PolicyVersion
 from app.orders import service as order_service
 from app.policy import service as policy_service
 
@@ -260,6 +260,24 @@ class TestPolicyVersions:
         )
         assert approved["status"] == PolicyStatus.ACTIVE.value
         assert approved["note"] == "同意发布"
+
+    @pytest.mark.parametrize("status", [PolicyStatus.EXPIRED.value, PolicyStatus.SUPERSEDED.value])
+    def test_non_draft_version_cannot_be_reapproved(self, seeded_db, status):
+        definition = _make_policy(seeded_db)
+        version = policy_service.create_version(
+            seeded_db,
+            definition["id"],
+            effective_from=D,
+            config={"rate": "5"},
+            actor="pytest",
+        )
+        item = seeded_db.get(PolicyVersion, version["id"])
+        item.status = status
+
+        with pytest.raises(Validation, match="只能发布草稿版本"):
+            policy_service.approve_version(
+                seeded_db, version["id"], approver="pytest"
+            )
 
     def test_update_version_draft_notfound_and_empty_config(self, seeded_db):
         with pytest.raises(NotFound):

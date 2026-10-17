@@ -187,6 +187,16 @@ class TestCreateAccountGuards:
             service.create_account(seeded_db, game_account="  ", actor="pytest")
         assert "账号标识必填" in str(exc.value)
 
+    def test_identifier_must_be_text_in_service(self, seeded_db):
+        with pytest.raises(Validation, match="账号标识必填"):
+            service.create_account(seeded_db, game_account=123, actor="pytest")
+
+        account = _account(seeded_db, "update-identifier-type")
+        with pytest.raises(Validation, match="账号标识必填"):
+            service.update_account_profile(
+                seeded_db, account.id, actor="pytest", game_account=123
+            )
+
     def test_duplicate_identifier_conflicts(self, seeded_db):
         _account(seeded_db, "dup-acc")
         with pytest.raises(Conflict) as exc:

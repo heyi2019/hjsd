@@ -87,7 +87,7 @@ def create_account(
     account_images: list[str] | None = None,
     note: str | None = None,
 ) -> Account:
-    identifier = (game_account or "").strip()
+    identifier = game_account.strip() if isinstance(game_account, str) else ""
     if not identifier:
         raise Validation("账号标识必填", details={"field": "game_account"})
     exists = session.scalar(select(Account).where(Account.game_account == identifier))
@@ -205,7 +205,7 @@ def update_account_profile(
         "note": account.note,
     }
     if game_account is not _UNSET:
-        identifier = (game_account or "").strip()
+        identifier = game_account.strip() if isinstance(game_account, str) else ""
         if not identifier:
             raise Validation("账号标识必填", details={"field": "game_account"})
         exists = session.scalar(select(Account).where(Account.game_account == identifier, Account.id != account_id))

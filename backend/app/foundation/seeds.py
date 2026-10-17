@@ -63,6 +63,7 @@ SEED_SEQUENCES: tuple[tuple[str, str], ...] = (
     (SequenceKey.ACCOUNT.value, "ACC"),
     (SequenceKey.CASHFLOW.value, "CF"),
     (SequenceKey.IMPORT.value, "IMP"),
+    (SequenceKey.ATTACHMENT.value, "ATT"),
 )
 
 

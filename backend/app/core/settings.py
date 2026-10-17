@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     # frontend
     vite_api_base_url: str = "http://127.0.0.1:8123/api/v1"
 
+    # attachments：业务附件独立于数据库文件保存，路径可由部署环境覆盖。
+    attachment_storage_dir: str = "data/attachments"
+
     @model_validator(mode="after")
     def _validate_runtime_security(self) -> "Settings":
         """生产配置不得沿用开发密钥或通配 CORS。"""
@@ -148,6 +151,13 @@ class Settings(BaseSettings):
     @property
     def alembic_url(self) -> str:
         return self.sqlalchemy_url
+
+    @property
+    def attachment_storage_path(self) -> Path:
+        path = Path(self.attachment_storage_dir).expanduser()
+        if not path.is_absolute():
+            path = BACKEND_DIR / path
+        return path
 
     @property
     def cors_origin_list(self) -> list[str]:

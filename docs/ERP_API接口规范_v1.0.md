@@ -30,9 +30,10 @@
 | 流水/对账 | GET/POST `/cashflows`，POST `/cashflows/{id}/approve`、`/reject`、`/reverse`；GET/POST `/reconciliations`，POST `/reconciliations/{id}/resolve` | 查询与受控审核；订单事件来源流水不可手工修改；划转由 `/transfers` 原子生成成对流水 |
 | 月结 | GET/POST `/period-locks` | 按 `YYYY-MM` 锁定会计期间；锁定后禁止新增、审核或修改该月事实，次月冲销仍可作为更正 |
 | 划转 | POST `/transfers`、POST `/transfers/{transfer_id}/repair` | 原子生成同一 `transfer_id` 下的 INTERNAL 转出/转入流水；异常修复须走修复接口 |
-| 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/daily-funds`、`/order-profit` | R1–R5；当前返回 JSON，库存 CSV 导出由前端基于当前权限数据生成 |
+| 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/daily-funds`、`/order-profit`；GET `/reports/{report_name}/export.csv` | R1–R5；导出复用当前权限范围并写入审计，查看者无导出权限 |
 | 异常 | GET `/quality/exceptions`；GET/POST `/quality/issues`，GET/PATCH `/quality/issues/{id}`，POST `/quality/issues/{id}/close` | 扫描异常、负责人分派、处理中状态、解决方式与关闭证据 |
 | 全局搜索 | GET `/search?q=...` | 按当前权限检索订单、库存、客户、合作方和返点，结果只返回可跳转摘要 |
+| 附件 | GET `/attachments`、POST `/attachments`、GET `/attachments/{id}/download`、DELETE `/attachments/{id}` | 关联订单、事件、资金、分期或质量异常；Base64 内容最大 20MB；删除为软删除并保留审计 |
 | 活字段 | GET/POST `/field-definitions`，PATCH `/field-definitions/{id}/active`，DELETE `/field-definitions/{id}` | 定义、停用、排序；有历史值的字段不可删除 |
 | 经营规则 | GET/POST `/policies`，GET `/policies/{id}/versions`，POST `/policies/{id}/versions`，PATCH/POST `/policy-versions/{id}`、`/approve` | 规则版本、审批、快照与多人利润分配；订单分配使用 `/orders/{id}/profit-allocations` |
 | 历史导入 | POST/GET `/imports/batches`，GET `/imports/batches/{id}/rows|preview|reconciliation`，POST 映射、跳过、提交、回滚、更正 | P2 标准导入与复核，不改变新单模型 |

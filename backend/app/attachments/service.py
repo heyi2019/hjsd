@@ -1,0 +1,293 @@
+"""附件中心服务：统一文件索引、权限、软删除与审计。"""
+from __future__ import annotations
+
+import base64
+import binascii
+import hashlib
+import re
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.audit import record_audit
+from app.core.errors import NotFound, PermissionDenied, Validation
+from app.core.security import (
+    PERM_FINANCE_READ,
+    PERM_ORDER_CREATE,
+    PERM_ORDER_EVENT_POST,
+    PERM_ORDER_EXCEPTION_APPROVE,
+    PERM_ORDER_UPDATE,
+    PERM_REPORT_READ,
+    CurrentUser,
+    owner_scope_filter,
+)
+from app.core.settings import get_settings
+from app.core.numbering import allocate_number
+from app.domain.attachments import Attachment
+from app.domain.enums import AuditAction, SequenceKey
+from app.domain.quality import QualityIssue
+from app.domain.trade import Cashflow, Installment, Order, OrderEvent
+
+
+MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+ENTITY_TYPES = frozenset({"order", "order_event", "cashflow", "installment", "quality_issue"})
+_SAFE_FILENAME = re.compile(r"^[^/\\]+$")
+
+
+@dataclass(frozen=True)
+class _Target:
+    entity_type: str
+    entity_id: str
+    order: Order | None = None
+    pool_id: int | None = None
+
+
+def _validate_entity_type(entity_type: str) -> str:
+    value = entity_type.strip().lower()
+    if value not in ENTITY_TYPES:
+        raise Validation(
+            "附件关联对象类型无效",
+            details={"field": "entity_type", "value": entity_type, "allowed": sorted(ENTITY_TYPES)},
+        )
+    return value
+
+
+def _load_target(session: Session, entity_type: str, entity_id: str) -> _Target:
+    entity_type = _validate_entity_type(entity_type)
+    identifier = entity_id.strip()
+    if not identifier:
+        raise Validation("附件关联对象编号不能为空", details={"field": "entity_id"})
+
+    if entity_type == "order":
+        order = session.scalar(select(Order).where(Order.order_no == identifier))
+        if order is None:
+            raise NotFound("附件关联的订单不存在", details={"order_no": identifier})
+        return _Target(entity_type, identifier, order=order)
+
+    if entity_type == "order_event":
+        event = session.scalar(select(OrderEvent).where(OrderEvent.event_no == identifier))
+        if event is None:
+            raise NotFound("附件关联的订单事件不存在", details={"event_no": identifier})
+        order = session.get(Order, event.order_id)
+        return _Target(entity_type, identifier, order=order, pool_id=event.pool_id)
+
+    if entity_type == "cashflow":
+        flow = session.scalar(select(Cashflow).where(Cashflow.flow_no == identifier))
+        if flow is None:
+            raise NotFound("附件关联的资金流水不存在", details={"flow_no": identifier})
+        order = session.get(Order, flow.order_id) if flow.order_id is not None else None
+        return _Target(entity_type, identifier, order=order, pool_id=flow.pool_id)
+
+    if entity_type == "installment":
+        installment = session.scalar(
+            select(Installment).where(Installment.inst_no == identifier)
+        )
+        if installment is None:
+            raise NotFound("附件关联的分期合约不存在", details={"inst_no": identifier})
+        return _Target(entity_type, identifier, order=session.get(Order, installment.order_id))
+
+    issue = session.scalar(select(QualityIssue).where(QualityIssue.issue_no == identifier))
+    if issue is None:
+        raise NotFound("附件关联的质量异常不存在", details={"issue_no": identifier})
+    return _Target(entity_type, identifier)
+
+
+def _assert_permission(user: CurrentUser, target: _Target, *, write: bool) -> None:
+    if user.is_admin:
+        return
+    if target.entity_type == "quality_issue":
+        allowed = user.has(PERM_ORDER_EXCEPTION_APPROVE if write else PERM_REPORT_READ)
+    elif target.entity_type == "cashflow":
+        allowed = user.has(PERM_FINANCE_READ)
+    elif write:
+        allowed = user.has_any((PERM_ORDER_UPDATE, PERM_ORDER_EVENT_POST))
+    else:
+        allowed = user.has_any((PERM_ORDER_CREATE, PERM_ORDER_EVENT_POST, PERM_FINANCE_READ, PERM_REPORT_READ))
+    if not allowed:
+        raise PermissionDenied("当前角色无权访问该附件", details={"entity_type": target.entity_type})
+
+
+def _assert_visible(session: Session, user: CurrentUser, target: _Target) -> None:
+    if user.is_admin:
+        return
+    if target.entity_type == "quality_issue":
+        return
+    if target.order is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None and session.scalar(
+            select(Order.id).where(Order.id == target.order.id, scope)
+        ) is None:
+            raise NotFound("附件不存在")
+        return
+    if target.pool_id is not None and not user.can_see_pool(target.pool_id):
+        raise NotFound("附件不存在")
+    if target.entity_type == "cashflow" and target.pool_id is None:
+        raise NotFound("附件不存在")
+
+
+def _storage_root() -> Path:
+    root = get_settings().attachment_storage_path
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _decode_content(raw: str) -> bytes:
+    value = raw.strip()
+    if "," in value and value.lower().startswith("data:"):
+        value = value.split(",", 1)[1]
+    try:
+        content = base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise Validation("附件内容必须是有效的 Base64", details={"field": "content_base64"}) from exc
+    if not content:
+        raise Validation("附件内容不能为空", details={"field": "content_base64"})
+    if len(content) > MAX_ATTACHMENT_BYTES:
+        raise Validation(
+            "附件大小不能超过 20MB",
+            details={"field": "content_base64", "max_bytes": MAX_ATTACHMENT_BYTES},
+        )
+    return content
+
+
+def _validate_file(file_name: str, content_type: str) -> tuple[str, str]:
+    name = file_name.strip()
+    content = content_type.strip().lower()
+    if not _SAFE_FILENAME.fullmatch(name):
+        raise Validation("附件文件名不能包含路径", details={"field": "file_name"})
+    if not content:
+        raise Validation("附件类型不能为空", details={"field": "content_type"})
+    return name, content
+
+
+def list_attachments(
+    session: Session,
+    *,
+    entity_type: str,
+    entity_id: str,
+    user: CurrentUser,
+) -> list[Attachment]:
+    target = _load_target(session, entity_type, entity_id)
+    _assert_permission(user, target, write=False)
+    _assert_visible(session, user, target)
+    return list(
+        session.scalars(
+            select(Attachment)
+            .where(
+                Attachment.entity_type == target.entity_type,
+                Attachment.entity_id == target.entity_id,
+                Attachment.deleted_at.is_(None),
+            )
+            .order_by(Attachment.created_at, Attachment.id)
+        ).all()
+    )
+
+
+def create_attachment(
+    session: Session,
+    *,
+    entity_type: str,
+    entity_id: str,
+    file_name: str,
+    content_type: str,
+    content_base64: str,
+    user: CurrentUser,
+) -> Attachment:
+    target = _load_target(session, entity_type, entity_id)
+    _assert_permission(user, target, write=True)
+    _assert_visible(session, user, target)
+    name, content = _validate_file(file_name, content_type)
+    payload = _decode_content(content_base64)
+    attachment_no = allocate_number(session, SequenceKey.ATTACHMENT)
+    suffix = Path(name).suffix.lower()
+    storage_key = f"{attachment_no}{suffix}"
+    path = _storage_root() / storage_key
+    path.write_bytes(payload)
+    item = Attachment(
+        attachment_no=attachment_no,
+        entity_type=target.entity_type,
+        entity_id=target.entity_id,
+        file_name=name,
+        storage_key=storage_key,
+        content_type=content,
+        size_bytes=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        created_by=user.username,
+        updated_by=user.username,
+    )
+    try:
+        session.add(item)
+        session.flush()
+        record_audit(
+            session,
+            action=AuditAction.ATTACHMENT_UPLOAD,
+            entity_type="attachment",
+            entity_id=item.attachment_no,
+            actor=user.username,
+            after={
+                "attachment_no": item.attachment_no,
+                "entity_type": item.entity_type,
+                "entity_id": item.entity_id,
+                "file_name": item.file_name,
+                "size_bytes": item.size_bytes,
+                "sha256": item.sha256,
+            },
+        )
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    return item
+
+
+def get_attachment(session: Session, attachment_id: int, user: CurrentUser) -> Attachment:
+    item = session.get(Attachment, attachment_id)
+    if item is None or item.deleted_at is not None:
+        raise NotFound("附件不存在", details={"attachment_id": attachment_id})
+    target = _load_target(session, item.entity_type, item.entity_id)
+    _assert_permission(user, target, write=False)
+    _assert_visible(session, user, target)
+    return item
+
+
+def attachment_path(item: Attachment) -> Path:
+    root = _storage_root().resolve()
+    path = (root / item.storage_key).resolve()
+    if root not in path.parents:
+        raise Validation("附件存储路径无效")
+    if not path.is_file():
+        raise NotFound("附件文件不存在", details={"attachment_no": item.attachment_no})
+    return path
+
+
+def delete_attachment(
+    session: Session, attachment_id: int, *, user: CurrentUser
+) -> Attachment:
+    item = get_attachment(session, attachment_id, user)
+    target = _load_target(session, item.entity_type, item.entity_id)
+    _assert_permission(user, target, write=True)
+    item.deleted_at = datetime.now()
+    item.updated_by = user.username
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.ATTACHMENT_DELETE,
+        entity_type="attachment",
+        entity_id=item.attachment_no,
+        actor=user.username,
+        after={"deleted_at": item.deleted_at.isoformat()},
+        reason="附件软删除，保留审计与文件追溯",
+    )
+    return item
+
+
+__all__ = [
+    "ENTITY_TYPES",
+    "MAX_ATTACHMENT_BYTES",
+    "attachment_path",
+    "create_attachment",
+    "delete_attachment",
+    "get_attachment",
+    "list_attachments",
+]

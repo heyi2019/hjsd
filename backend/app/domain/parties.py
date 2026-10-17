@@ -155,6 +155,7 @@ class EntityExtraValue(Base, TimestampMixin):
 
     __tablename__ = "entity_extra_values"
     __table_args__ = (
+        Index("ix_entity_extra_values_field_definition_id", "field_definition_id"),
         CheckConstraint(
             f"entity_type IN {EntityType.values()!r}".replace("[", "(").replace("]", ")"),
             name="extra_value_entity_valid",
@@ -180,6 +181,8 @@ class Customer(Base, AuditMixin):
 
     __tablename__ = "customers"
     __table_args__ = (
+        Index("ix_customers_owner_id", "owner_id"),
+        Index("ix_customers_merged_into_id", "merged_into_id"),
         CheckConstraint(
             f"status IN {CustomerStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="customer_status_valid",
@@ -217,6 +220,7 @@ class CustomerLead(Base, AuditMixin):
 
     __tablename__ = "customer_leads"
     __table_args__ = (
+        Index("ix_customer_leads_converted_order_id", "converted_order_id"),
         CheckConstraint(
             f"request_type IN {LeadType.values()!r}".replace("[", "(").replace("]", ")"),
             name="lead_type_valid",
@@ -291,6 +295,7 @@ class OrderCustomerRole(Base, TimestampMixin):
 
     __tablename__ = "order_customer_roles"
     __table_args__ = (
+        Index("ix_order_customer_roles_customer_id", "customer_id"),
         CheckConstraint(
             f"role IN {CustomerRole.values()!r}".replace("[", "(").replace("]", ")"),
             name="customer_role_valid",
@@ -313,6 +318,7 @@ class OrderCounterpartyRole(Base, TimestampMixin):
 
     __tablename__ = "order_counterparty_roles"
     __table_args__ = (
+        Index("ix_order_counterparty_roles_counterparty_id", "counterparty_id"),
         CheckConstraint(
             f"role IN {CounterpartyRole.values()!r}".replace("[", "(").replace("]", ")"),
             name="counterparty_role_valid",

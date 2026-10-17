@@ -64,7 +64,7 @@ export function InventoryPanel() {
   const visibleRows = rows.filter((row) => {
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
     const matchesType = !inventoryType || row.inventory_type === inventoryType;
-    const text = [row.inventory_no, row.game_account, row.game_type, row.channel_region, row.platform]
+    const text = [row.game_account, row.game_type, row.channel_region, row.platform]
       .filter(Boolean).join(" ").toLowerCase();
     const matchesKeyword = !keyword.trim() || text.includes(keyword.trim().toLowerCase());
     return matchesBusiness && matchesType && matchesKeyword;
@@ -108,7 +108,7 @@ export function InventoryPanel() {
             type="link"
             size="small"
             aria-label="售出"
-            disabled={row.status !== 'IN_STOCK' || row.inventory_type === "PICKUP"}
+            disabled={row.status !== 'IN_STOCK'}
             onClick={(event) => {
               event.stopPropagation();
               setSaleTarget(row);

@@ -26,12 +26,13 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.foundation import AuditLog
-from app.domain.trade import Installment, InstallmentDisposition, InstallmentSchedule, Order
+from app.domain.trade import Account, Installment, InstallmentDisposition, InstallmentSchedule, Order
 from app.domain.users import User
 from app.installments import service as installment_service
 from app.installments import router as installments_router
 from app.installments import schemas
 from app.orders import service as orders_service
+from app.reporting import service as reporting_service
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
@@ -101,6 +102,44 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    @pytest.mark.parametrize(
+        ("order_type", "contract_type"),
+        [
+            ("TH", "PICKUP_SALE"),
+            ("DG", "CONSIGNMENT_SALE"),
+        ],
+    )
+    def test_th_and_dg_support_installment_overdue_and_payment(
+        self, seeded_db, order_type, contract_type
+    ):
+        order = _order(seeded_db, order_type=order_type)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            contract_type=contract_type,
+            principal="100",
+            down_payment="0",
+            periods=1,
+            per_period="100",
+            first_due_on=PAST,
+        )
+
+        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        assert marked == 1
+        seeded_db.refresh(contract)
+        assert contract.status == InstallmentStatus.OVERDUE.value
+
+        installment_service.pay(
+            seeded_db,
+            contract.id,
+            amount=Decimal("100"),
+            paid_on=TODAY,
+            period_no=1,
+            actor="pytest",
+        )
+        seeded_db.refresh(contract)
+        assert contract.status == InstallmentStatus.SETTLED.value
+
     def test_installment_refund_only_after_delivery(self, seeded_db):
         from app.orders import service as order_service
         order = _order(seeded_db)
@@ -1188,7 +1227,115 @@ class TestInstallmentsApi:
         seeded_db.refresh(account)
         seeded_db.refresh(contract)
         assert account.status == "IN_STOCK"
-        assert contract.status == InstallmentStatus.OVERDUE.value
+        assert contract.status == InstallmentStatus.CLOSED.value
+
+    def test_dfq_overdue_recovery_materializes_account_and_auto_links_resale(self, seeded_db):
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="DFQ",
+            trade_date=TODAY,
+            actor="pytest",
+            account_snapshot={
+                "game_account": "dfq-recovery-account",
+                "game_type": "王者荣耀",
+                "game_password": "secret",
+            },
+        )
+        contract = _contract(
+            seeded_db,
+            order.id,
+            principal="1000",
+            down_payment="100",
+            periods=1,
+            per_period="900",
+            first_due_on=PAST,
+        )
+        _buy(seeded_db, order.id, amount="800")
+
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        installment_service.recover_account(
+            seeded_db,
+            contract.id,
+            occurred_on=TODAY,
+            actor="recovery-operator",
+            note="代分期逾期回收",
+        )
+
+        seeded_db.refresh(order)
+        assert order.account_id is not None
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert account.status == "IN_STOCK"
+        assert account.inventory_type == "RECOVERY"
+        assert account.cost_amount == Decimal("800.00")
+
+        sale_order = _order(seeded_db, order_type="HS", account_id=account.id)
+        orders_service.post_event(
+            seeded_db,
+            sale_order.id,
+            event_type="SELL",
+            amount=Decimal("1200"),
+            occurred_on=TODAY,
+            actor="resale-operator",
+        )
+        resale = seeded_db.scalar(
+            select(InstallmentDisposition).where(
+                InstallmentDisposition.installment_id == contract.id,
+                InstallmentDisposition.action == "RESELL",
+            )
+        )
+        assert resale is not None
+        assert resale.related_order_id == sale_order.id
+
+    def test_recovery_closes_installment_and_sale_still_rolls_into_total_profit(
+        self, seeded_db
+    ):
+        account = _account(seeded_db, "closed-recovery-account")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(
+            seeded_db,
+            order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal="1000",
+            down_payment="100",
+            periods=1,
+            per_period="900",
+            first_due_on=PAST,
+        )
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        installment_service.recover_account(
+            seeded_db,
+            contract.id,
+            occurred_on=TODAY,
+            actor="recovery-operator",
+            note="回收后关闭原分期",
+        )
+
+        sale_order = _order(seeded_db, order_type="HS", account_id=account.id)
+        orders_service.post_event(
+            seeded_db,
+            sale_order.id,
+            event_type="SELL",
+            amount=Decimal("1200"),
+            occurred_on=TODAY,
+            actor="resale-operator",
+        )
+        seeded_db.refresh(contract)
+        assert contract.status == InstallmentStatus.CLOSED.value
+        assert contract.bad_debt_amount == Decimal("1000.00")
+        resale = seeded_db.scalar(
+            select(InstallmentDisposition).where(
+                InstallmentDisposition.installment_id == contract.id,
+                InstallmentDisposition.action == "RESELL",
+            )
+        )
+        assert resale is not None
+        assert resale.related_order_id == sale_order.id
+
+        profit = reporting_service.order_profit_detail(seeded_db)
+        assert profit["total"]["direct_cost"] == Decimal("1000.00")
+        assert profit["total"]["net_profit"] == Decimal("-600.00")
 
     def test_recovered_account_resale_requires_posted_sell_on_new_order(self, seeded_db):
         account = _account(seeded_db, "overdue-resale-account")
@@ -1211,11 +1358,14 @@ class TestInstallmentsApi:
             occurred_on=TODAY, actor="resale-operator",
         )
 
-        resale = installment_service.record_resale(
-            seeded_db, contract.id, resale_order_id=resale_order.id,
-            occurred_on=TODAY, actor="resale-operator", note="回收后转售",
+        resale = seeded_db.scalar(
+            select(InstallmentDisposition).where(
+                InstallmentDisposition.installment_id == contract.id,
+                InstallmentDisposition.action == "RESELL",
+            )
         )
 
+        assert resale is not None
         assert resale.action == "RESELL"
         assert resale.related_order_id == resale_order.id
         assert seeded_db.scalar(
@@ -1227,3 +1377,66 @@ class TestInstallmentsApi:
 
         history = installment_service.list_dispositions(seeded_db, contract.id)
         assert [item.action for item in history] == ["RECOVER", "RESELL"]
+
+    @pytest.mark.parametrize(
+        ("order_type", "contract_type", "business_mode", "inventory_type"),
+        [
+            ("HS", "STOCK_SALE", "SELF", "RECOVERY"),
+            ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP"),
+            ("DG", "CONSIGNMENT_SALE", "DISTRIBUTION", "CONSIGNMENT"),
+        ],
+    )
+    def test_recovered_account_installment_sale_auto_links_resale(
+        self, seeded_db, order_type, contract_type, business_mode, inventory_type
+    ):
+        from app.accounts import service as accounts_service
+
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account=f"recovered-installment-{order_type.lower()}",
+            business_mode=business_mode,
+            inventory_type=inventory_type,
+            actor="pytest",
+        )
+        original_order = _order(seeded_db, order_type=order_type, account_id=account.id)
+        if order_type == "HS":
+            _buy(seeded_db, original_order.id, amount="800")
+        contract = _contract(
+            seeded_db,
+            original_order.id,
+            contract_type=contract_type,
+            principal="1000",
+            down_payment="100",
+            periods=1,
+            per_period="900",
+            first_due_on=PAST,
+        )
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        installment_service.recover_account(
+            seeded_db,
+            contract.id,
+            occurred_on=TODAY,
+            actor="recovery-operator",
+            note="分期逾期回收",
+        )
+
+        resale_order = _order(seeded_db, order_type=order_type, account_id=account.id)
+        _contract(
+            seeded_db,
+            resale_order.id,
+            contract_type=contract_type,
+            principal="1200",
+            down_payment="200",
+            periods=1,
+            per_period="1000",
+            first_due_on=TODAY,
+        )
+
+        resale = seeded_db.scalar(
+            select(InstallmentDisposition).where(
+                InstallmentDisposition.installment_id == contract.id,
+                InstallmentDisposition.action == "RESELL",
+            )
+        )
+        assert resale is not None
+        assert resale.related_order_id == resale_order.id

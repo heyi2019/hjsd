@@ -236,11 +236,6 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    if definition.code == "DFQ" and account_id is not None:
-        raise Validation(
-            "DFQ 代分期订单不关联库存账号",
-            details={"order_type": definition.code, "account_id": account_id},
-        )
     if definition.code != "DFQ" and account_snapshot is not None:
         raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
     if definition.code == "DFQ" and any(

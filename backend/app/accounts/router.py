@@ -44,7 +44,6 @@ class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    inventory_no: str
     source_order_no: str | None = None
     game_account: str | None = None
     game_type: str | None = None
@@ -88,7 +87,6 @@ class AccountInventoryOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     account_id: int
-    inventory_no: str
     game_account: str | None = None
     business_mode: str | None = None
     inventory_type: str | None = None

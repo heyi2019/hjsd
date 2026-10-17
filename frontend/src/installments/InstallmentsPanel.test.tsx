@@ -124,7 +124,7 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
     renderApp(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
     expect(screen.getByRole("button", { name: /登记回收/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /登记转售/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /登记出售/ })).toBeNull();
   });
 
   it("登记收款提交后回传金额字符串与收款日期", async () => {

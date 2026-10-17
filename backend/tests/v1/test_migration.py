@@ -59,6 +59,12 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 column["name"] for column in inspect(connection).get_columns("installments")
             }
             assert "account_id" not in installment_columns
+            disposition_columns = {
+                column["name"]: column["default"]
+                for column in inspect(connection).get_columns("installment_dispositions")
+            }
+            assert "CURRENT_TIMESTAMP" in str(disposition_columns["created_at"])
+            assert "CURRENT_TIMESTAMP" in str(disposition_columns["updated_at"])
             rebate_columns = {column["name"] for column in inspect(connection).get_columns("rebate_records")}
             assert "rebate_no" in rebate_columns
             assert "rebate_group_no" not in rebate_columns
@@ -89,8 +95,9 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 for index in inspect(connection).get_indexes("accounts")
                 if index["unique"]
             }
-            assert "uq_accounts_inventory_no" in inventory_indexes
+            assert "uq_accounts_inventory_no" not in inventory_indexes
             account_columns = {column["name"] for column in inspect(connection).get_columns("accounts")}
+            assert "inventory_no" not in account_columns
             assert "risk_level" not in account_columns
             assert "region" not in account_columns
             assert "channels" not in account_columns
@@ -167,7 +174,7 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0004 (head)"
+    assert result.stdout.strip() == "0023 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

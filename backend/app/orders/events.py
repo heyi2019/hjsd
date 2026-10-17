@@ -23,13 +23,14 @@ from app.domain.enums import (
     Direction,
     EventType,
     InstallmentContractType,
+    InstallmentDispositionAction,
     Nature,
     OrderStatus,
     Portion,
     PoolStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
+from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposition, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.finance.attributes import accounting_attribute_for_order_event
@@ -45,6 +46,26 @@ EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
     EventType.REFUND.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "REFUND"),
 }
 MONEY_EVENTS = tuple(EVENT_FLOW_MAP.keys())
+
+
+def _auto_link_recovered_installment_sale(
+    session: Session,
+    order: Order,
+    *,
+    occurred_on: date,
+    actor: str,
+    note: str | None,
+) -> None:
+    """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。"""
+    from app.installments.service import link_recovered_sale
+
+    link_recovered_sale(
+        session,
+        order,
+        occurred_on=occurred_on,
+        actor=actor,
+        note=note,
+    )
 
 # --------------------------------------------------------------------- 事件
 def post_event(
@@ -95,7 +116,43 @@ def post_event(
     assert_period_open(session, occurred_on, operation="登记业务事件")
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    if order.status != OrderStatus.ACTIVE.value and not (event_type == EventType.REFUND.value and order.status == OrderStatus.COMPLETED.value):
+    can_refund_completed = (
+        event_type == EventType.REFUND.value
+        and order.status == OrderStatus.COMPLETED.value
+    )
+    can_cancel_completed = (
+        event_type == EventType.CANCEL.value
+        and order.status == OrderStatus.COMPLETED.value
+    )
+    can_reopen_for_buy = (
+        event_type == EventType.BUY.value
+        and order.status == OrderStatus.COMPLETED.value
+        and order.order_type in {"HS", "TH"}
+        and session.scalar(
+            select(Installment.id).where(Installment.order_id == order.id)
+        )
+        is None
+    )
+    can_validate_completed_sell = (
+        event_type == EventType.SELL.value
+        and order.status == OrderStatus.COMPLETED.value
+        and session.scalar(
+            select(Installment.id).where(Installment.order_id == order.id)
+        )
+        is None
+    )
+    can_validate_completed_cost = (
+        event_type == EventType.COST.value
+        and order.status == OrderStatus.COMPLETED.value
+        and order.order_type == "HS"
+    )
+    if order.status != OrderStatus.ACTIVE.value and not (
+        can_refund_completed
+        or can_cancel_completed
+        or can_reopen_for_buy
+        or can_validate_completed_sell
+        or can_validate_completed_cost
+    ):
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
@@ -279,6 +336,24 @@ def post_event(
         cancel_fully_consumed=(offset is None or cancel_fully_consumed),
         actor=actor,
     )
+    if event_type == EventType.SELL.value:
+        # 非分期订单以 SELL 作为终态事件；分期订单不会进入此分支，
+        # 它们必须通过 PAYMENT -> DELIVER 完成闭环。
+        order.status = transition(
+            ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
+        )
+        _auto_link_recovered_installment_sale(
+            session,
+            order,
+            occurred_on=occurred_on,
+            actor=actor,
+            note=note,
+        )
+    elif event_type == EventType.BUY.value and can_reopen_for_buy:
+        # 同一库存账号允许再次买入，重新开启该订单的业务周期。
+        order.status = transition(
+            ORDER_TRANSITIONS, order.status, "BUY", entity="订单"
+        )
     if event_type == EventType.CANCEL.value and (
         offset is None or cancel_fully_consumed
     ):
@@ -412,6 +487,14 @@ def _assert_event_allowed(
         raise Validation("提号业务不允许 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:
         raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
+    if order.order_type in {"TH", "DG"} and event_type == EventType.SELL.value:
+        installment = session.scalar(
+            select(Installment).where(Installment.order_id == order.id)
+        )
+        if installment is not None:
+            raise Validation(
+                f"{order.order_type} 已建立分期合约，只能通过 PAYMENT 收款，不能直接 SELL"
+            )
     if event_type == EventType.SELL.value and session.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order.id,

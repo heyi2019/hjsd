@@ -1,5 +1,6 @@
 /** 库存账号售出：回收 / 代挂账号从库存中心售出，按货源类型映射订单类型。 */
 import { DatePicker, Form, Input, Modal, Radio, message } from "antd";
+import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   customersApi,
@@ -17,6 +18,7 @@ import { ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui"
 /** 库存账号售出：按货源类型映射回收 / 代挂订单类型。 */
 const SALE_ORDER_TYPE: Record<string, string> = {
   RECOVERY: "HS",
+  PICKUP: "TH",
   CONSIGNMENT: "DG",
 };
 const resolveSaleOrderType = (inventoryType?: string | null): string =>
@@ -98,10 +100,6 @@ export function InventorySaleModal(props: {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
-    if (props.account.inventory_type === "PICKUP") {
-      setError({ message: "提号库存请回到原提号订单处理售出" });
-      return;
-    }
     try {
       const order = await ordersApi.create({
         order_type: resolveSaleOrderType(props.account.inventory_type),
@@ -120,7 +118,11 @@ export function InventorySaleModal(props: {
           : today();
         await installmentsApi.create({
           order_id: order.id,
-          contract_type: "STOCK_SALE",
+          contract_type: props.account.inventory_type === "PICKUP"
+            ? "PICKUP_SALE"
+            : props.account.inventory_type === "CONSIGNMENT"
+              ? "CONSIGNMENT_SALE"
+              : "STOCK_SALE",
           principal: String(values.amount ?? 0),
           down_payment: String(values.down_payment ?? 0),
           service_fee: String(values.service_fee ?? 0),
@@ -163,7 +165,7 @@ export function InventorySaleModal(props: {
       }
     >
       <ErrorBanner error={error} />
-      <p className="muted">{props.account?.inventory_no} · {props.account?.game_account ?? "未填写账号"}</p>
+      <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
       <Form form={form} layout="vertical" onFinish={submit}>
         <Form.Item name="customer_id" label="买家" rules={[{ required: true, message: "请选择买家" }]}>
           <Select
@@ -197,7 +199,7 @@ export function InventorySaleModal(props: {
           </Form.Item>
         ) : (
           <div className="inventory-sale-installment-fields">
-            <p className="muted">分期必须关联当前库存账号，系统会自动创建库存售卖订单并将账号标记为“分期中”。</p>
+            <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
             <Form.Item name="down_payment" label="首付金额" initialValue="0">
               <MoneyInput placeholder="没有首付填 0" />
             </Form.Item>
@@ -218,7 +220,7 @@ export function InventorySaleModal(props: {
             >
               <MoneyInput placeholder="请输入每期应收" />
             </Form.Item>
-            <Form.Item name="first_due_on" label="首期日期" rules={[{ required: true, message: "请选择首期日期" }]}> 
+            <Form.Item name="first_due_on" label="首期日期" initialValue={dayjs()} rules={[{ required: true, message: "请选择首期日期" }]}>
               <DatePicker className="ui-control-full" placeholder="请选择日期" />
             </Form.Item>
           </div>

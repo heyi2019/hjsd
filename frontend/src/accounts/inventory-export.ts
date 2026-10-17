@@ -12,7 +12,7 @@ import {
 
 const INVENTORY_EXPORT_HEADERS = [
   "订单号", "业务", "类型", "产品", "账号标识", "平台", "成本", "库存状态", "未售时长",
-  "库存编号", "建档操作人", "登记时间", "出售时间", "下架时间", "寄售时间", "寄售平台",
+  "建档操作人", "登记时间", "出售时间", "下架时间", "寄售时间", "寄售平台",
   "账号密码", "渠道 / 区服", "绑定手机号", "有无二次", "账号描述", "账号图片", "备注", "执行明细", "资金明细",
   "支出笔数", "收入笔数", "总支出", "总收入",
 ];
@@ -102,7 +102,6 @@ export function buildInventoryCsv(
         row.cost_amount,
         inventoryStatusLabel(row.status),
         age ? `${age.days}天` : "",
-        row.inventory_no,
         row.created_by,
         detailText.registrationAt,
         detailText.soldAt,

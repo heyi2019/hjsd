@@ -74,7 +74,6 @@ class SequenceKey(StrEnum):
     LEAD = "LEAD"
     QUALITY_ISSUE = "QUALITY_ISSUE"
     NOTIFICATION = "NOTIFICATION"
-    ACCOUNT = "ACCOUNT"
     CASHFLOW = "CASHFLOW"
     IMPORT = "IMPORT"
     ATTACHMENT = "ATTACHMENT"
@@ -267,10 +266,12 @@ class InventoryType(StrEnum):
 
 
 class InstallmentContractType(StrEnum):
-    """STOCK_SALE 仅已买入 HS；ADVANCE_PURCHASE 仅 DFQ，两者不可混用。"""
+    """各业务独立分期合约类型，避免把不同资金/资产口径混在一起。"""
 
     STOCK_SALE = "STOCK_SALE"
     ADVANCE_PURCHASE = "ADVANCE_PURCHASE"
+    PICKUP_SALE = "PICKUP_SALE"
+    CONSIGNMENT_SALE = "CONSIGNMENT_SALE"
 
 
 class DeliveryMode(StrEnum):
@@ -296,6 +297,7 @@ class InstallmentStatus(StrEnum):
     SETTLED = "SETTLED"
     DELIVERED = "DELIVERED"
     DEFAULTED = "DEFAULTED"
+    CLOSED = "CLOSED"
     CANCELLED = "CANCELLED"
 
 

@@ -41,7 +41,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
 
     for query, expected_type in (
         (order.order_no, "ORDER"),
-        (account.inventory_no, "ACCOUNT"),
+        (account.game_account, "ACCOUNT"),
         (customer.customer_no, "CUSTOMER"),
         (counterparty.counterparty_no, "COUNTERPARTY"),
     ):
@@ -52,7 +52,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
         assert expected_type in _types(response)
 
     account_result = seeded_client.get(
-        "/api/v1/search", params={"q": account.inventory_no}, headers=headers
+        "/api/v1/search", params={"q": account.game_account}, headers=headers
     ).json()["items"][0]
     assert account_result["route"] == f"/accounts/{account.id}/execution-detail"
 

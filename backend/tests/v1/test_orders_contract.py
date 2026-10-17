@@ -85,6 +85,46 @@ def test_database_rejects_th_order_snapshots(seeded_db):
     seeded_db.rollback()
 
 
+@pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
+def test_sell_completes_non_installment_orders(seeded_db, order_type):
+    inventory_context = {
+        "HS": ("SELF", "RECOVERY"),
+        "TH": ("DISTRIBUTION", "PICKUP"),
+        "DG": ("DISTRIBUTION", "CONSIGNMENT"),
+    }[order_type]
+    account = accounts_service.create_account(
+        seeded_db,
+        game_account=f"sell-completes-{order_type.lower()}-{uuid4().hex[:10]}",
+        business_mode=inventory_context[0],
+        inventory_type=inventory_context[1],
+        actor="pytest",
+    )
+    order = _order(seeded_db, order_type=order_type, account_id=account.id)
+
+    if order_type in {"HS", "TH"}:
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("100"),
+            occurred_on=D,
+            actor="pytest",
+            pool_id=1,
+        )
+
+    order_service.post_event(
+        seeded_db,
+        order.id,
+        event_type="SELL",
+        amount=Decimal("150"),
+        occurred_on=D,
+        actor="pytest",
+        pool_id=2,
+    )
+
+    assert order.status == OrderStatus.COMPLETED.value
+
+
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
     def test_order_and_account_live_fields_round_trip_through_api(
@@ -529,9 +569,8 @@ class TestCreateOrderValidation:
             _order(seeded_db)
         assert "已停用" in str(exc.value)
 
-    def test_dfq_cannot_link_inventory_account(self, seeded_db):
+    def test_dfq_can_link_inventory_account_for_recovery_sale(self, seeded_db):
         account = Account(
-            inventory_no="ACC-DFQ-1",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -540,14 +579,12 @@ class TestCreateOrderValidation:
         seeded_db.add(account)
         seeded_db.flush()
 
-        with pytest.raises(Validation) as exc:
-            _order(seeded_db, order_type="DFQ", account_id=account.id)
+        order = _order(seeded_db, order_type="DFQ", account_id=account.id)
 
-        assert "DFQ 代分期订单不关联库存账号" in str(exc.value)
+        assert order.account_id == account.id
 
     def test_order_rejects_mismatched_existing_account_context(self, seeded_db):
         account = Account(
-            inventory_no="ACC-WRONG-CONTEXT",
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
@@ -563,7 +600,6 @@ class TestCreateOrderValidation:
 
     def test_order_rejects_existing_account_without_context(self, seeded_db):
         account = Account(
-            inventory_no="ACC-MISSING-CONTEXT",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -577,7 +613,6 @@ class TestCreateOrderValidation:
 
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(
-            inventory_no="ACC-SCOPE-1",
             game_account="scope-account",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
@@ -1208,7 +1243,6 @@ class TestCancelOffsetDirection:
 class TestAccountEffect:
     def test_event_updates_account_operator(self, seeded_db):
         account = Account(
-            inventory_no="ACC-ORD-OPERATOR",
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
@@ -1233,7 +1267,6 @@ class TestAccountEffect:
 
     def test_cancel_reverses_cost_and_voids_account(self, seeded_db):
         account = Account(
-            inventory_no="ACC-ORD-1",
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
@@ -1261,7 +1294,6 @@ class TestAccountEffect:
 
     def test_partial_buy_cancel_keeps_account_in_stock(self, seeded_db):
         account = Account(
-            inventory_no="ACC-ORD-PARTIAL",
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
@@ -1288,7 +1320,6 @@ class TestAccountEffect:
 
     def test_cancel_sell_restores_stock_without_reducing_cost(self, seeded_db):
         account = Account(
-            inventory_no="ACC-ORD-SELL-CANCEL",
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,

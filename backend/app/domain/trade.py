@@ -69,7 +69,6 @@ class Account(Base, AuditMixin):
             f"status IN {AccountStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="account_status_valid",
         ),
-        Index("uq_accounts_inventory_no", "inventory_no", unique=True),
         UniqueConstraint("game_account", name="uq_accounts_game_account"),
         Index("ix_accounts_status", "status"),
         CheckConstraint("cost_amount >= 0", name="cost_nonneg"),
@@ -91,7 +90,6 @@ class Account(Base, AuditMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    inventory_no: Mapped[str] = mapped_column(String(32), nullable=False)
     game_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     business_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
     inventory_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
@@ -116,6 +114,9 @@ class Order(Base, AuditMixin):
 
     __tablename__ = "orders"
     __table_args__ = (
+        Index("ix_orders_owner_id", "owner_id"),
+        Index("ix_orders_policy_version_id", "policy_version_id"),
+        Index("ix_orders_account_id", "account_id"),
         CheckConstraint(
             f"status IN {OrderStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="order_status_valid",
@@ -157,10 +158,6 @@ class Order(Base, AuditMixin):
             name="order_commission_type_valid",
         ),
         CheckConstraint(
-            "order_type != 'DFQ' OR account_id IS NULL",
-            name="order_account_link_type_valid",
-        ),
-        CheckConstraint(
             "order_type = 'DFQ' OR account_snapshot IS NULL OR account_snapshot = 'null'",
             name="order_account_snapshot_type_valid",
         ),
@@ -176,7 +173,7 @@ class Order(Base, AuditMixin):
     commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
     expected_settlement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # DFQ 只保留订单内的账号文本快照；HS / TH / DG 通过 account_id 关联库存实体。
+    # DFQ 建单时可只保留账号文本快照；逾期回收后会补建库存实体并写入 account_id。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
@@ -252,6 +249,8 @@ class OrderEvent(Base, AuditMixin):
 
     __tablename__ = "order_events"
     __table_args__ = (
+        Index("ix_order_events_pool_id", "pool_id"),
+        Index("ix_order_events_offset_event_id", "offset_event_id"),
         CheckConstraint(
             f"event_type IN {EventType.values()!r}".replace("[", "(").replace("]", ")"),
             name="event_type_valid",
@@ -397,6 +396,7 @@ class Reconciliation(Base, AuditMixin):
 
     __tablename__ = "reconciliations"
     __table_args__ = (
+        Index("ix_reconciliations_pool_account_id", "pool_account_id"),
         UniqueConstraint(
             "pool_id",
             "pool_account_id",
@@ -445,6 +445,8 @@ class OrderProfitAllocation(Base, TimestampMixin):
 
     __tablename__ = "order_profit_allocations"
     __table_args__ = (
+        Index("ix_order_profit_allocations_policy_version_id", "policy_version_id"),
+        Index("ix_order_profit_allocations_user_id", "user_id"),
         UniqueConstraint("order_id", "allocation_type", "user_id", "role", name="uq_order_profit_alloc"),
         CheckConstraint(
             f"role IN {AllocationRole.values()!r}".replace("[", "(").replace("]", ")"),
@@ -470,10 +472,11 @@ class OrderProfitAllocation(Base, TimestampMixin):
 
 
 class Installment(Base, AuditMixin):
-    """分期合约：一单一合约；STOCK_SALE 仅 HS、ADVANCE_PURCHASE 仅 DFQ。"""
+    """分期合约：一单一合约，按业务类型隔离资金与交付口径。"""
 
     __tablename__ = "installments"
     __table_args__ = (
+        Index("ix_installments_policy_version_id", "policy_version_id"),
         CheckConstraint(
             f"contract_type IN {InstallmentContractType.values()!r}"
             .replace("[", "(").replace("]", ")"),
@@ -487,7 +490,7 @@ class Installment(Base, AuditMixin):
         UniqueConstraint("order_id", name="uq_installments_order"),
         Index("ix_installments_status", "status", "first_due_on"),
         CheckConstraint(
-            "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0 AND waived_amount >= 0",
+            "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0 AND waived_amount >= 0 AND bad_debt_amount >= 0",
             name="amount_nonneg",
         ),
         CheckConstraint(
@@ -524,6 +527,7 @@ class Installment(Base, AuditMixin):
     per_period: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     waived_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    bad_debt_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=InstallmentStatus.PENDING.value
     )
@@ -576,6 +580,7 @@ class InstallmentDisposition(Base, AuditMixin):
 
     __tablename__ = "installment_dispositions"
     __table_args__ = (
+        Index("ix_installment_dispositions_related_order_id", "related_order_id"),
         CheckConstraint(
             f"action IN {InstallmentDispositionAction.values()!r}".replace("[", "(").replace("]", ")"),
             name="installment_disposition_action_valid",
@@ -604,6 +609,9 @@ class Deposit(Base, AuditMixin):
 
     __tablename__ = "deposits"
     __table_args__ = (
+        Index("ix_deposits_counterparty_id", "counterparty_id"),
+        Index("ix_deposits_source_order_id", "source_order_id"),
+        Index("ix_deposits_pool_id", "pool_id"),
         CheckConstraint(
             f"status IN {DepositStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="deposit_status_valid",
@@ -646,6 +654,7 @@ class RebateRecord(Base, AuditMixin):
 
     __tablename__ = "rebate_records"
     __table_args__ = (
+        Index("ix_rebate_records_policy_version_id", "policy_version_id"),
         CheckConstraint(
             f"status IN {RebateStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="rebate_status_valid",
@@ -702,6 +711,8 @@ class RebateSettlement(Base, AuditMixin):
 
     __tablename__ = "rebate_settlements"
     __table_args__ = (
+        Index("ix_rebate_settlements_rebate_record_id", "rebate_record_id"),
+        Index("ix_rebate_settlements_fee_cashflow_id", "fee_cashflow_id"),
         UniqueConstraint("settlement_no", name="uq_rebate_settlements_no"),
         UniqueConstraint("cashflow_id", name="uq_rebate_settlements_flow"),
         Index(

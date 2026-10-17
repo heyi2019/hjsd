@@ -12,7 +12,7 @@ class ReportModel(BaseModel):
 
 
 class InventoryHealthItemOut(ReportModel):
-    inventory_no: str
+    account_id: int
     game_account: str
     platform: str
     business: str | None = None

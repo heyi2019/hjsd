@@ -329,11 +329,25 @@ def create_order(
     db: Session = Depends(get_db),
     user: CurrentUser = create_orders,
 ) -> schemas.OrderOut:
-    if (payload.initial_buy is None) != (payload.installment is None):
-        raise Validation("初始买入和分期合约必须同时提交")
     normalized_order_type = payload.order_type.strip().upper()
-    if payload.initial_buy is not None and normalized_order_type != "DFQ":
-        raise Validation("只有 DFQ 订单可以在创建时提交初始买入和代分期合约")
+    if payload.installment is not None and normalized_order_type in {"TH", "DG"}:
+        raise Validation("TH/DG 分期必须在出售动作中选择付款方式并建立分期合约")
+    if payload.initial_buy is None and payload.installment is not None and normalized_order_type != "DG":
+        raise Validation("TH/DFQ 分期订单必须同时提交初始买入和分期合约")
+    if payload.initial_buy is not None and payload.installment is None:
+        raise Validation("初始买入和分期合约必须同时提交")
+    expected_contract_type = {
+        "DFQ": "ADVANCE_PURCHASE",
+        "TH": "PICKUP_SALE",
+        "DG": "CONSIGNMENT_SALE",
+    }.get(normalized_order_type)
+    if payload.installment is not None and payload.installment.contract_type != expected_contract_type:
+        raise Validation(
+            f"{normalized_order_type} 订单必须使用 {expected_contract_type} 分期合约",
+            details={"contract_type": payload.installment.contract_type},
+        )
+    if payload.initial_buy is not None and normalized_order_type not in {"DFQ", "TH"}:
+        raise Validation("只有 DFQ 或 TH 订单可以在创建时提交初始买入和分期合约")
     owner_id = (
         payload.owner_id
         if user.is_admin or user.owner_scope == "ALL"
@@ -373,7 +387,7 @@ def create_order(
         extra_values=payload.extra_values,
         user=user,
     )
-    if payload.initial_buy is not None and payload.installment is not None:
+    if payload.installment is not None:
         installments_service.create_installment(
             db,
             order_id=order.id,
@@ -395,6 +409,7 @@ def create_order(
             actor=_actor(user),
             user=user,
         )
+    if payload.initial_buy is not None:
         service.post_event(
             db,
             order.id,

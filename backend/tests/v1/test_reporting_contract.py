@@ -190,14 +190,13 @@ class TestR1Inventory:
         item = next(
             row
             for row in reporting_service.r1_inventory_health(seeded_db)["items"]
-            if row["inventory_no"] == account.inventory_no
+            if row["game_account"] == account.game_account
         )
 
         assert item["extra_values"] == {"marketing_note": "重点账号"}
 
     def test_pickup_accounts_are_excluded_from_inventory_health(self, seeded_db):
         pickup = Account(
-            inventory_no="ACC-R1-PICKUP",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
             status=AccountStatus.IN_STOCK.value,
@@ -211,11 +210,10 @@ class TestR1Inventory:
 
         data = reporting_service.r1_inventory_health(seeded_db)
 
-        assert "ACC-R1-PICKUP" not in {item["inventory_no"] for item in data["items"]}
+        assert pickup.id not in {item["account_id"] for item in data["items"]}
 
     def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
         in_stock = Account(
-                inventory_no="ACC-R1-1",
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
@@ -225,14 +223,12 @@ class TestR1Inventory:
             updated_by="pytest",
         )
         sold = Account(
-                inventory_no="ACC-R1-2",
             status=AccountStatus.SOLD.value,
             cost_amount=to_money("800.00"),
             created_by="pytest",
             updated_by="pytest",
         )
         no_buy_date = Account(
-                inventory_no="ACC-R1-3",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("500.00"),
             created_by="pytest",
@@ -258,18 +254,18 @@ class TestR1Inventory:
         )
 
         data = reporting_service.r1_inventory_health(seeded_db)
-        items = {item["inventory_no"]: item for item in data["items"]}
+        items = {item["account_id"]: item for item in data["items"]}
 
         # 非库存状态账号被 continue 排除
-        assert "ACC-R1-2" not in items
+        assert sold.id not in items
         # 无 buy_date → holding_days None、无挂单 → business/owner None
-        idle = items["ACC-R1-3"]
+        idle = items[no_buy_date.id]
         assert idle["holding_days"] is None
         assert idle["business"] is None
         assert idle["owner_id"] is None
         # 在库账号：成本按 BUY 累加（0+1000+800=1800）；
         # order_cost（1800）− 账号成本（1800）= 0；expected_price = 历史 SELL 合计 1500
-        held = items["ACC-R1-1"]
+        held = items[in_stock.id]
         assert held["business"] == "HS"
         assert held["buy_amount"] == 1800
         assert held["extra_cost"] == 0

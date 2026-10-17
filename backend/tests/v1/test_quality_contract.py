@@ -38,7 +38,6 @@ def _order(db, *, order_type="TH", owner_id=None):
 class TestQualityScan:
     def test_does_not_flag_inventory_account_link_on_th_order(self, seeded_db):
         account = Account(
-            inventory_no="ACC-QUALITY-LINK",
             game_account="quality-link-account",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",

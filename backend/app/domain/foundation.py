@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Index,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -127,6 +128,7 @@ class OrderTypePool(Base, TimestampMixin):
 
     __tablename__ = "order_type_pools"
     __table_args__ = (
+        Index("ix_order_type_pools_pool_id", "pool_id"),
         CheckConstraint(
             f"portion IN {Portion.values()!r}".replace("[", "(").replace("]", ")"),
             name="portion_valid",

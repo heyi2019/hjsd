@@ -18,7 +18,9 @@ class ScheduleCreate(RequestModel):
 
 class InstallmentCreate(RequestModel):
     order_id: int
-    contract_type: str = Field(description="STOCK_SALE / ADVANCE_PURCHASE")
+    contract_type: str = Field(
+        description="STOCK_SALE / ADVANCE_PURCHASE / PICKUP_SALE / CONSIGNMENT_SALE"
+    )
     principal: Decimal = Decimal("0")
     down_payment: Decimal = Decimal("0")
     service_fee: Decimal = Decimal("0")
@@ -47,6 +49,7 @@ class InstallmentOut(BaseModel):
     per_period: Decimal
     paid_amount: Decimal
     waived_amount: Decimal
+    bad_debt_amount: Decimal
     status: str
     delivery_mode: str | None = None
     delivered_on: date | None = None

@@ -12,7 +12,12 @@ from app.core.errors import ErrorCode, Validation
 
 ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     "ACTIVE": {"COMPLETE": "COMPLETED", "CANCEL": "CANCELLED"},
-    "COMPLETED": {},
+    # 完成后的 SELL 仍可通过带 offset_event_id 的 CANCEL 冲销，
+    # 以支持售出撤销并恢复库存；完整冲销后订单进入 CANCELLED。
+    "COMPLETED": {
+        "BUY": "ACTIVE",
+        "CANCEL": "CANCELLED",
+    },
     "CANCELLED": {},
 }
 
@@ -36,10 +41,16 @@ INSTALLMENT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
         "CANCEL": "CANCELLED",
     },
     "ACTIVE": {"PAYMENT": "ACTIVE", "MARK_OVERDUE": "OVERDUE", "SETTLE": "SETTLED", "DEFAULT": "DEFAULTED"},
-    "OVERDUE": {"PAYMENT": "OVERDUE", "SETTLE": "SETTLED", "DEFAULT": "DEFAULTED"},
+    "OVERDUE": {
+        "PAYMENT": "OVERDUE",
+        "SETTLE": "SETTLED",
+        "DEFAULT": "DEFAULTED",
+        "CLOSE": "CLOSED",
+    },
     "SETTLED": {"DELIVER": "DELIVERED"},
     "DELIVERED": {},
-    "DEFAULTED": {"PAYMENT": "DEFAULTED"},
+    "DEFAULTED": {"PAYMENT": "DEFAULTED", "CLOSE": "CLOSED"},
+    "CLOSED": {},
     "CANCELLED": {},
 }
 

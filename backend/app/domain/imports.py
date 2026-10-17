@@ -31,6 +31,7 @@ class ImportBatch(Base, AuditMixin):
 
     __tablename__ = "import_batches"
     __table_args__ = (
+        Index("ix_import_batches_corrects_batch_id", "corrects_batch_id"),
         CheckConstraint(
             f"status IN {ImportBatchStatus.values()!r}"
             .replace("[", "(")
@@ -76,6 +77,8 @@ class ImportRow(Base, TimestampMixin):
 
     __tablename__ = "import_rows"
     __table_args__ = (
+        Index("ix_import_rows_mapped_order_id", "mapped_order_id"),
+        Index("ix_import_rows_mapped_account_id", "mapped_account_id"),
         CheckConstraint(
             f"status IN {ImportRowStatus.values()!r}"
             .replace("[", "(")

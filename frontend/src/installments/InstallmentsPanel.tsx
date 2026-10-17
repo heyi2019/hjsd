@@ -1,4 +1,4 @@
-/** 分期：分期出售（STOCK_SALE）与代分期（ADVANCE_PURCHASE）分列（页面原型 §3.4）。
+/** 分期：按业务合约类型分列，支持 HS / DFQ / TH / DG 的收款与风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
 import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -49,12 +49,10 @@ function ContractTable({
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
-  const [resaleTarget, setResaleTarget] = useState<Installment | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
-  const [resaleForm] = Form.useForm();
 
   const load = useCallback(async () => {
     try {
@@ -133,23 +131,6 @@ function ContractTable({
     }
   };
 
-  const submitResale = async (values: Record<string, unknown>) => {
-    if (!resaleTarget) return;
-    try {
-      await installmentsApi.resale(resaleTarget.id, {
-        resale_order_id: Number(values.resale_order_id),
-        occurred_on: values.occurred_on as string,
-        note: values.note as string,
-      });
-      message.success("回收账号已登记转售");
-      setResaleTarget(null);
-      resaleForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
-  };
-
   // 只读展示口径：总应收 = 首付 + 每期 × 期数。
   const receivable = (row: Installment) =>
     Number(row.down_payment) + Number(row.per_period) * row.periods;
@@ -209,10 +190,20 @@ function ContractTable({
       render: (v: string) => <MoneyText value={v} />,
     },
     {
+      title: "坏账",
+      dataIndex: "bad_debt_amount",
+      align: "right",
+      render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
+    },
+    {
       title: "剩余",
       align: "right",
       render: (_v, row) => (
-        <MoneyText value={(receivable(row) - Number(row.paid_amount)).toFixed(2)} />
+        <MoneyText
+          value={(
+            receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)
+          ).toFixed(2)}
+        />
       ),
     },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={INSTALLMENT_STATUS_LABEL[v] ?? v} /> },
@@ -223,7 +214,7 @@ function ContractTable({
           <PermissionButton
             permission="order.event.post"
             size="small"
-            disabled={["DELIVERED", "CANCELLED"].includes(row.status)}
+            disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
             onClick={() => {
               setPayTarget(row);
               payForm.setFieldsValue({ paid_on: today() });
@@ -247,7 +238,7 @@ function ContractTable({
             permission="order.exception.approve"
             size="small"
             disabled={
-              !(["OVERDUE", "DEFAULTED"].includes(row.status))
+              !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status))
               || (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
             }
             onClick={() => {
@@ -257,20 +248,11 @@ function ContractTable({
           >
             登记回收
           </PermissionButton>
-          <PermissionButton
-            permission="order.exception.approve"
-            size="small"
-            disabled={
-              !(["OVERDUE", "DEFAULTED"].includes(row.status))
-              || (dispositions[row.id] ?? []).some((item) => item.action === "RESELL")
-            }
-            onClick={() => {
-              setResaleTarget(row);
-              resaleForm.setFieldsValue({ occurred_on: today() });
-            }}
-          >
-            登记转售
-          </PermissionButton>
+          {row.status === "CLOSED"
+            && (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
+            && !(dispositions[row.id] ?? []).some((item) => item.action === "RESELL") ? (
+              <Typography.Text type="secondary">请到库存中心售出，系统自动关联</Typography.Text>
+            ) : null}
         </Space>
       ),
     },
@@ -336,7 +318,7 @@ function ContractTable({
                 {(dispositions[row.id] ?? []).length > 0 && (
                   <Typography.Paragraph>
                     处置记录：{(dispositions[row.id] ?? []).map((item) =>
-                      `${item.action === "RECOVER" ? "回收" : "转售"}（${item.occurred_on}）`,
+                      `${item.action === "RECOVER" ? "回收" : "出售"}（${item.occurred_on}）`,
                     ).join("、")}
                   </Typography.Paragraph>
                 )}
@@ -394,33 +376,6 @@ function ContractTable({
       </Modal>
 
       <Modal
-        title={resaleTarget ? `逾期转售 · ${resaleTarget.inst_no}` : "逾期转售"}
-        open={Boolean(resaleTarget)}
-        onCancel={() => setResaleTarget(null)}
-        footer={null}
-      >
-        <Form form={resaleForm} layout="vertical" onFinish={submitResale}>
-          <Form.Item name="resale_order_id" label="转售订单" rules={[{ required: true }]}>
-            <Select
-              options={orders
-                .filter((order) => order.order_type === "HS" && order.id !== resaleTarget?.order_id)
-                .map((order) => ({ value: order.id, label: order.order_no }))}
-              placeholder="请选择已登记 SELL 的新售出订单"
-            />
-          </Form.Item>
-          <Form.Item name="occurred_on" label="转售日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="note" label="转售说明" rules={[{ required: true }]}>
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">
-            确认转售
-          </PermissionButton>
-        </Form>
-      </Modal>
-
-      <Modal
         title={deliverTarget ? `换绑交付 · ${deliverTarget.inst_no}` : "换绑交付"}
         open={Boolean(deliverTarget)}
         onCancel={() => setDeliverTarget(null)}
@@ -473,6 +428,16 @@ export function InstallmentsPanel() {
           key: "advance",
           label: "代分期",
           children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey} />,
+        },
+        {
+          key: "pickup",
+          label: "提号分期",
+          children: <ContractTable contractType="PICKUP_SALE" reloadKey={reloadKey} />,
+        },
+        {
+          key: "consignment",
+          label: "代挂分期",
+          children: <ContractTable contractType="CONSIGNMENT_SALE" reloadKey={reloadKey} />,
         },
       ]}
     />

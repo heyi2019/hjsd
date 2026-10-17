@@ -104,6 +104,7 @@ function orderSearchText(order: Order): string {
     order.account_channel_region,
     order.party_name,
     order.party_source,
+    order.note,
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
@@ -253,7 +254,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   <Input
                     allowClear
                     value={keyword}
-                    placeholder="搜索订单号 / 游戏账号 / 对方"
+                    placeholder="搜索订单号 / 游戏账号 / 对方 / 备注"
                     aria-label="搜索订单"
                     className="orders-ledger-search"
                     onChange={(event) => {

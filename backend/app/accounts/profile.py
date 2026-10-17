@@ -11,7 +11,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
-from app.domain.enums import AccountStatus, AuditAction, SequenceKey
+from app.domain.enums import AccountStatus, AuditAction
 from app.domain.trade import Account
 from app.parties import service as parties_service
 from ._common import (
@@ -48,16 +48,15 @@ def create_account(
     exists = session.scalar(select(Account).where(Account.game_account == identifier))
     if exists is not None:
         raise Conflict(
-            f"账号 {identifier} 已在台账中（{exists.inventory_no}）",
+            f"账号 {identifier} 已在台账中",
             code=ErrorCode.DUPLICATE_CODE,
-            details={"inventory_no": exists.inventory_no},
+            details={"game_account": identifier},
         )
     validate_inventory_context(business_mode, inventory_type)
     has_secondary = validate_optional_bool(has_secondary, field="has_secondary")
     validated_images = validate_account_images(account_images)
     validate_account_profile_scope(inventory_type, account_description, validated_images)
     account = Account(
-        inventory_no=allocate_number(session, SequenceKey.ACCOUNT),
         game_type=game_type,
         business_mode=business_mode,
         inventory_type=inventory_type,
@@ -87,10 +86,9 @@ def create_account(
         session,
         action=AuditAction.ACCOUNT_CREATE,
         entity_type="account",
-        entity_id=account.inventory_no,
+        entity_id=str(account.id),
         actor=actor,
         after={
-            "inventory_no": account.inventory_no,
             "game_account": account.game_account,
             "game_type": account.game_type,
             "business_mode": account.business_mode,
@@ -149,9 +147,9 @@ def update_account_profile(
         exists = session.scalar(select(Account).where(Account.game_account == identifier, Account.id != account_id))
         if exists is not None:
             raise Conflict(
-                f"账号 {identifier} 已在台账中（{exists.inventory_no}）",
+                f"账号 {identifier} 已在台账中（账号ID {exists.id}）",
                 code=ErrorCode.DUPLICATE_CODE,
-                details={"inventory_no": exists.inventory_no},
+                details={"account_id": exists.id},
             )
         next_game_account = identifier
     validated_images = validate_account_images(account_images) if account_images is not _UNSET else _UNSET
@@ -189,7 +187,7 @@ def update_account_profile(
         session,
         action=AuditAction.ACCOUNT_UPDATE,
         entity_type="account",
-        entity_id=account.inventory_no,
+        entity_id=str(account.id),
         actor=actor,
         before=before,
         after={

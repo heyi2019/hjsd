@@ -1,8 +1,9 @@
 """installments.service：分期合约、期次计划、收款与交付（ACC-01 / HS-01-06 / DFQ-01）。
 
 口径：
-- `STOCK_SALE` 只允许已买入且在库的 HS 账号，**不新增 BUY**（A05）；
-- `ADVANCE_PURCHASE` 只允许 DFQ（A04），两者不得混用；
+    - `STOCK_SALE` 只允许已买入且在库的 HS 账号，**不新增 BUY**（A05）；
+    - `ADVANCE_PURCHASE` 只允许 DFQ（A04）；
+    - `PICKUP_SALE` 只允许 TH，`CONSIGNMENT_SALE` 只允许 DG；
 - `PAYMENT` 是收入事实，产生现金流；`DELIVER` 无金额、无现金流；
 - 应收 = 首付 + 期数 × 每期；已收由收款事件累计，不允许直接改。
 """
@@ -47,6 +48,7 @@ from app.domain.trade import (
     OrderProfitAllocation,
 )
 from app.domain.users import User
+from app.accounts import service as accounts_service
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.installments.schemas import ScheduleCreate
@@ -71,6 +73,122 @@ def _required_text(value: Any, *, field: str, message: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise Validation(message, details={"field": field})
     return value.strip()
+
+
+def _materialize_dfq_recovery_account(
+    session: Session,
+    order: Order,
+    *,
+    actor: str,
+) -> Account:
+    """DFQ 原本只存账号快照；首次回收时把资产快照转为可售库存账号。"""
+    snapshot = order.account_snapshot or {}
+    game_account = snapshot.get("game_account")
+    if not isinstance(game_account, str) or not game_account.strip():
+        raise Validation("DFQ 分期缺少可回收的账号资料")
+    existing = session.scalar(
+        select(Account).where(Account.game_account == game_account.strip())
+    )
+    if existing is not None:
+        raise Conflict(
+            f"账号 {game_account.strip()} 已存在，不能从 DFQ 快照重复建库存账号"
+        )
+    account = accounts_service.create_account(
+        session,
+        game_account=game_account,
+        game_type=snapshot.get("game_type"),
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        game_password=snapshot.get("game_password"),
+        channel_region=snapshot.get("channel_region"),
+        bound_phone=snapshot.get("bound_phone"),
+        has_secondary=snapshot.get("has_secondary"),
+        platform=snapshot.get("platform"),
+        note=snapshot.get("note"),
+        actor=actor,
+    )
+    historical_cost = sum(
+        (
+            event.amount
+            for event in session.scalars(
+                select(OrderEvent).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event_type.in_({EventType.BUY.value, EventType.COST.value}),
+                    OrderEvent.is_posted.is_(True),
+                )
+            ).all()
+        ),
+        Decimal("0"),
+    )
+    account.cost_amount = to_money(historical_cost)
+    account.buy_date = order.trade_date if historical_cost > 0 else None
+    account.status = AccountStatus.INSTALLMENT.value
+    account.updated_by = actor
+    order.account_id = account.id
+    order.updated_by = actor
+    session.flush()
+    return account
+
+
+def link_recovered_sale(
+    session: Session,
+    order: Order,
+    *,
+    occurred_on: date,
+    actor: str,
+    note: str | None = None,
+) -> InstallmentDisposition | None:
+    """把回收账号的新出售事实关联到最近一笔未转售的原分期。"""
+    if order.account_id is None:
+        return None
+    candidates = session.scalars(
+        select(InstallmentDisposition)
+        .join(Installment, Installment.id == InstallmentDisposition.installment_id)
+        .where(
+            InstallmentDisposition.account_id == order.account_id,
+            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
+            Installment.order_id != order.id,
+        )
+        .order_by(InstallmentDisposition.occurred_on.desc(), InstallmentDisposition.id.desc())
+    ).all()
+    recovered = next(
+        (
+            candidate
+            for candidate in candidates
+            if session.scalar(
+                select(InstallmentDisposition.id).where(
+                    InstallmentDisposition.installment_id == candidate.installment_id,
+                    InstallmentDisposition.action == InstallmentDispositionAction.RESELL.value,
+                )
+            ) is None
+        ),
+        None,
+    )
+    if recovered is None:
+        return None
+    disposition = InstallmentDisposition(
+        installment_id=recovered.installment_id,
+        account_id=order.account_id,
+        action=InstallmentDispositionAction.RESELL.value,
+        occurred_on=occurred_on,
+        related_order_id=order.id,
+        note=note or f"库存中心出售自动关联订单 {order.order_no}",
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(disposition)
+    session.flush()
+    installment = session.get(Installment, recovered.installment_id)
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_RESELL,
+        entity_type="installment",
+        entity_id=installment.inst_no if installment is not None else str(recovered.installment_id),
+        actor=actor,
+        after={"account_id": order.account_id, "sale_order_id": order.id},
+        reason=disposition.note,
+    )
+    return disposition
 
 
 def _normalize_schedule(schedule: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -191,11 +309,25 @@ def create_installment(
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "order_type": order.order_type},
             )
-        if order.account_id is not None:
+        if order.account_id is not None and account is None:
             raise Validation(
-                "ADVANCE_PURCHASE 不关联库存账号",
+                "ADVANCE_PURCHASE 关联的库存账号不存在",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "account_id": order.account_id},
+            )
+    elif contract_type == InstallmentContractType.PICKUP_SALE.value:
+        if order.order_type != "TH":
+            raise Validation(
+                "PICKUP_SALE 只能用于 TH 订单",
+                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+                details={"order_no": order.order_no, "order_type": order.order_type},
+            )
+    elif contract_type == InstallmentContractType.CONSIGNMENT_SALE.value:
+        if order.order_type != "DG":
+            raise Validation(
+                "CONSIGNMENT_SALE 只能用于 DG 订单",
+                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+                details={"order_no": order.order_no, "order_type": order.order_type},
             )
 
     existing = session.scalar(
@@ -281,6 +413,7 @@ def create_installment(
         per_period=per_period_amount,
         paid_amount=Decimal("0"),
         waived_amount=Decimal("0"),
+        bad_debt_amount=Decimal("0"),
         status=InstallmentStatus.PENDING.value,
         first_due_on=first_due_on,
         delivery_mode=delivery_mode,
@@ -335,6 +468,13 @@ def create_installment(
     if account is not None:
         account.status = AccountStatus.INSTALLMENT.value
         account.updated_by = actor
+    link_recovered_sale(
+        session,
+        order,
+        occurred_on=order.trade_date,
+        actor=actor,
+        note=note,
+    )
 
     record_audit(
         session,
@@ -770,7 +910,7 @@ def recover_account(
     note: str,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
-    """登记逾期/违约后的账号回收，不改写原分期应收。"""
+    """登记账号回收并关闭原分期，不改写原分期应收。"""
     text_note = _required_text(note, field="note", message="回收必须填写说明")
     installment = get_installment(session, installment_id, user)
     if installment.status not in {
@@ -779,7 +919,11 @@ def recover_account(
     }:
         raise Validation("只有逾期或违约合约可以回收账号")
     order = session.get(Order, installment.order_id)
-    if order is None or order.account_id is None:
+    if order is None:
+        raise Validation("分期合约没有所属订单")
+    if order.account_id is None and order.order_type == "DFQ":
+        _materialize_dfq_recovery_account(session, order, actor=actor)
+    if order.account_id is None:
         raise Validation("分期合约没有可回收的账号")
     account = session.get(Account, order.account_id)
     if account is None:
@@ -796,6 +940,14 @@ def recover_account(
         ACCOUNT_TRANSITIONS, account.status, "RECOVER", entity="账号"
     )
     account.updated_by = actor
+    installment.status = transition(
+        INSTALLMENT_TRANSITIONS, installment.status, "CLOSE", entity="分期合约"
+    )
+    installment.bad_debt_amount = max(
+        Decimal("0"),
+        total_receivable(installment) - to_money(installment.paid_amount),
+    )
+    installment.updated_by = actor
     disposition = InstallmentDisposition(
         installment_id=installment.id,
         account_id=account.id,
@@ -813,7 +965,88 @@ def recover_account(
         entity_type="installment",
         entity_id=installment.inst_no,
         actor=actor,
-        after={"account_id": account.id, "occurred_on": occurred_on.isoformat()},
+        after={
+            "account_id": account.id,
+            "occurred_on": occurred_on.isoformat(),
+            "status": installment.status,
+            "bad_debt_amount": str(to_money(installment.bad_debt_amount)),
+        },
+        reason=text_note,
+    )
+    return disposition
+
+
+def record_sale(
+    session: Session,
+    installment_id: int,
+    *,
+    sale_order_id: int,
+    occurred_on: date,
+    actor: str,
+    note: str,
+    user: CurrentUser | None = None,
+) -> InstallmentDisposition:
+    """登记回收账号的出售订单，并保留原分期与出售订单的利润关联。"""
+    text_note = _required_text(note, field="note", message="出售必须填写说明")
+    installment = get_installment(session, installment_id, user)
+    if installment.status not in {
+        InstallmentStatus.CLOSED.value,
+        InstallmentStatus.OVERDUE.value,
+        InstallmentStatus.DEFAULTED.value,
+    }:
+        raise Validation("只有已关闭、逾期或违约合约可以登记出售")
+    original_order = session.get(Order, installment.order_id)
+    sale_order = session.get(Order, sale_order_id)
+    if original_order is None or original_order.account_id is None:
+        raise Validation("分期合约没有可出售的账号")
+    if sale_order is None or sale_order.id == original_order.id:
+        raise Validation("出售必须关联新的售出订单")
+    if sale_order.account_id != original_order.account_id:
+        raise Validation("出售订单必须关联同一个账号")
+    recovered = session.scalar(
+        select(InstallmentDisposition).where(
+            InstallmentDisposition.installment_id == installment.id,
+            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
+        )
+    )
+    if recovered is None:
+        raise Validation("出售前必须先登记回收")
+    posted_sell = session.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == sale_order.id,
+            OrderEvent.event_type == EventType.SELL.value,
+            OrderEvent.is_posted.is_(True),
+        )
+    )
+    if posted_sell is None:
+        raise Validation("出售订单必须先登记 SELL 事件")
+    existing = session.scalar(
+        select(InstallmentDisposition).where(
+            InstallmentDisposition.installment_id == installment.id,
+            InstallmentDisposition.action == InstallmentDispositionAction.RESELL.value,
+        )
+    )
+    if existing is not None:
+        raise Conflict("该分期合约已登记出售")
+    disposition = InstallmentDisposition(
+        installment_id=installment.id,
+        account_id=original_order.account_id,
+        action=InstallmentDispositionAction.RESELL.value,
+        occurred_on=occurred_on,
+        related_order_id=sale_order.id,
+        note=text_note,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(disposition)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_RESELL,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        after={"account_id": original_order.account_id, "sale_order_id": sale_order.id},
         reason=text_note,
     )
     return disposition
@@ -829,69 +1062,16 @@ def record_resale(
     note: str,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
-    """登记回收账号已通过新库存售出流程转售。"""
-    text_note = _required_text(note, field="note", message="转售必须填写说明")
-    installment = get_installment(session, installment_id, user)
-    if installment.status not in {
-        InstallmentStatus.OVERDUE.value,
-        InstallmentStatus.DEFAULTED.value,
-    }:
-        raise Validation("只有逾期或违约合约可以登记转售")
-    original_order = session.get(Order, installment.order_id)
-    resale_order = session.get(Order, resale_order_id)
-    if original_order is None or original_order.account_id is None:
-        raise Validation("分期合约没有可转售的账号")
-    if resale_order is None or resale_order.id == original_order.id:
-        raise Validation("转售必须关联新的售出订单")
-    if resale_order.account_id != original_order.account_id:
-        raise Validation("转售订单必须关联同一个账号")
-    recovered = session.scalar(
-        select(InstallmentDisposition).where(
-            InstallmentDisposition.installment_id == installment.id,
-            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
-        )
-    )
-    if recovered is None:
-        raise Validation("转售前必须先登记回收")
-    posted_sell = session.scalar(
-        select(OrderEvent.id).where(
-            OrderEvent.order_id == resale_order.id,
-            OrderEvent.event_type == EventType.SELL.value,
-            OrderEvent.is_posted.is_(True),
-        )
-    )
-    if posted_sell is None:
-        raise Validation("转售订单必须先登记 SELL 事件")
-    existing = session.scalar(
-        select(InstallmentDisposition).where(
-            InstallmentDisposition.installment_id == installment.id,
-            InstallmentDisposition.action == InstallmentDispositionAction.RESELL.value,
-        )
-    )
-    if existing is not None:
-        raise Conflict("该分期合约已登记转售")
-    disposition = InstallmentDisposition(
-        installment_id=installment.id,
-        account_id=original_order.account_id,
-        action=InstallmentDispositionAction.RESELL.value,
-        occurred_on=occurred_on,
-        related_order_id=resale_order.id,
-        note=text_note,
-        created_by=actor,
-        updated_by=actor,
-    )
-    session.add(disposition)
-    session.flush()
-    record_audit(
+    """兼容旧调用；新流程统一使用 record_sale。"""
+    return record_sale(
         session,
-        action=AuditAction.INSTALLMENT_RESELL,
-        entity_type="installment",
-        entity_id=installment.inst_no,
+        installment_id,
+        sale_order_id=resale_order_id,
+        occurred_on=occurred_on,
         actor=actor,
-        after={"account_id": original_order.account_id, "resale_order_id": resale_order.id},
-        reason=text_note,
+        note=note,
+        user=user,
     )
-    return disposition
 
 
 def list_dispositions(

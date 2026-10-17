@@ -27,6 +27,7 @@ from app.domain.enums import (
     CashflowStatus,
     Direction,
     EventType,
+    InstallmentDispositionAction,
     Nature,
     OrderStatus,
     RebateStatus,
@@ -39,6 +40,8 @@ from app.domain.trade import (
     Order,
     OrderEvent,
     OrderProfitAllocation,
+    Installment,
+    InstallmentDisposition,
     RebateRecord,
     RebateSettlement,
 )
@@ -268,6 +271,46 @@ def _event_totals(
     return income, buy_amount, direct_cost
 
 
+def _bad_debt_rows(
+    session: Session,
+    *,
+    user: CurrentUser | None = None,
+) -> list[tuple[int, Decimal, date]]:
+    """Return (order_id, recognized_loss, recognized_on) for recovered contracts."""
+    stmt = (
+        select(
+            Installment.order_id,
+            Installment.bad_debt_amount,
+            InstallmentDisposition.occurred_on,
+        )
+        .join(
+            InstallmentDisposition,
+            InstallmentDisposition.installment_id == Installment.id,
+        )
+        .join(Order, Order.id == Installment.order_id)
+        .where(
+            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
+            Installment.bad_debt_amount > 0,
+        )
+    )
+    stmt = _apply_order_scope(stmt, user, session)
+    return [
+        (order_id, _money(amount), occurred_on)
+        for order_id, amount, occurred_on in session.execute(stmt).all()
+    ]
+
+
+def _bad_debt_by_order(
+    session: Session,
+    *,
+    user: CurrentUser | None = None,
+) -> dict[int, Decimal]:
+    totals: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    for order_id, amount, _occurred_on in _bad_debt_rows(session, user=user):
+        totals[order_id] += amount
+    return totals
+
+
 def _month_key(value: date) -> str:
     return f"{value.year:04d}-{value.month:02d}"
 
@@ -352,7 +395,7 @@ def r1_inventory_health(
         total_cost = _money(account.cost_amount)
         items.append(
             {
-                "inventory_no": account.inventory_no,
+                "account_id": account.id,
                 "game_account": account.game_account,
                 "platform": account.platform,
                 "business": ",".join({o.order_type for o in orders}) or None,
@@ -401,6 +444,13 @@ def r2_monthly_pnl(
         income, buy_amount, event_cost = _event_contribution(event, event_types)
         revenue[key] += income
         direct_cost[key] += buy_amount + event_cost
+
+    for _order_id, amount, occurred_on in _bad_debt_rows(session, user=user):
+        if from_date and occurred_on < from_date:
+            continue
+        if to_date and occurred_on > to_date:
+            continue
+        direct_cost[_month_key(occurred_on)] += amount
 
     # 运营费用只认资金属性，避免依赖自由填写的流水类别。
     op_stmt = select(Cashflow).where(
@@ -525,6 +575,8 @@ def r3_commission_reconciliation(
     for order_id, order_events in events_by_order.items():
         income, buy_amount, direct_cost = _event_totals(order_events)
         per_order_profit[order_id] = income - buy_amount - direct_cost
+    for order_id, amount in _bad_debt_by_order(session, user=user).items():
+        per_order_profit[order_id] -= amount
 
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for allocation, order in rows:
@@ -607,6 +659,15 @@ def r5_business_pnl(
         )
         revenue[order_type] += income
         cost[order_type] += buy_amount + direct_cost
+
+    for order_id, amount, occurred_on in _bad_debt_rows(session, user=user):
+        if from_date and occurred_on < from_date:
+            continue
+        if to_date and occurred_on > to_date:
+            continue
+        order_type = order_types.get(order_id)
+        if order_type is not None:
+            cost[order_type] += amount
 
     settled: dict[str, Decimal] = defaultdict(lambda: ZERO)
     unsettled: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -826,6 +887,7 @@ def order_profit_detail(
     extra_values = parties_service.get_extra_values_bulk(
         session, entity_type="order", entity_ids=[order.id for order in orders]
     )
+    bad_debt_by_order = _bad_debt_by_order(session, user=user)
     items = []
     for order in orders:
         if from_date and order.trade_date < from_date:
@@ -836,6 +898,7 @@ def order_profit_detail(
             select(OrderEvent).where(OrderEvent.order_id == order.id)
         ).all()
         income, buy, direct_cost = _event_totals(events)
+        direct_cost += bad_debt_by_order.get(order.id, ZERO)
         rebate = ZERO
         settlements = session.execute(
             select(

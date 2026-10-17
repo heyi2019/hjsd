@@ -113,7 +113,7 @@ export function InventoryRebateModal(props: {
       }
     >
       <ErrorBanner error={error} />
-      <p className="muted">{props.account?.inventory_no} · {props.account?.game_account ?? "未填写账号"}</p>
+      <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
       {loading ? <Spin size="small" /> : (
         <Form form={form} layout="vertical" onFinish={submit}>
           <Form.Item

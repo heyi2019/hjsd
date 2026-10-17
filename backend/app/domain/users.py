@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -24,6 +24,7 @@ class Team(Base, TimestampMixin):
 class User(Base, TimestampMixin):
     __tablename__ = "users"
     __table_args__ = (
+        Index("ix_users_handover_user_id", "handover_user_id"),
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("phone", name="uq_users_phone"),
         CheckConstraint(

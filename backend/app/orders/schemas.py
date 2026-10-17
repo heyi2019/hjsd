@@ -27,7 +27,7 @@ class CounterpartyRoleInput(BaseModel):
 
 
 class OrderAccountSnapshot(BaseModel):
-    """DFQ 订单内的账号文本快照，不承载库存营销资料或库存字段。"""
+    """DFQ 建单时的账号文本快照，逾期回收时可转为库存账号。"""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
@@ -62,7 +62,9 @@ class OrderInstallmentScheduleCreate(BaseModel):
 class OrderInstallmentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    contract_type: str = Field(description="ADVANCE_PURCHASE")
+    contract_type: str = Field(
+        description="ADVANCE_PURCHASE / PICKUP_SALE / CONSIGNMENT_SALE"
+    )
     principal: Decimal = Field(default=Decimal("0"), ge=0)
     down_payment: Decimal = Field(default=Decimal("0"), ge=0)
     service_fee: Decimal = Field(default=Decimal("0"), ge=0)
@@ -82,7 +84,7 @@ class OrderCreate(BaseModel):
     trade_date: date
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
-    # HS / TH / DG 内联游戏账号字段，逐个独立落库（DFQ 走 account_snapshot，不填这些）。
+    # HS / TH / DG 内联游戏账号字段，DFQ 建单仍走 account_snapshot。
     game_type: str | None = Field(default=None, max_length=64)
     game_account: str | None = Field(default=None, max_length=128)
     game_password: str | None = Field(default=None, max_length=256)
@@ -274,6 +276,7 @@ class OrderInstallmentOut(BaseModel):
     per_period: Decimal
     paid_amount: Decimal
     waived_amount: Decimal
+    bad_debt_amount: Decimal
     status: str
     delivery_mode: str | None = None
     delivered_on: date | None = None

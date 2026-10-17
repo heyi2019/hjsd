@@ -36,9 +36,9 @@ beforeEach(() => {
   customersList.mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
   counterpartiesList.mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
   accountsList.mockResolvedValue([
-    { id: 9, inventory_no: "ACC0001", game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
-    { id: 10, inventory_no: "ACC0002", game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
-    { id: 11, inventory_no: "ACC0003", game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
+    { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
+    { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
+    { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
   ]);
   poolsList.mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   ordersList.mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
@@ -153,6 +153,8 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     expect(screen.queryByText("付款方：")).toBeNull();
     expect(screen.queryByText("预计结算日：")).toBeNull();
     expect(screen.getByLabelText("客户昵称")).toBeInTheDocument();
+    expect(screen.queryByText("分期设置")).toBeNull();
+    expect(screen.queryByLabelText("建立代挂分期合同")).toBeNull();
   });
 
   it("代分期表单展示金额、可自定义期次和付款信息", async () => {

@@ -33,4 +33,4 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    assert public_routes == 140
+    assert public_routes == 149

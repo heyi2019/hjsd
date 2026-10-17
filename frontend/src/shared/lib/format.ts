@@ -32,6 +32,7 @@ export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
   SETTLED: "已结清",
   DELIVERED: "已交付",
   DEFAULTED: "违约",
+  CLOSED: "已关闭",
   CANCELLED: "已取消",
 };
 

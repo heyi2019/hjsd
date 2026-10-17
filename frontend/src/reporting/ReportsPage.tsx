@@ -177,7 +177,6 @@ function InventoryReport() {
     [],
   );
   const columns: ColumnsType<InventoryHealthRow> = [
-    { title: "库存编号", dataIndex: "inventory_no", width: 140 },
     { title: "游戏账号", dataIndex: "game_account" },
     { title: "平台", dataIndex: "platform", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },

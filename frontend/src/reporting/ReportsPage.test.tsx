@@ -123,7 +123,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       total_cost: "100.00",
       items: [
         {
-          inventory_no: "ACC0001",
+          account_id: 1,
           game_account: "acc-1",
           platform: "A",
           status: "IN_STOCK",
@@ -135,7 +135,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       ],
     });
     renderApp(<ReportsPage />, { user: "admin" });
-    await screen.findByText("ACC0001");
+    await screen.findByText("acc-1");
     expect(screen.getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("5天")).toBeInTheDocument();
   });

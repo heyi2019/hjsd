@@ -74,7 +74,7 @@ export function InventoryConsignmentModal(props: {
       }
     >
       <ErrorBanner error={error} />
-      <p className="muted">{props.account?.inventory_no} · {props.account?.game_account ?? "未填写账号"}</p>
+      <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
       <Form form={form} layout="vertical" onFinish={submit}>
         <Form.Item
           name="platform_ids"

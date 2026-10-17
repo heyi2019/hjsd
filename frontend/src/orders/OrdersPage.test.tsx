@@ -67,6 +67,27 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.getAllByText("已完成").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
+    ordersList.mockResolvedValueOnce([
+      ...orders,
+      {
+        id: 3,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        capital_type: "ZERO",
+        trade_date: "2026-10-03",
+        status: "ACTIVE",
+        note: "[批量验收] DG 分期出售",
+      },
+    ]);
+
+    await openLedger();
+    await userEvent.type(screen.getByLabelText("搜索订单"), "批量验收");
+
+    expect(screen.getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
+    expect(screen.queryByText("HS-2026-0001")).toBeNull();
+  });
+
   it("业务台账统一展示通用字段", async () => {
     await openLedger();
 

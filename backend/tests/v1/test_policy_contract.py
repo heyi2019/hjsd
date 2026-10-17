@@ -397,16 +397,26 @@ class TestPolicyApi:
         put = seeded_client.put(
             f"/api/v1/orders/{order.id}/profit-allocations",
             headers=json_headers,
-            json={"items": [{"user_id": 7, "role": "SALES", "allocation_rate": 100}]},
+            json={
+                "items": [
+                    {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": 0},
+                    {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": 0},
+                    {"allocation_type": "OPERATION", "user_id": 7, "role": "OWNER", "allocation_rate": 100},
+                    {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": 0},
+                ]
+            },
         )
         assert put.status_code == 200, put.text
-        assert put.json()["total"] == 1
+        assert put.json()["total"] == 4
 
         listed = seeded_client.get(
             f"/api/v1/orders/{order.id}/profit-allocations", headers=json_headers
         )
         assert listed.status_code == 200
-        assert listed.json()["items"][0]["user_id"] == 7
+        operation = next(
+            item for item in listed.json()["items"] if item["allocation_type"] == "OPERATION"
+        )
+        assert operation["user_id"] == 7
 
     def test_policy_snapshot_endpoint(self, seeded_client, seeded_db, json_headers):
         definition = _make_policy(seeded_db)

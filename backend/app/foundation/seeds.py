@@ -60,7 +60,6 @@ SEED_SEQUENCES: tuple[tuple[str, str], ...] = (
     (SequenceKey.LEAD.value, "REQ"),
     (SequenceKey.QUALITY_ISSUE.value, "QI"),
     (SequenceKey.NOTIFICATION.value, "NTF"),
-    (SequenceKey.ACCOUNT.value, "ACC"),
     (SequenceKey.CASHFLOW.value, "CF"),
     (SequenceKey.IMPORT.value, "IMP"),
     (SequenceKey.ATTACHMENT.value, "ATT"),

@@ -131,7 +131,6 @@ export interface EventPostResult {
 
 export interface Account {
   id: number;
-  inventory_no: string;
   source_order_no?: string | null;
   game_type?: string | null;
   business_mode?: string | null;
@@ -155,7 +154,6 @@ export interface Account {
 
 export interface AccountInventoryRow {
   account_id: number;
-  inventory_no: string;
   game_account?: string | null;
   business_mode?: string | null;
   inventory_type?: string | null;
@@ -261,6 +259,7 @@ export interface Installment {
   per_period_service_fee: string;
   per_period: string;
   paid_amount: string;
+  bad_debt_amount?: string;
   status: string;
   delivery_mode?: string | null;
   delivered_on?: string | null;
@@ -479,6 +478,7 @@ export const accountsApi = {
 export const installmentsApi = {
   dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),
   recover: (id: number, data: {occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
+  sale: (id: number, data: {sale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, {resale_order_id: data.sale_order_id, occurred_on: data.occurred_on, note: data.note}).then(r => r.data),
   resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
@@ -557,7 +557,7 @@ export const fieldsApi = {
 /* ── M4：报表 / 审计 ─────────────────────────────── */
 
 export interface InventoryHealthRow {
-  inventory_no: string;
+  account_id: number;
   game_account?: string | null;
   platform?: string | null;
   business?: string | null;

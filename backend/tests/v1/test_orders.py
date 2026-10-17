@@ -36,7 +36,6 @@ def test_order_auxiliary_routes_expose_typed_response_models(app):
 
 def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     account = Account(
-        inventory_no=allocate_number(seeded_db, SequenceKey.ACCOUNT),
         game_account=game_account,
         platform="王者",
         business_mode="SELF" if game_account != "th-stock-acc" else "DISTRIBUTION",

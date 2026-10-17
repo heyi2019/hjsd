@@ -5,7 +5,6 @@ import { InventoryDetail } from "./InventoryDetail";
 
 const account = {
   id: 1,
-  inventory_no: "ACC0001",
   game_account: "acc-1",
   inventory_type: "RECOVERY",
   status: "IN_STOCK",

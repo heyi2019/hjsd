@@ -12,7 +12,6 @@ const account = {
   platform: "A平台",
   status: "IN_STOCK",
   cost_amount: "100.00",
-  inventory_no: "ACC0001",
   created_by: "admin",
   account_description: "高段位\n账号",
   account_images: ["image-1"],
@@ -28,7 +27,7 @@ describe("库存导出", () => {
 
   it("没有明细时保持明细字段为空而不阻断导出", () => {
     const csv = buildInventoryCsv([account]);
-    expect(csv).toContain(",ACC0001,admin,-,-,-,-,-,,,,,");
+    expect(csv).toContain(",admin,-,-,-,-,-");
     expect(csv).toContain(",0,0,0.00,0.00");
   });
 });

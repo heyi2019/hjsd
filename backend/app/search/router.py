@@ -80,7 +80,6 @@ def global_search(
         if any(
             _matches(value, query)
             for value in (
-                account.inventory_no,
                 account.game_account,
                 account.game_type,
                 account.platform,
@@ -90,8 +89,8 @@ def global_search(
                 SearchResult(
                     type="ACCOUNT",
                     id=account.id,
-                    code=account.inventory_no,
-                    title=account.inventory_no,
+                    code=account.game_account,
+                    title=account.game_account,
                     subtitle=" · ".join(
                         value for value in (account.game_type, account.platform) if value
                     ) or account.status,

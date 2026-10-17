@@ -107,7 +107,6 @@ class TestCreateAccountGuards:
 
     def test_database_rejects_invalid_inventory_context(self, seeded_db):
         account = Account(
-            inventory_no="ACC-DB-CHECK",
             game_account="db-invalid-context",
             business_mode="SELF",
             inventory_type="CONSIGNMENT",
@@ -138,7 +137,6 @@ class TestCreateAccountGuards:
 
     def test_account_update_validates_profile_scope_before_mutating_identifier(self, seeded_db):
         account = Account(
-            inventory_no="ACC-PICKUP-UPDATE",
             game_account="pickup-original",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
@@ -233,7 +231,7 @@ class TestCreateAccountGuards:
         actions = list(
             seeded_db.scalars(
                 select(AuditLog.action)
-                .where(AuditLog.entity_id == account.inventory_no)
+                .where(AuditLog.entity_id == str(account.id))
                 .order_by(AuditLog.id)
             )
         )
@@ -246,14 +244,13 @@ class TestCreateAccountGuards:
             select(AuditLog)
             .where(
                 AuditLog.entity_type == "account",
-                AuditLog.entity_id == account.inventory_no,
+                AuditLog.entity_id == str(account.id),
                 AuditLog.action == AuditAction.ACCOUNT_CREATE.value,
             )
         )
 
         assert audit is not None
         assert audit.actor == "pytest"
-        assert audit.after_json["inventory_no"] == account.inventory_no
         assert audit.after_json["game_type"] == "王者荣耀"
 
     def test_empty_identifier_rejected(self, seeded_db):
@@ -326,7 +323,6 @@ class TestAccountQueries:
 
     def test_pickup_accounts_are_not_inventory_assets(self, seeded_db):
         pickup = Account(
-            inventory_no="ACC-PICKUP-LEGACY",
             game_account="pickup-not-inventory",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
@@ -388,7 +384,7 @@ class TestAccountsApi:
 
         listed = seeded_client.get("/api/v1/accounts", headers=headers)
         assert listed.status_code == 200, listed.text
-        assert [row["inventory_no"] for row in listed.json()] == [mine.inventory_no]
+        assert [row["game_account"] for row in listed.json()] == [mine.game_account]
         assert all("risk_level" not in row for row in listed.json())
 
         hidden_detail = seeded_client.get(
@@ -549,7 +545,7 @@ class TestAccountsApi:
             "/api/v1/accounts", params={"status": AccountStatus.IN_STOCK.value},
             headers=headers,
         )
-        assert [item["inventory_no"] for item in stocked.json()] == [account.inventory_no]
+        assert [item["game_account"] for item in stocked.json()] == [account.game_account]
 
     def test_list_accounts_resolves_each_source_order(self, seeded_client, seeded_db, headers):
         first = _account(seeded_db, "batch-source-first")
@@ -561,10 +557,10 @@ class TestAccountsApi:
 
         assert response.status_code == 200, response.text
         source_orders = {
-            item["inventory_no"]: item["source_order_no"] for item in response.json()
+            item["game_account"]: item["source_order_no"] for item in response.json()
         }
-        assert source_orders[first.inventory_no] == first_order.order_no
-        assert source_orders[second.inventory_no] == second_order.order_no
+        assert source_orders[first.game_account] == first_order.order_no
+        assert source_orders[second.game_account] == second_order.order_no
 
     def test_list_accounts_uses_consignment_order_without_buy(self, seeded_client, seeded_db, headers):
         account = _account(
@@ -584,7 +580,7 @@ class TestAccountsApi:
         response = seeded_client.get("/api/v1/accounts", headers=headers)
 
         assert response.status_code == 200, response.text
-        item = next(row for row in response.json() if row["inventory_no"] == account.inventory_no)
+        item = next(row for row in response.json() if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
     def test_list_accounts_resolves_th_source_order(self, seeded_client, seeded_db, headers):
@@ -613,7 +609,7 @@ class TestAccountsApi:
         response = seeded_client.get("/api/v1/accounts", headers=headers)
 
         assert response.status_code == 200, response.text
-        item = next(row for row in response.json() if row["inventory_no"] == account.inventory_no)
+        item = next(row for row in response.json() if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
     def test_order_creation_rejects_legacy_consignment_account_payload(self, seeded_client, headers):

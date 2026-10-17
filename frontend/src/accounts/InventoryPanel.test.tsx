@@ -15,6 +15,7 @@ const customersList = vi.fn();
 const poolsList = vi.fn();
 const counterpartiesList = vi.fn();
 const rebatesCreate = vi.fn();
+const installmentsCreate = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   accountsApi: {
@@ -30,11 +31,12 @@ vi.mock("../shared/api/catalog", () => ({
   poolsApi: { list: (...a: unknown[]) => poolsList(...a) },
   counterpartiesApi: { list: (...a: unknown[]) => counterpartiesList(...a) },
   rebatesApi: { create: (...a: unknown[]) => rebatesCreate(...a) },
+  installmentsApi: { create: (...a: unknown[]) => installmentsCreate(...a) },
 }));
 
 const accounts = [
-  { id: 1, inventory_no: "ACC0001", source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
-  { id: 2, inventory_no: "ACC0002", source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
+  { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
+  { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
 beforeEach(() => {
@@ -46,6 +48,7 @@ beforeEach(() => {
   poolsList.mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   counterpartiesList.mockResolvedValue([]);
   rebatesCreate.mockResolvedValue({ id: 31 });
+  installmentsCreate.mockResolvedValue({ id: 41 });
   accountsExecutionDetail.mockResolvedValue({
     account: accounts[0],
     orders: [{
@@ -338,7 +341,7 @@ describe("InventoryPanel：账号台账", () => {
 
   it("代挂账号售出按货源类型生成 DG 订单", async () => {
     accountsList.mockResolvedValueOnce([
-      { id: 5, inventory_no: "ACC0005", game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
+      { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderApp(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -365,13 +368,55 @@ describe("InventoryPanel：账号台账", () => {
     }));
   });
 
-  it("提号库存不能从库存中心直接误建 HS 售出单", async () => {
+  it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 SELL", async () => {
     accountsList.mockResolvedValueOnce([
-      { id: 6, inventory_no: "ACC0006", game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
+      { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
+    ]);
+    renderApp(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-5");
+    await userEvent.click(screen.getByRole("button", { name: /售出/ }));
+    const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
+    await userEvent.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await userEvent.click(await screen.findByText("买家A"));
+    await userEvent.type(screen.getByPlaceholderText("请输入金额"), "200");
+    await userEvent.click(screen.getByText("分期付款"));
+    await userEvent.clear(screen.getByLabelText("每期金额"));
+    await userEvent.type(screen.getByLabelText("每期金额"), "100");
+    await userEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+    await waitFor(() => expect(installmentsCreate).toHaveBeenCalled());
+    expect(installmentsCreate.mock.calls[0][0]).toMatchObject({
+      order_id: 21,
+      contract_type: "CONSIGNMENT_SALE",
+      principal: "200",
+    });
+    expect(ordersPostEvent).not.toHaveBeenCalled();
+  });
+
+  it("提号库存从库存中心售出时可选择分期", async () => {
+    accountsList.mockResolvedValueOnce([
+      { id: 6, game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
     ]);
     renderApp(<InventoryPanel />, { user: "admin" });
     await screen.findByText("pickup-acc");
-    expect(screen.getByRole("button", { name: "售出" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /售出/ }));
+    expect(await screen.findByText("售出账号")).toBeInTheDocument();
+    const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
+    await userEvent.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await userEvent.click(await screen.findByText("买家A"));
+    await userEvent.type(screen.getByPlaceholderText("请输入金额"), "1200");
+    await userEvent.click(screen.getByText("分期付款"));
+    await userEvent.clear(screen.getByLabelText("每期金额"));
+    await userEvent.type(screen.getByLabelText("每期金额"), "600");
+    await userEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+    await waitFor(() => expect(installmentsCreate).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: 21,
+      contract_type: "PICKUP_SALE",
+      principal: "1200",
+    })));
+    expect(ordersCreate.mock.calls[0][0]).toMatchObject({ order_type: "TH", account_id: 6 });
+    expect(ordersPostEvent).not.toHaveBeenCalled();
   });
 
   it("寄售可以勾选寄售平台并登记 DG 业务", async () => {
@@ -454,7 +499,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(await screen.findByText("执行明细")).toBeInTheDocument();
     const detailPanel = document.querySelector(".inventory-detail") as HTMLElement;
     const accountSummary = detailPanel.querySelector(".ant-descriptions") as HTMLElement;
-    expect(within(accountSummary).getByText("库存编号")).toBeInTheDocument();
+    expect(within(accountSummary).getByText("建档操作人")).toBeInTheDocument();
     expect(within(accountSummary).queryByText("业务", { exact: true })).toBeNull();
     expect(within(accountSummary).queryByText("类型", { exact: true })).toBeNull();
     expect(within(accountSummary).queryByText("产品", { exact: true })).toBeNull();

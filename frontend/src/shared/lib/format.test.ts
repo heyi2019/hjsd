@@ -68,7 +68,7 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
 
   it("分期状态覆盖后端 InstallmentStatus", () => {
     expect(Object.keys(INSTALLMENT_STATUS_LABEL).sort()).toEqual(
-      ["ACTIVE", "CANCELLED", "DEFAULTED", "DELIVERED", "OVERDUE", "PENDING", "SETTLED"].sort(),
+      ["ACTIVE", "CANCELLED", "CLOSED", "DEFAULTED", "DELIVERED", "OVERDUE", "PENDING", "SETTLED"].sort(),
     );
   });
 

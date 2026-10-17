@@ -10,7 +10,10 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
+import pytest
+
 from app.accounts import service as account_service
+from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
@@ -144,6 +147,14 @@ class TestR1Inventory:
 
 # --------------------------------------------------------------------- R2 月度
 class TestR2MonthlyPnl:
+    def test_rejects_reversed_date_range(self, seeded_db):
+        with pytest.raises(Validation, match="开始日期不能晚于结束日期"):
+            reporting_service.r2_monthly_pnl(
+                seeded_db,
+                from_date=date(2026, 10, 31),
+                to_date=date(2026, 10, 1),
+            )
+
     def test_sell_revenue_and_event_date_filters(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(

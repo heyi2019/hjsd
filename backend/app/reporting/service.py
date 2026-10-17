@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
@@ -40,6 +41,16 @@ from app.domain.trade import (
 )
 
 ZERO = Decimal("0")
+
+
+def _validate_date_range(
+    from_date: date | None, to_date: date | None
+) -> None:
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise Validation(
+            "开始日期不能晚于结束日期",
+            details={"from": from_date.isoformat(), "to": to_date.isoformat()},
+        )
 
 
 def _sum_report_field(items: list[dict[str, Any]], field: str) -> Decimal:
@@ -201,6 +212,7 @@ def r2_monthly_pnl(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R2 月度经营损益：账号 COST 归直接成本，不进运营费用。"""
+    _validate_date_range(from_date, to_date)
     events = session.scalars(
         _apply_order_scope(
             select(OrderEvent)
@@ -323,6 +335,7 @@ def r3_commission_reconciliation(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R3 提成对账：按人员钻取到单；无规则版本时提成率为 0（不臆造）。"""
+    _validate_date_range(from_date, to_date)
     rows = session.execute(
         _apply_order_scope(
             select(OrderProfitAllocation, Order)
@@ -405,6 +418,7 @@ def r5_business_pnl(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """R5 业务级损益：未归集返点独立列，不摊给业务。"""
+    _validate_date_range(from_date, to_date)
     rows = session.execute(
         _apply_order_scope(
             select(Order, OrderEvent)
@@ -632,6 +646,7 @@ def order_profit_detail(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """订单利润明细：合计与 R5 对应维度一致，可导出但不改原始数据。"""
+    _validate_date_range(from_date, to_date)
     orders_stmt = _apply_order_scope(select(Order), user, session)
     orders = session.scalars(orders_stmt).all()
     items = []

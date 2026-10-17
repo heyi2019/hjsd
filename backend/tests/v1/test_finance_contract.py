@@ -1297,14 +1297,19 @@ class TestFinanceApi:
 
     def test_list_deposits_endpoint(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
         service.create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
-            actor="pytest",
+            actor="pytest", source_order_id=order_id,
+            expected_release_on=TODAY.replace(day=20), note="押金业务备注",
         )
         response = seeded_client.get("/api/v1/deposits", headers=headers)
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
         assert "deposit_no" not in response.json()[0]
+        assert response.json()[0]["source_order_id"] == order_id
+        assert response.json()[0]["expected_release_on"] == "2026-10-20"
+        assert response.json()[0]["note"] == "押金业务备注"
 
     def test_deposit_loss_endpoint_returns_operating_cashflow(
         self, seeded_client, seeded_db, headers
@@ -1331,13 +1336,17 @@ class TestFinanceApi:
         order_id = _active_order(seeded_db)
         service.create_rebate(
             seeded_db, source_order_id=order_id, base_amount=Decimal("100"),
-            collected_on=TODAY, actor="pytest",
+            collected_on=TODAY, actor="pytest", channel="买号返点",
+            note="回收买号返点",
         )
         response = seeded_client.get("/api/v1/rebates", headers=headers)
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
         assert response.json()[0]["rebate_no"].startswith("HS")
         assert "rebate_group_no" not in response.json()[0]
+        assert response.json()[0]["channel"] == "买号返点"
+        assert response.json()[0]["link_status"] == "LINKED"
+        assert response.json()[0]["note"] == "回收买号返点"
 
     def test_create_rebate_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
@@ -1354,6 +1363,7 @@ class TestFinanceApi:
         )
         assert response.status_code == 201, response.text
         assert response.json()["source_order_id"] == order_id
+        assert response.json()["channel"] == "WECHAT"
 
     def test_settle_rebate_endpoint(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -1369,11 +1379,13 @@ class TestFinanceApi:
                 "settled_on": TODAY.isoformat(),
                 "pool_id": invest.id,
                 "platform_fee": "20",
+                "note": "返点到账",
             },
             headers=headers,
         )
         assert response.status_code == 201, response.text
         assert response.json()["net_amount"] == "100.00"
+        assert response.json()["note"] == "返点到账"
 
     def test_rebate_settlement_list_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers

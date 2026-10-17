@@ -36,13 +36,17 @@ class DepositOut(BaseModel):
 
     id: int
     pool_id: int
+    counterparty_id: int | None = None
+    source_order_id: int | None = None
     paid_amount: Decimal
     returned_amount: Decimal
     lost_amount: Decimal
     status: str
     paid_on: date
+    expected_release_on: date | None = None
     released_on: date | None = None
     lost_on: date | None = None
+    note: str | None = None
 
 
 class CashflowOut(BaseModel):
@@ -156,10 +160,13 @@ class RebateOut(BaseModel):
     id: int
     rebate_no: str
     source_order_id: int | None = None
+    channel: str | None = None
     rate: Decimal
     base_amount: Decimal
+    link_status: str
     status: str
     collected_on: date
+    note: str | None = None
 
 
 class SettlementCreate(RequestModel):
@@ -182,6 +189,7 @@ class SettlementOut(BaseModel):
     settled_on: date
     cashflow_id: int | None = None
     reversal_of_id: int | None = None
+    note: str | None = None
 
 
 class SettlementReverse(RequestModel):

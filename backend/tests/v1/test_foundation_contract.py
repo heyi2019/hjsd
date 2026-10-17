@@ -30,6 +30,16 @@ class TestPoolGuards:
             service.create_pool(seeded_db, code="!", name="坏码池", actor="pytest")
         assert "必须为" in str(exc.value)
 
+    def test_non_string_code_is_rejected_as_business_error(self, seeded_db):
+        with pytest.raises(Validation):
+            service.create_pool(seeded_db, code=123, name="坏类型池", actor="pytest")
+
+    def test_pool_type_cannot_be_blank(self, seeded_db):
+        with pytest.raises(Validation, match="pool_type"):
+            service.create_pool(
+                seeded_db, code="TMPPT", name="空用途池", pool_type="   ", actor="pytest"
+            )
+
     def test_pool_name_is_required(self, seeded_db):
         with pytest.raises(Validation):
             service.create_pool(seeded_db, code="TMPNAME", name="   ", actor="pytest")
@@ -112,6 +122,17 @@ class TestOrderTypeGuards:
                 actor="pytest",
             )
         assert "排序值不能为负数" in str(exc.value)
+
+    def test_sort_order_must_be_an_integer(self, seeded_db):
+        with pytest.raises(Validation, match="排序值必须为非负整数"):
+            service.create_order_type(
+                seeded_db,
+                code="TBT",
+                name="类型值校验",
+                capital_type=CapitalType.PASS_THRU.value,
+                sort_order=True,
+                actor="pytest",
+            )
 
     def test_duplicate_sequence_prefix_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:

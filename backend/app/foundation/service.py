@@ -38,13 +38,13 @@ def _snapshot(obj: Any, fields: Sequence[str]) -> dict[str, Any]:
 
 
 def _normalize_code(
-    value: str,
+    value: object,
     *,
     field_name: str = "code",
     pattern: re.Pattern[str] = ORDER_TYPE_CODE_PATTERN,
     hint: str = "2-10 位大写字母或数字",
 ) -> str:
-    code = (value or "").strip().upper()
+    code = value.strip().upper() if isinstance(value, str) else ""
     if not pattern.match(code):
         raise Validation(
             f"{field_name} 必须为 {hint}",
@@ -65,6 +65,21 @@ def _required_name(value: str, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise Validation("名称不能为空", details={"field": field})
     return value.strip()
+
+
+def _required_pool_type(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation("pool_type 不能为空", details={"field": "pool_type"})
+    return value.strip()
+
+
+def _non_negative_int(value: object, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise Validation(
+            "排序值必须为非负整数" if field == "sort_order" else f"{field} 必须为非负整数",
+            details={"field": field, "value": value},
+        )
+    return value
 
 
 def _get_pool_or_404(session: Session, pool_id: int) -> Pool:
@@ -128,7 +143,7 @@ def create_pool(
     pool = Pool(
         code=normalized,
         name=normalized_name,
-        pool_type=pool_type,
+        pool_type=_required_pool_type(pool_type),
         ownership=ownership,
         status=PoolStatus.ACTIVE.value,
         note=note,
@@ -166,7 +181,7 @@ def update_pool(
     if note is not None:
         pool.note = note
     if pool_type is not None:
-        pool.pool_type = pool_type
+        pool.pool_type = _required_pool_type(pool_type)
     if ownership is not None:
         if ownership not in PoolOwnership.values():
             raise Validation("ownership 取值非法", details={"ownership": ownership})
@@ -293,6 +308,7 @@ def create_order_type(
             "capital_type 取值非法",
             details={"capital_type": capital_type, "allowed": CapitalType.values()},
         )
+    sort_order = _non_negative_int(sort_order, field="sort_order")
     if sort_order < 0:
         raise Validation(
             "排序值不能为负数",
@@ -303,6 +319,11 @@ def create_order_type(
             f"业务代码 {normalized} 已存在",
             code=ErrorCode.DUPLICATE_CODE,
             details={"code": normalized},
+        )
+    if sequence_prefix is not None and not isinstance(sequence_prefix, str):
+        raise Validation(
+            "编号前缀必须为 1-16 位大写字母或数字，且以字母开头",
+            details={"field": "sequence_prefix", "value": sequence_prefix},
         )
     prefix = (sequence_prefix or normalized).strip().upper()
     if not SEQUENCE_PREFIX_PATTERN.fullmatch(prefix):
@@ -353,6 +374,8 @@ def update_order_type(
 ) -> OrderTypeDef:
     """BAS-02-03：code / capital_type / 编号前缀一旦使用即不可改。"""
     order_type = _get_order_type_or_404(session, order_type_id)
+    if sort_order is not None:
+        sort_order = _non_negative_int(sort_order, field="sort_order")
     if sort_order is not None and sort_order < 0:
         raise Validation(
             "排序值不能为负数",
@@ -431,6 +454,7 @@ def set_route(
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
         )
+    priority = _non_negative_int(priority, field="priority")
     if priority < 0:
         raise Validation(
             "优先级不能为负数",

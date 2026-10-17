@@ -454,6 +454,7 @@ def r5_business_pnl(
             RebateSettlement.gross_amount,
             RebateSettlement.platform_fee,
             RebateSettlement.reversal_of_id,
+            RebateSettlement.settled_on,
             Order.order_type,
         )
         .outerjoin(RebateSettlement, RebateSettlement.rebate_record_id == RebateRecord.id)
@@ -468,7 +469,7 @@ def r5_business_pnl(
             )
     rebates = session.execute(rebate_stmt).all()
     rebate_totals: dict[int, tuple[RebateRecord, str | None, Decimal, Decimal]] = {}
-    for record, gross, fee, reversal_of_id, order_type in rebates:
+    for record, gross, fee, reversal_of_id, settled_on, order_type in rebates:
         previous = rebate_totals.get(record.id)
         if previous is None:
             rebate_totals[record.id] = (
@@ -478,7 +479,10 @@ def r5_business_pnl(
                 ZERO,
             )
             previous = rebate_totals[record.id]
-        if gross is not None:
+        if gross is not None and (
+            (from_date is None or settled_on >= from_date)
+            and (to_date is None or settled_on <= to_date)
+        ):
             sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
             rebate_totals[record.id] = (
                 previous[0],

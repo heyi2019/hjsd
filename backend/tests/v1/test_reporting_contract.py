@@ -365,6 +365,44 @@ class TestR3Commission:
 
 # --------------------------------------------------------------------- R5 业务
 class TestR5BusinessPnl:
+    def test_rebate_settlement_outside_report_period_is_excluded(self, seeded_db):
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="pytest",
+        )
+        record = finance_service.create_rebate(
+            seeded_db,
+            source_order_id=order.id,
+            rebate_type="BUY",
+            base_amount="1000.00",
+            collected_on=D,
+            actor="pytest",
+            rate="10",
+        )
+        finance_service.settle_rebate(
+            seeded_db,
+            record.id,
+            gross_amount="100.00",
+            settled_on=date(2026, 9, 30),
+            pool_id=2,
+            actor="pytest",
+            platform_fee="10.00",
+        )
+        seeded_db.commit()
+
+        hs = next(
+            row
+            for row in reporting_service.r5_business_pnl(
+                seeded_db,
+                from_date=date(2026, 10, 1),
+                to_date=date(2026, 10, 31),
+            )["items"]
+            if row["order_type"] == "HS"
+        )
+        assert hs["settled_rebate"] == 0
+        assert hs["uncollected_rebate"] == 100
+
     def test_partial_rebate_settlement_keeps_uncollected_balance(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(
@@ -449,19 +487,21 @@ class TestR5BusinessPnl:
         assert uncollected["main_profit"] == 0
         assert uncollected["full_income"] == 0
 
-        # from 过滤只影响事件侧（收入/成本），返点循环无日期参数
+        # from 过滤同时作用于事件和返点结算日期
         gated = reporting_service.r5_business_pnl(seeded_db, from_date=date(2026, 10, 5))
         gated_by_type = {item["order_type"]: item for item in gated["items"]}
         assert gated_by_type["HS"]["main_income"] == 0
         assert gated_by_type["HS"]["main_profit"] == 0
-        assert gated_by_type["HS"]["settled_rebate"] == 90
+        assert gated_by_type["HS"]["settled_rebate"] == 0
+        assert gated_by_type["HS"]["uncollected_rebate"] == 100
         assert gated_by_type["UNCOLLECTED"]["uncollected_rebate"] == 50
 
-        # to 过滤：occurred_on=D 的事件被 continue，收入/成本归零，返点列不受影响
+        # to 过滤：occurred_on 和 settled_on=D 的数据均在区间外
         gated_to = reporting_service.r5_business_pnl(seeded_db, to_date=date(2026, 10, 1))
         to_by_type = {item["order_type"]: item for item in gated_to["items"]}
         assert to_by_type["HS"]["main_income"] == 0
-        assert to_by_type["HS"]["settled_rebate"] == 90
+        assert to_by_type["HS"]["settled_rebate"] == 0
+        assert to_by_type["HS"]["uncollected_rebate"] == 100
         assert to_by_type["UNCOLLECTED"]["uncollected_rebate"] == 50
 
 

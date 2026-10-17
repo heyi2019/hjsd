@@ -71,6 +71,22 @@ class TestCreateCustomerGuards:
             service.create_customer(seeded_db, display_name="   ", actor="pytest")
         assert "称呼/昵称必填" in str(exc.value)
 
+    def test_extra_values_require_object_with_string_keys(self, seeded_db):
+        with pytest.raises(Validation, match="活字段值必须为对象"):
+            service.create_customer(
+                seeded_db,
+                display_name="活字段结构错误",
+                actor="pytest",
+                extra_values=["not-an-object"],
+            )
+        with pytest.raises(Validation, match="活字段键必须为非空字符串"):
+            service.create_customer(
+                seeded_db,
+                display_name="活字段键错误",
+                actor="pytest",
+                extra_values={1: "value"},
+            )
+
     def test_customer_owner_must_exist(self, seeded_db):
         with pytest.raises(Validation, match="客户负责人不存在"):
             service.create_customer(

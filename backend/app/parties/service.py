@@ -42,6 +42,25 @@ FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
 
 
+def _normalize_extra_values(
+    values: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if values is None:
+        return {}
+    if not isinstance(values, Mapping):
+        raise Validation("活字段值必须为对象", details={"field": "extra_values"})
+    normalized = dict(values)
+    invalid_keys = [
+        key for key in normalized if not isinstance(key, str) or not key.strip()
+    ]
+    if invalid_keys:
+        raise Validation(
+            "活字段键必须为非空字符串",
+            details={"field": "extra_values"},
+        )
+    return normalized
+
+
 def _validate_owner_id(session: Session, owner_id: int | None) -> None:
     if owner_id is None:
         return
@@ -131,7 +150,7 @@ def create_customer(
         raise Validation("称呼/昵称必填", details={"field": "display_name"})
     _validate_owner_id(session, owner_id)
 
-    extras = dict(extra_values or {})
+    extras = _normalize_extra_values(extra_values)
     _validate_required_extras(session, EntityType.CUSTOMER.value, extras)
 
     customer = Customer(
@@ -291,13 +310,14 @@ def update_customer(
     session.flush()
 
     saved_extras: dict[str, Any] = {}
-    if extra_values:
-        _validate_required_extras(session, EntityType.CUSTOMER.value, extra_values, partial=True)
+    extras = _normalize_extra_values(extra_values)
+    if extras:
+        _validate_required_extras(session, EntityType.CUSTOMER.value, extras, partial=True)
         saved_extras = set_extra_values(
             session,
             entity_type=EntityType.CUSTOMER.value,
             entity_id=customer.id,
-            values=extra_values.items(),
+            values=extras.items(),
         )
 
     action = AuditAction.CONTACT_WRITE if changed_contacts else AuditAction.CUSTOMER_UPDATE

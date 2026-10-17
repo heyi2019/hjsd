@@ -344,6 +344,12 @@ class TestAccountQueries:
 
 
 class TestAccountsApi:
+    def test_inventory_endpoint_publishes_typed_response_contract(self, app):
+        schema = app.openapi()["paths"]["/api/v1/accounts/inventory"]["get"]["responses"]["200"]
+        response_schema = schema["content"]["application/json"]["schema"]
+
+        assert response_schema["$ref"].endswith("/InventoryResponseOut")
+
     def test_account_endpoints_follow_order_owner_scope(
         self, seeded_client, seeded_db
     ):

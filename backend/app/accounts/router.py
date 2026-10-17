@@ -82,6 +82,32 @@ class AccountProfileUpdate(RequestModel):
     extra_values: dict[str, object] | None = None
 
 
+class AccountInventoryOut(BaseModel):
+    """库存健康接口的单行契约；与账号台账共享同一业务字段语义。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: int
+    inventory_no: str
+    game_account: str | None = None
+    business_mode: str | None = None
+    inventory_type: str | None = None
+    platform: str | None = None
+    status: str
+    cost_amount: Decimal
+    account_description: str | None = None
+    account_images: list[str] = Field(default_factory=list)
+    extra_values: dict[str, object] = Field(default_factory=dict)
+
+
+class InventoryResponseOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AccountInventoryOut]
+    count: int
+    total_cost: Decimal
+
+
 class ExecutionCashflowOut(BaseModel):
     flow_no: str
     pool_name: str | None = None
@@ -288,15 +314,15 @@ def update_account_profile(
     return _account_output(item, include_credentials=True, extra_values=extras)
 
 
-@router.get("/accounts/inventory")
+@router.get("/accounts/inventory", response_model=InventoryResponseOut)
 def inventory(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
-) -> dict:
+) -> InventoryResponseOut:
     """库存健康表 R1：只统计在库与分期中的真实占用。"""
     rows = service.inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
-    return {"items": rows, "count": len(rows), "total_cost": str(total)}
+    return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
 
 
 @router.get("/accounts/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)

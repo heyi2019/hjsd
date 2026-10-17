@@ -891,6 +891,21 @@ def _assert_event_allowed(
         raise Validation("代挂业务不允许 BUY 或 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:
         raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
+    if order.order_type == "TH" and event_type == EventType.SELL.value:
+        if offset_event_id is None:
+            raise Validation(
+                "TH SELL 必须指定 offset_event_id，核销对应的 BUY 事件",
+                details={"field": "offset_event_id"},
+            )
+        offset = _get_offset_event(session, offset_event_id, order_id=order.id)
+        if offset.event_type != EventType.BUY.value:
+            raise Validation(
+                "TH SELL 的 offset_event_id 必须指向 BUY 事件",
+                details={
+                    "offset_event_id": offset_event_id,
+                    "event_type": offset.event_type,
+                },
+            )
     if event_type == EventType.SELL.value and session.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order.id,

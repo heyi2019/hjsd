@@ -329,7 +329,7 @@ class TestEventRules:
         order = service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
-        service.post_event(
+        buy, _ = service.post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -337,6 +337,15 @@ class TestEventRules:
             occurred_on=TODAY,
             actor="pytest",
         )
+        with pytest.raises(Validation, match="offset_event_id"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="SELL",
+                amount=Decimal("120"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
         service.post_event(
             seeded_db,
             order.id,
@@ -344,6 +353,7 @@ class TestEventRules:
             amount=Decimal("120"),
             occurred_on=TODAY,
             actor="pytest",
+            offset_event_id=buy.id,
         )
 
         with pytest.raises(Validation, match="只能登记一次 SELL"):
@@ -354,6 +364,7 @@ class TestEventRules:
                 amount=Decimal("10"),
                 occurred_on=TODAY,
                 actor="pytest",
+                offset_event_id=buy.id,
             )
 
     def test_dfq_buy_requires_advance_purchase_contract(self, seeded_db):

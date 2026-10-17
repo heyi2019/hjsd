@@ -389,6 +389,27 @@ class TestAccountsApi:
         assert response.json()["account"]["source_order_no"] is None
         assert response.json()["orders"] == []
 
+    def test_read_only_finance_user_cannot_read_game_password(
+        self, seeded_client, seeded_db
+    ):
+        account = _account(seeded_db, "credential-scope-account", game_password="secret")
+        viewer = CurrentUser.build(
+            id=9, username="finance-reader", roles=["VIEWER"], owner_scope="ALL"
+        )
+        viewer_headers = {"Authorization": f"Bearer {build_access_token(viewer)}"}
+
+        listed = seeded_client.get("/api/v1/accounts", headers=viewer_headers)
+        assert listed.status_code == 200, listed.text
+        item = next(row for row in listed.json() if row["id"] == account.id)
+        assert item["game_password"] is None
+
+        detail = seeded_client.get(
+            f"/api/v1/accounts/{account.id}/execution-detail",
+            headers=viewer_headers,
+        )
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["account"]["game_password"] is None
+
     def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
         response = seeded_client.post(
             "/api/v1/accounts",

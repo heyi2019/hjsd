@@ -203,9 +203,16 @@ def _source_orders(
     }
 
 
-def _account_output(account: Account, source_order: Order | None = None) -> AccountOut:
+def _account_output(
+    account: Account,
+    source_order: Order | None = None,
+    *,
+    include_credentials: bool = False,
+) -> AccountOut:
     """统一补齐库存来源订单；业务与类型以标准导入的账号字段为准。"""
     output = AccountOut.model_validate(account)
+    if not include_credentials:
+        output.game_password = None
     if source_order is None:
         return output
     output.source_order_no = source_order.order_no
@@ -213,12 +220,20 @@ def _account_output(account: Account, source_order: Order | None = None) -> Acco
 
 
 def _account_outputs(
-    db: Session, accounts: list[Account], user: CurrentUser | None = None
+    db: Session,
+    accounts: list[Account],
+    user: CurrentUser | None = None,
+    *,
+    include_credentials: bool = False,
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
     source_orders = _source_orders(db, [account.id for account in accounts], user)
     return [
-        _account_output(account, source_orders.get(account.id))
+        _account_output(
+            account,
+            source_orders.get(account.id),
+            include_credentials=include_credentials,
+        )
         for account in accounts
     ]
 
@@ -230,7 +245,12 @@ def list_accounts(
     _user: CurrentUser = read_access,
 ) -> list[AccountOut]:
     items = service.list_accounts(db, status=status, user=_user)
-    return _account_outputs(db, items, _user)
+    return _account_outputs(
+        db,
+        items,
+        _user,
+        include_credentials=_user.has(PERM_ORDER_CREATE),
+    )
 
 
 @router.patch("/accounts/{account_id}", response_model=AccountOut)
@@ -384,7 +404,12 @@ def execution_detail(
             )
         )
     return AccountExecutionDetailOut(
-        account=_account_outputs(db, [account], _user)[0],
+        account=_account_outputs(
+            db,
+            [account],
+            _user,
+            include_credentials=_user.has(PERM_ORDER_CREATE),
+        )[0],
         orders=[
             AccountExecutionOrderOut(
                 order_id=order.id,

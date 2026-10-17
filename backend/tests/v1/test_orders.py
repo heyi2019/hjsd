@@ -324,6 +324,42 @@ class TestEventRules:
                 actor="pytest",
             )
 
+    def test_hs_cannot_add_cost_after_account_is_sold(self, seeded_db):
+        account = _new_account(seeded_db, game_account="sold-cost-guard")
+        order = service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("100"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+        service.post_event(
+            seeded_db,
+            order.id,
+            event_type="SELL",
+            amount=Decimal("150"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation, match="已售账号不能新增 COST"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="COST",
+                amount=Decimal("10"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
     def test_th_sell_requires_a_posted_buy(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"

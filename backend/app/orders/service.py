@@ -891,6 +891,20 @@ def _assert_event_allowed(
         EventType.COST.value,
     }:
         raise Validation("代挂业务不允许 BUY 或 COST 事件")
+    if order.order_type == "HS" and event_type == EventType.COST.value:
+        if order.account_id is None:
+            raise Validation("回收订单 COST 必须关联库存账号")
+        account = session.get(Account, order.account_id)
+        if account is None:
+            raise NotFound(
+                f"账号 {order.account_id} 不存在",
+                details={"account_id": order.account_id},
+            )
+        if account.status in {
+            AccountStatus.SOLD.value,
+            AccountStatus.VOID.value,
+        }:
+            raise Validation("已售账号不能新增 COST")
     if order.order_type == "TH" and event_type == EventType.COST.value:
         raise Validation("提号业务不允许 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:

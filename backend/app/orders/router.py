@@ -504,7 +504,7 @@ def post_event(
     payload: schemas.EventCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_events,
-) -> dict:
+) -> schemas.EventPostResult:
     service.get_order(db, order_id, user)
     event_type = payload.event_type.strip().upper()
     if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
@@ -529,10 +529,10 @@ def post_event(
         note=payload.note,
         user=user,
     )
-    return {
-        "event": _event_output(event),
-        "cashflow_no": flow.flow_no if flow else None,
-    }
+    return schemas.EventPostResult(
+        event=_event_output(event),
+        cashflow_no=flow.flow_no if flow else None,
+    )
 
 
 @router.get("/pools/{pool_id}/balance", response_model=schemas.PoolBalanceOut)
@@ -540,11 +540,13 @@ def pool_balance(
     pool_id: int,
     db: Session = Depends(get_db),
     _user: CurrentUser = read_finance,
-) -> dict:
+) -> schemas.PoolBalanceOut:
     if not _user.can_see_pool(pool_id):
         from app.core.errors import NotFound
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    return service.pool_balance(db, pool_id, user=_user)
+    return schemas.PoolBalanceOut.model_validate(
+        service.pool_balance(db, pool_id, user=_user)
+    )
 
 
 __all__ = ["router"]

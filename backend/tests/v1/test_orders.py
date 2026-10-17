@@ -19,6 +19,20 @@ from app.parties import service as parties_service
 TODAY = date(2026, 10, 4)
 
 
+def test_order_auxiliary_routes_expose_typed_response_models(app):
+    paths = app.openapi()["paths"]
+
+    event_response = paths["/api/v1/orders/{order_id}/events"]["post"]["responses"]["201"]
+    balance_response = paths["/api/v1/pools/{pool_id}/balance"]["get"]["responses"]["200"]
+
+    assert event_response["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/EventPostResult"
+    )
+    assert balance_response["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/PoolBalanceOut"
+    )
+
+
 def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     account = Account(
         inventory_no=allocate_number(seeded_db, SequenceKey.ACCOUNT),

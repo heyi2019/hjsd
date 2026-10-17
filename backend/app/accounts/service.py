@@ -32,7 +32,9 @@ _UNSET = object()
 def _validate_account_images(value: list[str] | None) -> list[str] | None:
     if value is None:
         return None
-    images = list(value)
+    if not isinstance(value, list):
+        raise Validation("账号图片必须为数组", details={"field": "account_images"})
+    images = value
     if len(images) > 9:
         raise Validation("账号图片最多 9 张", details={"field": "account_images", "max": 9})
     if any(not isinstance(image, str) or not image.strip() for image in images):

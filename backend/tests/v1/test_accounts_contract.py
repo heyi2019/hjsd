@@ -107,6 +107,10 @@ class TestCreateAccountGuards:
                 account_images=[f"image-{index}" for index in range(10)],
             )
 
+    def test_account_images_must_be_an_array(self, seeded_db):
+        with pytest.raises(Validation, match="必须为数组"):
+            _account(seeded_db, "invalid-image-shape", account_images="image-url")
+
     def test_risk_level_is_not_part_of_account_domain(self, seeded_db):
         account = _account(seeded_db, "no-risk-field")
         assert not hasattr(account, "risk_level")

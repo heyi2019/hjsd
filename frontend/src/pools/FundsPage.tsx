@@ -139,6 +139,7 @@ export function FundsPage() {
       const direction = String(values.direction ?? "IN");
       await cashflowsApi.create({
         pool_id: Number(values.pool_id),
+        pool_account_id: values.pool_account_id == null ? undefined : Number(values.pool_account_id),
         occurred_on: values.occurred_on as string,
         direction,
         nature: fundNature === "EXTERNAL" ? "EXTERNAL_IN" : fundNature === "INTERNAL" ? "INTERNAL" : direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",

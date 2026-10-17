@@ -408,6 +408,7 @@ export const ordersApi = {
       channel_region?: string;
       bound_phone?: string;
       has_secondary?: boolean;
+      purchase_price?: string;
       note?: string;
     };
     account_id?: number;

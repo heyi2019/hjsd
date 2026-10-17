@@ -145,6 +145,7 @@ export function CreateBusinessModal(props: {
             channel_region: values.dfq_channel_region as string,
             bound_phone: values.dfq_bound_phone as string,
             has_secondary: values.dfq_has_secondary ? values.dfq_has_secondary === "有" : undefined,
+            purchase_price: values.dfq_purchase_price as string | undefined,
             note: values.dfq_account_note as string,
           },
           customer_roles: [{ customer_id: customer.customer.id, role: "INSTALLMENT_CUSTOMER" }],
@@ -158,7 +159,7 @@ export function CreateBusinessModal(props: {
           installment: {
             contract_type: "ADVANCE_PURCHASE",
             principal: String(values.dfq_total_amount ?? 0),
-            down_payment: "0",
+            down_payment: String(values.dfq_down_payment ?? 0),
             service_fee: String(values.dfq_service_fee ?? 0),
             periods: Number(values.dfq_periods ?? 1),
             per_period_service_fee: String(values.dfq_period_service_fee ?? 0),

@@ -38,6 +38,7 @@ class OrderAccountSnapshot(BaseModel):
     bound_phone: str | None = Field(default=None, max_length=64)
     has_secondary: bool | None = None
     platform: str | None = Field(default=None, max_length=64)
+    purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")
     note: str | None = None
 
 

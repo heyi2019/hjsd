@@ -64,7 +64,7 @@ def list_customers(
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
-) -> list[dict]:
+) -> list[schemas.CustomerOut]:
     reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
     customers = service.list_customers(db, keyword=keyword, status=status, user=user)
     extras = service.get_extra_values_bulk(
@@ -91,7 +91,7 @@ def create_customer(
     payload: schemas.CustomerCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = create_customers,
-) -> dict:
+) -> schemas.CustomerWithCandidates:
     customer = service.create_customer(
         db,
         display_name=payload.display_name,
@@ -119,10 +119,12 @@ def create_customer(
         user=user,
     )
     extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
-    return {
-        "customer": service.to_customer_out(customer, reveal_contact=True, extra_values=extras),
-        "duplicate_candidates": candidates,
-    }
+    return schemas.CustomerWithCandidates(
+        customer=service.to_customer_out(
+            customer, reveal_contact=True, extra_values=extras
+        ),
+        duplicate_candidates=candidates,
+    )
 
 
 @router.get("/customers/{customer_id}", response_model=schemas.CustomerOut)
@@ -131,7 +133,7 @@ def get_customer(
     reveal: bool = Query(default=False, description="读取完整联系方式，写审计"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
-) -> dict:
+) -> schemas.CustomerOut:
     customer = service.get_customer(db, customer_id, user)
     show_full = reveal and user.has(PERM_CUSTOMER_CONTACT_READ)
     if show_full:
@@ -153,7 +155,7 @@ def get_customer_detail(
     reveal: bool = Query(default=False, description="读取完整联系方式，写审计"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
-) -> dict:
+) -> schemas.CustomerDetailOut:
     customer = service.get_customer(db, customer_id, user)
     show_full = reveal and user.has(PERM_CUSTOMER_CONTACT_READ)
     if show_full:
@@ -165,12 +167,12 @@ def get_customer_detail(
             actor=_actor(user),
         )
     extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
-    return {
-        "customer": service.to_customer_out(
+    return schemas.CustomerDetailOut(
+        customer=service.to_customer_out(
             customer, reveal_contact=show_full, extra_values=extras
         ),
         **service.get_customer_detail(db, customer_id, user),
-    }
+    )
 
 
 @router.patch("/customers/{customer_id}", response_model=schemas.CustomerOut)
@@ -179,7 +181,7 @@ def update_customer(
     payload: schemas.CustomerUpdate,
     db: Session = Depends(get_db),
     user: CurrentUser = update_customers,
-) -> dict:
+) -> schemas.CustomerOut:
     customer = service.update_customer(
         db,
         customer_id,
@@ -197,7 +199,7 @@ def update_customer_status(
     payload: schemas.CustomerStatusUpdate,
     db: Session = Depends(get_db),
     user: CurrentUser = update_customers,
-) -> dict:
+) -> schemas.CustomerOut:
     customer = service.set_customer_status(
         db,
         customer_id,
@@ -214,7 +216,7 @@ def merge_customer(
     payload: schemas.MergeRequest,
     db: Session = Depends(get_db),
     user: CurrentUser = merge_customers,
-) -> dict:
+) -> schemas.CustomerOut:
     target = service.merge_customers(
         db,
         source_customer_id=customer_id,
@@ -337,32 +339,34 @@ def list_counterparties(
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_counterparties,
-) -> list[dict]:
+) -> list[schemas.CounterpartyOut]:
     items = service.list_counterparties(db, type=type, status=status)
     extras = service.get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]
     )
     return [
-        {
-            **{
-                key: getattr(item, key)
-                for key in (
-                    "id",
-                    "counterparty_no",
-                    "display_name",
-                    "type",
-                    "contact_name",
-                    "phone",
-                    "wechat",
-                    "qq",
-                    "source",
-                    "status",
-                    "note",
-                    "created_at",
-                )
-            },
-            "extra_values": extras.get(item.id, {}),
-        }
+        schemas.CounterpartyOut.model_validate(
+            {
+                **{
+                    key: getattr(item, key)
+                    for key in (
+                        "id",
+                        "counterparty_no",
+                        "display_name",
+                        "type",
+                        "contact_name",
+                        "phone",
+                        "wechat",
+                        "qq",
+                        "source",
+                        "status",
+                        "note",
+                        "created_at",
+                    )
+                },
+                "extra_values": extras.get(item.id, {}),
+            }
+        )
         for item in items
     ]
 
@@ -372,7 +376,7 @@ def get_counterparty(
     counterparty_id: int,
     db: Session = Depends(get_db),
     _user: CurrentUser = read_counterparties,
-) -> dict:
+) -> schemas.CounterpartyOut:
     item = service.get_counterparty(db, counterparty_id)
     return _counterparty_output(db, item)
 
@@ -382,7 +386,7 @@ def create_counterparty(
     payload: schemas.CounterpartyCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = manage_counterparties,
-) -> dict:
+) -> schemas.CounterpartyOut:
     item = service.create_counterparty(
         db,
         display_name=payload.display_name,
@@ -405,7 +409,7 @@ def update_counterparty(
     payload: schemas.CounterpartyUpdate,
     db: Session = Depends(get_db),
     user: CurrentUser = manage_counterparties,
-) -> dict:
+) -> schemas.CounterpartyOut:
     item = service.update_counterparty(
         db, counterparty_id, actor=_actor(user), **payload.model_dump(exclude_unset=True)
     )
@@ -420,7 +424,7 @@ def update_counterparty_status(
     active: bool = Query(default=True),
     db: Session = Depends(get_db),
     user: CurrentUser = manage_counterparties,
-) -> dict:
+) -> schemas.CounterpartyOut:
     item = service.set_counterparty_status(
         db, counterparty_id, active, actor=_actor(user)
     )
@@ -434,7 +438,7 @@ def list_field_definitions(
     include_inactive: bool = Query(default=True),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_customers,
-) -> list[dict]:
+) -> list[schemas.FieldDefinitionOut]:
     items = service.list_field_definitions(
         db, entity_type=entity_type, include_inactive=include_inactive
     )
@@ -448,7 +452,7 @@ def create_field_definition(
     payload: schemas.FieldDefinitionCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = manage_fields,
-) -> dict:
+) -> schemas.FieldDefinitionOut:
     item = service.create_field_definition(
         db,
         entity_type=payload.entity_type,
@@ -475,7 +479,7 @@ def update_field_definition(
     payload: schemas.FieldDefinitionUpdate,
     db: Session = Depends(get_db),
     user: CurrentUser = manage_fields,
-) -> dict:
+) -> schemas.FieldDefinitionOut:
     item = service.update_field_definition(
         db,
         definition_id,
@@ -494,7 +498,7 @@ def set_field_definition_active(
     active: bool = Query(default=False),
     db: Session = Depends(get_db),
     user: CurrentUser = manage_fields,
-) -> dict:
+) -> schemas.FieldDefinitionOut:
     item = service.set_field_definition_active(db, definition_id, active, actor=_actor(user))
     return schemas.FieldDefinitionOut.model_validate(item)
 

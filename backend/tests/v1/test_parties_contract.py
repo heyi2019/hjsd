@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import get_type_hints
 
 import pytest
 from sqlalchemy import select
@@ -36,10 +37,20 @@ from app.accounts import service as accounts_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
 from app.parties import service
+from app.parties import router as parties_router
+from app.parties import schemas
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
 FIELDS = "/api/v1/field-definitions"
+
+
+def test_party_routes_use_declared_response_types():
+    assert get_type_hints(parties_router.list_customers)["return"] == list[schemas.CustomerOut]
+    assert get_type_hints(parties_router.create_customer)["return"] == schemas.CustomerWithCandidates
+    assert get_type_hints(parties_router.get_customer_detail)["return"] == schemas.CustomerDetailOut
+    assert get_type_hints(parties_router.list_counterparties)["return"] == list[schemas.CounterpartyOut]
+    assert get_type_hints(parties_router.list_field_definitions)["return"] == list[schemas.FieldDefinitionOut]
 
 
 def _scoped_user() -> CurrentUser:

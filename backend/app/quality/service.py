@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from calendar import monthrange
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -20,13 +21,16 @@ from app.core.numbering import allocate_number
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AuditAction,
+    CashflowStatus,
     Direction,
     EventType,
     InstallmentStatus,
     Nature,
     QualityIssueStatus,
+    ReconciliationStatus,
     SequenceKey,
 )
+from app.domain.attachments import Attachment
 from app.domain.quality import QualityIssue
 from app.domain.trade import (
     Cashflow,
@@ -34,6 +38,7 @@ from app.domain.trade import (
     InstallmentSchedule,
     Order,
     OrderEvent,
+    Reconciliation,
     RebateRecord,
 )
 from app.foundation import service as foundation_service
@@ -50,6 +55,34 @@ MONEY_EVENT_TYPES = frozenset(
         EventType.CANCEL.value,
     }
 )
+
+QUALITY_METRIC_DEFINITIONS: dict[str, dict[str, str]] = {
+    "linked_rebate_rate": {
+        "label": "已关联返点率",
+        "formula": "已关联返点记录数 / 返点记录总数",
+        "unit": "percent",
+    },
+    "reconciliation_completion_rate": {
+        "label": "对账完成率",
+        "formula": "已核销对账数 / 对账总数",
+        "unit": "percent",
+    },
+    "overdue_rate": {
+        "label": "分期逾期率",
+        "formula": "期末已逾期计划数 / 当月到期计划数",
+        "unit": "percent",
+    },
+    "th_outstanding_amount": {
+        "label": "TH 未闭环代垫额",
+        "formula": "截至月末 TH 现金流支出 - 收入，负数按 0 计",
+        "unit": "amount",
+    },
+    "missing_attachment_rate": {
+        "label": "缺附件率",
+        "formula": "无附件的已过账金额事件和独立流水 / 应有凭证记录总数",
+        "unit": "percent",
+    },
+}
 
 
 def _issue(
@@ -384,6 +417,228 @@ def summary(session: Session, *, user: CurrentUser | None = None) -> dict[str, A
     }
 
 
+def _month_start(value: date) -> date:
+    return value.replace(day=1)
+
+
+def _month_end(value: date) -> date:
+    return value.replace(day=monthrange(value.year, value.month)[1])
+
+
+def _next_month(value: date) -> date:
+    if value.month == 12:
+        return date(value.year + 1, 1, 1)
+    return date(value.year, value.month + 1, 1)
+
+
+def _metric_months(
+    from_date: date | None,
+    to_date: date | None,
+) -> list[date]:
+    if from_date is not None and to_date is not None and from_date > to_date:
+        raise Validation(
+            "开始日期不能晚于结束日期",
+            details={"from": from_date.isoformat(), "to": to_date.isoformat()},
+        )
+    start = _month_start(from_date or to_date or date.today())
+    end = _month_start(to_date or from_date or date.today())
+    result: list[date] = []
+    cursor = start
+    while cursor <= end:
+        result.append(cursor)
+        cursor = _next_month(cursor)
+    return result
+
+
+def _in_range(value: date, start: date, end: date) -> bool:
+    return start <= value <= end
+
+
+def _percentage(numerator: int, denominator: int) -> float | None:
+    if denominator == 0:
+        return None
+    return round(numerator * 100 / denominator, 2)
+
+
+def metrics(
+    session: Session,
+    *,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """按月计算质量指标；返回分子、分母和口径，前端不自行推算。"""
+    months = _metric_months(from_date, to_date)
+    orders = _visible_orders(session, user)
+    order_by_id = {order.id: order for order in orders}
+    order_ids = set(order_by_id)
+
+    rebates = list(session.scalars(select(RebateRecord)).all())
+    if user is not None and not user.is_admin and user.owner_scope != "ALL":
+        rebates = [
+            rebate
+            for rebate in rebates
+            if rebate.source_order_id is not None
+            and rebate.source_order_id in order_ids
+        ]
+    else:
+        rebates = [
+            rebate
+            for rebate in rebates
+            if rebate.source_order_id is None or rebate.source_order_id in order_ids
+        ]
+
+    reconciliations = list(session.scalars(select(Reconciliation)).all())
+    if user is not None and not user.is_admin and user.owner_scope != "ALL":
+        reconciliations = [
+            item for item in reconciliations if user.can_see_pool(item.pool_id)
+        ]
+
+    schedule_rows = list(
+        session.execute(
+            select(InstallmentSchedule, Installment)
+            .join(Installment, Installment.id == InstallmentSchedule.installment_id)
+        ).all()
+    )
+    schedule_rows = [
+        (schedule, installment)
+        for schedule, installment in schedule_rows
+        if installment.order_id in order_ids
+    ]
+
+    cashflows = list(session.scalars(select(Cashflow)).all())
+    if user is not None and not user.is_admin and user.owner_scope != "ALL":
+        cashflows = [
+            flow
+            for flow in cashflows
+            if (
+                flow.order_id is not None
+                and flow.order_id in order_ids
+                and user.can_see_pool(flow.pool_id)
+            )
+            or (
+                flow.order_id is None
+                and user.can_see_pool(flow.pool_id)
+            )
+        ]
+    else:
+        cashflows = [
+            flow
+            for flow in cashflows
+            if flow.order_id is None or flow.order_id in order_ids
+        ]
+    cashflows = [
+        flow for flow in cashflows if flow.status == CashflowStatus.APPROVED.value
+    ]
+
+    events = list(
+        session.scalars(
+            select(OrderEvent).where(
+                OrderEvent.order_id.in_(order_ids),
+                OrderEvent.is_posted.is_(True),
+                OrderEvent.event_type.in_(MONEY_EVENT_TYPES),
+            )
+        ).all()
+    ) if order_ids else []
+    attachments = list(
+        session.scalars(
+            select(Attachment).where(Attachment.deleted_at.is_(None))
+        ).all()
+    )
+    attachment_refs = {(item.entity_type, item.entity_id) for item in attachments}
+    th_order_ids = {order.id for order in orders if order.order_type == "TH"}
+
+    items: list[dict[str, Any]] = []
+    for month in months:
+        end = _month_end(month)
+        month_rebates = [
+            rebate for rebate in rebates if _in_range(rebate.collected_on, month, end)
+        ]
+        linked_rebates = sum(
+            1
+            for rebate in month_rebates
+            if rebate.link_status == "LINKED" and rebate.source_order_id is not None
+        )
+
+        month_reconciliations = [
+            item
+            for item in reconciliations
+            if _in_range(item.reconciled_on, month, end)
+        ]
+        resolved_reconciliations = sum(
+            item.status == ReconciliationStatus.RESOLVED.value
+            for item in month_reconciliations
+        )
+
+        month_schedules = [
+            schedule
+            for schedule, _installment in schedule_rows
+            if _in_range(schedule.due_on, month, end)
+        ]
+        overdue_schedules = sum(
+            to_money(schedule.received_amount) + to_money(schedule.waived_amount)
+            < to_money(schedule.due_amount)
+            for schedule in month_schedules
+        )
+
+        th_outstanding = Decimal("0.00")
+        for flow in cashflows:
+            if flow.order_id not in th_order_ids or flow.occurred_on > end:
+                continue
+            amount = to_money(flow.amount)
+            th_outstanding += amount if flow.direction == Direction.OUT.value else -amount
+        th_outstanding = max(to_money(th_outstanding), Decimal("0.00"))
+
+        required_refs: list[tuple[str, str]] = [
+            ("order_event", event.event_no)
+            for event in events
+            if _in_range(event.occurred_on, month, end)
+        ]
+        required_refs.extend(
+            ("cashflow", flow.flow_no)
+            for flow in cashflows
+            if flow.order_event_id is None and _in_range(flow.occurred_on, month, end)
+        )
+        missing_attachments = sum(
+            reference not in attachment_refs for reference in required_refs
+        )
+
+        items.append(
+            {
+                "month": month.strftime("%Y-%m"),
+                "linked_rebate_rate": {
+                    "rate": _percentage(linked_rebates, len(month_rebates)),
+                    "numerator": linked_rebates,
+                    "denominator": len(month_rebates),
+                },
+                "reconciliation_completion_rate": {
+                    "rate": _percentage(
+                        resolved_reconciliations, len(month_reconciliations)
+                    ),
+                    "numerator": resolved_reconciliations,
+                    "denominator": len(month_reconciliations),
+                },
+                "overdue_rate": {
+                    "rate": _percentage(overdue_schedules, len(month_schedules)),
+                    "numerator": overdue_schedules,
+                    "denominator": len(month_schedules),
+                },
+                "th_outstanding_amount": {"amount": f"{th_outstanding:.2f}"},
+                "missing_attachment_rate": {
+                    "rate": _percentage(missing_attachments, len(required_refs)),
+                    "numerator": missing_attachments,
+                    "denominator": len(required_refs),
+                },
+            }
+        )
+    return {
+        "from": months[0].isoformat(),
+        "to": _month_end(months[-1]).isoformat(),
+        "definitions": QUALITY_METRIC_DEFINITIONS,
+        "items": items,
+    }
+
+
 def get_issue(session: Session, issue_id: int) -> QualityIssue:
     issue = session.get(QualityIssue, issue_id)
     if issue is None:
@@ -571,6 +826,7 @@ __all__ = [
     "create_issue",
     "get_issue",
     "list_issues",
+    "metrics",
     "scan",
     "summary",
     "update_issue",

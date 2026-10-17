@@ -1,6 +1,8 @@
 """QLT-01 质量与异常工作台只读接口。"""
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -27,6 +29,17 @@ def list_quality_exceptions(
     db: Session = Depends(get_db), user: CurrentUser = read_quality
 ) -> dict:
     return service.summary(db, user=user)
+
+
+@router.get("/quality/metrics")
+def quality_metrics(
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_quality,
+) -> dict:
+    """按月返回质量指标及其计算口径，数据范围与质量中心一致。"""
+    return service.metrics(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/quality/issues", response_model=dict)

@@ -61,16 +61,24 @@ def _scoped_user() -> CurrentUser:
     )
 
 
-def test_database_rejects_inventory_links_for_text_only_orders(seeded_db):
-    order = _order(seeded_db, order_type="TH")
+def test_database_allows_inventory_links_for_th_orders(seeded_db):
     account = accounts_service.create_account(
         seeded_db,
-        game_account="text-only-order-link",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
+        game_account="th-inventory-link",
+        business_mode="DISTRIBUTION",
+        inventory_type="PICKUP",
         actor="pytest",
     )
-    order.account_id = account.id
+    order = _order(seeded_db, order_type="TH", account_id=account.id)
+
+    seeded_db.flush()
+    assert order.account_id == account.id
+    assert order.account_snapshot is None
+
+
+def test_database_rejects_th_order_snapshots(seeded_db):
+    order = _order(seeded_db, order_type="TH")
+    order.account_snapshot = {"game_account": "th-text-only"}
 
     with pytest.raises(IntegrityError):
         seeded_db.flush()
@@ -686,47 +694,34 @@ class TestCreateOrderValidation:
             select(Account.id).where(Account.game_account == "dfq-text-account")
         ) is None
 
-    def test_th_account_snapshot_does_not_create_inventory_account(self, seeded_db):
+    def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="th-pickup-account",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            actor="pytest",
+        )
+
         order = order_service.create_order(
             seeded_db,
             order_type="TH",
             trade_date=D,
             actor="pytest",
-            account_snapshot={
-                "game_type": "王者荣耀",
-                "game_account": "th-text-account",
-                "game_password": "secret",
-                "channel_region": "安卓一区",
-                "note": "提号只保留订单文本",
-            },
+            account_id=account.id,
         )
 
-        assert order.account_id is None
-        assert order.account_snapshot["game_account"] == "th-text-account"
-        assert seeded_db.scalar(
-            select(Account.id).where(Account.game_account == "th-text-account")
-        ) is None
+        assert order.account_id == account.id
+        assert order.account_snapshot is None
 
-    def test_th_rejects_inventory_account_link(self, seeded_db):
-        account = Account(
-            inventory_no="ACC-TH-NOT-INVENTORY",
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
-            cost_amount=to_money("0"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        seeded_db.add(account)
-        seeded_db.flush()
-
-        with pytest.raises(Validation, match="提号订单不关联库存账号"):
+    def test_th_rejects_order_account_snapshot(self, seeded_db):
+        with pytest.raises(Validation, match="只有 DFQ 代分期订单可以填写订单账号快照"):
             order_service.create_order(
                 seeded_db,
                 order_type="TH",
                 trade_date=D,
                 actor="pytest",
-                account_id=account.id,
+                account_snapshot={"game_account": "th-text-account"},
             )
 
     def test_dfq_account_snapshot_rejects_unknown_fields(self, seeded_db):
@@ -1515,7 +1510,7 @@ class TestOrdersApi:
         assert valid.status_code == 200, valid.text
         assert valid.json()["account_snapshot"]["game_account"] == "dfq-edit-account"
 
-    def test_update_th_account_snapshot_uses_order_account_contract(
+    def test_th_account_snapshot_is_rejected_by_order_account_contract(
         self, seeded_client, headers
     ):
         created = seeded_client.post(
@@ -1527,16 +1522,8 @@ class TestOrdersApi:
             },
             headers=headers,
         )
-        assert created.status_code == 201, created.text
-
-        updated = seeded_client.patch(
-            f"/api/v1/orders/{created.json()['id']}",
-            json={"account_snapshot": {"game_account": "th-after", "game_type": "王者荣耀"}},
-            headers=headers,
-        )
-
-        assert updated.status_code == 200, updated.text
-        assert updated.json()["account_snapshot"]["game_account"] == "th-after"
+        assert created.status_code == 422, created.text
+        assert "只有 DFQ 代分期订单可以填写订单账号快照" in created.json()["message"]
 
     def test_update_and_cancel_order_api(self, seeded_client, headers):
         created = seeded_client.post(

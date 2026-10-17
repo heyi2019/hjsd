@@ -154,11 +154,11 @@ class Order(Base, AuditMixin):
             name="order_commission_type_valid",
         ),
         CheckConstraint(
-            "order_type NOT IN ('TH', 'DFQ') OR account_id IS NULL",
+            "order_type != 'DFQ' OR account_id IS NULL",
             name="order_account_link_type_valid",
         ),
         CheckConstraint(
-            "order_type IN ('TH', 'DFQ') OR account_snapshot IS NULL OR account_snapshot = 'null'",
+            "order_type = 'DFQ' OR account_snapshot IS NULL OR account_snapshot = 'null'",
             name="order_account_snapshot_type_valid",
         ),
     )
@@ -174,7 +174,7 @@ class Order(Base, AuditMixin):
     commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
     expected_settlement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # DFQ / TH 只保留订单内的账号文本快照，不产生库存账号关联。
+    # DFQ 只保留订单内的账号文本快照；HS / TH / DG 通过 account_id 关联库存实体。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True

@@ -44,7 +44,10 @@ def validate_inventory_context(business_mode: str | None, inventory_type: str | 
         return
     allowed_types = {
         BusinessMode.SELF.value: {InventoryType.RECOVERY.value},
-        BusinessMode.DISTRIBUTION.value: {InventoryType.CONSIGNMENT.value},
+        BusinessMode.DISTRIBUTION.value: {
+            InventoryType.PICKUP.value,
+            InventoryType.CONSIGNMENT.value,
+        },
     }[business_mode]
     if inventory_type not in allowed_types:
         raise Validation(

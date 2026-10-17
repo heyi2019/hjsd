@@ -35,7 +35,7 @@ def _order(db, *, order_type="TH", owner_id=None):
 
 
 class TestQualityScan:
-    def test_detects_inventory_account_link_on_text_only_order(self, seeded_db):
+    def test_does_not_flag_inventory_account_link_on_th_order(self, seeded_db):
         account = Account(
             inventory_no="ACC-QUALITY-LINK",
             game_account="quality-link-account",
@@ -48,20 +48,13 @@ class TestQualityScan:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, order_type="TH")
-        # 数据库约束默认阻止这种脏数据；这里只为验证质量扫描对旧库残留的识别，
-        # 在同一连接上临时模拟历史库绕过约束写入。
-        seeded_db.connection().exec_driver_sql("PRAGMA ignore_check_constraints = ON")
         order.account_id = account.id
         seeded_db.flush()
-        seeded_db.connection().exec_driver_sql("PRAGMA ignore_check_constraints = OFF")
-
-        item = next(
-            row
+        assert not any(
+            row["code"] == "ORDER_ACCOUNT_LINK_INVALID"
+            and row["entity_id"] == order.order_no
             for row in service.scan(seeded_db)
-            if row["code"] == "ORDER_ACCOUNT_LINK_INVALID"
         )
-        assert item["entity_id"] == order.order_no
-        assert item["details"] == {"order_type": "TH", "account_id": account.id}
 
     def test_detects_th_unclosed_advance(self, seeded_db):
         order = _order(seeded_db)

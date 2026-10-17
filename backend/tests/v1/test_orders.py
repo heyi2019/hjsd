@@ -223,18 +223,14 @@ class TestA01HsStock:
 
 
 class TestA02ThPassthru:
-    def test_th_order_keeps_account_as_text_snapshot(self, seeded_db):
+    def test_th_order_keeps_inventory_link_without_snapshot(self, seeded_db):
+        account = _new_account(seeded_db, game_account="th-stock-acc")
         order = service.create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
-            account_snapshot={
-                "game_type": "王者荣耀",
-                "game_account": "th-text-account",
-                "game_password": "secret",
-                "channel_region": "安卓一区",
-            },
+            account_id=account.id,
         )
         service.post_event(
             seeded_db,
@@ -246,8 +242,8 @@ class TestA02ThPassthru:
         )
         seeded_db.commit()
 
-        assert seeded_db.get(Order, order.id).account_id is None
-        assert seeded_db.get(Order, order.id).account_snapshot["game_account"] == "th-text-account"
+        assert seeded_db.get(Order, order.id).account_id == account.id
+        assert seeded_db.get(Order, order.id).account_snapshot is None
 
     def test_advance_then_settle(self, seeded_db):
         peer = parties_service.create_counterparty(

@@ -498,7 +498,7 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 
 | 阶段 | 策略 |
 |---|---|
-| M0–M2 | 新数据强制填 `order_no`；HS/DG 订单按实际库存业务关联已建档的 `account_id`，TH/DFQ 仅保留订单账号文本快照，DFQ 不关联库存账号；历史数据按标准导入规则处理 |
+| M0–M2 | 新数据强制填 `order_no`；HS/DG/TH 订单按实际库存业务关联已建档的 `account_id`，DFQ 仅保留订单账号文本快照；历史数据按标准导入规则处理 |
 | M3 起 | 库存周转、呆滞清单等报表**仅统计 `link_status=LINKED` 的数据** |
 | 历史部分 | 报表页脚固定标注「2026-07 前的历史订单无账号关联，不计入周转指标」 |
 
@@ -1000,13 +1000,13 @@ orders(89)   ──[无]────────► cashflow(196)    ✗ 仅能�
 | V3 | 金额 = 0 的行不得入库（除作废标记） | 3 处 |
 | V4 | 结余递推：`本期 = 上期 + 本期变化` | 4 处违反 |
 | V5 | 每笔返点到账须满足 `gross_amount − platform_fee = net_amount`，且关联有效返点记录 | 源数据仅有净额，19 笔均需补到账结构 |
-| V6 | `capital_type='STOCK'` 的 `BUY` 事件必须有对应 `accounts` 记录；`CREDIT` 的 DFQ BUY 只保留订单账号快照，`PASS_THRU` 的 `TH.BUY` 也不要求库存账号 | 当前 36 个账号零关联 |
+| V6 | `capital_type='STOCK'` 的 `BUY` 事件必须有对应 `accounts` 记录；`CREDIT` 的 DFQ BUY 只保留订单账号快照；`PASS_THRU` 的 TH.BUY 关联提号库存实体 | 当前 36 个账号零关联 |
 | V7 | 账号入库 7 日内须被 `SELL` 引用 | 无法校验（缺关联） |
 | V8 | `accounts.channel` 须为**多值集合**（JSONB/ARRAY），非单字符串 | 现有 models.py 定义 `String(32)`，**建模错误**；真实数据 9 条单渠道、27 条多渠道 |
 | V9 | 多人订单的利润须按规则拆分到各参与人 | 现有 `orders` 把利润全部记在 `recycler`，`seller` 未参与计算 |
 | V10 | 返点记录须记录 `rate`（标称费率）；每笔到账须记录 `platform_fee`（平台手续费） | 当前只记净额，费率与手续费混在利润里 |
 | V11 | 分期须校验 `首付 ≤ 本金 ≤ 首付 + 期数×每期` | 8/15 那笔首付 900 > 本金 762，违反 |
-| V12 | `capital_type='STOCK'` 的 BUY 须有对应 `accounts` 记录；DFQ 的 `CREDIT` BUY 使用订单账号文本快照；HS 的 `COST` 累加至库存账号 `cost_amount`，DFQ 的 `COST` 归集至订单 | 库存型买号必须有账号实体，垫资型订单不伪造库存账号，附加成本不可丢失 |
+| V12 | `capital_type='STOCK'` 的 BUY 须有对应 `accounts` 记录；DFQ 的 `CREDIT` BUY 使用订单账号文本快照；HS/TH 的库存关联由订单实体承载，HS 的 `COST` 累加至库存账号 `cost_amount`，DFQ 的 `COST` 归集至订单 | 库存型买号必须有账号实体，垫资型订单不伪造库存账号，附加成本不可丢失 |
 | V13 | `capital_type=PASS_THRU` 的 BUY/SELL **不得计入库存占用**，但未被 `SELL`/`CANCEL` 核销的 BUY 必须计入「提号垫资未核销」 | 提号不形成库存资产，但买家未回款前真实占用可动用现金 |
 | V14 | `CANCEL` 事件须引用原 `BUY` 的 `offset_event_id` | 8/30 提号取消 5,520 须核销 8/29 的 BUY |
 | V15 | **每笔`cashflow` 必须有 `pool_id`**，无池归属的流水拒绝入库 | 双池模型第一约束 |

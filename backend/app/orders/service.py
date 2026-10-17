@@ -74,6 +74,7 @@ def _validate_existing_account_context(order_type: str, account: Account) -> Non
     """已建档账号必须带完整业务上下文，并只能挂到对应业务。"""
     expected = {
         "HS": (BusinessMode.SELF.value, InventoryType.RECOVERY.value),
+        "TH": (BusinessMode.DISTRIBUTION.value, InventoryType.PICKUP.value),
         "DG": (BusinessMode.DISTRIBUTION.value, InventoryType.CONSIGNMENT.value),
     }.get(order_type)
     if expected is None:
@@ -228,13 +229,13 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    if definition.code in {"DFQ", "TH"} and account_id is not None:
+    if definition.code == "DFQ" and account_id is not None:
         raise Validation(
-            "提号订单不关联库存账号" if definition.code == "TH" else "DFQ 代分期订单不关联库存账号",
+            "DFQ 代分期订单不关联库存账号",
             details={"order_type": definition.code, "account_id": account_id},
         )
-    if definition.code not in {"DFQ", "TH"} and account_snapshot is not None:
-        raise Validation("只有 DFQ 代分期和 TH 提号订单可以填写订单账号快照")
+    if definition.code != "DFQ" and account_snapshot is not None:
+        raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
     selected_capital_type = (
@@ -665,8 +666,8 @@ def update_order(
         ):
             raise Validation("服务费不能超过挂售价")
     if account_snapshot is not _UNSET and account_snapshot is not None:
-        if order.order_type not in {"DFQ", "TH"}:
-            raise Validation("只有 DFQ 代分期和 TH 提号订单可以填写订单账号快照")
+        if order.order_type != "DFQ":
+            raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
         account_snapshot = _normalize_account_snapshot(account_snapshot)
 
     before = {

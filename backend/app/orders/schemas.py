@@ -27,7 +27,7 @@ class CounterpartyRoleInput(BaseModel):
 
 
 class OrderAccountSnapshot(BaseModel):
-    """DFQ / TH 订单内的账号文本快照，不承载库存营销资料或库存字段。"""
+    """DFQ 订单内的账号文本快照，不承载库存营销资料或库存字段。"""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

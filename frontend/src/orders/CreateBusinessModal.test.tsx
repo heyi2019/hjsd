@@ -38,6 +38,7 @@ beforeEach(() => {
   accountsList.mockResolvedValue([
     { id: 9, inventory_no: "ACC0001", game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 10, inventory_no: "ACC0002", game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
+    { id: 11, inventory_no: "ACC0003", game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
   ]);
   poolsList.mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   ordersList.mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
@@ -90,10 +91,9 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     });
     const { container } = await openTypedModal("TH");
     await userEvent.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    await userEvent.type(screen.getByLabelText("游戏类型"), "王者荣耀");
-    await userEvent.type(screen.getByLabelText("游戏账号"), "account-1");
-    await userEvent.type(screen.getByLabelText("账号密码"), "password-1");
-    await userEvent.type(screen.getByLabelText("渠道／区服"), "安卓一区／微信");
+    const inventorySelector = screen.getByLabelText("库存编号").closest(".ant-form-item")?.querySelector(".ant-select-selector");
+    await userEvent.click(inventorySelector as Element);
+    await userEvent.click(await screen.findByText("ACC0003 · pickup-account", { selector: ".ant-select-item-option-content" }));
     await userEvent.click(container.querySelectorAll(".ant-select-selector")[5] as Element);
     await userEvent.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
@@ -115,35 +115,27 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     const { container, onCreated } = await openTypedModal("TH");
     await userEvent.type(screen.getByLabelText("供货方昵称"), "同行甲");
     const selectors = container.querySelectorAll(".ant-select-selector");
-    await userEvent.type(screen.getByLabelText("游戏类型"), "王者荣耀");
-    await userEvent.type(screen.getByLabelText("游戏账号"), "account-1");
-    await userEvent.type(screen.getByLabelText("账号密码"), "password-1");
-    await userEvent.type(screen.getByLabelText("渠道／区服"), "安卓一区／微信");
+    const inventorySelector = screen.getByLabelText("库存编号").closest(".ant-form-item")?.querySelector(".ant-select-selector");
+    await userEvent.click(inventorySelector as Element);
+    await userEvent.click(await screen.findByText("ACC0003 · pickup-account", { selector: ".ant-select-item-option-content" }));
     await userEvent.click(selectors[5]);
     await userEvent.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await userEvent.type(amounts[0], "1000");
     await userEvent.type(amounts[1], "1200");
-    await userEvent.type(screen.getByLabelText("账号备注"), "提号账号说明");
     await userEvent.click(container.querySelector(".payment-info-fields .ant-select-selector") as Element);
     await userEvent.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await userEvent.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(ordersCreate).toHaveBeenCalled());
     const payload = ordersCreate.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.order_type).toBe("TH");
-    expect(payload.account_snapshot).toMatchObject({
-      game_type: "王者荣耀",
-      game_account: "account-1",
-      game_password: "password-1",
-      channel_region: "安卓一区／微信",
-      note: "提号账号说明",
-    });
+    expect(payload.account_snapshot).toBeUndefined();
     expect(payload.account).toBeUndefined();
-    expect(payload.account_id).toBeUndefined();
+    expect(payload.account_id).toBe(11);
     expect(payload.customer_roles).toEqual([]);
     expect(payload.counterparty_roles).toEqual([{ counterparty_id: 2, role: "SUPPLIER" }]);
-    expect(payload.note).toBe("提号账号说明｜供货方来源：氪金联盟｜预期收买家：1200");
-    expect(orderEvents).toHaveBeenCalledTimes(1);
+    expect(payload.note).toBe("供货方来源：氪金联盟｜预期收买家：1200");
+    await waitFor(() => expect(orderEvents).toHaveBeenCalledTimes(1));
     expect(orderEvents.mock.calls[0][1]).toMatchObject({ event_type: "BUY", amount: "1000", pool_id: 1 });
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });

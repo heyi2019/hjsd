@@ -164,10 +164,10 @@ def test_upgrade_is_repeatable(migration_env):
         engine.dispose()
 
 
-def test_only_current_baseline_is_exposed():
+def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0002 (head)"
+    assert result.stdout.strip() == "0003 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

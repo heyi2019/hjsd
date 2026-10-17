@@ -40,19 +40,6 @@ const BUSINESS_CONTEXT: Partial<Record<BusinessOrderType, { business: string; ty
   DFQ: { business: "增值服务（独立分销服务）", type: "代分期" },
 };
 
-export function getOrderAccountSnapshot(values: Record<string, unknown>, prefix = "th_") {
-  const field = (name: string) => values[`${prefix}${name}`];
-  return {
-    game_type: field("game_type") as string,
-    game_account: field("game_account") as string,
-    game_password: field("game_password") as string,
-    channel_region: field("channel_region") as string,
-    bound_phone: field("bound_phone") as string,
-    has_secondary: field("has_secondary") ? field("has_secondary") === "有" : undefined,
-    note: field("account_note") as string,
-  };
-}
-
 function toDateString(value: unknown) {
   if (typeof value === "string" && value) return value;
   if (value && typeof value === "object" && "format" in value && typeof value.format === "function") {
@@ -76,7 +63,7 @@ export function CreateBusinessModal(props: {
   const isDg = orderType === "DG";
   const isDfq = orderType === "DFQ";
   const businessContext = BUSINESS_CONTEXT[orderType];
-  const usesInventoryAccount = isRecovery || isDg;
+  const usesInventoryAccount = isRecovery || isTh || isDg;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [inventoryAccounts, setInventoryAccounts] = useState<Account[]>([]);
@@ -120,7 +107,9 @@ export function CreateBusinessModal(props: {
         setInventoryAccounts(accountList.filter((account) =>
           isRecovery
             ? account.business_mode === "SELF" && account.inventory_type === "RECOVERY"
-            : account.business_mode === "DISTRIBUTION" && account.inventory_type === "CONSIGNMENT",
+            : isTh
+              ? account.business_mode === "DISTRIBUTION" && account.inventory_type === "PICKUP"
+              : account.business_mode === "DISTRIBUTION" && account.inventory_type === "CONSIGNMENT",
         ));
         setLoadError(null);
       } catch (error) {
@@ -200,7 +189,6 @@ export function CreateBusinessModal(props: {
         await props.onCreated();
         return;
       }
-      const accountSnapshot = isTh ? getOrderAccountSnapshot(values) : undefined;
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
       const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
@@ -271,7 +259,7 @@ export function CreateBusinessModal(props: {
         expected_settlement_date: isDg && values.dg_expected_settlement_date
           ? toDateString(values.dg_expected_settlement_date)
           : undefined,
-        account_snapshot: accountSnapshot,
+        account_snapshot: undefined,
         account_id: usesInventoryAccount ? values.account_id as number : undefined,
         note,
         customer_roles: customerRoles,
@@ -393,12 +381,12 @@ export function CreateBusinessModal(props: {
           <Space className="muted" size="large">
             <span>业务：{businessContext.business}</span>
             <span>类型：{businessContext.type}</span>
-            <span>产品：请在下方填写游戏类型</span>
+            <span>产品：来自已选库存</span>
           </Space>
         ) : null}
         {isRecovery ? <RecoveryAccountSection inventoryAccounts={inventoryAccounts}>
           <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
-        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} /> : isDg ? <DgOrderSection inventoryAccounts={inventoryAccounts} /> : <DfqOrderSection pools={pools} />}
+        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} inventoryAccounts={inventoryAccounts} /> : isDg ? <DgOrderSection inventoryAccounts={inventoryAccounts} /> : <DfqOrderSection pools={pools} />}
         {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
       </Form>
     </Modal>

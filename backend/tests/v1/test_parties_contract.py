@@ -514,6 +514,60 @@ class TestFieldDefinitionGuards:
             seeded_db, entity_type="customer", entity_id=customer.id
         ) == {}
 
+    def test_customer_update_does_not_partially_write_when_extra_value_fails(self, seeded_db):
+        definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="update_amount",
+            label="更新金额",
+            field_type="NUMBER",
+            actor="pytest",
+        )
+        customer = service.create_customer(
+            seeded_db, display_name="原客户名称", actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="字段 更新金额 必须为数字"):
+            service.update_customer(
+                seeded_db,
+                customer.id,
+                actor="operator",
+                display_name="不应保存的新名称",
+                extra_values={definition.field_key: "不是数字"},
+            )
+
+        seeded_db.commit()
+        seeded_db.refresh(customer)
+        assert customer.display_name == "原客户名称"
+        assert customer.updated_by == "pytest"
+        assert service.get_extra_values(
+            seeded_db, entity_type="customer", entity_id=customer.id
+        ) == {}
+
+    def test_customer_creation_does_not_partially_write_when_extra_value_fails(self, seeded_db):
+        definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="create_amount",
+            label="创建金额",
+            field_type="NUMBER",
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation, match="字段 创建金额 必须为数字"):
+            service.create_customer(
+                seeded_db,
+                display_name="不应落库的客户",
+                actor="operator",
+                extra_values={definition.field_key: "不是数字"},
+            )
+
+        seeded_db.commit()
+        assert seeded_db.scalar(
+            select(FieldDefinition.id).where(FieldDefinition.id == definition.id)
+        ) == definition.id
+        assert service.list_customers(seeded_db, keyword="不应落库的客户") == []
+
     def test_database_rejects_non_customer_extra_value(self, seeded_db):
         definition = service.create_field_definition(
             seeded_db,

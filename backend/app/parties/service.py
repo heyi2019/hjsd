@@ -158,6 +158,13 @@ def create_customer(
 
     extras = _normalize_extra_values(extra_values)
     _validate_required_extras(session, EntityType.CUSTOMER.value, extras)
+    if extras:
+        _validate_extra_values(
+            session,
+            entity_type=EntityType.CUSTOMER.value,
+            entity_id=None,
+            values=extras.items(),
+        )
 
     customer = Customer(
         customer_no=allocate_number(session, SequenceKey.CUSTOMER),
@@ -302,6 +309,18 @@ def update_customer(
             details={"customer_no": customer.customer_no},
         )
 
+    extras = _normalize_extra_values(extra_values)
+    if extras:
+        _validate_required_extras(
+            session, EntityType.CUSTOMER.value, extras, partial=True
+        )
+        _validate_extra_values(
+            session,
+            entity_type=EntityType.CUSTOMER.value,
+            entity_id=customer.id,
+            values=extras.items(),
+        )
+
     if "owner_id" in fields and user is not None and not user.is_admin and user.owner_scope != "ALL":
         fields["owner_id"] = user.id
     if "owner_id" in fields:
@@ -328,9 +347,7 @@ def update_customer(
     session.flush()
 
     saved_extras: dict[str, Any] = {}
-    extras = _normalize_extra_values(extra_values)
     if extras:
-        _validate_required_extras(session, EntityType.CUSTOMER.value, extras, partial=True)
         saved_extras = set_extra_values(
             session,
             entity_type=EntityType.CUSTOMER.value,
@@ -772,6 +789,43 @@ def _validate_extra_value(definition: FieldDefinition, value: Any) -> Any:
     return str(value)
 
 
+def _validate_extra_values(
+    session: Session,
+    *,
+    entity_type: str,
+    entity_id: int | None,
+    values: Iterable[tuple[str, Any]],
+) -> list[tuple[str, FieldDefinition, Any]]:
+    if (
+        entity_type == EntityType.CUSTOMER.value
+        and entity_id is not None
+        and session.get(Customer, entity_id) is None
+    ):
+        raise NotFound(
+            f"客户 {entity_id} 不存在",
+            details={"entity_type": entity_type, "entity_id": entity_id},
+        )
+
+    validated: list[tuple[str, FieldDefinition, Any]] = []
+    for field_key, value in values:
+        definition = session.scalar(
+            select(FieldDefinition).where(
+                FieldDefinition.entity_type == entity_type,
+                FieldDefinition.field_key == field_key,
+                FieldDefinition.is_active.is_(True),
+            )
+        )
+        if definition is None:
+            raise Validation(
+                f"字段 {field_key} 未启用或不存在",
+                details={"entity_type": entity_type, "field_key": field_key},
+            )
+        validated.append(
+            (field_key, definition, _validate_extra_value(definition, value))
+        )
+    return validated
+
+
 def _validate_required_extras(
     session: Session, entity_type: str, values: Mapping[str, Any], *, partial: bool = False
 ) -> None:
@@ -937,28 +991,12 @@ def set_extra_values(
     values: Iterable[tuple[str, Any]],
 ) -> dict[str, Any]:
     """按启用的字段定义写入活字段值；未启用字段拒绝写入（BAS-04-04）。"""
-    if entity_type == EntityType.CUSTOMER.value and session.get(Customer, entity_id) is None:
-        raise NotFound(
-            f"客户 {entity_id} 不存在",
-            details={"entity_type": entity_type, "entity_id": entity_id},
-        )
-    validated: list[tuple[str, FieldDefinition, Any]] = []
-    for field_key, value in values:
-        definition = session.scalar(
-            select(FieldDefinition).where(
-                FieldDefinition.entity_type == entity_type,
-                FieldDefinition.field_key == field_key,
-                FieldDefinition.is_active.is_(True),
-            )
-        )
-        if definition is None:
-            raise Validation(
-                f"字段 {field_key} 未启用或不存在",
-                details={"entity_type": entity_type, "field_key": field_key},
-            )
-        validated.append(
-            (field_key, definition, _validate_extra_value(definition, value))
-        )
+    validated = _validate_extra_values(
+        session,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        values=values,
+    )
 
     saved: dict[str, Any] = {}
     for field_key, definition, normalized_value in validated:

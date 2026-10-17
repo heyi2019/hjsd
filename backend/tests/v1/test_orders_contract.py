@@ -911,6 +911,36 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_dfq_snapshot_populates_safe_order_list_fields(
+        self, seeded_client, headers
+    ):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DFQ",
+                "trade_date": D.isoformat(),
+                "account_snapshot": {
+                    "game_type": "王者荣耀",
+                    "game_account": "dfq-list-account",
+                    "game_password": "must-not-list",
+                    "channel_region": "安卓一区",
+                    "platform": "平台A",
+                },
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        listed = seeded_client.get("/api/v1/orders", headers=headers)
+
+        assert listed.status_code == 200, listed.text
+        row = next(item for item in listed.json() if item["id"] == created.json()["id"])
+        assert row["account_game_type"] == "王者荣耀"
+        assert row["account_game_account"] == "dfq-list-account"
+        assert row["account_channel_region"] == "安卓一区"
+        assert row["account_platform"] == "平台A"
+        assert row["account_snapshot"] is None
+
     def test_viewer_order_detail_redacts_dfq_game_password(
         self, seeded_client, headers
     ):

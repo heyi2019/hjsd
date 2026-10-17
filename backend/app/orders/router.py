@@ -90,6 +90,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
     payloads: list[dict] = []
     for order in orders:
         account = accounts.get(order.account_id)
+        snapshot = order.account_snapshot or {}
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
         latest = events[0] if events else None
@@ -111,11 +112,13 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "owner_id": order.owner_id,
             "note": order.note,
             "created_at": order.created_at,
-            "account_game_type": account.game_type if account else None,
-            "account_game_account": account.game_account if account else None,
-            "account_channel_region": account.channel_region if account else None,
+            # DFQ 只有订单文本快照，没有库存账号；列表展示安全的业务字段，
+            # 不把快照中的 game_password 原样带入列表响应。
+            "account_game_type": account.game_type if account else snapshot.get("game_type"),
+            "account_game_account": account.game_account if account else snapshot.get("game_account"),
+            "account_channel_region": account.channel_region if account else snapshot.get("channel_region"),
             "account_business_mode": account.business_mode if account else None,
-            "account_platform": account.platform if account else None,
+            "account_platform": account.platform if account else snapshot.get("platform"),
             "account_status": account.status if account else None,
             "party_name": party[0] if party else None,
             "party_role": party[1] if party else None,

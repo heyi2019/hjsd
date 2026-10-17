@@ -27,27 +27,17 @@ function axiosError(opts: {
   return err;
 }
 
-describe("normalizeError：后端两种错误结构都要认", () => {
-  it("形态一：业务异常 { code, message }", () => {
+describe("normalizeError：只认 v1 统一错误结构", () => {
+  it("统一结构 { code, message }", () => {
     const err = axiosError({ responseData: { code: "VALIDATION_ERROR", message: "金额不能为负" } });
     expect(normalizeError(err)).toEqual({ message: "金额不能为负", code: "VALIDATION_ERROR" });
   });
 
-  it("形态二：FastAPI 框架错误 { detail: { message, code } }", () => {
-    const err = axiosError({ responseData: { detail: { message: "订单不存在", code: "NOT_FOUND" } } });
-    expect(normalizeError(err)).toEqual({ message: "订单不存在", code: "NOT_FOUND" });
-  });
-
-  it("形态二退化：detail 是字符串时不丢信息", () => {
-    const err = axiosError({ responseData: { detail: "Not Found" } });
-    expect(normalizeError(err).message).toBe("Request failed"); // 无 message 字段 → 回落 error.message
-  });
-
-  it("两种结构同时存在时优先 detail（页面既有读法）", () => {
+  it("不再兼容旧 detail 结构，统一结构优先", () => {
     const err = axiosError({
       responseData: { code: "X", message: "业务体", detail: { message: "框架体", code: "Y" } },
     });
-    expect(normalizeError(err).message).toBe("框架体");
+    expect(normalizeError(err)).toEqual({ message: "业务体", code: "X" });
   });
 
   it("无响应体（后端不可达/CORS/超时）不抛错，给出可读文案", () => {

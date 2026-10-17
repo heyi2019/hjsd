@@ -77,11 +77,7 @@ export function backendConnectionError(): string | null {
     "请确认后端已启动且端口正确；若页面数据为空但无报错，通常是 CORS 拒绝了本端口。";
 }
 
-/** 从 axios 错误里抽出后端业务错误体。
- *  后端实际存在**两种**结构，缺一不可：
- *   1. 业务异常：`{ code, message, details }`（顶层，如 VALIDATION_ERROR）
- *   2. FastAPI 框架错误：`{ detail: { message, code } | string }`（校验/404/405）
- *  只认其中一种会导致错误码丢失、ErrorBanner 提示退化成通用文案。 */
+/** 从 axios 错误里抽出 v1 统一错误体。 */
 export interface NormalizedError {
   message: string;
   code?: string;
@@ -90,14 +86,10 @@ export interface NormalizedError {
 export function normalizeError(error: unknown): NormalizedError {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data as
-      | { code?: string; message?: string; detail?: unknown }
+      | { code?: string; message?: string }
       | undefined;
 
-    // 形态 2：{ detail: { message, code } } —— 页面各处的既有读法
-    const detail = data?.detail as { message?: string; code?: string } | undefined;
-    if (detail?.message) return { message: detail.message, code: detail.code };
-
-    // 形态 1：{ code, message } —— 业务异常处理器
+    // v1 唯一错误结构：{ code, message, details }
     if (data?.message) return { message: data.message, code: data.code };
 
     // 无响应体：后端不可达 / 超时 / 被 CORS 拒绝
@@ -109,7 +101,7 @@ export function normalizeError(error: unknown): NormalizedError {
   return { message: String(error) };
 }
 
-/** 统一错误文案：后端返回 { code, message, details } 或 { detail: {...} }。 */
+/** 统一错误文案：后端只返回 v1 统一结构 { code, message, details }。 */
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const { message, code } = normalizeError(error);

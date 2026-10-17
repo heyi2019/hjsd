@@ -104,9 +104,9 @@ def create_user(
     note: str | None,
     actor: str,
 ) -> User:
-    if role not in ALL_ROLES:
+    if not isinstance(role, str) or role not in ALL_ROLES:
         raise Validation("无效角色")
-    if owner_scope not in OWNER_SCOPES:
+    if not isinstance(owner_scope, str) or owner_scope not in OWNER_SCOPES:
         raise Validation("无效数据范围")
     normalized_username = _required_text(username, message="用户名不能为空")
     normalized_display_name = _required_text(display_name, message="显示名称不能为空")
@@ -161,9 +161,14 @@ def update_user(
         changes = {**changes, "team_ids": _validate_id_list(changes["team_ids"], label="团队")}
     _check_pool_ids(session, changes.get("pool_ids") if "pool_ids" in changes else None)  # type: ignore[arg-type]
     _check_team_ids(session, changes.get("team_ids") if "team_ids" in changes else None)  # type: ignore[arg-type]
-    if "role" in changes and changes["role"] not in ALL_ROLES:
+    if "role" in changes and (
+        not isinstance(changes["role"], str) or changes["role"] not in ALL_ROLES
+    ):
         raise Validation("无效角色")
-    if "owner_scope" in changes and changes["owner_scope"] not in OWNER_SCOPES:
+    if "owner_scope" in changes and (
+        not isinstance(changes["owner_scope"], str)
+        or changes["owner_scope"] not in OWNER_SCOPES
+    ):
         raise Validation("无效数据范围")
     normalized_changes = dict(changes)
     if "display_name" in normalized_changes:

@@ -439,6 +439,49 @@ def test_user_service_rejects_unknown_and_immutable_fields(seeded_db):
         )
 
 
+def test_user_service_rejects_unhashable_role_and_scope(seeded_db):
+    with pytest.raises(Validation, match="无效角色"):
+        service.create_user(
+            seeded_db,
+            username="list-role",
+            display_name="列表角色",
+            password="password123",
+            role=[],
+            owner_scope="SELF",
+            pool_ids=[],
+            team_ids=[],
+            phone=None,
+            note=None,
+            actor="pytest",
+        )
+
+    with pytest.raises(Validation, match="无效数据范围"):
+        service.create_user(
+            seeded_db,
+            username="list-scope",
+            display_name="列表范围",
+            password="password123",
+            role="VIEWER",
+            owner_scope=[],
+            pool_ids=[],
+            team_ids=[],
+            phone=None,
+            note=None,
+            actor="pytest",
+        )
+
+    user = seeded_db.get(User, 1)
+    assert user is not None
+    with pytest.raises(Validation, match="无效角色"):
+        service.update_user(
+            seeded_db, user.id, changes={"role": []}, actor="pytest"
+        )
+    with pytest.raises(Validation, match="无效数据范围"):
+        service.update_user(
+            seeded_db, user.id, changes={"owner_scope": []}, actor="pytest"
+        )
+
+
 def test_user_service_validates_password_and_scope_id_shapes(seeded_db):
     with pytest.raises(Validation, match="密码至少需要 8 位"):
         service.create_user(

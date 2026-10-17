@@ -515,13 +515,14 @@ class TestRebateGuards:
             gross_amount=Decimal("100"),
             settled_on=TODAY,
             pool_id=invest.id,
-            actor="pytest",
+            actor="finance",
             platform_fee=Decimal("10"),
         )
 
         seeded_db.refresh(record)
         assert settlement.net_amount == Decimal("90.00")
         assert record.status == "SETTLED"
+        assert record.updated_by == "finance"
 
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
@@ -604,6 +605,7 @@ class TestRebateGuards:
         assert reversal.reversal_of_id == original.id
         assert original.gross_amount == Decimal("100.00")
         assert record.status == "OPEN"
+        assert record.updated_by == "finance"
         assert service.settled_net_total(seeded_db, record.id) == Decimal("0.00")
         assert seeded_db.scalar(
             select(Cashflow).where(Cashflow.id == reversal.cashflow_id)

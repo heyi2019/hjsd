@@ -1242,6 +1242,7 @@ def settle_rebate(
 
     session.flush()
     _refresh_rebate_status(session, record)
+    record.updated_by = actor
     record_audit(
         session,
         action=AuditAction.REBATE_SETTLE,
@@ -1404,6 +1405,7 @@ def reverse_rebate_settlement(
     session.add(reversal)
     session.flush()
     _refresh_rebate_status(session, record)
+    record.updated_by = actor
     record_audit(
         session,
         action=AuditAction.REBATE_REVERSE,

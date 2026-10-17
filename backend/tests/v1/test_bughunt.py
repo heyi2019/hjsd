@@ -164,6 +164,7 @@ class TestInstallment:
             principal="1200.00",
             down_payment="0",
             periods=3,
+            per_period="400.00",
             first_due_on=D,
             actor="hunt",
         )

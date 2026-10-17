@@ -221,6 +221,25 @@ def create_installment(
         per_period_service_fee, field="per_period_service_fee"
     )
     per_period_amount = _non_negative(per_period, field="per_period")
+    total_schedule_amount = down_payment_amount + per_period_amount * periods
+    if down_payment_amount > principal_amount:
+        raise Validation(
+            "首付不能大于本金",
+            details={
+                "field": "down_payment",
+                "down_payment": str(down_payment_amount),
+                "principal": str(principal_amount),
+            },
+        )
+    if principal_amount > total_schedule_amount:
+        raise Validation(
+            "本金不能大于首付与分期总额",
+            details={
+                "field": "principal",
+                "principal": str(principal_amount),
+                "maximum": str(total_schedule_amount),
+            },
+        )
 
     # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约
     order_type_definition = foundation_service.get_order_type_by_code(

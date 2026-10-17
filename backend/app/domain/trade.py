@@ -402,6 +402,14 @@ class Installment(Base, AuditMixin):
             "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0 AND waived_amount >= 0",
             name="amount_nonneg",
         ),
+        CheckConstraint(
+            "down_payment <= principal",
+            name="down_payment_lte_principal",
+        ),
+        CheckConstraint(
+            "principal <= down_payment + per_period * periods",
+            name="principal_lte_schedule_total",
+        ),
         CheckConstraint("periods > 0", name="periods_positive"),
         CheckConstraint(
             f"delivery_mode IS NULL OR delivery_mode IN {DeliveryMode.values()!r}",

@@ -65,17 +65,20 @@ def _contract(
     order_id: int,
     *,
     contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+    principal=None,
     down_payment="100",
     periods=2,
     per_period="300",
     first_due_on=TODAY,
     **kwargs,
 ) -> Installment:
+    if principal is None:
+        principal = str(Decimal(down_payment) + Decimal(per_period) * periods)
     return installment_service.create_installment(
         seeded_db,
         order_id=order_id,
         contract_type=contract_type,
-        principal=Decimal("700"),
+        principal=Decimal(principal),
         down_payment=Decimal(down_payment),
         periods=periods,
         per_period=Decimal(per_period),
@@ -129,6 +132,32 @@ class TestCreateInstallmentValidation:
             seeded_db.flush()
         seeded_db.rollback()
 
+    def test_installment_principal_schedule_invariant_is_closed_at_database_boundary(
+        self, seeded_db
+    ):
+        order = _order(seeded_db)
+        seeded_db.add(
+            Installment(
+                inst_no="INS-INVALID-SCHEDULE-TOTAL",
+                order_id=order.id,
+                contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+                principal=Decimal("700"),
+                down_payment=Decimal("100"),
+                service_fee=Decimal("0"),
+                periods=1,
+                per_period_service_fee=Decimal("0"),
+                per_period=Decimal("500"),
+                paid_amount=Decimal("0"),
+                waived_amount=Decimal("0"),
+                status=InstallmentStatus.PENDING.value,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            seeded_db.flush()
+        seeded_db.rollback()
+
     def test_schedule_received_and_waived_cannot_exceed_due_amount_in_database(
         self, seeded_db
     ):
@@ -153,6 +182,26 @@ class TestCreateInstallmentValidation:
         order = _order(seeded_db)
         with pytest.raises(Validation, match="不能为负数"):
             _contract(seeded_db, order.id, down_payment="-1")
+
+    @pytest.mark.parametrize(
+        ("down_payment", "principal", "per_period", "message"),
+        [
+            ("200", "100", "300", "首付不能大于本金"),
+            ("100", "801", "300", "本金不能大于首付与分期总额"),
+        ],
+    )
+    def test_principal_and_schedule_amounts_must_reconcile(
+        self, seeded_db, down_payment, principal, per_period, message
+    ):
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match=message):
+            _contract(
+                seeded_db,
+                order.id,
+                down_payment=down_payment,
+                per_period=per_period,
+                principal=Decimal(principal),
+            )
 
     def test_invalid_contract_type_rejected(self, seeded_db):
         order = _order(seeded_db)

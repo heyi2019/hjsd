@@ -213,6 +213,13 @@ class EventOut(BaseModel):
     reason: str | None = None
     note: str | None = None
     created_at: datetime
+    operator: str
+
+
+class OrderDetailOut(OrderOut):
+    """订单详情：主订单字段 + 按发生时间排列的执行事件时间线。"""
+
+    events: list[EventOut] = Field(default_factory=list)
 
 
 class EventPostResult(BaseModel):
@@ -246,6 +253,7 @@ __all__ = [
     "OrderInstallmentCreate",
     "OrderInstallmentScheduleCreate",
     "OrderOut",
+    "OrderDetailOut",
     "OrderListOut",
     "OrderUpdate",
     "PoolBalanceOut",

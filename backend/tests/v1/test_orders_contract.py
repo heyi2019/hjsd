@@ -1325,6 +1325,9 @@ class TestOrdersApi:
         fetched = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
         assert fetched.status_code == 200
         assert fetched.json()["id"] == order.id
+        assert len(fetched.json()["events"]) == 1
+        assert fetched.json()["events"][0]["event_type"] == "BUY"
+        assert fetched.json()["events"][0]["operator"] == "pytest"
 
         missing = seeded_client.get("/api/v1/orders/999999", headers=headers)
         assert missing.status_code == 404

@@ -49,6 +49,49 @@ def _order_output(order, user: CurrentUser) -> schemas.OrderOut:
     return output
 
 
+def _event_output(event: OrderEvent) -> schemas.EventOut:
+    """把审计字段映射为事件响应字段，避免 ORM 属性名泄漏到 API。"""
+    return schemas.EventOut.model_validate(
+        {
+            "id": event.id,
+            "event_no": event.event_no,
+            "order_id": event.order_id,
+            "event_type": event.event_type,
+            "amount": event.amount,
+            "occurred_on": event.occurred_on,
+            "pool_id": event.pool_id,
+            "offset_event_id": event.offset_event_id,
+            "portion": event.portion,
+            "delivery_mode": event.delivery_mode,
+            "is_posted": event.is_posted,
+            "posted_at": event.posted_at,
+            "reason": event.reason,
+            "note": event.note,
+            "created_at": event.created_at,
+            "operator": event.created_by,
+        }
+    )
+
+
+def _order_detail_output(
+    db: Session, order, user: CurrentUser
+) -> schemas.OrderDetailOut:
+    """订单详情统一返回主字段和执行事件，避免前端再拼接隐式查询。"""
+    output = schemas.OrderDetailOut.model_validate(order)
+    if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
+        snapshot = dict(output.account_snapshot)
+        if "game_password" in snapshot:
+            snapshot["game_password"] = None
+        output.account_snapshot = snapshot
+    events = db.scalars(
+        select(OrderEvent)
+        .where(OrderEvent.order_id == order.id)
+        .order_by(OrderEvent.occurred_on, OrderEvent.id)
+    ).all()
+    output.events = [_event_output(event) for event in events]
+    return output
+
+
 def _order_list_payload(db: Session, orders: list) -> list[dict]:
     """组装工作台摘要，避免列表页为每一行再请求详情。"""
     order_ids = [item.id for item in orders]
@@ -233,13 +276,13 @@ def create_order(
     return _order_output(order, user)
 
 
-@router.get("/orders/{order_id}", response_model=schemas.OrderOut)
+@router.get("/orders/{order_id}", response_model=schemas.OrderDetailOut)
 def get_order(
     order_id: int,
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
-) -> schemas.OrderOut:
-    return _order_output(service.get_order(db, order_id, _user), _user)
+) -> schemas.OrderDetailOut:
+    return _order_detail_output(db, service.get_order(db, order_id, _user), _user)
 
 
 @router.patch("/orders/{order_id}", response_model=schemas.OrderOut)
@@ -303,7 +346,7 @@ def post_event(
         user=user,
     )
     return {
-        "event": schemas.EventOut.model_validate(event),
+        "event": _event_output(event),
         "cashflow_no": flow.flow_no if flow else None,
     }
 

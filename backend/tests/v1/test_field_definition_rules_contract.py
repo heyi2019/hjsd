@@ -79,3 +79,20 @@ def test_field_definition_cannot_shadow_fixed_entity_fields(seeded_db):
             label="伪订单号",
             actor="pytest",
         )
+
+
+@pytest.mark.parametrize(
+    ("entity_type", "field_key"),
+    [("account", "source_order_no"), ("cashflow", "order_no")],
+)
+def test_field_definition_cannot_shadow_computed_api_fields(
+    seeded_db, entity_type, field_key
+):
+    with pytest.raises(Validation, match="不能覆盖固定字段"):
+        service.create_field_definition(
+            seeded_db,
+            entity_type=entity_type,
+            field_key=field_key,
+            label="不能覆盖接口字段",
+            actor="pytest",
+        )

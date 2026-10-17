@@ -684,6 +684,23 @@ class TestCashflowLifecycle:
 
 
 class TestReconciliation:
+    @pytest.mark.parametrize("raw_ids", [[[1]], [0], [True], ["1"]])
+    def test_reconciliation_rejects_invalid_unmatched_flow_ids(
+        self, seeded_db, raw_ids
+    ):
+        invest = _pool(seeded_db, "HJ_INVEST")
+
+        with pytest.raises(Validation, match="正整数"):
+            service.create_reconciliation(
+                seeded_db,
+                pool_id=invest.id,
+                reconciled_on=TODAY,
+                account_label="招商银行卡",
+                statement_balance=Decimal("0.00"),
+                unmatched_flow_ids=raw_ids,
+                actor="finance",
+            )
+
     def test_reconciliation_snapshots_difference_and_unmatched_flows(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         flow = Cashflow(

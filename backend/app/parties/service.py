@@ -203,10 +203,22 @@ def duplicate_candidates(
     exclude_customer_id: int | None = None,
     user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
-    conditions = []
-    for value, column in ((phone, Customer.phone), (wechat, Customer.wechat), (qq, Customer.qq)):
-        if value:
-            conditions.append(column == value.strip())
+    contacts: list[tuple[str, str, Any]] = []
+    for label, value, column in (
+        ("phone", phone, Customer.phone),
+        ("wechat", wechat, Customer.wechat),
+        ("qq", qq, Customer.qq),
+    ):
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise Validation(
+                "联系方式必须为文本", details={"field": label}
+            )
+        normalized = value.strip()
+        if normalized:
+            contacts.append((label, normalized, column))
+    conditions = [column == value for _label, value, column in contacts]
     if not conditions:
         return []
 
@@ -222,8 +234,8 @@ def duplicate_candidates(
             continue
         matched = [
             label
-            for label, value in (("phone", phone), ("wechat", wechat), ("qq", qq))
-            if value and getattr(customer, label) == value.strip()
+            for label, value, _column in contacts
+            if getattr(customer, label) == value
         ]
         if matched:
             candidates.append(

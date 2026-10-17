@@ -713,7 +713,23 @@ def create_reconciliation(
     if duplicate is not None:
         raise Validation("同一资金池、日期和账户只能对账一次")
 
-    raw_ids = list(unmatched_flow_ids or [])
+    try:
+        raw_ids = list(unmatched_flow_ids or [])
+    except TypeError as exc:
+        raise Validation(
+            "未达流水 ID 列表格式无效",
+            details={"field": "unmatched_flow_ids"},
+        ) from exc
+    invalid_ids = [
+        flow_id
+        for flow_id in raw_ids
+        if isinstance(flow_id, bool) or not isinstance(flow_id, int) or flow_id <= 0
+    ]
+    if invalid_ids:
+        raise Validation(
+            "未达流水 ID 必须为正整数",
+            details={"field": "unmatched_flow_ids", "invalid": invalid_ids},
+        )
     if len(raw_ids) != len(set(raw_ids)):
         raise Validation("未达流水不能重复", details={"field": "unmatched_flow_ids"})
     if raw_ids:

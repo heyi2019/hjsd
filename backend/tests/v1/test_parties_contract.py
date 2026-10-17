@@ -105,6 +105,10 @@ class TestCreateCustomerGuards:
         # 150：无任何联系方式入参 → 直接返回空候选，不查库
         assert service.duplicate_candidates(seeded_db) == []
 
+    def test_duplicate_candidates_reject_non_text_contact_values(self, seeded_db):
+        with pytest.raises(Validation, match="联系方式必须为文本"):
+            service.duplicate_candidates(seeded_db, phone=123)
+
     def test_scoped_user_cannot_assign_created_customer_to_other_owner(
         self, seeded_client, seeded_db
     ):

@@ -147,6 +147,28 @@ class TestCreateOrderValidation:
                 actor="pytest",
             )
 
+    @pytest.mark.parametrize("field", ["event_type", "portion"])
+    def test_event_enum_inputs_reject_unhashable_values_as_validation(
+        self, seeded_db, field
+    ):
+        order = _order(seeded_db)
+        values = {
+            "event_type": [],
+            "portion": {},
+        }
+        kwargs = {
+            "event_type": "BUY",
+            "portion": "PRINCIPAL",
+            "amount": "100.00",
+            "occurred_on": D,
+            "actor": "pytest",
+        }
+        kwargs[field] = values[field]
+
+        with pytest.raises(Validation) as exc:
+            order_service.post_event(seeded_db, order.id, **kwargs)
+        assert exc.value.details["field"] == field
+
     def test_duplicate_participant_role_rejected_before_unique_constraint(
         self, seeded_db
     ):

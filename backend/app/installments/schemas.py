@@ -47,6 +47,8 @@ class InstallmentOut(BaseModel):
     status: str
     delivery_mode: str | None = None
     delivered_on: date | None = None
+    first_due_on: date | None = None
+    note: str | None = None
 
 
 class ScheduleOut(BaseModel):

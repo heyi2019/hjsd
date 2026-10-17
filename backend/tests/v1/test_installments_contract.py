@@ -642,12 +642,15 @@ class TestInstallmentsApi:
 
     def test_list_endpoint(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
-        contract = _contract(seeded_db, order.id)
+        contract = _contract(seeded_db, order.id, first_due_on=PAST, note="分期备注")
         response = seeded_client.get(
             "/api/v1/installments", params={"status": "PENDING"}, headers=headers
         )
         assert response.status_code == 200, response.text
         assert [item["inst_no"] for item in response.json()] == [contract.inst_no]
+        row = response.json()[0]
+        assert row["first_due_on"] == PAST.isoformat()
+        assert row["note"] == "分期备注"
 
     def test_deliver_endpoint(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)

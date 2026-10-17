@@ -136,6 +136,34 @@ class TestCreateAccountGuards:
                 account_images=[f"image-{index}" for index in range(10)],
             )
 
+    def test_account_update_validates_profile_scope_before_mutating_identifier(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-PICKUP-UPDATE",
+            game_account="pickup-original",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=Decimal("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="仅适用于回收或代挂"):
+            service.update_account_profile(
+                seeded_db,
+                account.id,
+                actor="operator",
+                game_account="pickup-should-not-change",
+                account_description="不允许的描述",
+            )
+
+        seeded_db.commit()
+        seeded_db.refresh(account)
+        assert account.game_account == "pickup-original"
+        assert account.updated_by == "pytest"
+
     def test_account_images_must_be_an_array(self, seeded_db):
         with pytest.raises(Validation, match="必须为数组"):
             _account(seeded_db, "invalid-image-shape", account_images="image-url")

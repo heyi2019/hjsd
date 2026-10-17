@@ -222,6 +222,7 @@ def update_account_profile(
         "account_images": account.account_images or [],
         "note": account.note,
     }
+    next_game_account = account.game_account
     if game_account is not _UNSET:
         identifier = game_account.strip() if isinstance(game_account, str) else ""
         if not identifier:
@@ -233,7 +234,7 @@ def update_account_profile(
                 code=ErrorCode.DUPLICATE_CODE,
                 details={"inventory_no": exists.inventory_no},
             )
-        account.game_account = identifier
+        next_game_account = identifier
     validated_images = (
         _validate_account_images(account_images)
         if account_images is not _UNSET
@@ -244,6 +245,8 @@ def update_account_profile(
         account_description,
         validated_images,
     )
+    if game_account is not _UNSET:
+        account.game_account = next_game_account
     for field, value in {
         "game_type": game_type,
         "game_password": game_password,

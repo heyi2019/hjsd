@@ -204,6 +204,7 @@ export interface AccountExecutionOrder {
   created_at?: string | null;
   status: string;
   note?: string | null;
+  extra_values?: Record<string, unknown>;
   counterparties?: AccountExecutionCounterparty[];
   rebates?: AccountExecutionRebate[];
   events: AccountExecutionEvent[];

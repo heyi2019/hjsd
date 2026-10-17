@@ -624,6 +624,36 @@ class TestAccountsApi:
         assert response.status_code == 200, response.text
         assert response.json()["account"]["source_order_no"] == order.order_no
 
+    def test_execution_detail_includes_order_live_fields(
+        self, seeded_client, seeded_db, headers
+    ):
+        account = _account(seeded_db, "detail-live-field-acc")
+        parties_service.create_field_definition(
+            seeded_db,
+            entity_type="order",
+            field_key="execution_note",
+            label="执行备注",
+            actor="pytest",
+        )
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+            extra_values={"execution_note": "回收已核验"},
+        )
+
+        response = seeded_client.get(
+            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        order_payload = next(
+            item for item in response.json()["orders"] if item["order_id"] == order.id
+        )
+        assert order_payload["extra_values"] == {"execution_note": "回收已核验"}
+
     def test_execution_detail_includes_minute_timestamps(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-time-acc")
         order = orders_service.create_order(

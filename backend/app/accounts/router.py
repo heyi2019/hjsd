@@ -156,6 +156,7 @@ class AccountExecutionOrderOut(BaseModel):
     created_at: datetime
     status: str
     note: str | None = None
+    extra_values: dict[str, object] = Field(default_factory=dict)
     counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
     rebates: list[ExecutionRebateOut] = Field(default_factory=list)
     events: list[ExecutionEventOut]
@@ -311,6 +312,9 @@ def execution_detail(
         order_stmt = order_stmt.where(order_scope)
     orders = list(db.scalars(order_stmt.order_by(Order.id)).all())
     order_ids = [item.id for item in orders]
+    order_extra_values = parties_service.get_extra_values_bulk(
+        db, entity_type="order", entity_ids=order_ids
+    )
     counterparties_by_order: dict[int, list[ExecutionCounterpartyOut]] = {}
     if order_ids:
         for role, counterparty in db.execute(
@@ -438,6 +442,7 @@ def execution_detail(
                 created_at=order.created_at,
                 status=order.status,
                 note=order.note,
+                extra_values=order_extra_values.get(order.id, {}),
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
                 events=events_by_order.get(order.id, []),

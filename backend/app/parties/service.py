@@ -403,6 +403,11 @@ def merge_customers(
     actor: str,
     user: CurrentUser | None = None,
 ) -> Customer:
+    normalized_reason = _required_text(
+        reason,
+        field="reason",
+        message="客户合并必须填写原因",
+    )
     source = get_customer(session, source_customer_id, user)
     target = get_customer(session, target_customer_id, user)
     if source.id == target.id:
@@ -473,7 +478,7 @@ def merge_customers(
     before = {"status": source.status, "merged_into_id": source.merged_into_id}
     source.status = CustomerStatus.MERGED.value
     source.merged_into_id = target.id
-    source.merged_reason = reason
+    source.merged_reason = normalized_reason
     source.updated_by = actor
     session.flush()
 
@@ -490,7 +495,7 @@ def merge_customers(
             "migrated_roles": migrated,
             "migrated_extra_values": migrated_extras,
         },
-        reason=reason,
+        reason=normalized_reason,
     )
     return target
 

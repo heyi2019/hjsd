@@ -278,6 +278,18 @@ class TestUpdateCustomer:
 
 # ------------------------------------------------------------------ 合并守卫
 class TestMergeGuards:
+    def test_merge_requires_non_blank_reason(self, seeded_db):
+        source = _customer(seeded_db, "源")
+        target = _customer(seeded_db, "目标")
+        with pytest.raises(Validation, match="客户合并必须填写原因"):
+            service.merge_customers(
+                seeded_db,
+                source_customer_id=source.id,
+                target_customer_id=target.id,
+                reason="  ",
+                actor="admin",
+            )
+
     def test_merge_does_not_load_foreign_customer_for_scoped_user(self, seeded_db):
         source = _customer(seeded_db, "他人来源", owner_id=1)
         target = _customer(seeded_db, "我的目标", owner_id=9)

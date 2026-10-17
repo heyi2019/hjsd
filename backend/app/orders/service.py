@@ -77,6 +77,12 @@ def _positive_money(value: Any, *, field: str) -> Decimal:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
+def _required_text(value: Any, *, field: str, message: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation(message, details={"field": field})
+    return value.strip()
+
+
 def _audit_value(value: Any) -> Any:
     """把订单快照转换为 JSON 可持久化的值。"""
     if isinstance(value, date):
@@ -552,8 +558,7 @@ def cancel_order(
     user: CurrentUser | None = None,
 ) -> Order:
     """作废尚未过账的订单；已产生业务事实的订单必须走事件冲销。"""
-    if not reason or not reason.strip():
-        raise Validation("订单作废必须填写原因")
+    reason = _required_text(reason, field="reason", message="订单作废必须填写原因")
     order = get_order(session, order_id, user)
     posted = session.scalar(
         select(OrderEvent.id).where(
@@ -847,8 +852,7 @@ def _assert_event_allowed(
         if installment is None:
             raise Validation("PAYMENT 必须关联分期合约")
     if event_type == EventType.CANCEL.value:
-        if not (reason or "").strip():
-            raise Validation("CANCEL 必须填写冲销原因", details={"field": "reason"})
+        _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
         if order.order_type in {"TH", "DFQ"} and offset_event_id is None:
             raise Validation(
                 "TH/DFQ 的 CANCEL 必须指定 offset_event_id",

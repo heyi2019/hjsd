@@ -613,6 +613,23 @@ class TestCancelOffsetDirection:
             )
         assert "offset_event_id" in str(missing_offset.value)
 
+    def test_cancel_reasons_require_text_values(self, seeded_db):
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match="订单作废必须填写原因"):
+            order_service.cancel_order(
+                seeded_db, order.id, actor="pytest", reason=123
+            )
+
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="100.00",
+            occurred_on=D, actor="pytest",
+        )
+        with pytest.raises(Validation, match="CANCEL 必须填写冲销原因"):
+            order_service.post_event(
+                seeded_db, order.id, event_type="CANCEL", amount="10.00",
+                occurred_on=D, actor="pytest", reason=123,
+            )
+
     def test_cancel_cannot_exceed_offset_remaining_or_change_pool(self, seeded_db):
         order = _order(seeded_db, order_type="TH")
         buy, _ = order_service.post_event(

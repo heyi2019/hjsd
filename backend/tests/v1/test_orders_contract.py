@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
@@ -18,6 +19,7 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, CapitalType, OrderStatus
+from app.accounts import service as accounts_service
 from app.parties import service as parties_service
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.foundation import service as foundation_service
@@ -27,6 +29,14 @@ D = date(2026, 10, 4)
 
 
 def _order(seeded_db, *, order_type="HS", account_id=None, owner_id=None, trade_date=D):
+    if order_type == "HS" and account_id is None:
+        account_id = accounts_service.create_account(
+            seeded_db,
+            game_account=f"orders-contract-{uuid4().hex[:10]}",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        ).id
     return order_service.create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
@@ -42,6 +52,21 @@ def _scoped_user() -> CurrentUser:
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
+    def test_hs_buy_requires_inventory_account(self, seeded_db):
+        order = order_service.create_order(
+            seeded_db, order_type="HS", trade_date=D, actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="库存账号"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("100"),
+                occurred_on=D,
+                actor="pytest",
+            )
+
     def test_order_commission_fields_are_closed_at_database_boundary(self, seeded_db):
         order = _order(seeded_db, order_type="DG")
         order.commission_mode = "UNKNOWN"

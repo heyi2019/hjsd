@@ -795,6 +795,8 @@ class TestFinanceApi:
         assert item["system_balance"] == "100.00"
         assert item["difference"] == "-10.00"
         assert item["unmatched_flow_ids"] == [flow.id]
+        assert item["operator"] == "admin"
+        assert item["created_at"]
 
         listed = seeded_client.get(
             "/api/v1/reconciliations",
@@ -1166,6 +1168,8 @@ class TestFinanceApi:
         assert response.status_code == 201, response.text
         payload = response.json()
         assert payload["amount"] == "125.50"
+        assert payload["operator"] == "admin"
+        assert payload["created_at"]
         assert len(payload["cashflows"]) == 2
         assert {row["nature"] for row in payload["cashflows"]} == {"INTERNAL"}
         assert {row["direction"] for row in payload["cashflows"]} == {"IN", "OUT"}

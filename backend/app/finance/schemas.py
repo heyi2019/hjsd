@@ -125,6 +125,8 @@ class ReconciliationOut(BaseModel):
     resolved_by: str | None = None
     resolved_at: datetime | None = None
     note: str | None = None
+    created_at: datetime
+    operator: str
 
 
 class TransferCreate(RequestModel):
@@ -146,6 +148,8 @@ class TransferOut(BaseModel):
     target_pool_id: int
     amount: Decimal
     occurred_on: date
+    created_at: datetime
+    operator: str
     cashflows: list[CashflowOut]
 
 

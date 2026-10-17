@@ -95,6 +95,27 @@ def _settlement_out(item) -> schemas.SettlementOut:
     )
 
 
+def _reconciliation_out(item) -> schemas.ReconciliationOut:
+    return schemas.ReconciliationOut.model_validate(
+        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+    )
+
+
+def _transfer_out(db: Session, result: dict) -> schemas.TransferOut:
+    flows = result["cashflows"]
+    first_flow = min(flows, key=lambda flow: flow.created_at)
+    return schemas.TransferOut(
+        transfer_id=result["transfer_id"],
+        source_pool_id=result["source_pool_id"],
+        target_pool_id=result["target_pool_id"],
+        amount=result["amount"],
+        occurred_on=result["occurred_on"],
+        created_at=first_flow.created_at,
+        operator=first_flow.created_by,
+        cashflows=[_cashflow_out(db, flow) for flow in flows],
+    )
+
+
 @router.get("/cashflows", response_model=list[schemas.CashflowOut])
 def list_cashflows(
     pool_id: int | None = Query(default=None),
@@ -221,7 +242,7 @@ def list_reconciliations(
         else sorted(user.pool_ids),
         user=user,
     )
-    return [schemas.ReconciliationOut.model_validate(item) for item in items]
+    return [_reconciliation_out(item) for item in items]
 
 
 @router.post("/reconciliations", response_model=schemas.ReconciliationOut, status_code=201)
@@ -244,7 +265,7 @@ def create_reconciliation(
         actor=_actor(user),
         user=user,
     )
-    return schemas.ReconciliationOut.model_validate(item)
+    return _reconciliation_out(item)
 
 
 @router.post(
@@ -264,7 +285,7 @@ def resolve_reconciliation(
         reason=payload.reason,
         user=user,
     )
-    return schemas.ReconciliationOut.model_validate(item)
+    return _reconciliation_out(item)
 
 
 @router.post("/transfers", response_model=schemas.TransferOut, status_code=201)
@@ -284,39 +305,7 @@ def create_transfer(
         actor=_actor(user),
         note=payload.note,
     )
-    return schemas.TransferOut(
-        transfer_id=result["transfer_id"],
-        source_pool_id=result["source_pool_id"],
-        target_pool_id=result["target_pool_id"],
-        amount=result["amount"],
-        occurred_on=result["occurred_on"],
-        cashflows=[
-            schemas.CashflowOut(
-                id=flow.id,
-                flow_no=flow.flow_no,
-                pool_id=flow.pool_id,
-                occurred_on=flow.occurred_on,
-                occurred_at=flow.created_at,
-                nature=flow.nature,
-                category=flow.category,
-                direction=flow.direction,
-                amount=flow.amount,
-                status=flow.status,
-                reviewed_by=flow.reviewed_by,
-                reviewed_at=flow.reviewed_at,
-                reversal_of_id=flow.reversal_of_id,
-                order_id=flow.order_id,
-                order_no=None,
-                deposit_id=flow.deposit_id,
-                order_event_id=flow.order_event_id,
-                transfer_id=flow.transfer_id,
-                source="TRANSFER",
-                note=flow.note,
-                operator=flow.created_by,
-            )
-            for flow in result["cashflows"]
-        ],
-    )
+    return _transfer_out(db, result)
 
 
 @router.post(
@@ -339,17 +328,7 @@ def repair_transfer(
         reason=payload.reason,
         user=user,
     )
-    return schemas.TransferOut(
-        transfer_id=result["transfer_id"],
-        source_pool_id=result["source_pool_id"],
-        target_pool_id=result["target_pool_id"],
-        amount=result["amount"],
-        occurred_on=result["occurred_on"],
-        cashflows=[
-            _cashflow_out(db, flow)
-            for flow in result["cashflows"]
-        ],
-    )
+    return _transfer_out(db, result)
 
 
 # --------------------------------------------------------------------- 押金

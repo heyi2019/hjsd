@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "../shared/api/catalog";
 import { renderApp } from "../test/render";
-import { InventoryPanel, buildInventoryCsv } from "./InventoryPanel";
+import { InventoryPanel } from "./InventoryPanel";
+import { buildInventoryCsv } from "./inventory-export";
 
 const accountsList = vi.fn();
 const accountsExecutionDetail = vi.fn();

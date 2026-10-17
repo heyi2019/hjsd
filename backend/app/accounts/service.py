@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from collections.abc import Mapping
 from typing import Any
 
 from sqlalchemy import or_, select
@@ -24,6 +25,7 @@ from app.domain.enums import (
     SequenceKey,
 )
 from app.domain.trade import Account, Order
+from app.parties import service as parties_service
 
 INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.value)
 _UNSET = object()
@@ -110,6 +112,7 @@ def create_account(
     account_description: str | None = None,
     account_images: list[str] | None = None,
     note: str | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> Account:
     identifier = game_account.strip() if isinstance(game_account, str) else ""
     if not identifier:
@@ -147,6 +150,13 @@ def create_account(
     )
     session.add(account)
     session.flush()
+    parties_service.set_extra_values(
+        session,
+        entity_type="account",
+        entity_id=account.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
     record_audit(
         session,
         action=AuditAction.ACCOUNT_CREATE,
@@ -175,7 +185,7 @@ def _scope_filter(session: Session, user: CurrentUser | None):
     linked_to_visible_order = select(Order.account_id).where(
         Order.account_id.is_not(None), Order.owner_id.in_(visible_owner_ids)
     )
-    # 独立建档已不提供 API，但导入/历史数据可能存在；创建者仍可看自己的未关联账号。
+    # 独立建档已不提供 API，但标准导入可能存在；创建者仍可看自己的未关联账号。
     return or_(
         Account.created_by == user.username,
         Account.id.in_(linked_to_visible_order),
@@ -217,6 +227,7 @@ def update_account_profile(
     account_description: str | None | object = _UNSET,
     account_images: list[str] | None | object = _UNSET,
     note: str | None | object = _UNSET,
+    extra_values: Mapping[str, Any] | None | object = _UNSET,
     user: CurrentUser | None = None,
 ) -> Account:
     account = get_account(session, account_id, user)
@@ -277,6 +288,13 @@ def update_account_profile(
         setattr(account, field, value)
     account.updated_by = actor
     session.flush()
+    if extra_values is not _UNSET:
+        parties_service.set_extra_values(
+            session,
+            entity_type="account",
+            entity_id=account.id,
+            values=(extra_values or {}).items(),
+        )
     record_audit(
         session,
         action=AuditAction.ACCOUNT_UPDATE,

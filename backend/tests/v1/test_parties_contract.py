@@ -32,6 +32,7 @@ from app.domain.parties import (
     OrderCustomerRole,
 )
 from app.domain.trade import InstallmentSchedule
+from app.accounts import service as accounts_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
 from app.parties import service
@@ -705,7 +706,7 @@ class TestFieldDefinitionGuards:
         ) == definition.id
         assert service.list_customers(seeded_db, keyword="不应落库的客户") == []
 
-    def test_database_rejects_non_customer_extra_value(self, seeded_db):
+    def test_database_rejects_unsupported_extra_value_entity(self, seeded_db):
         definition = service.create_field_definition(
             seeded_db,
             entity_type="customer",
@@ -716,7 +717,7 @@ class TestFieldDefinitionGuards:
         with pytest.raises(IntegrityError):
             seeded_db.execute(
                 EntityExtraValue.__table__.insert().values(
-                    entity_type="order",
+                    entity_type="quality_issue",
                     entity_id=1,
                     field_definition_id=definition.id,
                     value={"value": "invalid"},
@@ -812,16 +813,55 @@ class TestFieldDefinitionGuards:
             )
         assert "实体类型必须为" in str(exc.value)
 
-    @pytest.mark.parametrize("entity_type", ["account", "order"])
-    def test_business_entities_cannot_define_live_fields(self, seeded_db, entity_type):
-        with pytest.raises(Validation):
-            service.create_field_definition(
-                seeded_db,
-                entity_type=entity_type,
-                field_key="custom_note",
-                label="自定义备注",
-                actor="pytest",
-            )
+    def test_order_and_account_support_live_fields(self, seeded_db):
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="live-field-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 4),
+            account_id=account.id,
+            actor="pytest",
+        )
+        order_definition = service.create_field_definition(
+            seeded_db,
+            entity_type="order",
+            field_key="seller_note",
+            label="卖家备注",
+            actor="pytest",
+        )
+        account_definition = service.create_field_definition(
+            seeded_db,
+            entity_type="account",
+            field_key="selling_point",
+            label="账号卖点",
+            actor="pytest",
+        )
+
+        service.set_extra_values(
+            seeded_db,
+            entity_type="order",
+            entity_id=order.id,
+            values=[(order_definition.field_key, "高等级")],
+        )
+        service.set_extra_values(
+            seeded_db,
+            entity_type="account",
+            entity_id=account.id,
+            values=[(account_definition.field_key, "稀有皮肤")],
+        )
+
+        assert service.get_extra_values(
+            seeded_db, entity_type="order", entity_id=order.id
+        ) == {"seller_note": "高等级"}
+        assert service.get_extra_values(
+            seeded_db, entity_type="account", entity_id=account.id
+        ) == {"selling_point": "稀有皮肤"}
 
     def test_invalid_field_key_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:

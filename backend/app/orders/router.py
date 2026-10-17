@@ -34,6 +34,7 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.installments import service as installments_service
+from app.parties import service as parties_service
 from app.orders import schemas, service
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
@@ -51,9 +52,12 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
-def _order_output(order, user: CurrentUser) -> schemas.OrderOut:
+def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
     """按订单权限输出详情，避免财务/查看权限读取 DFQ 游戏密码。"""
     output = schemas.OrderOut.model_validate(order)
+    output.extra_values = parties_service.get_extra_values(
+        db, entity_type="order", entity_id=order.id
+    )
     if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
         snapshot = dict(output.account_snapshot)
         if "game_password" in snapshot:
@@ -91,6 +95,9 @@ def _order_detail_output(
 ) -> schemas.OrderDetailOut:
     """订单详情统一返回主字段和执行事件，避免前端再拼接隐式查询。"""
     output = schemas.OrderDetailOut.model_validate(order)
+    output.extra_values = parties_service.get_extra_values(
+        db, entity_type="order", entity_id=order.id
+    )
     if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
         snapshot = dict(output.account_snapshot)
         if "game_password" in snapshot:
@@ -220,6 +227,9 @@ def _order_detail_output(
 def _order_list_payload(db: Session, orders: list) -> list[dict]:
     """组装工作台摘要，避免列表页为每一行再请求详情。"""
     order_ids = [item.id for item in orders]
+    extra_values = parties_service.get_extra_values_bulk(
+        db, entity_type="order", entity_ids=order_ids
+    )
     account_ids = [item.account_id for item in orders if item.account_id is not None]
     accounts = (
         {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
@@ -279,6 +289,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "link_status": order.link_status,
             "owner_id": order.owner_id,
             "note": order.note,
+            "extra_values": extra_values.get(order.id, {}),
             "created_at": order.created_at,
             # DFQ / TH 只有订单文本快照，没有库存账号；列表展示安全的业务字段，
             # 不把快照中的 game_password 原样带入列表响应。
@@ -362,6 +373,7 @@ def create_order(
             for role in payload.counterparty_roles
             if role.counterparty_id is not None
         ],
+        extra_values=payload.extra_values,
         user=user,
     )
     if payload.initial_buy is not None and payload.installment is not None:
@@ -398,7 +410,7 @@ def create_order(
             note=payload.initial_buy.note,
             user=user,
         )
-    return _order_output(order, user)
+    return _order_output(db, order, user)
 
 
 @router.get("/orders/{order_id}", response_model=schemas.OrderDetailOut)
@@ -466,7 +478,7 @@ def update_order(
     order = service.update_order(
         db, order_id, actor=_actor(user), user=user, **changes
     )
-    return _order_output(order, user)
+    return _order_output(db, order, user)
 
 
 @router.post("/orders/{order_id}/cancel", response_model=schemas.OrderOut)
@@ -483,7 +495,7 @@ def cancel_order(
         reason=payload.reason,
         user=user,
     )
-    return _order_output(order, user)
+    return _order_output(db, order, user)
 
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)

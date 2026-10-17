@@ -148,9 +148,16 @@ class CounterpartyRole(StrEnum):
 
 
 class EntityType(StrEnum):
-    """当前活字段实体域：只承载客户辅助信息。"""
+    """活字段可挂载的业务实体域；只承载非核算辅助信息。"""
 
+    ORDER = "order"
+    ACCOUNT = "account"
     CUSTOMER = "customer"
+    INSTALLMENT = "installment"
+    POOL = "pool"
+    CASHFLOW = "cashflow"
+    LEAD = "lead"
+    COUNTERPARTY = "counterparty"
 
 
 class FieldType(StrEnum):

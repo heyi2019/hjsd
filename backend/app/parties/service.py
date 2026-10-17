@@ -43,12 +43,40 @@ from app.domain.parties import (
     FieldDefinition,
     OrderCustomerRole,
 )
-from app.domain.foundation import AuditLog
-from app.domain.trade import Installment, InstallmentSchedule, Order, OrderEvent
+from app.domain.foundation import AuditLog, Pool
+from app.domain.trade import (
+    Account,
+    Cashflow,
+    Installment,
+    InstallmentSchedule,
+    Order,
+    OrderEvent,
+)
 from app.domain.users import User
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
+
+_EXTRA_ENTITY_MODELS: dict[str, type] = {
+    EntityType.ORDER.value: Order,
+    EntityType.ACCOUNT.value: Account,
+    EntityType.CUSTOMER.value: Customer,
+    EntityType.INSTALLMENT.value: Installment,
+    EntityType.POOL.value: Pool,
+    EntityType.CASHFLOW.value: Cashflow,
+    EntityType.LEAD.value: CustomerLead,
+    EntityType.COUNTERPARTY.value: Counterparty,
+}
+_ENTITY_LABELS = {
+    EntityType.ORDER.value: "订单",
+    EntityType.ACCOUNT.value: "账号",
+    EntityType.CUSTOMER.value: "客户",
+    EntityType.INSTALLMENT.value: "分期合约",
+    EntityType.POOL.value: "资金池",
+    EntityType.CASHFLOW.value: "资金流水",
+    EntityType.LEAD.value: "需求",
+    EntityType.COUNTERPARTY.value: "合作方",
+}
 
 
 def _required_text(value: Any, *, message: str, field: str) -> str:
@@ -1260,13 +1288,22 @@ def _validate_extra_values(
     entity_id: int | None,
     values: Iterable[tuple[str, Any]],
 ) -> list[tuple[str, FieldDefinition, Any]]:
-    if (
-        entity_type == EntityType.CUSTOMER.value
-        and entity_id is not None
-        and session.get(Customer, entity_id) is None
+    if entity_type not in _EXTRA_ENTITY_MODELS:
+        raise Validation(
+            f"实体类型必须为 {EntityType.values()}",
+            details={"field": "entity_type", "value": entity_type},
+        )
+    if entity_id is not None and (
+        isinstance(entity_id, bool) or not isinstance(entity_id, int) or entity_id <= 0
     ):
+        raise Validation(
+            "实体 ID 必须为正整数",
+            details={"field": "entity_id", "entity_type": entity_type, "entity_id": entity_id},
+        )
+    model = _EXTRA_ENTITY_MODELS[entity_type]
+    if entity_id is not None and session.get(model, entity_id) is None:
         raise NotFound(
-            f"客户 {entity_id} 不存在",
+            f"{_ENTITY_LABELS[entity_type]} {entity_id} 不存在",
             details={"entity_type": entity_type, "entity_id": entity_id},
         )
 
@@ -1454,8 +1491,20 @@ def set_extra_values(
     entity_type: str,
     entity_id: int,
     values: Iterable[tuple[str, Any]],
+    require_all: bool = False,
 ) -> dict[str, Any]:
     """按启用的字段定义写入活字段值；未启用字段拒绝写入（BAS-04-04）。"""
+    values = list(values)
+    values_map = {field_key: value for field_key, value in values}
+    if len(values_map) != len(values):
+        raise Validation(
+            "活字段不能重复提交",
+            details={"field": "extra_values"},
+        )
+    if require_all:
+        _validate_required_extras(
+            session, entity_type, values_map, partial=False
+        )
     validated = _validate_extra_values(
         session,
         entity_type=entity_type,

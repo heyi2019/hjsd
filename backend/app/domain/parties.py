@@ -6,7 +6,8 @@ BAS-02-05 / BAS-04 / BAS-06 / CUS-01。
 - 客户 `CUS0001` 与合作方 `CP0001` **编号域独立**，两类对象不得混用（V20）；
 - 联系方式**非唯一**，重名/同号只产生重复候选，不拦截建档（CUS-01-05）；
 - 停用 / 已合并对象不可作为**新**订单参与方，历史关系保留；
-- 活字段 `entity_type=customer` 仅承载辅助信息，不得覆盖核算字段（BAS-04）。
+- 活字段覆盖订单、账号、客户、分期、资金池、资金流水、需求和合作方，
+  仅承载辅助信息，不得覆盖核算字段（BAS-04）。
 """
 from __future__ import annotations
 
@@ -124,7 +125,7 @@ class FieldDefinition(Base, AuditMixin):
     __tablename__ = "field_definitions"
     __table_args__ = (
         CheckConstraint(
-            f"entity_type = '{EntityType.CUSTOMER.value}'",
+            f"entity_type IN {EntityType.values()!r}".replace("[", "(").replace("]", ")"),
             name="field_entity_valid",
         ),
         CheckConstraint(
@@ -152,7 +153,7 @@ class EntityExtraValue(Base, TimestampMixin):
     __tablename__ = "entity_extra_values"
     __table_args__ = (
         CheckConstraint(
-            f"entity_type = '{EntityType.CUSTOMER.value}'",
+            f"entity_type IN {EntityType.values()!r}".replace("[", "(").replace("]", ")"),
             name="extra_value_entity_valid",
         ),
         UniqueConstraint(

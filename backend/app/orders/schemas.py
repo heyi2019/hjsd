@@ -41,6 +41,7 @@ class OrderAccountCreate(BaseModel):
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] = Field(default_factory=list, max_length=9)
     note: str | None = None
+    extra_values: dict[str, object] = Field(default_factory=dict)
 
 
 class OrderAccountSnapshot(BaseModel):
@@ -107,6 +108,7 @@ class OrderCreate(BaseModel):
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
+    extra_values: dict[str, object] = Field(default_factory=dict)
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
     counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
     initial_buy: InitialBuyCreate | None = None
@@ -126,6 +128,7 @@ class OrderUpdate(BaseModel):
     expected_settlement_date: date | None = None
     account_snapshot: OrderAccountSnapshot | None = None
     note: str | None = None
+    extra_values: dict[str, object] | None = None
 
 
 class OrderLinkCreate(BaseModel):
@@ -163,6 +166,7 @@ class OrderOut(BaseModel):
     link_status: str
     owner_id: int | None = None
     note: str | None = None
+    extra_values: dict[str, object] = Field(default_factory=dict)
     created_at: datetime
 
 

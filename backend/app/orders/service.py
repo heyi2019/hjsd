@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -200,6 +200,7 @@ def create_order(
     note: str | None = None,
     customer_roles: Sequence[tuple[int, str]] = (),
     counterparty_roles: Sequence[tuple[int, str]] = (),
+    extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     definition = foundation_service.get_order_type_by_code(session, order_type)
@@ -404,6 +405,13 @@ def create_order(
         )
         session.add(_counterparty_role(order.id, counterparty_id, role))
     session.flush()
+    parties_service.set_extra_values(
+        session,
+        entity_type="order",
+        entity_id=order.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
 
     record_audit(
         session,
@@ -591,6 +599,7 @@ def update_order(
     expected_settlement_date: date | None | object = _UNSET,
     account_snapshot: dict[str, Any] | None | object = _UNSET,
     note: str | None | object = _UNSET,
+    extra_values: Mapping[str, Any] | None | object = _UNSET,
     user: CurrentUser | None = None,
 ) -> Order:
     """受控编辑订单主字段。
@@ -703,6 +712,13 @@ def update_order(
         order.note = note
     order.updated_by = actor
     session.flush()
+    if extra_values is not _UNSET:
+        parties_service.set_extra_values(
+            session,
+            entity_type="order",
+            entity_id=order.id,
+            values=(extra_values or {}).items(),
+        )
     record_audit(
         session,
         action=AuditAction.ORDER_UPDATE,

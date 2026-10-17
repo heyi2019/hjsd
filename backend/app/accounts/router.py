@@ -22,6 +22,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.accounts import service
+from app.parties import service as parties_service
 from app.domain.foundation import Pool
 from app.domain.parties import Counterparty, OrderCounterpartyRole
 from app.domain.trade import (
@@ -57,6 +58,7 @@ class AccountOut(BaseModel):
     note: str | None = None
     account_description: str | None = None
     account_images: list[str] | None = None
+    extra_values: dict[str, object] = Field(default_factory=dict)
     status: str
     cost_amount: Decimal
     buy_date: date | None = None
@@ -77,6 +79,7 @@ class AccountProfileUpdate(RequestModel):
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] | None = Field(default=None, max_length=9)
     note: str | None = None
+    extra_values: dict[str, object] | None = None
 
 
 class ExecutionCashflowOut(BaseModel):
@@ -214,14 +217,15 @@ def _account_output(
     source_order: Order | None = None,
     *,
     include_credentials: bool = False,
+    extra_values: dict[str, object] | None = None,
 ) -> AccountOut:
     """统一补齐库存来源订单；业务与类型以标准导入的账号字段为准。"""
     output = AccountOut.model_validate(account)
     if not include_credentials:
         output.game_password = None
-    if source_order is None:
-        return output
-    output.source_order_no = source_order.order_no
+    output.extra_values = extra_values or {}
+    if source_order is not None:
+        output.source_order_no = source_order.order_no
     return output
 
 
@@ -234,11 +238,15 @@ def _account_outputs(
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
     source_orders = _source_orders(db, [account.id for account in accounts], user)
+    extra_values = parties_service.get_extra_values_bulk(
+        db, entity_type="account", entity_ids=[account.id for account in accounts]
+    )
     return [
         _account_output(
             account,
             source_orders.get(account.id),
             include_credentials=include_credentials,
+            extra_values=extra_values.get(account.id),
         )
         for account in accounts
     ]
@@ -274,7 +282,8 @@ def update_account_profile(
     item = service.update_account_profile(
         db, account_id, actor=_actor(user), user=user, **changes
     )
-    return AccountOut.model_validate(item)
+    extras = parties_service.get_extra_values(db, entity_type="account", entity_id=item.id)
+    return _account_output(item, include_credentials=True, extra_values=extras)
 
 
 @router.get("/accounts/inventory")

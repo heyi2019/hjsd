@@ -42,6 +42,14 @@ def _validate_account_images(value: list[str] | None) -> list[str] | None:
     return images
 
 
+def _validate_optional_bool(value: object, *, field: str) -> bool | None:
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise Validation(f"{field} 必须为布尔值", details={"field": field})
+    return value
+
+
 def _validate_inventory_context(
     business_mode: str | None,
     inventory_type: str | None,
@@ -114,6 +122,7 @@ def create_account(
             details={"inventory_no": exists.inventory_no},
         )
     _validate_inventory_context(business_mode, inventory_type)
+    has_secondary = _validate_optional_bool(has_secondary, field="has_secondary")
     validated_images = _validate_account_images(account_images)
     _validate_account_profile_scope(
         inventory_type, account_description, validated_images
@@ -244,6 +253,11 @@ def update_account_profile(
         account.inventory_type,
         account_description,
         validated_images,
+    )
+    has_secondary = (
+        _validate_optional_bool(has_secondary, field="has_secondary")
+        if has_secondary is not _UNSET
+        else _UNSET
     )
     if game_account is not _UNSET:
         account.game_account = next_game_account

@@ -168,6 +168,19 @@ class TestCreateAccountGuards:
         with pytest.raises(Validation, match="必须为数组"):
             _account(seeded_db, "invalid-image-shape", account_images="image-url")
 
+    def test_has_secondary_must_be_boolean_in_service(self, seeded_db):
+        with pytest.raises(Validation, match="has_secondary 必须为布尔值"):
+            _account(seeded_db, "invalid-secondary-shape", has_secondary="false")
+
+        account = _account(seeded_db, "invalid-secondary-update")
+        with pytest.raises(Validation, match="has_secondary 必须为布尔值"):
+            service.update_account_profile(
+                seeded_db, account.id, actor="pytest", has_secondary="false"
+            )
+        seeded_db.commit()
+        seeded_db.refresh(account)
+        assert account.has_secondary is None
+
     def test_risk_level_is_not_part_of_account_domain(self, seeded_db):
         account = _account(seeded_db, "no-risk-field")
         assert not hasattr(account, "risk_level")

@@ -109,6 +109,28 @@ class TestPoolGuards:
 
 
 class TestOrderTypeGuards:
+    def test_active_flags_must_be_boolean_in_service(self, seeded_db):
+        order_type = service.create_order_type(
+            seeded_db,
+            code="TBOOL",
+            name="布尔状态校验",
+            capital_type=CapitalType.PASS_THRU.value,
+            actor="pytest",
+        )
+        with pytest.raises(Validation, match="is_active 必须为布尔值"):
+            service.set_order_type_active(
+                seeded_db, order_type.id, "false", actor="pytest"
+            )
+        with pytest.raises(Validation, match="is_active 必须为布尔值"):
+            service.set_route(
+                seeded_db,
+                order_type_code=order_type.code,
+                portion=Portion.PRINCIPAL.value,
+                pool_code="HJ_INVEST",
+                is_active="false",
+                actor="pytest",
+            )
+
     def test_activation_requires_an_active_route_to_an_active_pool(self, seeded_db):
         order_type = service.create_order_type(
             seeded_db,

@@ -48,6 +48,12 @@ def _required_text(value: Any, *, message: str, field: str) -> str:
     return value.strip()
 
 
+def _required_bool(value: object, *, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise Validation(f"{field} 必须为布尔值", details={"field": field})
+    return value
+
+
 def _normalize_extra_values(
     values: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -645,6 +651,7 @@ def set_counterparty_status(
     session: Session, counterparty_id: int, active: bool, *, actor: str
 ) -> Counterparty:
     """停用后不可参与新订单；有历史参与关系不物理删除（BAS-02-05）。"""
+    active = _required_bool(active, field="active")
     item = get_counterparty(session, counterparty_id)
     before = item.status
     item.status = (
@@ -972,6 +979,7 @@ def set_field_definition_active(
     session: Session, definition_id: int, active: bool, *, actor: str
 ) -> FieldDefinition:
     """停用后历史值仍显示，新建表单不可填（A10）。"""
+    active = _required_bool(active, field="active")
     definition = session.get(FieldDefinition, definition_id)
     if definition is None:
         raise NotFound(

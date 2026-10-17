@@ -443,6 +443,18 @@ class TestCounterpartyGuards:
             )
         assert "合作方名称必填" in str(exc.value)
 
+    def test_counterparty_active_must_be_boolean_in_service(self, seeded_db):
+        peer = service.create_counterparty(
+            seeded_db, display_name="布尔状态校验", type="PEER", actor="pytest"
+        )
+        with pytest.raises(Validation, match="active 必须为布尔值"):
+            service.set_counterparty_status(
+                seeded_db, peer.id, "false", actor="pytest"
+            )
+        seeded_db.commit()
+        seeded_db.refresh(peer)
+        assert peer.status == CounterpartyStatus.ACTIVE.value
+
     def test_list_filters_by_type_and_status(self, seeded_db):
         peer = service.create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
@@ -800,6 +812,22 @@ class TestFieldDefinitionGuards:
         assert len(
             service.list_field_definitions(seeded_db, entity_type="customer")
         ) == 1
+
+    def test_field_definition_active_must_be_boolean_in_service(self, seeded_db):
+        definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="bool_active",
+            label="布尔状态校验",
+            actor="pytest",
+        )
+        with pytest.raises(Validation, match="active 必须为布尔值"):
+            service.set_field_definition_active(
+                seeded_db, definition.id, "false", actor="pytest"
+            )
+        seeded_db.commit()
+        seeded_db.refresh(definition)
+        assert definition.is_active is True
 
     def test_set_active_notfound(self, seeded_db):
         with pytest.raises(NotFound):

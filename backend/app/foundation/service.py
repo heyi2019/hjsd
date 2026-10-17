@@ -73,6 +73,12 @@ def _required_pool_type(value: object) -> str:
     return value.strip()
 
 
+def _required_bool(value: object, *, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise Validation(f"{field} 必须为布尔值", details={"field": field})
+    return value
+
+
 def _non_negative_int(value: object, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise Validation(
@@ -412,6 +418,7 @@ def set_order_type_active(
     session: Session, order_type_id: int, is_active: bool, *, actor: str
 ) -> OrderTypeDef:
     """启用前必须已配置资金路由（BAS-02-02 验收）。"""
+    is_active = _required_bool(is_active, field="is_active")
     order_type = _get_order_type_or_404(session, order_type_id)
     if is_active:
         routes = list(
@@ -466,6 +473,7 @@ def set_route(
     is_active: bool = True,
 ) -> OrderTypePool:
     """BAS-03-02：同一业务同一份额仅保留一条默认路由（幂等覆盖）。"""
+    is_active = _required_bool(is_active, field="is_active")
     if portion not in Portion.values():
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}

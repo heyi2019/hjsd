@@ -320,7 +320,10 @@ def build_access_token(user: "CurrentUser", *, settings: Settings | None = None)
 
 def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
     try:
-        user_id = int(payload.get("sub", 0))
+        raw_user_id = payload.get("sub", 0)
+        if isinstance(raw_user_id, bool):
+            raise ValueError("invalid identity claims")
+        user_id = int(raw_user_id)
         username = payload.get("username")
         roles = payload.get("roles", [])
         pool_ids = payload.get("pool_ids", [])
@@ -330,17 +333,22 @@ def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
             raise ValueError("invalid identity claims")
         if not isinstance(roles, list) or not isinstance(pool_ids, list) or not isinstance(team_ids, list):
             raise ValueError("invalid collection claims")
+        if any(not isinstance(role, str) or role not in ALL_ROLES for role in roles):
+            raise ValueError("invalid role claims")
         if any(isinstance(item, bool) or not isinstance(item, int) or item <= 0 for item in pool_ids + team_ids):
             raise ValueError("invalid scope claims")
         if not isinstance(owner_scope, str) or owner_scope not in OWNER_SCOPES:
             raise ValueError("invalid owner scope")
+        display_name = payload.get("display_name", username.strip())
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise ValueError("invalid display name claim")
     except (TypeError, ValueError) as error:
         raise AuthError("登录凭证内容无效") from error
     return CurrentUser.build(
         id=user_id,
         username=username.strip(),
         roles=roles,
-        display_name=payload.get("display_name", username.strip()),
+        display_name=display_name.strip(),
         pool_ids=frozenset(pool_ids),
         team_ids=frozenset(team_ids),
         owner_scope=owner_scope,

@@ -27,6 +27,7 @@ from app.core.security import (
     owner_scope_filter,
     owner_scope_ids,
     require_role,
+    user_from_payload,
     verify_password,
 )
 from app.domain.foundation import DocumentSequence
@@ -233,6 +234,41 @@ class TestTokenGuards:
         )
         with pytest.raises(AuthError, match="登录凭证内容无效"):
             decode_token(token)
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {
+                "sub": "7",
+                "username": "operator",
+                "roles": ["NOT_A_ROLE"],
+            },
+            {
+                "sub": "7",
+                "username": "operator",
+                "roles": ["VIEWER", 1],
+            },
+            {
+                "sub": "7",
+                "username": "operator",
+                "roles": "VIEWER",
+            },
+        ],
+    )
+    def test_invalid_role_claims_rejected(self, payload):
+        with pytest.raises(AuthError, match="登录凭证内容无效"):
+            user_from_payload(payload)
+
+    def test_invalid_display_name_claim_rejected(self):
+        with pytest.raises(AuthError, match="登录凭证内容无效"):
+            user_from_payload(
+                {
+                    "sub": "7",
+                    "username": "operator",
+                    "roles": ["VIEWER"],
+                    "display_name": 123,
+                }
+            )
 
     def test_unexpected_algorithm_rejected(self):
         token = self._signed_token(

@@ -651,7 +651,11 @@ def post_event(
 
     direction, nature, category = EVENT_FLOW_MAP[event_type]
     if flow_category is not None:
-        if event_type != EventType.COST.value or flow_category not in {"FEE", "DESIGN", "OTHER"}:
+        if (
+            not isinstance(flow_category, str)
+            or event_type != EventType.COST.value
+            or flow_category not in {"FEE", "DESIGN", "OTHER"}
+        ):
             raise Validation(
                 "仅 COST 事件可使用 FEE、DESIGN 或 OTHER 资金分类",
                 details={"event_type": event_type, "flow_category": flow_category},

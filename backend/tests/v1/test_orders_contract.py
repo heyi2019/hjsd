@@ -503,6 +503,17 @@ class TestPostEventValidation:
             select(Cashflow).where(Cashflow.order_id == order.id)
         ).all() == []
 
+        with pytest.raises(Validation, match="资金分类"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="COST",
+                amount="1.00",
+                occurred_on=D,
+                actor="pytest",
+                flow_category=[],
+            )
+
     def test_invalid_event_type_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:

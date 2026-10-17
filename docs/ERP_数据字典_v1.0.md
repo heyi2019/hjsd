@@ -34,7 +34,7 @@
 | order_counterparty_roles | order_id, counterparty_id, role | `UNIQUE(order_id, counterparty_id, role)`；role=PEER/SUPPLIER/PLATFORM；TH 同行、DFQ 供货方等从此关联 |
 | cashflow | flow_no, pool_id, occurred_on, nature, category, direction, amount, order_id, order_event_id, deposit_id, transfer_id | 必属池；直接关联来源订单或押金；事件派生流水一对一；新 INTERNAL 成对 |
 | period_locks | period, locked_at, locked_by, note | `YYYY-MM` 唯一；锁定后禁止该月新增/审核业务事实，修正必须使用后续期间冲销 |
-| quality_issues | issue_no, code, severity, entity_type, entity_id, status, assignee_id, resolution, evidence | 异常工单不直接修改业务事实；关闭必须留解决方式，保留负责人和审计链 |
+| quality_issues | issue_no, code, severity, entity_type, entity_id, status, resolution, evidence | 异常工单不直接修改业务事实；通过状态记录处置进度，关闭必须留解决方式、关闭人和审计链 |
 | notifications | notification_no, recipient_user_id, notification_type, title, message, entity_type, entity_id, read_at | 系统跟进通知；按接收人隔离；来源对象只用于定位，不替代业务状态；标记已读保留通知记录 |
 | attachments | attachment_no, entity_type, entity_id, file_name, storage_key, content_type, size_bytes, sha256, deleted_at | 统一业务附件索引；可关联订单、事件、资金、分期、质量异常；文件独立存储，删除保留记录与审计 |
 | accounts | inventory_no, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, business_mode, inventory_type, buy_date, cost_amount, status, account_description, account_images, note | `inventory_no` 为 ACC 库存编号；HS/TH/DG 可关联库存账号，DFQ 不关联库存账号；`game_account` 只是游戏账号文本，库存主键始终是 `inventory_no`；手机号不可作键；滞销颜色由前端按买入日期计算，不落库风险等级；不再保留 `region`、`channels` 遗留字段。 |

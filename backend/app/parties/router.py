@@ -144,7 +144,6 @@ def get_customer(
             entity_id=customer.customer_no,
             actor=_actor(user),
         )
-        db.flush()
     extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return service.to_customer_out(customer, reveal_contact=show_full, extra_values=extras)
 

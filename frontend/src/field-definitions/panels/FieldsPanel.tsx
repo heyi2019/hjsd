@@ -1,0 +1,152 @@
+import { Card, Form, Input, InputNumber, Popconfirm, Select, Switch, Typography, message } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { useCallback, useEffect, useState } from "react";
+import { fieldsApi, type FieldDefinition } from "../../shared/api/catalog";
+import { normalizeError } from "../../shared/api/client";
+import { ENTITY_TYPE_LABEL, FIELD_TYPE_LABEL } from "../../shared/lib/labels";
+import { DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+
+const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+const ENTITY_TYPE_OPTIONS = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
+
+const parseOptions = (raw: unknown): string[] | undefined => {
+  const text = typeof raw === "string" ? raw : "";
+  const items = text.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
+  return items.length ? items : undefined;
+};
+
+export function FieldsPanel() {
+  const [rows, setRows] = useState<FieldDefinition[]>([]);
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [form] = Form.useForm();
+  const fieldType = Form.useWatch("field_type", form);
+  const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
+  const load = useCallback(async () => {
+    try {
+      setRows(await fieldsApi.list());
+      setError(null);
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const submit = async (values: Record<string, unknown>) => {
+    try {
+      await fieldsApi.create({
+        entity_type: values.entity_type as string,
+        field_key: values.field_key as string,
+        label: values.label as string,
+        field_type: (values.field_type as string) ?? "TEXT",
+        options: needsOptions ? parseOptions(values.options) : undefined,
+        required: Boolean(values.required),
+        sort_order: Number(values.sort_order ?? 0),
+      });
+      message.success("活字段已创建");
+      form.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const columns: ColumnsType<FieldDefinition> = [
+    { title: "实体", dataIndex: "entity_type", render: (v: string) => ENTITY_TYPE_LABEL[v] ?? v },
+    { title: "字段键", dataIndex: "field_key" },
+    { title: "标签", dataIndex: "label" },
+    { title: "类型", dataIndex: "field_type", render: (v: string) => FIELD_TYPE_LABEL[v] ?? v },
+    { title: "必填", dataIndex: "required", render: (value: boolean) => (value ? "是" : "否") },
+    { title: "选项", dataIndex: "options", render: (value: string[] | null | undefined) => (value?.length ? value.join("、") : "-") },
+    {
+      title: "启用",
+      dataIndex: "is_active",
+      render: (value: boolean) => <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />,
+    },
+    {
+      title: "操作",
+      render: (_v, row) => (
+        <PermissionGate permission="field-definition.manage">
+          <PermissionButton
+            permission="field-definition.manage"
+            size="small"
+            onClick={async () => {
+              await fieldsApi.setActive(row.id, !row.is_active);
+              await load();
+            }}
+          >
+            {row.is_active ? "停用" : "启用"}
+          </PermissionButton>
+          <Popconfirm
+            title={`删除字段「${row.label}」`}
+            description="无历史值才可删除；已有历史值只能停用（历史值保留）"
+            onConfirm={async () => {
+              try {
+                await fieldsApi.remove(row.id);
+                message.success("字段已删除");
+                await load();
+              } catch (err) {
+                setError(normalizeError(err));
+              }
+            }}
+          >
+            <PermissionButton permission="field-definition.manage" size="small" danger>删除</PermissionButton>
+          </Popconfirm>
+        </PermissionGate>
+      ),
+    },
+  ];
+
+  return (
+    <Card className="glass" title="活字段">
+      <ErrorBanner error={error} onRetry={() => void load()} />
+      <Typography.Paragraph type="secondary">
+        活字段仅承载辅助信息，不得覆盖核算字段；有历史值只能停用，无历史值可删除（BAS-04）。
+      </Typography.Paragraph>
+      <DataTable<FieldDefinition>
+        columns={columns}
+        rows={rows}
+        page={1}
+        pageSize={Math.max(rows.length, 10)}
+        total={rows.length}
+        emptyText="暂无活字段"
+        onPageChange={() => undefined}
+      />
+      <PermissionGate permission="field-definition.manage">
+        <Form
+          form={form}
+          layout="inline"
+          onFinish={submit}
+          className="ui-form-spaced"
+          initialValues={{ entity_type: "customer", field_type: "TEXT", sort_order: 0 }}
+        >
+          <Form.Item name="entity_type" label="实体">
+            <Select options={ENTITY_TYPE_OPTIONS} className="ui-control-width-120" disabled />
+          </Form.Item>
+          <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
+            <Input placeholder="小写下划线，如 credit_level" />
+          </Form.Item>
+          <Form.Item name="label" label="标签" rules={[{ required: true }]}>
+            <Input placeholder="页面显示名" />
+          </Form.Item>
+          <Form.Item name="field_type" label="类型">
+            <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" />
+          </Form.Item>
+          {needsOptions && (
+            <Form.Item name="options" label="选项">
+              <Input placeholder="逗号分隔，如 优质,观察,黑名单" className="ui-control-width-200" />
+            </Form.Item>
+          )}
+          <Form.Item name="required" label="必填" valuePropName="checked"><Switch /></Form.Item>
+          <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">新增字段</PermissionButton>
+          </Form.Item>
+        </Form>
+      </PermissionGate>
+    </Card>
+  );
+}

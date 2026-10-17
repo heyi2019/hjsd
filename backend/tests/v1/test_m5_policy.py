@@ -652,3 +652,14 @@ class TestPolicyApi:
             json={"policy_code": "X", "name": "X", "scope_type": "GLOBAL"},
         )
         assert response.status_code == 403
+
+    def test_policy_read_follows_manage_or_approve_permissions(self, seeded_client):
+        auditor = seeded_client.get(
+            "/api/v1/policies", headers={"X-Dev-User": "auditor"}
+        )
+        assert auditor.status_code == 200, auditor.text
+
+        operator = seeded_client.get(
+            "/api/v1/policies", headers={"X-Dev-User": "operator"}
+        )
+        assert operator.status_code == 403, operator.text

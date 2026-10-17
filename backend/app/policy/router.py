@@ -21,8 +21,12 @@ router = APIRouter(tags=["policy"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
 approve_access = require_permissions(PERM_POLICY_APPROVE)
 # 注意：require_permissions 返回的已是 Depends 对象，直接作默认值，不要再包一层。
-# 只读复用 order.create 门控：项目未定义 order.read，保持既有权限惯例。
-read_access = require_permissions(PERM_ORDER_CREATE)
+# 规则配置只对规则管理员/审核人开放；审核人必须能先读取规则再执行审批。
+policy_read_access = require_permissions(
+    PERM_POLICY_MANAGE, PERM_POLICY_APPROVE, require_all=False
+)
+# 订单自身的规则快照/利润分配属于订单数据，沿用订单读取门控并继续由 Service 做范围隔离。
+order_policy_read_access = require_permissions(PERM_ORDER_CREATE)
 
 
 # ── T19 / BAS-06-01：规则定义 ───────────────────────────────────
@@ -30,7 +34,7 @@ read_access = require_permissions(PERM_ORDER_CREATE)
 @router.get("/policies")
 def list_definitions(
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = policy_read_access,
     status: str | None = Query(default=None),
     policy_code: str | None = Query(default=None),
 ) -> dict[str, Any]:
@@ -60,7 +64,7 @@ def create_definition(
 def get_definition(
     definition_id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = policy_read_access,
 ) -> dict[str, Any]:
     return service.get_definition(db, definition_id)
 
@@ -69,7 +73,7 @@ def get_definition(
 def list_versions(
     definition_id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = policy_read_access,
     status: str | None = Query(default=None),
 ) -> dict[str, Any]:
     items = service.list_versions(db, definition_id, status=status)
@@ -127,7 +131,7 @@ def approve_version(
 @router.get("/policy-versions/resolve")
 def resolve(
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = policy_read_access,
     policy_code: str = Query(...),
     on: date = Query(...),
     scope_type: str = Query(default="GLOBAL"),
@@ -152,7 +156,7 @@ def resolve(
 def list_allocations(
     order_id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = order_policy_read_access,
 ) -> dict[str, Any]:
     items = service.list_allocations(db, order_id, user=user)
     return {"items": items, "total": len(items)}
@@ -180,7 +184,7 @@ def set_allocations(
 def order_snapshot(
     order_id: int,
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = order_policy_read_access,
 ) -> dict[str, Any]:
     """订单实际应用的规则快照（BAS-06-04：可追溯）。"""
     snapshot = service.snapshot_for(db, order_id, user=user)

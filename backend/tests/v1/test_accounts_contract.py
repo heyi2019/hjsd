@@ -605,6 +605,16 @@ class TestAccountsApi:
             channel="买号返点",
             actor="pytest",
         )
+        settlement = finance_service.settle_rebate(
+            seeded_db,
+            rebate.id,
+            gross_amount=Decimal("100"),
+            platform_fee=Decimal("5"),
+            settled_on=TODAY,
+            pool_id=_invest_pool(seeded_db).id,
+            actor="pytest",
+            note="返点到账",
+        )
 
         response = seeded_client.get(
             f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
@@ -617,9 +627,22 @@ class TestAccountsApi:
             "channel": "买号返点",
             "rate": "5.00",
             "base_amount": "300.00",
-            "status": "OPEN",
+            "status": "PARTIALLY_SETTLED",
             "collected_on": TODAY.isoformat(),
             "collected_at": rebate.created_at.isoformat(),
+            "settlements": [{
+                "id": settlement.id,
+                "settlement_no": settlement.settlement_no,
+                "settled_on": TODAY.isoformat(),
+                "settled_at": settlement.created_at.isoformat(),
+                "gross_amount": "100.00",
+                "platform_fee": "5.00",
+                "net_amount": "95.00",
+                "cashflow_id": settlement.cashflow_id,
+                "reversal_of_id": None,
+                "note": "返点到账",
+                "operator": "pytest",
+            }],
         }]
 
     def test_execution_detail_ignores_independent_dfq_order(

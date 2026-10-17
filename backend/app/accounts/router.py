@@ -24,7 +24,14 @@ from app.core.security import (
 from app.accounts import service
 from app.domain.foundation import Pool
 from app.domain.parties import Counterparty, OrderCounterpartyRole
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, RebateRecord
+from app.domain.trade import (
+    Account,
+    Cashflow,
+    Order,
+    OrderEvent,
+    RebateRecord,
+    RebateSettlement,
+)
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
@@ -115,6 +122,21 @@ class ExecutionRebateOut(BaseModel):
     status: str
     collected_on: date
     collected_at: datetime
+    settlements: list["ExecutionRebateSettlementOut"] = Field(default_factory=list)
+
+
+class ExecutionRebateSettlementOut(BaseModel):
+    id: int
+    settlement_no: str
+    settled_on: date
+    settled_at: datetime
+    gross_amount: Decimal
+    platform_fee: Decimal
+    net_amount: Decimal
+    cashflow_id: int | None = None
+    reversal_of_id: int | None = None
+    note: str | None = None
+    operator: str
 
 
 class AccountExecutionOrderOut(BaseModel):
@@ -271,11 +293,36 @@ def execution_detail(
             )
     rebates_by_order: dict[int, list[ExecutionRebateOut]] = {}
     if order_ids:
-        for rebate in db.scalars(
+        rebates = list(db.scalars(
             select(RebateRecord)
             .where(RebateRecord.source_order_id.in_(order_ids))
             .order_by(RebateRecord.id)
-        ).all():
+        ).all())
+        settlement_by_rebate: dict[int, list[ExecutionRebateSettlementOut]] = {}
+        rebate_ids = [rebate.id for rebate in rebates]
+        if rebate_ids:
+            settlements = db.scalars(
+                select(RebateSettlement)
+                .where(RebateSettlement.rebate_record_id.in_(rebate_ids))
+                .order_by(RebateSettlement.rebate_record_id, RebateSettlement.id)
+            ).all()
+            for settlement in settlements:
+                settlement_by_rebate.setdefault(settlement.rebate_record_id, []).append(
+                    ExecutionRebateSettlementOut(
+                        id=settlement.id,
+                        settlement_no=settlement.settlement_no,
+                        settled_on=settlement.settled_on,
+                        settled_at=settlement.created_at,
+                        gross_amount=settlement.gross_amount,
+                        platform_fee=settlement.platform_fee,
+                        net_amount=settlement.net_amount,
+                        cashflow_id=settlement.cashflow_id,
+                        reversal_of_id=settlement.reversal_of_id,
+                        note=settlement.note,
+                        operator=settlement.created_by,
+                    )
+                )
+        for rebate in rebates:
             if rebate.source_order_id is None:
                 continue
             rebates_by_order.setdefault(rebate.source_order_id, []).append(
@@ -288,6 +335,7 @@ def execution_detail(
                     status=rebate.status,
                     collected_on=rebate.collected_on,
                     collected_at=rebate.created_at,
+                    settlements=settlement_by_rebate.get(rebate.id, []),
                 )
             )
     events = list(

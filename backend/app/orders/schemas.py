@@ -41,6 +41,21 @@ class OrderAccountCreate(BaseModel):
     note: str | None = None
 
 
+class OrderAccountSnapshot(BaseModel):
+    """订单内的账号文本快照，不承载库存营销资料或库存字段。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    game_account: str = Field(min_length=1, max_length=128)
+    game_type: str | None = Field(default=None, max_length=64)
+    game_password: str | None = Field(default=None, max_length=256)
+    channel_region: str | None = Field(default=None, max_length=128)
+    bound_phone: str | None = Field(default=None, max_length=64)
+    has_secondary: bool | None = None
+    platform: str | None = Field(default=None, max_length=64)
+    note: str | None = None
+
+
 class InitialBuyCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -84,7 +99,7 @@ class OrderCreate(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     expected_settlement_date: date | None = None
-    account_snapshot: OrderAccountCreate | None = None
+    account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
     account: OrderAccountCreate | None = None
     owner_id: int | None = None
@@ -107,7 +122,7 @@ class OrderUpdate(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     expected_settlement_date: date | None = None
-    account_snapshot: OrderAccountCreate | None = None
+    account_snapshot: OrderAccountSnapshot | None = None
     note: str | None = None
 
 
@@ -220,6 +235,7 @@ __all__ = [
     "CustomerRoleInput",
     "InitialBuyCreate",
     "OrderAccountCreate",
+    "OrderAccountSnapshot",
     "OrderCreate",
     "OrderCancelIn",
     "OrderInstallmentCreate",

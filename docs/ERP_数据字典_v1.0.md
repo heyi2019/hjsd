@@ -25,7 +25,7 @@
 |---|---|---|
 | pools | code, name, pool_type, ownership, status | code 不改；有流水不可删除 |
 | order_type_defs / order_type_pools | code, capital_type, pool_id, portion | 业务与池多对多；显式池优先 |
-| orders | order_no, order_type, capital_type, trade_date, account_id, link_status | HS0001/TH0001/DG0001/DFQ0001；汇总金额由事件派生 |
+| orders | order_no, order_type, capital_type, trade_date, account_id, account_snapshot, link_status | HS0001/TH0001/DG0001/DFQ0001；`account_snapshot` 仅为 DFQ 的订单文本快照，不等同库存账号；汇总金额由事件派生 |
 | order_events | event_no, order_id, event_type, amount, portion, occurred_on, pool_id, offset_event_id | 有资金事件必须有池；TH 用 offset 核销 |
 | customers | customer_no, display_name, contact_name, phone, wechat, qq, source, owner_id, status, tags, note | 客户主数据；微信号、QQ、手机号、备注均可填写；联系方式非唯一；停用后不可用于新订单，历史关系保留；敏感资料修改写审计 |
 | order_customer_roles | order_id, customer_id, role | `UNIQUE(order_id, customer_id, role)`；role=SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER；客户可跨订单多角色 |

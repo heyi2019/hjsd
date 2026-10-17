@@ -396,6 +396,20 @@ class TestCreateOrderValidation:
                 },
             )
 
+    def test_account_snapshot_does_not_accept_inventory_media_fields(self, seeded_db):
+        with pytest.raises(Validation, match="订单账号快照字段校验失败"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DFQ",
+                trade_date=D,
+                actor="pytest",
+                account_snapshot={
+                    "game_account": "dfq-no-media",
+                    "account_description": "订单快照不承载营销资料",
+                    "account_images": ["image-1"],
+                },
+            )
+
 
 # ------------------------------------------------------------------ 查询与作用域
 class TestGetAndListOrders:

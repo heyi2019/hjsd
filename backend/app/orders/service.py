@@ -49,7 +49,7 @@ from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
-from app.orders.schemas import OrderAccountCreate
+from app.orders.schemas import OrderAccountCreate, OrderAccountSnapshot
 
 # 事件 → 现金流方向 / 性质 / 分类
 EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
@@ -148,11 +148,22 @@ def _normalize_account_data(
 
 
 def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
-    return _normalize_account_data(
-        snapshot,
-        field="account_snapshot",
-        message="订单账号快照字段校验失败",
-    )
+    try:
+        return OrderAccountSnapshot.model_validate(snapshot).model_dump(exclude_none=True)
+    except PydanticValidationError as exc:
+        raise Validation(
+            "订单账号快照字段校验失败",
+            details={
+                "field": "account_snapshot",
+                "errors": [
+                    {
+                        "field": ".".join(str(part) for part in error["loc"]),
+                        "message": error["msg"],
+                    }
+                    for error in exc.errors()
+                ],
+            },
+        ) from exc
 
 
 def _normalize_account_profile(profile: dict[str, Any]) -> dict[str, Any]:

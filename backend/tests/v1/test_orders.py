@@ -208,14 +208,18 @@ class TestA01HsStock:
 
 
 class TestA02ThPassthru:
-    def test_buy_puts_th_account_into_inventory(self, seeded_db):
-        account = _new_account(seeded_db, game_account="th-stock-acc")
+    def test_th_order_keeps_account_as_text_snapshot(self, seeded_db):
         order = service.create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
-            account_id=account.id,
+            account_snapshot={
+                "game_type": "王者荣耀",
+                "game_account": "th-text-account",
+                "game_password": "secret",
+                "channel_region": "安卓一区",
+            },
         )
         service.post_event(
             seeded_db,
@@ -227,7 +231,8 @@ class TestA02ThPassthru:
         )
         seeded_db.commit()
 
-        assert seeded_db.get(Account, account.id).status == AccountStatus.IN_STOCK.value
+        assert seeded_db.get(Order, order.id).account_id is None
+        assert seeded_db.get(Order, order.id).account_snapshot["game_account"] == "th-text-account"
 
     def test_advance_then_settle(self, seeded_db):
         peer = parties_service.create_counterparty(
@@ -255,7 +260,7 @@ class TestA02ThPassthru:
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
         seeded_db.commit()
-        # 无账号的历史提号单仍可完成过账；新提号单会绑定库存账号。
+        # 提号只保留订单文本，不建立库存账号关联。
         assert seeded_db.get(Order, order.id).account_id is None
 
 

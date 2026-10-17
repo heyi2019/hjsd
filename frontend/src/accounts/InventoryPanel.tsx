@@ -1,4 +1,4 @@
-/** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号均从这里进入待售流程。 */
+/** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收与代挂账号从这里进入待售流程。 */
 import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Descriptions, Image, Input, Modal, Select, Space, Spin, Typography, Upload, message } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
@@ -34,7 +34,6 @@ const BUSINESS_MODE_LABEL: Record<string, string> = {
 
 const INVENTORY_TYPE_LABEL: Record<string, string> = {
   RECOVERY: "回收",
-  PICKUP: "提号",
   CONSIGNMENT: "代挂",
 };
 

@@ -4,7 +4,7 @@
 口径红线：
 - 账号 COST 属直接成本，**不进运营费用**（R2 验收「作图费不会使运营费用重复增加」）。
 - 未归集返点**独立成列，不摊给业务**（R5）。
-- 回收与提号账号统一纳入库存（R1）。
+- 回收与代挂账号纳入库存；提号只保留订单账号文本，不纳入库存（R1）。
 """
 from __future__ import annotations
 
@@ -130,7 +130,7 @@ def _visible_pool_ids(user: CurrentUser | None) -> set[int] | None:
 def r1_inventory_health(
     session: Session, *, user: CurrentUser | None = None
 ) -> dict[str, Any]:
-    """R1 库存健康表：统计已采购并处于在库、待售或分期状态的账号。"""
+    """R1 库存健康表：统计回收/代挂账号中处于在库、待售或分期状态的账号。"""
     today = date.today()
     stock_statuses = [
         AccountStatus.IN_STOCK.value,
@@ -175,6 +175,8 @@ def r1_inventory_health(
         )
     accounts = session.scalars(account_stmt).all()
     for account in accounts:
+        if account.inventory_type == "PICKUP":
+            continue
         if account.status not in stock_statuses:
             continue
         orders = order_by_account.get(account.id, [])

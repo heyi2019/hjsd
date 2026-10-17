@@ -31,8 +31,8 @@ import { ThOrderSection } from "./th/ThOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";
 import { DfqOrderSection } from "./dfq/DfqOrderSection";
 
-type AccountCreationOrderType = "HS" | "TH" | "DG";
-type BusinessOrderType = AccountCreationOrderType | "DG" | "DFQ";
+type AccountCreationOrderType = "HS" | "DG";
+type BusinessOrderType = "HS" | "TH" | "DG" | "DFQ";
 
 const ADAPTIVE_BUSINESS_TYPES = new Set<BusinessOrderType>(["HS", "TH", "DG", "DFQ"]);
 
@@ -56,13 +56,26 @@ export function getAccountValues(values: Record<string, unknown>, orderType: Acc
   return {
     game_type: field("game_type") as string,
     business_mode: orderType === "HS" ? "SELF" : "DISTRIBUTION",
-    inventory_type: orderType === "HS" ? "RECOVERY" : orderType === "TH" ? "PICKUP" : "CONSIGNMENT",
+    inventory_type: orderType === "HS" ? "RECOVERY" : "CONSIGNMENT",
     game_account: field("game_account") as string,
     game_password: field("game_password") as string,
     channel_region: field("channel_region") as string,
     bound_phone: field("bound_phone") as string,
     has_secondary: field("has_secondary") ? field("has_secondary") === "有" : undefined,
     note: values[orderType === "HS" ? "game_account_note" : `${prefix}account_note`] as string,
+  };
+}
+
+export function getOrderAccountSnapshot(values: Record<string, unknown>, prefix = "th_") {
+  const field = (name: string) => values[`${prefix}${name}`];
+  return {
+    game_type: field("game_type") as string,
+    game_account: field("game_account") as string,
+    game_password: field("game_password") as string,
+    channel_region: field("channel_region") as string,
+    bound_phone: field("bound_phone") as string,
+    has_secondary: field("has_secondary") ? field("has_secondary") === "有" : undefined,
+    note: field("account_note") as string,
   };
 }
 
@@ -91,7 +104,7 @@ export function CreateBusinessModal(props: {
   const isAdaptiveBusiness = orderType ? ADAPTIVE_BUSINESS_TYPES.has(orderType) : false;
   const isGeneralBusiness = !isAdaptiveBusiness;
   const businessContext = orderType ? BUSINESS_CONTEXT[orderType] : undefined;
-  const needsAccountCreation = isRecovery || isTh || isDg;
+  const needsInventoryAccountCreation = isRecovery || isDg;
   const [types, setTypes] = useState<OrderType[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
@@ -217,9 +230,10 @@ export function CreateBusinessModal(props: {
         await props.onCreated();
         return;
       }
-      const accountProfile = needsAccountCreation
+      const accountProfile = needsInventoryAccountCreation
         ? getAccountValues(values, orderType as AccountCreationOrderType)
         : undefined;
+      const accountSnapshot = isTh ? getOrderAccountSnapshot(values) : undefined;
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
       const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
@@ -290,6 +304,7 @@ export function CreateBusinessModal(props: {
         expected_settlement_date: isDg && values.dg_expected_settlement_date
           ? toDateString(values.dg_expected_settlement_date)
           : undefined,
+        account_snapshot: accountSnapshot,
         account: accountProfile,
         note,
         customer_roles: customerRoles,

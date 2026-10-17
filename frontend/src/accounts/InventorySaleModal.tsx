@@ -1,4 +1,4 @@
-/** 库存账号售出：回收 / 提号 / 代挂账号统一从库存中心售出，按货源类型映射订单类型。 */
+/** 库存账号售出：回收 / 代挂账号从库存中心售出，按货源类型映射订单类型。 */
 import { DatePicker, Form, Input, Modal, Radio, message } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,10 +14,9 @@ import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 
-/** 库存账号售出：按货源类型映射订单类型，使回收 / 提号 / 代挂都能从库存中心卖出。 */
+/** 库存账号售出：按货源类型映射回收 / 代挂订单类型。 */
 const SALE_ORDER_TYPE: Record<string, string> = {
   RECOVERY: "HS",
-  PICKUP: "TH",
   CONSIGNMENT: "DG",
 };
 const resolveSaleOrderType = (inventoryType?: string | null): string =>

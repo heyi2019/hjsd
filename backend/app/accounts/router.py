@@ -163,7 +163,7 @@ class AccountExecutionDetailOut(BaseModel):
     orders: list[AccountExecutionOrderOut]
 
 
-INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
+INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "DG"})
 
 
 def _actor(user: CurrentUser) -> str:
@@ -173,7 +173,7 @@ def _actor(user: CurrentUser) -> str:
 def _source_orders(
     db: Session, account_ids: list[int], user: CurrentUser | None = None
 ) -> dict[int, Order]:
-    """解析标准订单数据中的库存来源，代挂无需 BUY 也能直接入库。"""
+    """解析标准订单数据中的库存来源；TH 提号不建立库存账号。"""
     if not account_ids:
         return {}
     stmt = select(Order).where(Order.account_id.in_(account_ids))

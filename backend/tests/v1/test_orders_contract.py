@@ -384,6 +384,49 @@ class TestCreateOrderValidation:
             select(Account.id).where(Account.game_account == "dfq-text-account")
         ) is None
 
+    def test_th_account_snapshot_does_not_create_inventory_account(self, seeded_db):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=D,
+            actor="pytest",
+            account_snapshot={
+                "game_type": "王者荣耀",
+                "game_account": "th-text-account",
+                "game_password": "secret",
+                "channel_region": "安卓一区",
+                "note": "提号只保留订单文本",
+            },
+        )
+
+        assert order.account_id is None
+        assert order.account_snapshot["game_account"] == "th-text-account"
+        assert seeded_db.scalar(
+            select(Account.id).where(Account.game_account == "th-text-account")
+        ) is None
+
+    def test_th_rejects_inventory_account_link(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-TH-NOT-INVENTORY",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="提号订单不关联库存账号"):
+            order_service.create_order(
+                seeded_db,
+                order_type="TH",
+                trade_date=D,
+                actor="pytest",
+                account_id=account.id,
+            )
+
     def test_dfq_account_snapshot_rejects_unknown_fields(self, seeded_db):
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
             order_service.create_order(
@@ -845,8 +888,8 @@ class TestAccountEffect:
     def test_cancel_sell_restores_stock_without_reducing_cost(self, seeded_db):
         account = Account(
             inventory_no="ACC-ORD-SELL-CANCEL",
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -854,7 +897,7 @@ class TestAccountEffect:
         )
         seeded_db.add(account)
         seeded_db.flush()
-        order = _order(seeded_db, order_type="TH", account_id=account.id)
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
         order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="500.00",
             occurred_on=D, actor="pytest",

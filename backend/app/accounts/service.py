@@ -291,7 +291,13 @@ def list_accounts(
     status: str | None = None,
     user: CurrentUser | None = None,
 ) -> list[Account]:
-    stmt = select(Account)
+    # 提号只保留在 TH 订单的账号文本快照，不属于库存资产。
+    stmt = select(Account).where(
+        or_(
+            Account.inventory_type.is_(None),
+            Account.inventory_type != InventoryType.PICKUP.value,
+        )
+    )
     if status:
         stmt = stmt.where(Account.status == status)
     scope = _scope_filter(session, user)
@@ -305,7 +311,12 @@ def inventory(
 ) -> list[dict[str, Any]]:
     """库存健康表 R1（简化版）：只统计在库与分期中的真实占用。"""
     rows = list_accounts(session, user=user)
-    rows = [row for row in rows if row.status in INVENTORY_STATUSES]
+    rows = [
+        row
+        for row in rows
+        if row.status in INVENTORY_STATUSES
+        and row.inventory_type != InventoryType.PICKUP.value
+    ]
     return [
         {
             "account_id": row.id,
@@ -332,7 +343,13 @@ def total_inventory_cost(
 def _inventory_rows(
     session: Session, *, user: CurrentUser | None = None
 ) -> list[Account]:
-    stmt = select(Account).where(Account.status.in_(INVENTORY_STATUSES))
+    stmt = select(Account).where(
+        Account.status.in_(INVENTORY_STATUSES),
+        or_(
+            Account.inventory_type.is_(None),
+            Account.inventory_type != InventoryType.PICKUP.value,
+        ),
+    )
     scope = _scope_filter(session, user)
     if scope is not None:
         stmt = stmt.where(scope)

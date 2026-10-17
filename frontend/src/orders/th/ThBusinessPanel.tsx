@@ -1,4 +1,4 @@
-/** 分销·提号业务页：提号订单独立展示，账号入库存中心后从库存完成售出。 */
+/** 分销·提号业务页：提号订单独立展示，游戏账号只保留在订单文本快照中。 */
 import { Card } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
@@ -47,7 +47,7 @@ export function ThBusinessPanel() {
     <section className="ui-stack th-business-page">
       <PageHeader
         title="分销·提号"
-        description="登记提号业务与供货方付款，账号进入库存中心后再完成售出与结算。"
+        description="登记提号业务与供货方付款，游戏账号信息随订单保存，不进入库存中心。"
         actions={(
           <PermissionButton permission="order.create" type="primary" onClick={() => setCreateOpen(true)}>
             新建提号

@@ -149,13 +149,14 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     await waitFor(() => expect(ordersCreate).toHaveBeenCalled());
     const payload = ordersCreate.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.order_type).toBe("TH");
-    expect(payload.account).toMatchObject({
+    expect(payload.account_snapshot).toMatchObject({
       game_type: "王者荣耀",
       game_account: "account-1",
       game_password: "password-1",
       channel_region: "安卓一区／微信",
       note: "提号账号说明",
     });
+    expect(payload.account).toBeUndefined();
     expect(payload.account_id).toBeUndefined();
     expect(payload.customer_roles).toEqual([]);
     expect(payload.counterparty_roles).toEqual([{ counterparty_id: 2, role: "SUPPLIER" }]);

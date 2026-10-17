@@ -83,6 +83,24 @@ def _month_item(data: dict, month: str) -> dict:
 
 # --------------------------------------------------------------------- R1 库存
 class TestR1Inventory:
+    def test_pickup_accounts_are_excluded_from_inventory_health(self, seeded_db):
+        pickup = Account(
+            inventory_no="ACC-R1-PICKUP",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            status=AccountStatus.IN_STOCK.value,
+            buy_date=D,
+            cost_amount=to_money("500.00"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(pickup)
+        seeded_db.flush()
+
+        data = reporting_service.r1_inventory_health(seeded_db)
+
+        assert "ACC-R1-PICKUP" not in {item["inventory_no"] for item in data["items"]}
+
     def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
         in_stock = Account(
                 inventory_no="ACC-R1-1",

@@ -165,7 +165,7 @@ class Order(Base, AuditMixin):
     commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
     expected_settlement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # DFQ 只保留订单内的账号文本快照，不产生库存账号关联。
+    # DFQ / TH 只保留订单内的账号文本快照，不产生库存账号关联。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True

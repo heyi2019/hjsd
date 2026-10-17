@@ -155,7 +155,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "owner_id": order.owner_id,
             "note": order.note,
             "created_at": order.created_at,
-            # DFQ 只有订单文本快照，没有库存账号；列表展示安全的业务字段，
+            # DFQ / TH 只有订单文本快照，没有库存账号；列表展示安全的业务字段，
             # 不把快照中的 game_password 原样带入列表响应。
             "account_game_type": account.game_type if account else snapshot.get("game_type"),
             "account_game_account": account.game_account if account else snapshot.get("game_account"),

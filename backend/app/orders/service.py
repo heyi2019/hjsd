@@ -100,7 +100,6 @@ def _validate_existing_account_context(order_type: str, account: Account) -> Non
     """已建档账号必须带完整业务上下文，并只能挂到对应业务。"""
     expected = {
         "HS": (BusinessMode.SELF.value, InventoryType.RECOVERY.value),
-        "TH": (BusinessMode.DISTRIBUTION.value, InventoryType.PICKUP.value),
         "DG": (BusinessMode.DISTRIBUTION.value, InventoryType.CONSIGNMENT.value),
     }.get(order_type)
     if expected is None:
@@ -205,13 +204,15 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    if definition.code == "DFQ" and (account_id is not None or account_profile is not None):
+    if definition.code in {"DFQ", "TH"} and (
+        account_id is not None or account_profile is not None
+    ):
         raise Validation(
-            "DFQ 代分期订单不关联库存账号",
+            "提号订单不关联库存账号" if definition.code == "TH" else "DFQ 代分期订单不关联库存账号",
             details={"order_type": definition.code, "account_id": account_id},
         )
-    if definition.code != "DFQ" and account_snapshot is not None:
-        raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+    if definition.code not in {"DFQ", "TH"} and account_snapshot is not None:
+        raise Validation("只有 DFQ 代分期和 TH 提号订单可以填写订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
     if account_profile is not None:
@@ -297,7 +298,6 @@ def create_order(
     if account_profile is not None:
         inventory_context = {
             "HS": ("SELF", "RECOVERY"),
-            "TH": ("DISTRIBUTION", "PICKUP"),
             "DG": ("DISTRIBUTION", "CONSIGNMENT"),
         }.get(definition.code)
         if inventory_context is None:
@@ -1109,9 +1109,7 @@ def _apply_account_effect(
     account = session.get(Account, order.account_id)
     if account is None:
         return
-    # HS 与 TH 都会把账号带入库存；TH 仍保持 PASS_THRU 资金口径，
-    # 这里只单独决定账号状态，不改变订单的资金核算类型。
-    stock_type = order.order_type in ("HS", "TH") or order.capital_type == CapitalType.STOCK.value
+    stock_type = order.order_type == "HS" or order.capital_type == CapitalType.STOCK.value
     credit_type = order.capital_type == CapitalType.CREDIT.value
 
     if event_type == EventType.BUY.value:

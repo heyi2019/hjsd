@@ -319,6 +319,7 @@ class OrderAuditOut(BaseModel):
     entity_id: str
     actor: str
     reason: str | None = None
+    request_id: str | None = None
     occurred_at: datetime
 
 

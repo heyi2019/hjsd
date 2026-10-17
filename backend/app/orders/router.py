@@ -208,6 +208,7 @@ def _order_detail_output(
                     "entity_id": item.entity_id,
                     "actor": item.actor,
                     "reason": item.reason,
+                    "request_id": item.request_id,
                     "occurred_at": item.occurred_at,
                 }
             )

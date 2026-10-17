@@ -15,11 +15,13 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
+    AuditAction,
     CapitalType,
     CustomerStatus,
     InstallmentContractType,
@@ -1740,6 +1742,15 @@ class TestOrdersApi:
         self, seeded_client, seeded_db, headers
     ):
         order = _order(seeded_db)
+        request_id = "order-detail-trace-20261017"
+        record_audit(
+            seeded_db,
+            action=AuditAction.ORDER_CREATE,
+            entity_type="order",
+            entity_id=order.order_no,
+            actor="pytest",
+            request_id=request_id,
+        )
         order_service.post_event(
             seeded_db,
             order.id,
@@ -1777,7 +1788,10 @@ class TestOrdersApi:
         assert body["installment"]["id"] == installment.id
         assert len(body["installment_schedule"]) >= 1
         assert any(item["period_no"] == 1 for item in body["installment_schedule"])
-        assert any(item["entity_type"] == "order" for item in body["audit"])
+        order_audit = next(
+            item for item in body["audit"] if item["request_id"] == request_id
+        )
+        assert order_audit["request_id"] == request_id
 
     def test_order_link_endpoints_and_detail_links(self, seeded_client, seeded_db, headers):
         source = _order(seeded_db, order_type="DFQ")

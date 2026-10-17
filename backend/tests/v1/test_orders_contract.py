@@ -18,8 +18,14 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
-from app.domain.enums import AccountStatus, CapitalType, OrderStatus
+from app.domain.enums import (
+    AccountStatus,
+    CapitalType,
+    InstallmentContractType,
+    OrderStatus,
+)
 from app.accounts import service as accounts_service
+from app.installments import service as installments_service
 from app.parties import service as parties_service
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.foundation import service as foundation_service
@@ -973,27 +979,53 @@ class TestAccountEffect:
         assert account.cost_amount == Decimal("500.00")
         assert account.status == AccountStatus.IN_STOCK.value
 
-    def test_cancel_payment_is_rejected_until_schedule_reversal_is_supported(self, seeded_db):
-        order = _order(seeded_db, order_type="HS")
-        contract = Installment(
-            inst_no="FQ-CANCEL-PAYMENT",
+    def test_payment_event_cannot_bypass_installment_service(self, seeded_db):
+        order = _order(seeded_db, order_type="DFQ")
+        installments_service.create_installment(
+            seeded_db,
             order_id=order.id,
-            contract_type="STOCK_SALE",
-            principal=to_money("1000"),
-            down_payment=to_money("0"),
-            service_fee=to_money("0"),
+            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            principal=Decimal("1000"),
             periods=1,
-            per_period_service_fee=to_money("0"),
+            per_period=Decimal("1000"),
+            first_due_on=D,
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation, match="分期收款流程"):
+            order_service.post_event(
+                seeded_db,
+                order.id,
+                event_type="PAYMENT",
+                amount=Decimal("100"),
+                occurred_on=D,
+                actor="pytest",
+            )
+
+    def test_cancel_payment_is_rejected_until_schedule_reversal_is_supported(self, seeded_db):
+        order = _order(seeded_db, order_type="DFQ")
+        contract = installments_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            principal=to_money("1000"),
+            periods=1,
             per_period=to_money("1000"),
-            paid_amount=to_money("0"),
-            status="ACTIVE",
+            first_due_on=D,
+            actor="pytest",
         )
-        seeded_db.add(contract)
-        seeded_db.flush()
-        payment, _ = order_service.post_event(
-            seeded_db, order.id, event_type="PAYMENT", amount="100.00",
-            occurred_on=D, actor="pytest",
+        installments_service.pay(
+            seeded_db, contract.id, amount="100.00", paid_on=D, actor="pytest"
         )
+        payment = seeded_db.scalar(
+            select(OrderEvent)
+            .where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == "PAYMENT",
+            )
+            .order_by(OrderEvent.id.desc())
+        )
+        assert payment is not None
 
         with pytest.raises(Validation) as exc:
             order_service.post_event(

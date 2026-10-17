@@ -430,6 +430,7 @@ def pay(
         portion="PROFIT",
         note=note or f"分期收款 {installment.inst_no} 第 {schedule.period_no} 期",
         user=user,
+        allow_installment_payment=True,
     )
 
     if installment.status == InstallmentStatus.PENDING.value:

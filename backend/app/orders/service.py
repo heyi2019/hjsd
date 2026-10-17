@@ -624,6 +624,7 @@ def post_event(
     flow_category: str | None = None,
     note: str | None = None,
     user: CurrentUser | None = None,
+    allow_installment_payment: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """过账：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
     try:
@@ -652,7 +653,12 @@ def post_event(
         )
 
     _assert_event_allowed(
-        session, order, event_type, offset_event_id=offset_event_id, reason=reason
+        session,
+        order,
+        event_type,
+        offset_event_id=offset_event_id,
+        reason=reason,
+        allow_installment_payment=allow_installment_payment,
     )
 
     if event_type == EventType.DELIVER.value:
@@ -865,6 +871,7 @@ def _assert_event_allowed(
     *,
     offset_event_id: int | None = None,
     reason: str | None = None,
+    allow_installment_payment: bool = False,
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
@@ -896,6 +903,8 @@ def _assert_event_allowed(
         )
         if installment is None:
             raise Validation("PAYMENT 必须关联分期合约")
+        if not allow_installment_payment:
+            raise Validation("PAYMENT 必须通过分期收款流程")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
         if order.order_type in {"TH", "DFQ"} and offset_event_id is None:

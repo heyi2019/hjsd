@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
@@ -197,6 +198,15 @@ class TestListAndGetCustomers:
 
     def test_customer_detail_aggregates_business_installments_and_audit(self, seeded_db):
         customer = _customer(seeded_db, "详情客户", owner_id=9)
+        request_id = "customer-detail-trace-20261017"
+        record_audit(
+            seeded_db,
+            action=AuditAction.CUSTOMER_UPDATE,
+            entity_type="customer",
+            entity_id=customer.customer_no,
+            actor="pytest",
+            request_id=request_id,
+        )
         dfq = orders_service.create_order(
             seeded_db,
             order_type="DFQ",
@@ -246,6 +256,7 @@ class TestListAndGetCustomers:
         assert detail["installments"][0]["inst_no"] == installment.inst_no
         assert detail["installments"][0]["remaining_amount"] == 500
         assert any(item["action"] == AuditAction.CUSTOMER_CREATE.value for item in detail["audit"])
+        assert any(item["request_id"] == request_id for item in detail["audit"])
 
 
 # ------------------------------------------------------------------ 客户更新

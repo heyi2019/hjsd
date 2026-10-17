@@ -134,6 +134,7 @@ class CustomerAuditOut(BaseModel):
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     reason: str | None = None
+    request_id: str | None = None
     occurred_at: datetime
 
 

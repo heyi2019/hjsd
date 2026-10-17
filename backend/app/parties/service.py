@@ -482,6 +482,7 @@ def get_customer_detail(
             "before": row.before_json,
             "after": row.after_json,
             "reason": row.reason,
+            "request_id": row.request_id,
             "occurred_at": row.occurred_at,
         }
         for row in audit_rows

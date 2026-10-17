@@ -1,8 +1,13 @@
 /** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。 */
-import { Card, Input, Space, Tabs, Typography } from "antd";
+import { Card, Input, Select, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
+import { QualityPanel } from "../quality/QualityPanel";
+import { NotificationsPanel } from "../notifications/NotificationsPanel";
+import { SearchPanel } from "../search/SearchPanel";
+import { AuditPanel } from "../audit/AuditPanel";
+import { AttachmentPanel } from "../attachments/AttachmentPanel";
 import {
   reportsApi,
   type BusinessPnlReport,
@@ -11,6 +16,8 @@ import {
   type CommissionRow,
   type DailyFundsReport,
   type DailyFundsRow,
+  type FinanceDimensionReport,
+  type FinanceDimensionRow,
   type InventoryHealthReport,
   type InventoryHealthRow,
   type MonthlyPnlReport,
@@ -19,18 +26,88 @@ import {
   type OrderProfitRow,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
-import { ORDER_TYPE_LABEL } from "../shared/lib/labels";
+import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
   MoneyText,
   StatRow,
   StatusTag,
+  PermissionButton,
 } from "../shared/ui";
 
+const REPORT_NAMES = [
+  "inventory-health",
+  "monthly-pnl",
+  "commission",
+  "daily-funds",
+  "business-pnl",
+  "finance-dimensions",
+  "order-profit",
+];
+
+const REPORT_LABEL: Record<string, string> = {
+  "inventory-health": "库存健康",
+  "monthly-pnl": "月度损益",
+  commission: "提成对账",
+  "daily-funds": "资金日报",
+  "business-pnl": "业务损益",
+  "finance-dimensions": "资金属性",
+  "order-profit": "订单利润",
+};
+
 export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void }) {
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
+  const [selectedReports, setSelectedReports] = useState<string[]>([]);
+  const exportSelected = async () => {
+    if (selectedReports.length === 0) {
+      setExportError("请至少勾选一项报表");
+      return;
+    }
+    let lastError: string | null = null;
+    for (const name of selectedReports) {
+      try {
+        const blob = await reportsApi.exportCsv(name, { from: exportFrom || undefined, to: exportTo || undefined });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${name}.csv`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        lastError = normalizeError(err).message;
+      }
+    }
+    setExportError(lastError);
+  };
   return (
     <section className="ui-stack">
+      <Card className="glass" title="报表导出">
+        <div className="ui-filter-bar">
+          <Space size="small">
+            <Input type="date" value={exportFrom} onChange={(event) => setExportFrom(event.target.value)} aria-label="导出开始日期" className="ui-control-width-date" />
+            <span className="muted">至</span>
+            <Input type="date" value={exportTo} onChange={(event) => setExportTo(event.target.value)} aria-label="导出结束日期" className="ui-control-width-date" />
+          </Space>
+          <Select
+            mode="multiple"
+            allowClear
+            virtual={false}
+            placeholder="选择导出报表"
+            value={selectedReports}
+            onChange={setSelectedReports}
+            options={REPORT_NAMES.map((name) => ({ value: name, label: REPORT_LABEL[name] }))}
+            className="ui-control-width-import"
+            maxTagCount="responsive"
+          />
+          <PermissionButton permission="report.export" onClick={() => void exportSelected()}>
+            导出
+          </PermissionButton>
+        </div>
+        {exportError ? <Typography.Text type="danger">{exportError}</Typography.Text> : null}
+      </Card>
       <Tabs
         defaultActiveKey="r1"
         items={[
@@ -39,8 +116,14 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
           { key: "r3", label: "提成对账 R3", children: <Commission /> },
           { key: "r4", label: "资金日报 R4", children: <DailyFunds /> },
           { key: "r5", label: "业务损益 R5", children: <BusinessPnl /> },
+          { key: "finance-dimensions", label: "资金属性分析", children: <FinanceDimensions /> },
           { key: "profit", label: "订单利润", children: <OrderProfit /> },
           { key: "data-center", label: "数据中心", children: <DataCenterPanel onNavigate={onNavigate} /> },
+          { key: "quality", label: "质量中心", children: <QualityPanel /> },
+          { key: "notifications", label: "系统提醒", children: <NotificationsPanel /> },
+          { key: "search", label: "全局搜索", children: <SearchPanel /> },
+          { key: "audit", label: "审计记录", children: <AuditPanel /> },
+          { key: "attachments", label: "附件中心", children: <AttachmentPanel /> },
         ]}
       />
     </section>
@@ -153,7 +236,7 @@ function MonthlyPnl() {
     { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "账号直接成本", dataIndex: "account_direct_cost", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "净返点", dataIndex: "rebate_net", align: "right", render: (v: string) => <MoneyText value={v} /> },
+    { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     {
       title: "经营利润",
       dataIndex: "operating_profit",
@@ -278,6 +361,47 @@ function DailyFunds() {
   );
 }
 
+function FinanceDimensions() {
+  const { params, picker } = useRange();
+  const { data, loading, error, reload } = useReport<FinanceDimensionReport>(
+    () => reportsApi.financeDimensions(params),
+    [params.from, params.to],
+  );
+  const columns: ColumnsType<FinanceDimensionRow> = [
+    { title: "资金池", dataIndex: "pool_name", width: 130 },
+    { title: "资金账户", dataIndex: "account_name", render: (v: string | null, row) => v ? `${v}（${row.account_no ?? "-"}）` : "未指定账户" },
+    { title: "资金性质", dataIndex: "fund_nature", width: 120 },
+    { title: "核算属性", dataIndex: "accounting_attribute", width: 160 },
+    { title: "现金方向", dataIndex: "direction", width: 90, render: (v: string) => v === "IN" ? "收入" : "支出" },
+    { title: "笔数", dataIndex: "flow_count", align: "right", width: 80 },
+    { title: "发生额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
+    { title: "净方向金额", dataIndex: "signed_amount", align: "right", render: (v: string) => <MoneyText value={v} tone="auto" strong /> },
+  ];
+  return (
+    <Card className="glass" title="资金属性分析">
+      <ErrorBanner error={error} onRetry={reload} retrying={loading} />
+      <Space className="ui-filter-bar">{picker}</Space>
+      <Note>按已审核流水的资金性质、核算属性、现金方向和资金账户聚合；净方向金额按收入为正、支出为负计算。</Note>
+      <StatRow
+        items={[
+          { label: "发生额合计", amount: data?.total_amount ?? "-" },
+          { label: "净方向金额", amount: data?.total_signed_amount ?? "-", tone: "auto" },
+        ]}
+      />
+      <DataTable<FinanceDimensionRow>
+        columns={columns}
+        rows={data?.items ?? []}
+        loading={loading}
+        page={1}
+        pageSize={10}
+        total={data?.items.length ?? 0}
+        emptyText="所选区间无已审核流水"
+        onPageChange={() => undefined}
+      />
+    </Card>
+  );
+}
+
 function BusinessPnl() {
   const { params, picker } = useRange();
   const { data, loading, error, reload } = useReport<BusinessPnlReport>(
@@ -285,7 +409,12 @@ function BusinessPnl() {
     [params.from, params.to],
   );
   const columns: ColumnsType<BusinessPnlRow> = [
-    { title: "业务", dataIndex: "order_type", width: 100, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）` },
+    {
+      title: "业务",
+      dataIndex: "order_type",
+      width: 150,
+      render: (v: string, row) => `${BUSINESS_MODE_LABEL[row.business_mode ?? ""] ?? "-"}·${BUSINESS_TYPE_LABEL[row.business_type ?? ""] ?? ORDER_TYPE_LABEL[v] ?? v}（${v}）`,
+    },
     { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} /> },
     {
@@ -308,7 +437,7 @@ function BusinessPnl() {
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>
-        完整收益 = 主营毛利 + 已结算净返点；未归集返点独立列示，不摊给业务（REB-01-06）。
+        完整收益 = 主营毛利 + 已结算返点收益；未归集返点独立列示，不摊给业务（REB-01-06）。
       </Note>
       <StatRow
         items={[

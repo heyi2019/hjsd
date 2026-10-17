@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -31,25 +31,28 @@ order_policy_read_access = require_permissions(PERM_ORDER_CREATE)
 
 # ── T19 / BAS-06-01：规则定义 ───────────────────────────────────
 
-@router.get("/policies")
+@router.get("/policies", response_model=schemas.PolicyDefinitionListOut)
 def list_definitions(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = policy_read_access,
     status: str | None = Query(default=None),
     policy_code: str | None = Query(default=None),
-) -> dict[str, Any]:
+) -> schemas.PolicyDefinitionListOut:
     """规则列表：按规则、范围、版本、生效期管理（BAS-06-01）。"""
     items = service.list_definitions(db, status=status, policy_code=policy_code)
-    return {"items": items, "total": len(items)}
+    return schemas.PolicyDefinitionListOut(
+        items=[schemas.PolicyDefinitionOut.model_validate(item) for item in items],
+        total=len(items),
+    )
 
 
-@router.post("/policies")
+@router.post("/policies", response_model=schemas.PolicyDefinitionOut)
 def create_definition(
     payload: schemas.PolicyDefinitionCreate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
-) -> dict[str, Any]:
-    return service.create_definition(
+) -> schemas.PolicyDefinitionOut:
+    return schemas.PolicyDefinitionOut.model_validate(service.create_definition(
         db,
         policy_code=payload.policy_code,
         name=payload.name,
@@ -57,40 +60,46 @@ def create_definition(
         scope_id=payload.scope_id,
         description=payload.description,
         actor=user.username,
-    )
+    ))
 
 
-@router.get("/policies/{definition_id}")
+@router.get("/policies/{definition_id}", response_model=schemas.PolicyDefinitionOut)
 def get_definition(
     definition_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = policy_read_access,
-) -> dict[str, Any]:
-    return service.get_definition(db, definition_id)
+) -> schemas.PolicyDefinitionOut:
+    return schemas.PolicyDefinitionOut.model_validate(service.get_definition(db, definition_id))
 
 
-@router.get("/policies/{definition_id}/versions")
+@router.get("/policies/{definition_id}/versions", response_model=schemas.PolicyVersionListOut)
 def list_versions(
     definition_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = policy_read_access,
     status: str | None = Query(default=None),
-) -> dict[str, Any]:
+) -> schemas.PolicyVersionListOut:
     items = service.list_versions(db, definition_id, status=status)
-    return {"items": items, "total": len(items)}
+    return schemas.PolicyVersionListOut(
+        items=[schemas.PolicyVersionOut.model_validate(item) for item in items],
+        total=len(items),
+    )
 
 
 # ── T19 / BAS-06-02：版本 ───────────────────────────────────────
 
-@router.post("/policies/{definition_id}/versions")
+@router.post(
+    "/policies/{definition_id}/versions",
+    response_model=schemas.PolicyVersionOut,
+)
 def create_version(
     definition_id: int,
     payload: schemas.PolicyVersionCreate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
-) -> dict[str, Any]:
+) -> schemas.PolicyVersionOut:
     """新增规则版本。生效期不得与已有版本重叠（BAS-06-02）。"""
-    return service.create_version(
+    return schemas.PolicyVersionOut.model_validate(service.create_version(
         db,
         definition_id,
         effective_from=payload.effective_from,
@@ -98,37 +107,39 @@ def create_version(
         config=payload.config,
         note=payload.note,
         actor=user.username,
-    )
+    ))
 
 
-@router.patch("/policy-versions/{version_id}")
+@router.patch("/policy-versions/{version_id}", response_model=schemas.PolicyVersionOut)
 def update_version(
     version_id: int,
     payload: schemas.PolicyVersionUpdate,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
-) -> dict[str, Any]:
+) -> schemas.PolicyVersionOut:
     """只允许改草稿版本；已发布版本必须新建（BAS-06-02）。"""
-    return service.update_version_draft(
-        db, version_id, config=payload.config, actor=user.username
+    return schemas.PolicyVersionOut.model_validate(
+        service.update_version_draft(db, version_id, config=payload.config, actor=user.username)
     )
 
 
-@router.post("/policy-versions/{version_id}/approve")
+@router.post(
+    "/policy-versions/{version_id}/approve", response_model=schemas.PolicyVersionOut
+)
 def approve_version(
     version_id: int,
     payload: schemas.PolicyVersionApprove,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = approve_access,
-) -> dict[str, Any]:
+) -> schemas.PolicyVersionOut:
     """发布规则版本。发布后只影响生效日后的新计算，不重算历史。"""
     approver = payload.approver or user.username
-    return service.approve_version(
-        db, version_id, approver=approver, note=payload.note
+    return schemas.PolicyVersionOut.model_validate(
+        service.approve_version(db, version_id, approver=approver, note=payload.note)
     )
 
 
-@router.get("/policy-versions/resolve")
+@router.get("/policy-versions/resolve", response_model=schemas.PolicyResolveOut)
 def resolve(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = policy_read_access,
@@ -136,7 +147,7 @@ def resolve(
     on: date = Query(...),
     scope_type: str = Query(default="GLOBAL"),
     scope_id: int | None = Query(default=None),
-) -> dict[str, Any]:
+) -> schemas.PolicyResolveOut:
     """取某日某作用域生效版本（BAS-06-04 快照固化的依据）。"""
     version = service.resolve_version(
         db,
@@ -147,28 +158,40 @@ def resolve(
     )
     from app.policy.service import _ver_out  # noqa: PLC0415
 
-    return {"found": version is not None, "version": _ver_out(version) if version else None}
+    return schemas.PolicyResolveOut(
+        found=version is not None,
+        version=schemas.PolicyVersionOut.model_validate(_ver_out(version)) if version else None,
+    )
 
 
 # ── T20 / BAS-06-03：订单利润分配 ────────────────────────────────
 
-@router.get("/orders/{order_id}/profit-allocations")
+@router.get(
+    "/orders/{order_id}/profit-allocations",
+    response_model=schemas.ProfitAllocationListOut,
+)
 def list_allocations(
     order_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = order_policy_read_access,
-) -> dict[str, Any]:
+) -> schemas.ProfitAllocationListOut:
     items = service.list_allocations(db, order_id, user=user)
-    return {"items": items, "total": len(items)}
+    return schemas.ProfitAllocationListOut(
+        items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
+        total=len(items),
+    )
 
 
-@router.put("/orders/{order_id}/profit-allocations")
+@router.put(
+    "/orders/{order_id}/profit-allocations",
+    response_model=schemas.ProfitAllocationListOut,
+)
 def set_allocations(
     order_id: int,
     payload: schemas.ProfitAllocationSet,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
-) -> dict[str, Any]:
+) -> schemas.ProfitAllocationListOut:
     """整单设置利润分配。有效比例合计必须为 100%（BAS-06-03）。"""
     items = service.set_allocations(
         db,
@@ -177,18 +200,27 @@ def set_allocations(
         actor=user.username,
         user=user,
     )
-    return {"items": items, "total": len(items)}
+    return schemas.ProfitAllocationListOut(
+        items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
+        total=len(items),
+    )
 
 
-@router.get("/orders/{order_id}/policy-snapshot")
+@router.get(
+    "/orders/{order_id}/policy-snapshot",
+    response_model=schemas.OrderPolicySnapshotOut,
+)
 def order_snapshot(
     order_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = order_policy_read_access,
-) -> dict[str, Any]:
+) -> schemas.OrderPolicySnapshotOut:
     """订单实际应用的规则快照（BAS-06-04：可追溯）。"""
     snapshot = service.snapshot_for(db, order_id, user=user)
-    return {"found": snapshot is not None, "snapshot": snapshot}
+    return schemas.OrderPolicySnapshotOut(
+        found=snapshot is not None,
+        snapshot=(schemas.PolicySnapshotOut.model_validate(snapshot) if snapshot else None),
+    )
 
 
 __all__ = ["router"]

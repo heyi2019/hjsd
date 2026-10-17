@@ -21,6 +21,20 @@ from app.policy import service as policy_service
 D = date(2026, 10, 4)
 
 
+def test_policy_routes_publish_typed_response_models(app):
+    paths = app.openapi()["paths"]
+
+    assert paths["/api/v1/policies"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/PolicyDefinitionListOut"
+    )
+    assert paths["/api/v1/policy-versions/resolve"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/PolicyResolveOut"
+    )
+    assert paths["/api/v1/orders/{order_id}/profit-allocations"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/ProfitAllocationListOut"
+    )
+
+
 @pytest.fixture()
 def json_headers(headers):
     """带 Content-Type 的写入头（conftest 的 headers 只有身份头）。"""

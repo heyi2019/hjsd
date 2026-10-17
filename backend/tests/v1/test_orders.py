@@ -250,7 +250,7 @@ class TestA02ThPassthru:
         )
         seeded_db.commit()
 
-        service.post_event(
+        buy_event, _ = service.post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -258,6 +258,7 @@ class TestA02ThPassthru:
         service.post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
+            offset_event_id=buy_event.id,
         )
         seeded_db.commit()
         # 提号只保留订单文本，不建立库存账号关联。

@@ -734,13 +734,13 @@ class TestCancelOffsetDirection:
 
         # 分支二：offset 指向 SELL → 方向取反为 OUT
         order_b = _order(seeded_db, order_type="TH")
-        order_service.post_event(
+        buy_event, _ = order_service.post_event(
             seeded_db, order_b.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
         sell_event, _ = order_service.post_event(
             seeded_db, order_b.id, event_type="SELL", amount="150.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="pytest", offset_event_id=buy_event.id,
         )
         cancel_b, _ = order_service.post_event(
             seeded_db, order_b.id, event_type="CANCEL", amount="10.00",
@@ -834,7 +834,7 @@ class TestCancelOffsetDirection:
     def test_cancel_offset_must_belong_to_the_same_order(self, seeded_db):
         first = _order(seeded_db)
         second = _order(seeded_db, order_type="TH")
-        order_service.post_event(
+        buy_event, _ = order_service.post_event(
             seeded_db,
             second.id,
             event_type="BUY",
@@ -849,6 +849,7 @@ class TestCancelOffsetDirection:
             amount="150.00",
             occurred_on=D,
             actor="pytest",
+            offset_event_id=buy_event.id,
         )
 
         with pytest.raises(Validation) as exc:

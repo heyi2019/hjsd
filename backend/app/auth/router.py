@@ -72,6 +72,50 @@ class TeamUpdate(RequestModel):
     is_active: bool | None = None
 
 
+class PublicUserOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    username: str
+    display_name: str = ""
+    role: str
+    owner_scope: str = "SELF"
+    phone: str | None = None
+    pool_ids: list[int] = Field(default_factory=list)
+    team_ids: list[int] = Field(default_factory=list)
+    is_active: bool = True
+    must_change_password: bool = False
+    hired_on: str | None = None
+    deactivated_on: str | None = None
+    handover_user_id: int | None = None
+    handover_note: str | None = None
+    created_at: str | None = None
+
+
+class LoginOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    access_token: str
+    token_type: str
+    user: PublicUserOut
+
+
+class OkOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+
+
+class TeamOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    code: str
+    name: str
+    description: str | None = None
+    is_active: bool
+
+
 def _public(user: User) -> dict:
     return {
         "id": user.id, "username": user.username, "display_name": user.display_name,
@@ -90,8 +134,8 @@ def _admin(actor: CurrentUser) -> None:
         raise PermissionDenied("仅系统管理员可管理用户")
 
 
-@router.post("/login")
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
+@router.post("/login", response_model=LoginOut)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginOut:
     user = db.scalar(select(User).where(User.username == payload.username.strip()))
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise AuthError("用户名或密码错误")
@@ -103,8 +147,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
     return {"access_token": build_access_token(current), "token_type": "bearer", "user": _public(user)}
 
 
-@router.get("/me")
-def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@router.get("/me", response_model=PublicUserOut)
+def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> PublicUserOut:
     record = db.get(User, user.id)
     return _public(record) if record else {
         "id": user.id, "username": user.username, "display_name": user.display_name,
@@ -112,8 +156,8 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
     }
 
 
-@router.post("/change-password")
-def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@router.post("/change-password", response_model=OkOut)
+def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> OkOut:
     service.change_password(
         db,
         user.id,
@@ -124,8 +168,8 @@ def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_cur
     return {"ok": True}
 
 
-@router.post("/logout")
-def logout(authorization: str | None = Header(default=None, alias="Authorization"), db: Session = Depends(get_db)) -> dict:
+@router.post("/logout", response_model=OkOut)
+def logout(authorization: str | None = Header(default=None, alias="Authorization"), db: Session = Depends(get_db)) -> OkOut:
     if authorization:
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() == "bearer" and token:
@@ -138,14 +182,14 @@ def logout(authorization: str | None = Header(default=None, alias="Authorization
     return {"ok": True}
 
 
-@admin_router.get("")
-def list_users(actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+@admin_router.get("", response_model=list[PublicUserOut])
+def list_users(actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[PublicUserOut]:
     _admin(actor)
     return [_public(item) for item in db.scalars(select(User).order_by(User.id)).all()]
 
 
-@admin_router.post("", status_code=201)
-def create_user(payload: UserCreate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@admin_router.post("", response_model=PublicUserOut, status_code=201)
+def create_user(payload: UserCreate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> PublicUserOut:
     _admin(actor)
     item = service.create_user(
         db,
@@ -163,8 +207,8 @@ def create_user(payload: UserCreate, actor: CurrentUser = Depends(get_current_us
     return _public(item)
 
 
-@admin_router.patch("/{user_id}")
-def update_user(user_id: int, payload: UserUpdate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@admin_router.patch("/{user_id}", response_model=PublicUserOut)
+def update_user(user_id: int, payload: UserUpdate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> PublicUserOut:
     _admin(actor)
     item = service.update_user(
         db,
@@ -175,23 +219,23 @@ def update_user(user_id: int, payload: UserUpdate, actor: CurrentUser = Depends(
     return _public(item)
 
 
-@admin_router.post("/{user_id}/reset-password")
-def reset_password(user_id: int, payload: PasswordResetRequest, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@admin_router.post("/{user_id}/reset-password", response_model=OkOut)
+def reset_password(user_id: int, payload: PasswordResetRequest, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> OkOut:
     _admin(actor)
     service.reset_password(db, user_id, password=payload.password, actor=actor.username)
     return {"ok": True}
 
 
-@teams_router.get("")
-def list_teams(_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[dict]:
+@teams_router.get("", response_model=list[TeamOut])
+def list_teams(_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[TeamOut]:
     return [
         {"id": item.id, "code": item.code, "name": item.name, "description": item.description, "is_active": item.is_active}
         for item in db.scalars(select(Team).order_by(Team.id)).all()
     ]
 
 
-@teams_router.post("", status_code=201)
-def create_team(payload: TeamCreate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@teams_router.post("", response_model=TeamOut, status_code=201)
+def create_team(payload: TeamCreate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> TeamOut:
     _admin(actor)
     item = service.create_team(
         db,
@@ -203,8 +247,8 @@ def create_team(payload: TeamCreate, actor: CurrentUser = Depends(get_current_us
     return {"id": item.id, "code": item.code, "name": item.name, "description": item.description, "is_active": item.is_active}
 
 
-@teams_router.patch("/{team_id}")
-def update_team(team_id: int, payload: TeamUpdate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+@teams_router.patch("/{team_id}", response_model=TeamOut)
+def update_team(team_id: int, payload: TeamUpdate, actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> TeamOut:
     _admin(actor)
     item = service.update_team(
         db,

@@ -51,6 +51,14 @@ def _login(client: TestClient, username: str, password: str) -> str:
     return response.json()["access_token"]
 
 
+def test_auth_routes_publish_typed_response_models(app):
+    paths = app.openapi()["paths"]
+
+    assert paths["/api/v1/auth/login"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/LoginOut")
+    assert paths["/api/v1/users"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["items"]["$ref"].endswith("/PublicUserOut")
+    assert paths["/api/v1/teams"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["items"]["$ref"].endswith("/TeamOut")
+
+
 def test_user_security_scope_values_are_constrained_in_database(seeded_db):
     seeded_db.add(
         User(

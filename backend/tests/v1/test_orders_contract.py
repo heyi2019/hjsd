@@ -305,6 +305,17 @@ class TestCreateOrderValidation:
         assert order.commission_payer == "CONSIGNOR"
         assert order.expected_settlement_date == date(2026, 10, 20)
 
+    def test_dg_commission_terms_reject_unhashable_values(self, seeded_db):
+        with pytest.raises(Validation, match="抽成方式无效"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DG",
+                trade_date=D,
+                actor="pytest",
+                commission_mode=[],
+                commission_payer="CONSIGNOR",
+            )
+
     def test_dg_service_fee_cannot_exceed_listing_price(self, seeded_db):
         with pytest.raises(Validation, match="服务费不能超过挂售价"):
             order_service.create_order(

@@ -237,16 +237,22 @@ def create_order(
     ):
         raise Validation("只有 DG 代挂订单可以填写代挂结算条款")
     if definition.code == "DG":
-        if commission_mode is not None and commission_mode not in {
-            "DEDUCT_FROM_SETTLEMENT",
-            "SEPARATE_PAYMENT",
-        }:
+        if commission_mode is not None and (
+            not isinstance(commission_mode, str)
+            or commission_mode not in {
+                "DEDUCT_FROM_SETTLEMENT",
+                "SEPARATE_PAYMENT",
+            }
+        ):
             raise Validation("代挂抽成方式无效", details={"field": "commission_mode"})
-        if commission_payer is not None and commission_payer not in {
-            "BUYER",
-            "CONSIGNOR",
-            "PLATFORM",
-        }:
+        if commission_payer is not None and (
+            not isinstance(commission_payer, str)
+            or commission_payer not in {
+                "BUYER",
+                "CONSIGNOR",
+                "PLATFORM",
+            }
+        ):
             raise Validation("代挂付款方无效", details={"field": "commission_payer"})
         if (commission_mode is None) != (commission_payer is None):
             raise Validation("代挂抽成方式和付款方必须同时填写")
@@ -476,16 +482,22 @@ def update_order(
     ):
         raise Validation("只有 DG 代挂订单可以填写代挂结算条款")
     if order.order_type == "DG":
-        if next_mode is not None and next_mode not in {
-            "DEDUCT_FROM_SETTLEMENT",
-            "SEPARATE_PAYMENT",
-        }:
+        if next_mode is not None and (
+            not isinstance(next_mode, str)
+            or next_mode not in {
+                "DEDUCT_FROM_SETTLEMENT",
+                "SEPARATE_PAYMENT",
+            }
+        ):
             raise Validation("代挂抽成方式无效", details={"field": "commission_mode"})
-        if next_payer is not None and next_payer not in {
-            "BUYER",
-            "CONSIGNOR",
-            "PLATFORM",
-        }:
+        if next_payer is not None and (
+            not isinstance(next_payer, str)
+            or next_payer not in {
+                "BUYER",
+                "CONSIGNOR",
+                "PLATFORM",
+            }
+        ):
             raise Validation("代挂付款方无效", details={"field": "commission_payer"})
         if (next_mode is None) != (next_payer is None):
             raise Validation("代挂抽成方式和付款方必须同时填写")

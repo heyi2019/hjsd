@@ -277,6 +277,14 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
         raise NotFound(f"导入批次 {batch_id} 不存在", details={"batch_id": batch_id})
     if batch.status == ImportBatchStatus.COMMITTED.value:
         raise Validation("批次已提交，不可重复提交", details={"batch_id": batch_id})
+    if batch.status not in {
+        ImportBatchStatus.DRAFT.value,
+        ImportBatchStatus.MAPPED.value,
+    }:
+        raise Validation(
+            "只有未确认批次可提交",
+            details={"batch_id": batch_id, "status": batch.status},
+        )
 
     rows = session.scalars(
         select(ImportRow).where(ImportRow.batch_id == batch_id)

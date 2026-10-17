@@ -242,6 +242,24 @@ class TestCommitGuards:
         with pytest.raises(NotFound):
             service.commit_batch(seeded_db, 999999, actor="pytest")
 
+    @pytest.mark.parametrize(
+        "status",
+        [
+            ImportBatchStatus.REJECTED.value,
+            ImportBatchStatus.ROLLED_BACK.value,
+            ImportBatchStatus.CORRECTED.value,
+        ],
+    )
+    def test_terminal_batch_cannot_be_committed_again(self, seeded_db, status):
+        batch = _batch(seeded_db)
+        item = seeded_db.get(ImportBatch, batch["id"])
+        assert item is not None
+        item.status = status
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="只有未确认批次可提交"):
+            service.commit_batch(seeded_db, batch["id"], actor="pytest")
+
     def test_skipped_rows_are_not_imported(self, seeded_db):
         from app.orders import service as orders_service
         from datetime import date

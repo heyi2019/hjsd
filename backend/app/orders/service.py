@@ -1263,10 +1263,12 @@ def _apply_account_effect(
 
 
 # --------------------------------------------------------------------- 池余额
-def pool_balance(session: Session, pool_id: int) -> dict[str, Any]:
+def pool_balance(
+    session: Session, pool_id: int, user: CurrentUser | None = None
+) -> dict[str, Any]:
     """资金池卡片：经营收支、内部划转、押金占用与可用余额。"""
     pool = session.get(Pool, pool_id)
-    if pool is None:
+    if pool is None or (user is not None and not user.can_see_pool(pool_id)):
         raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
 
     def total(direction: str, nature: str | None = None) -> Decimal:

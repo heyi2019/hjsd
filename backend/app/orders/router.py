@@ -360,7 +360,7 @@ def pool_balance(
     if not _user.can_see_pool(pool_id):
         from app.core.errors import NotFound
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    return service.pool_balance(db, pool_id)
+    return service.pool_balance(db, pool_id, user=_user)
 
 
 __all__ = ["router"]

@@ -1143,6 +1143,18 @@ class TestAccountEffect:
 
 # ------------------------------------------------------------------ 池余额
 class TestPoolBalance:
+    def test_pool_balance_service_enforces_pool_visibility(self, seeded_db):
+        scoped = CurrentUser.build(
+            id=9,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+
+        with pytest.raises(NotFound):
+            order_service.pool_balance(seeded_db, 2, user=scoped)
+
     def test_pool_balance_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             order_service.pool_balance(seeded_db, 999999)

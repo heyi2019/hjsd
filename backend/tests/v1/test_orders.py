@@ -505,6 +505,8 @@ class TestOrdersApi:
                 "amount": "1400.00",
                 "occurred_on": TODAY.isoformat(),
                 "portion": "PROFIT",
+                "reason": "买家确认收款",
+                "note": "售出动作备注",
             },
             headers=headers,
         )
@@ -512,6 +514,11 @@ class TestOrdersApi:
         body = event.json()
         assert body["cashflow_no"] == "HS0001-CF-SELL-01"
         assert body["event"]["event_type"] == "SELL"
+        assert body["event"]["reason"] == "买家确认收款"
+        assert body["event"]["note"] == "售出动作备注"
+        assert body["event"]["offset_event_id"] is None
+        assert body["event"]["created_at"]
+        assert body["event"]["posted_at"]
 
     def test_viewer_cannot_post_event(self, seeded_client, headers, viewer_headers):
         order = seeded_client.post(

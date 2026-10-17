@@ -205,9 +205,14 @@ class EventOut(BaseModel):
     amount: Decimal
     occurred_on: date
     pool_id: int | None = None
+    offset_event_id: int | None = None
     portion: str
     delivery_mode: str | None = None
     is_posted: bool
+    posted_at: datetime | None = None
+    reason: str | None = None
+    note: str | None = None
+    created_at: datetime
 
 
 class EventPostResult(BaseModel):

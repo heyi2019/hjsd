@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -743,6 +743,7 @@ def post_event(
         reason=reason,
         note=note,
         is_posted=True,
+        posted_at=datetime.now(),
         created_by=actor,
         updated_by=actor,
     )
@@ -1045,6 +1046,7 @@ def _post_deliver(
         pool_id=None,
         delivery_mode=delivery_mode,
         is_posted=True,
+        posted_at=datetime.now(),
         note=note,
         created_by=actor,
         updated_by=actor,

@@ -1055,6 +1055,7 @@ class TestFinanceApi:
                 "source_order_id": other_order.id,
                 "base_amount": "10",
                 "collected_on": TODAY.isoformat(),
+                "rebate_type": "BUY",
             },
             headers=headers,
         )
@@ -1367,12 +1368,14 @@ class TestFinanceApi:
                 "base_amount": "300",
                 "collected_on": TODAY.isoformat(),
                 "rate": "5",
+                "rebate_type": "BUY",
                 "channel": "WECHAT",
             },
             headers=headers,
         )
         assert response.status_code == 201, response.text
         assert response.json()["source_order_id"] == order_id
+        assert response.json()["rebate_type"] == "BUY"
         assert response.json()["channel"] == "WECHAT"
 
     def test_settle_rebate_endpoint(self, seeded_client, seeded_db, headers):

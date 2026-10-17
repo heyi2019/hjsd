@@ -120,6 +120,7 @@ class ExecutionCounterpartyOut(BaseModel):
 class ExecutionRebateOut(BaseModel):
     id: int
     rebate_no: str
+    rebate_type: str
     channel: str | None = None
     rate: Decimal
     base_amount: Decimal
@@ -353,6 +354,7 @@ def execution_detail(
                 ExecutionRebateOut(
                     id=rebate.id,
                     rebate_no=rebate.rebate_no,
+                    rebate_type=rebate.rebate_type,
                     channel=rebate.channel,
                     rate=rebate.rate,
                     base_amount=rebate.base_amount,

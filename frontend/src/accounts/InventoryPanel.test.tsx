@@ -79,6 +79,7 @@ beforeEach(() => {
       rebates: [{
         id: 41,
         rebate_no: "HS0001-RB01",
+        rebate_type: "BUY",
         channel: "买号返点",
         rate: "5.00",
         base_amount: "1000.00",
@@ -203,6 +204,7 @@ describe("InventoryPanel：账号台账", () => {
         rebates: [{
           id: 41,
           rebate_no: "HS0001-RB01",
+          rebate_type: "BUY",
           channel: "买号返点",
           rate: "5.00",
           base_amount: "1000.00",
@@ -391,6 +393,7 @@ describe("InventoryPanel：账号台账", () => {
     await waitFor(() => expect(rebatesCreate).toHaveBeenCalled());
     expect(rebatesCreate.mock.calls[0][0]).toMatchObject({
       source_order_id: 23,
+      rebate_type: "SELL",
       base_amount: "350.00",
       channel: "卖号返点",
     });

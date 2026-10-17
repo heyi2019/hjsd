@@ -31,6 +31,7 @@ from app.domain.enums import (
     Nature,
     OrderStatus,
     PolicyType,
+    RebateType,
     RebateStatus,
     ReconciliationStatus,
     SequenceKey,
@@ -1041,6 +1042,7 @@ def create_rebate(
     session: Session,
     *,
     source_order_id: int,
+    rebate_type: str = RebateType.UNSPECIFIED.value,
     base_amount: Any,
     collected_on: date,
     actor: str,
@@ -1066,6 +1068,11 @@ def create_rebate(
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"order_no": order.order_no, "status": order.status},
         )
+    if rebate_type not in RebateType.values():
+        raise Validation(
+            f"返点类型必须为 {RebateType.values()}",
+            details={"field": "rebate_type", "value": rebate_type},
+        )
 
     base = _positive(base_amount, field="base_amount")
     rebate_rate = _non_negative(rate, field="rate")
@@ -1090,6 +1097,7 @@ def create_rebate(
     record = RebateRecord(
         rebate_no=rebate_no,
         source_order_id=order.id,
+        rebate_type=rebate_type,
         channel=channel,
         rate=rebate_rate,
         base_amount=base,

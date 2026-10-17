@@ -325,6 +325,14 @@ class RebateStatus(StrEnum):
     VOID = "VOID"
 
 
+class RebateType(StrEnum):
+    """返点归属方向：买入侧和售出侧可挂在同一主订单上。"""
+
+    BUY = "BUY"
+    SELL = "SELL"
+    UNSPECIFIED = "UNSPECIFIED"  # 历史记录未补齐类型
+
+
 class ReconciliationStatus(StrEnum):
     """日对账快照状态：差异处理完成后才可核销。"""
 
@@ -425,6 +433,7 @@ __all__ = [
     "PoolType",
     "Portion",
     "RebateStatus",
+    "RebateType",
     "ReconciliationStatus",
     "ScheduleStatus",
     "SequenceKey",

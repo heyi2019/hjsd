@@ -155,6 +155,7 @@ class TransferOut(BaseModel):
 
 class RebateCreate(RequestModel):
     source_order_id: int
+    rebate_type: str = Field(description="BUY 买号返点 / SELL 卖号返点")
     base_amount: Decimal
     collected_on: date
     rate: Decimal = Decimal("0")
@@ -168,6 +169,7 @@ class RebateOut(BaseModel):
     id: int
     rebate_no: str
     source_order_id: int | None = None
+    rebate_type: str
     channel: str | None = None
     rate: Decimal
     base_amount: Decimal

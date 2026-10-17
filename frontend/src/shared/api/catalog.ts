@@ -187,6 +187,7 @@ export interface AccountExecutionCounterparty {
 export interface AccountExecutionRebate {
   id: number;
   rebate_no: string;
+  rebate_type: "BUY" | "SELL" | "UNSPECIFIED" | string;
   channel?: string | null;
   rate: string;
   base_amount: string;
@@ -280,6 +281,7 @@ export interface Rebate {
   id: number;
   rebate_no: string;
   source_order_id?: number | null;
+  rebate_type: "BUY" | "SELL" | "UNSPECIFIED" | string;
   rate: string;
   base_amount: string;
   status: string;
@@ -486,6 +488,7 @@ export const rebatesApi = {
     api.get<Rebate[]>("/rebates", { params }).then((r) => r.data),
   create: (payload: Partial<Rebate> & {
     source_order_id: number;
+    rebate_type: "BUY" | "SELL";
     base_amount: string;
     collected_on: string;
     channel?: string;

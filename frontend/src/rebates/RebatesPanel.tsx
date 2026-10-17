@@ -69,6 +69,7 @@ export function RebatesPanel() {
     try {
       await rebatesApi.create({
         source_order_id: Number(values.source_order_id),
+        rebate_type: values.rebate_type as "BUY" | "SELL",
         base_amount: values.base_amount as string,
         rate: (values.rate as string) ?? "0",
         collected_on: values.collected_on as string,
@@ -192,12 +193,25 @@ export function RebatesPanel() {
       </Card>
 
       <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
-        <Form form={form} layout="vertical" onFinish={submitCreate} initialValues={{ collected_on: today() }}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={submitCreate}
+          initialValues={{ collected_on: today(), rebate_type: "BUY" }}
+        >
           <Form.Item name="source_order_id" label="来源订单" rules={[{ required: true }]}>
             <Select
               options={orders
                 .filter((order) => ["ACTIVE", "COMPLETED"].includes(order.status))
                 .map((order) => ({ value: order.id, label: order.order_no }))}
+            />
+          </Form.Item>
+          <Form.Item name="rebate_type" label="返点类型" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "BUY", label: "买号返点" },
+                { value: "SELL", label: "卖号返点" },
+              ]}
             />
           </Form.Item>
           <Form.Item name="base_amount" label="返点金额" rules={[{ required: true }]}>

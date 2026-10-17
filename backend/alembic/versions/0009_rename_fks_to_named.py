@@ -103,6 +103,14 @@ def _rebuild(bind, tname: str) -> None:
             "",
         )
     if tname == "rebate_records":
+        # rebate_type was added in 0069; 0009 runs much earlier and must not
+        # materialize a future column while rebuilding from the current ORM.
+        if "rebate_type" not in source_columns:
+            ddl = ddl.replace("\trebate_type VARCHAR(16) NOT NULL, \n", "")
+            ddl = ddl.replace(
+                "\tCONSTRAINT ck_rebate_records_rebate_type_valid CHECK (rebate_type IN ('BUY', 'SELL', 'UNSPECIFIED')), \n",
+                "",
+            )
         ddl = ddl.replace(
             "\tCONSTRAINT ck_rebate_records_rebate_link_status_valid CHECK (link_status IN ('LINKED', 'UNLINKED', 'ORPHAN', 'UNLINKED_TRANSFER')), \n",
             "",

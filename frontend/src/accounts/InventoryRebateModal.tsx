@@ -84,6 +84,7 @@ export function InventoryRebateModal(props: {
     try {
       await rebatesApi.create({
         source_order_id: order.order_id,
+        rebate_type: kind,
         base_amount: values.base_amount ?? "0",
         rate: values.rate ?? "0",
         collected_on: values.collected_on ?? today(),

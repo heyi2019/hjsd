@@ -662,6 +662,7 @@ class TestAccountsApi:
             base_amount=Decimal("300"),
             rate=Decimal("5"),
             collected_on=TODAY,
+            rebate_type="BUY",
             channel="买号返点",
             actor="pytest",
         )
@@ -684,6 +685,7 @@ class TestAccountsApi:
         assert response.json()["orders"][0]["rebates"] == [{
             "id": rebate.id,
             "rebate_no": rebate.rebate_no,
+            "rebate_type": "BUY",
             "channel": "买号返点",
             "rate": "5.00",
             "base_amount": "300.00",

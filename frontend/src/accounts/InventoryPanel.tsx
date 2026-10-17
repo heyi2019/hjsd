@@ -69,7 +69,9 @@ function financeTypeLabel(eventType: string, direction: string): string {
   return labels[eventType] ?? (direction === "IN" ? "其他收入" : "其他支出");
 }
 
-function rebateTypeLabel(channel?: string | null): string {
+function rebateTypeLabel(rebateType?: string | null, channel?: string | null): string {
+  if (rebateType === "BUY") return "买号返点";
+  if (rebateType === "SELL") return "卖号返点";
   if (channel === "买号返点") return "买号返点";
   if (channel === "卖号返点") return "卖号返点";
   return "其他返点";
@@ -149,7 +151,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
         cashflow.pool_name || "未分配资金池",
       ].join(" / ")),
       ...rebateItems.map(({ order, rebate }) => [
-        rebateTypeLabel(rebate.channel),
+        rebateTypeLabel(rebate.rebate_type, rebate.channel),
         order.order_no,
         rebate.rebate_no,
         rebate.status,
@@ -544,7 +546,7 @@ export function InventoryPanel() {
       })),
       ...rebateItems.map(({ order, rebate }) => ({
         key: `rebate-${rebate.id}`,
-        type: rebateTypeLabel(rebate.channel),
+        type: rebateTypeLabel(rebate.rebate_type, rebate.channel),
         orderNo: order.order_no,
         financeNo: rebate.rebate_no,
         direction: rebate.status === "SETTLED" ? "收入" as const : "待结算" as const,

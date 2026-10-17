@@ -438,6 +438,7 @@ def create_rebate(
     item = service.create_rebate(
         db,
         source_order_id=payload.source_order_id,
+        rebate_type=payload.rebate_type,
         base_amount=payload.base_amount,
         collected_on=payload.collected_on,
         actor=_actor(user),

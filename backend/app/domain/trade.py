@@ -49,6 +49,7 @@ from app.domain.enums import (
     OrderStatus,
     Portion,
     RebateStatus,
+    RebateType,
     ReconciliationStatus,
     ScheduleStatus,
     AllocationRole,
@@ -524,6 +525,10 @@ class RebateRecord(Base, AuditMixin):
             f"status IN {RebateStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="rebate_status_valid",
         ),
+        CheckConstraint(
+            f"rebate_type IN {RebateType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="rebate_type_valid",
+        ),
         UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
         Index("ix_rebate_source_order", "source_order_id"),
         CheckConstraint(
@@ -541,6 +546,9 @@ class RebateRecord(Base, AuditMixin):
     rebate_no: Mapped[str] = mapped_column(String(32), nullable=False)
     source_order_id: Mapped[int | None] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    rebate_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=RebateType.UNSPECIFIED.value
     )
     channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)

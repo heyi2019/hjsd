@@ -482,6 +482,20 @@ def test_user_service_rejects_unhashable_role_and_scope(seeded_db):
         )
 
 
+def test_user_service_rejects_non_boolean_active_state(seeded_db):
+    user = seeded_db.get(User, 1)
+    assert user is not None
+
+    with pytest.raises(Validation, match="启用状态必须为布尔值"):
+        service.update_user(
+            seeded_db, user.id, changes={"is_active": "false"}, actor="pytest"
+        )
+
+    seeded_db.commit()
+    seeded_db.refresh(user)
+    assert user.is_active is True
+
+
 def test_user_service_validates_password_and_scope_id_shapes(seeded_db):
     with pytest.raises(Validation, match="密码至少需要 8 位"):
         service.create_user(
@@ -643,6 +657,21 @@ def test_team_service_rejects_unknown_fields(seeded_db):
         service.update_team(
             seeded_db, team.id, changes={"unknown_field": "ignored"}, actor="pytest"
         )
+
+
+def test_team_service_rejects_non_boolean_active_state(seeded_db):
+    team = service.create_team(
+        seeded_db, code="T-SERVICE-BOOL", name="服务团队", description=None, actor="pytest"
+    )
+
+    with pytest.raises(Validation, match="启用状态必须为布尔值"):
+        service.update_team(
+            seeded_db, team.id, changes={"is_active": "false"}, actor="pytest"
+        )
+
+    seeded_db.commit()
+    seeded_db.refresh(team)
+    assert team.is_active is True
 
 
 def test_admin_mutations_write_audit(client: TestClient, db: Session):

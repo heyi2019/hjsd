@@ -41,6 +41,12 @@ def _required_password(value: object) -> str:
     return value
 
 
+def _required_bool(value: object, *, message: str) -> bool:
+    if not isinstance(value, bool):
+        raise Validation(message, details={"field": "is_active"})
+    return value
+
+
 def _validate_id_list(value: object, *, label: str) -> list[int] | None:
     if value is None:
         return None
@@ -175,6 +181,10 @@ def update_user(
         normalized_changes["display_name"] = _required_text(
             normalized_changes["display_name"], message="显示名称不能为空"
         )
+    if "is_active" in normalized_changes:
+        normalized_changes["is_active"] = _required_bool(
+            normalized_changes["is_active"], message="启用状态必须为布尔值"
+        )
     before = _user_snapshot(user)
     for key, value in normalized_changes.items():
         setattr(user, key, value)
@@ -286,6 +296,10 @@ def update_team(
     if "name" in normalized_changes:
         normalized_changes["name"] = _required_text(
             normalized_changes["name"], message="团队名称不能为空"
+        )
+    if "is_active" in normalized_changes:
+        normalized_changes["is_active"] = _required_bool(
+            normalized_changes["is_active"], message="启用状态必须为布尔值"
         )
     before = _team_snapshot(team)
     for key, value in normalized_changes.items():

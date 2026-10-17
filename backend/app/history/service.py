@@ -241,10 +241,29 @@ def skip_row(
     row = session.get(ImportRow, row_id)
     if row is None:
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
+    if row.status == ImportRowStatus.IMPORTED.value:
+        raise Validation(
+            "已导入的历史行不可跳过", details={"row_id": row_id}
+        )
+    if row.status == ImportRowStatus.ROLLED_BACK.value:
+        raise Validation(
+            "已回滚的历史行不可跳过", details={"row_id": row_id}
+        )
+    before = {"status": row.status, "issue_note": row.issue_note}
     row.status = ImportRowStatus.SKIPPED.value
     row.issue_note = text
     session.flush()
     _refresh_counts(session, row.batch_id)
+    record_audit(
+        session,
+        action=AuditAction.IMPORT_SKIP,
+        entity_type="import_row",
+        entity_id=row.id,
+        actor=actor,
+        before=before,
+        after={"status": row.status, "issue_note": row.issue_note},
+        reason=text,
+    )
     return _row_out(row)
 
 

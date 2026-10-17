@@ -391,6 +391,7 @@ class AuditAction(StrEnum):
     IMPORT_LAND = "IMPORT_LAND"  # 原始行落地（只存原文，不做字段推断）
     IMPORT_COMMIT = "IMPORT_COMMIT"  # 映射确认后生成业务实体
     IMPORT_MAP = "IMPORT_MAP"  # 人工指派某行的订单/账号映射
+    IMPORT_SKIP = "IMPORT_SKIP"  # 人工跳过历史行并留存理由
     IMPORT_MARK_UNLINKED = "IMPORT_MARK_UNLINKED"  # 标记为未关联划转
     IMPORT_ROLLBACK = "IMPORT_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
     IMPORT_CORRECTION = "IMPORT_CORRECTION"  # 建冲销/更正批次

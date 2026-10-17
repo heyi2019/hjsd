@@ -9,10 +9,12 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import ImportBatchStatus, ImportRowStatus, ImportSourceKind
-from app.domain.history import ImportBatch
+from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus, ImportSourceKind
+from app.domain.foundation import AuditLog
+from app.domain.history import ImportBatch, ImportRow
 from app.history import service
 
 ROWS = [
@@ -197,6 +199,41 @@ class TestSkipRow:
         # 刷新未映射计数：跳过行不再计入 unmapped
         refreshed = service.list_batches(seeded_db)[0]
         assert refreshed["unmapped_count"] == len(ROWS) - 1
+
+    def test_imported_row_cannot_be_skipped_and_skip_is_audited(self, seeded_db):
+        from datetime import date
+
+        from app.orders import service as orders_service
+
+        order = orders_service.create_order(
+            seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
+        )
+        batch = _batch(seeded_db, rows=[{"订单号": order.order_no}])
+        row_id = _first_row_id(seeded_db, batch["id"])
+        service.assign_mapping(
+            seeded_db, row_id, order_id=order.id, basis="订单号一致", actor="pytest"
+        )
+        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+
+        with pytest.raises(Validation, match="已导入的历史行不可跳过"):
+            service.skip_row(seeded_db, row_id, reason="再次核对", actor="pytest")
+
+        row = seeded_db.get(ImportRow, row_id)
+        assert row is not None
+        assert row.status == ImportRowStatus.IMPORTED.value
+
+        batch2 = _batch(seeded_db, rows=[{"订单号": "HS-待判断"}])
+        row2_id = _first_row_id(seeded_db, batch2["id"])
+        service.skip_row(seeded_db, row2_id, reason="口径不明", actor="pytest")
+        audit = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == AuditAction.IMPORT_SKIP.value,
+                AuditLog.entity_id == str(row2_id),
+            )
+            .order_by(AuditLog.id.desc())
+        )
+        assert audit is not None
 
 
 # ------------------------------------------------------------------ 提交守卫

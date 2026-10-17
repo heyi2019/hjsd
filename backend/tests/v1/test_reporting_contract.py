@@ -84,6 +84,36 @@ def _month_item(data: dict, month: str) -> dict:
 
 # --------------------------------------------------------------------- R1 库存
 class TestR1Inventory:
+    def test_inventory_health_includes_account_live_fields(self, seeded_db):
+        account = account_service.create_account(
+            seeded_db,
+            game_account="report-live-field",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
+        parties_service.create_field_definition(
+            seeded_db,
+            entity_type="account",
+            field_key="marketing_note",
+            label="营销备注",
+            actor="pytest",
+        )
+        parties_service.set_extra_values(
+            seeded_db,
+            entity_type="account",
+            entity_id=account.id,
+            values=[("marketing_note", "重点账号")],
+        )
+
+        item = next(
+            row
+            for row in reporting_service.r1_inventory_health(seeded_db)["items"]
+            if row["inventory_no"] == account.inventory_no
+        )
+
+        assert item["extra_values"] == {"marketing_note": "重点账号"}
+
     def test_pickup_accounts_are_excluded_from_inventory_health(self, seeded_db):
         pickup = Account(
             inventory_no="ACC-R1-PICKUP",

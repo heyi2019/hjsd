@@ -256,6 +256,11 @@ def r1_inventory_health(
             (Account.created_by == user.username) | Account.id.in_(visible_order_ids)
         )
     accounts = session.scalars(account_stmt).all()
+    account_extra_values = parties_service.get_extra_values_bulk(
+        session,
+        entity_type="account",
+        entity_ids=[account.id for account in accounts],
+    )
     for account in accounts:
         if account.inventory_type == "PICKUP":
             continue
@@ -285,6 +290,7 @@ def r1_inventory_health(
                 "expected_price": expected_price,
                 "expected_profit": expected_price - total_cost,
                 "owner_id": orders[0].owner_id if orders else None,
+                "extra_values": account_extra_values.get(account.id, {}),
             }
         )
     return {"generated_on": today.isoformat(), "items": items, "total": len(items)}

@@ -9,6 +9,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.attachments.schemas import AttachmentOut
+
 
 class CustomerRoleInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -236,6 +238,7 @@ class OrderDetailOut(OrderOut):
     installment: "OrderInstallmentOut | None" = None
     installment_schedule: list["OrderScheduleOut"] = Field(default_factory=list)
     audit: list["OrderAuditOut"] = Field(default_factory=list)
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class OrderCashflowOut(BaseModel):

@@ -41,6 +41,12 @@ def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
     assert listed.status_code == 200, listed.text
     assert listed.json()["total"] == 1
 
+    order_detail = seeded_client.get(
+        f"/api/v1/orders/{order.id}", headers=headers
+    )
+    assert order_detail.status_code == 200, order_detail.text
+    assert order_detail.json()["attachments"][0]["attachment_no"] == item["attachment_no"]
+
     downloaded = seeded_client.get(
         f"/api/v1/attachments/{item['id']}/download", headers=headers
     )

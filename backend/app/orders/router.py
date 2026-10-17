@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,6 +23,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.foundation import AuditLog
+from app.domain.attachments import Attachment
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import (
     Account,
@@ -166,6 +167,28 @@ def _order_detail_output(
         ).all()
         output.installment_schedule = [
             schemas.OrderScheduleOut.model_validate(item) for item in schedules
+        ]
+    attachment_refs = [("order", order.order_no)]
+    attachment_refs.extend(("order_event", event.event_no) for event in events)
+    if installment is not None:
+        attachment_refs.append(("installment", installment.inst_no))
+    if user.has(PERM_FINANCE_READ):
+        attachment_refs.extend(("cashflow", item.flow_no) for item in cashflows)
+    if attachment_refs:
+        output.attachments = [
+            schemas.AttachmentOut.model_validate(item)
+            for item in db.scalars(
+                select(Attachment)
+                .where(
+                    Attachment.deleted_at.is_(None),
+                    or_(*(
+                        (Attachment.entity_type == entity_type)
+                        & (Attachment.entity_id == entity_id)
+                        for entity_type, entity_id in attachment_refs
+                    )),
+                )
+                .order_by(Attachment.created_at, Attachment.id)
+            ).all()
         ]
     if user.has(PERM_AUDIT_READ):
         audit_rows = db.scalars(

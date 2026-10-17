@@ -57,6 +57,16 @@ def _buy(seeded_db, account, amount="500"):
 
 
 class TestCreateAccountGuards:
+    def test_pickup_inventory_type_cannot_be_created(self, seeded_db):
+        with pytest.raises(Validation, match="业务模式与库存类型不匹配"):
+            service.create_account(
+                seeded_db,
+                game_account="pickup-is-order-text-only",
+                business_mode="DISTRIBUTION",
+                inventory_type="PICKUP",
+                actor="pytest",
+            )
+
     def test_unknown_business_mode_is_rejected(self, seeded_db):
         with pytest.raises(Validation, match="业务模式无效"):
             _account(
@@ -85,15 +95,6 @@ class TestCreateAccountGuards:
     def test_description_and_images_only_belong_to_recovery_or_consignment(
         self, seeded_db
     ):
-        with pytest.raises(Validation, match="账号描述和图片仅适用于回收或代挂"):
-            _account(
-                seeded_db,
-                "pickup-profile",
-                business_mode="DISTRIBUTION",
-                inventory_type="PICKUP",
-                account_description="提号不应有账号描述",
-            )
-
         consignment = _account(
             seeded_db,
             "consignment-profile",
@@ -103,29 +104,6 @@ class TestCreateAccountGuards:
             account_images=["image-1"],
         )
         assert consignment.account_description == "代挂账号描述"
-
-        pickup = _account(
-            seeded_db,
-            "pickup-update-profile",
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
-        )
-        empty_pickup = _account(
-            seeded_db,
-            "pickup-empty-profile",
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
-            account_description=None,
-            account_images=[],
-        )
-        assert empty_pickup.account_images == []
-        with pytest.raises(Validation, match="账号描述和图片仅适用于回收或代挂"):
-            service.update_account_profile(
-                seeded_db,
-                pickup.id,
-                actor="pytest",
-                account_images=["image-1"],
-            )
 
     def test_database_rejects_invalid_inventory_context(self, seeded_db):
         account = Account(
@@ -298,14 +276,17 @@ class TestAccountQueries:
         assert service.total_inventory_cost(seeded_db) == Decimal("500.00")
 
     def test_pickup_accounts_are_not_inventory_assets(self, seeded_db):
-        pickup = service.create_account(
-            seeded_db,
+        pickup = Account(
+            inventory_no="ACC-PICKUP-LEGACY",
             game_account="pickup-not-inventory",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            actor="pytest",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=Decimal("300.00"),
+            created_by="pytest",
+            updated_by="pytest",
         )
-        pickup.cost_amount = Decimal("300.00")
+        seeded_db.add(pickup)
         seeded_db.flush()
 
         assert pickup.id not in {row["account_id"] for row in service.inventory(seeded_db)}

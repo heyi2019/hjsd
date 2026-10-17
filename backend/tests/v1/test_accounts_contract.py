@@ -654,6 +654,48 @@ class TestAccountsApi:
         )
         assert order_payload["extra_values"] == {"execution_note": "回收已核验"}
 
+    def test_execution_detail_includes_order_linked_standalone_cashflows(
+        self, seeded_client, seeded_db, headers
+    ):
+        account = _account(seeded_db, "detail-standalone-flow-acc")
+        order = _buy(seeded_db, account, amount="300")
+        pool = _invest_pool(seeded_db)
+        flow = finance_service.create_cashflow(
+            seeded_db,
+            pool_id=pool.id,
+            occurred_on=TODAY,
+            direction="OUT",
+            nature="BUSINESS_OUT",
+            category="OTHER",
+            amount=Decimal("12"),
+            order_id=order.id,
+            note="订单关联的独立支出",
+            actor="pytest",
+        )
+
+        response = seeded_client.get(
+            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        order_payload = next(
+            item for item in response.json()["orders"] if item["order_id"] == order.id
+        )
+        assert order_payload["cashflows"] == [
+            {
+                "flow_no": flow.flow_no,
+                "pool_name": pool.name,
+                "occurred_on": TODAY.isoformat(),
+                "occurred_at": order_payload["cashflows"][0]["occurred_at"],
+                "direction": "OUT",
+                "nature": "BUSINESS_OUT",
+                "category": "OTHER",
+                "amount": "12.00",
+                "note": "订单关联的独立支出",
+                "operator": "pytest",
+            }
+        ]
+
     def test_execution_detail_includes_minute_timestamps(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-time-acc")
         order = orders_service.create_order(

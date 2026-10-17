@@ -201,6 +201,9 @@ describe("InventoryPanel：账号台账", () => {
           { event_no: "EV-PAY", event_type: "PAYMENT", amount: "100.00", occurred_on: "2026-10-17", cashflow: { flow_no: "CF-PAY", direction: "IN", amount: "100.00" } },
           { event_no: "EV-CANCEL", event_type: "CANCEL", amount: "20.00", occurred_on: "2026-10-18", cashflow: { flow_no: "CF-CANCEL", direction: "IN", amount: "20.00" } },
         ],
+        cashflows: [
+          { flow_no: "CF-OTHER", occurred_on: "2026-10-18", direction: "OUT", amount: "12.00" },
+        ],
         rebates: [{
           id: 41,
           rebate_no: "HS0001-RB01",
@@ -215,7 +218,7 @@ describe("InventoryPanel：账号台账", () => {
     } as unknown as AccountExecutionDetail;
 
     const csv = buildInventoryCsv([accounts[0]], { 1: detail });
-    for (const label of ["买号本金", "账号成本", "售出回款", "分期回款", "取消退款", "买号返点"]) {
+    for (const label of ["买号本金", "账号成本", "售出回款", "分期回款", "取消退款", "其他支出", "买号返点"]) {
       expect(csv).toContain(label);
     }
     expect(csv).not.toContain("订单资金");

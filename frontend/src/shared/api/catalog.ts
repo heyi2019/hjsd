@@ -205,6 +205,7 @@ export interface AccountExecutionOrder {
   status: string;
   note?: string | null;
   extra_values?: Record<string, unknown>;
+  cashflows?: AccountExecutionCashflow[];
   counterparties?: AccountExecutionCounterparty[];
   rebates?: AccountExecutionRebate[];
   events: AccountExecutionEvent[];

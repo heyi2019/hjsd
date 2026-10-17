@@ -157,6 +157,7 @@ class AccountExecutionOrderOut(BaseModel):
     status: str
     note: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
+    cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)
     counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
     rebates: list[ExecutionRebateOut] = Field(default_factory=list)
     events: list[ExecutionEventOut]
@@ -404,6 +405,31 @@ def execution_detail(
                 note=flow.note,
                 operator=flow.created_by,
             )
+    cashflows_by_order: dict[int, list[ExecutionCashflowOut]] = {}
+    if order_ids:
+        for flow, pool in db.execute(
+            select(Cashflow, Pool)
+            .join(Pool, Pool.id == Cashflow.pool_id)
+            .where(
+                Cashflow.order_id.in_(order_ids),
+                Cashflow.order_event_id.is_(None),
+            )
+            .order_by(Cashflow.occurred_on, Cashflow.id)
+        ).all():
+            cashflows_by_order.setdefault(flow.order_id, []).append(
+                ExecutionCashflowOut(
+                    flow_no=flow.flow_no,
+                    pool_name=pool.name,
+                    occurred_on=flow.occurred_on,
+                    occurred_at=flow.created_at,
+                    direction=flow.direction,
+                    nature=flow.nature,
+                    category=flow.category,
+                    amount=flow.amount,
+                    note=flow.note,
+                    operator=flow.created_by,
+                )
+            )
     events_by_order: dict[int, list[ExecutionEventOut]] = {}
     for event in events:
         events_by_order.setdefault(event.order_id, []).append(
@@ -443,6 +469,7 @@ def execution_detail(
                 status=order.status,
                 note=order.note,
                 extra_values=order_extra_values.get(order.id, {}),
+                cashflows=cashflows_by_order.get(order.id, []),
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
                 events=events_by_order.get(order.id, []),

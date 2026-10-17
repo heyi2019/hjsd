@@ -68,6 +68,15 @@ function financeTypeLabel(eventType: string, direction: string): string {
   return labels[eventType] ?? (direction === "IN" ? "其他收入" : "其他支出");
 }
 
+function accountFinancialFlows(detail: AccountExecutionDetail | undefined) {
+  return detail?.orders.flatMap((order) => [
+    ...order.events.flatMap((event) => (
+      event.cashflow ? [{ order, event, cashflow: event.cashflow }] : []
+    )),
+    ...(order.cashflows ?? []).map((cashflow) => ({ order, event: null, cashflow })),
+  ]) ?? [];
+}
+
 function rebateTypeLabel(rebateType?: string | null, channel?: string | null): string {
   if (rebateType === "BUY") return "买号返点";
   if (rebateType === "SELL") return "卖号返点";
@@ -116,9 +125,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
   totalIncome: string;
 } {
   const orders = detail?.orders ?? [];
-  const financialFlows = orders.flatMap((order) => order.events.flatMap((event) => (
-    event.cashflow ? [{ order, event, cashflow: event.cashflow }] : []
-  )));
+  const financialFlows = accountFinancialFlows(detail);
   const rebateItems = orders.flatMap((order) => (
     (order.rebates ?? []).map((rebate) => ({ order, rebate }))
   ));
@@ -141,7 +148,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
     ].join(" / "))).join("；"),
     finance: [
       ...financialFlows.map(({ order, event, cashflow }) => [
-        financeTypeLabel(event.event_type, cashflow.direction),
+        financeTypeLabel(event?.event_type ?? "", cashflow.direction),
         order.order_no,
         cashflow.flow_no,
         cashflow.direction === "OUT" ? "支出" : "收入",
@@ -521,9 +528,7 @@ export function InventoryPanel() {
     const detail = executionDetails[row.id];
     const sourceOrder = detail?.orders[0];
     if (executionLoading[row.id] && !detail) return <Spin size="small" />;
-    const financialFlows = detail?.orders.flatMap((order) => order.events.flatMap((event) => (
-      event.cashflow ? [{ order, event, cashflow: event.cashflow }] : []
-    ))) ?? [];
+    const financialFlows = accountFinancialFlows(detail);
     const rebateItems = detail?.orders.flatMap((order) => (
       (order.rebates ?? []).map((rebate) => ({ order, rebate }))
     )) ?? [];
@@ -534,7 +539,7 @@ export function InventoryPanel() {
     const financeRows: InventoryFinanceRow[] = [
       ...financialFlows.map(({ order, event, cashflow }) => ({
         key: `flow-${cashflow.flow_no}`,
-        type: financeTypeLabel(event.event_type, cashflow.direction),
+        type: financeTypeLabel(event?.event_type ?? "", cashflow.direction),
         orderNo: order.order_no,
         financeNo: cashflow.flow_no,
         direction: cashflow.direction === "OUT" ? "支出" as const : "收入" as const,

@@ -623,6 +623,24 @@ class TestReportsApiDateParams:
         assert funds.status_code == 200, funds.text
         assert {row["pool_code"] for row in funds.json()["items"]} == {"HJ_INVEST"}
 
+    def test_report_export_is_csv_and_viewer_cannot_export(
+        self, seeded_client, headers, viewer_headers
+    ):
+        exported = seeded_client.get(
+            "/api/v1/reports/order-profit/export.csv",
+            params={"from": "2026-10-01", "to": "2026-10-31"},
+            headers=headers,
+        )
+        assert exported.status_code == 200, exported.text
+        assert exported.headers["content-type"].startswith("text/csv")
+        assert "attachment" in exported.headers["content-disposition"]
+        assert "row_type" in exported.content.decode("utf-8-sig").splitlines()[0]
+
+        denied = seeded_client.get(
+            "/api/v1/reports/order-profit/export.csv", headers=viewer_headers
+        )
+        assert denied.status_code == 403
+
     def test_scoped_business_pnl_hides_unlinked_rebates(
         self, seeded_db
     ):

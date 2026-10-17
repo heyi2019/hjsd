@@ -4,11 +4,13 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.audit import record_audit
 from app.core.security import (
+    PERM_REPORT_EXPORT,
     PERM_REPORT_READ,
     CurrentUser,
     get_current_user,
@@ -18,6 +20,7 @@ from app.reporting import service
 
 router = APIRouter(tags=["reporting"])
 read_access = require_permissions(PERM_REPORT_READ)
+export_access = require_permissions(PERM_REPORT_EXPORT)
 
 
 @router.get("/reports/inventory-health")
@@ -81,6 +84,47 @@ def order_profit(
 ) -> dict:
     """订单利润明细：合计与 R5 对应维度一致。"""
     return service.order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
+
+
+@router.get("/reports/{report_name}/export.csv")
+def export_report(
+    report_name: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = export_access,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    on: date | None = Query(default=None),
+) -> Response:
+    """导出当前权限范围内的报表；导出动作写入审计日志。"""
+    report = service.report_for_export(
+        db,
+        report_name,
+        from_date=from_date,
+        to_date=to_date,
+        on=on,
+        user=user,
+    )
+    item_count = len(report.get("items", [])) if isinstance(report.get("items"), list) else 0
+    record_audit(
+        db,
+        action="REPORT_EXPORT",
+        entity_type="report_export",
+        entity_id=report_name,
+        actor=user.username,
+        after={
+            "report_name": report_name,
+            "item_count": item_count,
+            "from": from_date.isoformat() if from_date else None,
+            "to": to_date.isoformat() if to_date else None,
+            "on": on.isoformat() if on else None,
+        },
+    )
+    filename = f"{report_name}-{date.today().isoformat()}.csv"
+    return Response(
+        content=service.report_csv(report),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 __all__ = ["router"]

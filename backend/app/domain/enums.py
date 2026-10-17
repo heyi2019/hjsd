@@ -434,6 +434,7 @@ class AuditAction(StrEnum):
     FIELD_DEFINITION_CHANGE = "FIELD_DEFINITION_CHANGE"
     POLICY_CHANGE = "POLICY_CHANGE"
     EXCEPTION_APPROVE = "EXCEPTION_APPROVE"
+    REPORT_EXPORT = "REPORT_EXPORT"
     # 标准导入（MIG-01）：与 EXCEPTION_APPROVE 分开，避免「导入」被误读为「异常审批」。
     # audit_logs.action 无 CHECK 约束，新增枚举值不需要迁移。
     IMPORT_LAND = "IMPORT_LAND"  # 原始行落地（只存原文，不做字段推断）

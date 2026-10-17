@@ -61,6 +61,7 @@ PERM_AUDIT_READ = "audit.read"
 PERM_POOL_MANAGE = "pool.manage"
 PERM_ORDER_TYPE_MANAGE = "order-type.manage"
 PERM_REPORT_READ = "report.read"
+PERM_REPORT_EXPORT = "report.export"
 PERM_IMPORT_MANAGE = "import.manage"
 PERM_USER_MANAGE = "user.manage"
 PERM_PERIOD_LOCK = "finance.period.lock"
@@ -90,6 +91,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_POOL_MANAGE,
         PERM_ORDER_TYPE_MANAGE,
         PERM_REPORT_READ,
+        PERM_REPORT_EXPORT,
         PERM_IMPORT_MANAGE,
         PERM_USER_MANAGE,
         PERM_PERIOD_LOCK,
@@ -111,6 +113,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_ORDER_EVENT_POST,
             PERM_FINANCE_READ,
             PERM_REPORT_READ,
+            PERM_REPORT_EXPORT,
         }
     ),
     ROLE_FINANCE: frozenset(
@@ -124,6 +127,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_FINANCE_ORDER_EVENT_POST,
             PERM_AUDIT_READ,
             PERM_REPORT_READ,
+            PERM_REPORT_EXPORT,
             PERM_PERIOD_LOCK,
         }
     ),
@@ -138,6 +142,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_POLICY_APPROVE,
             PERM_AUDIT_READ,
             PERM_REPORT_READ,
+            PERM_REPORT_EXPORT,
         }
     ),
     ROLE_VIEWER: frozenset({PERM_FINANCE_READ, PERM_REPORT_READ}),
@@ -470,6 +475,7 @@ __all__ = [
     "ROLE_VIEWER",
     "OWNER_SCOPES",
     "PERM_FINANCE_ORDER_EVENT_POST",
+    "PERM_REPORT_EXPORT",
     "build_access_token",
     "decode_token",
     "encode_token",

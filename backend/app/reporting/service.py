@@ -9,6 +9,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import csv
+import io
+import json
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -41,6 +44,16 @@ from app.domain.trade import (
 )
 
 ZERO = Decimal("0")
+REPORT_NAMES = frozenset(
+    {
+        "inventory-health",
+        "monthly-pnl",
+        "commission",
+        "business-pnl",
+        "daily-funds",
+        "order-profit",
+    }
+)
 
 
 def _validate_date_range(
@@ -51,6 +64,74 @@ def _validate_date_range(
             "开始日期不能晚于结束日期",
             details={"from": from_date.isoformat(), "to": to_date.isoformat()},
         )
+
+
+def report_for_export(
+    session: Session,
+    report_name: str,
+    *,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    on: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """统一执行可导出的报表，所有分支复用既有数据权限和口径。"""
+    name = report_name.strip().lower()
+    if name not in REPORT_NAMES:
+        raise Validation(
+            "不支持导出的报表",
+            details={"report_name": report_name, "allowed": sorted(REPORT_NAMES)},
+        )
+    if name == "inventory-health":
+        return r1_inventory_health(session, user=user)
+    if name == "monthly-pnl":
+        return r2_monthly_pnl(session, from_date=from_date, to_date=to_date, user=user)
+    if name == "commission":
+        return r3_commission_reconciliation(
+            session, from_date=from_date, to_date=to_date, user=user
+        )
+    if name == "business-pnl":
+        return r5_business_pnl(session, from_date=from_date, to_date=to_date, user=user)
+    if name == "daily-funds":
+        return daily_funds_report(session, on=on, user=user)
+    return order_profit_detail(session, from_date=from_date, to_date=to_date, user=user)
+
+
+def report_csv(report: dict[str, Any]) -> str:
+    """将报表 items 与 total 统一导出为 UTF-8 CSV，嵌套字段保留为 JSON。"""
+    items = report.get("items") if isinstance(report.get("items"), list) else []
+    total = report.get("total") if isinstance(report.get("total"), dict) else None
+    rows: list[dict[str, Any]] = [
+        {"row_type": "ITEM", **item} for item in items if isinstance(item, dict)
+    ]
+    if total is not None:
+        rows.append({"row_type": "TOTAL", **total})
+    columns = ["row_type"]
+    for row in rows:
+        for key in row:
+            if key not in columns:
+                columns.append(key)
+    if len(columns) == 1:
+        columns.extend(["items", "total"])
+
+    def normalize(value: Any) -> Any:
+        if value is None:
+            return ""
+        if isinstance(value, (dict, list, tuple)):
+            return json.dumps(value, ensure_ascii=False, default=str)
+        return value
+
+    stream = io.StringIO(newline="")
+    writer = csv.DictWriter(
+        stream,
+        fieldnames=columns,
+        extrasaction="ignore",
+        lineterminator="\r\n",
+    )
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({key: normalize(row.get(key)) for key in columns})
+    return "\ufeff" + stream.getvalue()
 
 
 def _sum_report_field(items: list[dict[str, Any]], field: str) -> Decimal:
@@ -705,8 +786,11 @@ def order_profit_detail(
 
 
 __all__ = [
+    "REPORT_NAMES",
     "daily_funds_report",
     "order_profit_detail",
+    "report_csv",
+    "report_for_export",
     "r1_inventory_health",
     "r2_monthly_pnl",
     "r3_commission_reconciliation",

@@ -325,6 +325,37 @@ class TestEventRules:
 
         assert "BUY" in str(exc.value)
 
+    def test_th_order_accepts_only_one_sell_event(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
+        )
+        service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("100"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+        service.post_event(
+            seeded_db,
+            order.id,
+            event_type="SELL",
+            amount=Decimal("120"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+
+        with pytest.raises(Validation, match="只能登记一次 SELL"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="SELL",
+                amount=Decimal("10"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
     def test_dfq_cannot_post_sell(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"

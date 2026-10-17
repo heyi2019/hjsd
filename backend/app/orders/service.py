@@ -871,6 +871,14 @@ def _assert_event_allowed(
         raise Validation("代挂业务不允许 BUY 或 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:
         raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
+    if event_type == EventType.SELL.value and session.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == EventType.SELL.value,
+            OrderEvent.is_posted.is_(True),
+        )
+    ) is not None:
+        raise Validation("每张订单只能登记一次 SELL")
     if event_type == EventType.PAYMENT.value:
         installment = session.scalar(
             select(Installment.id).where(Installment.order_id == order.id)

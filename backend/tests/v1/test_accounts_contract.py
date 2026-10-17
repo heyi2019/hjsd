@@ -316,6 +316,15 @@ class TestAccountQueries:
         # total_inventory_cost 复用同一库存口径
         assert service.total_inventory_cost(seeded_db) == Decimal("500.00")
 
+    def test_inventory_includes_for_sale_accounts(self, seeded_db):
+        for_sale = _account(seeded_db, "for-sale-acc")
+        for_sale.status = AccountStatus.FOR_SALE.value
+        seeded_db.flush()
+
+        inventory = service.inventory(seeded_db)
+
+        assert [row["account_id"] for row in inventory] == [for_sale.id]
+
     def test_pickup_accounts_are_not_inventory_assets(self, seeded_db):
         pickup = Account(
             inventory_no="ACC-PICKUP-LEGACY",

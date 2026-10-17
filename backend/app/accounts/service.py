@@ -27,7 +27,11 @@ from app.domain.enums import (
 from app.domain.trade import Account, Order
 from app.parties import service as parties_service
 
-INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.value)
+INVENTORY_STATUSES = (
+    AccountStatus.IN_STOCK.value,
+    AccountStatus.INSTALLMENT.value,
+    AccountStatus.FOR_SALE.value,
+)
 _UNSET = object()
 
 

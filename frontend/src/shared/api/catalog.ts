@@ -141,6 +141,7 @@ export interface Account {
   has_secondary?: boolean | null;
   account_description?: string | null;
   account_images?: string[] | null;
+  extra_values?: Record<string, unknown>;
   note?: string | null;
   platform?: string | null;
   status: string;
@@ -194,6 +195,21 @@ export interface AccountExecutionRebate {
   status: string;
   collected_on: string;
   collected_at?: string | null;
+  settlements?: AccountExecutionRebateSettlement[];
+}
+
+export interface AccountExecutionRebateSettlement {
+  id: number;
+  settlement_no: string;
+  settled_on: string;
+  settled_at: string;
+  gross_amount: string;
+  platform_fee: string;
+  net_amount: string;
+  cashflow_id?: number | null;
+  reversal_of_id?: number | null;
+  note?: string | null;
+  operator: string;
 }
 
 export interface AccountExecutionOrder {

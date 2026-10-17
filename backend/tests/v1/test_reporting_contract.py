@@ -268,6 +268,7 @@ class TestR2MonthlyPnl:
         # 返点结算：毛额 − 手续费 = 净额
         record = finance_service.create_rebate(
             seeded_db, source_order_id=order.id, base_amount="1000.00",
+            rebate_type="BUY",
             collected_on=D, actor="pytest", rate="10",
         )
         finance_service.settle_rebate(
@@ -366,9 +367,14 @@ class TestR3Commission:
 class TestR5BusinessPnl:
     def test_partial_rebate_settlement_keeps_uncollected_balance(self, seeded_db):
         order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="pytest",
+        )
         record = finance_service.create_rebate(
             seeded_db,
             source_order_id=order.id,
+            rebate_type="BUY",
             base_amount="1000.00",
             collected_on=D,
             actor="pytest",
@@ -405,6 +411,7 @@ class TestR5BusinessPnl:
         # 已结算返点：毛额 100 − 手续费 10 = 90
         record = finance_service.create_rebate(
             seeded_db, source_order_id=order.id, base_amount="1000.00",
+            rebate_type="BUY",
             collected_on=D, actor="pytest", rate="10",
         )
         finance_service.settle_rebate(
@@ -416,6 +423,7 @@ class TestR5BusinessPnl:
             RebateRecord(
                 rebate_no="RB-R5-1",
                 source_order_id=None,
+                rebate_type="SELL",
                 rate=to_money("10"),
                 base_amount=to_money("500.00"),
                 status=RebateStatus.OPEN.value,
@@ -475,6 +483,7 @@ class TestOrderProfitDetail:
         )
         record = finance_service.create_rebate(
             seeded_db, source_order_id=order.id, base_amount="1000.00",
+            rebate_type="BUY",
             collected_on=D, actor="pytest", rate="10",
         )
         finance_service.settle_rebate(
@@ -581,6 +590,7 @@ class TestReportsApiDateParams:
             RebateRecord(
                 rebate_no="RB-R5-SCOPE",
                 source_order_id=None,
+                rebate_type="SELL",
                 rate=to_money("10"),
                 base_amount=to_money("500"),
                 status=RebateStatus.OPEN.value,

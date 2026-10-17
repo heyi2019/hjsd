@@ -352,6 +352,7 @@ class TestA06Rebate:
         record = finance_service.create_rebate(
             seeded_db,
             source_order_id=order.id,
+            rebate_type="BUY",
             base_amount=Decimal("300"),
             rate=Decimal("0.10"),
             collected_on=TODAY,

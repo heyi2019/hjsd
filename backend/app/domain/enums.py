@@ -330,7 +330,6 @@ class RebateType(StrEnum):
 
     BUY = "BUY"
     SELL = "SELL"
-    UNSPECIFIED = "UNSPECIFIED"  # 历史记录未补齐类型
 
 
 class ReconciliationStatus(StrEnum):

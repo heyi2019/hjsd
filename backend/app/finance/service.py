@@ -1044,10 +1044,10 @@ def create_rebate(
     session: Session,
     *,
     source_order_id: int,
-    rebate_type: str = RebateType.UNSPECIFIED.value,
     base_amount: Any,
     collected_on: date,
     actor: str,
+    rebate_type: str | None = None,
     rate: Any = 0,
     channel: str | None = None,
     note: str | None = None,
@@ -1083,8 +1083,8 @@ def create_rebate(
     required_event = {
         RebateType.BUY.value: EventType.BUY.value,
         RebateType.SELL.value: EventType.SELL.value,
-    }.get(rebate_type)
-    if required_event is not None and session.scalar(
+    }[rebate_type]
+    if session.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order.id,
             OrderEvent.event_type == required_event,

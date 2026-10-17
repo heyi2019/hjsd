@@ -316,6 +316,19 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_type_is_required_and_closed(self, seeded_db):
+        order_id = _active_order(seeded_db)
+
+        with pytest.raises(Validation, match="返点类型必须为"):
+            service.create_rebate(
+                seeded_db,
+                source_order_id=order_id,
+                rebate_type="UNSPECIFIED",
+                base_amount=Decimal("100"),
+                collected_on=TODAY,
+                actor="pytest",
+            )
+
     def test_rebate_type_must_match_source_order_event(self, seeded_db):
         order_id = _active_order(seeded_db)
 
@@ -334,6 +347,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -360,6 +374,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -374,6 +389,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -401,6 +417,7 @@ class TestRebateGuards:
             service.create_rebate(
                 seeded_db,
                 source_order_id=order_id,
+                rebate_type="BUY",
                 base_amount=Decimal("100"),
                 collected_on=TODAY,
                 actor="pytest",
@@ -410,6 +427,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -431,6 +449,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -470,7 +489,7 @@ class TestRebateGuards:
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
         record = service.create_rebate(
-            seeded_db, source_order_id=order_id, base_amount=Decimal("200"),
+            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("200"),
             collected_on=TODAY, actor="pytest", rate=Decimal("10"),
         )
         with pytest.raises(Validation) as exc:
@@ -484,11 +503,11 @@ class TestRebateGuards:
         first = _active_order(seeded_db)
         second = _active_order(seeded_db)
         service.create_rebate(
-            seeded_db, source_order_id=first, base_amount=Decimal("100"),
+            seeded_db, source_order_id=first, rebate_type="BUY", base_amount=Decimal("100"),
             collected_on=TODAY, actor="pytest",
         )
         service.create_rebate(
-            seeded_db, source_order_id=second, base_amount=Decimal("200"),
+            seeded_db, source_order_id=second, rebate_type="BUY", base_amount=Decimal("200"),
             collected_on=TODAY, actor="pytest",
         )
         by_order = service.list_rebates(seeded_db, source_order_id=second)
@@ -503,6 +522,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -572,6 +592,7 @@ class TestRebateGuards:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
@@ -916,12 +937,20 @@ class TestFinanceApi:
         other_order = orders_service.create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
         )
+        orders_service.post_event(
+            seeded_db, own_order.id, event_type="BUY", amount=Decimal("10"),
+            occurred_on=TODAY, actor="pytest",
+        )
+        orders_service.post_event(
+            seeded_db, other_order.id, event_type="BUY", amount=Decimal("20"),
+            occurred_on=TODAY, actor="pytest",
+        )
         service.create_rebate(
-            seeded_db, source_order_id=own_order.id, base_amount=Decimal("10"),
+            seeded_db, source_order_id=own_order.id, rebate_type="BUY", base_amount=Decimal("10"),
             collected_on=TODAY, actor="pytest"
         )
         service.create_rebate(
-            seeded_db, source_order_id=other_order.id, base_amount=Decimal("20"),
+            seeded_db, source_order_id=other_order.id, rebate_type="BUY", base_amount=Decimal("20"),
             collected_on=TODAY, actor="pytest"
         )
 
@@ -1143,9 +1172,14 @@ class TestFinanceApi:
             actor="scoped-finance",
             owner_id=9,
         )
+        orders_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
+            occurred_on=TODAY, actor="scoped-finance",
+        )
         record = service.create_rebate(
             seeded_db,
             source_order_id=order.id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="scoped-finance",
@@ -1287,7 +1321,7 @@ class TestFinanceApi:
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
         record = service.create_rebate(
-            seeded_db, source_order_id=order_id, base_amount=Decimal("200"),
+            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("200"),
             collected_on=TODAY, actor="pytest",
         )
         service.settle_rebate(
@@ -1357,7 +1391,7 @@ class TestFinanceApi:
     def test_list_rebates_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
         service.create_rebate(
-            seeded_db, source_order_id=order_id, base_amount=Decimal("100"),
+            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("100"),
             collected_on=TODAY, actor="pytest", channel="买号返点",
             note="回收买号返点",
         )
@@ -1395,7 +1429,7 @@ class TestFinanceApi:
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
         record = service.create_rebate(
-            seeded_db, source_order_id=order_id, base_amount=Decimal("200"),
+            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("200"),
             collected_on=TODAY, actor="pytest",
         )
         response = seeded_client.post(
@@ -1423,6 +1457,7 @@ class TestFinanceApi:
         record = service.create_rebate(
             seeded_db,
             source_order_id=order_id,
+            rebate_type="BUY",
             base_amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",

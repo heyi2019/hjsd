@@ -548,7 +548,7 @@ class RebateRecord(Base, AuditMixin):
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
     )
     rebate_type: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=RebateType.UNSPECIFIED.value
+        String(16), nullable=False
     )
     channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)

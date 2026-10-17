@@ -79,6 +79,7 @@ class TestQualityScan:
             RebateRecord(
                 rebate_no="RB-UNLINKED-1",
                 source_order_id=None,
+                rebate_type="SELL",
                 rate=Decimal("10"),
                 base_amount=Decimal("500"),
                 link_status="UNLINKED",

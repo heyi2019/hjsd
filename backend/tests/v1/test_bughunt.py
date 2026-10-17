@@ -247,6 +247,7 @@ class TestDepositAndRebate:
         rebate = finance_service.create_rebate(
             seeded_db,
             source_order_id=order.id,
+            rebate_type="BUY",
             base_amount="1000.00",
             rate="5",
             collected_on=D,
@@ -280,6 +281,7 @@ class TestDepositAndRebate:
         rebate = finance_service.create_rebate(
             seeded_db,
             source_order_id=order.id,
+            rebate_type="BUY",
             base_amount="1000.00",
             rate="5",
             collected_on=D,

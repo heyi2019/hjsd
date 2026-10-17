@@ -108,7 +108,7 @@ def _rebuild(bind, tname: str) -> None:
         if "rebate_type" not in source_columns:
             ddl = ddl.replace("\trebate_type VARCHAR(16) NOT NULL, \n", "")
             ddl = ddl.replace(
-                "\tCONSTRAINT ck_rebate_records_rebate_type_valid CHECK (rebate_type IN ('BUY', 'SELL', 'UNSPECIFIED')), \n",
+                "\tCONSTRAINT ck_rebate_records_rebate_type_valid CHECK (rebate_type IN ('BUY', 'SELL')), \n",
                 "",
             )
         ddl = ddl.replace(

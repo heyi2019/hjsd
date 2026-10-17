@@ -270,6 +270,18 @@ class TestTokenGuards:
                 }
             )
 
+    @pytest.mark.parametrize("jti", [123, [], {}, "   "])
+    def test_invalid_jti_claim_rejected(self, jti):
+        with pytest.raises(AuthError, match="登录凭证内容无效"):
+            user_from_payload(
+                {
+                    "sub": "7",
+                    "username": "operator",
+                    "roles": ["VIEWER"],
+                    "jti": jti,
+                }
+            )
+
     def test_unexpected_algorithm_rejected(self):
         token = self._signed_token(
             {"alg": "none", "typ": "JWT"}, {"sub": "1", "exp": 4102444800}

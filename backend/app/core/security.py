@@ -329,6 +329,7 @@ def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
         pool_ids = payload.get("pool_ids", [])
         team_ids = payload.get("team_ids", [])
         owner_scope = payload.get("owner_scope", "SELF")
+        jti = payload.get("jti")
         if user_id <= 0 or not isinstance(username, str) or not username.strip():
             raise ValueError("invalid identity claims")
         if not isinstance(roles, list) or not isinstance(pool_ids, list) or not isinstance(team_ids, list):
@@ -342,6 +343,8 @@ def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
         display_name = payload.get("display_name", username.strip())
         if not isinstance(display_name, str) or not display_name.strip():
             raise ValueError("invalid display name claim")
+        if jti is not None and (not isinstance(jti, str) or not jti.strip()):
+            raise ValueError("invalid jti claim")
     except (TypeError, ValueError) as error:
         raise AuthError("登录凭证内容无效") from error
     return CurrentUser.build(
@@ -383,7 +386,10 @@ def get_current_user(
         if scheme.lower() != "bearer" or not token:
             raise AuthError("登录凭证格式无效")
         payload = decode_token(token, settings=settings)
-        if payload.get("jti") and db.get(RevokedToken, payload["jti"]):
+        jti = payload.get("jti")
+        if jti is not None and (not isinstance(jti, str) or not jti.strip()):
+            raise AuthError("登录凭证内容无效")
+        if jti and db.get(RevokedToken, jti):
             raise AuthError("登录已退出，请重新登录")
         try:
             user_id = int(payload.get("sub", 0))

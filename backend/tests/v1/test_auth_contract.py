@@ -178,6 +178,19 @@ def test_malformed_bearer_identity_claim_is_auth_error(client: TestClient):
     assert response.json()["message"] == "登录凭证内容无效"
 
 
+def test_malformed_bearer_jti_claim_is_auth_error(client: TestClient):
+    from app.core.security import encode_token
+
+    token = encode_token(
+        {"sub": "1", "username": "admin", "roles": ["ADMIN"], "jti": {"bad": True}}
+    )
+    response = client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 401
+    assert response.json()["message"] == "登录凭证内容无效"
+
+
 def test_me_requires_authentication(client: TestClient):
     assert client.get("/api/v1/auth/me").status_code == 401
 

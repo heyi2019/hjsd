@@ -282,7 +282,9 @@ def create_order(
         account = accounts_service.get_account(session, account_id, user)
         _validate_existing_account_context(definition.code, account)
 
-    _validate_participant_roles(customer_roles, counterparty_roles)
+    _validate_participant_roles(
+        definition.code, customer_roles, counterparty_roles
+    )
 
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         owner_id = user.id
@@ -940,7 +942,22 @@ def _assert_event_allowed(
                 )
 
 
+_CUSTOMER_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
+    "HS": frozenset({"SELLER", "BUYER", "INSTALLMENT_CUSTOMER"}),
+    "TH": frozenset({"BUYER"}),
+    "DG": frozenset({"CONSIGNOR"}),
+    "DFQ": frozenset({"INSTALLMENT_CUSTOMER"}),
+}
+_COUNTERPARTY_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
+    "HS": frozenset(),
+    "TH": frozenset({"PEER"}),
+    "DG": frozenset({"PLATFORM"}),
+    "DFQ": frozenset({"SUPPLIER"}),
+}
+
+
 def _validate_participant_roles(
+    order_type: str,
     customer_roles: Sequence[tuple[int, str]],
     counterparty_roles: Sequence[tuple[int, str]],
 ) -> None:
@@ -951,6 +968,13 @@ def _validate_participant_roles(
                 f"客户角色必须为 {CustomerRole.values()}",
                 code=ErrorCode.PARTICIPANT_ROLE_INVALID,
                 details={"role": role},
+            )
+        allowed_roles = _CUSTOMER_ROLES_BY_ORDER_TYPE.get(order_type)
+        if allowed_roles is not None and role not in allowed_roles:
+            raise Validation(
+                f"{order_type} 不允许客户角色 {role}",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"order_type": order_type, "role": role},
             )
         if isinstance(_participant_id, bool) or not isinstance(_participant_id, int) or _participant_id <= 0:
             raise Validation(
@@ -973,6 +997,13 @@ def _validate_participant_roles(
                 f"合作方角色必须为 {CounterpartyRole.values()}",
                 code=ErrorCode.PARTICIPANT_ROLE_INVALID,
                 details={"role": role},
+            )
+        allowed_roles = _COUNTERPARTY_ROLES_BY_ORDER_TYPE.get(order_type)
+        if allowed_roles is not None and role not in allowed_roles:
+            raise Validation(
+                f"{order_type} 不允许合作方角色 {role}",
+                code=ErrorCode.PARTICIPANT_ROLE_INVALID,
+                details={"order_type": order_type, "role": role},
             )
         if isinstance(_participant_id, bool) or not isinstance(_participant_id, int) or _participant_id <= 0:
             raise Validation(

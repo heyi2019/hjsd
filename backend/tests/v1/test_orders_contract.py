@@ -218,6 +218,32 @@ class TestCreateOrderValidation:
                 ],
             )
 
+    def test_participant_roles_must_match_order_type(self, seeded_db):
+        customer = parties_service.create_customer(
+            seeded_db, display_name="业务角色客户", actor="pytest"
+        )
+        supplier = parties_service.create_counterparty(
+            seeded_db, display_name="供货方", type="SUPPLIER", actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="TH 不允许客户角色 SELLER"):
+            order_service.create_order(
+                seeded_db,
+                order_type="TH",
+                trade_date=D,
+                actor="pytest",
+                customer_roles=[(customer.id, "SELLER")],
+            )
+
+        with pytest.raises(Validation, match="TH 不允许合作方角色 SUPPLIER"):
+            order_service.create_order(
+                seeded_db,
+                order_type="TH",
+                trade_date=D,
+                actor="pytest",
+                counterparty_roles=[(supplier.id, "SUPPLIER")],
+            )
+
     def test_participant_id_shape_is_rejected_before_database_flush(self, seeded_db):
         with pytest.raises(Validation, match="参与方 ID"):
             order_service.create_order(

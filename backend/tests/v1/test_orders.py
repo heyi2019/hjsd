@@ -455,16 +455,43 @@ class TestEventRules:
             select(Installment).where(Installment.order_id == order.id)
         )
         assert contract is not None
-        event, flow = service.post_event(
-            seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
-            delivery_mode="CUSTOMER_SELF", note="客户自行换绑凭证",
+        installment_service.deliver(
+            seeded_db,
+            contract.id,
+            delivery_mode="CUSTOMER_SELF",
+            delivered_on=TODAY,
+            note="客户自行换绑凭证",
+            actor="pytest",
         )
+        event = seeded_db.scalar(
+            select(OrderEvent)
+            .where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.DELIVER.value,
+            )
+            .order_by(OrderEvent.id.desc())
+        )
+        flow = None
+        assert event is not None
         seeded_db.commit()
         assert flow is None
         assert event.amount == Decimal("0.00")
         assert seeded_db.scalar(
             select(Cashflow).where(Cashflow.order_event_id == event.id)
         ) is None
+
+    def test_direct_deliver_event_cannot_bypass_installment_service(self, seeded_db):
+        order = _settled_hs_installment(seeded_db)
+        with pytest.raises(Exception, match="分期交付流程"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type=EventType.DELIVER.value,
+                occurred_on=TODAY,
+                actor="pytest",
+                delivery_mode="CUSTOMER_SELF",
+                note="客户自行换绑凭证",
+            )
 
     def test_deliver_requires_mode_and_voucher(self, seeded_db):
         order = service.create_order(

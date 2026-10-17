@@ -755,6 +755,7 @@ def deliver(
         delivery_mode=delivery_mode,
         note=note,
         user=user,
+        allow_installment_delivery=True,
     )
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "DELIVER", entity="分期合约"

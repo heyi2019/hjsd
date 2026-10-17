@@ -625,6 +625,7 @@ def post_event(
     note: str | None = None,
     user: CurrentUser | None = None,
     allow_installment_payment: bool = False,
+    allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """过账：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
     try:
@@ -669,6 +670,7 @@ def post_event(
             actor=actor,
             delivery_mode=delivery_mode,
             note=note,
+            allow_installment_delivery=allow_installment_delivery,
         )
 
     if event_type not in MONEY_EVENTS:
@@ -1029,6 +1031,7 @@ def _post_deliver(
     actor: str,
     delivery_mode: str | None,
     note: str | None,
+    allow_installment_delivery: bool,
 ) -> tuple[OrderEvent, None]:
     """`DELIVER`：无金额、无现金流，必须记录交付方式与凭证（DFQ-01-07 / A04 / A05）。"""
     modes = ("PLATFORM_OPERATOR", "CUSTOMER_SELF")
@@ -1060,6 +1063,8 @@ def _post_deliver(
             code=ErrorCode.DELIVERY_CONDITION_UNMET,
             details={"inst_no": installment.inst_no, "status": installment.status},
         )
+    if not allow_installment_delivery:
+        raise Validation("DELIVER 必须通过分期交付流程")
     event = OrderEvent(
         event_no=next_event_no(
             session,

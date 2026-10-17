@@ -26,6 +26,7 @@ from app.domain.enums import (
 )
 from app.domain.foundation import AuditLog
 from app.domain.trade import Installment, InstallmentSchedule, Order
+from app.domain.users import User
 from app.installments import service as installment_service
 from app.orders import service as orders_service
 
@@ -111,6 +112,41 @@ class TestCreateInstallmentValidation:
         seeded_db.refresh(account)
         assert account.status == "INSTALLMENT"
         assert account.updated_by == "contract-creator"
+
+    def test_finance_can_collect_installment_payment_with_pool_scope(
+        self, seeded_client, seeded_db
+    ):
+        finance_account = seeded_db.get(User, 9)
+        finance_account.role = "FINANCE"
+        finance_account.owner_scope = "SELF"
+        finance_account.pool_ids = [1]
+        seeded_db.flush()
+
+        order = _order(seeded_db, owner_id=9)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="0",
+            periods=1,
+            per_period="100",
+            first_due_on=TODAY,
+        )
+        token = build_access_token(
+            CurrentUser.build(
+                id=9,
+                username="seeduser9",
+                roles=["FINANCE"],
+                owner_scope="SELF",
+                pool_ids=frozenset({1}),
+            )
+        )
+        response = seeded_client.post(
+            f"/api/v1/installments/{contract.id}/payments",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"amount": "100", "paid_on": TODAY.isoformat(), "pool_id": 1},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["schedule"]["status"] == "PAID"
 
     def test_schedule_period_no_cannot_be_negative_in_database(self, seeded_db):
         order = _order(seeded_db)

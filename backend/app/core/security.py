@@ -49,6 +49,7 @@ PERM_COUNTERPARTY_MANAGE = "counterparty.manage"
 PERM_ORDER_CREATE = "order.create"
 PERM_ORDER_UPDATE = "order.update"
 PERM_ORDER_EVENT_POST = "order.event.post"
+PERM_FINANCE_ORDER_EVENT_POST = "finance.order.event.post"
 PERM_ORDER_EXCEPTION_APPROVE = "order.exception.approve"
 PERM_FINANCE_READ = "finance.read"
 PERM_DEPOSIT_POST = "deposit.post"
@@ -76,6 +77,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_ORDER_CREATE,
         PERM_ORDER_UPDATE,
         PERM_ORDER_EVENT_POST,
+        PERM_FINANCE_ORDER_EVENT_POST,
         PERM_ORDER_EXCEPTION_APPROVE,
         PERM_FINANCE_READ,
         PERM_DEPOSIT_POST,
@@ -117,6 +119,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_FINANCE_READ,
             PERM_DEPOSIT_POST,
             PERM_TRANSFER_POST,
+            PERM_FINANCE_ORDER_EVENT_POST,
             PERM_AUDIT_READ,
             PERM_REPORT_READ,
         }
@@ -463,6 +466,7 @@ __all__ = [
     "ROLE_PERMISSIONS",
     "ROLE_VIEWER",
     "OWNER_SCOPES",
+    "PERM_FINANCE_ORDER_EVENT_POST",
     "build_access_token",
     "decode_token",
     "encode_token",

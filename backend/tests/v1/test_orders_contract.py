@@ -29,6 +29,7 @@ from app.accounts import service as accounts_service
 from app.installments import service as installments_service
 from app.parties import service as parties_service
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
+from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import service as order_service
 
@@ -81,6 +82,67 @@ class TestCreateOrderValidation:
                 actor="pytest",
                 allow_installment_delivery="false",
             )
+
+    def test_finance_can_post_buy_sell_but_not_other_order_events(self, seeded_client, seeded_db):
+        finance_account = seeded_db.get(User, 9)
+        finance_account.role = "FINANCE"
+        finance_account.owner_scope = "SELF"
+        finance_account.pool_ids = [1]
+        seeded_db.flush()
+
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account=f"finance-event-{uuid4().hex[:10]}",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
+        order = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="pytest",
+            account_id=account.id,
+            owner_id=9,
+        )
+        token = build_access_token(
+            CurrentUser.build(
+                id=9,
+                username="seeduser9",
+                roles=["FINANCE"],
+                owner_scope="SELF",
+                pool_ids=frozenset({1}),
+            )
+        )
+        auth = {"Authorization": f"Bearer {token}"}
+
+        buy = seeded_client.post(
+            f"/api/v1/orders/{order.id}/events",
+            headers=auth,
+            json={"event_type": "BUY", "amount": "100", "occurred_on": D.isoformat(), "pool_id": 1},
+        )
+        assert buy.status_code == 201, buy.text
+
+        sell = seeded_client.post(
+            f"/api/v1/orders/{order.id}/events",
+            headers=auth,
+            json={"event_type": "SELL", "amount": "120", "occurred_on": D.isoformat(), "pool_id": 1},
+        )
+        assert sell.status_code == 201, sell.text
+
+        cost = seeded_client.post(
+            f"/api/v1/orders/{order.id}/events",
+            headers=auth,
+            json={
+                "event_type": "COST",
+                "amount": "10",
+                "occurred_on": D.isoformat(),
+                "pool_id": 1,
+                "flow_category": "FEE",
+            },
+        )
+        assert cost.status_code == 403, cost.text
+        assert cost.json()["code"] == ErrorCode.PERMISSION_DENIED
 
     def test_order_creation_validates_participants_before_creating_account(self, seeded_db):
         customer = parties_service.create_customer(

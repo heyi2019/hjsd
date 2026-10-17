@@ -11,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import Validation
+from app.core.errors import PermissionDenied, Validation
 from app.core.security import (
+    PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
@@ -29,7 +30,9 @@ router = APIRouter(tags=["ORD-01/02 订单与事件"])
 
 read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 create_orders = require_permissions(PERM_ORDER_CREATE)
-post_events = require_permissions(PERM_ORDER_EVENT_POST)
+post_events = require_permissions(
+    PERM_ORDER_EVENT_POST, PERM_FINANCE_ORDER_EVENT_POST, require_all=False
+)
 update_orders = require_permissions(PERM_ORDER_UPDATE)
 read_finance = require_permissions(PERM_FINANCE_READ)
 
@@ -329,10 +332,17 @@ def post_event(
     user: CurrentUser = post_events,
 ) -> dict:
     service.get_order(db, order_id, user)
+    event_type = payload.event_type.strip().upper()
+    if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
+        if event_type not in {"BUY", "SELL"}:
+            raise PermissionDenied(
+                "财务只能登记付款或回款事件",
+                details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
+            )
     event, flow = service.post_event(
         db,
         order_id,
-        event_type=payload.event_type.strip().upper(),
+        event_type=event_type,
         amount=payload.amount,
         occurred_on=payload.occurred_on,
         actor=_actor(user),

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import (
+    PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_EXCEPTION_APPROVE,
@@ -23,7 +24,10 @@ router = APIRouter(tags=["HS-01/DFQ-01 分期合约"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
-post_payment = require_permissions(PERM_ORDER_EVENT_POST)
+post_payment = require_permissions(
+    PERM_ORDER_EVENT_POST, PERM_FINANCE_ORDER_EVENT_POST, require_all=False
+)
+post_delivery = require_permissions(PERM_ORDER_EVENT_POST)
 default_manage = require_permissions(PERM_ORDER_EXCEPTION_APPROVE)
 
 
@@ -203,7 +207,7 @@ def deliver_installment(
     installment_id: int,
     payload: schemas.DeliverIn,
     db: Session = Depends(get_db),
-    user: CurrentUser = post_payment,
+    user: CurrentUser = post_delivery,
 ) -> schemas.InstallmentOut:
     item = service.deliver(
         db,
@@ -221,7 +225,7 @@ def deliver_installment(
 def mark_overdue(
     as_of: date = Query(default_factory=date.today),
     db: Session = Depends(get_db),
-    user: CurrentUser = post_payment,
+    user: CurrentUser = post_delivery,
 ) -> dict[str, int]:
     return {"marked": service.mark_overdue(db, as_of=as_of, actor=_actor(user), user=user)}
 

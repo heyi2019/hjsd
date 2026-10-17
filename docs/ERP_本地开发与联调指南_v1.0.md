@@ -12,7 +12,7 @@
 | SQLite | 3.35+ | 本地 MVP 数据库 |
 | PostgreSQL | 16+（可选） | 正式环境 |
 
-首次克隆后，复制根目录 `.env.example` 为 `.env`，替换 `JWT_SECRET_KEY` 与数据库连接。`.env` 不得提交。v1 后端必须在 `core/settings` 读取该文件；尚未完成改造的 legacy 入口不可把示例环境变量误认为已生效。
+首次克隆后，复制根目录 `.env.example` 为 `.env`，替换 `JWT_SECRET_KEY` 与数据库连接。`.env` 不得提交。后端必须在 `core/settings` 读取该文件。
 
 ## 2. 启动步骤
 

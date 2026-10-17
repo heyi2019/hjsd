@@ -1,7 +1,7 @@
 """core.database：v1 独立库 engine / session / Base。
 
 约束：
-- v1 库地址只来自 `core.settings`，与旧 `heijin.db`、`heijin_v2.db` 物理隔离；
+- v1 库地址只来自 `core.settings`；
 - SQLite 显式开启外键约束（SQLite 默认关闭，级联删除会静默失效）；
 - 统一约束命名，保证 Alembic 在 SQLite / PostgreSQL 上都能正确迁移。
 """
@@ -26,7 +26,7 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """v1 全部领域模型的基类（与 legacy `app.db.Base` 互相独立）。"""
+    """全部领域模型的基类。"""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 

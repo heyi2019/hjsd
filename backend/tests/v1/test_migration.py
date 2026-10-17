@@ -1,4 +1,4 @@
-"""T01 / SYS-01-01：Alembic 迁移 — 可重复执行、不覆盖旧库、Up/Down 闭环。"""
+"""T01 / SYS-01-01：单一基线迁移 — 可重复执行、不覆盖旧库、Up/Down 闭环。"""
 from __future__ import annotations
 
 import os
@@ -160,6 +160,12 @@ def test_upgrade_is_repeatable(migration_env):
         engine.dispose()
 
 
+def test_only_current_baseline_is_exposed():
+    result = _alembic({}, "heads")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == "0001 (head)"
+
+
 def test_downgrade_and_upgrade_roundtrip(migration_env):
     env, db_file = migration_env
     assert _alembic(env, "upgrade", "head").returncode == 0
@@ -235,49 +241,6 @@ def test_order_event_portion_check_matches_domain_enum(migration_env):
         engine.dispose()
 
 
-def test_order_event_cost_portion_is_normalized_during_upgrade(migration_env):
-    """旧成本事件的误写值只按确定口径归一，不保留伪份额。"""
-    env, db_file = migration_env
-    assert _alembic(env, "upgrade", "0044_remove_account_risk_level").returncode == 0
-
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.begin() as connection:
-            # 当前 ORM 已带新 CHECK；用 SQLite 的测试开关模拟 0044 旧库中的历史脏值。
-            connection.execute(text("PRAGMA ignore_check_constraints = ON"))
-            connection.execute(
-                text(
-                    "INSERT INTO orders "
-                    "(order_no, order_type, capital_type, trade_date, status, link_status, created_by, updated_by) "
-                    "VALUES ('HS-MIG-1', 'HS', 'STOCK', '2026-01-01', 'ACTIVE', 'LINKED', 'pytest', 'pytest')"
-                )
-            )
-            order_id = connection.execute(
-                text("SELECT id FROM orders WHERE order_no = 'HS-MIG-1'")
-            ).scalar_one()
-            connection.execute(
-                text(
-                    "INSERT INTO order_events "
-                    "(event_no, order_id, event_type, amount, portion, occurred_on, is_posted, created_by, updated_by) "
-                    "VALUES ('HS-MIG-E1', :order_id, 'COST', 10, 'COST', '2026-01-01', 1, 'pytest', 'pytest')"
-                ),
-                {"order_id": order_id},
-            )
-            connection.execute(text("PRAGMA ignore_check_constraints = OFF"))
-    finally:
-        engine.dispose()
-
-    assert _alembic(env, "upgrade", "head").returncode == 0
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.connect() as connection:
-            assert connection.execute(
-                text("SELECT portion FROM order_events WHERE event_no = 'HS-MIG-E1'")
-            ).scalar_one() == "PRINCIPAL"
-    finally:
-        engine.dispose()
-
-
 def test_accounts_status_check_drops_legacy_pending(migration_env):
     """账号不再保留旧 PENDING/待收状态，迁移后默认直接进入在库。"""
     env, db_file = migration_env
@@ -293,91 +256,6 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
             assert "'PENDING'" not in create_sql
             expected = "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')"
             assert expected in create_sql
-    finally:
-        engine.dispose()
-
-
-def test_text_only_order_migration_unlinks_inventory_and_preserves_snapshot(migration_env):
-    env, db_file = migration_env
-    assert _alembic(env, "upgrade", "0084_field_definition_rules").returncode == 0
-
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.begin() as connection:
-            connection.execute(text("PRAGMA ignore_check_constraints = ON"))
-            connection.execute(
-                text(
-                    "INSERT INTO accounts "
-                    "(inventory_no, game_account, game_type, platform, status, cost_amount, created_by, updated_by) "
-                    "VALUES ('ACC-MIG-TH', 'text-account', '测试游戏', '测试平台', 'SOLD', 100, 'pytest', 'pytest')"
-                )
-            )
-            account_id = connection.execute(
-                text("SELECT id FROM accounts WHERE inventory_no = 'ACC-MIG-TH'")
-            ).scalar_one()
-            connection.execute(
-                text(
-                    "INSERT INTO orders "
-                    "(order_no, order_type, capital_type, trade_date, account_id, status, link_status, created_by, updated_by) "
-                    "VALUES ('TH-MIG-01', 'TH', 'PASS_THRU', '2026-10-17', :account_id, 'ACTIVE', 'LINKED', 'pytest', 'pytest')"
-                ),
-                {"account_id": account_id},
-            )
-            connection.execute(text("PRAGMA ignore_check_constraints = OFF"))
-    finally:
-        engine.dispose()
-
-    result = _alembic(env, "upgrade", "head")
-    assert result.returncode == 0, result.stdout + result.stderr
-
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.connect() as connection:
-            row = connection.execute(
-                text(
-                    "SELECT account_id, account_snapshot FROM orders "
-                    "WHERE order_no = 'TH-MIG-01'"
-                )
-            ).one()
-            assert row.account_id is None
-            assert '"game_account": "text-account"' in row.account_snapshot
-            create_sql = connection.execute(
-                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'")
-            ).scalar_one()
-            assert "order_account_link_type_valid" in create_sql
-    finally:
-        engine.dispose()
-
-
-def test_deposit_number_cleanup_removes_legacy_sequence(migration_env):
-    """升级旧库时，押金编号字段和对应的编号序列都应移除。"""
-    env, db_file = migration_env
-    assert _alembic(env, "upgrade", "0020_account_description_images").returncode == 0
-
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "INSERT INTO document_sequences "
-                    "(sequence_key, prefix, padding, current_value) "
-                    "VALUES ('DEPOSIT', 'DEP', 4, 1)"
-                )
-            )
-    finally:
-        engine.dispose()
-
-    assert _alembic(env, "upgrade", "head").returncode == 0
-
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.connect() as connection:
-            assert connection.execute(
-                text(
-                    "SELECT 1 FROM document_sequences "
-                    "WHERE sequence_key = 'DEPOSIT'"
-                )
-            ).first() is None
     finally:
         engine.dispose()
 

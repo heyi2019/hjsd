@@ -259,7 +259,7 @@ def _has_cashflow(session: Session, pool_id: int) -> bool:
         return False
     from sqlalchemy import func as sa_func
 
-    from app.domain.trade import Cashflow  # 局部导入：M0 阶段该表由 0002 迁移建立
+    from app.domain.trade import Cashflow  # 局部导入：资金流水模型只在使用时加载
 
     count = session.scalar(
         select(sa_func.count()).select_from(Cashflow).where(Cashflow.pool_id == pool_id)

@@ -23,5 +23,3 @@ app/
 每个业务领域通常由 `router.py`、`service.py`、`schemas.py` 和测试组成；写路径统一经过 Service 事务和审计记录。
 
 返点记录、返点结算属于资金域，由 `finance` 统一维护，不再保留独立运行域；历史导入与迁移审计属于 `history`，数据质量检查属于 `quality`。
-
-旧版后端位于仓库根目录的 `archive/v0_backend/`，仅用于历史迁移参考，不参与当前运行和测试。

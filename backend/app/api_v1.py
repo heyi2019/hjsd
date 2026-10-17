@@ -2,7 +2,7 @@
 
 设计要点：
 - 金额/编号/权限相关的业务异常一律走 `AppError` → 统一 JSON `{code, message, details}`；
-- `app.main` 即 v1 入口（唯一入口）；v1 之前的实现已归档至 `archive/v0_backend/`，不再挂载。
+- `app.main` 即 v1 入口（唯一入口）。
 """
 from __future__ import annotations
 

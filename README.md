@@ -1,6 +1,6 @@
 # 宜游轩 ERP
 
-FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py`），旧版后端已归档在 `archive/v0_backend/`，不参与运行与测试。
+FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py`）。
 
 ## 快速启动
 
@@ -69,15 +69,14 @@ cd frontend && npm run build
 | 目录 | 职责 |
 |---|---|
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
-| `backend/app/domain` | ORM 模型（**不叫 models**，与 legacy 命名冲突） |
+| `backend/app/domain` | 当前 ORM 模型与领域对象 |
 | `backend/app/foundation` `finance` `orders` `installments` `policy` `reporting` | 领域服务与路由，每个含 `service.py` + `router.py` |
-| `backend/alembic/versions` | 迁移（0001 M0 … 当前至 0071，持续收紧业务字段与金额不变量） |
+| `backend/alembic/versions` | 单一当前结构基线迁移（`0001_current_schema_baseline`） |
 | `backend/tests/v1` | v1 测试 |
 | `frontend/src` | `shared/`（UI 与 API）、各领域页面目录 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
 | `docs` | PRD、功能规格、架构、数据字典、DDL、API、任务清单（**业务唯一依据**） |
 | `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
-| `archive/v0_backend` | 旧版后端，仅作历史迁移参考 |
 | `data` `logs` `runtime` `outputs` `monitor` `business_output` | 运行态与生成物，默认不提交 |
 
 ## 关键业务约束

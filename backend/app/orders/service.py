@@ -447,6 +447,8 @@ def update_order(
     订单编号、业务类型、库存账号关联和状态属于不可编辑的身份字段。
     """
     order = get_order(session, order_id, user)
+    if trade_date is not _UNSET and trade_date is None:
+        raise Validation("订单日期不能清空", details={"field": "trade_date"})
     accounting_changes = (
         trade_date,
         listing_price,

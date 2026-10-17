@@ -481,6 +481,13 @@ class TestGetAndListOrders:
         )
         assert updated.note == "补充客户备注"
 
+    def test_order_trade_date_cannot_be_cleared(self, seeded_db):
+        order = _order(seeded_db)
+        with pytest.raises(Validation, match="订单日期不能清空"):
+            order_service.update_order(
+                seeded_db, order.id, actor="operator", trade_date=None
+            )
+
     def test_posted_order_cannot_update_accounting_fields_but_can_update_note(
         self, seeded_db
     ):

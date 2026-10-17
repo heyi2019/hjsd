@@ -353,13 +353,22 @@ def inventory(
         if row.status in INVENTORY_STATUSES
         and row.inventory_type != InventoryType.PICKUP.value
     ]
+    extra_values = parties_service.get_extra_values_bulk(
+        session, entity_type="account", entity_ids=[row.id for row in rows]
+    )
     return [
         {
             "account_id": row.id,
             "inventory_no": row.inventory_no,
+            "game_account": row.game_account,
+            "business_mode": row.business_mode,
+            "inventory_type": row.inventory_type,
             "platform": row.platform,
             "status": row.status,
             "cost_amount": to_money(row.cost_amount),
+            "account_description": row.account_description,
+            "account_images": row.account_images or [],
+            "extra_values": extra_values.get(row.id, {}),
         }
         for row in rows
     ]

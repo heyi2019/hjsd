@@ -401,6 +401,30 @@ class TestAccountsApi:
         assert inventory.status_code == 200, inventory.text
         assert [row["account_id"] for row in inventory.json()["items"]] == [mine.id]
 
+    def test_inventory_endpoint_includes_account_live_fields(
+        self, seeded_client, seeded_db, headers
+    ):
+        account = _account(seeded_db, "inventory-live-field")
+        parties_service.create_field_definition(
+            seeded_db,
+            entity_type="account",
+            field_key="inventory_note",
+            label="库存备注",
+            actor="pytest",
+        )
+        parties_service.set_extra_values(
+            seeded_db,
+            entity_type="account",
+            entity_id=account.id,
+            values=[("inventory_note", "库存重点")],
+        )
+
+        response = seeded_client.get("/api/v1/accounts/inventory", headers=headers)
+
+        assert response.status_code == 200, response.text
+        item = next(row for row in response.json()["items"] if row["account_id"] == account.id)
+        assert item["extra_values"] == {"inventory_note": "库存重点"}
+
     def test_visible_account_does_not_leak_foreign_source_order(
         self, seeded_client, seeded_db
     ):

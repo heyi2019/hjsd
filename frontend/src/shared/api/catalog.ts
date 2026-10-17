@@ -151,6 +151,20 @@ export interface Account {
   created_at?: string | null;
 }
 
+export interface AccountInventoryRow {
+  account_id: number;
+  inventory_no: string;
+  game_account?: string | null;
+  business_mode?: string | null;
+  inventory_type?: string | null;
+  platform?: string | null;
+  status: string;
+  cost_amount: string;
+  account_description?: string | null;
+  account_images?: string[];
+  extra_values?: Record<string, unknown>;
+}
+
 export interface AccountExecutionCashflow {
   flow_no: string;
   pool_name?: string | null;
@@ -453,7 +467,7 @@ export const accountsApi = {
     api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api
-      .get<{ items: Account[]; count: number; total_cost: string }>("/accounts/inventory")
+      .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/accounts/inventory")
       .then((r) => r.data),
   executionDetail: (id: number) =>
     api.get<AccountExecutionDetail>(`/accounts/${id}/execution-detail`).then((r) => r.data),

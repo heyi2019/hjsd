@@ -57,15 +57,15 @@ def _buy(seeded_db, account, amount="500"):
 
 
 class TestCreateAccountGuards:
-    def test_pickup_inventory_type_cannot_be_created(self, seeded_db):
-        with pytest.raises(Validation, match="业务模式与库存类型不匹配"):
-            service.create_account(
-                seeded_db,
-                game_account="pickup-is-order-text-only",
-                business_mode="DISTRIBUTION",
-                inventory_type="PICKUP",
-                actor="pytest",
-            )
+    def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
+        account = service.create_account(
+            seeded_db,
+            game_account="pickup-inventory-entity",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            actor="pytest",
+        )
+        assert account.inventory_type == "PICKUP"
 
     def test_unknown_business_mode_is_rejected(self, seeded_db):
         with pytest.raises(Validation, match="业务模式无效"):
@@ -338,6 +338,7 @@ class TestAccountQueries:
         seeded_db.add(pickup)
         seeded_db.flush()
 
+        assert pickup in service.list_accounts(seeded_db)
         assert pickup.id not in {row["account_id"] for row in service.inventory(seeded_db)}
         assert service.total_inventory_cost(seeded_db) == Decimal("0.00")
 
@@ -626,6 +627,35 @@ class TestAccountsApi:
             trade_date=TODAY,
             actor="pytest",
             account_id=account.id,
+        )
+
+        response = seeded_client.get("/api/v1/accounts", headers=headers)
+
+        assert response.status_code == 200, response.text
+        item = next(row for row in response.json() if row["inventory_no"] == account.inventory_no)
+        assert item["source_order_no"] == order.order_no
+
+    def test_list_accounts_resolves_th_source_order(self, seeded_client, seeded_db, headers):
+        account = _account(
+            seeded_db,
+            "th-source-account",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+        )
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        orders_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("100.00"),
+            occurred_on=TODAY,
+            actor="pytest",
         )
 
         response = seeded_client.get("/api/v1/accounts", headers=headers)

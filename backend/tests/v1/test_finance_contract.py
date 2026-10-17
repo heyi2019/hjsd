@@ -374,7 +374,7 @@ class TestRebateGuards:
             actor="pytest",
         )
 
-        with pytest.raises(Validation, match="卖号返点必须关联已过账的 SELL"):
+        with pytest.raises(Validation, match="卖号返点必须关联已登记的 SELL"):
             service.create_rebate(
                 seeded_db,
                 source_order_id=order.id,

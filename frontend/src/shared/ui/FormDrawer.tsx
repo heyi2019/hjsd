@@ -1,4 +1,4 @@
-/** 资金操作抽屉：金额类动作必须走抽屉/弹窗提交，禁止列表内直接过账。 */
+/** 资金操作抽屉：金额类动作必须走抽屉/弹窗提交，禁止列表内直接登记。 */
 import { Button, Drawer, Form, Input, InputNumber, Select, Space } from "antd";
 import type { ReactNode } from "react";
 

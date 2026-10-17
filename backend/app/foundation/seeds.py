@@ -36,7 +36,7 @@ SEED_POOLS: tuple[tuple[str, str, str, str], ...] = (
 # (code, name, capital_type, sort_order, description)
 SEED_ORDER_TYPES: tuple[tuple[str, str, str, int, str], ...] = (
     ("HS", "回收", CapitalType.STOCK.value, 10, "客户把号卖给我，我择机卖出（库存型）"),
-    ("TH", "提号", CapitalType.PASS_THRU.value, 20, "买家找我买号，我去同行那里提号卖给他（过账型）"),
+    ("TH", "提号", CapitalType.STOCK.value, 20, "买家找我买号，我去同行那里提号卖给他（库存型）"),
     ("DG", "代挂", CapitalType.ZERO.value, 30, "客户让我帮忙卖他的号，我收服务费（零本金型）"),
     ("DFQ", "代分期", CapitalType.CREDIT.value, 40, "代客户买号，到期账号再换绑给他（垫资型）"),
 )

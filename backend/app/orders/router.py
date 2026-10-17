@@ -1,6 +1,6 @@
 """orders.router：订单、事件与资金池余额 API（ORD-01/02、FIN-01）。
 
-金额类动作全部走 Service 事务；列表页只提供查询，不做直接过账。
+金额类动作全部走 Service 事务；列表页只提供查询，不做直接登记。
 """
 from __future__ import annotations
 

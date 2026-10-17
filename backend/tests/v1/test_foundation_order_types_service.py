@@ -11,7 +11,7 @@ from app.foundation import service
 class TestOrderTypes:
     def test_new_business_needs_no_code_change(self, db):
         order_type = service.create_order_type(
-            db, code="TB", name="同行代收", capital_type=CapitalType.PASS_THRU.value, actor="pytest"
+            db, code="TB", name="同行代收", capital_type=CapitalType.STOCK.value, actor="pytest"
         )
         db.commit()
         assert order_type.is_active is False
@@ -20,7 +20,7 @@ class TestOrderTypes:
 
     def test_activate_without_route_is_blocked(self, db):
         order_type = service.create_order_type(
-            db, code="TB", name="同行代收", capital_type=CapitalType.PASS_THRU.value, actor="pytest"
+            db, code="TB", name="同行代收", capital_type=CapitalType.STOCK.value, actor="pytest"
         )
         db.commit()
         with pytest.raises(AppError) as exc:

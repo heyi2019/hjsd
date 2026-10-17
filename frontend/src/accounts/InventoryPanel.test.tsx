@@ -132,6 +132,7 @@ describe("InventoryPanel：账号台账", () => {
 
     renderApp(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
+    expect(screen.getByText("提号")).toBeInTheDocument();
     for (const label of ["售出", "寄售", "下架", "返点", "账号描述", "账号图片"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
@@ -271,7 +272,7 @@ describe("InventoryPanel：账号台账", () => {
   it("库存操作区编辑可保存账号主资料与明细资料", async () => {
     renderApp(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    await userEvent.click(screen.getByRole("button", { name: "编辑" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "编辑" })[0]);
     expect(await screen.findByText("编辑账号资料")).toBeInTheDocument();
     await userEvent.clear(screen.getByPlaceholderText("账号描述"));
     await userEvent.type(screen.getByPlaceholderText("账号描述"), "已核验账号");
@@ -362,6 +363,15 @@ describe("InventoryPanel：账号台账", () => {
       pool_id: 3,
       portion: "PROFIT",
     }));
+  });
+
+  it("提号库存不能从库存中心直接误建 HS 售出单", async () => {
+    accountsList.mockResolvedValueOnce([
+      { id: 6, inventory_no: "ACC0006", game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
+    ]);
+    renderApp(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("pickup-acc");
+    expect(screen.getByRole("button", { name: "售出" })).toBeDisabled();
   });
 
   it("寄售可以勾选寄售平台并登记 DG 业务", async () => {

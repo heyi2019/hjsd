@@ -36,7 +36,7 @@ class TestSeed:
 
         expected = {
             "HS": (CapitalType.STOCK.value, 1),
-            "TH": (CapitalType.PASS_THRU.value, 2),
+            "TH": (CapitalType.STOCK.value, 2),
             "DG": (CapitalType.ZERO.value, 3),
             "DFQ": (CapitalType.CREDIT.value, 4),
         }

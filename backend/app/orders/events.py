@@ -1,4 +1,4 @@
-"""orders 事件过账服务（ORD-02）。"""
+"""orders 事件登记服务（ORD-02）。"""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -63,7 +63,7 @@ def post_event(
     allow_installment_payment: bool = False,
     allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
-    """过账：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
+    """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
     from .service import get_order
 
     allow_installment_payment = _required_bool(
@@ -120,7 +120,7 @@ def post_event(
 
     if event_type not in MONEY_EVENTS:
         raise Validation(
-            f"{event_type} 不是可过账的金额事件", details={"event_type": event_type}
+            f"{event_type} 不是可登记的金额事件", details={"event_type": event_type}
         )
 
     if event_type == EventType.SELL.value:
@@ -273,7 +273,7 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
                 )
             )
             if purchased is None:
-                raise Validation("TH 收款前必须存在已过账的 BUY 事件")
+                raise Validation("TH 收款前必须存在 BUY 事件")
         return
 
     if session.scalar(
@@ -307,7 +307,7 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     )
     if purchased is None:
         raise Validation(
-            "账号缺少已过账的采购入库记录，不能售出",
+            "账号缺少采购入库记录，不能售出",
             details={"account_id": account.id},
         )
 
@@ -353,21 +353,6 @@ def _assert_event_allowed(
         raise Validation("提号业务不允许 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:
         raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
-    if order.order_type == "TH" and event_type == EventType.SELL.value:
-        if offset_event_id is None:
-            raise Validation(
-                "TH SELL 必须指定 offset_event_id，核销对应的 BUY 事件",
-                details={"field": "offset_event_id"},
-            )
-        offset = _get_offset_event(session, offset_event_id, order_id=order.id)
-        if offset.event_type != EventType.BUY.value:
-            raise Validation(
-                "TH SELL 的 offset_event_id 必须指向 BUY 事件",
-                details={
-                    "offset_event_id": offset_event_id,
-                    "event_type": offset.event_type,
-                },
-            )
     if event_type == EventType.SELL.value and session.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order.id,
@@ -436,7 +421,7 @@ def _get_offset_event(
         )
     if not offset.is_posted:
         raise Validation(
-            "只能冲销已过账事件",
+            "只能冲销已登记事件",
             details={"offset_event_id": offset_event_id},
         )
     if offset.event_type not in {

@@ -10,7 +10,7 @@ def test_create_business_then_route_then_activate(client, headers, seeded_db):
     """BAS-02-02：新业务必须“先配路由、再启用”，否则 TB0001 无法生成。"""
     created = client.post(
         ORDER_TYPES,
-        json={"code": "TB", "name": "同行代收", "capital_type": "PASS_THRU"},
+        json={"code": "TB", "name": "同行代收", "capital_type": "STOCK"},
         headers=headers,
     )
     assert created.status_code == 201, created.text
@@ -37,10 +37,19 @@ def test_create_business_then_route_then_activate(client, headers, seeded_db):
 
 def test_new_sequence_created_with_business(client, headers):
     client.post(
-        ORDER_TYPES, json={"code": "TB", "name": "同行代收", "capital_type": "PASS_THRU"}, headers=headers
+        ORDER_TYPES, json={"code": "TB", "name": "同行代收", "capital_type": "STOCK"}, headers=headers
     )
     sequences = client.get("/api/v1/sequences", headers=headers).json()
     assert any(item["sequence_key"] == "ORDER_TB" and item["next_number"] == "TB0001" for item in sequences)
+
+
+def test_pass_thru_capital_type_is_removed(client, headers):
+    response = client.post(
+        ORDER_TYPES,
+        json={"code": "TP", "name": "不应存在的资金分类", "capital_type": "PASS_THRU"},
+        headers=headers,
+    )
+    assert response.status_code == 422, response.text
 
 
 def test_route_upsert_is_idempotent(client, seeded_db, headers):

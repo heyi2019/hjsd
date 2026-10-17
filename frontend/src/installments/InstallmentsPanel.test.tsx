@@ -61,7 +61,7 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(screen.getAllByText("HS-2026-0010").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("总应收 = 首付 + 每期 × 期数（前端只做展示，不参与过账）", async () => {
+  it("总应收 = 首付 + 每期 × 期数（前端只做展示，不参与登记）", async () => {
     renderApp(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
     // 100 + 50*4 = 300.00

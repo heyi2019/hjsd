@@ -11,7 +11,6 @@ export const ORDER_TYPE_LABEL: Record<string, string> = {
 
 export const CAPITAL_TYPE_LABEL: Record<string, string> = {
   STOCK: "库存型",
-  PASS_THRU: "过账型",
   ZERO: "零本金型",
   CREDIT: "垫资型",
 };

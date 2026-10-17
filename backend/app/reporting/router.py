@@ -36,7 +36,7 @@ def inventory_health(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
 ) -> InventoryHealthOut:
-    """R1 库存健康表（回收与代挂进入库存，提号不进入库存）。"""
+    """R1 自营库存健康表（提号实体可追踪，但不计入自营资产统计）。"""
     return service.r1_inventory_health(db, user=user)
 
 

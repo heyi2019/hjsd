@@ -47,7 +47,7 @@ export function ThBusinessPanel() {
     <section className="ui-stack th-business-page">
       <PageHeader
         title="分销·提号"
-        description="登记提号业务与供货方付款，游戏账号信息随订单保存，不进入库存中心。"
+        description="登记提号业务与供货方付款，游戏账号关联提号库存实体并保留订单轨迹。"
         actions={(
           <PermissionButton permission="order.create" type="primary" onClick={() => setCreateOpen(true)}>
             新建提号

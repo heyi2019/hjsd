@@ -58,12 +58,12 @@ describe("FormDrawer：金额动作必须走抽屉提交", () => {
         title="收款"
         fields={fields}
         submitting
-        submitText="确认过账"
+        submitText="确认登记"
         onClose={() => {}}
         onSubmit={() => {}}
       />,
     );
-    const btn = await screen.findByRole("button", { name: /确认过账/ });
+    const btn = await screen.findByRole("button", { name: /确认登记/ });
     expect(btn.classList.contains("ant-btn-loading")).toBe(true);
   });
 

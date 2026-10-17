@@ -247,7 +247,7 @@ class TestNoAutoMatch:
         assert order.owner_id is None
 
     def test_events_not_posted(self, mapper, seeded_db):
-        """导入事件默认未过账——池余额不受导入数据影响。"""
+        """导入事件默认未登记——池余额不受导入数据影响。"""
         _seed_order_rows(
             seeded_db,
             [{"订单类型": "回收", "日期": "2026-06-01", "本金": 1000, "利润": 200, "交易金额": 1200}],

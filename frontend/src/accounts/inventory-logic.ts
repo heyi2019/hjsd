@@ -14,12 +14,14 @@ export const BUSINESS_MODE_LABEL: Record<string, string> = {
 
 export const INVENTORY_TYPE_LABEL: Record<string, string> = {
   RECOVERY: "回收",
+  PICKUP: "提号",
   CONSIGNMENT: "代挂",
 };
 
 export const BUSINESS_OPTIONS = Object.entries(BUSINESS_MODE_LABEL).map(([value, label]) => ({ value, label }));
 export const INVENTORY_TYPE_OPTIONS = Object.entries(INVENTORY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 export const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
+export const EDITABLE_ACCOUNT_TYPES = new Set(["RECOVERY", "PICKUP", "CONSIGNMENT"]);
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 

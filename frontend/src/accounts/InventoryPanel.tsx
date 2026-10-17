@@ -1,4 +1,4 @@
-/** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收与代挂账号从这里进入在库流程。 */
+/** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Input, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -21,6 +21,7 @@ import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryP
 import {
   BUSINESS_MODE_LABEL,
   BUSINESS_OPTIONS,
+  EDITABLE_ACCOUNT_TYPES,
   INVENTORY_TYPE_LABEL,
   INVENTORY_TYPE_OPTIONS,
   PROFILE_ACCOUNT_TYPES,
@@ -107,7 +108,7 @@ export function InventoryPanel() {
             type="link"
             size="small"
             aria-label="售出"
-            disabled={row.status !== 'IN_STOCK'}
+            disabled={row.status !== 'IN_STOCK' || row.inventory_type === "PICKUP"}
             onClick={(event) => {
               event.stopPropagation();
               setSaleTarget(row);
@@ -153,7 +154,7 @@ export function InventoryPanel() {
           >
             返点
           </PermissionButton>
-          {PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? "") ? <>
+          {EDITABLE_ACCOUNT_TYPES.has(row.inventory_type ?? "") ? <>
             <PermissionButton
               permission="order.create"
               type="link"

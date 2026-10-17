@@ -80,7 +80,7 @@ QUALITY_METRIC_DEFINITIONS: dict[str, dict[str, str]] = {
     },
     "missing_attachment_rate": {
         "label": "缺附件率",
-        "formula": "无附件的已过账金额事件和独立流水 / 应有凭证记录总数",
+        "formula": "无附件的已登记金额事件和独立流水 / 应有凭证记录总数",
         "unit": "percent",
     },
 }
@@ -144,7 +144,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                     title="事件缺少资金池",
                     entity_type="order_event",
                     entity_id=event.event_no,
-                    message="已过账动钱事件没有资金池，无法完成资金归集。",
+                    message="已登记动钱事件没有资金池，无法完成资金归集。",
                     details={"order_no": order_by_id[event.order_id].order_no},
                 )
             )
@@ -159,7 +159,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                     title="事件与现金流不一致",
                     entity_type="order_event",
                     entity_id=event.event_no,
-                    message="已过账金额事件必须且只能派生一条现金流。",
+                    message="已登记金额事件必须且只能派生一条现金流。",
                     details={"cashflow_count": cashflow_count},
                 )
             )

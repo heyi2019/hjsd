@@ -16,9 +16,8 @@ from ._common import INVENTORY_STATUSES, scope_filter
 
 
 def list_accounts(session: Session, *, status: str | None = None, user: CurrentUser | None = None) -> list[Account]:
-    stmt = select(Account).where(
-        or_(Account.inventory_type.is_(None), Account.inventory_type != InventoryType.PICKUP.value)
-    )
+    # 账号台账包含 TH 的 PICKUP 库存实体；自营资产健康与成本统计单独排除提号库存。
+    stmt = select(Account)
     if status:
         stmt = stmt.where(Account.status == status)
     scope = scope_filter(session, user)

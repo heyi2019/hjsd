@@ -95,7 +95,7 @@ def create_rebate(
     ) is None:
         label = "买号返点" if rebate_type == RebateType.BUY.value else "卖号返点"
         raise Validation(
-            f"{label}必须关联已过账的 {required_event} 事件",
+            f"{label}必须关联已登记的 {required_event} 事件",
             details={
                 "rebate_type": rebate_type,
                 "order_id": order.id,

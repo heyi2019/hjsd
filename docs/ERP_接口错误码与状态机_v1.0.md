@@ -22,7 +22,7 @@
 | 422 | `INSTALLMENT_TYPE_INVALID` | 合约类型与订单不匹配 |
 | 422 | `PAYMENT_EXCEEDS_RECEIVABLE` | 刷新应收后重新填写 |
 | 422 | `DELIVERY_CONDITION_UNMET` | 补结清、审批或交付凭证 |
-| 422 | `EVENT_CASHFLOW_EXISTS` | 不允许重复过账 |
+| 422 | `EVENT_CASHFLOW_EXISTS` | 不允许重复登记 |
 | 422 | `MERGE_TARGET_INVALID` | 选择其他有效客户作为目标 |
 
 ## 2. 订单状态

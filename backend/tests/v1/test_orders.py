@@ -222,7 +222,7 @@ class TestA01HsStock:
         assert exc.value.code == ErrorCode.ORDER_STATUS_CONFLICT
 
 
-class TestA02ThPassthru:
+class TestA02ThStock:
     def test_th_order_keeps_inventory_link_without_snapshot(self, seeded_db):
         account = _new_account(seeded_db, game_account="th-stock-acc")
         order = service.create_order(
@@ -261,7 +261,7 @@ class TestA02ThPassthru:
         )
         seeded_db.commit()
 
-        buy_event, _ = service.post_event(
+        service.post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -269,11 +269,10 @@ class TestA02ThPassthru:
         service.post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
-            offset_event_id=buy_event.id,
         )
         seeded_db.commit()
-        # 提号只保留订单文本，不建立库存账号关联。
-        assert seeded_db.get(Order, order.id).account_id is None
+        # 提号按普通库存资金处理，不再要求 BUY/SELL 互相核销。
+        assert seeded_db.get(Order, order.id).capital_type == "STOCK"
 
 
 class TestA03DgZeroCapital:
@@ -371,7 +370,7 @@ class TestEventRules:
                 actor="pytest",
             )
 
-    def test_th_sell_requires_a_posted_buy(self, seeded_db):
+    def test_th_sell_requires_a_buy(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
@@ -400,15 +399,6 @@ class TestEventRules:
             occurred_on=TODAY,
             actor="pytest",
         )
-        with pytest.raises(Validation, match="offset_event_id"):
-            service.post_event(
-                seeded_db,
-                order.id,
-                event_type="SELL",
-                amount=Decimal("120"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
         service.post_event(
             seeded_db,
             order.id,
@@ -416,7 +406,6 @@ class TestEventRules:
             amount=Decimal("120"),
             occurred_on=TODAY,
             actor="pytest",
-            offset_event_id=buy.id,
         )
 
         with pytest.raises(Validation, match="只能登记一次 SELL"):

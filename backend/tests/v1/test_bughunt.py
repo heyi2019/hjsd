@@ -106,7 +106,7 @@ class TestOrderStateMachine:
             )
 
     def test_same_event_cannot_derive_two_cashflows(self, seeded_db):
-        """事件→现金流必须一对一：重复过账同一事件不允许。"""
+        """事件→现金流必须一对一：重复登记同一事件不允许。"""
         order = _order(seeded_db)
         event, flow = order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="500", occurred_on=D, actor="hunt"

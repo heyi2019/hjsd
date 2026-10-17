@@ -98,6 +98,10 @@ export function InventorySaleModal(props: {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
+    if (props.account.inventory_type === "PICKUP") {
+      setError({ message: "提号库存请回到原提号订单处理售出" });
+      return;
+    }
     try {
       const order = await ordersApi.create({
         order_type: resolveSaleOrderType(props.account.inventory_type),

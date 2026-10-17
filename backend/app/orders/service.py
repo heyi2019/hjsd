@@ -1,6 +1,6 @@
 """orders 订单服务门面：订单建档、查询、更新与资金池汇总。
 
-事件过账与账号状态派生位于 ``orders.events``，通过本模块继续对外提供原入口。
+事件登记与账号状态派生位于 ``orders.events``，通过本模块继续对外提供原入口。
 
 不可突破的口径：
 - 订单汇总、账号成本、分期已收一律**由事件派生**，禁止直接写（ORD-02-02）；
@@ -590,7 +590,7 @@ def update_order(
 ) -> Order:
     """受控编辑订单主字段。
 
-    订单一旦存在已过账事件，核算字段只能通过事件冲销/更正处理；备注仍可补充。
+    订单一旦存在已登记事件，核算字段只能通过事件冲销/更正处理；备注仍可补充。
     订单编号、业务类型、库存账号关联和状态属于不可编辑的身份字段。
     """
     order = get_order(session, order_id, user)
@@ -613,7 +613,7 @@ def update_order(
             )
         )
         if posted is not None:
-            raise Validation("已有过账事件的订单只能修改备注，核算字段必须通过冲销/更正")
+            raise Validation("已有登记事件的订单只能修改备注，核算字段必须通过冲销/更正")
 
     next_listing = (
         _non_negative_money(listing_price, field="listing_price")
@@ -734,7 +734,7 @@ def cancel_order(
     reason: str,
     user: CurrentUser | None = None,
 ) -> Order:
-    """作废尚未过账的订单；已产生业务事实的订单必须走事件冲销。"""
+    """作废尚未登记事件的订单；已产生业务事实的订单必须走事件冲销。"""
     reason = _required_text(reason, field="reason", message="订单作废必须填写原因")
     order = get_order(session, order_id, user)
     posted = session.scalar(
@@ -744,7 +744,7 @@ def cancel_order(
         )
     )
     if posted is not None:
-        raise Validation("订单已有过账事件，不能直接作废，请先冲销")
+        raise Validation("订单已有登记事件，不能直接作废，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     order.updated_by = actor
     session.flush()

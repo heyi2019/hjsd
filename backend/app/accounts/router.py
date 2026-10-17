@@ -195,7 +195,7 @@ class AccountExecutionDetailOut(BaseModel):
     orders: list[AccountExecutionOrderOut]
 
 
-INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "DG"})
+INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
 
 
 def _actor(user: CurrentUser) -> str:
@@ -205,7 +205,7 @@ def _actor(user: CurrentUser) -> str:
 def _source_orders(
     db: Session, account_ids: list[int], user: CurrentUser | None = None
 ) -> dict[int, Order]:
-    """解析标准订单数据中的库存来源；TH 提号不建立库存账号。"""
+    """解析标准订单数据中的库存来源；HS/TH/DG 均可回溯到库存实体。"""
     if not account_ids:
         return {}
     stmt = select(Order).where(Order.account_id.in_(account_ids))
@@ -331,7 +331,7 @@ def execution_detail(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> AccountExecutionDetailOut:
-    """查询库存账号关联的全部订单、已过账事件和资金流水。"""
+    """查询库存账号关联的全部订单、已登记事件和资金流水。"""
     account = service.get_account(db, account_id, _user)
     order_stmt = select(Order).where(Order.account_id == account_id)
     order_scope = owner_scope_filter(Order.owner_id, _user, db)

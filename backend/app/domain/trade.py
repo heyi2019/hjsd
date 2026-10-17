@@ -237,7 +237,7 @@ class OrderLink(Base, TimestampMixin):
 
 
 class OrderEvent(Base, AuditMixin):
-    """业务事件：过账后原子派生现金流，已过账事件不可改，只能冲销。"""
+    """业务事件：登记后原子派生现金流，已登记事件不可改，只能冲销。"""
 
     __tablename__ = "order_events"
     __table_args__ = (

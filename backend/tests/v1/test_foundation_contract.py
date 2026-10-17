@@ -116,7 +116,7 @@ class TestOrderTypeGuards:
             seeded_db,
             code="TBOOL",
             name="布尔状态校验",
-            capital_type=CapitalType.PASS_THRU.value,
+            capital_type=CapitalType.STOCK.value,
             actor="pytest",
         )
         with pytest.raises(Validation, match="is_active 必须为布尔值"):
@@ -138,7 +138,7 @@ class TestOrderTypeGuards:
             seeded_db,
             code="TBR",
             name="路由状态校验",
-            capital_type=CapitalType.PASS_THRU.value,
+            capital_type=CapitalType.STOCK.value,
             actor="pytest",
         )
         service.set_route(
@@ -158,7 +158,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBN",
                 name="   ",
-                capital_type=CapitalType.PASS_THRU.value,
+                capital_type=CapitalType.STOCK.value,
                 actor="pytest",
             )
         with pytest.raises(Validation):
@@ -166,7 +166,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBP",
                 name="同行代收",
-                capital_type=CapitalType.PASS_THRU.value,
+                capital_type=CapitalType.STOCK.value,
                 sequence_prefix="TB-",
                 actor="pytest",
             )
@@ -177,7 +177,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TB",
                 name="同行代收",
-                capital_type=CapitalType.PASS_THRU.value,
+                capital_type=CapitalType.STOCK.value,
                 sort_order=-1,
                 actor="pytest",
             )
@@ -189,7 +189,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBT",
                 name="类型值校验",
-                capital_type=CapitalType.PASS_THRU.value,
+                capital_type=CapitalType.STOCK.value,
                 sort_order=True,
                 actor="pytest",
             )
@@ -200,7 +200,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TB",
                 name="同行代收",
-                capital_type=CapitalType.PASS_THRU.value,
+                capital_type=CapitalType.STOCK.value,
                 sequence_prefix="HS",
                 actor="pytest",
             )
@@ -220,7 +220,7 @@ class TestOrderTypeGuards:
                 OrderTypeDef.__table__.insert().values(
                     code="TB",
                     name="同行代收",
-                    capital_type=CapitalType.PASS_THRU.value,
+                    capital_type=CapitalType.STOCK.value,
                     sequence_prefix="TB",
                     sequence_key="ORDER_TB",
                     is_active=False,
@@ -236,7 +236,7 @@ class TestOrderTypeGuards:
                 OrderTypeDef.__table__.insert().values(
                     code="TB",
                     name="同行代收",
-                    capital_type=CapitalType.PASS_THRU.value,
+                    capital_type=CapitalType.STOCK.value,
                     sequence_prefix="HS",
                     sequence_key="ORDER_TB",
                     is_active=False,

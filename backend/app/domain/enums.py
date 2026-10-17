@@ -46,7 +46,6 @@ class CapitalType(StrEnum):
     """资金性质：默认取业务定义，允许按单覆盖（V34）。"""
 
     STOCK = "STOCK"  # 回收：库存型
-    PASS_THRU = "PASS_THRU"  # 提号：过账型
     ZERO = "ZERO"  # 代挂：零本金
     CREDIT = "CREDIT"  # 代分期：垫资型
 

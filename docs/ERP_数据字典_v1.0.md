@@ -8,7 +8,7 @@
 
 | 字段 | 值 / 规则 |
 |---|---|
-| capital_type | STOCK / PASS_THRU / ZERO / CREDIT；默认取业务定义，可单笔覆盖 |
+| capital_type | STOCK / ZERO / CREDIT；默认取业务定义，可单笔覆盖 |
 | event_type | BUY / COST / SELL / PAYMENT / DELIVER / TRANSFER / CANCEL；`DELIVER` 为分期结清后的无金额交付事件；返点不是订单事件 |
 | installment.contract_type | STOCK_SALE（HS 已买入库存分期出售）/ ADVANCE_PURCHASE（DFQ 代客户买号）；合约类型必须与来源订单一致 |
 | installment.delivery_mode | PLATFORM_OPERATOR（平台/本方操作换绑）/ CUSTOMER_SELF（客户自行换绑）；必须留换绑凭证 |

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { accountFinancialFlows, inventoryAge, rebateTypeLabel } from "./inventory-logic";
+import { accountFinancialFlows, inventoryAge, rebateTypeLabel, INVENTORY_TYPE_LABEL } from "./inventory-logic";
 
 describe("库存纯逻辑", () => {
+  it("展示提号库存类型", () => {
+    expect(INVENTORY_TYPE_LABEL.PICKUP).toBe("提号");
+  });
+
   it("按在库天数返回绿色、橙色、红色等级", () => {
     const now = new Date("2026-10-17T12:00:00");
     expect(inventoryAge({ status: "IN_STOCK", buy_date: "2026-10-15" }, now)).toEqual({ days: 2, color: "green" });

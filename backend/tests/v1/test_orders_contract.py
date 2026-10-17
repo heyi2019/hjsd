@@ -1,7 +1,7 @@
 """orders 订单/事件契约测试（ORD-01/02、FIN-01/03）。
 
 与 test_orders.py / test_bughunt.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
-BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 过账、状态机、路由缺失等主路径；
+BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 登记、状态机、路由缺失等主路径；
 本文件补NotFound/越权/过滤/非法入参分支、`_opposite_direction` 三分支、
 `_apply_account_effect` 防御与 CANCEL 分支、以及 3 个未测路由端点。
 """
@@ -798,7 +798,7 @@ class TestGetAndListOrders:
             actor="pytest",
             portion="GROSS",
         )
-        with pytest.raises(Validation, match="过账事件"):
+        with pytest.raises(Validation, match="登记事件"):
             order_service.update_order(
                 seeded_db, order.id, actor="operator", listing_price=Decimal("300")
             )
@@ -819,7 +819,7 @@ class TestGetAndListOrders:
             seeded_db, posted.id, event_type="BUY", amount=Decimal("100"),
             occurred_on=D, actor="pytest"
         )
-        with pytest.raises(Validation, match="过账事件"):
+        with pytest.raises(Validation, match="登记事件"):
             order_service.cancel_order(
                 seeded_db, posted.id, actor="operator", reason="不能直接作废"
             )
@@ -875,7 +875,7 @@ class TestGetAndListOrders:
         by_type = order_service.list_orders(seeded_db, order_type="HS")
         assert [o.id for o in by_type] == [mine.id]
         by_status = order_service.list_orders(seeded_db, status="ACTIVE")
-        assert mine.id in [o.id for o in by_status]  # 创建即 ACTIVE，过账不翻转状态
+        assert mine.id in [o.id for o in by_status]  # 创建即 ACTIVE，登记不翻转状态
 
         scoped = order_service.list_orders(seeded_db, user=_scoped_user())
         assert [o.id for o in scoped] == [mine.id]
@@ -945,7 +945,7 @@ class TestPostEventValidation:
         assert "事件类型" in str(exc.value)
 
     def test_transfer_removed_from_event_types(self, seeded_db):
-        """划转已从 EventType 移除：不再是「可枚举但不可过账」，而是非法事件类型。"""
+        """划转已从 EventType 移除：不再是「可枚举但不可登记」，而是非法事件类型。"""
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
             order_service.post_event(

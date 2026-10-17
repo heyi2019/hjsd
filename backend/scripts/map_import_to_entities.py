@@ -8,7 +8,7 @@
 | 源「订单类型」 | v1 类型 | 行数 | 依据 |
 |---|---|---|---|
 | 回收 | `HS` 回收（STOCK 库存型） | 30 | 种子 SEED_ORDER_TYPES |
-| 氪金联盟提号 | `TH` 提号（PASS_THRU 过账型） | 15 | 同上 |
+| 氪金联盟提号 | `TH` 提号（STOCK，关联 PICKUP 实体） | 15 | 同上 |
 | 代挂 | `DG` 代挂（ZERO 零本金） | 24 | 同上 |
 | 蹭点 | `DG` 代挂（同上） | 1 | PRD §术语等价表：蹭点 = 代挂的叫法，非独立业务 |
 
@@ -82,7 +82,7 @@ ORDER_TYPE_MAP: dict[str, str] = {
     "代挂": "DG",
     # PRD §术语等价表：「蹭点 → DG 代挂，主理人口述确认：蹭点就是代挂」，
     # 是代挂的叫法而非独立业务。数据侧佐证：该单本金为 0，与其余 20 单代挂同形态，
-    # 且与过账型（TH）应有本金的前提矛盾。
+    # 且与提号库存型（TH）应有本金的前提矛盾。
     "蹭点": "DG",
 }
 
@@ -260,7 +260,7 @@ def map_orders(session: Any, *, dry_run: bool) -> dict[str, Any]:
                     portion=portion,
                     occurred_on=trade_date,
                     pool_id=pool_id,
-                    is_posted=False,  # 导入数据默认未过账，池余额不受影响
+                    is_posted=False,  # 导入数据默认未登记，池余额不受影响
                     reason="标准导入",
                     created_by=ACTOR,
                     updated_by=ACTOR,

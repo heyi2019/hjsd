@@ -171,6 +171,22 @@ class TestCreateInstallmentValidation:
             )
         assert "已在库" in str(exc.value)
 
+    def test_stock_sale_uses_account_purchase_history_not_sale_order_buy(
+        self, seeded_db
+    ):
+        account = _account(seeded_db, "inst-sale-history-acc")
+        purchase_order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, purchase_order.id, amount="800")
+        sale_order = _order(seeded_db, order_type="HS", account_id=account.id)
+
+        contract = _contract(
+            seeded_db,
+            sale_order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+        )
+
+        assert contract.order_id == sale_order.id
+
     def test_advance_purchase_does_not_require_account(self, seeded_db):
         # DFQ 是独立分销代分期，不关联库存账号。
         order = _order(seeded_db, order_type="DFQ", account_id=None)

@@ -155,9 +155,12 @@ def create_installment(
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "order_type": order.order_type},
             )
+        # 售出订单本身不再重复 BUY；采购事实来自该库存账号的历史订单。
         has_buy_event = account is not None and session.scalar(
-            select(OrderEvent.id).where(
-                OrderEvent.order_id == order.id,
+            select(OrderEvent.id)
+            .join(Order, Order.id == OrderEvent.order_id)
+            .where(
+                Order.account_id == account.id,
                 OrderEvent.event_type == EventType.BUY.value,
                 OrderEvent.is_posted.is_(True),
             )

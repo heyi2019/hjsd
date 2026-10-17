@@ -1110,6 +1110,29 @@ class TestOrdersApi:
         assert valid.status_code == 200, valid.text
         assert valid.json()["account_snapshot"]["game_account"] == "dfq-edit-account"
 
+    def test_update_th_account_snapshot_uses_order_account_contract(
+        self, seeded_client, headers
+    ):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "TH",
+                "trade_date": D.isoformat(),
+                "account_snapshot": {"game_account": "th-before"},
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        updated = seeded_client.patch(
+            f"/api/v1/orders/{created.json()['id']}",
+            json={"account_snapshot": {"game_account": "th-after", "game_type": "王者荣耀"}},
+            headers=headers,
+        )
+
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["account_snapshot"]["game_account"] == "th-after"
+
     def test_update_and_cancel_order_api(self, seeded_client, headers):
         created = seeded_client.post(
             "/api/v1/orders",

@@ -517,8 +517,8 @@ def update_order(
         ):
             raise Validation("服务费不能超过挂售价")
     if account_snapshot is not _UNSET and account_snapshot is not None:
-        if order.order_type != "DFQ":
-            raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+        if order.order_type not in {"DFQ", "TH"}:
+            raise Validation("只有 DFQ 代分期和 TH 提号订单可以填写订单账号快照")
         account_snapshot = _normalize_account_snapshot(account_snapshot)
 
     before = {

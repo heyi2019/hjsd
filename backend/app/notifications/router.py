@@ -57,17 +57,22 @@ def mark_notification_read(
     return schemas.NotificationOut.model_validate(notification)
 
 
-@router.post("/notifications/sync-overdue-rebates")
+@router.post(
+    "/notifications/sync-overdue-rebates",
+    response_model=schemas.NotificationSyncOut,
+)
 def sync_overdue_rebate_notifications(
     as_of: date | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = sync_access,
-) -> dict[str, int | str]:
+) -> schemas.NotificationSyncOut:
     """同步返点逾期跟进通知；供定时任务调用，重复执行不会重复建通知。"""
-    return finance_service.sync_overdue_rebate_notifications(
-        db,
-        as_of=as_of or date.today(),
-        actor=user.username,
+    return schemas.NotificationSyncOut.model_validate(
+        finance_service.sync_overdue_rebate_notifications(
+            db,
+            as_of=as_of or date.today(),
+            actor=user.username,
+        )
     )
 
 

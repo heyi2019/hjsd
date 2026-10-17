@@ -12,6 +12,11 @@ from app.orders import service as order_service
 D = date(2026, 10, 17)
 
 
+def test_notification_sync_route_publishes_typed_response_model(app):
+    schema = app.openapi()["paths"]["/api/v1/notifications/sync-overdue-rebates"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert schema["$ref"].endswith("/NotificationSyncOut")
+
+
 def test_quality_assignment_creates_notification_and_can_be_read(
     seeded_client, headers
 ):

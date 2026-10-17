@@ -18,6 +18,7 @@ from app.core.database import describe_engine, get_engine
 from app.core.errors import AppError, ErrorCode
 from app.core.settings import Settings, get_settings
 from app.core.request_context import reset_request_id, set_request_id
+from app.core.schemas import HealthOut
 from app.foundation.router import router as foundation_router
 from app.accounts.router import router as accounts_router
 from app.audit.router import router as audit_router
@@ -155,8 +156,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         info["docs"] = "/docs"
         return info
 
-    @app.get(f"{settings.api_prefix}/health", tags=["health"])
-    def health() -> JSONResponse:
+    @app.get(
+        f"{settings.api_prefix}/health",
+        response_model=HealthOut,
+        tags=["health"],
+    )
+    def health() -> HealthOut | JSONResponse:
         try:
             with get_engine().connect() as connection:
                 connection.execute(text("SELECT 1"))
@@ -165,9 +170,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 status_code=503,
                 content={"status": "error", "database_status": "unavailable"},
             )
-        return JSONResponse(
-            status_code=200,
-            content={"status": "ok", "database_status": "ok", **describe_engine(settings)},
+        return HealthOut.model_validate(
+            {"status": "ok", "database_status": "ok", **describe_engine(settings)}
         )
 
     return app

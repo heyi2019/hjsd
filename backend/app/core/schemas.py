@@ -10,4 +10,18 @@ class RequestModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-__all__ = ["RequestModel"]
+class HealthOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    database_status: str
+    app_env: str
+    app_name: str
+    app_version: str
+    api_prefix: str
+    database: str
+    env_file: str
+    sqlite_exists: str
+
+
+__all__ = ["HealthOut", "RequestModel"]

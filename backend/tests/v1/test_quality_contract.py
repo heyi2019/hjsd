@@ -48,8 +48,12 @@ class TestQualityScan:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, order_type="TH")
+        # 数据库约束默认阻止这种脏数据；这里只为验证质量扫描对旧库残留的识别，
+        # 在同一连接上临时模拟历史库绕过约束写入。
+        seeded_db.connection().exec_driver_sql("PRAGMA ignore_check_constraints = ON")
         order.account_id = account.id
         seeded_db.flush()
+        seeded_db.connection().exec_driver_sql("PRAGMA ignore_check_constraints = OFF")
 
         item = next(
             row

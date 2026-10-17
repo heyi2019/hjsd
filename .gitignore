@@ -28,5 +28,8 @@ frontend/test-results/
 /business_output/*
 !/business_output/.gitkeep
 
+# 附件上传运行产物，不纳入代码版本库
+/backend/data/attachments/*
+
 # WorkBuddy 记忆目录，与项目代码无关
 .workbuddy/

@@ -53,8 +53,16 @@ def list_customers(
     extras = service.get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
     )
+    activity = service.get_customer_activity_summary(
+        db, [item.id for item in customers]
+    )
     return [
-        service.to_customer_out(item, reveal_contact=reveal, extra_values=extras.get(item.id))
+        service.to_customer_out(
+            item,
+            reveal_contact=reveal,
+            extra_values=extras.get(item.id),
+            activity_summary=activity.get(item.id),
+        )
         for item in customers
     ]
 

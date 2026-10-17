@@ -41,7 +41,7 @@ from app.domain.parties import (
     OrderCustomerRole,
 )
 from app.domain.foundation import AuditLog
-from app.domain.trade import Installment, InstallmentSchedule, Order
+from app.domain.trade import Installment, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -126,6 +126,7 @@ def to_customer_out(
     *,
     reveal_contact: bool,
     extra_values: Mapping[str, Any] | None = None,
+    activity_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload = {
         "id": customer.id,
@@ -143,6 +144,9 @@ def to_customer_out(
         "merged_into_id": customer.merged_into_id,
         "contact_masked": False,
         "extra_values": dict(extra_values or {}),
+        "order_roles": list((activity_summary or {}).get("order_roles", [])),
+        "active_order_count": int((activity_summary or {}).get("active_order_count", 0)),
+        "last_interaction_at": (activity_summary or {}).get("last_interaction_at"),
     }
     if reveal_contact:
         return payload
@@ -297,6 +301,61 @@ def list_customers(
         if scope is not None:
             stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(Customer.id)).all())
+
+
+def get_customer_activity_summary(
+    session: Session, customer_ids: Sequence[int]
+) -> dict[int, dict[str, Any]]:
+    """从订单参与关系与事件时间线汇总客户列表的经营摘要。"""
+    ids = {customer_id for customer_id in customer_ids if isinstance(customer_id, int)}
+    summary = {
+        customer_id: {
+            "order_roles": [],
+            "active_order_count": 0,
+            "last_interaction_at": None,
+        }
+        for customer_id in ids
+    }
+    if not ids:
+        return summary
+    order_ids_by_customer: dict[int, set[int]] = {customer_id: set() for customer_id in ids}
+    active_order_ids_by_customer: dict[int, set[int]] = {
+        customer_id: set() for customer_id in ids
+    }
+    rows = session.execute(
+        select(OrderCustomerRole, Order).join(
+            Order, Order.id == OrderCustomerRole.order_id
+        ).where(OrderCustomerRole.customer_id.in_(ids))
+    ).all()
+    for role_row, order in rows:
+        item = summary[role_row.customer_id]
+        if role_row.role not in item["order_roles"]:
+            item["order_roles"].append(role_row.role)
+        order_ids_by_customer[role_row.customer_id].add(order.id)
+        if order.status == "ACTIVE":
+            active_order_ids_by_customer[role_row.customer_id].add(order.id)
+        if order.created_at and (
+            item["last_interaction_at"] is None
+            or order.created_at > item["last_interaction_at"]
+        ):
+            item["last_interaction_at"] = order.created_at
+
+    event_rows = session.execute(
+        select(OrderCustomerRole.customer_id, OrderEvent.created_at)
+        .join(OrderEvent, OrderEvent.order_id == OrderCustomerRole.order_id)
+        .where(OrderCustomerRole.customer_id.in_(ids))
+    ).all()
+    for customer_id, created_at in event_rows:
+        if created_at and (
+            summary[customer_id]["last_interaction_at"] is None
+            or created_at > summary[customer_id]["last_interaction_at"]
+        ):
+            summary[customer_id]["last_interaction_at"] = created_at
+    for item in summary.values():
+        item["order_roles"].sort()
+    for customer_id, order_ids in active_order_ids_by_customer.items():
+        summary[customer_id]["active_order_count"] = len(order_ids)
+    return summary
 
 
 def get_customer(session: Session, customer_id: int, user: CurrentUser | None = None) -> Customer:
@@ -1284,6 +1343,7 @@ __all__ = [
     "get_counterparty",
     "get_customer",
     "get_customer_detail",
+    "get_customer_activity_summary",
     "get_extra_values",
     "get_extra_values_bulk",
     "list_counterparties",

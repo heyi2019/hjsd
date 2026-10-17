@@ -77,6 +77,9 @@ class CustomerOut(BaseModel):
     merged_into_id: int | None = None
     contact_masked: bool = True
     extra_values: dict[str, Any] = Field(default_factory=dict)
+    order_roles: list[str] = Field(default_factory=list)
+    active_order_count: int = 0
+    last_interaction_at: datetime | None = None
 
 
 class CustomerWithCandidates(BaseModel):

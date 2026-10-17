@@ -168,6 +168,25 @@ class TestListAndGetCustomers:
         assert [c.id for c in scoped] == [mine.id]
         assert other.id not in [c.id for c in scoped]
 
+    def test_customer_list_activity_summary_comes_from_order_relations(self, seeded_db):
+        customer = _customer(seeded_db, "列表汇总客户", owner_id=9)
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 12),
+            customer_roles=[
+                (customer.id, "SELLER"),
+                (customer.id, "BUYER"),
+            ],
+            actor="pytest",
+        )
+
+        summary = service.get_customer_activity_summary(seeded_db, [customer.id])
+
+        assert summary[customer.id]["order_roles"] == ["BUYER", "SELLER"]
+        assert summary[customer.id]["active_order_count"] == 1
+        assert summary[customer.id]["last_interaction_at"] == order.created_at
+
     def test_get_customer_notfound_and_scope_forbidden(self, seeded_db):
         with pytest.raises(NotFound):
             service.get_customer(seeded_db, 999999)
@@ -924,6 +943,8 @@ class TestPartiesApi:
         # admin 具备 customer.contact.read → 不脱敏
         assert response.json()[0]["contact_masked"] is False
         assert response.json()[0]["id"] == customer.id
+        assert response.json()[0]["order_roles"] == []
+        assert response.json()[0]["active_order_count"] == 0
 
     def test_customer_detail_endpoint_returns_four_tabs(self, seeded_client, seeded_db, headers):
         customer = _customer(seeded_db, "详情接口客户", owner_id=9)

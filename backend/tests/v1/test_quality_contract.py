@@ -98,6 +98,36 @@ class TestQualityScan:
         codes = {row["code"] for row in service.scan(seeded_db)}
         assert "TRANSFER_UNPAIRED" in codes
 
+    def test_negative_available_includes_balance_breakdown(self, seeded_db):
+        seeded_db.add(
+            Cashflow(
+                flow_no="CF-QUALITY-NEGATIVE",
+                pool_id=1,
+                occurred_on=TODAY,
+                nature="BUSINESS_OUT",
+                category="TEST_EXPENSE",
+                direction="OUT",
+                amount=Decimal("120"),
+                status="APPROVED",
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+
+        item = next(
+            row for row in service.scan(seeded_db) if row["code"] == "NEGATIVE_AVAILABLE"
+        )
+        assert item["details"] == {
+            "income": "0.00",
+            "expense": "120.00",
+            "transfer_in": "0.00",
+            "transfer_out": "0.00",
+            "cash_balance": "-120.00",
+            "deposit_held": "0.00",
+            "available": "-120.00",
+        }
+
     def test_detects_unlinked_rebate_without_source_order(self, seeded_db):
         seeded_db.add(
             RebateRecord(

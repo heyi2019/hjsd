@@ -208,7 +208,15 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                     entity_type="pool",
                     entity_id=pool.code,
                     message="现金头寸扣除押金占用后出现负数。",
-                    details={"available": str(balance["available"])},
+                    details={
+                        "income": str(balance["income"]),
+                        "expense": str(balance["expense"]),
+                        "transfer_in": str(balance["transfer_in"]),
+                        "transfer_out": str(balance["transfer_out"]),
+                        "cash_balance": str(balance["cash_balance"]),
+                        "deposit_held": str(balance["deposit_held"]),
+                        "available": str(balance["available"]),
+                    },
                 )
             )
 

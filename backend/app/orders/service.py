@@ -889,6 +889,8 @@ def _assert_event_allowed(
         EventType.COST.value,
     }:
         raise Validation("代挂业务不允许 BUY 或 COST 事件")
+    if order.order_type == "TH" and event_type == EventType.COST.value:
+        raise Validation("提号业务不允许 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:
         raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
     if order.order_type == "TH" and event_type == EventType.SELL.value:

@@ -309,6 +309,21 @@ class TestEventRules:
                 )
             assert "代挂业务不允许" in str(exc.value)
 
+    def test_th_cannot_post_cost(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="提号业务不允许 COST"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="COST",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
     def test_th_sell_requires_a_posted_buy(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"

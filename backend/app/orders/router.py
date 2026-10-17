@@ -240,18 +240,6 @@ def create_order(
         user=user,
     )
     if payload.initial_buy is not None and payload.installment is not None:
-        service.post_event(
-            db,
-            order.id,
-            event_type="BUY",
-            amount=payload.initial_buy.amount,
-            occurred_on=payload.initial_buy.occurred_on,
-            actor=_actor(user),
-            pool_id=payload.initial_buy.pool_id,
-            portion=payload.initial_buy.portion,
-            note=payload.initial_buy.note,
-            user=user,
-        )
         installments_service.create_installment(
             db,
             order_id=order.id,
@@ -271,6 +259,18 @@ def create_order(
                 else None
             ),
             actor=_actor(user),
+            user=user,
+        )
+        service.post_event(
+            db,
+            order.id,
+            event_type="BUY",
+            amount=payload.initial_buy.amount,
+            occurred_on=payload.initial_buy.occurred_on,
+            actor=_actor(user),
+            pool_id=payload.initial_buy.pool_id,
+            portion=payload.initial_buy.portion,
+            note=payload.initial_buy.note,
             user=user,
         )
     return _order_output(order, user)

@@ -35,6 +35,7 @@ from app.domain.enums import (
     CustomerRole,
     Direction,
     EventType,
+    InstallmentContractType,
     BusinessMode,
     InventoryType,
     Nature,
@@ -868,6 +869,12 @@ def _assert_event_allowed(
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
         raise Validation("回收订单 BUY 必须关联库存账号")
+    if order.order_type == "DFQ" and event_type == EventType.BUY.value:
+        contract_type = session.scalar(
+            select(Installment.contract_type).where(Installment.order_id == order.id)
+        )
+        if contract_type != InstallmentContractType.ADVANCE_PURCHASE.value:
+            raise Validation("DFQ BUY 必须先创建 ADVANCE_PURCHASE 分期合约")
     if order.order_type == "DG" and event_type in {
         EventType.BUY.value,
         EventType.COST.value,

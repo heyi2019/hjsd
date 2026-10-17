@@ -356,9 +356,35 @@ class TestEventRules:
                 actor="pytest",
             )
 
+    def test_dfq_buy_requires_advance_purchase_contract(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="ADVANCE_PURCHASE"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
+
     def test_dfq_cannot_post_sell(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
+        )
+        installment_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type="ADVANCE_PURCHASE",
+            principal=Decimal("100"),
+            down_payment=Decimal("0"),
+            periods=1,
+            per_period=Decimal("100"),
+            first_due_on=TODAY,
+            actor="pytest",
         )
         service.post_event(
             seeded_db,

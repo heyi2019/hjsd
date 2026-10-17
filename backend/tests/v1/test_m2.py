@@ -62,12 +62,6 @@ class TestA04DfqAdvancePurchase:
         )
         seeded_db.commit()
 
-        orders_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
-            occurred_on=TODAY, actor="pytest",
-        )
-        seeded_db.commit()
-
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
@@ -78,6 +72,10 @@ class TestA04DfqAdvancePurchase:
             per_period=Decimal("500"),
             first_due_on=TODAY,
             actor="pytest",
+        )
+        orders_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
+            occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
         assert contract.inst_no == f"{order.order_no}-INS01"

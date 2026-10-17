@@ -332,7 +332,7 @@
 | `orders` | 订单主表，**只存汇总** | id / **order_no(带业务前缀的业务单号)** / **order_type(引用 `order_type_defs`，首批 HS/TH/DG/DFQ)** / **capital_type** / account_id / **link_status** / owner_id / trade_date / gross_amount / status |
 | ↳ 回款池归属 | — | **不在订单上**，记在 `order_events.pool_id`（池可自由创建，订单层写死会无法扩展） |
 | `order_events` | 动作事件流（核心） | id / **event_no** / order_id / event_type / amount / **portion(PRINCIPAL/PROFIT/GROSS)** / occurred_on / **pool_id** / counterparty / **offset_event_id** |
-| `accounts` | 在途账号 | id / **inventory_no(ACC库存编号)** / **game_account(唯一, 可空)** / buy_date / cost_amount / status / **channels(JSON多值)** / platform / region / bound_phone |
+| `accounts` | 在途账号 | id / **inventory_no(ACC库存编号)** / **game_account(唯一, 可空)** / game_type / game_password / channel_region / bound_phone / has_secondary / platform / business_mode / inventory_type / buy_date / cost_amount / status / account_description / account_images / note |
 | `customers` | 客户主数据 | id / **customer_no** / display_name / contact_name / phone / wechat / qq / source / owner_id / status / tags / note；联系方式不作为唯一键，修改留审计 |
 | `order_customer_roles` | 订单—客户参与关系 | id / order_id / customer_id / **role(SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER)**；同一客户可在不同订单担任不同角色 |
 | `counterparties` | 合作方主数据 | id / **counterparty_no** / display_name / type(PEER/SUPPLIER/PLATFORM) / contact_name / phone / wechat / qq / status / note；同行、供货方、平台不归入客户 |

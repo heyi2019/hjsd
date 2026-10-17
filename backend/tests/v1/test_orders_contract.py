@@ -383,6 +383,19 @@ class TestCreateOrderValidation:
                 },
             )
 
+    def test_account_snapshot_rejects_removed_legacy_account_fields(self, seeded_db):
+        with pytest.raises(Validation, match="订单账号快照字段校验失败"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DFQ",
+                trade_date=D,
+                actor="pytest",
+                account_snapshot={
+                    "game_account": "dfq-legacy-region",
+                    "region": "旧字段",
+                },
+            )
+
 
 # ------------------------------------------------------------------ 查询与作用域
 class TestGetAndListOrders:

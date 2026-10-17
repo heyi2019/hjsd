@@ -13,7 +13,7 @@
 | pools | `id`, `code UNIQUE` | ownership: OWNED/CUSTODY/THIRD_PART；有流水禁止删除 |
 | order_type_defs | `id`, `code UNIQUE` | capital_type 为已登记类型 |
 | order_type_pools | `UNIQUE(order_type_id, portion)` | FK 业务、池 |
-| accounts | `id`, `inventory_no UNIQUE`, `game_account UNIQUE NULL` | `inventory_no` 是 ACC 库存编号；channels JSON；手机号非唯一 |
+| accounts | `id`, `inventory_no UNIQUE`, `game_account UNIQUE NULL` | `inventory_no` 是 ACC 库存编号；业务归属与入库类型由 `business_mode` / `inventory_type` 表示；手机号非唯一；不保留 `region`、`channels` 遗留字段 |
 | customers | `id`, `customer_no UNIQUE` | 联系方式非唯一；停用客户不得作为新订单参与方 |
 | order_customer_roles | `id`, `UNIQUE(order_id, customer_id, role)` | FK order/customer；角色为 SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER |
 | counterparties | `id`, `counterparty_no UNIQUE` | type 为 PEER/SUPPLIER/PLATFORM；停用合作方不得作为新订单参与方 |

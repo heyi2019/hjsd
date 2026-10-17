@@ -96,13 +96,11 @@ class Account(Base, AuditMixin):
     bound_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    region: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AccountStatus.IN_STOCK.value
     )
     buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    channels: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     account_images: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

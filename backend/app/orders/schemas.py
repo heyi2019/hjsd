@@ -36,7 +36,6 @@ class OrderAccountCreate(BaseModel):
     bound_phone: str | None = Field(default=None, max_length=64)
     has_secondary: bool | None = None
     platform: str | None = Field(default=None, max_length=64)
-    region: str | None = Field(default=None, max_length=64)
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] = Field(default_factory=list, max_length=9)
     note: str | None = None

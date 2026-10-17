@@ -87,6 +87,8 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
             assert "uq_accounts_inventory_no" in inventory_indexes
             account_columns = {column["name"] for column in inspect(connection).get_columns("accounts")}
             assert "risk_level" not in account_columns
+            assert "region" not in account_columns
+            assert "channels" not in account_columns
             cashflow_sql = connection.execute(
                 text("SELECT sql FROM sqlite_master WHERE type='table' AND name='cashflow'")
             ).scalar_one()

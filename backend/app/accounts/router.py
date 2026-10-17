@@ -126,6 +126,7 @@ class ExecutionRebateOut(BaseModel):
     base_amount: Decimal
     status: str
     collected_on: date
+    expected_on: date | None = None
     collected_at: datetime
     settlements: list["ExecutionRebateSettlementOut"] = Field(default_factory=list)
 
@@ -360,6 +361,7 @@ def execution_detail(
                     base_amount=rebate.base_amount,
                     status=rebate.status,
                     collected_on=rebate.collected_on,
+                    expected_on=rebate.expected_on,
                     collected_at=rebate.created_at,
                     settlements=settlement_by_rebate.get(rebate.id, []),
                 )

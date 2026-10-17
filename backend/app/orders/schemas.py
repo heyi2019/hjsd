@@ -266,6 +266,7 @@ class OrderRebateOut(BaseModel):
     link_status: str
     status: str
     collected_on: date
+    expected_on: date | None = None
     note: str | None = None
     created_at: datetime
     operator: str

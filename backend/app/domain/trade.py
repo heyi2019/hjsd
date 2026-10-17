@@ -578,6 +578,7 @@ class RebateRecord(Base, AuditMixin):
         ),
         UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
         Index("ix_rebate_source_order", "source_order_id"),
+        Index("ix_rebate_records_expected_status", "expected_on", "status"),
         CheckConstraint(
             "rate >= 0 AND base_amount >= 0",
             name="amount_nonneg",
@@ -614,6 +615,7 @@ class RebateRecord(Base, AuditMixin):
         String(24), nullable=False, default=RebateStatus.OPEN.value
     )
     collected_on: Mapped[date] = mapped_column(Date, nullable=False)
+    expected_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 

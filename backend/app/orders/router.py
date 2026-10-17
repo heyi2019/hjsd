@@ -146,6 +146,7 @@ def _order_detail_output(
                     "link_status": item.link_status,
                     "status": item.status,
                     "collected_on": item.collected_on,
+                    "expected_on": item.expected_on,
                     "note": item.note,
                     "created_at": item.created_at,
                     "operator": item.created_by,

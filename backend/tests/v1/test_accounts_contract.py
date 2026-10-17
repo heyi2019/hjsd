@@ -727,6 +727,7 @@ class TestAccountsApi:
             "base_amount": "300.00",
             "status": "PARTIALLY_SETTLED",
             "collected_on": TODAY.isoformat(),
+            "expected_on": None,
             "collected_at": rebate.created_at.isoformat(),
             "settlements": [{
                 "id": settlement.id,

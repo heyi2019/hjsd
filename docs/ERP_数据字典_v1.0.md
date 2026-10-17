@@ -39,7 +39,7 @@
 | accounts | inventory_no, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, business_mode, inventory_type, buy_date, cost_amount, status, account_description, account_images, note | `inventory_no` 为 ACC 库存编号；HS/TH/DG 可关联库存账号，DFQ 不关联库存账号；`game_account` 只是游戏账号文本，库存主键始终是 `inventory_no`；手机号不可作键；滞销颜色由前端按买入日期计算，不落库风险等级；不再保留 `region`、`channels` 遗留字段。 |
 | installments | inst_no, order_id, contract_type, principal, down_payment, periods, per_period, paid, status | 分期合约通过所属订单取得账号信息，不单独保存 account_id；`ADVANCE_PURCHASE` 仅 DFQ，`STOCK_SALE` 仅已买入 HS；一单一合约；总应收=首付+期数×每期 |
 | installment_schedules | installment_id, period_no, due_on, due_amount, received_amount, received_on, status | 分期计划明细；`UNIQUE(installment_id, period_no)`；支持部分收款、逾期、减免与展期留痕 |
-| rebate_records | rebate_no, source_order_id, rate, base_amount, link_status | HS0001-RB01；新记录来源订单必填 |
+| rebate_records | rebate_no, source_order_id, rate, base_amount, collected_on, expected_on, policy_version_id, policy_snapshot, link_status | HS0001-RB01；新记录来源订单必填；预计到账日用于逾期跟进；费率与规则版本快照一并固化 |
 | rebate_settlements | settlement_no, rebate_record_id, settled_on, gross_amount, platform_fee, net_amount, cashflow_id | HS0001-RB01-CF-01；毛额−手续费=净额 |
 | deposits | pool_id, paid_amount, returned_amount, status, dates | 可退押金不进损益，必须关联现金流；不单独生成押金编号 |
 | field_definitions / entity_extra_values | entity_type, field_key, type, options, active, value(JSON) | 活字段仅业务辅助信息；`entity_type=customer` 可新增客户偏好、来源细分、预算、常用平台、跟进备注等；有历史值只能停用 |

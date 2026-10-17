@@ -177,7 +177,8 @@ class RebateCreate(RequestModel):
     rebate_type: str = Field(description="BUY 买号返点 / SELL 卖号返点")
     base_amount: Decimal
     collected_on: date
-    rate: Decimal = Decimal("0")
+    expected_on: date | None = None
+    rate: Decimal | None = None
     channel: str | None = None
     note: str | None = None
 
@@ -195,9 +196,14 @@ class RebateOut(BaseModel):
     link_status: str
     status: str
     collected_on: date
+    expected_on: date | None = None
     note: str | None = None
     created_at: datetime
     operator: str
+
+
+class RebateOverdueOut(RebateOut):
+    overdue_days: int
 
 
 class SettlementCreate(RequestModel):

@@ -1109,8 +1109,9 @@ def create_rebate(
     base_amount: Any,
     collected_on: date,
     actor: str,
+    expected_on: date | None = None,
     rebate_type: str | None = None,
-    rate: Any = 0,
+    rate: Any = None,
     channel: str | None = None,
     note: str | None = None,
     user: CurrentUser | None = None,
@@ -1170,13 +1171,6 @@ def create_rebate(
         )
 
     base = _positive(base_amount, field="base_amount")
-    rebate_rate = _non_negative(rate, field="rate")
-    if rebate_rate > Decimal("100.00"):
-        raise Validation(
-            "返点比例必须在 0% 到 100% 之间",
-            details={"field": "rate", "value": str(rebate_rate)},
-        )
-
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
     order_type_definition = foundation_service.get_order_type_by_code(
@@ -1189,6 +1183,14 @@ def create_rebate(
         scope_type="ORDER_TYPE",
         scope_id=order_type_definition.id if order_type_definition else None,
     )
+    if rate is None:
+        rate = _rebate_rate_from_snapshot(snapshot, rebate_type)
+    rebate_rate = _non_negative(Decimal("0") if rate is None else rate, field="rate")
+    if rebate_rate > Decimal("100.00"):
+        raise Validation(
+            "返点比例必须在 0% 到 100% 之间",
+            details={"field": "rate", "value": str(rebate_rate)},
+        )
     record = RebateRecord(
         rebate_no=rebate_no,
         source_order_id=order.id,
@@ -1200,6 +1202,7 @@ def create_rebate(
         policy_version_id=policy_version_id,
         policy_snapshot=snapshot,
         status=RebateStatus.OPEN.value,
+        expected_on=expected_on,
         note=note,
         created_by=actor,
         updated_by=actor,
@@ -1215,6 +1218,30 @@ def create_rebate(
         after={"source_order": order.order_no, "base_amount": str(base)},
     )
     return record
+
+
+def _rebate_rate_from_snapshot(
+    snapshot: dict[str, Any] | None, rebate_type: str
+) -> Decimal | None:
+    """从 REBATE 规则快照读取费率；显式传入的 rate 始终优先。"""
+    if not snapshot:
+        return None
+    config = snapshot.get("config")
+    if not isinstance(config, dict):
+        return None
+    rates = config.get("rates")
+    value: Any = rates.get(rebate_type) if isinstance(rates, dict) else None
+    if value is None:
+        value = config.get("rate")
+    if value is None:
+        return None
+    try:
+        return to_money(value)
+    except (TypeError, ValueError, ArithmeticError) as exc:
+        raise Validation(
+            "返点规则中的费率必须是数值",
+            details={"field": "config.rate", "value": value},
+        ) from exc
 
 
 def settle_rebate(
@@ -1504,6 +1531,31 @@ def list_rebates(
     return list(session.scalars(stmt.order_by(RebateRecord.id)).all())
 
 
+def list_overdue_rebates(
+    session: Session,
+    *,
+    as_of: date,
+    user: CurrentUser | None = None,
+) -> list[tuple[RebateRecord, int]]:
+    """列出预计到账日已过且仍未结清的返点，返回逾期天数。"""
+    stmt = (
+        select(RebateRecord)
+        .join(Order, Order.id == RebateRecord.source_order_id)
+        .where(
+            RebateRecord.expected_on.is_not(None),
+            RebateRecord.expected_on < as_of,
+            RebateRecord.status != RebateStatus.SETTLED.value,
+        )
+    )
+    scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = session.scalars(
+        stmt.order_by(RebateRecord.expected_on, RebateRecord.id)
+    ).all()
+    return [(row, (as_of - row.expected_on).days) for row in rows if row.expected_on is not None]
+
+
 def get_rebate(
     session: Session,
     rebate_id: int,
@@ -1545,6 +1597,7 @@ __all__ = [
     "resolve_reconciliation",
     "list_deposits",
     "list_rebates",
+    "list_overdue_rebates",
     "get_rebate",
     "create_transfer",
     "repair_transfer",

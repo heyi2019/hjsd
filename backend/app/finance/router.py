@@ -456,6 +456,27 @@ def list_rebates(
     return [_rebate_out(item) for item in items]
 
 
+@router.get("/rebates/overdue", response_model=list[schemas.RebateOverdueOut])
+def list_overdue_rebates(
+    as_of: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.RebateOverdueOut]:
+    """返点预计到账日逾期清单，供通知任务和跟进台账使用。"""
+    on = as_of or date.today()
+    return [
+        schemas.RebateOverdueOut.model_validate(
+            {
+                **vars(item),
+                "created_at": item.created_at,
+                "operator": item.created_by,
+                "overdue_days": overdue_days,
+            }
+        )
+        for item, overdue_days in service.list_overdue_rebates(db, as_of=on, user=user)
+    ]
+
+
 @router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)
 def get_rebate(
     rebate_id: int,
@@ -478,6 +499,7 @@ def create_rebate(
         rebate_type=payload.rebate_type,
         base_amount=payload.base_amount,
         collected_on=payload.collected_on,
+        expected_on=payload.expected_on,
         actor=_actor(user),
         rate=payload.rate,
         channel=payload.channel,

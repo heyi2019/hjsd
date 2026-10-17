@@ -17,9 +17,11 @@ from app.core.periods import assert_period_open
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AuditAction,
+    AccountingAttribute,
     CashflowStatus,
     Direction,
     EventType,
+    FundNature,
     Nature,
     OrderStatus,
     PolicyType,
@@ -237,9 +239,11 @@ def settle_rebate(
         pool_id=pool.id,
         occurred_on=settled_on,
         nature=Nature.BUSINESS_IN.value,
+        fund_nature=FundNature.BUSINESS.value,
+        accounting_attribute=AccountingAttribute.REBATE_INCOME.value,
         category="REBATE",
         direction=Direction.IN.value,
-        amount=net,
+        amount=gross,
         order_id=record.source_order_id,
         note=f"返点结算 {settlement_no}",
         created_by=actor,
@@ -247,6 +251,19 @@ def settle_rebate(
     )
     session.add(flow)
     session.flush()
+
+    fee_flow = None
+    if fee:
+        fee_flow = Cashflow(
+            flow_no=f"{settlement_no}-F", pool_id=pool.id, occurred_on=settled_on,
+            nature=Nature.BUSINESS_OUT.value, fund_nature=FundNature.BUSINESS.value,
+            accounting_attribute=AccountingAttribute.OPERATING_EXPENSE.value,
+            category="REBATE_FEE", direction=Direction.OUT.value, amount=fee,
+            order_id=record.source_order_id, note=f"返点手续费 {settlement_no}",
+            created_by=actor, updated_by=actor,
+        )
+        session.add(fee_flow)
+        session.flush()
 
     settlement = RebateSettlement(
         settlement_no=settlement_no,
@@ -256,6 +273,7 @@ def settle_rebate(
         platform_fee=fee,
         net_amount=net,
         cashflow_id=flow.id,
+        fee_cashflow_id=fee_flow.id if fee_flow is not None else None,
         note=note,
         created_by=actor,
         updated_by=actor,
@@ -389,9 +407,11 @@ def reverse_rebate_settlement(
         pool_id=original_flow.pool_id,
         occurred_on=reversed_on,
         nature=Nature.BUSINESS_OUT.value,
+        fund_nature=FundNature.BUSINESS.value,
+        accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REBATE_REVERSAL",
         direction=Direction.OUT.value,
-        amount=to_money(original.net_amount),
+        amount=to_money(original_flow.amount),
         order_id=record.source_order_id,
         reversal_of_id=original_flow.id,
         status=CashflowStatus.APPROVED.value,
@@ -405,6 +425,25 @@ def reverse_rebate_settlement(
     session.add(reversal_flow)
     session.flush()
 
+    fee_reversal = None
+    if original.fee_cashflow_id is not None:
+        original_fee = session.get(Cashflow, original.fee_cashflow_id)
+        if original_fee is None:
+            raise Validation("返点手续费关联的资金流水不存在")
+        fee_reversal = Cashflow(
+            flow_no=f"{settlement_no}-F", pool_id=original_fee.pool_id,
+            occurred_on=reversed_on, nature=Nature.BUSINESS_IN.value,
+            fund_nature=FundNature.BUSINESS.value,
+            accounting_attribute=AccountingAttribute.REVERSAL.value,
+            category="REBATE_FEE_REVERSAL", direction=Direction.IN.value,
+            amount=to_money(original_fee.amount), order_id=record.source_order_id,
+            reversal_of_id=original_fee.id, status=CashflowStatus.APPROVED.value,
+            reviewed_by=actor, reviewed_at=datetime.now(), reversal_reason=text_reason,
+            note=f"返点手续费冲销 {original.settlement_no}", created_by=actor, updated_by=actor,
+        )
+        session.add(fee_reversal)
+        session.flush()
+
     reversal = RebateSettlement(
         settlement_no=settlement_no,
         rebate_record_id=record.id,
@@ -413,6 +452,7 @@ def reverse_rebate_settlement(
         platform_fee=to_money(original.platform_fee),
         net_amount=to_money(original.net_amount),
         cashflow_id=reversal_flow.id,
+        fee_cashflow_id=fee_reversal.id if fee_reversal is not None else None,
         reversal_of_id=original.id,
         note=text_reason,
         created_by=actor,

@@ -26,7 +26,7 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.foundation import AuditLog
-from app.domain.trade import Installment, InstallmentSchedule, Order
+from app.domain.trade import Installment, InstallmentDisposition, InstallmentSchedule, Order
 from app.domain.users import User
 from app.installments import service as installment_service
 from app.installments import router as installments_router
@@ -40,6 +40,8 @@ PAST = date(2026, 9, 1)
 def test_installment_action_routes_use_declared_response_types():
     assert get_type_hints(installments_router.pay_installment)["return"] == schemas.PaymentResult
     assert get_type_hints(installments_router.mark_overdue)["return"] == schemas.MarkOverdueOut
+    assert get_type_hints(installments_router.recover_installment_account)["return"] == schemas.DispositionOut
+    assert get_type_hints(installments_router.resale_installment_account)["return"] == schemas.DispositionOut
 
 
 def _account(seeded_db, game_account: str):
@@ -99,6 +101,34 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    def test_installment_refund_only_after_delivery(self, seeded_db):
+        from app.orders import service as order_service
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="100", principal="100")
+        installment_service.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest")
+        with pytest.raises(Validation, match="交付前"):
+            order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=TODAY, actor="pytest", reason="退款")
+        installment_service.deliver(seeded_db, contract.id, delivery_mode="CUSTOMER_SELF", delivered_on=TODAY, note="交付凭证", actor="pytest")
+        refund, flow = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=TODAY, actor="pytest", reason="退款")
+        assert refund.refund_responsibility == "COMPANY"
+        assert flow.direction == "OUT"
+
+    def test_installment_sale_binds_buyer_and_seller_across_orders(self, seeded_db):
+        from app.policy import service as policy_service
+        from app.orders import service as order_service
+        account = _account(seeded_db, "inst-sale-actors")
+        purchase = _order(seeded_db, order_type="HS", account_id=account.id)
+        order_service.post_event(seeded_db, purchase.id, event_type="BUY", amount="800", occurred_on=TODAY, actor="seeduser1")
+        sale = _order(seeded_db, order_type="HS", account_id=account.id)
+        items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
+        policy_service.set_allocations(seeded_db, sale.id, items=items)
+        installment_service.create_installment(seeded_db, order_id=sale.id, contract_type="STOCK_SALE", principal="1000", down_payment="100", periods=1, per_period="900", first_due_on=TODAY, actor="seeduser2")
+        allocation = {x["allocation_type"]: x for x in policy_service.list_allocations(seeded_db, sale.id)}
+        assert allocation["BUY"]["user_id"] == 1
+        assert allocation["SELL"]["user_id"] == 2
+        allocation = {x["allocation_type"]: x for x in policy_service.set_allocations(seeded_db, sale.id, items=items)}
+        assert allocation["SELL"]["user_id"] == 2
+
     def test_stock_sale_contract_records_account_operator(self, seeded_db):
         account = _account(seeded_db, "installment-account-operator")
         order = _order(seeded_db, order_type="HS", account_id=account.id)
@@ -1070,6 +1100,31 @@ class TestInstallmentsApi:
         assert waived.json()["status"] == ScheduleStatus.WAIVED.value
         assert waived.json()["waived_amount"] == "300.00"
 
+    def test_recover_endpoint_records_disposition(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "recover-endpoint-account")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(
+            seeded_db, order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal="1000", down_payment="100", periods=1,
+            per_period="900", first_due_on=PAST,
+        )
+        seeded_client.post(
+            "/api/v1/installments/mark-overdue",
+            params={"as_of": TODAY.isoformat()},
+            headers=headers,
+        )
+
+        response = seeded_client.post(
+            f"/api/v1/installments/{contract.id}/recover",
+            json={"occurred_on": TODAY.isoformat(), "note": "客户逾期回收"},
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["action"] == "RECOVER"
+
     def test_scoped_user_mark_overdue_only_updates_visible_orders(
         self, seeded_client, seeded_db
     ):
@@ -1096,6 +1151,7 @@ class TestInstallmentsApi:
 
         assert response.status_code == 200, response.text
         assert response.json()["marked"] == 1
+
         own_schedule = seeded_db.scalar(
             select(InstallmentSchedule).where(
                 InstallmentSchedule.installment_id == own_contract.id,
@@ -1110,3 +1166,64 @@ class TestInstallmentsApi:
         )
         assert own_schedule.status == ScheduleStatus.OVERDUE.value
         assert foreign_schedule.status == ScheduleStatus.PENDING.value
+
+    def test_overdue_account_can_be_recovered_without_rewriting_contract(self, seeded_db):
+        account = _account(seeded_db, "overdue-recovery-account")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(
+            seeded_db, order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal="1000", down_payment="100", periods=1,
+            per_period="900", first_due_on=PAST,
+        )
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        recovered = installment_service.recover_account(
+            seeded_db, contract.id, occurred_on=TODAY,
+            actor="recovery-operator", note="客户逾期回收",
+        )
+
+        assert recovered.action == "RECOVER"
+        assert recovered.installment_id == contract.id
+        seeded_db.refresh(account)
+        seeded_db.refresh(contract)
+        assert account.status == "IN_STOCK"
+        assert contract.status == InstallmentStatus.OVERDUE.value
+
+    def test_recovered_account_resale_requires_posted_sell_on_new_order(self, seeded_db):
+        account = _account(seeded_db, "overdue-resale-account")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(
+            seeded_db, order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal="1000", down_payment="100", periods=1,
+            per_period="900", first_due_on=PAST,
+        )
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        installment_service.recover_account(
+            seeded_db, contract.id, occurred_on=TODAY,
+            actor="recovery-operator", note="客户逾期回收",
+        )
+        resale_order = _order(seeded_db, order_type="HS", account_id=account.id)
+        orders_service.post_event(
+            seeded_db, resale_order.id, event_type="SELL", amount=Decimal("1200"),
+            occurred_on=TODAY, actor="resale-operator",
+        )
+
+        resale = installment_service.record_resale(
+            seeded_db, contract.id, resale_order_id=resale_order.id,
+            occurred_on=TODAY, actor="resale-operator", note="回收后转售",
+        )
+
+        assert resale.action == "RESELL"
+        assert resale.related_order_id == resale_order.id
+        assert seeded_db.scalar(
+            select(InstallmentDisposition).where(
+                InstallmentDisposition.installment_id == contract.id,
+                InstallmentDisposition.action == "RECOVER",
+            )
+        ) is not None
+
+        history = installment_service.list_dispositions(seeded_db, contract.id)
+        assert [item.action for item in history] == ["RECOVER", "RESELL"]

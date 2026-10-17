@@ -10,6 +10,7 @@ const depositsList = vi.fn();
 const cashflowsList = vi.fn();
 const depositsCreate = vi.fn();
 const depositsRelease = vi.fn();
+const reconciliationsList = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   poolsApi: {
@@ -24,6 +25,11 @@ vi.mock("../shared/api/catalog", () => ({
   },
   cashflowsApi: {
     list: (...a: unknown[]) => cashflowsList(...a),
+  },
+  reconciliationsApi: {
+    list: (...a: unknown[]) => reconciliationsList(...a),
+    create: vi.fn(),
+    resolve: vi.fn(),
   },
 }));
 
@@ -42,8 +48,8 @@ const deposits = [
   { id: 11, pool_id: 1, paid_amount: "500.00", returned_amount: "200.00", status: "HELD" },
 ];
 const cashflows = [
-  { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT" },
-  { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT" },
+  { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
@@ -52,6 +58,7 @@ beforeEach(() => {
   poolsBalance.mockResolvedValue(balance);
   depositsList.mockResolvedValue(deposits);
   cashflowsList.mockResolvedValue(cashflows);
+  reconciliationsList.mockResolvedValue([]);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -121,6 +128,9 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("总收入")).toBeInTheDocument();
     expect(screen.getByText("总支出")).toBeInTheDocument();
+    expect(screen.getAllByText("本方经营").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("自营直接成本")).toBeInTheDocument();
+    expect(screen.getByText("自营收入")).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
   });

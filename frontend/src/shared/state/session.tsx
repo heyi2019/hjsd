@@ -27,6 +27,7 @@ export const ALL_PERMISSIONS = [
   "pool.manage",
   "order-type.manage",
   "report.read",
+  "report.export",
   "import.manage",
   "user.manage",
 ] as const;
@@ -47,6 +48,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "order.event.post",
     "finance.read",
     "report.read",
+    "report.export",
   ],
   finance: [
     "finance.read",
@@ -56,8 +58,9 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "counterparty.read",
     "order.event.post",
     "report.read",
+    "report.export",
   ],
-  auditor: ["finance.read", "order.exception.approve", "policy.approve", "counterparty.read", "report.read"],
+  auditor: ["finance.read", "order.exception.approve", "policy.approve", "counterparty.read", "report.read", "report.export"],
   viewer: ["finance.read", "report.read"],
 };
 

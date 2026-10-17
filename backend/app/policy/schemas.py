@@ -35,8 +35,9 @@ class PolicyVersionApprove(RequestModel):
 
 
 class ProfitAllocationItem(RequestModel):
-    user_id: int = Field(gt=0)
+    user_id: int | None = Field(default=None, gt=0)
     role: str = Field(min_length=1, max_length=32)
+    allocation_type: str = Field(min_length=1, max_length=16)
     allocation_rate: Decimal = Field(ge=0)
 
 
@@ -98,8 +99,9 @@ class ProfitAllocationOut(BaseModel):
 
     id: int
     order_id: int
-    user_id: int
+    user_id: int | None = None
     role: str
+    allocation_type: str | None = None
     allocation_rate: Decimal
     policy_version_id: int | None = None
     total_rate: Decimal

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -39,12 +40,76 @@ def test_reporting_read_routes_publish_typed_response_models(app):
         "/api/v1/reports/monthly-pnl": "MonthlyPnlOut",
         "/api/v1/reports/commission": "CommissionOut",
         "/api/v1/reports/business-pnl": "BusinessPnlOut",
+        "/api/v1/reports/finance-dimensions": "FinanceDimensionOut",
         "/api/v1/reports/daily-funds": "DailyFundsOut",
         "/api/v1/reports/order-profit": "OrderProfitOut",
     }
     for path, model_name in expected.items():
         schema = paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
         assert schema["$ref"].endswith(f"/{model_name}")
+
+
+def test_finance_dimension_report_groups_fund_and_accounting_attributes(
+    seeded_db, seeded_client, headers
+):
+    from app.finance.cashflows import approve_cashflow, create_cashflow
+    from app.finance.pool_accounts import create_pool_account, get_pool
+
+    pool = get_pool(seeded_db, "HJ_INVEST")
+    account = create_pool_account(
+        seeded_db,
+        pool_id=pool.id,
+        account_no="RPT-DIM-001",
+        account_name="经营分析账户",
+        account_type="BANK",
+        ownership="OWNED",
+        opening_balance=Decimal("0"),
+        actor="pytest",
+    )
+    for direction, amount, attribute in (
+        ("IN", "100.00", "SELF_REVENUE"),
+        ("OUT", "40.00", "SELF_DIRECT_COST"),
+    ):
+        flow = create_cashflow(
+            seeded_db,
+            pool_id=pool.id,
+            pool_account_id=account.id,
+            occurred_on=date(2026, 10, 17),
+            direction=direction,
+            nature="BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
+            fund_nature="BUSINESS",
+            accounting_attribute=attribute,
+            category="OTHER",
+            amount=Decimal(amount),
+            actor="pytest",
+            note="资金属性分析测试",
+        )
+        approve_cashflow(seeded_db, flow.id, actor="finance")
+
+    report = reporting_service.finance_dimension_report(
+        seeded_db, from_date=date(2026, 10, 17), to_date=date(2026, 10, 17)
+    )
+    assert len(report["items"]) == 2
+    assert report["total_amount"] == Decimal("140.00")
+    assert report["total_signed_amount"] == Decimal("60.00")
+    assert {item["account_no"] for item in report["items"]} == {"RPT-DIM-001"}
+    assert {item["accounting_attribute"] for item in report["items"]} == {
+        "SELF_REVENUE", "SELF_DIRECT_COST"
+    }
+
+    response = seeded_client.get(
+        "/api/v1/reports/finance-dimensions",
+        params={"from": "2026-10-17", "to": "2026-10-17"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["total_signed_amount"] == "60.00"
+
+    exported = seeded_client.get(
+        "/api/v1/reports/finance-dimensions/export.csv", headers=headers
+    )
+    assert exported.status_code == 200, exported.text
+    assert "fund_nature" in exported.content.decode("utf-8-sig").splitlines()[0]
 
 D = date(2026, 10, 4)        # 主测试日（与 m4 一致）
 EARLY = date(2026, 9, 15)    # 月初侧样本（用于 from 过滤）
@@ -324,8 +389,8 @@ class TestR2MonthlyPnl:
         )
 
         full = reporting_service.r2_monthly_pnl(seeded_db)
-        assert _month_item(full, "2026-10")["operating_expense"] == 500
-        assert _month_item(full, "2026-10")["rebate_net"] == 90
+        assert _month_item(full, "2026-10")["operating_expense"] == 510
+        assert _month_item(full, "2026-10")["rebate_income"] == 100
         assert _month_item(full, "2026-09")["operating_expense"] == 100
 
         # from 过滤同时排除运营费用与返点结算
@@ -338,7 +403,7 @@ class TestR2MonthlyPnl:
         )
         assert [i["month"] for i in early_only["items"]] == ["2026-09"]
         assert _month_item(early_only, "2026-09")["operating_expense"] == 100
-        assert _month_item(early_only, "2026-09")["rebate_net"] == 0
+        assert _month_item(early_only, "2026-09")["rebate_income"] == 0
 
 
 # --------------------------------------------------------------------- R3 提成
@@ -347,23 +412,23 @@ class TestR3Commission:
         order = _order(seeded_db)
         order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="seeduser1",
         )
         order_service.post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="seeduser1",
         )
         policy_service.set_allocations(
             seeded_db, order.id,
-            items=[{"user_id": 7, "role": "SALES", "allocation_rate": 100}],
+            items=[{"allocation_type": kind, "user_id": 7 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 100 if kind == "OPERATION" else 0} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
 
         data = reporting_service.r3_commission_reconciliation(seeded_db)
-        assert data["total"]["order_count"] == 1
-        assert len(data["items"]) == 1
-        assert data["items"][0]["user_id"] == 7
-        person = data["groups"][0]
+        assert data["total"]["order_count"] == 4
+        assert len(data["items"]) == 4
+        assert any(item["user_id"] == 7 for item in data["items"])
+        person = next(group for group in data["groups"] if group["user_id"] == 7)
         assert person["user_id"] == 7
         assert person["order_count"] == 1
         assert person["profit_base"] == 300
@@ -374,21 +439,21 @@ class TestR3Commission:
         completed = _order(seeded_db)
         order_service.post_event(
             seeded_db, completed.id, event_type="BUY", amount="500.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="seeduser1",
         )
         order_service.post_event(
             seeded_db, completed.id, event_type="SELL", amount="800.00",
-            occurred_on=D, actor="pytest",
+            occurred_on=D, actor="seeduser1",
         )
         completed.status = OrderStatus.COMPLETED.value
         policy_service.set_allocations(
             seeded_db, completed.id,
-            items=[{"user_id": 7, "role": "SALES", "allocation_rate": 100}],
+            items=[{"allocation_type": kind, "user_id": 7 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 100 if kind == "OPERATION" else 0} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
 
         data = reporting_service.r3_commission_reconciliation(seeded_db)
-        person = data["groups"][0]
+        person = next(group for group in data["groups"] if group["user_id"] == 7)
         assert person["order_count"] == 2
         assert {item["order_id"] for item in person["orders"]} == {
             order.id,
@@ -525,10 +590,12 @@ class TestR5BusinessPnl:
         data = reporting_service.r5_business_pnl(seeded_db)
         by_type = {item["order_type"]: item for item in data["items"]}
         hs = by_type["HS"]
+        assert hs["business_mode"] == "SELF"
+        assert hs["business_type"] == "RECOVERY"
         assert hs["main_income"] == 1300
-        assert hs["main_cost"] == 1000
-        assert hs["main_profit"] == 300
-        assert hs["settled_rebate"] == 90
+        assert hs["main_cost"] == 1010
+        assert hs["main_profit"] == 290
+        assert hs["settled_rebate"] == 100
         assert hs["uncollected_rebate"] == 0
         assert hs["full_income"] == 390
         # 未归集独立成桶，不摊给 HS
@@ -584,14 +651,14 @@ class TestOrderProfitDetail:
         data = reporting_service.order_profit_detail(seeded_db)
         assert data["total"]["income"] == 1300
         assert data["total"]["buy_amount"] == 1000
-        assert data["total"]["direct_cost"] == 200
-        assert data["total"]["rebate"] == 90
+        assert data["total"]["direct_cost"] == 210
+        assert data["total"]["rebate"] == 100
         assert data["total"]["net_profit"] == 190
         item = data["items"][0]
         assert item["income"] == 1300
         assert item["buy_amount"] == 1000
-        assert item["direct_cost"] == 200
-        assert item["rebate"] == 90
+        assert item["direct_cost"] == 210
+        assert item["rebate"] == 100
         assert item["net_profit"] == 190
 
         # 交易日在区间外 → continue

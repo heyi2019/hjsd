@@ -165,8 +165,13 @@ class TestA01HsStock:
         in_flows = _flows(seeded_db, profit.id)
         assert [str(flow.amount) for flow in out_flows] == ["1000.00", "50.00"]
         assert all(flow.direction == Direction.OUT.value for flow in out_flows)
+        assert out_flows[0].fund_nature == "BUSINESS"
+        assert out_flows[0].accounting_attribute == "SELF_DIRECT_COST"
+        assert out_flows[1].accounting_attribute == "SELF_DIRECT_COST"
         assert [str(flow.amount) for flow in in_flows] == ["1400.00"]
         assert in_flows[0].direction == Direction.IN.value
+        assert in_flows[0].fund_nature == "BUSINESS"
+        assert in_flows[0].accounting_attribute == "SELF_REVENUE"
 
         events = seeded_db.scalars(
             select(OrderEvent).where(OrderEvent.order_id == order.id)

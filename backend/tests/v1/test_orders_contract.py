@@ -977,6 +977,45 @@ class TestPostEventValidation:
                 occurred_on=D, actor="pytest", pool_id=999999,
             )
 
+    def test_refund_event_records_responsibility_and_limits_amount(self, seeded_db):
+        from app.domain.trade import Cashflow
+
+        order = _order(seeded_db, order_type="TH")
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="60.00",
+            occurred_on=D, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="100.00",
+            occurred_on=D, actor="pytest",
+        )
+        refund, flow = order_service.post_event(
+            seeded_db, order.id, event_type="REFUND", amount="40.00",
+            occurred_on=D, actor="pytest", reason="售后退款",
+            refund_responsibility="COMPANY",
+        )
+        assert refund.refund_responsibility == "COMPANY"
+        assert flow.direction == "OUT"
+        assert flow.accounting_attribute == "REFUND"
+        with pytest.raises(Validation, match="退款金额超过可退余额"):
+            order_service.post_event(
+                seeded_db, order.id, event_type="REFUND", amount="61.00",
+                occurred_on=D, actor="pytest", reason="超额退款",
+                refund_responsibility="COMPANY",
+            )
+
+    def test_refund_requires_sale_and_defaults_responsibility(self, seeded_db):
+        order = _order(seeded_db, order_type="TH")
+        with pytest.raises(Validation):
+            order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="1", occurred_on=D, actor="pytest", reason="售后")
+        order_service.post_event(seeded_db, order.id, event_type="BUY", amount="60", occurred_on=D, actor="pytest")
+        order_service.post_event(seeded_db, order.id, event_type="SELL", amount="100", occurred_on=D, actor="pytest")
+        refund, _ = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="20", occurred_on=D, actor="pytest", reason="售后")
+        assert refund.refund_responsibility == "COMPANY"
+        order.status = "COMPLETED"
+        refund, _ = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=D, actor="pytest", reason="售后")
+        assert refund.amount == 30
+
 
 # ------------------------------------------------------------------ 冲销方向
 class TestCancelOffsetDirection:
@@ -1628,7 +1667,7 @@ class TestOrdersApi:
 
         assert response.status_code == 422, response.text
 
-    def test_dg_creation_returns_settlement_terms(
+    def test_dg_creation_rejects_legacy_settlement_terms(
         self, seeded_client, seeded_db, headers
     ):
         response = seeded_client.post(
@@ -1645,12 +1684,8 @@ class TestOrdersApi:
             headers=headers,
         )
 
-        assert response.status_code == 201, response.text
-        assert response.json()["listing_price"] == "1200.00"
-        assert response.json()["service_fee"] == "120.00"
-        assert response.json()["commission_mode"] == "DEDUCT_FROM_SETTLEMENT"
-        assert response.json()["commission_payer"] == "CONSIGNOR"
-        assert response.json()["expected_settlement_date"] == "2026-10-20"
+        assert response.status_code == 422, response.text
+        assert "Extra inputs are not permitted" in response.text
 
     def test_dfq_composite_create_persists_buy_and_installment(
         self, seeded_client, seeded_db, headers

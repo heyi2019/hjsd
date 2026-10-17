@@ -7,6 +7,7 @@ import {
   installmentsApi,
   ordersApi,
   type Installment,
+  type InstallmentDisposition,
   type Order,
   type Schedule,
 } from "../shared/api/catalog";
@@ -44,11 +45,16 @@ function ContractTable({
   const [rows, setRows] = useState<Installment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [schedules, setSchedules] = useState<Record<number, Schedule[]>>({});
+  const [dispositions, setDispositions] = useState<Record<number, InstallmentDisposition[]>>({});
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
+  const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
+  const [resaleTarget, setResaleTarget] = useState<Installment | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
+  const [recoverForm] = Form.useForm();
+  const [resaleForm] = Form.useForm();
 
   const load = useCallback(async () => {
     try {
@@ -57,9 +63,16 @@ function ContractTable({
       setRows(filtered);
       setOrders(orderList);
       const entries = await Promise.all(
-        filtered.map(async (item) => [item.id, await installmentsApi.schedules(item.id)] as const),
+        filtered.map(async (item) => {
+          const [scheduleRows, dispositionRows] = await Promise.all([
+            installmentsApi.schedules(item.id),
+            installmentsApi.dispositions(item.id),
+          ]);
+          return [item.id, scheduleRows, dispositionRows] as const;
+        }),
       );
-      setSchedules(Object.fromEntries(entries));
+      setSchedules(Object.fromEntries(entries.map(([id, scheduleRows]) => [id, scheduleRows])));
+      setDispositions(Object.fromEntries(entries.map(([id, _scheduleRows, dispositionRows]) => [id, dispositionRows])));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -98,6 +111,39 @@ function ContractTable({
       message.success("已完成交付，不新增现金流");
       setDeliverTarget(null);
       deliverForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitRecover = async (values: Record<string, unknown>) => {
+    if (!recoverTarget) return;
+    try {
+      await installmentsApi.recover(recoverTarget.id, {
+        occurred_on: values.occurred_on as string,
+        note: values.note as string,
+      });
+      message.success("逾期账号已登记回收");
+      setRecoverTarget(null);
+      recoverForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitResale = async (values: Record<string, unknown>) => {
+    if (!resaleTarget) return;
+    try {
+      await installmentsApi.resale(resaleTarget.id, {
+        resale_order_id: Number(values.resale_order_id),
+        occurred_on: values.occurred_on as string,
+        note: values.note as string,
+      });
+      message.success("回收账号已登记转售");
+      setResaleTarget(null);
+      resaleForm.resetFields();
       await load();
     } catch (err) {
       setError(normalizeError(err));
@@ -197,6 +243,34 @@ function ContractTable({
           >
             换绑交付
           </PermissionButton>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            disabled={
+              !(["OVERDUE", "DEFAULTED"].includes(row.status))
+              || (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
+            }
+            onClick={() => {
+              setRecoverTarget(row);
+              recoverForm.setFieldsValue({ occurred_on: today() });
+            }}
+          >
+            登记回收
+          </PermissionButton>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            disabled={
+              !(["OVERDUE", "DEFAULTED"].includes(row.status))
+              || (dispositions[row.id] ?? []).some((item) => item.action === "RESELL")
+            }
+            onClick={() => {
+              setResaleTarget(row);
+              resaleForm.setFieldsValue({ occurred_on: today() });
+            }}
+          >
+            登记转售
+          </PermissionButton>
         </Space>
       ),
     },
@@ -249,15 +323,24 @@ function ContractTable({
           onPageChange={() => undefined}
           expandable={{
             expandedRowRender: (row) => (
-              <DataTable<Schedule>
-                rows={schedules[row.id] ?? []}
-                page={1}
-                pageSize={20}
-                total={(schedules[row.id] ?? []).length}
-                onPageChange={() => undefined}
-                emptyText="暂无期次"
-                columns={scheduleColumns}
-              />
+              <Space direction="vertical" size="middle" className="installment-detail-stack">
+                <DataTable<Schedule>
+                  rows={schedules[row.id] ?? []}
+                  page={1}
+                  pageSize={20}
+                  total={(schedules[row.id] ?? []).length}
+                  onPageChange={() => undefined}
+                  emptyText="暂无期次"
+                  columns={scheduleColumns}
+                />
+                {(dispositions[row.id] ?? []).length > 0 && (
+                  <Typography.Paragraph>
+                    处置记录：{(dispositions[row.id] ?? []).map((item) =>
+                      `${item.action === "RECOVER" ? "回收" : "转售"}（${item.occurred_on}）`,
+                    ).join("、")}
+                  </Typography.Paragraph>
+                )}
+              </Space>
             ),
           }}
         />
@@ -287,6 +370,52 @@ function ContractTable({
           </Form.Item>
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
             确认收款
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={recoverTarget ? `逾期回收 · ${recoverTarget.inst_no}` : "逾期回收"}
+        open={Boolean(recoverTarget)}
+        onCancel={() => setRecoverTarget(null)}
+        footer={null}
+      >
+        <Form form={recoverForm} layout="vertical" onFinish={submitRecover}>
+          <Form.Item name="occurred_on" label="回收日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="note" label="回收说明" rules={[{ required: true }]}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">
+            确认回收
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={resaleTarget ? `逾期转售 · ${resaleTarget.inst_no}` : "逾期转售"}
+        open={Boolean(resaleTarget)}
+        onCancel={() => setResaleTarget(null)}
+        footer={null}
+      >
+        <Form form={resaleForm} layout="vertical" onFinish={submitResale}>
+          <Form.Item name="resale_order_id" label="转售订单" rules={[{ required: true }]}>
+            <Select
+              options={orders
+                .filter((order) => order.order_type === "HS" && order.id !== resaleTarget?.order_id)
+                .map((order) => ({ value: order.id, label: order.order_no }))}
+              placeholder="请选择已登记 SELL 的新售出订单"
+            />
+          </Form.Item>
+          <Form.Item name="occurred_on" label="转售日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="note" label="转售说明" rules={[{ required: true }]}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">
+            确认转售
           </PermissionButton>
         </Form>
       </Modal>

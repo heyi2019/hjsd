@@ -210,6 +210,13 @@ def create_order(
     account_snapshot: dict[str, Any] | None = None,
     actor: str,
     account_id: int | None = None,
+    game_type: str | None = None,
+    game_account: str | None = None,
+    game_password: str | None = None,
+    channel_region: str | None = None,
+    bound_phone: str | None = None,
+    has_secondary: bool | None = None,
+    account_note: str | None = None,
     owner_id: int | None = None,
     capital_type: str | None = None,
     note: str | None = None,
@@ -236,6 +243,19 @@ def create_order(
         )
     if definition.code != "DFQ" and account_snapshot is not None:
         raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+    if definition.code == "DFQ" and any(
+        v is not None
+        for v in (
+            game_type,
+            game_account,
+            game_password,
+            channel_region,
+            bound_phone,
+            has_secondary,
+            account_note,
+        )
+    ):
+        raise Validation("DFQ 代分期订单的游戏账号资料应填写在 account_snapshot 内，不应单独传游戏账号字段")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
     selected_capital_type = (
@@ -368,6 +388,13 @@ def create_order(
         expected_settlement_date=expected_settlement_date,
         account_snapshot=account_snapshot,
         account_id=account_id,
+        game_type=game_type,
+        game_account=game_account,
+        game_password=game_password,
+        channel_region=channel_region,
+        bound_phone=bound_phone,
+        has_secondary=has_secondary,
+        account_note=account_note,
         status=OrderStatus.ACTIVE.value,
         policy_version_id=primary_version_id,
         policy_snapshot=snapshot or None,

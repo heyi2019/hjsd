@@ -505,10 +505,8 @@ class TestAccountsApi:
         )
         assert response.status_code == 405, response.text
 
-    def test_order_creation_provides_standard_inventory_context(
-        self, seeded_client, seeded_db, headers
-    ):
-        created = seeded_client.post(
+    def test_order_creation_rejects_legacy_account_payload(self, seeded_client, headers):
+        response = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
@@ -517,71 +515,25 @@ class TestAccountsApi:
             },
             headers=headers,
         )
-        assert created.status_code == 201, created.text
-        account = seeded_db.get(Account, created.json()["account_id"])
-        assert account is not None
-        assert account.business_mode == "SELF"
-        assert account.inventory_type == "RECOVERY"
+        assert response.status_code == 422, response.text
+        assert response.json()["details"]["errors"][0]["field"] == "account"
 
-    def test_create_account_persists_description_and_at_most_nine_images(
-        self, seeded_client, seeded_db, headers
-    ):
-        images = [f"data:image/png;base64,image-{index}" for index in range(9)]
-        created = seeded_client.post(
+    def test_order_creation_rejects_legacy_account_media_payload(self, seeded_client, headers):
+        response = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
                 "account": {
-                    "game_account": "account-with-media",
+                    "game_account": "legacy-account-with-media",
                     "platform": "王者",
-                    "account_description": "高段位，未绑定二次验证",
-                    "account_images": images,
+                    "account_description": "不再兼容的旧建单资料",
+                    "account_images": ["data:image/png;base64,image-0"],
                 },
             },
             headers=headers,
         )
-
-        assert created.status_code == 201, created.text
-        account_id = created.json()["account_id"]
-        account = seeded_db.get(Account, account_id)
-        assert account is not None
-        assert account.account_description == "高段位，未绑定二次验证"
-        assert account.account_images == images
-
-        updated_images = [f"data:image/jpeg;base64,updated-{index}" for index in range(9)]
-        updated = seeded_client.patch(
-            f"/api/v1/accounts/{account_id}",
-            json={
-                "account_description": "已补充平台与资源说明",
-                "game_type": "王者荣耀",
-                "game_account": "account-with-media-renamed",
-                "game_password": "new-secret",
-                "channel_region": "安卓一区",
-                "bound_phone": "13800000000",
-                "has_secondary": True,
-                "platform": "王者平台",
-                "note": "资料已核验",
-                "account_images": updated_images,
-            },
-            headers=headers,
-        )
-        assert updated.status_code == 200, updated.text
-        assert updated.json()["account_description"] == "已补充平台与资源说明"
-        assert updated.json()["account_images"] == updated_images
-        assert updated.json()["game_account"] == "account-with-media-renamed"
-        assert updated.json()["game_password"] == "new-secret"
-        assert updated.json()["has_secondary"] is True
-
-        cleared = seeded_client.patch(
-            f"/api/v1/accounts/{account_id}",
-            json={"account_description": None, "account_images": [], "note": None},
-            headers=headers,
-        )
-        assert cleared.status_code == 200, cleared.text
-        assert cleared.json()["account_description"] is None
-        assert cleared.json()["account_images"] == []
-        assert cleared.json()["note"] is None
+        assert response.status_code == 422, response.text
 
     def test_list_accounts_endpoint_with_status(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "api-acc")
@@ -664,8 +616,8 @@ class TestAccountsApi:
         item = next(row for row in response.json() if row["inventory_no"] == account.inventory_no)
         assert item["source_order_no"] == order.order_no
 
-    def test_order_created_consignment_account_has_source_order(self, seeded_client, headers):
-        created = seeded_client.post(
+    def test_order_creation_rejects_legacy_consignment_account_payload(self, seeded_client, headers):
+        response = seeded_client.post(
             "/api/v1/orders",
             json={
                 "order_type": "DG",
@@ -674,12 +626,7 @@ class TestAccountsApi:
             },
             headers=headers,
         )
-        assert created.status_code == 201, created.text
-
-        listed = seeded_client.get("/api/v1/accounts", headers=headers)
-        assert listed.status_code == 200, listed.text
-        item = next(row for row in listed.json() if row["game_account"] == "consignment-source")
-        assert item["source_order_no"] == created.json()["order_no"]
+        assert response.status_code == 422, response.text
 
     def test_execution_detail_includes_source_order(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-acc")

@@ -59,20 +59,22 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
-  it("回收入口只加载已有库存账号，不提供随订单建档", async () => {
+  it("回收入口内联填写游戏账号信息，不加载库存账号", async () => {
     const { container } = await openTypedModal("HS");
 
-    expect(await screen.findByLabelText("库存编号")).toBeInTheDocument();
-    expect(accountsList).toHaveBeenCalledWith({ status: "IN_STOCK" });
+    expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
+    expect(screen.queryByLabelText("库存编号")).toBeNull();
+    expect(accountsList).not.toHaveBeenCalled();
     expect(ordersList).not.toHaveBeenCalled();
     expect(typesList).not.toHaveBeenCalled();
   });
 
   it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
-    expect(await screen.findByLabelText("库存编号")).toBeInTheDocument();
+    expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
+    expect(screen.queryByLabelText("库存编号")).toBeNull();
     expect(typesList).not.toHaveBeenCalled();
-    expect(accountsList).toHaveBeenCalledWith({ status: "IN_STOCK" });
+    expect(accountsList).not.toHaveBeenCalled();
     expect(ordersList).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });
@@ -91,10 +93,11 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     });
     const { container } = await openTypedModal("TH");
     await userEvent.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    const inventorySelector = screen.getByLabelText("库存编号").closest(".ant-form-item")?.querySelector(".ant-select-selector");
-    await userEvent.click(inventorySelector as Element);
-    await userEvent.click(await screen.findByText("ACC0003 · pickup-account", { selector: ".ant-select-item-option-content" }));
-    await userEvent.click(container.querySelectorAll(".ant-select-selector")[5] as Element);
+    await userEvent.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await userEvent.type(screen.getByLabelText("游戏账号"), "pickup-account");
+    await userEvent.type(screen.getByLabelText("账号密码"), "secret");
+    await userEvent.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await userEvent.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")?.querySelector(".ant-select-selector") as Element);
     await userEvent.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await userEvent.type(amounts[0], "1000");
@@ -114,11 +117,11 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     ordersCreate.mockResolvedValueOnce({ id: 8, order_no: "TH-2026-0008", status: "ACTIVE" });
     const { container, onCreated } = await openTypedModal("TH");
     await userEvent.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    const selectors = container.querySelectorAll(".ant-select-selector");
-    const inventorySelector = screen.getByLabelText("库存编号").closest(".ant-form-item")?.querySelector(".ant-select-selector");
-    await userEvent.click(inventorySelector as Element);
-    await userEvent.click(await screen.findByText("ACC0003 · pickup-account", { selector: ".ant-select-item-option-content" }));
-    await userEvent.click(selectors[5]);
+    await userEvent.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await userEvent.type(screen.getByLabelText("游戏账号"), "pickup-account");
+    await userEvent.type(screen.getByLabelText("账号密码"), "secret");
+    await userEvent.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await userEvent.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")?.querySelector(".ant-select-selector") as Element);
     await userEvent.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await userEvent.type(amounts[0], "1000");
@@ -131,7 +134,7 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     expect(payload.order_type).toBe("TH");
     expect(payload.account_snapshot).toBeUndefined();
     expect(payload.account).toBeUndefined();
-    expect(payload.account_id).toBe(11);
+    expect(payload.account_id).toBeUndefined();
     expect(payload.customer_roles).toEqual([]);
     expect(payload.counterparty_roles).toEqual([{ counterparty_id: 2, role: "SUPPLIER" }]);
     expect(payload.note).toBe("供货方来源：氪金联盟｜预期收买家：1200");
@@ -140,15 +143,15 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });
 
-  it("代挂表单先展示完整前端字段", async () => {
+  it("代挂建单沿用统一出售流程，不展示独立结算字段", async () => {
     const { container } = await openTypedModal("DG");
 
     expect(screen.getByText("委托客户")).toBeInTheDocument();
-    expect(screen.getByText("挂售价：")).toBeInTheDocument();
-    expect(screen.getByText("服务费／抽成：")).toBeInTheDocument();
-    expect(screen.getByText("抽成方式：")).toBeInTheDocument();
-    expect(screen.getByText("付款方：")).toBeInTheDocument();
-    expect(screen.getByText("预计结算日：")).toBeInTheDocument();
+    expect(screen.queryByText("挂售价：")).toBeNull();
+    expect(screen.queryByText("服务费／抽成：")).toBeNull();
+    expect(screen.queryByText("抽成方式：")).toBeNull();
+    expect(screen.queryByText("付款方：")).toBeNull();
+    expect(screen.queryByText("预计结算日：")).toBeNull();
     expect(screen.getByLabelText("客户昵称")).toBeInTheDocument();
   });
 

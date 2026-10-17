@@ -533,6 +533,21 @@ class TestRebateGuards:
         assert record.status == "SETTLED"
         assert record.updated_by == "finance"
 
+    def test_rebate_income_and_fee_are_separate_cashflows(self, seeded_db):
+        from app.domain.trade import Cashflow
+        invest = _pool(seeded_db, "HJ_INVEST")
+        record = service.create_rebate(seeded_db, source_order_id=_active_order(seeded_db), rebate_type="BUY", base_amount=Decimal("100"), collected_on=TODAY, actor="pytest")
+        settlement = service.settle_rebate(seeded_db, record.id, gross_amount="100", platform_fee="10", settled_on=TODAY, pool_id=invest.id, actor="finance")
+        income = seeded_db.get(Cashflow, settlement.cashflow_id)
+        fee = seeded_db.get(Cashflow, settlement.fee_cashflow_id)
+        assert (income.amount, income.direction, income.accounting_attribute) == (Decimal("100"), "IN", "REBATE_INCOME")
+        assert (fee.amount, fee.direction, fee.accounting_attribute) == (Decimal("10"), "OUT", "OPERATING_EXPENSE")
+        reversal = service.reverse_rebate_settlement(seeded_db, record.id, settlement.id, reversed_on=TODAY, actor="finance", reason="录入错误")
+        income_reversal = seeded_db.get(Cashflow, reversal.cashflow_id)
+        fee_reversal = seeded_db.get(Cashflow, reversal.fee_cashflow_id)
+        assert (income_reversal.amount, income_reversal.direction, income_reversal.reversal_of_id) == (Decimal("100"), "OUT", income.id)
+        assert (fee_reversal.amount, fee_reversal.direction, fee_reversal.reversal_of_id) == (Decimal("10"), "IN", fee.id)
+
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_rebate(
@@ -692,11 +707,11 @@ class TestRebateGuards:
 
         r5 = reporting_service.r5_business_pnl(seeded_db)
         hs = next(item for item in r5["items"] if item["order_type"] == "HS")
-        assert hs["settled_rebate"] == Decimal("95.00")
+        assert hs["settled_rebate"] == Decimal("100.00")
         assert hs["uncollected_rebate"] == Decimal("0.00")
 
         detail = reporting_service.order_profit_detail(seeded_db)
-        assert detail["items"][0]["rebate"] == Decimal("95.00")
+        assert detail["items"][0]["rebate"] == Decimal("100.00")
 
 
 class TestCashflowLifecycle:

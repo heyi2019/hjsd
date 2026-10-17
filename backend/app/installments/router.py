@@ -217,6 +217,64 @@ def default_installment(
 
 
 @router.post(
+    "/installments/{installment_id}/recover",
+    response_model=schemas.DispositionOut,
+)
+def recover_installment_account(
+    installment_id: int,
+    payload: schemas.DispositionIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = default_manage,
+) -> schemas.DispositionOut:
+    item = service.recover_account(
+        db,
+        installment_id,
+        occurred_on=payload.occurred_on,
+        actor=_actor(user),
+        note=payload.note,
+        user=user,
+    )
+    return schemas.DispositionOut.model_validate(item)
+
+
+@router.get(
+    "/installments/{installment_id}/dispositions",
+    response_model=list[schemas.DispositionOut],
+)
+def list_installment_dispositions(
+    installment_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.DispositionOut]:
+    return [
+        schemas.DispositionOut.model_validate(item)
+        for item in service.list_dispositions(db, installment_id, user)
+    ]
+
+
+@router.post(
+    "/installments/{installment_id}/resale",
+    response_model=schemas.DispositionOut,
+)
+def resale_installment_account(
+    installment_id: int,
+    payload: schemas.ResaleIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = default_manage,
+) -> schemas.DispositionOut:
+    item = service.record_resale(
+        db,
+        installment_id,
+        resale_order_id=payload.resale_order_id,
+        occurred_on=payload.occurred_on,
+        actor=_actor(user),
+        note=payload.note,
+        user=user,
+    )
+    return schemas.DispositionOut.model_validate(item)
+
+
+@router.post(
     "/installments/{installment_id}/deliver", response_model=schemas.InstallmentOut
 )
 def deliver_installment(

@@ -19,6 +19,7 @@ from app.core.security import (
 from app.reporting import service
 from app.reporting.schemas import (
     BusinessPnlOut,
+    FinanceDimensionOut,
     CommissionOut,
     DailyFundsOut,
     InventoryHealthOut,
@@ -71,6 +72,17 @@ def business_pnl(
 ) -> BusinessPnlOut:
     """R5 业务级损益：未归集返点独立列，不摊给业务。"""
     return service.r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
+
+
+@router.get("/reports/finance-dimensions", response_model=FinanceDimensionOut)
+def finance_dimensions(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = read_access,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+) -> FinanceDimensionOut:
+    """按资金性质、核算属性、现金方向和资金池账户聚合已审核流水。"""
+    return service.finance_dimension_report(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/daily-funds", response_model=DailyFundsOut)

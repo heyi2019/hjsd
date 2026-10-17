@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.money import to_money
 from app.domain.enums import PolicyStatus, PolicyType
 from app.domain.parties import PolicyVersion
-from app.domain.trade import OrderProfitAllocation
+from app.domain.trade import OrderEvent, OrderProfitAllocation
 from app.orders import service as order_service
 from app.policy import service as policy_service
 
@@ -362,6 +362,28 @@ class TestSnapshotRedline:
 
 
 class TestProfitAllocation:
+    def test_allocation_rejects_legacy_and_duplicate_categories(self, seeded_db):
+        from app.core.errors import Validation
+        order = self._order(seeded_db)
+        with pytest.raises(Validation):
+            policy_service.set_allocations(seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_rate": 100}])
+        items = [
+            {"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 20}
+            for kind in ("BUY", "SELL", "OPERATION", "COMPANY", "SELL")
+        ]
+        with pytest.raises(Validation):
+            policy_service.set_allocations(seeded_db, order.id, items=items)
+
+    def test_allocation_cannot_choose_seller_before_sale(self, seeded_db):
+        from app.core.errors import Validation
+        order = self._order(seeded_db)
+        items = [
+            {"allocation_type": kind, "user_id": 1 if kind in ("SELL", "OPERATION") else None, "role": "OWNER", "allocation_rate": 25}
+            for kind in ("BUY", "SELL", "OPERATION", "COMPANY")
+        ]
+        with pytest.raises(Validation):
+            policy_service.set_allocations(seeded_db, order.id, items=items)
+
     """BAS-06-03：订单多人利润分配，合计必须 100%。"""
 
     @staticmethod
@@ -402,7 +424,7 @@ class TestProfitAllocation:
             policy_service.set_allocations(
                 seeded_db,
                 order.id,
-                items=[{"user_id": 1, "role": "UNKNOWN", "allocation_rate": "100"}],
+                items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "UNKNOWN" if kind == "BUY" else "OWNER", "allocation_rate": "25"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
                 actor="pytest",
             )
         assert "角色" in str(exc.value)
@@ -431,9 +453,7 @@ class TestProfitAllocation:
             policy_service.set_allocations(
                 seeded_db,
                 order.id,
-                items=[
-                    {"user_id": 999999, "role": "OWNER", "allocation_rate": "100"}
-                ],
+                items=[{"allocation_type": kind, "user_id": 999999 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "25"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
                 actor="pytest",
             )
         assert "人员不存在" in str(exc.value)
@@ -443,14 +463,65 @@ class TestProfitAllocation:
         items = policy_service.set_allocations(
             seeded_db,
             order.id,
+            items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "50" if kind in ("OPERATION", "COMPANY") else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
+            actor="pytest",
+        )
+        assert len(items) == 4
+        assert to_money(items[0]["total_rate"]) == to_money("100")
+
+    def test_typed_allocation_requires_four_income_categories(self, seeded_db):
+        order = self._order(seeded_db)
+        items = policy_service.set_allocations(
+            seeded_db,
+            order.id,
             items=[
-                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
-                {"user_id": 2, "role": "SALES", "allocation_rate": "50"},
+                {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+                {"allocation_type": "SELL", "user_id": None, "role": "SALES", "allocation_rate": "25"},
+                {"allocation_type": "OPERATION", "user_id": 1, "role": "OWNER", "allocation_rate": "25"},
+                {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
             ],
             actor="pytest",
         )
-        assert len(items) == 2
+        assert {item["allocation_type"] for item in items} == {"BUY", "SELL", "OPERATION", "COMPANY"}
         assert to_money(items[0]["total_rate"]) == to_money("100")
+
+    def test_buy_sell_recipient_is_bound_to_action_actor(self, seeded_db):
+        order = self._order(seeded_db)
+        seeded_db.add(
+            OrderEvent(
+                event_no="EVT-TEST-BUY",
+                order_id=order.id,
+                event_type="BUY",
+                amount=100,
+                occurred_on=date(2026, 6, 1),
+                is_posted=True,
+                created_by="seeduser1",
+                updated_by="seeduser1",
+            )
+        )
+        seeded_db.flush()
+        items = policy_service.set_allocations(
+            seeded_db,
+            order.id,
+            items=[
+                {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+                {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+                {"allocation_type": "OPERATION", "user_id": 2, "role": "OWNER", "allocation_rate": "25"},
+                {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+            ],
+            actor="pytest",
+        )
+        by_type = {item["allocation_type"]: item for item in items}
+        assert by_type["BUY"]["user_id"] == 1
+        assert by_type["SELL"]["user_id"] is None
+
+    def test_sale_click_binds_seller_after_allocation(self, seeded_db):
+        order = order_service.create_order(seeded_db, order_type="DG", trade_date=date(2026, 6, 1), actor="seeduser1")
+        items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
+        policy_service.set_allocations(seeded_db, order.id, items=items)
+        order_service.post_event(seeded_db, order.id, event_type="SELL", amount="100", portion="PROFIT", occurred_on=date(2026, 6, 1), actor="seeduser2")
+        by_type = {item["allocation_type"]: item for item in policy_service.list_allocations(seeded_db, order.id)}
+        assert by_type["SELL"]["user_id"] == 2
 
     def test_total_must_be_100(self, seeded_db):
         order = self._order(seeded_db)
@@ -512,21 +583,18 @@ class TestProfitAllocation:
         policy_service.set_allocations(
             seeded_db,
             order.id,
-            items=[
-                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
-                {"user_id": 2, "role": "SALES", "allocation_rate": "50"},
-            ],
+            items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "50" if kind in ("OPERATION", "COMPANY") else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
         policy_service.set_allocations(
             seeded_db,
             order.id,
-            items=[{"user_id": 3, "role": "OWNER", "allocation_rate": "100"}],
+            items=[{"allocation_type": kind, "user_id": 3 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "100" if kind == "OPERATION" else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
         items = policy_service.list_allocations(seeded_db, order.id)
-        assert len(items) == 1
-        assert items[0]["user_id"] == 3
+        assert len(items) == 4
+        assert next(item for item in items if item["allocation_type"] == "OPERATION")["user_id"] == 3
 
     def test_allocation_inherits_order_policy_version(self, seeded_db):
         definition = _make_policy(seeded_db)
@@ -535,7 +603,7 @@ class TestProfitAllocation:
         items = policy_service.set_allocations(
             seeded_db,
             order.id,
-            items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
+            items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "100" if kind == "OPERATION" else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
         assert items[0]["policy_version_id"] == order.policy_version_id

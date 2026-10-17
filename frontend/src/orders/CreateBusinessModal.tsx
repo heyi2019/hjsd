@@ -4,12 +4,10 @@ import { useEffect, useState } from "react";
 import {
   counterpartiesApi,
   customersApi,
-  accountsApi,
   ordersApi,
   poolsApi,
   type Counterparty,
   type Customer,
-  type Account,
   type Pool,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
@@ -63,10 +61,8 @@ export function CreateBusinessModal(props: {
   const isDg = orderType === "DG";
   const isDfq = orderType === "DFQ";
   const businessContext = BUSINESS_CONTEXT[orderType];
-  const usesInventoryAccount = isRecovery || isTh || isDg;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
-  const [inventoryAccounts, setInventoryAccounts] = useState<Account[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
@@ -94,23 +90,15 @@ export function CreateBusinessModal(props: {
     let cancelled = false;
     void (async () => {
       try {
-        const [customerList, cpList, poolList, accountList] = await Promise.all([
+        const [customerList, cpList, poolList] = await Promise.all([
           customersApi.list(),
           counterpartiesApi.list(),
           poolsApi.list(),
-          usesInventoryAccount ? accountsApi.list({ status: "IN_STOCK" }) : Promise.resolve([] as Account[]),
         ]);
         if (cancelled) return;
         setCustomers(customerList);
         setCounterparties(cpList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-        setInventoryAccounts(accountList.filter((account) =>
-          isRecovery
-            ? account.business_mode === "SELF" && account.inventory_type === "RECOVERY"
-            : isTh
-              ? account.business_mode === "DISTRIBUTION" && account.inventory_type === "PICKUP"
-              : account.business_mode === "DISTRIBUTION" && account.inventory_type === "CONSIGNMENT",
-        ));
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(normalizeError(error));
@@ -252,16 +240,16 @@ export function CreateBusinessModal(props: {
       const order = await ordersApi.create({
         order_type: props.initialOrderType,
         trade_date: today(),
-        listing_price: isDg && values.dg_listing_price != null ? String(values.dg_listing_price) : undefined,
-        service_fee: isDg && values.dg_service_fee != null ? String(values.dg_service_fee) : undefined,
-        commission_mode: isDg ? values.dg_commission_mode as string : undefined,
-        commission_payer: isDg ? values.dg_commission_payer as string : undefined,
-        expected_settlement_date: isDg && values.dg_expected_settlement_date
-          ? toDateString(values.dg_expected_settlement_date)
-          : undefined,
         account_snapshot: undefined,
-        account_id: usesInventoryAccount ? values.account_id as number : undefined,
+        account_id: undefined,
         note,
+        game_type: values.game_type as string | undefined,
+        game_account: values.game_account as string | undefined,
+        game_password: values.game_password as string | undefined,
+        channel_region: values.channel_region as string | undefined,
+        bound_phone: values.bound_phone as string | undefined,
+        has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
+        account_note: values.game_account_note as string | undefined,
         customer_roles: customerRoles,
         counterparty_roles: counterpartyId
           ? [
@@ -381,12 +369,12 @@ export function CreateBusinessModal(props: {
           <Space className="muted" size="large">
             <span>业务：{businessContext.business}</span>
             <span>类型：{businessContext.type}</span>
-            <span>产品：来自已选库存</span>
+            <span>产品：业务单内联登记</span>
           </Space>
         ) : null}
-        {isRecovery ? <RecoveryAccountSection inventoryAccounts={inventoryAccounts}>
+        {isRecovery ? <RecoveryAccountSection>
           <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
-        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} inventoryAccounts={inventoryAccounts} /> : isDg ? <DgOrderSection inventoryAccounts={inventoryAccounts} /> : <DfqOrderSection pools={pools} />}
+        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} /> : isDg ? <DgOrderSection /> : <DfqOrderSection pools={pools} />}
         {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
       </Form>
     </Modal>

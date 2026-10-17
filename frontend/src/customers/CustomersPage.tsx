@@ -13,6 +13,7 @@ import {
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
+import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import {
   DataTable,
   ErrorBanner,
@@ -135,6 +136,7 @@ export function CustomersPage() {
         items={[
           { key: "customers", label: "客户档案", children: <CustomerPanel /> },
           { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel /> },
+          { key: "leads", label: "客户需求池", children: <CustomerLeadPanel /> },
         ]}
       />
     </section>

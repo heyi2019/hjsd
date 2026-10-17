@@ -38,7 +38,7 @@ class MonthlyPnlItemOut(ReportModel):
     sales_income: Decimal
     account_direct_cost: Decimal
     operating_expense: Decimal
-    rebate_net: Decimal
+    rebate_income: Decimal
     operating_profit: Decimal
 
 
@@ -46,7 +46,7 @@ class MonthlyPnlTotalOut(ReportModel):
     sales_income: Decimal
     account_direct_cost: Decimal
     operating_expense: Decimal
-    rebate_net: Decimal
+    rebate_income: Decimal
     operating_profit: Decimal
 
 
@@ -56,7 +56,7 @@ class MonthlyPnlOut(ReportModel):
 
 
 class CommissionOrderOut(ReportModel):
-    user_id: int
+    user_id: int | None = None
     order_no: str
     order_id: int
     profit_base: Decimal
@@ -67,7 +67,7 @@ class CommissionOrderOut(ReportModel):
 
 
 class CommissionGroupOut(ReportModel):
-    user_id: int
+    user_id: int | None = None
     order_count: int
     profit_base: Decimal
     payable: Decimal
@@ -91,6 +91,9 @@ class CommissionOut(ReportModel):
 
 class BusinessPnlItemOut(ReportModel):
     order_type: str
+    business_mode: str | None = None
+    business_type: str | None = None
+    value_added_service: str | None = None
     main_income: Decimal
     main_cost: Decimal
     main_profit: Decimal
@@ -111,6 +114,29 @@ class BusinessPnlTotalOut(ReportModel):
 class BusinessPnlOut(ReportModel):
     items: list[BusinessPnlItemOut]
     total: BusinessPnlTotalOut
+
+
+class FinanceDimensionItemOut(ReportModel):
+    pool_id: int
+    pool_code: str
+    pool_name: str
+    pool_account_id: int | None = None
+    account_no: str | None = None
+    account_name: str | None = None
+    fund_nature: str
+    accounting_attribute: str
+    direction: str
+    flow_count: int
+    amount: Decimal
+    signed_amount: Decimal
+
+
+class FinanceDimensionOut(ReportModel):
+    from_date: str | None = None
+    to_date: str | None = None
+    items: list[FinanceDimensionItemOut]
+    total_amount: Decimal
+    total_signed_amount: Decimal
 
 
 class DailyFundsItemOut(ReportModel):
@@ -174,6 +200,7 @@ class OrderProfitOut(ReportModel):
 
 __all__ = [
     "BusinessPnlOut",
+    "FinanceDimensionOut",
     "CommissionOut",
     "DailyFundsOut",
     "InventoryHealthOut",

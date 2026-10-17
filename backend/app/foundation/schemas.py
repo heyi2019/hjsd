@@ -81,6 +81,9 @@ class OrderTypeOut(BaseModel):
     code: str
     name: str
     capital_type: str
+    business_mode: str | None = None
+    business_type: str | None = None
+    value_added_service: str | None = None
     sequence_prefix: str
     sequence_key: str
     is_active: bool

@@ -120,4 +120,20 @@ def close_quality_issue(
     return schemas.QualityIssueOut.model_validate(item)
 
 
+@router.post("/quality/issues/batch-close", response_model=list[schemas.QualityIssueOut])
+def batch_close_quality_issues(
+    payload: schemas.QualityIssueBatchClose,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_quality,
+) -> list[schemas.QualityIssueOut]:
+    items = service.batch_close_issues(
+        db,
+        payload.issue_ids,
+        resolution=payload.resolution,
+        evidence=payload.evidence,
+        actor=_actor(user),
+    )
+    return [schemas.QualityIssueOut.model_validate(item) for item in items]
+
+
 __all__ = ["router"]

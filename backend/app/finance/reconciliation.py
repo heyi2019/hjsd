@@ -34,26 +34,36 @@ def _get_reconciliation(
     return item
 
 
-def _system_balance_as_of(session: Session, pool_id: int, reconciled_on: date) -> Decimal:
+def _system_balance_as_of(session: Session, pool_id: int, reconciled_on: date, pool_account_id: int | None = None) -> Decimal:
     signed_amount = case(
         (Cashflow.direction == Direction.IN.value, Cashflow.amount),
         else_=-Cashflow.amount,
     )
-    value = session.scalar(
-        select(func.coalesce(func.sum(signed_amount), 0)).where(
+    conditions = [
             Cashflow.pool_id == pool_id,
             Cashflow.occurred_on <= reconciled_on,
             Cashflow.status == CashflowStatus.APPROVED.value,
-        )
-    )
+        ]
+    if pool_account_id is not None:
+        conditions.append(Cashflow.pool_account_id == pool_account_id)
+    value = session.scalar(select(func.coalesce(func.sum(signed_amount), 0)).where(*conditions))
+    opening = Decimal("0")
+    if pool_account_id is not None:
+        from app.domain.foundation import PoolAccount
+        opening = session.scalar(
+            select(PoolAccount.opening_balance).where(
+                PoolAccount.id == pool_account_id, PoolAccount.pool_id == pool_id
+            )
+        ) or Decimal("0")
     # 账户余额可能因历史支出而低于零，但资金快照本身仍必须能记录它。
-    return to_money(value or 0)
+    return to_money((value or 0) + opening)
 
 
 def create_reconciliation(
     session: Session,
     *,
     pool_id: int,
+    pool_account_id: int | None = None,
     reconciled_on: date,
     account_label: str,
     statement_balance: Any,
@@ -76,6 +86,7 @@ def create_reconciliation(
     duplicate = session.scalar(
         select(Reconciliation.id).where(
             Reconciliation.pool_id == pool.id,
+            Reconciliation.pool_account_id == pool_account_id,
             Reconciliation.reconciled_on == reconciled_on,
             Reconciliation.account_label == label,
         )
@@ -124,7 +135,12 @@ def create_reconciliation(
                 details={"field": "unmatched_flow_ids", "invalid": invalid},
             )
 
-    system_balance = _system_balance_as_of(session, pool.id, reconciled_on)
+    if pool_account_id is not None:
+        from app.domain.foundation import PoolAccount
+        account = session.get(PoolAccount, pool_account_id)
+        if account is None or account.pool_id != pool.id:
+            raise Validation("对账账户不属于当前资金池", details={"pool_account_id": pool_account_id})
+    system_balance = _system_balance_as_of(session, pool.id, reconciled_on, pool_account_id)
     difference = to_money(statement - system_balance)
     text_reason = _text(
         reason,
@@ -137,6 +153,7 @@ def create_reconciliation(
         raise Validation("存在差异时必须填写差异原因", details={"field": "reason"})
     item = Reconciliation(
         pool_id=pool.id,
+        pool_account_id=pool_account_id,
         reconciled_on=reconciled_on,
         account_label=label,
         system_balance=system_balance,
@@ -175,6 +192,7 @@ def list_reconciliations(
     *,
     pool_id: int | None = None,
     pool_ids: Iterable[int] | None = None,
+    pool_account_id: int | None = None,
     user: CurrentUser | None = None,
 ) -> list[Reconciliation]:
     stmt = select(Reconciliation)
@@ -189,6 +207,8 @@ def list_reconciliations(
         stmt = stmt.where(Reconciliation.pool_id.in_(visible_pool_ids))
     elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
         stmt = stmt.where(Reconciliation.pool_id.in_(sorted(user.pool_ids)))
+    if pool_account_id is not None:
+        stmt = stmt.where(Reconciliation.pool_account_id == pool_account_id)
     return list(
         session.scalars(
             stmt.order_by(

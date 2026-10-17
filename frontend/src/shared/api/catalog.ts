@@ -30,6 +30,8 @@ export interface OrderType {
   name: string;
   capital_type: string;
   is_active: boolean;
+  description?: string | null;
+  sort_order?: number;
 }
 
 /** 业务 → 资金池路由（get_order_type routes）。份额可选集必须由它决定：
@@ -80,12 +82,10 @@ export interface Order {
   order_no: string;
   order_type: string;
   capital_type: string;
+  business_mode?: string | null;
+  business_type?: string | null;
+  value_added_service?: string | null;
   trade_date: string;
-  listing_price?: string | null;
-  service_fee?: string | null;
-  commission_mode?: string | null;
-  commission_payer?: string | null;
-  expected_settlement_date?: string | null;
   account_id?: number | null;
   status: string;
   note?: string | null;
@@ -108,6 +108,7 @@ export interface Order {
   installment_paid?: string | null;
   installment_periods?: number | null;
   installment_status?: string | null;
+  events?: OrderEvent[];
 }
 
 export interface OrderEvent {
@@ -120,6 +121,7 @@ export interface OrderEvent {
   pool_id?: number | null;
   delivery_mode?: string | null;
   is_posted: boolean;
+  operator?: string;
 }
 
 export interface EventPostResult {
@@ -292,6 +294,7 @@ export interface Deposit {
 }
 
 export interface Cashflow {
+  status: string;
   id: number;
   flow_no: string;
   pool_id: number;
@@ -344,6 +347,8 @@ export interface FieldDefinition {
 }
 
 export const poolsApi = {
+  update: (id: number, data: Partial<Pool>) => api.patch<Pool>(`/pools/${id}`, data).then(r => r.data),
+  setStatus: (id: number, status: string) => api.patch<Pool>(`/pools/${id}/status`, {status}).then(r => r.data),
   list: () => api.get<Pool[]>("/pools").then((r) => r.data),
   create: (payload: Partial<Pool>) => api.post<Pool>("/pools", payload).then((r) => r.data),
   balance: (poolId: number) =>
@@ -351,6 +356,9 @@ export const poolsApi = {
 };
 
 export const orderTypesApi = {
+  update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
+  setActive: (id: number, is_active: boolean) => api.patch<OrderType>(`/order-types/${id}/active`, {is_active}).then(r => r.data),
+  impactPreview: (code: string, portion: string, pool_code: string) => api.get<RouteImpactPreview>(`/order-types/${code}/routes/impact-preview`, {params: {portion, pool_code}}).then(r => r.data),
   list: () => api.get<OrderType[]>("/order-types").then((r) => r.data),
   create: (payload: Partial<OrderType>) =>
     api.post<OrderType>("/order-types", payload).then((r) => r.data),
@@ -388,14 +396,11 @@ export const counterpartiesApi = {
 export const ordersApi = {
   list: (params?: { order_type?: string; status?: string }) =>
     api.get<Order[]>("/orders", { params }).then((r) => r.data),
+  get: (orderId: number) =>
+    api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
   create: (payload: {
     order_type: string;
     trade_date: string;
-    listing_price?: string;
-    service_fee?: string;
-    commission_mode?: string;
-    commission_payer?: string;
-    expected_settlement_date?: string;
     account_snapshot?: {
       game_account: string;
       game_type?: string;
@@ -408,6 +413,13 @@ export const ordersApi = {
     account_id?: number;
     owner_id?: number;
     capital_type?: string;
+    game_type?: string;
+    game_account?: string;
+    game_password?: string;
+    channel_region?: string;
+    bound_phone?: string;
+    has_secondary?: boolean;
+    account_note?: string;
     note?: string;
     customer_roles?: { customer_id: number; role: string }[];
     counterparty_roles?: { counterparty_id: number; role: string }[];
@@ -441,6 +453,9 @@ export const ordersApi = {
       pool_id?: number;
       portion?: string;
       delivery_mode?: string;
+      offset_event_id?: number;
+      reason?: string;
+      refund_responsibility?: "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER";
       flow_category?: string;
       note?: string;
     },
@@ -461,6 +476,9 @@ export const accountsApi = {
 };
 
 export const installmentsApi = {
+  dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),
+  recover: (id: number, data: {occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
+  resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
   create: (payload: Partial<Installment> & { first_due_on: string; schedule?: InstallmentScheduleInput[] }) =>
@@ -491,6 +509,10 @@ export const depositsApi = {
 };
 
 export const cashflowsApi = {
+  create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),
+  approve: (id: number) => api.post<Cashflow>(`/cashflows/${id}/approve`).then(r => r.data),
+  reject: (id: number, reason: string) => api.post<Cashflow>(`/cashflows/${id}/reject`, {reason}).then(r => r.data),
+  reverse: (id: number, data: {reversed_on: string; reason: string}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
   list: (params?: {
     pool_id?: number;
     order_id?: number;
@@ -559,7 +581,7 @@ export interface MonthlyPnlRow {
   sales_income: string;
   account_direct_cost: string;
   operating_expense: string;
-  rebate_net: string;
+  rebate_income: string;
   operating_profit: string;
 }
 
@@ -598,6 +620,8 @@ export interface CommissionReport {
 }
 
 export interface BusinessPnlRow {
+  business_mode?: string | null;
+  business_type?: string | null;
   order_type: string;
   order_count?: number;
   main_income: string;
@@ -651,6 +675,8 @@ export interface OrderProfitReport {
 }
 
 export const reportsApi = {
+  financeDimensions: (params?: {from?: string; to?: string}) => api.get<FinanceDimensionReport>("/reports/finance-dimensions", {params}).then(r => r.data),
+  exportCsv: (name: string, params?: {from?: string; to?: string}) => api.get<Blob>(`/reports/${name}/export.csv`, {params, responseType: "blob"}).then(r => r.data),
   inventoryHealth: () => api.get<InventoryHealthReport>("/reports/inventory-health").then((r) => r.data),
   monthlyPnl: (params?: { from?: string; to?: string }) =>
     api.get<MonthlyPnlReport>("/reports/monthly-pnl", { params }).then((r) => r.data),
@@ -816,8 +842,9 @@ export interface PolicyVersion {
 export interface ProfitAllocation {
   id: number;
   order_id: number;
-  user_id: number;
+  user_id?: number | null;
   role: string;
+  allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null;
   allocation_rate: string;
   policy_version_id?: number | null;
   total_rate?: string;
@@ -844,7 +871,7 @@ export const policyApi = {
       .then((r) => r.data),
   allocations: (orderId: number) =>
     api.get<{ items: ProfitAllocation[]; total: number }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
-  setAllocations: (orderId: number, items: { user_id: number; role: string; allocation_rate: string }[]) =>
+  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type: "BUY" | "SELL" | "OPERATION" | "COMPANY"; allocation_rate: string }[]) =>
     api.put<{ items: ProfitAllocation[]; total: number }>(`/orders/${orderId}/profit-allocations`, { items }).then((r) => r.data),
   orderSnapshot: (orderId: number) =>
     api
@@ -853,3 +880,53 @@ export const policyApi = {
       )
       .then((r) => r.data),
 };
+
+export interface RouteImpactPreview { changed: boolean; historical_impact: Record<string, unknown>; future_effect: string }
+export interface InstallmentDisposition { id: number; installment_id: number; account_id: number; action: string; occurred_on: string; related_order_id?: number | null; note: string }
+export interface FinanceDimensionRow { pool_id: number; pool_code: string; pool_name: string; pool_account_id?: number | null; account_no?: string | null; account_name?: string | null; fund_nature: string; accounting_attribute: string; direction: string; flow_count: number; amount: string; signed_amount: string }
+export interface FinanceDimensionReport { items: FinanceDimensionRow[]; total_amount: string; total_signed_amount: string }
+export interface PoolAccount { id: number; pool_id: number; account_no: string; account_name: string; account_type: string; ownership: string; opening_balance: string; current_balance: string; status: string }
+export interface Reconciliation { id: number; pool_id: number; pool_account_id?: number | null; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string }
+export interface AttachmentItem { id: number; attachment_no: string; file_name: string; size_bytes: number; created_by: string }
+export interface Lead { id: number; lead_no: string; customer_id: number; request_type: string; budget?: string | null; target: string; status: string }
+export interface QualityIssue { id: number; issue_no: string; severity: string; title: string; entity_type: string; entity_id: string; status: string; message: string }
+export interface QualitySummary { total: number; by_severity: Record<string, number> }
+export interface NotificationItem { id: number; notification_no: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
+export interface SearchResult { id: number; type: string; code: string; title: string; subtitle?: string | null; route: string }
+export const poolAccountsApi = {
+  list: () => api.get<PoolAccount[]>("/pool-accounts").then(r => r.data),
+  create: (data: Record<string, unknown>) => api.post<PoolAccount>("/pool-accounts", data).then(r => r.data),
+  setStatus: (id: number, status: string) => api.patch<PoolAccount>(`/pool-accounts/${id}/status`, { status }).then(r => r.data),
+  batchStatus: (data: { account_ids: number[]; status: string; reason: string }) => api.post<PoolAccount[]>("/pool-accounts/batch-status", data).then(r => r.data),
+};
+export const transfersApi = { create: (data: Record<string, unknown>) => api.post("/transfers", data).then(r => r.data) };
+export const reconciliationsApi = {
+  list: () => api.get<Reconciliation[]>("/reconciliations").then(r => r.data),
+  create: (data: Record<string, unknown>) => api.post<Reconciliation>("/reconciliations", data).then(r => r.data),
+  resolve: (id: number, reason: string) => api.post<Reconciliation>(`/reconciliations/${id}/resolve`, { reason }).then(r => r.data),
+};
+export const attachmentsApi = {
+  list: (entity_type: string, entity_id: string) => api.get<{ items: AttachmentItem[] }>("/attachments", { params: { entity_type, entity_id } }).then(r => r.data),
+  create: (data: Record<string, unknown>) => api.post<AttachmentItem>("/attachments", data).then(r => r.data),
+  download: (id: number) => api.get<Blob>(`/attachments/${id}/download`, { responseType: "blob" }).then(r => r.data),
+  remove: (id: number) => api.delete(`/attachments/${id}`).then(r => r.data),
+};
+export const leadsApi = {
+  list: () => api.get<Lead[]>("/leads").then(r => r.data),
+  create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
+  close: (id: number, reason: string) => api.post<Lead>(`/leads/${id}/close`, { reason }).then(r => r.data),
+  convert: (id: number, order_id: number) => api.post<Lead>(`/leads/${id}/convert`, { order_id }).then(r => r.data),
+};
+export const qualityApi = {
+  summary: () => api.get<QualitySummary>("/quality/exceptions").then(r => r.data),
+  list: () => api.get<{ items: QualityIssue[] }>("/quality/issues").then(r => r.data),
+  create: (data: Record<string, unknown>) => api.post<QualityIssue>("/quality/issues", data).then(r => r.data),
+  close: (id: number, data: { resolution: string; evidence: string }) => api.post<QualityIssue>(`/quality/issues/${id}/close`, data).then(r => r.data),
+  batchClose: (data: { issue_ids: number[]; resolution: string; evidence: string }) => api.post<QualityIssue[]>("/quality/issues/batch-close", data).then(r => r.data),
+};
+export const notificationsApi = {
+  list: (params: { limit: number }) => api.get<{ items: NotificationItem[]; unread_total: number }>("/notifications", { params }).then(r => r.data),
+  markRead: (id: number) => api.post<NotificationItem>(`/notifications/${id}/read`).then(r => r.data),
+  syncOverdueRebates: () => api.post<{ created: number }>("/notifications/sync-overdue-rebates").then(r => r.data),
+};
+export const searchApi = { query: (q: string) => api.get<{ items: SearchResult[] }>("/search", { params: { q } }).then(r => r.data) };

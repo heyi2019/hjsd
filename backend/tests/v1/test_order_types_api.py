@@ -2,8 +2,20 @@
 from __future__ import annotations
 
 from app.core.errors import ErrorCode
+from app.foundation.classification import classification_for_order_type
 
 ORDER_TYPES = "/api/v1/order-types"
+
+
+def test_fixed_business_classification_is_not_inferred_from_capital_type():
+    assert classification_for_order_type("HS") == {
+        "business_mode": "SELF",
+        "business_type": "RECOVERY",
+        "value_added_service": None,
+    }
+    assert classification_for_order_type("TH")["business_mode"] == "DISTRIBUTION"
+    assert classification_for_order_type("DG")["business_type"] == "CONSIGNMENT"
+    assert classification_for_order_type("DFQ")["value_added_service"] == "ADVANCE_PURCHASE"
 
 
 def test_create_business_then_route_then_activate(client, headers, seeded_db):
@@ -86,5 +98,11 @@ def test_duplicate_business_code_returns_422(client, seeded_db, headers):
 
 
 def test_seeded_business_visible(client, seeded_db, headers):
-    codes = {item["code"] for item in client.get(ORDER_TYPES, headers=headers).json()}
+    body = client.get(ORDER_TYPES, headers=headers).json()
+    codes = {item["code"] for item in body}
     assert {"HS", "TH", "DG", "DFQ"} <= codes
+    by_code = {item["code"]: item for item in body}
+    assert by_code["HS"]["business_mode"] == "SELF"
+    assert by_code["TH"]["business_mode"] == "DISTRIBUTION"
+    assert by_code["DG"]["business_type"] == "CONSIGNMENT"
+    assert by_code["DFQ"]["value_added_service"] == "ADVANCE_PURCHASE"

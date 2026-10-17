@@ -29,6 +29,12 @@ class QualityIssueClose(RequestModel):
     evidence: str | None = Field(default=None, max_length=4000)
 
 
+class QualityIssueBatchClose(RequestModel):
+    issue_ids: list[int] = Field(min_length=1, max_length=50)
+    resolution: str = Field(min_length=1, max_length=4000)
+    evidence: str | None = Field(default=None, max_length=4000)
+
+
 class QualityIssueOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

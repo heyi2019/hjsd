@@ -29,8 +29,10 @@ from app.domain.enums import (
     PoolStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
+from app.domain.users import User
 from app.foundation import service as foundation_service
+from app.finance.attributes import accounting_attribute_for_order_event
 from ._common import _positive_money, _required_bool, _required_text
 
 # 事件 → 现金流方向 / 性质 / 分类
@@ -40,6 +42,7 @@ EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
     EventType.SELL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "SELL"),
     EventType.PAYMENT.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "PAYMENT"),
     EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
+    EventType.REFUND.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "REFUND"),
 }
 MONEY_EVENTS = tuple(EVENT_FLOW_MAP.keys())
 
@@ -57,6 +60,7 @@ def post_event(
     delivery_mode: str | None = None,
     offset_event_id: int | None = None,
     reason: str | None = None,
+    refund_responsibility: str | None = None,
     flow_category: str | None = None,
     note: str | None = None,
     user: CurrentUser | None = None,
@@ -91,7 +95,7 @@ def post_event(
     assert_period_open(session, occurred_on, operation="登记业务事件")
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    if order.status != OrderStatus.ACTIVE.value:
+    if order.status != OrderStatus.ACTIVE.value and not (event_type == EventType.REFUND.value and order.status == OrderStatus.COMPLETED.value):
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
@@ -140,6 +144,40 @@ def post_event(
         category = flow_category
 
     money = _positive_money(amount, field="amount")
+    if event_type == EventType.REFUND.value:
+        _required_text(reason, field="reason", message="退款必须填写原因")
+        refund_responsibility = refund_responsibility or "COMPANY"
+        installment = session.scalar(select(Installment).where(Installment.order_id == order.id))
+        delivered = session.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == (EventType.DELIVER.value if installment else EventType.SELL.value), OrderEvent.is_posted.is_(True)))
+        if delivered is None:
+            raise Validation("交付前请使用取消或冲销，交付后才能退款")
+        if refund_responsibility not in {"COMPANY", "CUSTOMER", "CONSIGNOR", "PLATFORM", "OTHER"}:
+            raise Validation(
+                "退款责任方必须为 COMPANY、CUSTOMER、CONSIGNOR、PLATFORM 或 OTHER",
+                details={"field": "refund_responsibility"},
+            )
+        if offset_event_id is not None:
+            raise Validation("退款不使用 offset_event_id")
+        received = session.scalar(
+            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type.in_((EventType.SELL.value, EventType.PAYMENT.value)),
+                OrderEvent.is_posted.is_(True),
+            )
+        ) or 0
+        refunded = session.scalar(
+            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.REFUND.value,
+                OrderEvent.is_posted.is_(True),
+            )
+        ) or 0
+        remaining_refundable = to_money(received) - to_money(refunded)
+        if money > remaining_refundable:
+            raise Validation(
+                f"退款金额超过可退余额 {remaining_refundable}",
+                details={"remaining_refundable": str(remaining_refundable), "amount": str(money)},
+            )
     offset = None
     cancel_fully_consumed = False
     if event_type == EventType.CANCEL.value and offset_event_id is not None:
@@ -195,6 +233,7 @@ def post_event(
         pool_id=resolved_pool_id,
         offset_event_id=offset_event_id,
         reason=reason,
+        refund_responsibility=refund_responsibility,
         note=note,
         is_posted=True,
         posted_at=datetime.now(),
@@ -207,6 +246,10 @@ def post_event(
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
 
+    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+        order.order_type, event_type
+    )
+
     flow = Cashflow(
         flow_no=next_cashflow_no(
             session, order_no=order.order_no, order_id=order.id, category=category
@@ -214,6 +257,8 @@ def post_event(
         pool_id=event.pool_id,
         occurred_on=occurred_on,
         nature=nature,
+        fund_nature=fund_nature,
+        accounting_attribute=accounting_attribute,
         category=category,
         direction=direction,
         amount=money,
@@ -242,6 +287,20 @@ def post_event(
             ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单"
         )
     session.flush()
+
+    # BUY/SELL 收益人自动绑定动作执行人，避免手工选错人员。
+    if event_type in {EventType.BUY.value, EventType.SELL.value}:
+        actor_id = session.scalar(select(User.id).where(User.username == actor))
+        if actor_id is not None:
+            allocations = session.scalars(
+                select(OrderProfitAllocation).where(
+                    OrderProfitAllocation.order_id == order.id,
+                    OrderProfitAllocation.allocation_type == event_type,
+                )
+            ).all()
+            for allocation in allocations:
+                allocation.user_id = actor_id
+                allocation.updated_by = actor
 
     record_audit(
         session,

@@ -55,7 +55,7 @@ describe("OrdersPage：四类业务台账", () => {
     renderApp(<OrdersPage />);
     await screen.findByRole("tab", { name: "业务台账" });
     expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
-    expect(screen.queryByText("获客是通用能力；买号、买入交付、卖号、卖号交付和回款（分期）是执行动作。回收、提号、代挂、代分期分别承载不同业务。")).toBeNull();
+    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂、代分期分别承载不同业务。")).toBeNull();
     expect(screen.queryByText(/待处理/)).toBeNull();
   });
 

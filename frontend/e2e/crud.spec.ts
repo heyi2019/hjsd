@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 /**
  * 真后端「写路径」CRUD 联测（前后端闭环）。
  *
- * 不走 DEV 态 stub，直连真实后端（默认 127.0.0.1:8123），用 admin/12345678 实测：
+ * 不走页面 stub，直连真实后端（默认 127.0.0.1:8123），使用开发态 admin 身份实测：
  *   创建客户 → 落库后出现在列表 → 改名并回读 → 软删除（后端无硬 DELETE，置 DISABLED）。
  * 覆盖 frontend `customersApi` 的 create / list / patch / status 写路径契约。
  *
@@ -14,24 +14,14 @@ import { test, expect } from "@playwright/test";
  */
 const API_BASE =
   process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "12345678";
 const TEST_PREFIX = "联测_CRUD_";
-
-async function login(request: import("@playwright/test").APIRequestContext) {
-  const res = await request.post(`${API_BASE}/auth/login`, {
-    data: { username: ADMIN_USER, password: ADMIN_PASS },
-  });
-  expect(res.status()).toBe(200);
-  return (await res.json()).access_token as string;
-}
+const AUTH_HEADERS = { "X-Dev-User": "admin" };
 
 test.describe("real-backend CRUD round-trip", () => {
   test("创建→读取→更新→软删除（写路径闭环，自清理）", async ({
     request,
   }) => {
-    const token = await login(request);
-    const auth = { Authorization: `Bearer ${token}` };
+    const auth = AUTH_HEADERS;
 
     // 0) 清理残留：把此前运行的 联测_CRUD_ 测试客户置 DISABLED
     const pre = await request.get(`${API_BASE}/customers`, { headers: auth });

@@ -16,6 +16,7 @@ from .order_types import (
     update_order_type,
 )
 from .pools import (
+    _has_cashflow,
     assert_pool_usable,
     create_pool,
     delete_pool,
@@ -29,6 +30,7 @@ from .sequences import ensure_order_sequence, list_sequences, next_order_no, pre
 
 __all__ = [
     "assert_pool_usable",
+    "_has_cashflow",
     "create_order_type",
     "create_pool",
     "delete_pool",

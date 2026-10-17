@@ -10,16 +10,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
-from app.core.errors import ErrorCode, NotFound, Validation
+from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_number
 from app.core.periods import assert_period_open, normalize_period
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
+    AccountingAttribute,
     AuditAction,
     CashflowStatus,
     DepositStatus,
     Direction,
+    FundNature,
     Nature,
     SequenceKey,
 )
@@ -28,6 +30,10 @@ from app.domain.trade import Cashflow, Deposit, Order
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.parties import service as parties_service
+from app.finance.attributes import (
+    accounting_attributes_for_manual_cashflow,
+    validate_fund_accounting_attribute,
+)
 
 from ._common import _non_negative, _positive, _text
 
@@ -86,9 +92,12 @@ def create_cashflow(
     session: Session,
     *,
     pool_id: int,
+    pool_account_id: int | None = None,
     occurred_on: date,
     direction: str,
     nature: str,
+    fund_nature: str | None = None,
+    accounting_attribute: str | None = None,
     category: str,
     amount: Any,
     actor: str,
@@ -127,6 +136,17 @@ def create_cashflow(
         uppercase=True,
         type_message="category 必须为文本",
     )
+    default_fund_nature, default_accounting_attribute = (
+        accounting_attributes_for_manual_cashflow(
+            nature=nature, category=label, direction=direction
+        )
+    )
+    fund_nature = fund_nature or default_fund_nature
+    accounting_attribute = accounting_attribute or default_accounting_attribute
+    try:
+        validate_fund_accounting_attribute(fund_nature, accounting_attribute)
+    except ValueError as exc:
+        raise Validation(str(exc), details={"fund_nature": fund_nature, "accounting_attribute": accounting_attribute}) from exc
     if nature == Nature.EXTERNAL_IN.value and (
         not isinstance(note, str) or not note.strip()
     ):
@@ -134,14 +154,24 @@ def create_cashflow(
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
+    if pool_account_id is not None:
+        from app.domain.foundation import PoolAccount
+        account = session.get(PoolAccount, pool_account_id)
+        if account is None or account.pool_id != pool.id:
+            raise Validation("资金账户不属于所选资金池", details={"pool_account_id": pool_account_id})
+        if account.status != "ACTIVE":
+            raise Validation("停用资金账户不能新增流水", details={"pool_account_id": pool_account_id})
     if order_id is not None:
         orders_service.get_order(session, order_id, user)
     money = _positive(amount, field="amount")
     flow = Cashflow(
         flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
         pool_id=pool.id,
+        pool_account_id=pool_account_id,
         occurred_on=occurred_on,
         nature=nature,
+        fund_nature=fund_nature,
+        accounting_attribute=accounting_attribute,
         category=label,
         direction=direction,
         amount=money,
@@ -282,6 +312,8 @@ def reverse_cashflow(
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
         nature=reverse_nature,
+        fund_nature=flow.fund_nature,
+        accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REVERSAL",
         direction=reverse_direction,
         amount=to_money(flow.amount),
@@ -360,6 +392,8 @@ def create_deposit(
             pool_id=pool.id,
             occurred_on=paid_on,
             nature=Nature.BUSINESS_OUT.value,
+            fund_nature=FundNature.EXTERNAL.value,
+            accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_HOLD",
             direction=Direction.OUT.value,
             amount=money,
@@ -429,6 +463,8 @@ def return_deposit(
             pool_id=deposit.pool_id,
             occurred_on=released_on,
             nature=Nature.BUSINESS_IN.value,
+            fund_nature=FundNature.EXTERNAL.value,
+            accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_RELEASE",
             direction=Direction.IN.value,
             amount=money,
@@ -510,6 +546,8 @@ def lose_deposit(
         pool_id=deposit.pool_id,
         occurred_on=lost_on,
         nature=Nature.BUSINESS_OUT.value,
+        fund_nature=FundNature.EXTERNAL.value,
+        accounting_attribute=AccountingAttribute.DEPOSIT.value,
         category=label,
         direction=Direction.OUT.value,
         amount=money,
@@ -639,9 +677,12 @@ def list_cashflows(
                 "id": flow.id,
                 "flow_no": flow.flow_no,
                 "pool_id": flow.pool_id,
+                "pool_account_id": flow.pool_account_id,
                 "occurred_on": flow.occurred_on,
                 "occurred_at": flow.created_at,
                 "nature": flow.nature,
+                "fund_nature": flow.fund_nature,
+                "accounting_attribute": flow.accounting_attribute,
                 "category": flow.category,
                 "direction": flow.direction,
                 "amount": flow.amount,

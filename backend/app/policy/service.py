@@ -32,7 +32,7 @@ from app.domain.enums import (
 from app.domain.parties import PolicyDefinition, PolicyVersion
 from app.domain.foundation import OrderTypeDef, Pool
 from app.domain.users import User
-from app.domain.trade import Order, OrderProfitAllocation
+from app.domain.trade import Installment, Order, OrderEvent, OrderProfitAllocation
 from app.core.security import CurrentUser
 from app.policy.schemas import ProfitAllocationItem
 
@@ -517,8 +517,47 @@ def set_allocations(
 
     normalized_items = [_normalize_allocation_item(item) for item in items]
     total = Decimal("0")
-    seen: set[tuple[int, str]] = set()
+    seen: set[tuple[str | None, int | None, str]] = set()
     user_ids: set[int] = set()
+    allocation_types: set[str] = set()
+    if len(normalized_items) != 4 or any(not item.get("allocation_type") for item in normalized_items):
+        raise Validation("利润分配必须且只能包含买号、售出、运营和公司归属四项")
+    has_typed_items = True
+    action_actor_ids: dict[str, int] = {}
+    if has_typed_items:
+        for action_type in ("BUY", "SELL"):
+            action = session.scalar(
+                select(OrderEvent)
+                .where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event_type == action_type,
+                    OrderEvent.is_posted.is_(True),
+                )
+                .order_by(OrderEvent.id.desc())
+            )
+            if action is None and action_type == "BUY" and order.account_id is not None:
+                action = session.scalar(select(OrderEvent).join(Order, Order.id == OrderEvent.order_id).where(Order.account_id == order.account_id, OrderEvent.event_type == "BUY", OrderEvent.is_posted.is_(True)).order_by(OrderEvent.id.desc()))
+            if action is not None:
+                actor_id = session.scalar(select(User.id).where(User.username == action.created_by))
+                if actor_id is None:
+                    raise Validation(
+                        f"{action_type} 动作执行人不存在，无法绑定收益人",
+                        details={"event_id": action.id, "actor": action.created_by},
+                    )
+                action_actor_ids[action_type] = actor_id
+            elif action_type == "SELL":
+                contract = session.scalar(select(Installment).where(Installment.order_id == order.id, Installment.contract_type == "STOCK_SALE"))
+                if contract is not None:
+                    actor_id = session.scalar(select(User.id).where(User.username == contract.created_by))
+                    if actor_id is None:
+                        raise Validation("售出动作执行人不存在，无法绑定收益人")
+                    action_actor_ids[action_type] = actor_id
+            elif action_type == "BUY" and order.order_type in {"HS", "TH", "DG"}:
+                # 回收、提号、代挂都属于买号业务动作；DG 沿用标准 SELL
+                # 资金事件，因此其买号收益人取建单操作人员。
+                creator_id = session.scalar(select(User.id).where(User.username == order.created_by))
+                if creator_id is not None:
+                    action_actor_ids[action_type] = creator_id
     for item in normalized_items:
         try:
             rate = to_money(item.get("allocation_rate"))
@@ -535,15 +574,38 @@ def set_allocations(
                 f"分配角色必须为 {AllocationRole.values()}",
                 details={"field": "role", "value": item.get("role")},
             )
+        allocation_type = item.get("allocation_type")
+        if allocation_type is not None:
+            allocation_type = str(allocation_type).upper()
+            if allocation_type not in {"BUY", "SELL", "OPERATION", "COMPANY"}:
+                raise Validation("分配项必须为 BUY、SELL、OPERATION 或 COMPANY；COMPANY 表示公司归属", details={"field": "allocation_type"})
+            if allocation_type in allocation_types:
+                raise Validation("利润分配项不可重复", details={"allocation_type": allocation_type})
+            allocation_types.add(allocation_type)
+            if allocation_type == "COMPANY" and item.get("user_id") is not None:
+                raise Validation("公司收益不绑定人员", details={"field": "user_id"})
+            if allocation_type == "OPERATION" and item.get("user_id") is None:
+                raise Validation("人员收益必须绑定人员", details={"field": "user_id"})
+            if allocation_type in {"BUY", "SELL"} and allocation_type not in action_actor_ids and item.get("user_id") is not None:
+                raise Validation(f"{allocation_type} 收益人必须绑定对应动作执行人", details={"field": "user_id"})
+            if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids:
+                expected_user_id = action_actor_ids[allocation_type]
+                if item.get("user_id") is not None and int(item["user_id"]) != expected_user_id:
+                    raise Validation(
+                        f"{allocation_type} 收益人必须绑定对应动作执行人",
+                        details={"field": "user_id", "expected_user_id": expected_user_id},
+                    )
+                item["user_id"] = expected_user_id
+        if item.get("user_id") is not None:
+            user_ids.add(int(item["user_id"]))
         total += rate
-        key = (int(item["user_id"]), role)
+        key = (allocation_type, int(item["user_id"]) if item.get("user_id") is not None else None, role)
         if key in seen:
             raise Validation(
                 "同一人员同一角色不可重复分配",
                 details={"user_id": key[0], "role": key[1]},
             )
         seen.add(key)
-        user_ids.add(key[0])
 
     existing_user_ids = {
         user_id
@@ -556,6 +618,8 @@ def set_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
+    if has_typed_items and allocation_types != {"BUY", "SELL", "OPERATION", "COMPANY"}:
+        raise Validation("分配项必须完整包含 BUY、SELL、OPERATION、COMPANY；COMPANY 表示公司归属", details={"allocation_types": sorted(allocation_types)})
     if total != Decimal("100.00"):
         raise Validation(
             "有效分配比例合计必须为 100%",
@@ -571,10 +635,16 @@ def set_allocations(
 
     created = []
     for item in normalized_items:
+        allocation_type = str(item["allocation_type"]).upper() if item.get("allocation_type") else None
         row = OrderProfitAllocation(
             order_id=order_id,
-            user_id=int(item["user_id"]),
+            user_id=(
+                action_actor_ids.get(allocation_type)
+                if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids
+                else (int(item["user_id"]) if item.get("user_id") is not None else None)
+            ),
             role=str(item["role"]).upper(),
+            allocation_type=allocation_type,
             allocation_rate=to_money(item.get("allocation_rate")),
             policy_version_id=order.policy_version_id,
         )
@@ -589,7 +659,7 @@ def set_allocations(
         actor=actor,
         after={
             "allocations": [
-                {"user_id": r.user_id, "role": r.role, "rate": str(r.allocation_rate)}
+                {"user_id": r.user_id, "role": r.role, "allocation_type": r.allocation_type, "rate": str(r.allocation_rate)}
                 for r in created
             ]
         },
@@ -616,6 +686,7 @@ def list_allocations(
                 "order_id": row.order_id,
                 "user_id": row.user_id,
                 "role": row.role,
+                "allocation_type": row.allocation_type,
                 "allocation_rate": str(to_money(row.allocation_rate)),
                 "policy_version_id": row.policy_version_id,
             }

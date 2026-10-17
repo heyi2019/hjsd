@@ -1,38 +1,16 @@
-import { DatePicker, Form, Input } from "antd";
-import type { Account } from "../../shared/api/catalog";
-import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
+import { Form, Input } from "antd";
+import { NestedFormField, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CUSTOMER_SOURCE_OPTIONS } from "../recovery/recoveryConfig";
 import "./DgOrderSection.css";
 
-const COMMISSION_MODE_OPTIONS = [
-  { value: "DEDUCT_FROM_SETTLEMENT", label: "从成交结算扣除" },
-  { value: "SEPARATE_PAYMENT", label: "单独收取" },
-];
-
-const COMMISSION_PAYER_OPTIONS = [
-  { value: "BUYER", label: "买家" },
-  { value: "CONSIGNOR", label: "委托方" },
-  { value: "PLATFORM", label: "平台" },
-];
-
-/** 代挂前端表单：委托账号、委托客户与抽成规则统一写入 DG 订单。 */
-export function DgOrderSection(props: { inventoryAccounts: Account[] }) {
+/** 代挂前端表单：沿用统一出售事实登记，订单创建阶段只登记寄售账号与委托客户。 */
+export function DgOrderSection() {
   const customerSource = Form.useWatch("dg_customer_source");
   const isOtherSource = customerSource === "其他";
   return (
     <>
-      <RecoveryAccountSection inventoryAccounts={props.inventoryAccounts}>
-        <NestedFormSection className="nested-form-section--card dg-service-section" title="代挂信息">
-          <AdaptiveFormGrid>
-            <NestedFormField label="挂售价"><Form.Item noStyle name="dg_listing_price"><MoneyInput placeholder="可选填" /></Form.Item></NestedFormField>
-            <NestedFormField label="服务费／抽成"><Form.Item noStyle name="dg_service_fee"><MoneyInput placeholder="可选填" /></Form.Item></NestedFormField>
-            <NestedFormField label="抽成方式"><Form.Item noStyle name="dg_commission_mode" rules={[{ required: true, message: "请选择抽成方式" }]}><Select placeholder="请选择" options={COMMISSION_MODE_OPTIONS} /></Form.Item></NestedFormField>
-            <NestedFormField label="付款方"><Form.Item noStyle name="dg_commission_payer" rules={[{ required: true, message: "请选择付款方" }]}><Select placeholder="请选择" options={COMMISSION_PAYER_OPTIONS} /></Form.Item></NestedFormField>
-            <NestedFormField label="预计结算日"><Form.Item noStyle name="dg_expected_settlement_date"><DatePicker className="dg-service-date" placeholder="可选填" /></Form.Item></NestedFormField>
-          </AdaptiveFormGrid>
-        </NestedFormSection>
-      </RecoveryAccountSection>
+      <RecoveryAccountSection />
 
       <section className="dg-customer-section recovery-customer-fields" aria-labelledby="dg-customer-info-title">
         <div id="dg-customer-info-title" className="recovery-customer-fields__title">委托客户</div>

@@ -24,6 +24,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.foundation import schemas, service
+from app.foundation.classification import classification_for_order_type
 from app.parties import service as parties_service
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
@@ -43,6 +44,16 @@ def _pool_output(db: Session, pool) -> schemas.PoolOut:
         db, entity_type="pool", entity_id=pool.id
     )
     return output
+
+
+def _order_type_output(order_type) -> schemas.OrderTypeOut:
+    payload = schemas.OrderTypeOut.model_validate(order_type)
+    classification = classification_for_order_type(order_type.code)
+    if classification:
+        payload.business_mode = classification["business_mode"]
+        payload.business_type = classification["business_type"]
+        payload.value_added_service = classification["value_added_service"]
+    return payload
 
 
 # --------------------------------------------------------------------- 资金池
@@ -126,7 +137,7 @@ def list_order_types(
 ) -> list[schemas.OrderTypeOut]:
     del user  # 登录即可读；数据范围由上层查询条件施加
     items = service.list_order_types(db, include_inactive=include_inactive)
-    return [schemas.OrderTypeOut.model_validate(item) for item in items]
+    return [_order_type_output(item) for item in items]
 
 
 @router.post("/order-types", response_model=schemas.OrderTypeOut, status_code=201)
@@ -145,7 +156,7 @@ def create_order_type(
         sort_order=payload.sort_order,
         description=payload.description,
     )
-    return schemas.OrderTypeOut.model_validate(order_type)
+    return _order_type_output(order_type)
 
 
 @router.patch("/order-types/{order_type_id}", response_model=schemas.OrderTypeOut)
@@ -163,7 +174,7 @@ def update_order_type(
         description=payload.description,
         sort_order=payload.sort_order,
     )
-    return schemas.OrderTypeOut.model_validate(order_type)
+    return _order_type_output(order_type)
 
 
 @router.patch("/order-types/{order_type_id}/active", response_model=schemas.OrderTypeOut)
@@ -174,7 +185,7 @@ def set_order_type_active(
     user: CurrentUser = manage_order_types,
 ) -> schemas.OrderTypeOut:
     order_type = service.set_order_type_active(db, order_type_id, is_active, actor=_actor(user))
-    return schemas.OrderTypeOut.model_validate(order_type)
+    return _order_type_output(order_type)
 
 
 @router.get("/order-types/{order_type_id}/routes", response_model=list[schemas.RouteOut])

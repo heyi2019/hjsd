@@ -14,7 +14,7 @@ from app.core.money import to_money
 from app.core.numbering import allocate_number
 from app.core.periods import assert_period_open
 from app.core.security import CurrentUser
-from app.domain.enums import AuditAction, Direction, Nature, SequenceKey
+from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature, SequenceKey
 from app.domain.trade import Cashflow
 from app.foundation import service as foundation_service
 
@@ -48,6 +48,8 @@ def create_transfer(
         "transfer_id": transfer_id,
         "occurred_on": occurred_on,
         "nature": Nature.INTERNAL.value,
+        "fund_nature": FundNature.INTERNAL.value,
+        "accounting_attribute": AccountingAttribute.INTERNAL_TRANSFER.value,
         "category": "TRANSFER",
         "amount": money,
         "created_by": actor,
@@ -149,6 +151,8 @@ def repair_transfer(
         pool_id=target.id,
         occurred_on=source.occurred_on,
         nature=Nature.INTERNAL.value,
+        fund_nature=FundNature.INTERNAL.value,
+        accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
         category="TRANSFER",
         direction=direction,
         amount=to_money(source.amount),

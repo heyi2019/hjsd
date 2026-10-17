@@ -108,7 +108,10 @@ export function InventorySaleModal(props: {
         trade_date: today(),
         account_id: props.account.id,
         note: values.note as string | undefined,
-        customer_roles: [{ customer_id: values.customer_id as number, role: "BUYER" }],
+        customer_roles: [{
+          customer_id: values.customer_id as number,
+          role: props.account.inventory_type === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER",
+        }],
       });
 
       if (values.payment_method === "INSTALLMENT") {

@@ -193,6 +193,7 @@ class EventType(StrEnum):
     PAYMENT = "PAYMENT"
     DELIVER = "DELIVER"
     CANCEL = "CANCEL"
+    REFUND = "REFUND"
 
 
 class Nature(StrEnum):
@@ -200,6 +201,32 @@ class Nature(StrEnum):
     BUSINESS_IN = "BUSINESS_IN"
     BUSINESS_OUT = "BUSINESS_OUT"
     INTERNAL = "INTERNAL"
+
+
+class FundNature(StrEnum):
+    """资金所有权性质：本方经营、外部/受托或本方内部调拨。"""
+
+    BUSINESS = "BUSINESS"
+    EXTERNAL = "EXTERNAL"
+    INTERNAL = "INTERNAL"
+
+
+class AccountingAttribute(StrEnum):
+    """资金在经营核算中的具体归类。"""
+
+    SELF_REVENUE = "SELF_REVENUE"
+    SELF_DIRECT_COST = "SELF_DIRECT_COST"
+    TH_DIRECT_COST = "TH_DIRECT_COST"
+    TH_REVENUE = "TH_REVENUE"
+    DFQ_PRINCIPAL = "DFQ_PRINCIPAL"
+    SERVICE_REVENUE = "SERVICE_REVENUE"
+    REBATE_INCOME = "REBATE_INCOME"
+    OPERATING_EXPENSE = "OPERATING_EXPENSE"
+    DEPOSIT = "DEPOSIT"
+    EXTERNAL_FUNDING = "EXTERNAL_FUNDING"
+    INTERNAL_TRANSFER = "INTERNAL_TRANSFER"
+    REVERSAL = "REVERSAL"
+    REFUND = "REFUND"
 
 
 class Direction(StrEnum):
@@ -278,6 +305,11 @@ class ScheduleStatus(StrEnum):
     PAID = "PAID"
     OVERDUE = "OVERDUE"
     WAIVED = "WAIVED"
+
+
+class InstallmentDispositionAction(StrEnum):
+    RECOVER = "RECOVER"
+    RESELL = "RESELL"
 
 
 class DepositStatus(StrEnum):
@@ -413,6 +445,8 @@ class AuditAction(StrEnum):
     INSTALLMENT_DEFAULT = "INSTALLMENT_DEFAULT"
     INSTALLMENT_WAIVE = "INSTALLMENT_WAIVE"
     INSTALLMENT_EXTEND = "INSTALLMENT_EXTEND"
+    INSTALLMENT_RECOVER = "INSTALLMENT_RECOVER"
+    INSTALLMENT_RESELL = "INSTALLMENT_RESELL"
     DELIVER_CREATE = "DELIVER_CREATE"
     REBATE_CREATE = "REBATE_CREATE"
     REBATE_SETTLE = "REBATE_SETTLE"
@@ -458,6 +492,7 @@ __all__ = [
     "AccountStatus",
     "AuditAction",
     "CapitalType",
+    "AccountingAttribute",
     "CashflowStatus",
     "CounterpartyRole",
     "CounterpartyStatus",
@@ -471,7 +506,9 @@ __all__ = [
     "ImportBatchStatus",
     "ImportRowStatus",
     "EventType",
+    "FundNature",
     "InstallmentContractType",
+    "InstallmentDispositionAction",
     "InstallmentStatus",
     "LinkStatus",
     "LeadStatus",

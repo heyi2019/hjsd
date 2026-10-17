@@ -6,16 +6,22 @@ import { InstallmentsPanel } from "./InstallmentsPanel";
 
 const installmentsList = vi.fn();
 const schedules = vi.fn();
+const dispositions = vi.fn();
 const pay = vi.fn();
 const deliver = vi.fn();
+const recover = vi.fn();
+const resale = vi.fn();
 const ordersList = vi.fn();
 
 vi.mock("../shared/api/catalog", () => ({
   installmentsApi: {
     list: (...a: unknown[]) => installmentsList(...a),
     schedules: (...a: unknown[]) => schedules(...a),
+    dispositions: (...a: unknown[]) => dispositions(...a),
     pay: (...a: unknown[]) => pay(...a),
     deliver: (...a: unknown[]) => deliver(...a),
+    recover: (...a: unknown[]) => recover(...a),
+    resale: (...a: unknown[]) => resale(...a),
   },
   ordersApi: { list: (...a: unknown[]) => ordersList(...a), create: vi.fn() },
 }));
@@ -51,6 +57,7 @@ beforeEach(() => {
   schedules.mockResolvedValue([
     { id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
   ]);
+  dispositions.mockResolvedValue([]);
   ordersList.mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
 });
 
@@ -106,6 +113,20 @@ describe("InstallmentsPanel：分期合约", () => {
 });
 
 describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
+  it("已有回收和转售记录时禁用重复处置", async () => {
+    installmentsList.mockResolvedValueOnce([
+      { ...installments[0], status: "OVERDUE" },
+    ]);
+    dispositions.mockResolvedValueOnce([
+      { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+      { id: 2, installment_id: 1, account_id: 2, action: "RESELL", occurred_on: "2026-10-13", note: "转售" },
+    ]);
+    renderApp(<InstallmentsPanel />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    expect(screen.getByRole("button", { name: /登记回收/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /登记转售/ })).toBeDisabled();
+  });
+
   it("登记收款提交后回传金额字符串与收款日期", async () => {
     pay.mockResolvedValueOnce({ id: 1 });
     renderApp(<InstallmentsPanel />, { user: "admin" });

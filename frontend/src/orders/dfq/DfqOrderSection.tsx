@@ -75,6 +75,7 @@ export function DfqOrderSection(props: { pools: Pool[] }) {
                   <div className="dfq-schedule-row" key={field.key}>
                     <span className="dfq-schedule-row__period">第 {index + 1} 期</span>
                     <Form.Item name={[field.name, "due_on"]} label="到期日" rules={[{ required: true, message: "请选择到期日" }]}><DatePicker placeholder="请选择日期" /></Form.Item>
+                    <Form.Item name={[field.name, "service_fee_rate"]} label="本期费率"><Input suffix="%" inputMode="decimal" placeholder="可选填" /></Form.Item>
                     <Form.Item name={[field.name, "note"]} label="期次备注"><Input placeholder="可选填" /></Form.Item>
                     {fields.length > 1 && <button type="button" className="dfq-schedule-row__remove" onClick={() => remove(field.name)}>删除</button>}
                   </div>

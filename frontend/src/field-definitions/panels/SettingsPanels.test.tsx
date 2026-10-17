@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../../test/render";
@@ -7,7 +7,7 @@ import { FieldsPanel } from "./FieldsPanel";
 import { PoolsPanel } from "./PoolsPanel";
 
 const { poolsApi, fieldsApi, policyApi } = vi.hoisted(() => ({
-  poolsApi: { list: vi.fn(), create: vi.fn() },
+  poolsApi: { list: vi.fn(), create: vi.fn(), update: vi.fn() },
   fieldsApi: { list: vi.fn(), create: vi.fn(), setActive: vi.fn(), remove: vi.fn() },
   policyApi: {
     list: vi.fn(),
@@ -50,6 +50,19 @@ describe("设置面板：资金池", () => {
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
     expect(screen.getByText("当前角色无主数据维护权限。")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /新增资金池/ })).toBeNull();
+  });
+
+  it("admin 可编辑资金池名称、用途和归属", async () => {
+    poolsApi.update.mockResolvedValue({ ...pools[0], name: "新托管池" });
+    renderApp(<PoolsPanel />, { user: "admin" });
+    expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /编辑/ }));
+    const dialog = screen.getByRole("dialog", { name: /编辑资金池/ });
+    const name = within(dialog).getAllByRole("textbox")[1];
+    await userEvent.clear(name);
+    await userEvent.type(name, "新托管池");
+    await userEvent.click(within(dialog).getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(poolsApi.update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
   });
 });
 

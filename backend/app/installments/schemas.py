@@ -13,6 +13,7 @@ from app.core.schemas import RequestModel
 class ScheduleCreate(RequestModel):
     period_no: int = Field(ge=1)
     due_on: date
+    service_fee_rate: Decimal = Decimal("0")
 
 
 class InstallmentCreate(RequestModel):
@@ -61,6 +62,7 @@ class ScheduleOut(BaseModel):
     installment_id: int
     period_no: int
     due_on: date
+    service_fee_rate: Decimal
     due_amount: Decimal
     received_amount: Decimal
     waived_amount: Decimal
@@ -83,6 +85,27 @@ class EarlySettlementIn(RequestModel):
 
 class DefaultIn(RequestModel):
     reason: str = Field(min_length=1)
+
+
+class DispositionIn(RequestModel):
+    occurred_on: date
+    note: str = Field(min_length=1)
+
+
+class ResaleIn(DispositionIn):
+    resale_order_id: int
+
+
+class DispositionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    installment_id: int
+    account_id: int
+    action: str
+    occurred_on: date
+    related_order_id: int | None = None
+    note: str
 
 
 class ScheduleWaiveIn(RequestModel):
@@ -114,6 +137,8 @@ class MarkOverdueOut(BaseModel):
 __all__ = [
     "DeliverIn",
     "DefaultIn",
+    "DispositionIn",
+    "DispositionOut",
     "EarlySettlementIn",
     "InstallmentCreate",
     "InstallmentOut",
@@ -124,4 +149,5 @@ __all__ = [
     "ScheduleWaiveIn",
     "ScheduleCreate",
     "ScheduleOut",
+    "ResaleIn",
 ]

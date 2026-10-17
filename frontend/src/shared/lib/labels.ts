@@ -15,6 +15,23 @@ export const CAPITAL_TYPE_LABEL: Record<string, string> = {
   CREDIT: "垫资型",
 };
 
+export const BUSINESS_MODE_LABEL: Record<string, string> = {
+  SELF: "自营",
+  DISTRIBUTION: "分销",
+};
+
+export const BUSINESS_TYPE_LABEL: Record<string, string> = {
+  RECOVERY: "回收",
+  PICKUP: "提号",
+  CONSIGNMENT: "代挂",
+  INSTALLMENT: "代分期",
+};
+
+export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
+  STOCK_SALE: "分期出售",
+  ADVANCE_PURCHASE: "代分期",
+};
+
 export const POOL_TYPE_LABEL: Record<string, string> = {
   INVEST: "投资款",
   PROFIT: "利润",

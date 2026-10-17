@@ -92,7 +92,7 @@ export function RebatesPanel() {
         settled_on: values.settled_on as string,
         pool_id: Number(values.pool_id),
       });
-      message.success("结算已登记，净额 = 到账 - 手续费");
+      message.success("返点结算已登记");
       setSettleTarget(null);
       settleForm.resetFields();
       await load();
@@ -242,7 +242,7 @@ export function RebatesPanel() {
           <Form.Item name="gross_amount" label="到账金额" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="platform_fee" label="手续费">
+          <Form.Item name="platform_fee" label="平台手续费（自动生成费用流水）">
             <Input />
           </Form.Item>
           <Form.Item name="pool_id" label="回款池" rules={[{ required: true }]}>

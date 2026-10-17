@@ -45,23 +45,25 @@ export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
 export const EVENT_TYPE_LABEL: Record<string, string> = {
   BUY: "买号",
   COST: "附加成本",
-  SELL: "卖号",
+  SELL: "售出",
   PAYMENT: "回款（分期）",
   DELIVER: "交付",
   CANCEL: "冲销",
+  REFUND: "退款",
 };
 
 /**
  * 执行动作统一文案：底层事件编码保持稳定，页面不再直接暴露 BUY/SELL/DELIVER。
- * 买入交付和卖号交付结合订单类型判断：代分期是向客户完成卖号交付，其余交付语义归入买入交付。
+ * 买入交付和售出交付结合订单类型判断：代分期是向客户完成售出交付，其余交付语义归入买入交付。
  */
 export const EXECUTION_ACTION_LABEL: Record<string, string> = {
   BUY: "买号",
   COST: "费用支出",
-  SELL: "卖号",
+  SELL: "售出",
   PAYMENT: "回款（分期）",
   DELIVER: "交付",
   CANCEL: "取消",
+  REFUND: "退款",
 };
 
 /** 跨业务复用的能力，不作为买卖资金事件落账。 */
@@ -74,7 +76,7 @@ export function executionActionLabel(
   orderType?: string | null,
 ): string {
   if (!eventType) return "-";
-  if (eventType === "DELIVER") return orderType === "DFQ" ? "卖号交付" : "买入交付";
+  if (eventType === "DELIVER") return orderType === "DFQ" ? "售出交付" : "买入交付";
   return EXECUTION_ACTION_LABEL[eventType] ?? eventType;
 }
 

@@ -25,9 +25,13 @@ export default defineConfig({
     headless: true,
     trace: "on-first-retry",
   },
+  // 可用 ERP_E2E_BACKEND_PORT / ERP_E2E_API_BASE 指向隔离联调服务；默认保持本地 8123。
+  metadata: {
+    backendPort: process.env.ERP_E2E_BACKEND_PORT ?? "8123",
+  },
   webServer: [
     {
-      command: "npx vite --port 5180 --strictPort",
+      command: `VITE_API_BASE=${process.env.ERP_E2E_API_BASE ?? "/api/v1"} npx vite --port 5180 --strictPort`,
       url: "http://localhost:5180",
       // 端口空闲则起新实例；若已有 vite 在 5180 则复用。
       reuseExistingServer: true,
@@ -38,8 +42,8 @@ export default defineConfig({
       // 绑 0.0.0.0 以便前端 .env.local 的 LAN IP（192.168.124.12:8123）也能到达；
       // 若 8123 已有实例则复用（reuseExistingServer）。本机 8000 被 Docker 占用，用 8123。
       command:
-        "cd /Users/aries/黑金时代/backend && /Users/aries/Applications/Python_3.13/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8123",
-      url: "http://127.0.0.1:8123/api/v1/auth/me",
+        `cd /Users/aries/黑金时代/backend && /Users/aries/Applications/Python_3.13/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${process.env.ERP_E2E_BACKEND_PORT ?? "8123"}`,
+      url: `http://127.0.0.1:${process.env.ERP_E2E_BACKEND_PORT ?? "8123"}/api/v1/auth/me`,
       reuseExistingServer: true,
       timeout: 120000,
     },

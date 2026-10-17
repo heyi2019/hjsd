@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import select
 
 from app.core.security import CurrentUser, build_access_token
@@ -218,3 +219,43 @@ class TestQualityScan:
         )
         assert response.status_code == 200, response.text
         assert all(row["entity_id"] != "TR-HIDDEN" for row in response.json()["items"])
+
+
+def test_quality_batch_close_requires_all_issues_open_and_writes_audit(seeded_db):
+    first = service.create_issue(
+        seeded_db, code="BATCH_CLOSE_A", severity="LOW", title="批量一",
+        entity_type="order", entity_id="A", message="待处理", actor="pytest",
+    )
+    second = service.create_issue(
+        seeded_db, code="BATCH_CLOSE_B", severity="LOW", title="批量二",
+        entity_type="order", entity_id="B", message="待处理", actor="pytest",
+    )
+    items = service.batch_close_issues(
+        seeded_db, [first.id, second.id], resolution="已批量处理", evidence="批量凭证", actor="pytest"
+    )
+    assert [item.status for item in items] == ["CLOSED", "CLOSED"]
+    assert all(item.resolution == "已批量处理" for item in items)
+
+    from app.core.errors import Conflict
+    with pytest.raises(Conflict, match="不可重复关闭"):
+        service.batch_close_issues(
+            seeded_db, [first.id, second.id], resolution="重复处理", evidence=None, actor="pytest"
+        )
+
+
+def test_quality_batch_close_endpoint(seeded_client, seeded_db):
+    first = service.create_issue(
+        seeded_db, code="BATCH_API_A", severity="LOW", title="接口批量一",
+        entity_type="order", entity_id="API-A", message="待处理", actor="pytest",
+    )
+    second = service.create_issue(
+        seeded_db, code="BATCH_API_B", severity="LOW", title="接口批量二",
+        entity_type="order", entity_id="API-B", message="待处理", actor="pytest",
+    )
+    response = seeded_client.post(
+        "/api/v1/quality/issues/batch-close",
+        headers={"X-Dev-User": "admin"},
+        json={"issue_ids": [first.id, second.id], "resolution": "接口批量已处理"},
+    )
+    assert response.status_code == 200, response.text
+    assert {item["status"] for item in response.json()} == {"CLOSED"}

@@ -17,6 +17,7 @@ from app.core.security import (
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
     PERM_PERIOD_LOCK,
+    PERM_POOL_MANAGE,
     PERM_TRANSFER_POST,
     CurrentUser,
     require_permissions,
@@ -34,10 +35,76 @@ manage_period_locks = require_permissions(PERM_PERIOD_LOCK)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
 post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 post_transfer = require_permissions(PERM_TRANSFER_POST)
+manage_pool_accounts = require_permissions(PERM_POOL_MANAGE)
 
 
 def _actor(user: CurrentUser) -> str:
     return user.username
+
+
+def _pool_account_out(db: Session, row) -> schemas.PoolAccountOut:
+    output = schemas.PoolAccountOut.model_validate(row)
+    output.current_balance = service.pool_account_balance(db, row)
+    return output
+
+
+@router.get("/pool-accounts", response_model=list[schemas.PoolAccountOut])
+def list_pool_accounts(
+    pool_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.PoolAccountOut]:
+    rows = service.list_pool_accounts(db, pool_id=pool_id)
+    return [_pool_account_out(db, row) for row in rows if user.can_see_pool(row.pool_id)]
+
+
+@router.post("/pool-accounts", response_model=schemas.PoolAccountOut, status_code=201)
+def create_pool_account(
+    payload: schemas.PoolAccountCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_pool_accounts,
+) -> schemas.PoolAccountOut:
+    row = service.create_pool_account(
+        db,
+        pool_id=payload.pool_id,
+        account_no=payload.account_no,
+        account_name=payload.account_name,
+        account_type=payload.account_type.strip().upper(),
+        ownership=payload.ownership.strip().upper(),
+        opening_balance=payload.opening_balance,
+        note=payload.note,
+        actor=_actor(user),
+    )
+    return _pool_account_out(db, row)
+
+
+@router.patch("/pool-accounts/{account_id}/status", response_model=schemas.PoolAccountOut)
+def set_pool_account_status(
+    account_id: int,
+    status: str = Query(...),
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_pool_accounts,
+) -> schemas.PoolAccountOut:
+    row = service.set_pool_account_status(db, account_id, status=status.strip().upper(), actor=_actor(user))
+    return _pool_account_out(db, row)
+
+
+@router.post("/pool-accounts/batch-status", response_model=list[schemas.PoolAccountOut])
+def batch_set_pool_account_status(
+    payload: schemas.PoolAccountBatchStatus,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_pool_accounts,
+) -> list[schemas.PoolAccountOut]:
+    rows = service.batch_set_pool_account_status(
+        db,
+        payload.account_ids,
+        status=payload.status.strip().upper(),
+        reason=payload.reason,
+        actor=_actor(user),
+    )
+    if any(not user.can_see_pool(row.pool_id) for row in rows):
+        raise NotFound("资金账户不存在")
+    return [_pool_account_out(db, row) for row in rows]
 
 
 @router.get("/period-locks", response_model=list[schemas.PeriodLockOut])
@@ -64,45 +131,63 @@ def create_period_lock(
 
 
 def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
-    order = db.get(Order, flow.order_id) if flow.order_id else None
-    if flow.order_event_id is not None:
+    def value(key: str):
+        if isinstance(flow, dict):
+            return flow.get(key)
+        if key == "occurred_at":
+            return flow.created_at
+        return getattr(flow, key)
+    nature = value("nature")
+    category = value("category")
+    direction = value("direction")
+    order_id = value("order_id")
+    order_event_id = value("order_event_id")
+    transfer_id = value("transfer_id")
+    deposit_id = value("deposit_id")
+    order = db.get(Order, order_id) if order_id else None
+    if order_event_id is not None:
         source = "ORDER_EVENT"
-    elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
+    elif category in {"REBATE", "REBATE_REVERSAL"}:
         source = "REBATE_SETTLEMENT"
-    elif flow.deposit_id is not None or flow.category in {
+    elif deposit_id is not None or category in {
         "DEPOSIT_HOLD",
         "DEPOSIT_RELEASE",
         "DEPOSIT_LOSS",
     }:
         source = "DEPOSIT"
-    elif flow.category == "TRANSFER":
+    elif category == "TRANSFER":
         source = "TRANSFER"
     else:
         source = "OTHER"
     return schemas.CashflowOut(
-        id=flow.id,
-        flow_no=flow.flow_no,
-        pool_id=flow.pool_id,
-        occurred_on=flow.occurred_on,
-        occurred_at=flow.created_at,
-        nature=flow.nature,
-        category=flow.category,
-        direction=flow.direction,
-        amount=flow.amount,
-        status=flow.status,
-        reviewed_by=flow.reviewed_by,
-        reviewed_at=flow.reviewed_at,
-        reversal_of_id=flow.reversal_of_id,
-        order_id=flow.order_id,
+        id=value("id"),
+        flow_no=value("flow_no"),
+        pool_id=value("pool_id"),
+        pool_account_id=value("pool_account_id"),
+        occurred_on=value("occurred_on"),
+        occurred_at=value("occurred_at"),
+        nature=nature,
+        fund_nature=value("fund_nature"),
+        accounting_attribute=value("accounting_attribute"),
+        category=category,
+        direction=direction,
+        amount=value("amount"),
+        status=value("status"),
+        reviewed_by=value("reviewed_by"),
+        reviewed_at=value("reviewed_at"),
+        reversal_of_id=value("reversal_of_id"),
+        order_id=order_id,
         order_no=order.order_no if order else None,
-        deposit_id=flow.deposit_id,
-        order_event_id=flow.order_event_id,
-        transfer_id=flow.transfer_id,
+        deposit_id=deposit_id,
+        order_event_id=order_event_id,
+        transfer_id=transfer_id,
         source=source,
-        note=flow.note,
-        operator=flow.created_by,
+        note=value("note"),
+        operator=(value("operator") or value("created_by"))
+        if isinstance(flow, dict)
+        else flow.created_by,
         extra_values=parties_service.get_extra_values(
-            db, entity_type="cashflow", entity_id=flow.id
+            db, entity_type="cashflow", entity_id=value("id")
         ),
     )
 
@@ -176,7 +261,7 @@ def list_cashflows(
             offset=offset,
             user=user,
         )
-        return [schemas.CashflowOut.model_validate(item) for item in items]
+        return [_cashflow_out(db, item) for item in items]
 
     items = service.list_cashflows(
         db,
@@ -190,7 +275,7 @@ def list_cashflows(
         offset=offset,
         user=user,
     )
-    return [schemas.CashflowOut.model_validate(item) for item in items]
+    return [_cashflow_out(db, item) for item in items]
 
 
 @router.post("/cashflows", response_model=schemas.CashflowOut, status_code=201)
@@ -202,9 +287,16 @@ def create_cashflow(
     flow = service.create_cashflow(
         db,
         pool_id=payload.pool_id,
+        pool_account_id=payload.pool_account_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
         nature=payload.nature.strip().upper(),
+        fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
+        accounting_attribute=(
+            payload.accounting_attribute.strip().upper()
+            if payload.accounting_attribute
+            else None
+        ),
         category=payload.category,
         amount=payload.amount,
         order_id=payload.order_id,
@@ -260,6 +352,7 @@ def reverse_cashflow(
 @router.get("/reconciliations", response_model=list[schemas.ReconciliationOut])
 def list_reconciliations(
     pool_id: int | None = Query(default=None),
+    pool_account_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> list[schemas.ReconciliationOut]:
@@ -268,6 +361,7 @@ def list_reconciliations(
     items = service.list_reconciliations(
         db,
         pool_id=pool_id,
+        pool_account_id=pool_account_id,
         pool_ids=None
         if pool_id is not None or user.is_admin or user.owner_scope == "ALL"
         else sorted(user.pool_ids),
@@ -287,6 +381,7 @@ def create_reconciliation(
     item = service.create_reconciliation(
         db,
         pool_id=payload.pool_id,
+        pool_account_id=payload.pool_account_id,
         reconciled_on=payload.reconciled_on,
         account_label=payload.account_label,
         statement_balance=payload.statement_balance,

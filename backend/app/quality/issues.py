@@ -153,7 +153,51 @@ def close_issue(
     )
     return issue
 
+
+def batch_close_issues(
+    session: Session,
+    issue_ids: list[int],
+    *,
+    resolution: str,
+    evidence: str | None,
+    actor: str,
+) -> list[QualityIssue]:
+    if not issue_ids or len(issue_ids) > 50 or len(issue_ids) != len(set(issue_ids)):
+        raise Validation("批量关闭工单必须选择 1-50 个且不能重复")
+    text_resolution = resolution.strip()
+    if not text_resolution:
+        raise Validation("关闭质量工单必须填写解决方式", details={"field": "resolution"})
+    rows = list(session.scalars(select(QualityIssue).where(QualityIssue.id.in_(issue_ids))).all())
+    by_id = {row.id: row for row in rows}
+    missing = [issue_id for issue_id in issue_ids if issue_id not in by_id]
+    if missing:
+        raise NotFound("质量工单不存在", details={"issue_ids": missing})
+    closed = [row.issue_no for row in rows if row.status == QualityIssueStatus.CLOSED.value]
+    if closed:
+        raise Conflict("已关闭质量工单不可重复关闭", details={"issue_no": closed})
+    closed_at = datetime.now()
+    for issue_id in issue_ids:
+        issue = by_id[issue_id]
+        issue.status = QualityIssueStatus.CLOSED.value
+        issue.resolution = text_resolution
+        issue.evidence = evidence.strip() if evidence else None
+        issue.closed_by = actor
+        issue.closed_at = closed_at
+        issue.updated_by = actor
+        record_audit(
+            session,
+            action=AuditAction.QUALITY_ISSUE_CLOSE,
+            entity_type="quality_issue",
+            entity_id=issue.issue_no,
+            actor=actor,
+            after={"status": issue.status, "resolution": issue.resolution, "batch": True},
+            reason=text_resolution,
+        )
+    session.flush()
+    return [by_id[issue_id] for issue_id in issue_ids]
+
 __all__ = [
+    "batch_close_issues",
     "close_issue",
     "create_issue",
     "get_issue",

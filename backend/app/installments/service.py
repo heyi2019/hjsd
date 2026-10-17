@@ -23,7 +23,7 @@ from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import require_non_negative, require_positive, to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.core.numbering import allocate_number
-from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
+from app.core.state_machine import ACCOUNT_TRANSITIONS, INSTALLMENT_TRANSITIONS, transition
 from app.policy import service as policy_service
 from app.domain.enums import (
     AccountStatus,
@@ -31,12 +31,22 @@ from app.domain.enums import (
     DeliveryMode,
     EventType,
     InstallmentContractType,
+    InstallmentDispositionAction,
     InstallmentStatus,
     PolicyType,
     ScheduleStatus,
     SequenceKey,
 )
-from app.domain.trade import Account, Installment, InstallmentSchedule, Order, OrderEvent
+from app.domain.trade import (
+    Account,
+    Installment,
+    InstallmentDisposition,
+    InstallmentSchedule,
+    Order,
+    OrderEvent,
+    OrderProfitAllocation,
+)
+from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.installments.schemas import ScheduleCreate
@@ -201,11 +211,13 @@ def create_installment(
         raise Validation("期数必须大于 0", details={"field": "periods", "value": periods})
 
     schedule_dates: dict[int, date] = {}
+    schedule_rates: dict[int, Decimal] = {}
     for item in _normalize_schedule(schedule):
         period_no = item["period_no"]
         if period_no < 1 or period_no > periods or period_no in schedule_dates:
             raise Validation("分期计划期次必须从 1 开始且不能重复", details={"period_no": period_no})
         schedule_dates[period_no] = item["due_on"]
+        schedule_rates[period_no] = _non_negative(item.get("service_fee_rate", 0), field="service_fee_rate")
 
     if delivery_mode is not None:
         try:
@@ -278,6 +290,12 @@ def create_installment(
     )
     session.add(installment)
     session.flush()
+    if contract_type == InstallmentContractType.STOCK_SALE.value:
+        actor_id = session.scalar(select(User.id).where(User.username == actor))
+        if actor_id is not None:
+            for allocation in session.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id, OrderProfitAllocation.allocation_type == "SELL")).all():
+                allocation.user_id = actor_id
+                allocation.updated_by = actor
 
     # 首付为期次 0，其后按期递增
     session.add(
@@ -285,6 +303,7 @@ def create_installment(
             installment_id=installment.id,
             period_no=0,
             due_on=first_due_on,
+            service_fee_rate=Decimal("0"),
             due_amount=down_payment_amount,
             received_amount=Decimal("0"),
             waived_amount=Decimal("0"),
@@ -297,6 +316,7 @@ def create_installment(
                 installment_id=installment.id,
                 period_no=index,
                 due_on=schedule_dates.get(index, _add_months(first_due_on, index - 1)),
+                service_fee_rate=schedule_rates.get(index, Decimal("0")),
                 due_amount=per_period_amount,
                 received_amount=Decimal("0"),
                 waived_amount=Decimal("0"),
@@ -739,6 +759,155 @@ def mark_default(
         reason=text_reason,
     )
     return installment
+
+
+def recover_account(
+    session: Session,
+    installment_id: int,
+    *,
+    occurred_on: date,
+    actor: str,
+    note: str,
+    user: CurrentUser | None = None,
+) -> InstallmentDisposition:
+    """登记逾期/违约后的账号回收，不改写原分期应收。"""
+    text_note = _required_text(note, field="note", message="回收必须填写说明")
+    installment = get_installment(session, installment_id, user)
+    if installment.status not in {
+        InstallmentStatus.OVERDUE.value,
+        InstallmentStatus.DEFAULTED.value,
+    }:
+        raise Validation("只有逾期或违约合约可以回收账号")
+    order = session.get(Order, installment.order_id)
+    if order is None or order.account_id is None:
+        raise Validation("分期合约没有可回收的账号")
+    account = session.get(Account, order.account_id)
+    if account is None:
+        raise NotFound("分期合约关联账号不存在")
+    existing = session.scalar(
+        select(InstallmentDisposition).where(
+            InstallmentDisposition.installment_id == installment.id,
+            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
+        )
+    )
+    if existing is not None:
+        raise Conflict("该分期合约已登记回收")
+    account.status = transition(
+        ACCOUNT_TRANSITIONS, account.status, "RECOVER", entity="账号"
+    )
+    account.updated_by = actor
+    disposition = InstallmentDisposition(
+        installment_id=installment.id,
+        account_id=account.id,
+        action=InstallmentDispositionAction.RECOVER.value,
+        occurred_on=occurred_on,
+        note=text_note,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(disposition)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_RECOVER,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        after={"account_id": account.id, "occurred_on": occurred_on.isoformat()},
+        reason=text_note,
+    )
+    return disposition
+
+
+def record_resale(
+    session: Session,
+    installment_id: int,
+    *,
+    resale_order_id: int,
+    occurred_on: date,
+    actor: str,
+    note: str,
+    user: CurrentUser | None = None,
+) -> InstallmentDisposition:
+    """登记回收账号已通过新库存售出流程转售。"""
+    text_note = _required_text(note, field="note", message="转售必须填写说明")
+    installment = get_installment(session, installment_id, user)
+    if installment.status not in {
+        InstallmentStatus.OVERDUE.value,
+        InstallmentStatus.DEFAULTED.value,
+    }:
+        raise Validation("只有逾期或违约合约可以登记转售")
+    original_order = session.get(Order, installment.order_id)
+    resale_order = session.get(Order, resale_order_id)
+    if original_order is None or original_order.account_id is None:
+        raise Validation("分期合约没有可转售的账号")
+    if resale_order is None or resale_order.id == original_order.id:
+        raise Validation("转售必须关联新的售出订单")
+    if resale_order.account_id != original_order.account_id:
+        raise Validation("转售订单必须关联同一个账号")
+    recovered = session.scalar(
+        select(InstallmentDisposition).where(
+            InstallmentDisposition.installment_id == installment.id,
+            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
+        )
+    )
+    if recovered is None:
+        raise Validation("转售前必须先登记回收")
+    posted_sell = session.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == resale_order.id,
+            OrderEvent.event_type == EventType.SELL.value,
+            OrderEvent.is_posted.is_(True),
+        )
+    )
+    if posted_sell is None:
+        raise Validation("转售订单必须先登记 SELL 事件")
+    existing = session.scalar(
+        select(InstallmentDisposition).where(
+            InstallmentDisposition.installment_id == installment.id,
+            InstallmentDisposition.action == InstallmentDispositionAction.RESELL.value,
+        )
+    )
+    if existing is not None:
+        raise Conflict("该分期合约已登记转售")
+    disposition = InstallmentDisposition(
+        installment_id=installment.id,
+        account_id=original_order.account_id,
+        action=InstallmentDispositionAction.RESELL.value,
+        occurred_on=occurred_on,
+        related_order_id=resale_order.id,
+        note=text_note,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(disposition)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_RESELL,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        after={"account_id": original_order.account_id, "resale_order_id": resale_order.id},
+        reason=text_note,
+    )
+    return disposition
+
+
+def list_dispositions(
+    session: Session,
+    installment_id: int,
+    user: CurrentUser | None = None,
+) -> list[InstallmentDisposition]:
+    """返回分期账号处置历史，按发生时间和登记顺序排列。"""
+    installment = get_installment(session, installment_id, user)
+    return list(
+        session.scalars(
+            select(InstallmentDisposition)
+            .where(InstallmentDisposition.installment_id == installment.id)
+            .order_by(InstallmentDisposition.occurred_on, InstallmentDisposition.id)
+        ).all()
+    )
 
 
 def deliver(

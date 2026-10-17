@@ -41,7 +41,10 @@ from app.domain.enums import (
     DepositStatus,
     Direction,
     EventType,
+    AccountingAttribute,
+    FundNature,
     InstallmentContractType,
+    InstallmentDispositionAction,
     InventoryType,
     InstallmentStatus,
     LinkStatus,
@@ -168,7 +171,6 @@ class Order(Base, AuditMixin):
     order_type: Mapped[str] = mapped_column(String(16), nullable=False)
     capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
-    # DG 代挂结算条款：寄售登记可为空，成交前由业务补齐并固化在订单上。
     listing_price: Mapped[object | None] = mapped_column(Amount, nullable=True)
     service_fee: Mapped[object | None] = mapped_column(Amount, nullable=True)
     commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -179,6 +181,15 @@ class Order(Base, AuditMixin):
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
     )
+    # HS / TH / DG 内联填写的游戏账号资料：库存编号由库存中心建档时自动生成，
+    # 这里的字段逐个独立落库，不塞进 account_snapshot（非 DFQ 的 account_snapshot 必须为 NULL）。
+    game_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    game_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    bound_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    account_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=OrderStatus.ACTIVE.value
     )
@@ -280,6 +291,7 @@ class OrderEvent(Base, AuditMixin):
     is_posted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refund_responsibility: Mapped[str | None] = mapped_column(String(32), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -291,6 +303,16 @@ class Cashflow(Base, AuditMixin):
         CheckConstraint(
             f"nature IN {Nature.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_nature_valid",
+        ),
+        CheckConstraint(
+            f"fund_nature IN {FundNature.values()!r}".replace("[", "(").replace("]", ")"),
+            name="cashflow_fund_nature_valid",
+        ),
+        CheckConstraint(
+            f"accounting_attribute IN {AccountingAttribute.values()!r}"
+            .replace("[", "(")
+            .replace("]", ")"),
+            name="cashflow_accounting_attribute_valid",
         ),
         CheckConstraint(
             f"direction IN {Direction.values()!r}".replace("[", "(").replace("]", ")"),
@@ -314,9 +336,12 @@ class Cashflow(Base, AuditMixin):
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
+        Index("ix_cashflow_pool_account", "pool_account_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_deposit", "deposit_id"),
         Index("ix_cashflow_nature", "nature"),
+        Index("ix_cashflow_fund_nature", "fund_nature"),
+        Index("ix_cashflow_accounting_attribute", "accounting_attribute"),
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
         Index("ix_cashflow_occurred_on", "occurred_on"),
@@ -329,8 +354,19 @@ class Cashflow(Base, AuditMixin):
     pool_id: Mapped[int] = mapped_column(
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
+    pool_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pool_accounts.id", ondelete="SET NULL"), nullable=True
+    )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
     nature: Mapped[str] = mapped_column(String(16), nullable=False)
+    fund_nature: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=FundNature.BUSINESS.value,
+        server_default=FundNature.BUSINESS.value,
+    )
+    accounting_attribute: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=AccountingAttribute.OPERATING_EXPENSE.value,
+        server_default=AccountingAttribute.OPERATING_EXPENSE.value,
+    )
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
@@ -363,6 +399,7 @@ class Reconciliation(Base, AuditMixin):
     __table_args__ = (
         UniqueConstraint(
             "pool_id",
+            "pool_account_id",
             "reconciled_on",
             "account_label",
             name="uq_reconciliations_scope",
@@ -385,6 +422,9 @@ class Reconciliation(Base, AuditMixin):
     pool_id: Mapped[int] = mapped_column(
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
+    pool_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pool_accounts.id", ondelete="SET NULL"), nullable=True
+    )
     reconciled_on: Mapped[date] = mapped_column(Date, nullable=False)
     account_label: Mapped[str] = mapped_column(String(128), nullable=False)
     system_balance: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
@@ -405,7 +445,7 @@ class OrderProfitAllocation(Base, TimestampMixin):
 
     __tablename__ = "order_profit_allocations"
     __table_args__ = (
-        UniqueConstraint("order_id", "user_id", "role", name="uq_order_profit_alloc"),
+        UniqueConstraint("order_id", "allocation_type", "user_id", "role", name="uq_order_profit_alloc"),
         CheckConstraint(
             f"role IN {AllocationRole.values()!r}".replace("[", "(").replace("]", ")"),
             name="allocation_role_valid",
@@ -418,6 +458,7 @@ class OrderProfitAllocation(Base, TimestampMixin):
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
     )
+    allocation_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -520,6 +561,7 @@ class InstallmentSchedule(Base, TimestampMixin):
     )
     period_no: Mapped[int] = mapped_column(Integer, nullable=False)
     due_on: Mapped[date] = mapped_column(Date, nullable=False)
+    service_fee_rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     due_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     received_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     waived_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
@@ -527,6 +569,34 @@ class InstallmentSchedule(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=ScheduleStatus.PENDING.value
     )
+
+
+class InstallmentDisposition(Base, AuditMixin):
+    """逾期后的账号处置事实：回收或回收后的转售。"""
+
+    __tablename__ = "installment_dispositions"
+    __table_args__ = (
+        CheckConstraint(
+            f"action IN {InstallmentDispositionAction.values()!r}".replace("[", "(").replace("]", ")"),
+            name="installment_disposition_action_valid",
+        ),
+        UniqueConstraint("installment_id", "action", name="uq_installment_disposition_action"),
+        Index("ix_installment_dispositions_account", "account_id", "occurred_on"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    installment_id: Mapped[int] = mapped_column(
+        ForeignKey("installments.id", ondelete="RESTRICT"), nullable=False
+    )
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
+    related_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=True
+    )
+    note: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class Deposit(Base, AuditMixin):
@@ -661,6 +731,9 @@ class RebateSettlement(Base, AuditMixin):
     cashflow_id: Mapped[int | None] = mapped_column(
         ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
     )
+    fee_cashflow_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
+    )
     reversal_of_id: Mapped[int | None] = mapped_column(
         ForeignKey("rebate_settlements.id", ondelete="RESTRICT"), nullable=True
     )
@@ -672,6 +745,7 @@ __all__ = [
     "Cashflow",
     "Deposit",
     "Installment",
+    "InstallmentDisposition",
     "InstallmentSchedule",
     "Order",
     "OrderLink",

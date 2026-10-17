@@ -39,6 +39,7 @@ from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 
 from .issues import (
+    batch_close_issues,
     close_issue,
     create_issue,
     get_issue,
@@ -635,6 +636,7 @@ def metrics(
 
 
 __all__ = [
+    "batch_close_issues",
     "close_issue",
     "create_issue",
     "get_issue",

@@ -31,8 +31,9 @@ test.describe("real frontend<->backend integration", () => {
     expect(Array.isArray(body)).toBe(true);
     expect(body.length).toBeGreaterThanOrEqual(1);
 
-    // 真实客户名经前端渲染出现在 DOM（证明数据真的从后端流到页面）。
-    await expect(page.getByText("yaotong5200629").first()).toBeVisible();
+    // 取真实响应中的客户名断言渲染，避免把测试绑定到会变化的种子名称。
+    expect(body.length).toBeGreaterThan(0);
+    await expect(page.getByText(body[0].display_name).first()).toBeVisible();
   });
 
   test("资金中心：真实 /pools 返回荷包且渲染到页面", async ({ page }) => {

@@ -355,7 +355,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(ordersCreate.mock.calls[0][0]).toMatchObject({
       order_type: "DG",
       account_id: 5,
-      customer_roles: [{ customer_id: 7, role: "BUYER" }],
+      customer_roles: [{ customer_id: 7, role: "CONSIGNOR" }],
     });
     expect(ordersPostEvent).toHaveBeenCalledWith(21, expect.objectContaining({
       event_type: "SELL",

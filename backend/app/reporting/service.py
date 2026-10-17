@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -31,7 +31,7 @@ from app.domain.enums import (
     OrderStatus,
     RebateStatus,
 )
-from app.domain.foundation import Pool
+from app.domain.foundation import Pool, PoolAccount
 from app.domain.trade import (
     Account,
     Cashflow,
@@ -43,6 +43,7 @@ from app.domain.trade import (
     RebateSettlement,
 )
 from app.parties import service as parties_service
+from app.foundation.classification import classification_for_order_type
 
 ZERO = Decimal("0")
 REPORT_NAMES = frozenset(
@@ -53,6 +54,7 @@ REPORT_NAMES = frozenset(
         "business-pnl",
         "daily-funds",
         "order-profit",
+        "finance-dimensions",
     }
 )
 
@@ -93,6 +95,8 @@ def report_for_export(
         )
     if name == "business-pnl":
         return r5_business_pnl(session, from_date=from_date, to_date=to_date, user=user)
+    if name == "finance-dimensions":
+        return finance_dimension_report(session, from_date=from_date, to_date=to_date, user=user)
     if name == "daily-funds":
         return daily_funds_report(session, on=on, user=user)
     return order_profit_detail(session, from_date=from_date, to_date=to_date, user=user)
@@ -133,6 +137,79 @@ def report_csv(report: dict[str, Any]) -> str:
     for row in rows:
         writer.writerow({key: normalize(row.get(key)) for key in columns})
     return "\ufeff" + stream.getvalue()
+
+
+def finance_dimension_report(
+    session: Session,
+    *,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """按资金性质、核算属性、方向和账户聚合已审核流水。"""
+    _validate_date_range(from_date, to_date)
+    stmt = (
+        select(
+            Pool.id.label("pool_id"),
+            Pool.code.label("pool_code"),
+            Pool.name.label("pool_name"),
+            PoolAccount.id.label("pool_account_id"),
+            PoolAccount.account_no.label("account_no"),
+            PoolAccount.account_name.label("account_name"),
+            Cashflow.fund_nature,
+            Cashflow.accounting_attribute,
+            Cashflow.direction,
+            func.count(Cashflow.id).label("flow_count"),
+            func.sum(Cashflow.amount).label("amount"),
+            func.sum(
+                case(
+                    (Cashflow.direction == Direction.IN.value, Cashflow.amount),
+                    else_=-Cashflow.amount,
+                )
+            ).label("signed_amount"),
+        )
+        .join(Pool, Pool.id == Cashflow.pool_id)
+        .outerjoin(PoolAccount, PoolAccount.id == Cashflow.pool_account_id)
+        .where(Cashflow.status == CashflowStatus.APPROVED.value)
+        .group_by(
+            Pool.id, Pool.code, Pool.name, PoolAccount.id, PoolAccount.account_no,
+            PoolAccount.account_name, Cashflow.fund_nature,
+            Cashflow.accounting_attribute, Cashflow.direction,
+        )
+        .order_by(Pool.code, PoolAccount.account_no, Cashflow.fund_nature, Cashflow.accounting_attribute, Cashflow.direction)
+    )
+    if from_date is not None:
+        stmt = stmt.where(Cashflow.occurred_on >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(Cashflow.occurred_on <= to_date)
+    visible_pool_ids = _visible_pool_ids(user)
+    if visible_pool_ids is not None:
+        stmt = stmt.where(Cashflow.pool_id.in_(visible_pool_ids))
+    rows = session.execute(stmt).mappings().all()
+    items = [
+        {
+            "pool_id": row["pool_id"],
+            "pool_code": row["pool_code"],
+            "pool_name": row["pool_name"],
+            "pool_account_id": row["pool_account_id"],
+            "account_no": row["account_no"],
+            "account_name": row["account_name"],
+            "fund_nature": row["fund_nature"],
+            "accounting_attribute": row["accounting_attribute"],
+            "direction": row["direction"],
+            "flow_count": int(row["flow_count"] or 0),
+            "amount": _money(row["amount"]),
+            "signed_amount": _money(row["signed_amount"]),
+        }
+        for row in rows
+    ]
+    return {
+        "from_date": from_date.isoformat() if from_date else None,
+        "to_date": to_date.isoformat() if to_date else None,
+        "items": items,
+        "total_amount": _sum_report_field(items, "amount"),
+        "total_signed_amount": _sum_report_field(items, "signed_amount"),
+    }
 
 
 def _sum_report_field(items: list[dict[str, Any]], field: str) -> Decimal:
@@ -325,18 +402,15 @@ def r2_monthly_pnl(
         revenue[key] += income
         direct_cost[key] += buy_amount + event_cost
 
-    # 运营费用 = 非订单来源的已审核业务支出流水；返点、押金、划转不重复计入。
+    # 运营费用只认资金属性，避免依赖自由填写的流水类别。
     op_stmt = select(Cashflow).where(
         Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
-        Cashflow.category.notin_(
-            {
-                "REBATE",
-                "REBATE_REVERSAL",
-                "DEPOSIT_HOLD",
-                "DEPOSIT_RELEASE",
-                "TRANSFER",
-            }
+        or_(Cashflow.fund_nature == "BUSINESS", Cashflow.category == "OPERATING_COST"),
+        or_(
+            Cashflow.accounting_attribute == "OPERATING_EXPENSE",
+            Cashflow.accounting_attribute == "REVERSAL",
+            Cashflow.category == "OPERATING_COST",
         ),
     )
     pool_ids = _visible_pool_ids(user)
@@ -376,33 +450,33 @@ def r2_monthly_pnl(
     )
     rebate_stmt = _apply_order_scope(rebate_stmt, user, session)
     rebate_rows = session.execute(rebate_stmt).all()
-    rebate_net: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    rebate_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for settled_on, gross, fee, reversal_of_id in rebate_rows:
         if from_date and settled_on < from_date:
             continue
         if to_date and settled_on > to_date:
             continue
         sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
-        rebate_net[_month_key(settled_on)] += sign * (_money(gross) - _money(fee))
+        rebate_income[_month_key(settled_on)] += sign * _money(gross)
 
-    for bucket in (revenue, direct_cost, operating, rebate_net):
+    for bucket in (revenue, direct_cost, operating, rebate_income):
         for month in list(bucket):
             if bucket[month] == ZERO:
                 del bucket[month]
-    months = sorted(set(revenue) | set(direct_cost) | set(operating) | set(rebate_net))
+    months = sorted(set(revenue) | set(direct_cost) | set(operating) | set(rebate_income))
     items = []
     for month in months:
         income = revenue[month]
         cost = direct_cost[month]
         op = operating[month]
-        rebate = rebate_net[month]
+        rebate = rebate_income[month]
         items.append(
             {
                 "month": month,
                 "sales_income": income,
                 "account_direct_cost": cost,
                 "operating_expense": op,
-                "rebate_net": rebate,
+                "rebate_income": rebate,
                 "operating_profit": income - cost - op + rebate,
             }
         )
@@ -412,7 +486,7 @@ def r2_monthly_pnl(
             "sales_income": _sum_report_field(items, "sales_income"),
             "account_direct_cost": _sum_report_field(items, "account_direct_cost"),
             "operating_expense": _sum_report_field(items, "operating_expense"),
-            "rebate_net": _sum_report_field(items, "rebate_net"),
+            "rebate_income": _sum_report_field(items, "rebate_income"),
             "operating_profit": _sum_report_field(items, "operating_profit"),
         },
     }
@@ -466,6 +540,7 @@ def r3_commission_reconciliation(
                 "user_id": allocation.user_id,
                 "order_no": order.order_no,
                 "order_id": order.id,
+                "allocation_type": allocation.allocation_type,
                 "profit_base": base,
                 "rate": allocation.allocation_rate,
                 "payable": ZERO,
@@ -582,7 +657,8 @@ def r5_business_pnl(
         expected = (
             _money(record.base_amount) * _money(record.rate) / Decimal("100")
         ).quantize(Decimal("0.01"))
-        settled[bucket] += settled_gross - settled_fee
+        settled[bucket] += settled_gross
+        cost[bucket] += settled_fee
         # 分次结算只减少剩余未归集金额；没有结算记录时即为全部应收返点。
         unsettled[bucket] += max(ZERO, expected - settled_gross)
 
@@ -591,9 +667,15 @@ def r5_business_pnl(
         income = revenue[order_type]
         direct = cost[order_type]
         gross_profit = income - direct
+        classification = classification_for_order_type(order_type) or {
+            "business_mode": None,
+            "business_type": None,
+            "value_added_service": None,
+        }
         items.append(
             {
                 "order_type": order_type,
+                **classification,
                 "main_income": income,
                 "main_cost": direct,
                 "main_profit": gross_profit,
@@ -766,7 +848,8 @@ def order_profit_detail(
         ).all()
         for gross, fee, reversal_of_id in settlements:
             sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
-            rebate += sign * (_money(gross) - _money(fee))
+            rebate += sign * _money(gross)
+            direct_cost += sign * _money(fee)
         items.append(
             {
                 "order_no": order.order_no,
@@ -797,6 +880,7 @@ def order_profit_detail(
 __all__ = [
     "REPORT_NAMES",
     "daily_funds_report",
+    "finance_dimension_report",
     "order_profit_detail",
     "report_csv",
     "report_for_export",

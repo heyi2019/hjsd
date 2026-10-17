@@ -79,13 +79,16 @@ class OrderCreate(BaseModel):
 
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
-    listing_price: Decimal | None = Field(default=None, ge=0)
-    service_fee: Decimal | None = Field(default=None, ge=0)
-    commission_mode: str | None = None
-    commission_payer: str | None = None
-    expected_settlement_date: date | None = None
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
+    # HS / TH / DG 内联游戏账号字段，逐个独立落库（DFQ 走 account_snapshot，不填这些）。
+    game_type: str | None = Field(default=None, max_length=64)
+    game_account: str | None = Field(default=None, max_length=128)
+    game_password: str | None = Field(default=None, max_length=256)
+    channel_region: str | None = Field(default=None, max_length=128)
+    bound_phone: str | None = Field(default=None, max_length=64)
+    has_secondary: bool | None = None
+    account_note: str | None = None
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
@@ -102,11 +105,6 @@ class OrderUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     trade_date: date | None = None
-    listing_price: Decimal | None = Field(default=None, ge=0)
-    service_fee: Decimal | None = Field(default=None, ge=0)
-    commission_mode: str | None = None
-    commission_payer: str | None = None
-    expected_settlement_date: date | None = None
     account_snapshot: OrderAccountSnapshot | None = None
     note: str | None = None
     extra_values: dict[str, object] | None = None
@@ -135,12 +133,10 @@ class OrderOut(BaseModel):
     order_no: str
     order_type: str
     capital_type: str
+    business_mode: str | None = None
+    business_type: str | None = None
+    value_added_service: str | None = None
     trade_date: date
-    listing_price: Decimal | None = None
-    service_fee: Decimal | None = None
-    commission_mode: str | None = None
-    commission_payer: str | None = None
-    expected_settlement_date: date | None = None
     account_snapshot: dict | None = None
     account_id: int | None = None
     status: str
@@ -186,6 +182,7 @@ class EventCreate(BaseModel):
     delivery_mode: str | None = None
     offset_event_id: int | None = None
     reason: str | None = None
+    refund_responsibility: str | None = None
     flow_category: str | None = Field(
         default=None, description="COST 时可填 FEE / DESIGN / OTHER"
     )
@@ -208,6 +205,7 @@ class EventOut(BaseModel):
     is_posted: bool
     posted_at: datetime | None = None
     reason: str | None = None
+    refund_responsibility: str | None = None
     note: str | None = None
     created_at: datetime
     operator: str

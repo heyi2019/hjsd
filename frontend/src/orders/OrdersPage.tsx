@@ -1,15 +1,16 @@
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Card, Descriptions, Drawer, Dropdown, Input, Segmented, Space, Tabs, Typography } from "antd";
+import { Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
   ordersApi,
   orderTypesApi,
+  policyApi,
   type Order,
   type OrderType,
 } from "../shared/api/catalog";
-import { normalizeError } from "../shared/api/client";
-import { orderTypeLabel } from "../shared/lib/labels";
+import { api, normalizeError } from "../shared/api/client";
+import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money } from "../shared/lib/format";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -81,9 +82,11 @@ const BUSINESS_CREATE_ITEMS = [
   { key: "DFQ", label: "新建代分期订单" },
 ];
 
-const BUSINESS_MODE_LABEL: Record<string, string> = {
-  SELF: "自营",
-  DISTRIBUTION: "分销",
+const ALLOCATION_LABEL: Record<"BUY" | "SELL" | "OPERATION" | "COMPANY", string> = {
+  BUY: "买号",
+  SELL: "售出",
+  OPERATION: "运营",
+  COMPANY: "公司归属",
 };
 
 function formatOrderAmount(order: Order): string {
@@ -105,7 +108,7 @@ function orderSearchText(order: Order): string {
 }
 
 function orderMatchesBusinessMode(order: Order, mode: BusinessModeFilterKey): boolean {
-  return mode === "all" || order.account_business_mode === mode;
+  return mode === "all" || order.business_mode === mode || order.account_business_mode === mode;
 }
 
 function filterBusinessOrders(
@@ -140,6 +143,13 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [refundForm] = Form.useForm();
+  const [allocationOpen, setAllocationOpen] = useState(false);
+  const [allocationSubmitting, setAllocationSubmitting] = useState(false);
+  const [allocationForm] = Form.useForm();
+  const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,6 +164,37 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       setLoading(false);
     }
   }, []);
+
+  const openAllocations = async () => {
+    if (!selectedOrder) return;
+    try {
+      const [result, userResult] = await Promise.all([
+        policyApi.allocations(selectedOrder.id),
+        api.get<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>("/users"),
+      ]);
+      setUsers(userResult.data.filter((item) => item.is_active));
+      const byType = Object.fromEntries(result.items.map((item) => [item.allocation_type, item]));
+      allocationForm.setFieldsValue({
+        allocations: ["BUY", "SELL", "OPERATION", "COMPANY"].map((allocation_type) => ({
+          allocation_type,
+          user_id: byType[allocation_type]?.user_id ?? undefined,
+          role: byType[allocation_type]?.role ?? (allocation_type === "COMPANY" ? "OWNER" : "OWNER"),
+          allocation_rate: byType[allocation_type]?.allocation_rate ?? "0",
+        })),
+      });
+      setAllocationOpen(true);
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrder = async (order: Order) => {
+    try {
+      setSelectedOrder(await ordersApi.get(order.id));
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -176,7 +217,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
     { title: "日期", dataIndex: "trade_date" },
-    { title: "操作", key: "actions", render: (_, order) => <Typography.Link onClick={() => setSelectedOrder(order)}>查看详情</Typography.Link> },
+    { title: "操作", key: "actions", render: (_, order) => <Typography.Link onClick={() => void openOrder(order)}>查看详情</Typography.Link> },
   ];
 
   return (
@@ -268,7 +309,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 <MobileOrderList
                   orders={filteredOrders}
                   emptyText="暂无业务订单"
-                  onSelect={setSelectedOrder}
+                  onSelect={(order) => void openOrder(order)}
                 />
               </Card>
             ),
@@ -289,8 +330,9 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       >
         {selectedOrder ? (
           <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="业务">{BUSINESS_MODE_LABEL[selectedOrder.account_business_mode ?? ""] || "-"}</Descriptions.Item>
-            <Descriptions.Item label="类型">{orderTypeLabel(selectedOrder.order_type, typeNames)}</Descriptions.Item>
+            <Descriptions.Item label="业务">{BUSINESS_MODE_LABEL[selectedOrder.business_mode ?? ""] || "-"}</Descriptions.Item>
+            <Descriptions.Item label="类型">{BUSINESS_TYPE_LABEL[selectedOrder.business_type ?? ""] || orderTypeLabel(selectedOrder.order_type, typeNames)}</Descriptions.Item>
+            <Descriptions.Item label="增值服务">{VALUE_ADDED_SERVICE_LABEL[selectedOrder.value_added_service ?? ""] || "-"}</Descriptions.Item>
             <Descriptions.Item label="产品">{[selectedOrder.account_game_type, selectedOrder.account_game_account, selectedOrder.account_channel_region].filter(Boolean).join(" / ") || "-"}</Descriptions.Item>
             <Descriptions.Item label="对方">{selectedOrder.party_name || "-"}</Descriptions.Item>
             <Descriptions.Item label="获客来源">{selectedOrder.party_source || "-"}</Descriptions.Item>
@@ -303,8 +345,24 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>
           </Descriptions>
         ) : null}
+        {selectedOrder?.events?.length ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>动作记录</Typography.Text>
+            {selectedOrder.events.map((event) => (
+              <div key={event.id} className="orders-event-row">
+                <span>{executionActionLabel(event.event_type, selectedOrder.order_type)}</span>
+                <span>{event.operator || "-"}</span>
+                <span>{event.occurred_on}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {selectedOrder ? (
           <Space className="ui-form-spaced" wrap>
+              <PermissionButton permission="policy.manage" onClick={() => void openAllocations()}>利润分配</PermissionButton>
+            {["ACTIVE", "COMPLETED"].includes(selectedOrder.status) ? (
+              <PermissionButton permission="order.event.post" onClick={() => { refundForm.resetFields(); setRefundOpen(true); }}>登记退款</PermissionButton>
+            ) : null}
             {selectedOrder.account_id ? (
               <Typography.Link onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
                 去库存中心
@@ -318,6 +376,113 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           </Space>
         ) : null}
       </Drawer>
+
+      <Modal
+        title={selectedOrder ? `利润分配 · ${selectedOrder.order_no}` : "利润分配"}
+        open={allocationOpen}
+        confirmLoading={allocationSubmitting}
+        onCancel={() => setAllocationOpen(false)}
+        onOk={() => void allocationForm.submit()}
+      >
+        <Form
+          form={allocationForm}
+          layout="vertical"
+          onFinish={async (values: { allocations: Array<{ allocation_type: "BUY" | "SELL" | "OPERATION" | "COMPANY"; user_id?: number; role: string; allocation_rate: string }> }) => {
+            if (!selectedOrder) return;
+            const rows = values.allocations ?? [];
+            const total = rows.reduce((sum, row) => sum + Number(row.allocation_rate || 0), 0);
+            if (Math.abs(total - 100) > 0.001) {
+              message.error("四类收益比例合计必须为 100%");
+              return;
+            }
+            setAllocationSubmitting(true);
+            try {
+              await policyApi.setAllocations(selectedOrder.id, rows.map((row) => ({
+                allocation_type: row.allocation_type,
+                user_id: row.allocation_type === "OPERATION" ? Number(row.user_id) : null,
+                role: row.role,
+                allocation_rate: String(row.allocation_rate),
+              })));
+              message.success("利润分配已保存");
+              setAllocationOpen(false);
+            } catch (error) {
+              message.error(normalizeError(error).message);
+            } finally {
+              setAllocationSubmitting(false);
+            }
+          }}
+        >
+          <Form.List name="allocations">
+            {(fields) => fields.map((field) => (
+              <Space key={field.key} align="baseline" className="orders-allocation-row">
+                <Form.Item {...field} name={[field.name, "allocation_type"]} hidden><Input /></Form.Item>
+                <Form.Item label="动作/归属"><Typography.Text>{ALLOCATION_LABEL[["BUY", "SELL", "OPERATION", "COMPANY"][field.name] as keyof typeof ALLOCATION_LABEL]}</Typography.Text></Form.Item>
+                <Form.Item {...field} name={[field.name, "user_id"]} label="收益人">
+                  {field.name === 2 ? (
+                    <AntSelect
+                      placeholder="请选择运营人员"
+                      options={users.map((item) => ({
+                        value: item.id,
+                        label: item.display_name + "（" + item.username + "）",
+                      }))}
+                    />
+                  ) : (
+                    <Input
+                      disabled
+                      placeholder={field.name === 0 ? "自动绑定回收/提号/代挂操作人" : field.name === 1 ? "自动绑定售出操作人" : "公司归属"}
+                    />
+                  )}
+                </Form.Item>
+                <Form.Item {...field} name={[field.name, "role"]} hidden><Input /></Form.Item>
+                <Form.Item {...field} name={[field.name, "allocation_rate"]} label="比例" rules={[{ required: true }]}><Input suffix="%" inputMode="decimal" /></Form.Item>
+              </Space>
+            ))}
+          </Form.List>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={selectedOrder ? `登记退款 · ${selectedOrder.order_no}` : "登记退款"}
+        open={refundOpen}
+        confirmLoading={refundSubmitting}
+        onCancel={() => setRefundOpen(false)}
+        onOk={() => void refundForm.submit()}
+      >
+        <Form
+          form={refundForm}
+          layout="vertical"
+          onFinish={async (values: { amount: string; reason: string; refund_responsibility: string }) => {
+            if (!selectedOrder) return;
+            setRefundSubmitting(true);
+            try {
+              await ordersApi.postEvent(selectedOrder.id, {
+                event_type: "REFUND",
+                amount: values.amount,
+                occurred_on: new Date().toISOString().slice(0, 10),
+                reason: values.reason,
+                refund_responsibility: values.refund_responsibility as "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER",
+              });
+              message.success("退款已登记");
+              setRefundOpen(false);
+              await load();
+            } catch (error) {
+              message.error(normalizeError(error).message);
+            } finally {
+              setRefundSubmitting(false);
+            }
+          }}
+        >
+          <Form.Item name="amount" label="退款金额" rules={[{ required: true, message: "请输入退款金额" }]}>
+            <Input inputMode="decimal" placeholder="请输入退款金额" />
+          </Form.Item>
+          <Form.Item name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
+            <AntSelect options={["COMPANY", "CUSTOMER", "CONSIGNOR", "PLATFORM", "OTHER"].map((value) => ({ value, label: { COMPANY: "公司", CUSTOMER: "客户", CONSIGNOR: "寄售方", PLATFORM: "平台", OTHER: "其他" }[value] }))} />
+          </Form.Item>
+          <Form.Item name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
+            <Input.TextArea rows={3} placeholder="请输入退款原因" />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <CreateBusinessModal
         open={Boolean(createType)}

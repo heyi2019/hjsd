@@ -464,6 +464,22 @@ class TestCounterpartyGuards:
 
 # ------------------------------------------------------------------ 活字段
 class TestFieldDefinitionGuards:
+    def test_extra_values_require_an_existing_customer(self, seeded_db):
+        definition = service.create_field_definition(
+            seeded_db,
+            entity_type="customer",
+            field_key="orphan_guard",
+            label="孤儿值校验",
+            actor="pytest",
+        )
+        with pytest.raises(NotFound, match="客户 999999 不存在"):
+            service.set_extra_values(
+                seeded_db,
+                entity_type="customer",
+                entity_id=999999,
+                values=[(definition.field_key, "不应落库")],
+            )
+
     def test_extra_values_validate_as_a_batch_before_mutating(self, seeded_db):
         text_definition = service.create_field_definition(
             seeded_db,

@@ -937,6 +937,11 @@ def set_extra_values(
     values: Iterable[tuple[str, Any]],
 ) -> dict[str, Any]:
     """按启用的字段定义写入活字段值；未启用字段拒绝写入（BAS-04-04）。"""
+    if entity_type == EntityType.CUSTOMER.value and session.get(Customer, entity_id) is None:
+        raise NotFound(
+            f"客户 {entity_id} 不存在",
+            details={"entity_type": entity_type, "entity_id": entity_id},
+        )
     validated: list[tuple[str, FieldDefinition, Any]] = []
     for field_key, value in values:
         definition = session.scalar(

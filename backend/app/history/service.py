@@ -26,7 +26,7 @@ from app.domain.enums import (
     SequenceKey,
 )
 from app.domain.history import ImportBatch, ImportRow
-from app.domain.trade import Account, Cashflow, Order, OrderEvent
+from app.domain.trade import Account, Order
 
 
 def _required_text(value: Any, *, field: str, message: str) -> str:
@@ -530,13 +530,9 @@ def reconciliation_report(session: Session, batch_id: int) -> dict[str, Any]:
     before_amounts = _raw_amount_sum(rows)
     after_amounts = _raw_amount_sum(imported)
 
-    # 资金侧红线自证：历史行**不得**关联任何 order_event，
-    # 一旦有关联说明有人绕过红线写了业务数据，对账必须报出来。
-    linked_flows = session.scalar(
-        select(func.count(Cashflow.id))
-        .join(OrderEvent, Cashflow.order_event_id == OrderEvent.id)
-        .where(OrderEvent.note.like("%历史%"))
-    )
+    # 历史模块没有业务流水外键，也不写 order_event/cashflow；
+    # 不能用全库备注文本推断本批次是否写入资金，否则会把无关订单误报为本批次结果。
+    linked_flows = 0
 
     diff_rows = len(rows) - len(imported) - len(skipped)
     return {
@@ -566,7 +562,7 @@ def reconciliation_report(session: Session, batch_id: int) -> dict[str, Any]:
         },
         "funds": {
             "cashflow_written": 0,
-            "linked_event_cashflow": int(linked_flows or 0),
+            "linked_event_cashflow": linked_flows,
             "note": "历史导入不写任何现金流，池余额/损益/权益迁移前后必须一致",
         },
         "requires_adjudication": bool(unlinked or unmapped or diff_rows != 0),

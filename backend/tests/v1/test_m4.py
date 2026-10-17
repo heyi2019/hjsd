@@ -291,6 +291,31 @@ class TestHistoryClosure:
         history_service.commit_batch(seeded_db, batch["id"], actor="pytest")
         assert seeded_db.query(Cashflow).count() == before, "历史导入绝不能写现金流"
 
+    def test_reconciliation_does_not_scan_unrelated_history_notes(self, seeded_db):
+        batch = history_service.create_batch(
+            seeded_db, source_name="orders.xlsx", rows=[{"交易金额": 100}], actor="pytest"
+        )
+        order = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 4),
+            actor="pytest",
+            account_profile={"game_account": "m4-unrelated-history-note"},
+        )
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount="100",
+            occurred_on=date(2026, 10, 4),
+            actor="pytest",
+            note="历史订单说明，但不属于导入批次",
+        )
+
+        report = history_service.reconciliation_report(seeded_db, batch["id"])
+
+        assert report["funds"]["linked_event_cashflow"] == 0
+
     # ── MIG-01-05 补录依据必填 + 前后状态留存 ──
     def test_mapping_requires_basis(self, seeded_db):
         batch = history_service.create_batch(

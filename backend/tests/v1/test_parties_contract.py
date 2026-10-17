@@ -233,6 +233,11 @@ class TestUpdateCustomer:
             service.update_customer(seeded_db, source.id, actor="pytest", note="x")
         assert "已合并客户不可修改" in str(exc.value)
 
+        with pytest.raises(Validation, match="已合并客户不可修改状态"):
+            service.set_customer_status(
+                seeded_db, source.id, CustomerStatus.ACTIVE.value, actor="pytest"
+            )
+
     def test_contact_change_writes_contact_audit(self, seeded_db):
         customer = _customer(seeded_db, "阿甲", phone="13800001111")
         service.update_customer(

@@ -372,6 +372,12 @@ def set_customer_status(
         raise Validation(
             "MERGED 只能由合并动作产生", details={"field": "status", "value": status}
         )
+    if customer.status == CustomerStatus.MERGED.value:
+        raise Validation(
+            "已合并客户不可修改状态",
+            code=ErrorCode.MERGE_TARGET_INVALID,
+            details={"customer_no": customer.customer_no, "status": customer.status},
+        )
     before = customer.status
     customer.status = status
     customer.updated_by = actor

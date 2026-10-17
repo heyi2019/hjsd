@@ -41,6 +41,22 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
+def _lead_output(db: Session, item) -> schemas.LeadOut:
+    output = schemas.LeadOut.model_validate(item)
+    output.extra_values = service.get_extra_values(
+        db, entity_type="lead", entity_id=item.id
+    )
+    return output
+
+
+def _counterparty_output(db: Session, item) -> schemas.CounterpartyOut:
+    output = schemas.CounterpartyOut.model_validate(item)
+    output.extra_values = service.get_extra_values(
+        db, entity_type="counterparty", entity_id=item.id
+    )
+    return output
+
+
 # --------------------------------------------------------------------- 客户
 @router.get("/customers", response_model=list[schemas.CustomerOut])
 def list_customers(
@@ -219,11 +235,15 @@ def list_leads(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> list[schemas.LeadOut]:
+    items = service.list_leads(
+        db, customer_id=customer_id, status=status, keyword=keyword, user=user
+    )
+    extras = service.get_extra_values_bulk(
+        db, entity_type="lead", entity_ids=[item.id for item in items]
+    )
     return [
-        schemas.LeadOut.model_validate(item)
-        for item in service.list_leads(
-            db, customer_id=customer_id, status=status, keyword=keyword, user=user
-        )
+        schemas.LeadOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
+        for item in items
     ]
 
 
@@ -233,7 +253,7 @@ def get_lead(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.LeadOut:
-    return schemas.LeadOut.model_validate(service.get_lead(db, lead_id, user))
+    return _lead_output(db, service.get_lead(db, lead_id, user))
 
 
 @router.post("/leads", response_model=schemas.LeadOut, status_code=201)
@@ -257,8 +277,9 @@ def create_lead(
         note=payload.note,
         actor=_actor(user),
         user=user,
+        extra_values=payload.extra_values,
     )
-    return schemas.LeadOut.model_validate(item)
+    return _lead_output(db, item)
 
 
 @router.patch("/leads/{lead_id}", response_model=schemas.LeadOut)
@@ -272,7 +293,7 @@ def update_lead(
     if "owner_id" in changes and not (user.is_admin or user.owner_scope == "ALL"):
         raise PermissionDenied("只有全量范围用户可以转交需求负责人")
     item = service.update_lead(db, lead_id, actor=_actor(user), user=user, **changes)
-    return schemas.LeadOut.model_validate(item)
+    return _lead_output(db, item)
 
 
 @router.post("/leads/{lead_id}/convert", response_model=schemas.LeadOut)
@@ -289,7 +310,7 @@ def convert_lead(
         actor=_actor(user),
         user=user,
     )
-    return schemas.LeadOut.model_validate(item)
+    return _lead_output(db, item)
 
 
 @router.post("/leads/{lead_id}/close", response_model=schemas.LeadOut)
@@ -306,7 +327,7 @@ def close_lead(
         actor=_actor(user),
         user=user,
     )
-    return schemas.LeadOut.model_validate(item)
+    return _lead_output(db, item)
 
 
 # --------------------------------------------------------------------- 合作方
@@ -318,6 +339,9 @@ def list_counterparties(
     _user: CurrentUser = read_counterparties,
 ) -> list[dict]:
     items = service.list_counterparties(db, type=type, status=status)
+    extras = service.get_extra_values_bulk(
+        db, entity_type="counterparty", entity_ids=[item.id for item in items]
+    )
     return [
         {
             **{
@@ -336,7 +360,8 @@ def list_counterparties(
                     "note",
                     "created_at",
                 )
-            }
+            },
+            "extra_values": extras.get(item.id, {}),
         }
         for item in items
     ]
@@ -349,7 +374,7 @@ def get_counterparty(
     _user: CurrentUser = read_counterparties,
 ) -> dict:
     item = service.get_counterparty(db, counterparty_id)
-    return schemas.CounterpartyOut.model_validate(item)
+    return _counterparty_output(db, item)
 
 
 @router.post("/counterparties", response_model=schemas.CounterpartyOut, status_code=201)
@@ -369,8 +394,9 @@ def create_counterparty(
         qq=payload.qq,
         source=payload.source,
         note=payload.note,
+        extra_values=payload.extra_values,
     )
-    return schemas.CounterpartyOut.model_validate(item)
+    return _counterparty_output(db, item)
 
 
 @router.patch("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)
@@ -383,7 +409,7 @@ def update_counterparty(
     item = service.update_counterparty(
         db, counterparty_id, actor=_actor(user), **payload.model_dump(exclude_unset=True)
     )
-    return schemas.CounterpartyOut.model_validate(item)
+    return _counterparty_output(db, item)
 
 
 @router.patch(
@@ -398,7 +424,7 @@ def update_counterparty_status(
     item = service.set_counterparty_status(
         db, counterparty_id, active, actor=_actor(user)
     )
-    return schemas.CounterpartyOut.model_validate(item)
+    return _counterparty_output(db, item)
 
 
 # --------------------------------------------------------------------- 活字段

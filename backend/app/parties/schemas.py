@@ -153,6 +153,7 @@ class LeadCreate(RequestModel):
     target: str = Field(min_length=1, max_length=2000)
     owner_id: int | None = Field(default=None, gt=0)
     note: str | None = Field(default=None, max_length=2000)
+    extra_values: dict[str, Any] | None = None
 
 
 class LeadUpdate(RequestModel):
@@ -160,6 +161,7 @@ class LeadUpdate(RequestModel):
     target: str | None = Field(default=None, min_length=1, max_length=2000)
     owner_id: int | None = Field(default=None, gt=0)
     note: str | None = Field(default=None, max_length=2000)
+    extra_values: dict[str, Any] | None = None
 
 
 class LeadConvert(RequestModel):
@@ -188,6 +190,7 @@ class LeadOut(BaseModel):
     updated_at: datetime
     created_by: str
     updated_by: str
+    extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class MergeRequest(RequestModel):
@@ -206,6 +209,7 @@ class CounterpartyCreate(RequestModel):
     qq: str | None = None
     source: str | None = Field(default=None, max_length=64)
     note: str | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class CounterpartyUpdate(RequestModel):
@@ -218,6 +222,7 @@ class CounterpartyUpdate(RequestModel):
     qq: str | None = None
     source: str | None = None
     note: str | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class CounterpartyOut(BaseModel):
@@ -235,6 +240,7 @@ class CounterpartyOut(BaseModel):
     status: str
     note: str | None = None
     created_at: datetime
+    extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class FieldDefinitionCreate(RequestModel):

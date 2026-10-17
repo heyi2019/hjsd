@@ -24,6 +24,7 @@ from app.core.security import (
 from app.finance import schemas, service
 from app.domain.trade import Deposit, Order, RebateRecord
 from app.orders import service as orders_service
+from app.parties import service as parties_service
 
 router = APIRouter(tags=["FIN-04/REB-01 押金与返点"])
 
@@ -100,6 +101,9 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         source=source,
         note=flow.note,
         operator=flow.created_by,
+        extra_values=parties_service.get_extra_values(
+            db, entity_type="cashflow", entity_id=flow.id
+        ),
     )
 
 
@@ -205,6 +209,7 @@ def create_cashflow(
         amount=payload.amount,
         order_id=payload.order_id,
         note=payload.note,
+        extra_values=payload.extra_values,
         actor=_actor(user),
         user=user,
     )

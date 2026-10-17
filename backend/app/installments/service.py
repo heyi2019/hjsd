@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from collections.abc import Mapping
 from typing import Any
 
 from sqlalchemy import select
@@ -39,6 +40,7 @@ from app.domain.trade import Account, Installment, InstallmentSchedule, Order, O
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.installments.schemas import ScheduleCreate
+from app.parties import service as parties_service
 
 
 def _non_negative(value: Any, *, field: str) -> Decimal:
@@ -124,6 +126,7 @@ def create_installment(
     delivery_mode: str | None = None,
     note: str | None = None,
     schedule: list[dict[str, Any]] | None = None,
+    extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
     if first_due_on is None:
@@ -301,6 +304,13 @@ def create_installment(
             )
         )
     session.flush()
+    parties_service.set_extra_values(
+        session,
+        entity_type="installment",
+        entity_id=installment.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
 
     if account is not None:
         account.status = AccountStatus.INSTALLMENT.value

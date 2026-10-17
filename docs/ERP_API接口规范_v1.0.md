@@ -57,7 +57,7 @@
 {"display_name":"小周","contact_name":"周某","wechat":"zhou123","qq":"123456","phone":"13800000000","source":"老客转介绍","tags":["复购"],"owner_id":3,"note":"偏好苹果区","extra_values":{"budget":"3000"}}
 ```
 
-固定字段为 `display_name/contact_name/wechat/qq/phone/source/tags/owner_id/note`；`extra_values` 仅接收当前启用且 `entity_type=customer` 的活字段。返回可选 `duplicate_candidates`（微信号、QQ、手机号命中），不会阻止创建。`POST /customers/{id}/merge` 请求 `{"target_customer_id": 18,"reason":"同一微信号"}`，仅管理员可操作，来源客户置为 `MERGED`。
+固定字段为 `display_name/contact_name/wechat/qq/phone/source/tags/owner_id/note`；客户接口的 `extra_values` 仅接收当前启用且 `entity_type=customer` 的活字段。订单、账号、资金池、资金流水、分期、需求和合作方接口分别使用对应实体类型的活字段，并在创建/列表/详情响应中返回。返回可选 `duplicate_candidates`（微信号、QQ、手机号命中），不会阻止创建。`POST /customers/{id}/merge` 请求 `{"target_customer_id": 18,"reason":"同一微信号"}`，仅管理员可操作，来源客户置为 `MERGED`。
 
 `POST /counterparties` 请求固定使用 `display_name/type/contact_name/wechat/qq/phone/note`；`type` 为 `PEER/SUPPLIER/PLATFORM`。订单创建、修改或客户/合作方停用时，如参与关系非法，返回 `422`：`PARTICIPANT_ROLE_INVALID`、`CUSTOMER_DISABLED` 或 `COUNTERPARTY_DISABLED`。
 

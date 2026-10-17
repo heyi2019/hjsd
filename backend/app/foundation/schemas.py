@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,6 +22,7 @@ class PoolCreate(RequestModel):
     pool_type: str = Field(default=PoolType.OTHER.value, min_length=1, max_length=32)
     ownership: PoolOwnership = PoolOwnership.OWNED
     note: str | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class PoolUpdate(RequestModel):
@@ -31,6 +33,7 @@ class PoolUpdate(RequestModel):
     # pool_type 是可扩展注册值，不锁死在首批枚举。
     pool_type: str | None = Field(default=None, min_length=1, max_length=32)
     ownership: PoolOwnership | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class PoolStatusUpdate(RequestModel):
@@ -49,6 +52,7 @@ class PoolOut(BaseModel):
     note: str | None = None
     created_at: datetime
     updated_at: datetime
+    extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class OrderTypeCreate(RequestModel):

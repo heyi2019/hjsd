@@ -19,6 +19,7 @@ from app.core.security import (
 )
 from app.domain.trade import InstallmentSchedule
 from app.installments import schemas, service
+from app.parties import service as parties_service
 
 router = APIRouter(tags=["HS-01/DFQ-01 分期合约"])
 
@@ -35,6 +36,14 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
+def _installment_output(db: Session, item) -> schemas.InstallmentOut:
+    output = schemas.InstallmentOut.model_validate(item)
+    output.extra_values = parties_service.get_extra_values(
+        db, entity_type="installment", entity_id=item.id
+    )
+    return output
+
+
 @router.get("/installments", response_model=list[schemas.InstallmentOut])
 def list_installments(
     status: str | None = Query(default=None),
@@ -43,7 +52,13 @@ def list_installments(
     _user: CurrentUser = read_access,
 ) -> list[schemas.InstallmentOut]:
     items = service.list_installments(db, status=status, order_id=order_id, user=_user)
-    return [schemas.InstallmentOut.model_validate(item) for item in items]
+    extras = parties_service.get_extra_values_bulk(
+        db, entity_type="installment", entity_ids=[item.id for item in items]
+    )
+    return [
+        schemas.InstallmentOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
+        for item in items
+    ]
 
 
 @router.post("/installments", response_model=schemas.InstallmentOut, status_code=201)
@@ -68,8 +83,9 @@ def create_installment(
         delivery_mode=payload.delivery_mode,
         note=payload.note,
         schedule=[item.model_dump() for item in payload.schedule] if payload.schedule else None,
+        extra_values=payload.extra_values,
     )
-    return schemas.InstallmentOut.model_validate(item)
+    return _installment_output(db, item)
 
 
 @router.get("/installments/{installment_id}/schedules", response_model=list[schemas.ScheduleOut])
@@ -155,7 +171,7 @@ def pay_installment(
         user=user,
     )
     return {
-        "installment": schemas.InstallmentOut.model_validate(installment),
+        "installment": _installment_output(db, installment),
         "schedule": schemas.ScheduleOut.model_validate(schedule),
     }
 
@@ -178,7 +194,7 @@ def settle_early_installment(
         actor=_actor(user),
         user=user,
     )
-    return schemas.InstallmentOut.model_validate(item)
+    return _installment_output(db, item)
 
 
 @router.post(
@@ -197,7 +213,7 @@ def default_installment(
         reason=payload.reason,
         user=user,
     )
-    return schemas.InstallmentOut.model_validate(item)
+    return _installment_output(db, item)
 
 
 @router.post(
@@ -218,7 +234,7 @@ def deliver_installment(
         actor=_actor(user),
         user=user,
     )
-    return schemas.InstallmentOut.model_validate(item)
+    return _installment_output(db, item)
 
 
 @router.post("/installments/mark-overdue", status_code=200)

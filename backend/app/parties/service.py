@@ -14,7 +14,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, inspect, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -56,6 +56,7 @@ from app.domain.users import User
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
+_UNSET = object()
 
 _EXTRA_ENTITY_MODELS: dict[str, type] = {
     EntityType.ORDER.value: Order,
@@ -812,6 +813,7 @@ def create_lead(
     owner_id: int | None = None,
     note: str | None = None,
     user: CurrentUser | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> CustomerLead:
     customer = assert_customer_usable(session, customer_id, user=user)
     try:
@@ -839,6 +841,13 @@ def create_lead(
     )
     session.add(lead)
     session.flush()
+    set_extra_values(
+        session,
+        entity_type=EntityType.LEAD.value,
+        entity_id=lead.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
     record_audit(
         session,
         action=AuditAction.LEAD_CREATE,
@@ -891,6 +900,7 @@ def update_lead(
     *,
     actor: str,
     user: CurrentUser | None = None,
+    extra_values: Mapping[str, Any] | None | object = _UNSET,
     **fields: Any,
 ) -> CustomerLead:
     lead = _get_lead_for_user(session, lead_id, user)
@@ -922,6 +932,17 @@ def update_lead(
         setattr(lead, name, value)
     lead.updated_by = actor
     session.flush()
+    if extra_values is not _UNSET:
+        values = _normalize_extra_values(extra_values)
+        _validate_required_extras(
+            session, EntityType.LEAD.value, values, partial=True
+        )
+        set_extra_values(
+            session,
+            entity_type=EntityType.LEAD.value,
+            entity_id=lead.id,
+            values=values.items(),
+        )
     record_audit(
         session,
         action=AuditAction.LEAD_UPDATE,
@@ -1030,6 +1051,7 @@ def create_counterparty(
     qq: str | None = None,
     source: str | None = None,
     note: str | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> Counterparty:
     name = _required_text(
         display_name, message="合作方名称必填", field="display_name"
@@ -1058,6 +1080,13 @@ def create_counterparty(
     )
     session.add(counterparty)
     session.flush()
+    set_extra_values(
+        session,
+        entity_type=EntityType.COUNTERPARTY.value,
+        entity_id=counterparty.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
     record_audit(
         session,
         action=AuditAction.CUSTOMER_CREATE,
@@ -1090,7 +1119,12 @@ def get_counterparty(session: Session, counterparty_id: int) -> Counterparty:
 
 
 def update_counterparty(
-    session: Session, counterparty_id: int, *, actor: str, **fields: Any
+    session: Session,
+    counterparty_id: int,
+    *,
+    actor: str,
+    extra_values: Mapping[str, Any] | None | object = _UNSET,
+    **fields: Any,
 ) -> Counterparty:
     item = get_counterparty(session, counterparty_id)
     allowed_fields = {
@@ -1111,6 +1145,17 @@ def update_counterparty(
         setattr(item, name, value)
     item.updated_by = actor
     session.flush()
+    if extra_values is not _UNSET:
+        values = _normalize_extra_values(extra_values)
+        _validate_required_extras(
+            session, EntityType.COUNTERPARTY.value, values, partial=True
+        )
+        set_extra_values(
+            session,
+            entity_type=EntityType.COUNTERPARTY.value,
+            entity_id=item.id,
+            values=values.items(),
+        )
     record_audit(
         session,
         action=AuditAction.CUSTOMER_UPDATE,
@@ -1495,6 +1540,10 @@ def set_extra_values(
 ) -> dict[str, Any]:
     """按启用的字段定义写入活字段值；未启用字段拒绝写入（BAS-04-04）。"""
     values = list(values)
+    # 初始 Alembic 迁移会先种子资金池，再创建活字段表；没有提交活字段值时，
+    # 不能在表尚未存在的阶段查询定义。正常业务库仍会执行必填字段校验。
+    if not values and not inspect(session.get_bind()).has_table("field_definitions"):
+        return {}
     values_map = {field_key: value for field_key, value in values}
     if len(values_map) != len(values):
         raise Validation(

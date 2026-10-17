@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import func, inspect, select
@@ -26,11 +26,13 @@ from app.domain.enums import (
 )
 from app.domain.foundation import DocumentSequence, OrderTypeDef, OrderTypePool, Pool
 from app.domain.trade import Cashflow, Order, OrderEvent
+from app.parties import service as parties_service
 
 # 池代码允许下划线（HJ_INVEST / HJ_PROFIT）；业务代码为紧凑大写字母数字（HS / TB2）
 POOL_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 SEQUENCE_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]{0,15}$")
+_UNSET = object()
 
 
 # --------------------------------------------------------------------- 内部工具
@@ -133,6 +135,7 @@ def create_pool(
     pool_type: str = PoolType.OTHER.value,
     ownership: str = PoolOwnership.OWNED.value,
     note: str | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> Pool:
     """新增资金池：新增池无需改代码（PRD §1.2）。"""
     normalized = _normalize_pool_code(code)
@@ -159,6 +162,13 @@ def create_pool(
     )
     session.add(pool)
     session.flush()
+    parties_service.set_extra_values(
+        session,
+        entity_type="pool",
+        entity_id=pool.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
     record_audit(
         session,
         action=AuditAction.POOL_CREATE,
@@ -179,6 +189,7 @@ def update_pool(
     note: str | None = None,
     pool_type: str | None = None,
     ownership: str | None = None,
+    extra_values: Mapping[str, Any] | None | object = _UNSET,
 ) -> Pool:
     """V18：`code` 永久不可修改，只有显示名/备注/用途/归属可更新。"""
     pool = _get_pool_or_404(session, pool_id)
@@ -201,6 +212,13 @@ def update_pool(
         pool.ownership = next_ownership
     pool.updated_by = actor
     session.flush()
+    if extra_values is not _UNSET:
+        parties_service.set_extra_values(
+            session,
+            entity_type="pool",
+            entity_id=pool.id,
+            values=(extra_values or {}).items(),
+        )
     record_audit(
         session,
         action=AuditAction.POOL_UPDATE,

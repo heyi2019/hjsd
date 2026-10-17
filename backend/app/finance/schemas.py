@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -92,6 +93,7 @@ class CashflowOut(BaseModel):
     source: str
     note: str | None = None
     operator: str
+    extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class CashflowCreate(RequestModel):
@@ -103,6 +105,7 @@ class CashflowCreate(RequestModel):
     amount: Decimal
     order_id: int | None = None
     note: str | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class CashflowReject(RequestModel):

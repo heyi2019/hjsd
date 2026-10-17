@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,6 +28,7 @@ class InstallmentCreate(RequestModel):
     delivery_mode: str | None = None
     note: str | None = None
     schedule: list[ScheduleCreate] | None = None
+    extra_values: dict[str, Any] | None = None
 
 
 class InstallmentOut(BaseModel):
@@ -49,6 +51,7 @@ class InstallmentOut(BaseModel):
     delivered_on: date | None = None
     first_due_on: date | None = None
     note: str | None = None
+    extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class ScheduleOut(BaseModel):

@@ -24,6 +24,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.foundation import schemas, service
+from app.parties import service as parties_service
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 
@@ -36,6 +37,14 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
+def _pool_output(db: Session, pool) -> schemas.PoolOut:
+    output = schemas.PoolOut.model_validate(pool)
+    output.extra_values = parties_service.get_extra_values(
+        db, entity_type="pool", entity_id=pool.id
+    )
+    return output
+
+
 # --------------------------------------------------------------------- 资金池
 @router.get("/pools", response_model=list[schemas.PoolOut])
 def list_pools(
@@ -44,7 +53,13 @@ def list_pools(
     _user: CurrentUser = read_access,
 ) -> list[schemas.PoolOut]:
     pools = service.list_pools(db, include_disabled=include_disabled, user=_user)
-    return [schemas.PoolOut.model_validate(pool) for pool in pools]
+    extras = parties_service.get_extra_values_bulk(
+        db, entity_type="pool", entity_ids=[pool.id for pool in pools]
+    )
+    return [
+        schemas.PoolOut.model_validate({**pool.__dict__, "extra_values": extras.get(pool.id, {})})
+        for pool in pools
+    ]
 
 
 @router.post("/pools", response_model=schemas.PoolOut, status_code=201)
@@ -61,8 +76,9 @@ def create_pool(
         pool_type=payload.pool_type,
         ownership=payload.ownership.value,
         note=payload.note,
+        extra_values=payload.extra_values,
     )
-    return schemas.PoolOut.model_validate(pool)
+    return _pool_output(db, pool)
 
 
 @router.patch("/pools/{pool_id}", response_model=schemas.PoolOut)
@@ -72,16 +88,11 @@ def update_pool(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_pools,
 ) -> schemas.PoolOut:
-    pool = service.update_pool(
-        db,
-        pool_id,
-        actor=_actor(user),
-        name=payload.name,
-        note=payload.note,
-        pool_type=payload.pool_type,
-        ownership=payload.ownership.value if payload.ownership else None,
-    )
-    return schemas.PoolOut.model_validate(pool)
+    changes = payload.model_dump(exclude_unset=True)
+    if "ownership" in changes and changes["ownership"] is not None:
+        changes["ownership"] = changes["ownership"].value
+    pool = service.update_pool(db, pool_id, actor=_actor(user), **changes)
+    return _pool_output(db, pool)
 
 
 @router.patch("/pools/{pool_id}/status", response_model=schemas.PoolOut)
@@ -92,7 +103,7 @@ def set_pool_status(
     user: CurrentUser = manage_pools,
 ) -> schemas.PoolOut:
     pool = service.set_pool_status(db, pool_id, payload.status.value, actor=_actor(user))
-    return schemas.PoolOut.model_validate(pool)
+    return _pool_output(db, pool)
 
 
 @router.delete("/pools/{pool_id}", status_code=204)

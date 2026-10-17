@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 from uuid import uuid4
 
@@ -150,6 +150,7 @@ def create_cashflow(
     actor: str,
     order_id: int | None = None,
     note: str | None = None,
+    extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
@@ -208,6 +209,13 @@ def create_cashflow(
     )
     session.add(flow)
     session.flush()
+    parties_service.set_extra_values(
+        session,
+        entity_type="cashflow",
+        entity_id=flow.id,
+        values=(extra_values or {}).items(),
+        require_all=True,
+    )
     record_audit(
         session,
         action=AuditAction.CASHFLOW_CREATE,
@@ -707,6 +715,11 @@ def list_cashflows(
                 "operator": flow.created_by,
             }
         )
+    extras = parties_service.get_extra_values_bulk(
+        session, entity_type="cashflow", entity_ids=[row["id"] for row in rows]
+    )
+    for row in rows:
+        row["extra_values"] = extras.get(row["id"], {})
     return rows
 
 

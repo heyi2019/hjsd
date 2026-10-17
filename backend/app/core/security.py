@@ -63,6 +63,7 @@ PERM_ORDER_TYPE_MANAGE = "order-type.manage"
 PERM_REPORT_READ = "report.read"
 PERM_IMPORT_MANAGE = "import.manage"
 PERM_USER_MANAGE = "user.manage"
+PERM_PERIOD_LOCK = "finance.period.lock"
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(
     {
@@ -91,6 +92,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_REPORT_READ,
         PERM_IMPORT_MANAGE,
         PERM_USER_MANAGE,
+        PERM_PERIOD_LOCK,
     }
 )
 
@@ -122,6 +124,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_FINANCE_ORDER_EVENT_POST,
             PERM_AUDIT_READ,
             PERM_REPORT_READ,
+            PERM_PERIOD_LOCK,
         }
     ),
     ROLE_AUDITOR: frozenset(

@@ -19,6 +19,25 @@ class DepositCreate(RequestModel):
     note: str | None = None
 
 
+class PeriodLockCreate(RequestModel):
+    period: str = Field(min_length=7, max_length=7)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class PeriodLockOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    period: str
+    locked_at: datetime
+    locked_by: str
+    note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    created_by: str
+    updated_by: str
+
+
 class DepositReturn(RequestModel):
     amount: Decimal
     released_on: date
@@ -216,6 +235,8 @@ __all__ = [
     "DepositOut",
     "DepositReturn",
     "DepositLoss",
+    "PeriodLockCreate",
+    "PeriodLockOut",
     "CashflowOut",
     "CashflowCreate",
     "CashflowReject",

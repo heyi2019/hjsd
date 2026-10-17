@@ -16,6 +16,7 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
+    PERM_PERIOD_LOCK,
     PERM_TRANSFER_POST,
     CurrentUser,
     require_permissions,
@@ -27,6 +28,8 @@ from app.orders import service as orders_service
 router = APIRouter(tags=["FIN-04/REB-01 押金与返点"])
 
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
+read_period_locks = require_permissions(PERM_FINANCE_READ)
+manage_period_locks = require_permissions(PERM_PERIOD_LOCK)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
 post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 post_transfer = require_permissions(PERM_TRANSFER_POST)
@@ -34,6 +37,29 @@ post_transfer = require_permissions(PERM_TRANSFER_POST)
 
 def _actor(user: CurrentUser) -> str:
     return user.username
+
+
+@router.get("/period-locks", response_model=list[schemas.PeriodLockOut])
+def list_period_locks(
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_period_locks,
+) -> list[schemas.PeriodLockOut]:
+    return [
+        schemas.PeriodLockOut.model_validate(item)
+        for item in service.list_period_locks(db)
+    ]
+
+
+@router.post("/period-locks", response_model=schemas.PeriodLockOut, status_code=201)
+def create_period_lock(
+    payload: schemas.PeriodLockCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_period_locks,
+) -> schemas.PeriodLockOut:
+    item = service.create_period_lock(
+        db, period=payload.period, note=payload.note, actor=_actor(user)
+    )
+    return schemas.PeriodLockOut.model_validate(item)
 
 
 def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:

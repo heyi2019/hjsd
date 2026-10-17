@@ -23,6 +23,7 @@ from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
 from app.core.money import require_non_negative, require_positive, to_money
 from app.core.numbering import allocate_number
+from app.core.periods import assert_period_open
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.policy import service as policy_service
 from app.accounts import service as accounts_service
@@ -800,6 +801,7 @@ def post_event(
         ) from exc
 
     order = get_order(session, order_id, user)
+    assert_period_open(session, occurred_on, operation="登记业务事件")
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     if order.status != OrderStatus.ACTIVE.value:

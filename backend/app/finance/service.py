@@ -17,10 +17,11 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.business_numbering import rebate_no as order_rebate_no
 from app.core.business_numbering import rebate_settlement_no
-from app.core.errors import NotFound, Validation
+from app.core.errors import Conflict, NotFound, Validation
 from app.core.errors import ErrorCode
 from app.core.money import require_non_negative, require_positive, to_money
 from app.core.numbering import allocate_number
+from app.core.periods import assert_period_open, normalize_period
 from app.core.security import CurrentUser, owner_scope_filter
 from app.policy import service as policy_service
 from app.domain.enums import (
@@ -46,6 +47,7 @@ from app.domain.trade import (
     RebateSettlement,
     Reconciliation,
 )
+from app.domain.foundation import PeriodLock
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.parties import service as parties_service
@@ -101,6 +103,40 @@ def _get_cashflow(
     return flow
 
 
+def create_period_lock(
+    session: Session, *, period: str, actor: str, note: str | None = None
+) -> PeriodLock:
+    normalized = normalize_period(period)
+    if session.scalar(select(PeriodLock).where(PeriodLock.period == normalized)) is not None:
+        raise Conflict(
+            f"账期 {normalized} 已锁定",
+            code=ErrorCode.DUPLICATE_CODE,
+            details={"period": normalized},
+        )
+    item = PeriodLock(
+        period=normalized,
+        locked_by=actor,
+        note=note,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(item)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.PERIOD_LOCK,
+        entity_type="period_lock",
+        entity_id=normalized,
+        actor=actor,
+        after={"period": normalized, "locked_by": actor},
+    )
+    return item
+
+
+def list_period_locks(session: Session) -> list[PeriodLock]:
+    return list(session.scalars(select(PeriodLock).order_by(PeriodLock.period.desc())).all())
+
+
 def create_cashflow(
     session: Session,
     *,
@@ -116,6 +152,7 @@ def create_cashflow(
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
+    assert_period_open(session, occurred_on, operation="创建现金流")
     try:
         direction = Direction(direction).value
     except ValueError as exc:
@@ -195,6 +232,7 @@ def approve_cashflow(
     user: CurrentUser | None = None,
 ) -> Cashflow:
     flow = _get_cashflow(session, cashflow_id, user)
+    assert_period_open(session, flow.occurred_on, operation="审核历史流水")
     if flow.status != CashflowStatus.PENDING.value:
         raise Validation(
             "只有待审核流水可以审核",
@@ -231,6 +269,7 @@ def reject_cashflow(
         type_message="驳回流水必须填写原因",
     )
     flow = _get_cashflow(session, cashflow_id, user)
+    assert_period_open(session, flow.occurred_on, operation="驳回历史流水")
     if flow.status != CashflowStatus.PENDING.value:
         raise Validation(
             "只有待审核流水可以驳回",
@@ -269,6 +308,7 @@ def reverse_cashflow(
         type_message="冲销流水必须填写原因",
     )
     flow = _get_cashflow(session, cashflow_id, user)
+    assert_period_open(session, reversed_on, operation="创建冲销流水")
     if flow.status != CashflowStatus.APPROVED.value:
         raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
     if flow.order_event_id is not None:
@@ -330,6 +370,7 @@ def create_deposit(
     note: str | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
+    assert_period_open(session, paid_on, operation="创建押金流水")
     money = _positive(amount, field="amount")
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
@@ -402,6 +443,7 @@ def return_deposit(
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
     if user is not None and not user.can_see_pool(deposit.pool_id):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+    assert_period_open(session, released_on, operation="释放押金")
     money = _positive(amount, field="amount")
     outstanding = (
         to_money(deposit.paid_amount)
@@ -474,6 +516,7 @@ def lose_deposit(
     deposit = session.get(Deposit, deposit_id)
     if deposit is None or (user is not None and not user.can_see_pool(deposit.pool_id)):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+    assert_period_open(session, lost_on, operation="登记押金损失")
     text_reason = _text(
         reason,
         field="reason",
@@ -892,6 +935,7 @@ def create_transfer(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
+    assert_period_open(session, occurred_on, operation="创建资金划转")
     if source_pool_id == target_pool_id:
         raise Validation("转出池与转入池不能相同", details={"pool_id": source_pool_id})
     if user is not None and (
@@ -989,6 +1033,7 @@ def repair_transfer(
     if len(rows) != 1:
         raise Validation("该划转不是单边记录，不能自动修复", details={"transfer_id": transfer})
     source = rows[0]
+    assert_period_open(session, source.occurred_on, operation="修复历史资金划转")
     if user is not None and (
         not user.can_see_pool(source.pool_id) or not user.can_see_pool(counterpart_pool_id)
     ):
@@ -1071,6 +1116,7 @@ def create_rebate(
     user: CurrentUser | None = None,
 ) -> RebateRecord:
     """返点记录：来源订单必填且必须已成单（REB-01-02）。"""
+    assert_period_open(session, collected_on, operation="创建返点记录")
     try:
         order = orders_service.get_order(session, source_order_id, user)
     except NotFound as exc:
@@ -1195,6 +1241,7 @@ def settle_rebate(
             f"返点记录 {rebate_record_id} 不存在",
             details={"rebate_record_id": rebate_record_id},
         ) from exc
+    assert_period_open(session, settled_on, operation="登记返点到账")
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     gross = _positive(gross_amount, field="gross_amount")
@@ -1346,6 +1393,7 @@ def reverse_rebate_settlement(
         message="返点冲销必须填写原因",
         type_message="返点冲销必须填写原因",
     )
+    assert_period_open(session, reversed_on, operation="创建返点冲销")
     record = session.get(RebateRecord, rebate_record_id)
     if record is None or record.source_order_id is None:
         raise NotFound(

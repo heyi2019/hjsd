@@ -28,6 +28,7 @@
 | 返点 | GET/POST `/rebates`，GET `/rebates/{id}`，GET/POST `/rebates/{id}/settlements`，POST `/rebates/{id}/settlements/{settlement_id}/reverse` | 返点记录、详情、分次到账、冲销与现金流 |
 | 押金 | GET/POST `/deposits`，POST `/deposits/{id}/returns`、`/losses` | 缴纳、部分退回、损失与状态 |
 | 流水/对账 | GET/POST `/cashflows`，POST `/cashflows/{id}/approve`、`/reject`、`/reverse`；GET/POST `/reconciliations`，POST `/reconciliations/{id}/resolve` | 查询与受控审核；订单事件来源流水不可手工修改；划转由 `/transfers` 原子生成成对流水 |
+| 月结 | GET/POST `/period-locks` | 按 `YYYY-MM` 锁定会计期间；锁定后禁止新增、审核或修改该月事实，次月冲销仍可作为更正 |
 | 划转 | POST `/transfers`、POST `/transfers/{transfer_id}/repair` | 原子生成同一 `transfer_id` 下的 INTERNAL 转出/转入流水；异常修复须走修复接口 |
 | 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/daily-funds`、`/order-profit` | R1–R5；当前返回 JSON，库存 CSV 导出由前端基于当前权限数据生成 |
 | 异常 | GET `/quality/exceptions` | 未路由、单边划转、负可用余额、逾期、库存缺失、未关联返点等质量异常 |

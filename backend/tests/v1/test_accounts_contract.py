@@ -577,7 +577,23 @@ class TestAccountsApi:
 
     def test_execution_detail_includes_minute_timestamps(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-time-acc")
-        order = _buy(seeded_db, account, amount="300")
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        event, _ = orders_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("300"),
+            occurred_on=TODAY,
+            actor="pytest",
+            reason="核验回收成本",
+            note="带理由的买入动作",
+        )
 
         response = seeded_client.get(
             f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
@@ -589,6 +605,9 @@ class TestAccountsApi:
         assert order_payload["order_no"] == order.order_no
         assert datetime.fromisoformat(order_payload["created_at"])
         assert datetime.fromisoformat(event_payload["occurred_at"])
+        assert event_payload["reason"] == "核验回收成本"
+        assert event_payload["offset_event_id"] is None
+        assert event_payload["id"] == event.id
 
     def test_execution_detail_includes_consign_platform(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-platform-acc")

@@ -99,9 +99,11 @@ class ExecutionEventOut(BaseModel):
     amount: Decimal
     occurred_on: date
     occurred_at: datetime
+    offset_event_id: int | None = None
     portion: str
     delivery_mode: str | None = None
     is_posted: bool
+    reason: str | None = None
     note: str | None = None
     cashflow: ExecutionCashflowOut | None = None
     operator: str
@@ -395,9 +397,11 @@ def execution_detail(
                 amount=event.amount,
                 occurred_on=event.occurred_on,
                 occurred_at=event.posted_at or event.created_at,
+                offset_event_id=event.offset_event_id,
                 portion=event.portion,
                 delivery_mode=event.delivery_mode,
                 is_posted=event.is_posted,
+                reason=event.reason,
                 note=event.note,
                 cashflow=flow_by_event.get(event.id),
                 operator=event.created_by,

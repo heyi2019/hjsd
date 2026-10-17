@@ -175,17 +175,23 @@ def update_pool(
 ) -> Pool:
     """V18：`code` 永久不可修改，只有显示名/备注/用途/归属可更新。"""
     pool = _get_pool_or_404(session, pool_id)
+    next_name = _required_name(name, field="name") if name is not None else pool.name
+    next_pool_type = (
+        _required_pool_type(pool_type) if pool_type is not None else pool.pool_type
+    )
+    next_ownership = ownership if ownership is not None else pool.ownership
+    if next_ownership not in PoolOwnership.values():
+        raise Validation("ownership 取值非法", details={"ownership": next_ownership})
+
     before = _snapshot(pool, ("name", "note", "pool_type", "ownership"))
     if name is not None:
-        pool.name = _required_name(name, field="name")
+        pool.name = next_name
     if note is not None:
         pool.note = note
     if pool_type is not None:
-        pool.pool_type = _required_pool_type(pool_type)
+        pool.pool_type = next_pool_type
     if ownership is not None:
-        if ownership not in PoolOwnership.values():
-            raise Validation("ownership 取值非法", details={"ownership": ownership})
-        pool.ownership = ownership
+        pool.ownership = next_ownership
     pool.updated_by = actor
     session.flush()
     record_audit(

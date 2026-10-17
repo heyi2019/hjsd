@@ -77,6 +77,23 @@ class TestPoolGuards:
             service.update_pool(seeded_db, pool.id, actor="pytest", ownership="MARS")
         assert "ownership 取值非法" in str(exc.value)
 
+    def test_update_pool_validates_all_fields_before_mutating(self, seeded_db):
+        pool = _pool(seeded_db, "TMPATOMIC")
+
+        with pytest.raises(Validation, match="ownership"):
+            service.update_pool(
+                seeded_db,
+                pool.id,
+                actor="operator",
+                name="不应保存的新名称",
+                ownership="INVALID",
+            )
+
+        seeded_db.commit()
+        seeded_db.refresh(pool)
+        assert pool.name == "池-TMPATOMIC"
+        assert pool.updated_by == "pytest"
+
     def test_invalid_pool_status_rejected(self, seeded_db):
         pool = _pool(seeded_db, "TMPSTA")
         with pytest.raises(Validation) as exc:

@@ -285,6 +285,24 @@ def create_order(
     _validate_participant_roles(
         definition.code, customer_roles, counterparty_roles
     )
+    customer_participants = [
+        (
+            customer_id,
+            role,
+            parties_service.assert_customer_usable(session, customer_id, user=user),
+        )
+        for customer_id, role in customer_roles
+    ]
+    counterparty_participants = [
+        (
+            counterparty_id,
+            role,
+            parties_service.assert_counterparty_usable(
+                session, counterparty_id, expected_type=role
+            ),
+        )
+        for counterparty_id, role in counterparty_roles
+    ]
 
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         owner_id = user.id
@@ -361,16 +379,12 @@ def create_order(
     session.flush()
 
     role_records: list[dict[str, Any]] = []
-    for customer_id, role in customer_roles:
-        customer = parties_service.assert_customer_usable(session, customer_id, user=user)
+    for customer_id, role, customer in customer_participants:
         role_records.append({"kind": "customer", "id": customer.customer_no, "role": role})
         session.add(
             _customer_role(order.id, customer_id, role)
         )
-    for counterparty_id, role in counterparty_roles:
-        counterparty = parties_service.assert_counterparty_usable(
-            session, counterparty_id, expected_type=role
-        )
+    for counterparty_id, role, counterparty in counterparty_participants:
         role_records.append(
             {"kind": "counterparty", "id": counterparty.counterparty_no, "role": role}
         )

@@ -21,6 +21,7 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     CapitalType,
+    CustomerStatus,
     InstallmentContractType,
     OrderStatus,
 )
@@ -58,6 +59,33 @@ def _scoped_user() -> CurrentUser:
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
+    def test_order_creation_validates_participants_before_creating_account(self, seeded_db):
+        customer = parties_service.create_customer(
+            seeded_db, display_name="已停用客户", actor="pytest"
+        )
+        parties_service.set_customer_status(
+            seeded_db, customer.id, CustomerStatus.DISABLED.value, actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="不可作为新订单参与方"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="operator",
+                account_profile={"game_account": "should-not-be-created"},
+                customer_roles=[(customer.id, "SELLER")],
+                note="atomic-participant-validation",
+            )
+
+        seeded_db.commit()
+        assert seeded_db.scalar(
+            select(Account.id).where(Account.game_account == "should-not-be-created")
+        ) is None
+        assert seeded_db.scalar(
+            select(Order.id).where(Order.note == "atomic-participant-validation")
+        ) is None
+
     def test_hs_buy_requires_inventory_account(self, seeded_db):
         order = order_service.create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"

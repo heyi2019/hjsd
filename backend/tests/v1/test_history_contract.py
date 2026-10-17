@@ -157,6 +157,20 @@ class TestAssignMappingGuards:
             )
         assert "已导入的历史行不可再改映射" in str(exc.value)
 
+    def test_committed_unmapped_row_is_read_only(self, seeded_db):
+        batch = _batch(seeded_db, rows=[{"订单号": "待人工确认"}])
+        row_id = _first_row_id(seeded_db, batch["id"])
+        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+
+        with pytest.raises(Validation, match="已确认批次的历史行不可修改"):
+            service.assign_mapping(
+                seeded_db, row_id, basis="提交后补录", actor="pytest"
+            )
+        with pytest.raises(Validation, match="已确认批次的历史行不可修改"):
+            service.skip_row(seeded_db, row_id, reason="提交后跳过", actor="pytest")
+        with pytest.raises(Validation, match="已确认批次的历史行不可修改"):
+            service.mark_unlinked_transfer(seeded_db, row_id, actor="pytest")
+
     def test_unknown_order_rejected(self, seeded_db):
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])

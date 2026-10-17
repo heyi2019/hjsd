@@ -46,6 +46,21 @@ def _validate_optional_id(value: object, *, field: str) -> int | None:
     return value
 
 
+def _assert_batch_editable(session: Session, batch_id: int) -> ImportBatch:
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        raise NotFound(f"导入批次 {batch_id} 不存在", details={"batch_id": batch_id})
+    if batch.status not in {
+        ImportBatchStatus.DRAFT.value,
+        ImportBatchStatus.MAPPED.value,
+    }:
+        raise Validation(
+            "已确认批次的历史行不可修改，请使用更正批次",
+            details={"batch_id": batch.id, "status": batch.status},
+        )
+    return batch
+
+
 def _batch_out(batch: ImportBatch) -> dict[str, Any]:
     return {
         "id": batch.id,
@@ -183,6 +198,7 @@ def assign_mapping(
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
     if row.status == ImportRowStatus.IMPORTED.value:
         raise Validation("已导入的历史行不可再改映射", details={"row_id": row_id})
+    _assert_batch_editable(session, row.batch_id)
     order_id = _validate_optional_id(order_id, field="订单")
     account_id = _validate_optional_id(account_id, field="账号")
     text_basis = _required_text(
@@ -249,6 +265,7 @@ def skip_row(
         raise Validation(
             "已回滚的历史行不可跳过", details={"row_id": row_id}
         )
+    _assert_batch_editable(session, row.batch_id)
     before = {"status": row.status, "issue_note": row.issue_note}
     row.status = ImportRowStatus.SKIPPED.value
     row.issue_note = text
@@ -349,6 +366,7 @@ def mark_unlinked_transfer(
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
     if row.unlinked_transfer:
         return _row_out(row)
+    _assert_batch_editable(session, row.batch_id)
 
     before = {"unlinked_transfer": False, "issue_note": row.issue_note}
     row.unlinked_transfer = True

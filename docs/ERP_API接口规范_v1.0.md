@@ -42,7 +42,7 @@
 {"order_type":"HS","trade_date":"2026-10-04","account_id":12,"customer_roles":[{"customer_id":10,"role":"SELLER"},{"customer_id":11,"role":"BUYER"}],"counterparty_roles":[]}
 ```
 
-返回包含 `order_no`。HS/DFQ 必填 account；DG 禁止关联工作室库存账号；TH 可选。订单角色必须符合业务类型，且停用客户/合作方不可引用。TH 同行写 `counterparty_roles:PEER`，DFQ 供货方写 `SUPPLIER`；不得把同行或供货方写入客户。创建分期合约时，`contract_type=STOCK_SALE` 仅接受已买入在库的 HS 订单，`ADVANCE_PURCHASE` 仅接受 DFQ 订单。
+返回包含 `order_no`。HS 必须使用 `account_id` 关联库存账号；DFQ 只填写 `account_snapshot` 中的游戏账号文本，禁止关联库存 `account_id`；DG 禁止关联工作室库存账号，TH 使用订单账号快照且不关联库存。订单角色必须符合业务类型，且停用客户/合作方不可引用。TH 同行写 `counterparty_roles:PEER`，DFQ 供货方写 `SUPPLIER`；不得把同行或供货方写入客户。创建分期合约时，`contract_type=STOCK_SALE` 仅接受已买入在库的 HS 订单，`ADVANCE_PURCHASE` 仅接受 DFQ 订单。
 
 ### 客户与合作方
 

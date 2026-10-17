@@ -35,7 +35,7 @@
 |---|---|---|
 | 资金池 | pools / cashflow | 每笔现金流必有 pool；池 code 不改；有流水不删 |
 | 订单 | orders / order_events | 订单号、事件号不改不复用；有资金事件派生唯一 cashflow |
-| 账号 | accounts | game_account 可空唯一；手机号不作关联键；HS/DFQ 买入必须有账号 |
+| 账号 | accounts | `inventory_no` 是 ACC 库存编号；`game_account` 只是游戏账号文本；HS 买入必须关联库存账号，DFQ 买入只保留订单账号快照，不关联库存账号；手机号不作关联键 |
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注为客户资料；联系方式非唯一；新建返回重复候选，管理员合并后来源置 `MERGED`；停用/合并后不可新关联，历史关系保留 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台与客户分离；仅允许匹配的业务角色参与订单；停用后不可新关联 |
 | 分期 | installments / installment_schedules | `ADVANCE_PURCHASE` 仅 DFQ，`STOCK_SALE` 仅已买入 HS；一单一合约；期次计划与总应收、已收、剩余应收勾稽 |

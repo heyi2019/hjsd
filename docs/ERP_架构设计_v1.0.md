@@ -79,10 +79,10 @@ erDiagram
 |---|---|---|
 | 资金 | pools / cashflow / deposits | OWNED/CUSTODY/THIRD_PART；押金不计损益；新 INTERNAL 成对 |
 | 订单 | order_type_defs / orders / order_events | HS/TH/DG/DFQ 为首批业务；订单汇总由事件派生 |
-| 账号 | accounts | HS/DFQ 必须关联；渠道多值；BUY+COST 累加成本 |
+| 账号 | accounts | HS 关联库存账号；DFQ 只保留订单账号文本快照、不关联库存；渠道多值；BUY+COST 按业务规则累加成本 |
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注等复购资料；客户可跨订单多角色；联系方式非唯一 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台；与客户分离，按业务角色关联 |
-| 分期 | installments / installment_schedules | `installments` 支持 HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE；一单一合约一账号；`installment_schedules` 为期次计划明细；PAYMENT→换绑→DELIVER |
+| 分期 | installments / installment_schedules | `installments` 支持 HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE；一单一合约，HS 从库存账号取数、DFQ 从订单账号快照取数；`installment_schedules` 为期次计划明细；PAYMENT→换绑→DELIVER |
 | 返点 | rebate_records / rebate_settlements | HS0001-RB01 返点记录，HS0001-RB01-CF-01 分次到账 |
 | 经营规则 | policy_definitions / policy_versions / order_profit_allocations | 费率、提成、分期、跌价等版本化；已发生业务保存快照 |
 | 活字段 | field_definitions / entity_extra_values | 可增、停用、排序；历史值不可删除 |

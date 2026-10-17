@@ -22,7 +22,7 @@
 | T02A | CUS-01 | customers / order_customer_roles / 客户权限 | 微信号、QQ、手机号、备注可维护；客户可跨业务多角色；敏感资料修改可审计 |
 | T02B | BAS-02-05 / CUS-01-05 | counterparties / order_counterparty_roles / 客户重复合并 | `CP` 编号与客户分离；参与方类型校验；重复候选不拦截、管理员合并可追溯 |
 | T03 | ORD-01 / ORD-02 | orders / order_events / cashflow / 编号 | 分类型订单号；事件和派生现金流一对一，无双录 |
-| T04 | ACC-01 / HS-01 / DFQ-01 | accounts / installments / 状态机 | HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE 一单一合约一账号；delivery_mode、PAYMENT、换绑、违约可校验 |
+| T04 | ACC-01 / HS-01 / DFQ-01 | accounts / installments / 状态机 | HS 的 STOCK_SALE 关联已入库库存账号；DFQ 的 ADVANCE_PURCHASE 只关联订单账号文本快照；一单一合约，delivery_mode、PAYMENT、换绑、违约可校验 |
 | T05 | REB-01 / FIN-04 / BAS-04 | rebate_records / deposits / 活字段 | REB 归集+分次结算；押金不进损益；活字段不影响核算 |
 
 ## M1：账务、资金与质量（P0）

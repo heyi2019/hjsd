@@ -93,6 +93,14 @@ class TestCreateCustomerGuards:
                 seeded_db, display_name="负责人校验", actor="pytest", owner_id=999999
             )
 
+    def test_create_names_reject_non_text_values(self, seeded_db):
+        with pytest.raises(Validation, match="称呼/昵称必填"):
+            service.create_customer(seeded_db, display_name=123, actor="pytest")
+        with pytest.raises(Validation, match="合作方名称必填"):
+            service.create_counterparty(
+                seeded_db, display_name=123, type="PEER", actor="pytest"
+            )
+
     def test_duplicate_candidates_without_conditions_returns_empty(self, seeded_db):
         # 150：无任何联系方式入参 → 直接返回空候选，不查库
         assert service.duplicate_candidates(seeded_db) == []
@@ -445,6 +453,28 @@ class TestFieldDefinitionGuards:
                 actor="pytest",
             )
         assert "排序值不能为负数" in str(exc.value)
+
+    def test_field_definition_inputs_are_strictly_typed(self, seeded_db):
+        with pytest.raises(Validation, match="实体类型必须为"):
+            service.create_field_definition(
+                seeded_db, entity_type=123, field_key="typed_entity", label="字段",
+                actor="pytest",
+            )
+        with pytest.raises(Validation, match="字段键必须为小写字母开头"):
+            service.create_field_definition(
+                seeded_db, entity_type="customer", field_key=123, label="字段",
+                actor="pytest",
+            )
+        with pytest.raises(Validation, match="字段名称不能为空"):
+            service.create_field_definition(
+                seeded_db, entity_type="customer", field_key="typed_label", label=123,
+                actor="pytest",
+            )
+        with pytest.raises(Validation, match="排序值必须为整数"):
+            service.create_field_definition(
+                seeded_db, entity_type="customer", field_key="typed_sort", label="字段",
+                sort_order="1", actor="pytest",
+            )
 
     def test_database_rejects_invalid_field_definition_values(self, seeded_db):
         with pytest.raises(IntegrityError):

@@ -42,6 +42,12 @@ FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
 
 
+def _required_text(value: Any, *, message: str, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation(message, details={"field": field})
+    return value.strip()
+
+
 def _normalize_extra_values(
     values: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -145,9 +151,9 @@ def create_customer(
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
 ) -> Customer:
-    name = (display_name or "").strip()
-    if not name:
-        raise Validation("称呼/昵称必填", details={"field": "display_name"})
+    name = _required_text(
+        display_name, message="称呼/昵称必填", field="display_name"
+    )
     _validate_owner_id(session, owner_id)
 
     extras = _normalize_extra_values(extra_values)
@@ -467,9 +473,9 @@ def create_counterparty(
     source: str | None = None,
     note: str | None = None,
 ) -> Counterparty:
-    name = (display_name or "").strip()
-    if not name:
-        raise Validation("合作方名称必填", details={"field": "display_name"})
+    name = _required_text(
+        display_name, message="合作方名称必填", field="display_name"
+    )
     try:
         CounterpartyType(type)
     except ValueError as exc:
@@ -757,16 +763,23 @@ def create_field_definition(
     required: bool = False,
     sort_order: int = 0,
 ) -> FieldDefinition:
-    entity = (entity_type or "").strip().lower()
+    entity = _required_text(
+        entity_type, message=f"实体类型必须为 {EntityType.values()}", field="entity_type"
+    ).lower()
     if entity not in EntityType.values():
         raise Validation(
             f"实体类型必须为 {EntityType.values()}",
             details={"field": "entity_type", "value": entity_type},
         )
-    if field_type not in FieldType.values():
+    if not isinstance(field_type, str) or field_type not in FieldType.values():
         raise Validation(
             f"字段类型必须为 {FieldType.values()}",
             details={"field": "field_type", "value": field_type},
+        )
+    if isinstance(sort_order, bool) or not isinstance(sort_order, int):
+        raise Validation(
+            "排序值必须为整数",
+            details={"field": "sort_order", "value": sort_order},
         )
     if sort_order < 0:
         raise Validation(
@@ -774,7 +787,11 @@ def create_field_definition(
             details={"field": "sort_order", "value": sort_order},
         )
     normalized_options = _normalize_field_options(field_type, options)
-    key = (field_key or "").strip()
+    key = _required_text(
+        field_key,
+        message="字段键必须为小写字母开头，仅含小写字母、数字与下划线",
+        field="field_key",
+    )
     if not FIELD_KEY_PATTERN.match(key):
         raise Validation(
             "字段键必须为小写字母开头，仅含小写字母、数字与下划线",
@@ -792,9 +809,9 @@ def create_field_definition(
             details={"entity_type": entity, "field_key": key},
         )
 
-    normalized_label = (label or "").strip()
-    if not normalized_label:
-        raise Validation("字段名称不能为空", details={"field": "label"})
+    normalized_label = _required_text(
+        label, message="字段名称不能为空", field="label"
+    )
 
     definition = FieldDefinition(
         entity_type=entity,

@@ -410,15 +410,6 @@ def pay(
             details={"period_no": schedule.period_no, "outstanding": str(outstanding)},
         )
 
-    schedule.received_amount = to_money(schedule.received_amount) + money
-    schedule.received_on = paid_on
-    schedule.status = (
-        ScheduleStatus.PAID.value
-        if schedule.received_amount + schedule.waived_amount >= schedule.due_amount
-        else ScheduleStatus.PARTIAL.value
-    )
-    installment.paid_amount = to_money(installment.paid_amount) + money
-
     orders_service.post_event(
         session,
         installment.order_id,
@@ -432,6 +423,16 @@ def pay(
         user=user,
         allow_installment_payment=True,
     )
+
+    schedule.received_amount = to_money(schedule.received_amount) + money
+    schedule.received_on = paid_on
+    schedule.status = (
+        ScheduleStatus.PAID.value
+        if schedule.received_amount + schedule.waived_amount >= schedule.due_amount
+        else ScheduleStatus.PARTIAL.value
+    )
+    installment.paid_amount = to_money(installment.paid_amount) + money
+    installment.updated_by = actor
 
     if installment.status == InstallmentStatus.PENDING.value:
         installment.status = transition(
@@ -777,6 +778,7 @@ def deliver(
     )
     installment.delivery_mode = delivery_mode
     installment.delivered_on = delivered_on
+    installment.updated_by = actor
     session.flush()
     record_audit(
         session,
@@ -838,6 +840,7 @@ def mark_overdue(
                     "MARK_OVERDUE",
                     entity="分期合约",
                 )
+                installment.updated_by = actor
                 record_audit(
                     session,
                     action=AuditAction.INSTALLMENT_OVERDUE,

@@ -330,6 +330,49 @@ class TestGetAndListInstallments:
 
 # ------------------------------------------------------------------ 收款守卫
 class TestPayGuards:
+    def test_payment_failure_does_not_mutate_contract_or_schedule(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, down_payment="100", periods=1, per_period="300"
+        )
+        with pytest.raises(NotFound):
+            installment_service.pay(
+                seeded_db,
+                contract.id,
+                amount=Decimal("100"),
+                paid_on=TODAY,
+                period_no=0,
+                pool_id=999999,
+                actor="cashier",
+            )
+
+        seeded_db.commit()
+        seeded_db.refresh(contract)
+        schedule = seeded_db.scalar(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == contract.id,
+                InstallmentSchedule.period_no == 0,
+            )
+        )
+        assert contract.paid_amount == Decimal("0.00")
+        assert contract.status == InstallmentStatus.PENDING.value
+        assert contract.updated_by == "pytest"
+        assert schedule.received_amount == Decimal("0.00")
+        assert schedule.status == ScheduleStatus.PENDING.value
+
+    def test_payment_updates_contract_operator(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id)
+        installment_service.pay(
+            seeded_db,
+            contract.id,
+            amount=Decimal("100"),
+            paid_on=TODAY,
+            period_no=0,
+            actor="cashier",
+        )
+        assert contract.updated_by == "cashier"
+
     def test_full_waiver_settles_contract_for_delivery(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(
@@ -466,6 +509,18 @@ class TestDeliverGuards:
             )
         assert "交付方式" in str(exc.value)
 
+    def test_delivery_updates_contract_operator(self, seeded_db):
+        contract = self._settled(seeded_db, "delivery-operator")
+        installment_service.deliver(
+            seeded_db,
+            contract.id,
+            delivery_mode=DeliveryMode.CUSTOMER_SELF.value,
+            delivered_on=TODAY,
+            note="交付凭证",
+            actor="delivery",
+        )
+        assert contract.updated_by == "delivery"
+
     def test_deliver_requires_note(self, seeded_db):
         contract = self._settled(seeded_db, "no-note")
         with pytest.raises(Validation) as exc:
@@ -479,6 +534,21 @@ class TestDeliverGuards:
 
 # ------------------------------------------------------------------ 逾期升级
 class TestMarkOverdue:
+    def test_overdue_updates_contract_operator(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="0",
+            periods=1,
+            per_period="300",
+            first_due_on=PAST,
+        )
+
+        installment_service.mark_overdue(seeded_db, as_of=TODAY, actor="risk")
+
+        assert contract.updated_by == "risk"
+
     def test_terminal_contract_is_not_marked_overdue(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(

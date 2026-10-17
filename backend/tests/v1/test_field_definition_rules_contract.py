@@ -68,3 +68,14 @@ def test_field_definition_rejects_rules_that_do_not_apply_to_type(seeded_db):
             validation_rule={"pattern": "正常|异常"},
             actor="pytest",
         )
+
+
+def test_field_definition_cannot_shadow_fixed_entity_fields(seeded_db):
+    with pytest.raises(Validation, match="不能覆盖固定字段"):
+        service.create_field_definition(
+            seeded_db,
+            entity_type="order",
+            field_key="order_no",
+            label="伪订单号",
+            actor="pytest",
+        )

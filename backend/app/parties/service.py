@@ -81,6 +81,12 @@ _ENTITY_LABELS = {
 }
 
 
+def _fixed_entity_fields(entity_type: str) -> set[str]:
+    """Return persisted/API-reserved names that a live field cannot shadow."""
+    model = _EXTRA_ENTITY_MODELS[entity_type]
+    return {column.key for column in inspect(model).mapper.column_attrs} | {"extra_values"}
+
+
 def _required_text(value: Any, *, message: str, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise Validation(message, details={"field": field})
@@ -1591,6 +1597,11 @@ def create_field_definition(
         raise Validation(
             "字段键必须为小写字母开头，仅含小写字母、数字与下划线",
             details={"field": "field_key", "value": field_key},
+        )
+    if key in _fixed_entity_fields(entity):
+        raise Validation(
+            f"活字段不能覆盖固定字段 {key}",
+            details={"entity_type": entity, "field_key": key},
         )
     exists = session.scalar(
         select(FieldDefinition).where(

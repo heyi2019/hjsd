@@ -35,7 +35,7 @@
 | 异常 | GET `/quality/exceptions`、GET `/quality/metrics`；GET/POST `/quality/issues`，GET/PATCH `/quality/issues/{id}`，POST `/quality/issues/{id}/close` | 异常扫描、按月质量指标、负责人分派、处理中状态、解决方式与关闭证据 |
 | 全局搜索 | GET `/search?q=...` | 按当前权限检索订单、库存、客户、合作方和返点，结果只返回可跳转摘要 |
 | 附件 | GET `/attachments`、POST `/attachments`、GET `/attachments/{id}/download`、DELETE `/attachments/{id}` | 关联订单、事件、资金、分期或质量异常；Base64 内容最大 20MB；删除为软删除并保留审计 |
-| 活字段 | GET/POST `/field-definitions`，PATCH `/field-definitions/{id}/active`，DELETE `/field-definitions/{id}` | 定义、停用、排序；有历史值的字段不可删除 |
+| 活字段 | GET/POST `/field-definitions`，PATCH `/field-definitions/{id}`、`/field-definitions/{id}/active`，DELETE `/field-definitions/{id}` | 定义、编辑、停用、排序；键/实体/类型不可改，有历史值的字段不可删除 |
 | 经营规则 | GET/POST `/policies`，GET `/policies/{id}/versions`，POST `/policies/{id}/versions`，PATCH/POST `/policy-versions/{id}`、`/approve` | 规则版本、审批、快照与多人利润分配；订单分配使用 `/orders/{id}/profit-allocations` |
 | 历史导入 | POST/GET `/imports/batches`，GET `/imports/batches/{id}/rows|preview|reconciliation`，POST 映射、跳过、提交、回滚、更正 | P2 标准导入与复核，不改变新单模型 |
 | 审计 | GET `/audit-logs`、`/audit-logs/actions` | 按对象、人员、日期查询受控操作记录 |

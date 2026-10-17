@@ -43,7 +43,7 @@
 | rebate_records | rebate_no, source_order_id, rate, base_amount, collected_on, expected_on, policy_version_id, policy_snapshot, link_status | HS0001-RB01；新记录来源订单必填；预计到账日用于逾期跟进；费率与规则版本快照一并固化 |
 | rebate_settlements | settlement_no, rebate_record_id, settled_on, gross_amount, platform_fee, net_amount, cashflow_id | HS0001-RB01-CF-01；毛额−手续费=净额 |
 | deposits | pool_id, paid_amount, returned_amount, status, dates | 可退押金不进损益，必须关联现金流；不单独生成押金编号 |
-| field_definitions / entity_extra_values | entity_type, field_key, type, options, active, value(JSON) | 活字段仅业务辅助信息；支持 `order`、`account`、`customer`、`installment`、`pool`、`cashflow`、`lead`、`counterparty` 八类实体；有历史值只能停用 |
+| field_definitions / entity_extra_values | entity_type, field_key, type, options, default_value, applicable_order_types, validation_rule, active, value(JSON) | 活字段仅业务辅助信息；支持 `order`、`account`、`customer`、`installment`、`pool`、`cashflow`、`lead`、`counterparty` 八类实体；有历史值只能停用 |
 | policy_definitions / policy_versions | policy_code, scope_type, scope_id, effective_from/to, config(JSON), version, status | 经营规则受控配置；已引用版本不可修改或删除，只能新建版本 |
 | order_profit_allocations | order_id, user_id, role, allocation_rate, policy_version_id | 多人订单利润分配固定结构化记录；比例合计必须为 100% |
 

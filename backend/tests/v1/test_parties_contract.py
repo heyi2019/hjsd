@@ -144,6 +144,21 @@ class TestListAndGetCustomers:
 
 # ------------------------------------------------------------------ 客户更新
 class TestUpdateCustomer:
+    def test_customer_and_counterparty_names_cannot_be_blank_on_update(self, seeded_db):
+        customer = _customer(seeded_db, "客户名")
+        with pytest.raises(Validation, match="称呼/昵称不能清空"):
+            service.update_customer(
+                seeded_db, customer.id, actor="pytest", display_name="   "
+            )
+
+        counterparty = service.create_counterparty(
+            seeded_db, display_name="合作方名", type="PEER", actor="pytest"
+        )
+        with pytest.raises(Validation, match="合作方名称不能清空"):
+            service.update_counterparty(
+                seeded_db, counterparty.id, actor="pytest", display_name="   "
+            )
+
     def test_customer_mutations_respect_owner_scope(self, seeded_db):
         other = _customer(seeded_db, "他人客户", owner_id=1)
 

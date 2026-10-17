@@ -279,8 +279,10 @@ def update_customer(
     for name, value in fields.items():
         if name not in allowed_fields:
             raise Validation("客户更新字段不受支持", details={"field": name})
-        if name == "display_name" and value is None:
-            raise Validation("称呼/昵称不能清空", details={"field": name})
+        if name == "display_name":
+            if not isinstance(value, str) or not value.strip():
+                raise Validation("称呼/昵称不能清空", details={"field": name})
+            value = value.strip()
         if getattr(customer, name, None) != value:
             setattr(customer, name, value)
             if name in CONTACT_FIELDS:
@@ -513,8 +515,10 @@ def update_counterparty(
     for name, value in fields.items():
         if name not in allowed_fields:
             raise Validation("合作方更新字段不受支持", details={"field": name})
-        if name == "display_name" and value is None:
-            raise Validation("合作方名称不能清空", details={"field": name})
+        if name == "display_name":
+            if not isinstance(value, str) or not value.strip():
+                raise Validation("合作方名称不能清空", details={"field": name})
+            value = value.strip()
         setattr(item, name, value)
     item.updated_by = actor
     session.flush()

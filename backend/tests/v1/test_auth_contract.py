@@ -439,6 +439,38 @@ def test_user_service_rejects_unknown_and_immutable_fields(seeded_db):
         )
 
 
+def test_user_service_validates_password_and_scope_id_shapes(seeded_db):
+    with pytest.raises(Validation, match="密码至少需要 8 位"):
+        service.create_user(
+            seeded_db,
+            username="short-password",
+            display_name="短密码",
+            password="short",
+            role="VIEWER",
+            owner_scope="SELF",
+            pool_ids=[],
+            team_ids=[],
+            phone=None,
+            note=None,
+            actor="pytest",
+        )
+
+    with pytest.raises(Validation, match="资金池 ID 必须为正整数"):
+        service.create_user(
+            seeded_db,
+            username="bad-pool-id",
+            display_name="坏池编号",
+            password="password123",
+            role="VIEWER",
+            owner_scope="SELF",
+            pool_ids=[True],
+            team_ids=[],
+            phone=None,
+            note=None,
+            actor="pytest",
+        )
+
+
 def test_reset_password_not_found(client: TestClient):
     response = client.post(
         "/api/v1/users/999/reset-password",

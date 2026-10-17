@@ -33,6 +33,26 @@ def _required_text(value: object, *, message: str) -> str:
     return normalized
 
 
+def _required_password(value: object) -> str:
+    if not isinstance(value, str) or len(value) < 8:
+        raise Validation("密码至少需要 8 位", details={"field": "password"})
+    if len(value) > 128:
+        raise Validation("密码不能超过 128 位", details={"field": "password"})
+    return value
+
+
+def _validate_id_list(value: object, *, label: str) -> list[int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise Validation(f"{label} ID 列表格式无效", details={"field": label})
+    if any(isinstance(item, bool) or not isinstance(item, int) or item <= 0 for item in value):
+        raise Validation(f"{label} ID 必须为正整数", details={"field": label})
+    if len(value) != len(set(value)):
+        raise Validation(f"{label} ID 不能重复", details={"field": label})
+    return value
+
+
 def _user_snapshot(user: User) -> dict[str, object]:
     return {field: getattr(user, field) for field in _USER_FIELDS}
 
@@ -90,6 +110,9 @@ def create_user(
         raise Validation("无效数据范围")
     normalized_username = _required_text(username, message="用户名不能为空")
     normalized_display_name = _required_text(display_name, message="显示名称不能为空")
+    password = _required_password(password)
+    pool_ids = _validate_id_list(pool_ids, label="资金池") or []
+    team_ids = _validate_id_list(team_ids, label="团队") or []
     if session.scalar(select(User).where(User.username == normalized_username)):
         raise Conflict("用户名已存在")
     _check_pool_ids(session, pool_ids)
@@ -132,6 +155,10 @@ def update_user(
     unsupported = sorted(set(changes) - _USER_MUTABLE_FIELDS)
     if unsupported:
         raise Validation("用户更新字段不受支持", details={"fields": unsupported})
+    if "pool_ids" in changes:
+        changes = {**changes, "pool_ids": _validate_id_list(changes["pool_ids"], label="资金池")}
+    if "team_ids" in changes:
+        changes = {**changes, "team_ids": _validate_id_list(changes["team_ids"], label="团队")}
     _check_pool_ids(session, changes.get("pool_ids") if "pool_ids" in changes else None)  # type: ignore[arg-type]
     _check_team_ids(session, changes.get("team_ids") if "team_ids" in changes else None)  # type: ignore[arg-type]
     if "role" in changes and changes["role"] not in ALL_ROLES:
@@ -170,6 +197,7 @@ def change_password(
     user = session.get(User, user_id)
     if user is None or not verify_password(old_password, user.password_hash):
         raise AuthError("原密码错误")
+    new_password = _required_password(new_password)
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
     session.flush()
@@ -192,6 +220,7 @@ def reset_password(
     user = session.get(User, user_id)
     if user is None:
         raise Validation("用户不存在")
+    password = _required_password(password)
     user.password_hash = hash_password(password)
     user.must_change_password = True
     session.flush()

@@ -221,6 +221,19 @@ class TestTokenGuards:
             decode_token(token)
         assert "无法解析" in str(exc.value)
 
+    def test_non_object_claims_rejected(self):
+        token = self._signed_token({"alg": "HS256", "typ": "JWT"}, ["not", "claims"])
+        with pytest.raises(AuthError, match="登录凭证内容无效"):
+            decode_token(token)
+
+    def test_invalid_exp_claim_rejected(self):
+        token = self._signed_token(
+            {"alg": "HS256", "typ": "JWT"},
+            {"sub": "1", "exp": "not-a-timestamp"},
+        )
+        with pytest.raises(AuthError, match="登录凭证内容无效"):
+            decode_token(token)
+
     def test_unexpected_algorithm_rejected(self):
         token = self._signed_token(
             {"alg": "none", "typ": "JWT"}, {"sub": "1", "exp": 4102444800}

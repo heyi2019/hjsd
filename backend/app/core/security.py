@@ -267,9 +267,15 @@ def decode_token(token: str, *, settings: Settings | None = None) -> dict[str, A
         payload = json.loads(_b64url_decode(parts[1]))
     except (ValueError, TypeError) as error:
         raise AuthError("登录凭证无法解析") from error
+    if not isinstance(header, dict) or not isinstance(payload, dict):
+        raise AuthError("登录凭证内容无效")
     if header.get("alg") != settings.jwt_algorithm:
         raise AuthError("登录凭证算法不被接受")
-    if int(payload.get("exp", 0)) < int(time.time()):
+    try:
+        expires_at = int(payload.get("exp", 0))
+    except (TypeError, ValueError) as error:
+        raise AuthError("登录凭证内容无效") from error
+    if expires_at < int(time.time()):
         raise TokenExpired("登录已过期，请重新登录")
     return payload
 
@@ -313,14 +319,31 @@ def build_access_token(user: "CurrentUser", *, settings: Settings | None = None)
 
 
 def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
+    try:
+        user_id = int(payload.get("sub", 0))
+        username = payload.get("username")
+        roles = payload.get("roles", [])
+        pool_ids = payload.get("pool_ids", [])
+        team_ids = payload.get("team_ids", [])
+        owner_scope = payload.get("owner_scope", "SELF")
+        if user_id <= 0 or not isinstance(username, str) or not username.strip():
+            raise ValueError("invalid identity claims")
+        if not isinstance(roles, list) or not isinstance(pool_ids, list) or not isinstance(team_ids, list):
+            raise ValueError("invalid collection claims")
+        if any(isinstance(item, bool) or not isinstance(item, int) or item <= 0 for item in pool_ids + team_ids):
+            raise ValueError("invalid scope claims")
+        if not isinstance(owner_scope, str) or owner_scope not in OWNER_SCOPES:
+            raise ValueError("invalid owner scope")
+    except (TypeError, ValueError) as error:
+        raise AuthError("登录凭证内容无效") from error
     return CurrentUser.build(
-        id=int(payload.get("sub", 0)),
-        username=payload.get("username", "unknown"),
-        roles=payload.get("roles", []),
-        display_name=payload.get("display_name", payload.get("username", "unknown")),
-        pool_ids=frozenset(payload.get("pool_ids", [])),
-        team_ids=frozenset(payload.get("team_ids", [])),
-        owner_scope=payload.get("owner_scope", "SELF"),
+        id=user_id,
+        username=username.strip(),
+        roles=roles,
+        display_name=payload.get("display_name", username.strip()),
+        pool_ids=frozenset(pool_ids),
+        team_ids=frozenset(team_ids),
+        owner_scope=owner_scope,
     )
 
 
@@ -354,7 +377,11 @@ def get_current_user(
         payload = decode_token(token, settings=settings)
         if payload.get("jti") and db.get(RevokedToken, payload["jti"]):
             raise AuthError("登录已退出，请重新登录")
-        account = db.get(User, int(payload.get("sub", 0)))
+        try:
+            user_id = int(payload.get("sub", 0))
+        except (TypeError, ValueError) as error:
+            raise AuthError("登录凭证内容无效") from error
+        account = db.get(User, user_id)
         if account is not None and account.username == payload.get("username"):
             if not account.is_active:
                 raise AuthError("账号已停用，请联系管理员")

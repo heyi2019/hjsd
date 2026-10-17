@@ -1,11 +1,10 @@
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收与代挂账号从这里进入在库流程。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Input, Modal, Select, Space, Upload, message } from "antd";
-import type { UploadFile } from "antd/es/upload/interface";
+import { Card, Input, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { accountsApi, type Account, type AccountExecutionDetail } from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
+import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
@@ -18,6 +17,7 @@ import { InventorySaleModal } from "./InventorySaleModal";
 import { InventoryConsignmentModal } from "./InventoryConsignmentModal";
 import { InventoryRebateModal } from "./InventoryRebateModal";
 import { InventoryDetail } from "./InventoryDetail";
+import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
 import {
   BUSINESS_MODE_LABEL,
   BUSINESS_OPTIONS,
@@ -27,16 +27,8 @@ import {
   STATUS_OPTIONS,
   inventoryAge,
 } from "./inventory-logic";
-import { buildInventoryCsv, downloadInventoryCsv } from "./inventory-export";
+import { downloadInventoryCsv } from "./inventory-export";
 
-function readImageData(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("图片读取失败"));
-    reader.readAsDataURL(file);
-  });
-}
 export function InventoryPanel() {
   const [rows, setRows] = useState<Account[]>([]);
   const [status, setStatus] = useState<string | undefined>(undefined);
@@ -53,21 +45,7 @@ export function InventoryPanel() {
   const [executionLoading, setExecutionLoading] = useState<Record<number, boolean>>({});
   const [expandedAccountIds, setExpandedAccountIds] = useState<Key[]>([]);
   const [exporting, setExporting] = useState(false);
-  const [profileTarget, setProfileTarget] = useState<{ account: Account; mode: "description" | "images" | "all" } | null>(null);
-  const [profileForm, setProfileForm] = useState({
-    gameAccount: "",
-    gameType: "",
-    gamePassword: "",
-    channelRegion: "",
-    boundPhone: "",
-    platform: "",
-    hasSecondary: undefined as boolean | undefined,
-    description: "",
-    note: "",
-  });
-  const [profileImages, setProfileImages] = useState<UploadFile[]>([]);
-  const [savingProfile, setSavingProfile] = useState(false);
-
+  const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const load = useCallback(async () => {
     try {
       const list = await accountsApi.list(status ? { status } : undefined);
@@ -93,66 +71,8 @@ export function InventoryPanel() {
   const visibleOccupied = visibleRows.filter((row) => ["IN_STOCK", "INSTALLMENT"].includes(row.status));
   const totalCost = visibleOccupied.reduce((sum, row) => sum + Number(row.cost_amount), 0).toFixed(2);
 
-  function openProfile(account: Account, mode: "description" | "images" | "all") {
+  function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
-    setProfileForm({
-      gameAccount: account.game_account ?? "",
-      gameType: account.game_type ?? "",
-      gamePassword: account.game_password ?? "",
-      channelRegion: account.channel_region ?? "",
-      boundPhone: account.bound_phone ?? "",
-      platform: account.platform ?? "",
-      hasSecondary: account.has_secondary ?? undefined,
-      description: account.account_description ?? "",
-      note: account.note ?? "",
-    });
-    setProfileImages((account.account_images ?? []).slice(0, 9).map((url, index) => ({
-      uid: `${account.id}-${index}`,
-      name: `账号图片${index + 1}`,
-      status: "done",
-      url,
-    })));
-  }
-
-  async function saveProfile() {
-    if (!profileTarget) return;
-    setSavingProfile(true);
-    try {
-      const payload = profileTarget.mode === "description"
-        ? { account_description: profileForm.description }
-        : profileTarget.mode === "images" ? {
-            account_images: (await Promise.all(profileImages.slice(0, 9).map(async (file) => {
-              if (file.url) return file.url;
-              return file.originFileObj ? readImageData(file.originFileObj) : null;
-            }))).filter((item): item is string => Boolean(item)),
-          } : {
-            game_account: profileForm.gameAccount,
-            game_type: profileForm.gameType,
-            game_password: profileForm.gamePassword,
-            channel_region: profileForm.channelRegion,
-            bound_phone: profileForm.boundPhone,
-            platform: profileForm.platform,
-            has_secondary: profileForm.hasSecondary,
-            account_description: profileForm.description,
-            account_images: (await Promise.all(profileImages.slice(0, 9).map(async (file) => {
-              if (file.url) return file.url;
-              return file.originFileObj ? readImageData(file.originFileObj) : null;
-            }))).filter((item): item is string => Boolean(item)),
-            note: profileForm.note,
-          };
-      const updated = await accountsApi.updateProfile(profileTarget.account.id, payload);
-      setRows((current) => current.map((row) => row.id === updated.id ? { ...row, ...updated } : row));
-      setExecutionDetails((current) => {
-        const detail = current[updated.id];
-        return detail ? { ...current, [updated.id]: { ...detail, account: { ...detail.account, ...updated } } } : current;
-      });
-      setProfileTarget(null);
-      message.success("账号资料已保存");
-    } catch (err) {
-      setError(normalizeError(err));
-    } finally {
-      setSavingProfile(false);
-    }
   }
 
   const columns: ColumnsType<Account> = [
@@ -401,67 +321,18 @@ export function InventoryPanel() {
           await load();
         }}
       />
-      <Modal
-        open={Boolean(profileTarget)}
-        title={profileTarget?.mode === "images" ? "账号图片" : profileTarget?.mode === "description" ? "账号描述" : "编辑账号资料"}
-        okText="保存"
-        cancelText="取消"
-        confirmLoading={savingProfile}
-        onCancel={() => setProfileTarget(null)}
-        onOk={() => void saveProfile()}
-      >
-        {profileTarget?.mode === "images" ? (
-          <Upload
-            listType="picture-card"
-            accept="image/*"
-            maxCount={9}
-            fileList={profileImages}
-            beforeUpload={() => false}
-            onChange={({ fileList }) => setProfileImages(fileList.slice(0, 9))}
-          >
-            <span aria-hidden="true">＋</span>
-            <div>添加图片</div>
-          </Upload>
-        ) : profileTarget?.mode === "description" ? (
-          <Input.TextArea
-            rows={6}
-            maxLength={2000}
-            showCount
-            value={profileForm.description}
-            placeholder="补充账号等级、资源、限制等信息"
-            onChange={(event) => setProfileForm((current) => ({ ...current, description: event.target.value }))}
-          />
-        ) : (
-          <Space className="inventory-profile-editor" direction="vertical" size="middle">
-            <Input aria-label="游戏账号" placeholder="游戏账号" value={profileForm.gameAccount} onChange={(event) => setProfileForm((current) => ({ ...current, gameAccount: event.target.value }))} />
-            <Input aria-label="游戏类型" placeholder="游戏类型" value={profileForm.gameType} onChange={(event) => setProfileForm((current) => ({ ...current, gameType: event.target.value }))} />
-            <Input.Password aria-label="账号密码" placeholder="账号密码" value={profileForm.gamePassword} onChange={(event) => setProfileForm((current) => ({ ...current, gamePassword: event.target.value }))} />
-            <Input aria-label="渠道 / 区服" placeholder="渠道 / 区服" value={profileForm.channelRegion} onChange={(event) => setProfileForm((current) => ({ ...current, channelRegion: event.target.value }))} />
-            <Input aria-label="绑定手机号" placeholder="绑定手机号" value={profileForm.boundPhone} onChange={(event) => setProfileForm((current) => ({ ...current, boundPhone: event.target.value }))} />
-            <Input aria-label="平台" placeholder="平台" value={profileForm.platform} onChange={(event) => setProfileForm((current) => ({ ...current, platform: event.target.value }))} />
-            <Select
-              allowClear
-              value={profileForm.hasSecondary == null ? undefined : profileForm.hasSecondary ? "有" : "无"}
-              placeholder="有无二次"
-              options={[{ value: "有", label: "有二次" }, { value: "无", label: "无二次" }]}
-              onChange={(value) => setProfileForm((current) => ({ ...current, hasSecondary: value == null ? undefined : value === "有" }))}
-            />
-            <Input.TextArea rows={4} maxLength={2000} showCount value={profileForm.description} placeholder="账号描述" onChange={(event) => setProfileForm((current) => ({ ...current, description: event.target.value }))} />
-            <Upload
-              listType="picture-card"
-              accept="image/*"
-              maxCount={9}
-              fileList={profileImages}
-              beforeUpload={() => false}
-              onChange={({ fileList }) => setProfileImages(fileList.slice(0, 9))}
-            >
-              <span aria-hidden="true">＋</span>
-              <div>添加图片</div>
-            </Upload>
-            <Input.TextArea rows={3} value={profileForm.note} placeholder="账号备注" onChange={(event) => setProfileForm((current) => ({ ...current, note: event.target.value }))} />
-          </Space>
-        )}
-      </Modal>
+      <InventoryProfileModal
+        target={profileTarget}
+        onClose={() => setProfileTarget(null)}
+        onSaved={(updated) => {
+          setRows((current) => current.map((row) => row.id === updated.id ? { ...row, ...updated } : row));
+          setExecutionDetails((current) => {
+            const detail = current[updated.id];
+            return detail ? { ...current, [updated.id]: { ...detail, account: { ...detail.account, ...updated } } } : current;
+          });
+        }}
+        onError={(error) => setError(normalizeError(error))}
+      />
     </section>
   );
 }

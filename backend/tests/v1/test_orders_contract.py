@@ -61,6 +61,22 @@ def _scoped_user() -> CurrentUser:
     )
 
 
+def test_database_rejects_inventory_links_for_text_only_orders(seeded_db):
+    order = _order(seeded_db, order_type="TH")
+    account = accounts_service.create_account(
+        seeded_db,
+        game_account="text-only-order-link",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
+    )
+    order.account_id = account.id
+
+    with pytest.raises(IntegrityError):
+        seeded_db.flush()
+    seeded_db.rollback()
+
+
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
     def test_order_and_account_live_fields_round_trip_through_api(

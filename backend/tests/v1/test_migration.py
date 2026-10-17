@@ -297,6 +297,58 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
         engine.dispose()
 
 
+def test_text_only_order_migration_unlinks_inventory_and_preserves_snapshot(migration_env):
+    env, db_file = migration_env
+    assert _alembic(env, "upgrade", "0084_field_definition_rules").returncode == 0
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("PRAGMA ignore_check_constraints = ON"))
+            connection.execute(
+                text(
+                    "INSERT INTO accounts "
+                    "(inventory_no, game_account, game_type, platform, status, cost_amount, created_by, updated_by) "
+                    "VALUES ('ACC-MIG-TH', 'text-account', '测试游戏', '测试平台', 'SOLD', 100, 'pytest', 'pytest')"
+                )
+            )
+            account_id = connection.execute(
+                text("SELECT id FROM accounts WHERE inventory_no = 'ACC-MIG-TH'")
+            ).scalar_one()
+            connection.execute(
+                text(
+                    "INSERT INTO orders "
+                    "(order_no, order_type, capital_type, trade_date, account_id, status, link_status, created_by, updated_by) "
+                    "VALUES ('TH-MIG-01', 'TH', 'PASS_THRU', '2026-10-17', :account_id, 'ACTIVE', 'LINKED', 'pytest', 'pytest')"
+                ),
+                {"account_id": account_id},
+            )
+            connection.execute(text("PRAGMA ignore_check_constraints = OFF"))
+    finally:
+        engine.dispose()
+
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT account_id, account_snapshot FROM orders "
+                    "WHERE order_no = 'TH-MIG-01'"
+                )
+            ).one()
+            assert row.account_id is None
+            assert '"game_account": "text-account"' in row.account_snapshot
+            create_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'")
+            ).scalar_one()
+            assert "order_account_link_type_valid" in create_sql
+    finally:
+        engine.dispose()
+
+
 def test_deposit_number_cleanup_removes_legacy_sequence(migration_env):
     """升级旧库时，押金编号字段和对应的编号序列都应移除。"""
     env, db_file = migration_env

@@ -153,6 +153,14 @@ class Order(Base, AuditMixin):
             "order_type = 'DG' OR (commission_mode IS NULL AND commission_payer IS NULL)",
             name="order_commission_type_valid",
         ),
+        CheckConstraint(
+            "order_type NOT IN ('TH', 'DFQ') OR account_id IS NULL",
+            name="order_account_link_type_valid",
+        ),
+        CheckConstraint(
+            "order_type IN ('TH', 'DFQ') OR account_snapshot IS NULL OR account_snapshot = 'null'",
+            name="order_account_snapshot_type_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

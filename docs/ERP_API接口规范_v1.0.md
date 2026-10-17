@@ -8,31 +8,32 @@
 
 - 成功：`200/201`；校验失败：`422`；状态冲突：`409`；不存在：`404`。客户联系方式默认脱敏；读取完整联系方式须 `customer.contact.read`，修改须 `customer.contact.write`，合并须 `customer.merge`。
 - 响应错误：`{ "code": "POOL_ROUTE_MISSING", "message": "业务 HS 未配置 PROFIT 资金池", "details": {} }`。
-- 列表统一支持 `page`、`page_size`、`from`、`to`、`keyword` 及对象筛选。
+- 列表筛选参数按各端点的请求签名执行；日期报表支持 `from` / `to`，订单和资金接口的可用筛选以 Swagger 为准，不假定所有列表都有分页参数。
 
 ## 2. 端点
 
 | 模块 | 方法与路径 | 用途 |
 |---|---|---|
-| 池/业务 | GET/POST `/pools`, PATCH `/pools/{id}` | 创建、停用、查看池；禁止删除有流水池 |
-| 池/业务 | GET/POST `/order-types`, POST `/order-types/{code}/routes` | 业务主数据和默认路由 |
-| 客户 | GET/POST `/customers`，GET/PATCH `/customers/{id}`，POST `/customers/{id}/merge` | 客户档案、重复候选、合并、角色汇总与关联业务 |
-| 合作方 | GET/POST `/counterparties`，GET/PATCH `/counterparties/{id}` | 同行、供货方、平台等非客户对手方主数据 |
-| 订单 | GET/POST `/orders`, GET `/orders/{id}` | 创建订单及读取事件时间线 |
-| 事件 | POST `/orders/{id}/events` | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL；有资金影响的事件自动生成 cashflow，DELIVER 不生成 |
-| 划转 | POST `/transfers` | source_pool、target_pool、amount；原子生成成对 INTERNAL |
-| 账号 | GET/PATCH `/accounts` | 查看与维护库存账号；新账号只随工作台订单创建，不提供独立新增接口 |
-| 分期 | GET/POST/PATCH `/installments`，POST `/installments/{id}/payments` | `contract_type`=STOCK_SALE/ADVANCE_PURCHASE；HS 分期出售或 DFQ 代分期的计划、收款、逾期、换绑 |
-| 人员/权限 | GET/POST/PATCH `/users`、`/roles` | 人员、角色、数据范围与停用 |
-| 返点 | POST `/rebates`, POST `/rebates/{id}/settlements` | 返点记录、分次到账与现金流 |
-| 押金 | GET/POST/PATCH `/deposits` | 缴纳、部分退回、状态 |
-| 流水 | GET `/cashflows` | 查询；订单事件来源流水不可手工修改 |
-| 划转 | POST `/transfers` | 原子生成同一 `transfer_id` 下的 INTERNAL 转出/转入流水 |
-| 报表 | GET `/reports/pools|inventory|operating|business-profitability|commissions` | R1–R5 |
-| 异常 | GET `/quality/exceptions` | 未关联、单边划转、逾期、库存缺失 |
-| 活字段 | GET/POST/PATCH `/field-definitions` | 定义、停用、排序；不允许删除历史字段 |
-| 经营规则 | GET/POST/PATCH `/policies`，POST `/orders/{id}/profit-allocations` | 规则版本、审批、快照与多人利润分配 |
-| 审计 | GET `/audit-logs` | 按对象、人员、日期查询受控操作记录 |
+| 认证 | POST `/auth/login`、GET `/auth/me`、POST `/auth/change-password`、POST `/auth/logout` | 登录、当前用户、改密、会话注销 |
+| 池/业务 | GET/POST `/pools`，PATCH `/pools/{id}`、PATCH `/pools/{id}/status`、GET `/pools/{id}/balance` | 创建、停用、查看池及余额；有流水池禁止删除 |
+| 业务主数据 | GET/POST `/order-types`，PATCH `/order-types/{id}`、PATCH `/order-types/{id}/active`，GET `/order-types/{id}/routes`、POST `/order-types/{code}/routes` | 业务类型和资金路由；业务类型可扩展 |
+| 客户 | GET/POST `/customers`，GET/PATCH `/customers/{id}`，PATCH `/customers/{id}/status`，POST `/customers/{id}/merge` | 客户档案、重复候选、状态、合并与订单参与关系 |
+| 合作方 | GET/POST `/counterparties`，PATCH `/counterparties/{id}`，PATCH `/counterparties/{id}/status` | 同行、供货方、平台等非客户对手方主数据 |
+| 订单 | GET/POST `/orders`，GET/PATCH `/orders/{id}`，POST `/orders/{id}/cancel` | 创建、编辑、作废订单及读取事件时间线 |
+| 事件 | POST `/orders/{id}/events` | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL；动钱事件自动生成 cashflow，DELIVER 不生成 |
+| 账号 | GET `/accounts`、GET `/accounts/inventory`、GET `/accounts/{id}/execution-detail`、PATCH `/accounts/{id}` | 查看库存、执行明细和维护账号；新账号只随工作台订单创建 |
+| 分期 | GET/POST `/installments`，GET `/installments/{id}/schedules`，POST `/installments/{id}/payments`、`/settle-early`、`/default`、`/deliver`、期次 `/waive` / `/extend`，POST `/installments/mark-overdue` | `contract_type`=STOCK_SALE/ADVANCE_PURCHASE；HS 分期出售或 DFQ 代分期的计划、收款、逾期、换绑 |
+| 人员/团队 | GET/POST/PATCH `/users`、POST `/users/{id}/reset-password`，GET/POST/PATCH `/teams` | 人员、角色、数据范围、团队与停用；角色不另设 `/roles` 资源 |
+| 返点 | GET/POST `/rebates`，GET/POST `/rebates/{id}/settlements`，POST `/rebates/{id}/settlements/{settlement_id}/reverse` | 返点记录、分次到账、冲销与现金流 |
+| 押金 | GET/POST `/deposits`，POST `/deposits/{id}/returns`、`/losses` | 缴纳、部分退回、损失与状态 |
+| 流水/对账 | GET/POST `/cashflows`，POST `/cashflows/{id}/approve`、`/reject`、`/reverse`；GET/POST `/reconciliations`，POST `/reconciliations/{id}/resolve` | 查询与受控审核；订单事件来源流水不可手工修改；划转由 `/transfers` 原子生成成对流水 |
+| 划转 | POST `/transfers`、POST `/transfers/{transfer_id}/repair` | 原子生成同一 `transfer_id` 下的 INTERNAL 转出/转入流水；异常修复须走修复接口 |
+| 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/daily-funds`、`/order-profit` | R1–R5；当前返回 JSON，库存 CSV 导出由前端基于当前权限数据生成 |
+| 异常 | GET `/quality/exceptions` | 未路由、单边划转、负可用余额、逾期、库存缺失、未关联返点等质量异常 |
+| 活字段 | GET/POST `/field-definitions`，PATCH `/field-definitions/{id}/active`，DELETE `/field-definitions/{id}` | 定义、停用、排序；有历史值的字段不可删除 |
+| 经营规则 | GET/POST `/policies`，GET `/policies/{id}/versions`，POST `/policies/{id}/versions`，PATCH/POST `/policy-versions/{id}`、`/approve` | 规则版本、审批、快照与多人利润分配；订单分配使用 `/orders/{id}/profit-allocations` |
+| 历史导入 | POST/GET `/imports/batches`，GET `/imports/batches/{id}/rows|preview|reconciliation`，POST 映射、跳过、提交、回滚、更正 | P2 标准导入与复核，不改变新单模型 |
+| 审计 | GET `/audit-logs`、`/audit-logs/actions` | 按对象、人员、日期查询受控操作记录 |
 
 ## 3. 关键请求
 

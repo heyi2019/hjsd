@@ -44,6 +44,43 @@ def create_notification(
     return notification
 
 
+def ensure_notification(
+    session: Session,
+    *,
+    recipient_user_id: int,
+    notification_type: str,
+    title: str,
+    message: str,
+    entity_type: str,
+    entity_id: str,
+    actor: str = "system",
+) -> tuple[Notification, bool]:
+    """按接收人、类型和来源对象幂等创建通知，返回（记录、是否新建）。"""
+    existing = session.scalar(
+        select(Notification).where(
+            Notification.recipient_user_id == recipient_user_id,
+            Notification.notification_type == notification_type.strip(),
+            Notification.entity_type == entity_type.strip(),
+            Notification.entity_id == str(entity_id).strip(),
+        )
+    )
+    if existing is not None:
+        return existing, False
+    return (
+        create_notification(
+            session,
+            recipient_user_id=recipient_user_id,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            actor=actor,
+        ),
+        True,
+    )
+
+
 def list_notifications(
     session: Session,
     *,
@@ -104,6 +141,7 @@ def mark_read(
 
 __all__ = [
     "create_notification",
+    "ensure_notification",
     "list_notifications",
     "mark_read",
     "unread_count",

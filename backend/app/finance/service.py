@@ -51,6 +51,7 @@ from app.domain.foundation import PeriodLock
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.parties import service as parties_service
+from app.notifications import service as notifications_service
 
 
 def _non_negative(value: Any, *, field: str) -> Decimal:
@@ -1556,6 +1557,46 @@ def list_overdue_rebates(
     return [(row, (as_of - row.expected_on).days) for row in rows if row.expected_on is not None]
 
 
+def sync_overdue_rebate_notifications(
+    session: Session,
+    *,
+    as_of: date,
+    actor: str,
+) -> dict[str, int | str]:
+    """为逾期返点的订单负责人生成幂等跟进通知。"""
+    created = 0
+    existing = 0
+    skipped = 0
+    for rebate, overdue_days in list_overdue_rebates(session, as_of=as_of):
+        order = session.get(Order, rebate.source_order_id) if rebate.source_order_id else None
+        if order is None or order.owner_id is None:
+            skipped += 1
+            continue
+        _, is_created = notifications_service.ensure_notification(
+            session,
+            recipient_user_id=order.owner_id,
+            notification_type="REBATE_OVERDUE",
+            title="返点到账逾期",
+            message=(
+                f"{rebate.rebate_no}：预计 {rebate.expected_on.isoformat()} 到账，"
+                f"已逾期 {overdue_days} 天。"
+            ),
+            entity_type="rebate_record",
+            entity_id=rebate.rebate_no,
+            actor=actor,
+        )
+        if is_created:
+            created += 1
+        else:
+            existing += 1
+    return {
+        "as_of": as_of.isoformat(),
+        "created": created,
+        "existing": existing,
+        "skipped": skipped,
+    }
+
+
 def get_rebate(
     session: Session,
     rebate_id: int,
@@ -1598,6 +1639,7 @@ __all__ = [
     "list_deposits",
     "list_rebates",
     "list_overdue_rebates",
+    "sync_overdue_rebate_notifications",
     "get_rebate",
     "create_transfer",
     "repair_transfer",

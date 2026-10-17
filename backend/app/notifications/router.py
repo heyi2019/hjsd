@@ -1,14 +1,23 @@
 """SYS-01-04 系统通知接口。"""
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import CurrentUser, get_current_user
+from app.core.security import (
+    PERM_ORDER_EXCEPTION_APPROVE,
+    CurrentUser,
+    get_current_user,
+    require_permissions,
+)
+from app.finance import service as finance_service
 from app.notifications import schemas, service
 
 router = APIRouter(tags=["SYS-01-04 系统通知"])
+sync_access = require_permissions(PERM_ORDER_EXCEPTION_APPROVE)
 
 
 @router.get("/notifications", response_model=schemas.NotificationListOut)
@@ -46,6 +55,20 @@ def mark_notification_read(
         actor=user.username,
     )
     return schemas.NotificationOut.model_validate(notification)
+
+
+@router.post("/notifications/sync-overdue-rebates")
+def sync_overdue_rebate_notifications(
+    as_of: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = sync_access,
+) -> dict[str, int | str]:
+    """同步返点逾期跟进通知；供定时任务调用，重复执行不会重复建通知。"""
+    return finance_service.sync_overdue_rebate_notifications(
+        db,
+        as_of=as_of or date.today(),
+        actor=user.username,
+    )
 
 
 __all__ = ["router"]

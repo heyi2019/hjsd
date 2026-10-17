@@ -126,6 +126,8 @@ def logout(authorization: str | None = Header(default=None, alias="Authorization
         if scheme.lower() == "bearer" and token:
             payload = decode_token(token)
             jti = payload.get("jti")
+            if jti is not None and (not isinstance(jti, str) or not jti.strip()):
+                raise AuthError("登录凭证内容无效")
             if jti:
                 service.revoke_token(db, jti=jti, expires_at=int(payload.get("exp", 0)))
     return {"ok": True}

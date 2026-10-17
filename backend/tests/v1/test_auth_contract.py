@@ -258,6 +258,19 @@ def test_logout_revokes_token(client: TestClient, db: Session):
     assert replay.json()["code"] == "AUTH_REQUIRED"
 
 
+def test_logout_rejects_malformed_jti_claim(client: TestClient):
+    from app.core.security import encode_token
+
+    token = encode_token(
+        {"sub": "1", "username": "admin", "roles": ["ADMIN"], "jti": {"bad": True}}
+    )
+    response = client.post(
+        "/api/v1/auth/logout", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 401
+    assert response.json()["message"] == "登录凭证内容无效"
+
+
 # ------------------------------------------------------------------ 用户管理
 
 

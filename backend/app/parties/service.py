@@ -29,6 +29,8 @@ from app.domain.enums import (
     CustomerStatus,
     EntityType,
     FieldType,
+    LeadStatus,
+    LeadType,
     OrderStatus,
     ScheduleStatus,
     SequenceKey,
@@ -36,6 +38,7 @@ from app.domain.enums import (
 from app.domain.parties import (
     Counterparty,
     Customer,
+    CustomerLead,
     EntityExtraValue,
     FieldDefinition,
     OrderCustomerRole,
@@ -684,6 +687,13 @@ def merge_customers(
         role.customer_id = target.id
         migrated += 1
 
+    leads = session.scalars(
+        select(CustomerLead).where(CustomerLead.customer_id == source.id)
+    ).all()
+    for lead in leads:
+        lead.customer_id = target.id
+        lead.updated_by = actor
+
     # 活字段是客户资料的一部分：目标已有同一字段时保留目标值，
     # 目标缺失时复制一份；来源行不删除，保证合并前的历史值仍可审计。
     source_extras = session.scalars(
@@ -734,10 +744,234 @@ def merge_customers(
             "merged_into": target.customer_no,
             "migrated_roles": migrated,
             "migrated_extra_values": migrated_extras,
+            "migrated_leads": len(leads),
         },
         reason=normalized_reason,
     )
     return target
+
+
+def _get_lead_for_user(
+    session: Session, lead_id: int, user: CurrentUser | None = None
+) -> CustomerLead:
+    lead = session.get(CustomerLead, lead_id)
+    if lead is None:
+        raise NotFound("客户需求不存在", details={"lead_id": lead_id})
+    if user is not None:
+        scope = owner_scope_filter(CustomerLead.owner_id, user, session)
+        if scope is not None and not session.scalar(
+            select(CustomerLead.id).where(CustomerLead.id == lead_id, scope)
+        ):
+            raise NotFound("客户需求不存在", details={"lead_id": lead_id})
+    return lead
+
+
+def get_lead(
+    session: Session, lead_id: int, user: CurrentUser | None = None
+) -> CustomerLead:
+    return _get_lead_for_user(session, lead_id, user)
+
+
+def create_lead(
+    session: Session,
+    *,
+    customer_id: int,
+    request_type: str,
+    target: str,
+    actor: str,
+    budget: Decimal | None = None,
+    owner_id: int | None = None,
+    note: str | None = None,
+    user: CurrentUser | None = None,
+) -> CustomerLead:
+    customer = assert_customer_usable(session, customer_id, user=user)
+    try:
+        LeadType(request_type)
+    except ValueError as exc:
+        raise Validation(
+            f"需求类型必须为 {LeadType.values()}",
+            details={"field": "request_type", "value": request_type},
+        ) from exc
+    target_text = _required_text(target, message="需求目标必填", field="target")
+    if budget is not None and to_money(budget) < 0:
+        raise Validation("需求预算不能为负数", details={"field": "budget"})
+    _validate_owner_id(session, owner_id)
+    lead = CustomerLead(
+        lead_no=allocate_number(session, SequenceKey.LEAD),
+        customer_id=customer.id,
+        request_type=request_type,
+        budget=to_money(budget) if budget is not None else None,
+        target=target_text,
+        owner_id=owner_id,
+        note=note,
+        status=LeadStatus.OPEN.value,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(lead)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.LEAD_CREATE,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        actor=actor,
+        after={"customer_id": customer.id, "request_type": request_type},
+    )
+    return lead
+
+
+def list_leads(
+    session: Session,
+    *,
+    customer_id: int | None = None,
+    status: str | None = None,
+    keyword: str | None = None,
+    user: CurrentUser | None = None,
+) -> list[CustomerLead]:
+    stmt = select(CustomerLead)
+    if customer_id is not None:
+        stmt = stmt.where(CustomerLead.customer_id == customer_id)
+    if status is not None:
+        try:
+            LeadStatus(status)
+        except ValueError as exc:
+            raise Validation(
+                f"需求状态必须为 {LeadStatus.values()}",
+                details={"field": "status", "value": status},
+            ) from exc
+        stmt = stmt.where(CustomerLead.status == status)
+    if keyword:
+        text = keyword.strip()
+        stmt = stmt.where(
+            or_(
+                CustomerLead.lead_no.ilike(f"%{text}%"),
+                CustomerLead.target.ilike(f"%{text}%"),
+            )
+        )
+    if user is not None:
+        scope = owner_scope_filter(CustomerLead.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    return list(session.scalars(stmt.order_by(CustomerLead.id.desc())).all())
+
+
+def update_lead(
+    session: Session,
+    lead_id: int,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+    **fields: Any,
+) -> CustomerLead:
+    lead = _get_lead_for_user(session, lead_id, user)
+    if lead.status != LeadStatus.OPEN.value:
+        raise Conflict("已转单或关闭的需求不可编辑", details={"lead_no": lead.lead_no})
+    allowed = {"budget", "target", "owner_id", "note"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise Validation("需求更新字段不受支持", details={"fields": sorted(unknown)})
+    before = {
+        name: (
+            str(getattr(lead, name))
+            if isinstance(getattr(lead, name), Decimal)
+            else getattr(lead, name)
+        )
+        for name in fields
+    }
+    if "target" in fields:
+        fields["target"] = _required_text(
+            fields["target"], message="需求目标必填", field="target"
+        )
+    if "budget" in fields and fields["budget"] is not None:
+        fields["budget"] = to_money(fields["budget"])
+        if fields["budget"] < 0:
+            raise Validation("需求预算不能为负数", details={"field": "budget"})
+    if "owner_id" in fields:
+        _validate_owner_id(session, fields["owner_id"])
+    for name, value in fields.items():
+        setattr(lead, name, value)
+    lead.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.LEAD_UPDATE,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        actor=actor,
+        before=before,
+        after={
+            name: (
+                str(getattr(lead, name))
+                if isinstance(getattr(lead, name), Decimal)
+                else getattr(lead, name)
+            )
+            for name in fields
+        },
+    )
+    return lead
+
+
+def convert_lead(
+    session: Session,
+    lead_id: int,
+    *,
+    order_id: int,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> CustomerLead:
+    lead = _get_lead_for_user(session, lead_id, user)
+    if lead.status != LeadStatus.OPEN.value:
+        raise Conflict("只有 OPEN 需求可以转单", details={"lead_no": lead.lead_no})
+    order = session.get(Order, order_id)
+    if order is None:
+        raise NotFound("订单不存在", details={"order_id": order_id})
+    scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
+    if scope is not None and not session.scalar(
+        select(Order.id).where(Order.id == order_id, scope)
+    ):
+        raise NotFound("订单不存在", details={"order_id": order_id})
+    lead.status = LeadStatus.CONVERTED.value
+    lead.converted_order_id = order.id
+    lead.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.LEAD_CONVERT,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        actor=actor,
+        after={"status": lead.status, "converted_order_no": order.order_no},
+    )
+    return lead
+
+
+def close_lead(
+    session: Session,
+    lead_id: int,
+    *,
+    reason: str,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> CustomerLead:
+    lead = _get_lead_for_user(session, lead_id, user)
+    if lead.status != LeadStatus.OPEN.value:
+        raise Conflict("只有 OPEN 需求可以关闭", details={"lead_no": lead.lead_no})
+    normalized = _required_text(reason, message="关闭需求必须填写原因", field="reason")
+    lead.status = LeadStatus.CLOSED.value
+    lead.closed_reason = normalized
+    lead.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.LEAD_CLOSE,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        actor=actor,
+        after={"status": lead.status},
+        reason=normalized,
+    )
+    return lead
 
 
 def assert_customer_usable(
@@ -1335,18 +1569,23 @@ def delete_field_definition(
 __all__ = [
     "assert_counterparty_usable",
     "assert_customer_usable",
+    "close_lead",
     "create_counterparty",
     "create_customer",
     "create_field_definition",
+    "create_lead",
+    "convert_lead",
     "delete_field_definition",
     "duplicate_candidates",
     "get_counterparty",
     "get_customer",
     "get_customer_detail",
     "get_customer_activity_summary",
+    "get_lead",
     "get_extra_values",
     "get_extra_values_bulk",
     "list_counterparties",
+    "list_leads",
     "list_customers",
     "list_field_definitions",
     "mask_id",
@@ -1357,6 +1596,7 @@ __all__ = [
     "set_extra_values",
     "set_field_definition_active",
     "to_customer_out",
+    "update_lead",
     "update_counterparty",
     "update_customer",
 ]

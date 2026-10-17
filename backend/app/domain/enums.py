@@ -72,6 +72,7 @@ class SequenceKey(StrEnum):
     ORDER_DFQ = "ORDER_DFQ"
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
+    LEAD = "LEAD"
     ACCOUNT = "ACCOUNT"
     CASHFLOW = "CASHFLOW"
     IMPORT = "IMPORT"
@@ -93,6 +94,20 @@ class CustomerStatus(StrEnum):
     ACTIVE = "ACTIVE"
     DISABLED = "DISABLED"
     MERGED = "MERGED"
+
+
+class LeadType(StrEnum):
+    """客户需求池类型（CUS-02）。"""
+
+    FIND_ACCOUNT = "FIND_ACCOUNT"
+    SELL_ACCOUNT = "SELL_ACCOUNT"
+    SPECIFIC_SEARCH = "SPECIFIC_SEARCH"
+
+
+class LeadStatus(StrEnum):
+    OPEN = "OPEN"
+    CONVERTED = "CONVERTED"
+    CLOSED = "CLOSED"
 
 
 class CounterpartyStatus(StrEnum):
@@ -362,6 +377,10 @@ class AuditAction(StrEnum):
     CONTACT_READ = "CONTACT_READ"
     CONTACT_WRITE = "CONTACT_WRITE"
     CUSTOMER_MERGE = "CUSTOMER_MERGE"
+    LEAD_CREATE = "LEAD_CREATE"
+    LEAD_UPDATE = "LEAD_UPDATE"
+    LEAD_CONVERT = "LEAD_CONVERT"
+    LEAD_CLOSE = "LEAD_CLOSE"
     ACCOUNT_CREATE = "ACCOUNT_CREATE"
     ACCOUNT_UPDATE = "ACCOUNT_UPDATE"
     ORDER_CREATE = "ORDER_CREATE"
@@ -434,6 +453,8 @@ __all__ = [
     "InstallmentContractType",
     "InstallmentStatus",
     "LinkStatus",
+    "LeadStatus",
+    "LeadType",
     "Nature",
     "OrderLinkType",
     "OrderStatus",

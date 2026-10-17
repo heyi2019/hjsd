@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.database import get_db
+from app.core.errors import PermissionDenied
 from app.core.security import (
     PERM_COUNTERPARTY_MANAGE,
     PERM_COUNTERPARTY_READ,
@@ -207,6 +208,105 @@ def merge_customer(
         user=user,
     )
     return service.to_customer_out(target, reveal_contact=True)
+
+
+# --------------------------------------------------------------------- 客户需求池（CUS-02）
+@router.get("/leads", response_model=list[schemas.LeadOut])
+def list_leads(
+    customer_id: int | None = Query(default=None, gt=0),
+    status: str | None = Query(default=None),
+    keyword: str | None = Query(default=None, max_length=128),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> list[schemas.LeadOut]:
+    return [
+        schemas.LeadOut.model_validate(item)
+        for item in service.list_leads(
+            db, customer_id=customer_id, status=status, keyword=keyword, user=user
+        )
+    ]
+
+
+@router.get("/leads/{lead_id}", response_model=schemas.LeadOut)
+def get_lead(
+    lead_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> schemas.LeadOut:
+    return schemas.LeadOut.model_validate(service.get_lead(db, lead_id, user))
+
+
+@router.post("/leads", response_model=schemas.LeadOut, status_code=201)
+def create_lead(
+    payload: schemas.LeadCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = create_customers,
+) -> schemas.LeadOut:
+    owner_id = (
+        payload.owner_id
+        if user.is_admin or user.owner_scope == "ALL"
+        else user.id
+    )
+    item = service.create_lead(
+        db,
+        customer_id=payload.customer_id,
+        request_type=payload.request_type.value,
+        budget=payload.budget,
+        target=payload.target,
+        owner_id=owner_id,
+        note=payload.note,
+        actor=_actor(user),
+        user=user,
+    )
+    return schemas.LeadOut.model_validate(item)
+
+
+@router.patch("/leads/{lead_id}", response_model=schemas.LeadOut)
+def update_lead(
+    lead_id: int,
+    payload: schemas.LeadUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_customers,
+) -> schemas.LeadOut:
+    changes = payload.model_dump(exclude_unset=True)
+    if "owner_id" in changes and not (user.is_admin or user.owner_scope == "ALL"):
+        raise PermissionDenied("只有全量范围用户可以转交需求负责人")
+    item = service.update_lead(db, lead_id, actor=_actor(user), user=user, **changes)
+    return schemas.LeadOut.model_validate(item)
+
+
+@router.post("/leads/{lead_id}/convert", response_model=schemas.LeadOut)
+def convert_lead(
+    lead_id: int,
+    payload: schemas.LeadConvert,
+    db: Session = Depends(get_db),
+    user: CurrentUser = create_customers,
+) -> schemas.LeadOut:
+    item = service.convert_lead(
+        db,
+        lead_id,
+        order_id=payload.order_id,
+        actor=_actor(user),
+        user=user,
+    )
+    return schemas.LeadOut.model_validate(item)
+
+
+@router.post("/leads/{lead_id}/close", response_model=schemas.LeadOut)
+def close_lead(
+    lead_id: int,
+    payload: schemas.LeadClose,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_customers,
+) -> schemas.LeadOut:
+    item = service.close_lead(
+        db,
+        lead_id,
+        reason=payload.reason,
+        actor=_actor(user),
+        user=user,
+    )
+    return schemas.LeadOut.model_validate(item)
 
 
 # --------------------------------------------------------------------- 合作方

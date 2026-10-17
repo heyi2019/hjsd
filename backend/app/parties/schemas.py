@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import RequestModel
-from app.domain.enums import CounterpartyType, CustomerStatus
+from app.domain.enums import CounterpartyType, CustomerStatus, LeadStatus, LeadType
 
 
 class CustomerCreate(RequestModel):
@@ -145,6 +145,50 @@ class CustomerDetailOut(BaseModel):
     audit: list[CustomerAuditOut]
 
 
+class LeadCreate(RequestModel):
+    customer_id: int = Field(gt=0)
+    request_type: LeadType
+    budget: Decimal | None = Field(default=None, ge=0)
+    target: str = Field(min_length=1, max_length=2000)
+    owner_id: int | None = Field(default=None, gt=0)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class LeadUpdate(RequestModel):
+    budget: Decimal | None = Field(default=None, ge=0)
+    target: str | None = Field(default=None, min_length=1, max_length=2000)
+    owner_id: int | None = Field(default=None, gt=0)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class LeadConvert(RequestModel):
+    order_id: int = Field(gt=0)
+
+
+class LeadClose(RequestModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class LeadOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    lead_no: str
+    customer_id: int
+    request_type: str
+    budget: Decimal | None = None
+    target: str
+    status: str
+    owner_id: int | None = None
+    converted_order_id: int | None = None
+    closed_reason: str | None = None
+    note: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    created_by: str
+    updated_by: str
+
+
 class MergeRequest(RequestModel):
     target_customer_id: int
     reason: str = Field(min_length=1, max_length=500)
@@ -242,4 +286,9 @@ __all__ = [
     "FieldDefinitionCreate",
     "FieldDefinitionOut",
     "MergeRequest",
+    "LeadClose",
+    "LeadConvert",
+    "LeadCreate",
+    "LeadOut",
+    "LeadUpdate",
 ]

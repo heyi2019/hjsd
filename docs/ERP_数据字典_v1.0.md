@@ -28,6 +28,7 @@
 | orders | order_no, order_type, capital_type, trade_date, account_id, account_snapshot, link_status | HS0001/TH0001/DG0001/DFQ0001；`account_snapshot` 仅为 DFQ 的订单文本快照，不等同库存账号；汇总金额由事件派生 |
 | order_events | event_no, order_id, event_type, amount, portion, occurred_on, pool_id, offset_event_id | 有资金事件必须有池；TH 用 offset 核销 |
 | customers | customer_no, display_name, contact_name, phone, wechat, qq, source, owner_id, status, tags, note | 客户主数据；微信号、QQ、手机号、备注均可填写；联系方式非唯一；停用后不可用于新订单，历史关系保留；敏感资料修改写审计 |
+| customer_leads | lead_no, customer_id, request_type, budget, target, status, owner_id, converted_order_id, closed_reason, note | 客户需求池；`FIND_ACCOUNT`/`SELL_ACCOUNT`/`SPECIFIC_SEARCH`；不占用资金、不自动建单；转单后保留来源订单关系 |
 | order_customer_roles | order_id, customer_id, role | `UNIQUE(order_id, customer_id, role)`；role=SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER；客户可跨订单多角色 |
 | counterparties | counterparty_no, display_name, type, contact_name, phone, wechat, qq, status, note | 合作方主数据；type=PEER/SUPPLIER/PLATFORM；不与客户混用；停用后不可用于新订单 |
 | order_counterparty_roles | order_id, counterparty_id, role | `UNIQUE(order_id, counterparty_id, role)`；role=PEER/SUPPLIER/PLATFORM；TH 同行、DFQ 供货方等从此关联 |

@@ -57,6 +57,7 @@ SEED_ROUTES: tuple[tuple[str, str, str], ...] = (
 SEED_SEQUENCES: tuple[tuple[str, str], ...] = (
     (SequenceKey.CUSTOMER.value, "CUS"),
     (SequenceKey.COUNTERPARTY.value, "CP"),
+    (SequenceKey.LEAD.value, "REQ"),
     (SequenceKey.ACCOUNT.value, "ACC"),
     (SequenceKey.CASHFLOW.value, "CF"),
     (SequenceKey.IMPORT.value, "IMP"),

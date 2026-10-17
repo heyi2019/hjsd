@@ -29,11 +29,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 from app.domain.base import AuditMixin, TimestampMixin
+from app.core.money import Amount
 from app.domain.enums import (
     CounterpartyStatus,
     CounterpartyType,
     CustomerRole,
     CustomerStatus,
+    LeadStatus,
+    LeadType,
     EntityType,
     PolicyStatus,
     PolicyScopeType,
@@ -205,6 +208,46 @@ class Customer(Base, AuditMixin):
     merged_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class CustomerLead(Base, AuditMixin):
+    """客户需求池：只记录跟进事实，不自动生成订单或资金流水。"""
+
+    __tablename__ = "customer_leads"
+    __table_args__ = (
+        CheckConstraint(
+            f"request_type IN {LeadType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="lead_type_valid",
+        ),
+        CheckConstraint(
+            f"status IN {LeadStatus.values()!r}".replace("[", "(").replace("]", ")"),
+            name="lead_status_valid",
+        ),
+        CheckConstraint("budget IS NULL OR budget >= 0", name="lead_budget_nonneg"),
+        UniqueConstraint("lead_no", name="uq_customer_leads_no"),
+        Index("ix_customer_leads_customer_status", "customer_id", "status"),
+        Index("ix_customer_leads_owner_status", "owner_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lead_no: Mapped[str] = mapped_column(String(32), nullable=False)
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False
+    )
+    request_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    budget: Mapped[object | None] = mapped_column(Amount, nullable=True)
+    target: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=LeadStatus.OPEN.value
+    )
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    converted_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
+    )
+    closed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Counterparty(Base, AuditMixin):
     """合作方主数据：同行 / 供货方 / 平台，编号 `CP0001`，与客户分离。"""
 
@@ -288,6 +331,7 @@ class OrderCounterpartyRole(Base, TimestampMixin):
 __all__ = [
     "Counterparty",
     "Customer",
+    "CustomerLead",
     "EntityExtraValue",
     "FieldDefinition",
     "OrderCounterpartyRole",

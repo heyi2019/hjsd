@@ -1,6 +1,6 @@
 /** 工作台：优先动作 + 低负担导航入口。
  * 资金/订单数据总览仍归「经营中心 · 数据中心」，这里不复制数据、不制造假 KPI。 */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ordersApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
@@ -12,14 +12,21 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
   const [createType, setCreateType] = useState<BusinessOrderType>("HS");
   const [orders, setOrders] = useState<Order[]>([]);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
+  const mountedRef = useRef(true);
   const loadSummary = async () => {
     try {
-      setOrders(await ordersApi.list());
+      const nextOrders = await ordersApi.list();
+      if (!mountedRef.current) return;
+      setOrders(nextOrders);
       setSummaryError(null);
     } catch (error) {
+      if (!mountedRef.current) return;
       setSummaryError(normalizeError(error));
     }
   };
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
   useEffect(() => { void loadSummary(); }, []);
   const openCreate = (orderType: BusinessOrderType) => {
     setCreateType(orderType);

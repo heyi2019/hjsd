@@ -624,7 +624,7 @@ export function InventoryPanel() {
     ];
 
     return <div className="inventory-detail">
-    <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 3 }}>
+    <Descriptions size="small" bordered column={3}>
       <Descriptions.Item label="库存编号">{row.inventory_no}</Descriptions.Item>
       <Descriptions.Item label="建档操作人">{row.created_by || "-"}</Descriptions.Item>
       <Descriptions.Item label="登记时间">{dateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date ?? row.created_at)}</Descriptions.Item>

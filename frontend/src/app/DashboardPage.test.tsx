@@ -142,4 +142,22 @@ describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
     expect(screen.queryByText("订单总数")).toBeNull();
     expect(screen.queryByText(/POOL-A/)).toBeNull();
   });
+
+  it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {
+    let resolveOrders!: (value: never[]) => void;
+    ordersList.mockReturnValueOnce(new Promise<never[]>((resolve) => {
+      resolveOrders = resolve;
+    }));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const view = renderApp(<DashboardPage />, { user: "admin" });
+
+    view.unmount();
+    resolveOrders([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      consoleError.mock.calls.some((args) => args.join(" ").includes("not wrapped in act")),
+    ).toBe(false);
+    consoleError.mockRestore();
+  });
 });

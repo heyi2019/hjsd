@@ -30,7 +30,12 @@ ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
 }
 
 INSTALLMENT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
-    "PENDING": {"PAYMENT": "ACTIVE", "MARK_OVERDUE": "OVERDUE", "CANCEL": "CANCELLED"},
+    "PENDING": {
+        "PAYMENT": "ACTIVE",
+        "MARK_OVERDUE": "OVERDUE",
+        "SETTLE": "SETTLED",
+        "CANCEL": "CANCELLED",
+    },
     "ACTIVE": {"PAYMENT": "ACTIVE", "MARK_OVERDUE": "OVERDUE", "SETTLE": "SETTLED", "DEFAULT": "DEFAULTED"},
     "OVERDUE": {"PAYMENT": "OVERDUE", "SETTLE": "SETTLED", "DEFAULT": "DEFAULTED"},
     "SETTLED": {"DELIVER": "DELIVERED"},

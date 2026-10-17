@@ -330,6 +330,38 @@ class TestGetAndListInstallments:
 
 # ------------------------------------------------------------------ 收款守卫
 class TestPayGuards:
+    def test_full_waiver_settles_contract_for_delivery(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="0",
+            periods=1,
+            per_period="100",
+            principal="100",
+        )
+
+        installment_service.waive_schedule(
+            seeded_db,
+            contract.id,
+            period_no=1,
+            amount="100",
+            waived_on=TODAY,
+            actor="pytest",
+            reason="全额减免测试",
+        )
+
+        assert contract.status == InstallmentStatus.SETTLED.value
+        installment_service.deliver(
+            seeded_db,
+            contract.id,
+            delivery_mode="CUSTOMER_SELF",
+            delivered_on=TODAY,
+            note="全额减免后交付凭证",
+            actor="pytest",
+        )
+        assert contract.status == InstallmentStatus.DELIVERED.value
+
     def test_payment_amount_is_business_error_in_service(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)

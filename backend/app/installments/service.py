@@ -504,6 +504,21 @@ def waive_schedule(
     ):
         schedule.status = ScheduleStatus.WAIVED.value
     installment.waived_amount = to_money(installment.waived_amount) + money
+    if (
+        installment.status
+        in {
+            InstallmentStatus.PENDING.value,
+            InstallmentStatus.ACTIVE.value,
+            InstallmentStatus.OVERDUE.value,
+        }
+        and to_money(installment.paid_amount) >= total_receivable(installment)
+    ):
+        installment.status = transition(
+            INSTALLMENT_TRANSITIONS,
+            installment.status,
+            "SETTLE",
+            entity="分期合约",
+        )
     installment.updated_by = actor
     session.flush()
     record_audit(

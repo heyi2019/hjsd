@@ -47,12 +47,11 @@ def quality_metrics(
 @router.get("/quality/issues", response_model=schemas.QualityIssueListOut)
 def list_quality_issues(
     status: str | None = Query(default=None),
-    assignee_id: int | None = Query(default=None, gt=0),
     code: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_quality,
 ) -> schemas.QualityIssueListOut:
-    items = service.list_issues(db, status=status, assignee_id=assignee_id, code=code)
+    items = service.list_issues(db, status=status, code=code)
     return schemas.QualityIssueListOut(
         items=[schemas.QualityIssueOut.model_validate(item) for item in items],
         total=len(items),
@@ -83,7 +82,6 @@ def create_quality_issue(
         entity_id=payload.entity_id,
         message=payload.message,
         details=payload.details,
-        assignee_id=payload.assignee_id,
         actor=_actor(user),
     )
     return schemas.QualityIssueOut.model_validate(item)
@@ -99,7 +97,6 @@ def update_quality_issue(
     item = service.update_issue(
         db,
         issue_id,
-        assignee_id=payload.assignee_id,
         status=payload.status.value,
         actor=_actor(user),
     )

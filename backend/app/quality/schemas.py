@@ -18,11 +18,9 @@ class QualityIssueCreate(RequestModel):
     entity_id: str = Field(min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=4000)
     details: dict[str, Any] | None = None
-    assignee_id: int | None = Field(default=None, gt=0)
 
 
 class QualityIssueUpdate(RequestModel):
-    assignee_id: int | None = Field(default=None, gt=0)
     status: QualityIssueStatus
 
 
@@ -44,7 +42,6 @@ class QualityIssueOut(BaseModel):
     message: str
     details: dict[str, Any] | None = None
     status: str
-    assignee_id: int | None = None
     resolution: str | None = None
     evidence: str | None = None
     closed_by: str | None = None

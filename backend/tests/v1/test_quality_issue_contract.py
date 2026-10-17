@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-def test_quality_issue_can_be_created_assigned_and_closed(
+def test_quality_issue_can_be_created_updated_and_closed(
     seeded_client, seeded_db, headers
 ):
     created = seeded_client.post(
@@ -37,14 +37,20 @@ def test_quality_issue_can_be_created_assigned_and_closed(
     )
     assert duplicate.status_code == 409, duplicate.text
 
-    assigned = seeded_client.patch(
+    updated = seeded_client.patch(
         f"/api/v1/quality/issues/{issue['id']}",
-        json={"assignee_id": 2, "status": "IN_PROGRESS"},
+        json={"status": "IN_PROGRESS"},
         headers=headers,
     )
-    assert assigned.status_code == 200, assigned.text
-    assert assigned.json()["assignee_id"] == 2
-    assert assigned.json()["status"] == "IN_PROGRESS"
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["status"] == "IN_PROGRESS"
+
+    removed_field = seeded_client.patch(
+        f"/api/v1/quality/issues/{issue['id']}",
+        json={"assignee_id": 2},
+        headers=headers,
+    )
+    assert removed_field.status_code == 422, removed_field.text
 
     closed = seeded_client.post(
         f"/api/v1/quality/issues/{issue['id']}/close",

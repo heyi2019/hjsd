@@ -97,7 +97,7 @@ def _audit_value(value: Any) -> Any:
 
 
 def _validate_existing_account_context(order_type: str, account: Account) -> None:
-    """已建档账号只能挂到对应业务；空分类保留给历史导入账号。"""
+    """已建档账号必须带完整业务上下文，并只能挂到对应业务。"""
     expected = {
         "HS": (BusinessMode.SELF.value, InventoryType.RECOVERY.value),
         "TH": (BusinessMode.DISTRIBUTION.value, InventoryType.PICKUP.value),
@@ -107,11 +107,9 @@ def _validate_existing_account_context(order_type: str, account: Account) -> Non
         return
     expected_mode, expected_inventory = expected
     if (
-        account.business_mode is not None
-        and account.business_mode != expected_mode
+        account.business_mode != expected_mode
     ) or (
-        account.inventory_type is not None
-        and account.inventory_type != expected_inventory
+        account.inventory_type != expected_inventory
     ):
         raise Validation(
             "库存账号业务类型与订单类型不匹配",

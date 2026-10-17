@@ -24,6 +24,8 @@ def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
         inventory_no=allocate_number(seeded_db, SequenceKey.ACCOUNT),
         game_account=game_account,
         platform="王者",
+        business_mode="SELF" if game_account != "th-stock-acc" else "DISTRIBUTION",
+        inventory_type="RECOVERY" if game_account != "th-stock-acc" else "PICKUP",
         status=AccountStatus.IN_STOCK.value,
         created_by="pytest",
         updated_by="pytest",

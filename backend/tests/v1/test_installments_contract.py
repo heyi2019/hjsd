@@ -37,7 +37,12 @@ def _account(seeded_db, game_account: str):
     from app.accounts import service as accounts_service
 
     return accounts_service.create_account(
-        seeded_db, game_account=game_account, platform="王者", actor="pytest"
+        seeded_db,
+        game_account=game_account,
+        platform="王者",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
     )
 
 

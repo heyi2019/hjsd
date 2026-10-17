@@ -39,6 +39,8 @@ def _order(seeded_db, *, trade_date: date = D, account_id: int | None = None):
         account_id = account_service.create_account(
             seeded_db,
             game_account=f"report-{uuid4().hex[:12]}",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             actor="pytest",
         ).id
     return order_service.create_order(
@@ -84,6 +86,8 @@ class TestR1Inventory:
     def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
         in_stock = Account(
                 inventory_no="ACC-R1-1",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
             buy_date=D,
             cost_amount=to_money("0"),

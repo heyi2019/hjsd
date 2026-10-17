@@ -35,7 +35,12 @@ def _pool(seeded_db, code: str) -> Pool:
 
 def _account(seeded_db, game_account: str):
     return accounts_service.create_account(
-        seeded_db, game_account=game_account, platform="王者", actor="pytest"
+        seeded_db,
+        game_account=game_account,
+        platform="王者",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
     )
 
 
@@ -230,7 +235,14 @@ class TestA05HsStockSale:
         assert seeded_db.get(Installment, contract.id).status == InstallmentStatus.DELIVERED.value
 
     def test_stock_sale_requires_hs_order(self, seeded_db):
-        account = _account(seeded_db, "th-acc")
+        account = accounts_service.create_account(
+            seeded_db,
+            game_account="th-acc",
+            platform="王者",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            actor="pytest",
+        )
         seeded_db.commit()
         order = orders_service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", account_id=account.id

@@ -27,6 +27,12 @@ TODAY = date(2026, 10, 4)
 
 
 def _account(seeded_db, game_account: str, **kwargs):
+    inventory_type = kwargs.get("inventory_type", "RECOVERY")
+    kwargs.setdefault(
+        "business_mode",
+        "DISTRIBUTION" if inventory_type in {"PICKUP", "CONSIGNMENT"} else "SELF",
+    )
+    kwargs.setdefault("inventory_type", inventory_type)
     return service.create_account(
         seeded_db, game_account=game_account, platform="王者", actor="pytest", **kwargs
     )
@@ -357,6 +363,8 @@ class TestAccountsApi:
             seeded_db,
             game_account="scope-source-account",
             platform="王者",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             actor="operator",
         )
         foreign_order = orders_service.create_order(
@@ -532,7 +540,12 @@ class TestAccountsApi:
         assert source_orders[second.inventory_no] == second_order.order_no
 
     def test_list_accounts_uses_consignment_order_without_buy(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "unposted-source")
+        account = _account(
+            seeded_db,
+            "unposted-source",
+            business_mode="DISTRIBUTION",
+            inventory_type="CONSIGNMENT",
+        )
         order = orders_service.create_order(
             seeded_db,
             order_type="DG",
@@ -610,7 +623,12 @@ class TestAccountsApi:
         assert event_payload["id"] == event.id
 
     def test_execution_detail_includes_consign_platform(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "detail-platform-acc")
+        account = _account(
+            seeded_db,
+            "detail-platform-acc",
+            business_mode="DISTRIBUTION",
+            inventory_type="CONSIGNMENT",
+        )
         platform = parties_service.create_counterparty(
             seeded_db, display_name="寄售平台A", type="PLATFORM", actor="pytest"
         )

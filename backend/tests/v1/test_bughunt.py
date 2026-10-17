@@ -24,6 +24,8 @@ def _order(seeded_db, order_type: str = "HS", **kw):
         account = account_service.create_account(
             seeded_db,
             game_account=f"hunt-{uuid4().hex[:12]}",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             actor="hunt",
         )
         kw["account_id"] = account.id
@@ -139,7 +141,12 @@ class TestInstallment:
         from app.accounts import service as account_service
 
         account = account_service.create_account(
-            seeded_db, game_account="hunt-acc", platform="王者", actor="hunt"
+            seeded_db,
+            game_account="hunt-acc",
+            platform="王者",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="hunt",
         )
         order = _order(seeded_db, order_type="HS", account_id=account.id)
         order_service.post_event(

@@ -238,6 +238,20 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="DG", account_id=account.id)
 
+    def test_order_rejects_existing_account_without_context(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-MISSING-CONTEXT",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
+            _order(seeded_db, order_type="HS", account_id=account.id)
+
     def test_order_account_profile_rejects_unknown_fields_in_service(self, seeded_db):
         with pytest.raises(Validation, match="订单账号资料字段校验失败"):
             order_service.create_order(
@@ -777,6 +791,8 @@ class TestAccountEffect:
     def test_cancel_reverses_cost_and_voids_account(self, seeded_db):
         account = Account(
             inventory_no="ACC-ORD-1",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -802,6 +818,8 @@ class TestAccountEffect:
     def test_partial_buy_cancel_keeps_account_in_stock(self, seeded_db):
         account = Account(
             inventory_no="ACC-ORD-PARTIAL",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -827,6 +845,8 @@ class TestAccountEffect:
     def test_cancel_sell_restores_stock_without_reducing_cost(self, seeded_db):
         account = Account(
             inventory_no="ACC-ORD-SELL-CANCEL",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
             status=AccountStatus.IN_STOCK.value,
             cost_amount=to_money("0"),
             created_by="pytest",

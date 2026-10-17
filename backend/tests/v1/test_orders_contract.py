@@ -27,6 +27,7 @@ from app.domain.enums import (
 )
 from app.accounts import service as accounts_service
 from app.installments import service as installments_service
+from app.finance import service as finance_service
 from app.parties import service as parties_service
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderLink
 from app.domain.users import User
@@ -1734,6 +1735,49 @@ class TestOrdersApi:
 
         missing = seeded_client.get("/api/v1/orders/999999", headers=headers)
         assert missing.status_code == 404
+
+    def test_order_detail_aggregates_finance_installment_and_audit(
+        self, seeded_client, seeded_db, headers
+    ):
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount="100.00",
+            occurred_on=D,
+            actor="pytest",
+        )
+        rebate = finance_service.create_rebate(
+            seeded_db,
+            source_order_id=order.id,
+            rebate_type="BUY",
+            base_amount="100.00",
+            collected_on=D,
+            actor="pytest",
+        )
+        installment = installments_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type="STOCK_SALE",
+            principal="100.00",
+            periods=1,
+            per_period="100.00",
+            first_due_on=D,
+            actor="pytest",
+        )
+
+        response = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["cashflows"][0]["order_event_id"] is not None
+        assert body["cashflows"][0]["flow_no"]
+        assert body["rebates"][0]["id"] == rebate.id
+        assert body["installment"]["id"] == installment.id
+        assert len(body["installment_schedule"]) >= 1
+        assert any(item["period_no"] == 1 for item in body["installment_schedule"])
+        assert any(item["entity_type"] == "order" for item in body["audit"])
 
     def test_order_link_endpoints_and_detail_links(self, seeded_client, seeded_db, headers):
         source = _order(seeded_db, order_type="DFQ")

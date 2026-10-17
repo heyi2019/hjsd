@@ -227,10 +227,95 @@ class EventOut(BaseModel):
 
 
 class OrderDetailOut(OrderOut):
-    """订单详情：主订单字段 + 按发生时间排列的执行事件时间线。"""
+    """订单详情：主字段 + 执行、资金、分期与审计摘要。"""
 
     events: list[EventOut] = Field(default_factory=list)
     links: list["OrderLinkOut"] = Field(default_factory=list)
+    cashflows: list["OrderCashflowOut"] = Field(default_factory=list)
+    rebates: list["OrderRebateOut"] = Field(default_factory=list)
+    installment: "OrderInstallmentOut | None" = None
+    installment_schedule: list["OrderScheduleOut"] = Field(default_factory=list)
+    audit: list["OrderAuditOut"] = Field(default_factory=list)
+
+
+class OrderCashflowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    flow_no: str
+    pool_id: int
+    occurred_on: date
+    nature: str
+    category: str
+    direction: str
+    amount: Decimal
+    status: str
+    order_event_id: int | None = None
+    note: str | None = None
+    operator: str
+
+
+class OrderRebateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    rebate_no: str
+    rebate_type: str
+    channel: str | None = None
+    rate: Decimal
+    base_amount: Decimal
+    link_status: str
+    status: str
+    collected_on: date
+    note: str | None = None
+    created_at: datetime
+    operator: str
+
+
+class OrderInstallmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    inst_no: str
+    order_id: int
+    contract_type: str
+    principal: Decimal
+    down_payment: Decimal
+    service_fee: Decimal
+    periods: int
+    per_period_service_fee: Decimal
+    per_period: Decimal
+    paid_amount: Decimal
+    waived_amount: Decimal
+    status: str
+    delivery_mode: str | None = None
+    delivered_on: date | None = None
+    first_due_on: date | None = None
+    note: str | None = None
+
+
+class OrderScheduleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    installment_id: int
+    period_no: int
+    due_on: date
+    due_amount: Decimal
+    received_amount: Decimal
+    waived_amount: Decimal
+    status: str
+
+
+class OrderAuditOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    action: str
+    entity_type: str
+    entity_id: str
+    actor: str
+    reason: str | None = None
+    occurred_at: datetime
 
 
 class OrderLinkOut(BaseModel):

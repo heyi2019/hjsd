@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.errors import PermissionDenied, Validation
 from app.core.security import (
+    PERM_AUDIT_READ,
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
@@ -21,8 +22,16 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
+from app.domain.foundation import AuditLog
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
-from app.domain.trade import Account, Installment, OrderEvent
+from app.domain.trade import (
+    Account,
+    Cashflow,
+    Installment,
+    InstallmentSchedule,
+    OrderEvent,
+    RebateRecord,
+)
 from app.installments import service as installments_service
 from app.orders import schemas, service
 
@@ -96,6 +105,90 @@ def _order_detail_output(
         schemas.OrderLinkOut.model_validate(item)
         for item in service.list_order_links(db, order.id, user)
     ]
+    if user.has(PERM_FINANCE_READ):
+        cashflows = db.scalars(
+            select(Cashflow)
+            .where(Cashflow.order_id == order.id)
+            .order_by(Cashflow.occurred_on, Cashflow.id)
+        ).all()
+        output.cashflows = [
+            schemas.OrderCashflowOut.model_validate(
+                {
+                    "flow_no": item.flow_no,
+                    "pool_id": item.pool_id,
+                    "occurred_on": item.occurred_on,
+                    "nature": item.nature,
+                    "category": item.category,
+                    "direction": item.direction,
+                    "amount": item.amount,
+                    "status": item.status,
+                    "order_event_id": item.order_event_id,
+                    "note": item.note,
+                    "operator": item.created_by,
+                }
+            )
+            for item in cashflows
+        ]
+        rebates = db.scalars(
+            select(RebateRecord)
+            .where(RebateRecord.source_order_id == order.id)
+            .order_by(RebateRecord.id)
+        ).all()
+        output.rebates = [
+            schemas.OrderRebateOut.model_validate(
+                {
+                    "id": item.id,
+                    "rebate_no": item.rebate_no,
+                    "rebate_type": item.rebate_type,
+                    "channel": item.channel,
+                    "rate": item.rate,
+                    "base_amount": item.base_amount,
+                    "link_status": item.link_status,
+                    "status": item.status,
+                    "collected_on": item.collected_on,
+                    "note": item.note,
+                    "created_at": item.created_at,
+                    "operator": item.created_by,
+                }
+            )
+            for item in rebates
+        ]
+    installment = db.scalar(
+        select(Installment).where(Installment.order_id == order.id)
+    )
+    if installment is not None:
+        output.installment = schemas.OrderInstallmentOut.model_validate(installment)
+        schedules = db.scalars(
+            select(InstallmentSchedule)
+            .where(InstallmentSchedule.installment_id == installment.id)
+            .order_by(InstallmentSchedule.period_no)
+        ).all()
+        output.installment_schedule = [
+            schemas.OrderScheduleOut.model_validate(item) for item in schedules
+        ]
+    if user.has(PERM_AUDIT_READ):
+        audit_rows = db.scalars(
+            select(AuditLog)
+            .where(
+                AuditLog.entity_type == "order",
+                AuditLog.entity_id == order.order_no,
+            )
+            .order_by(AuditLog.id)
+        ).all()
+        output.audit = [
+            schemas.OrderAuditOut.model_validate(
+                {
+                    "id": item.id,
+                    "action": item.action,
+                    "entity_type": item.entity_type,
+                    "entity_id": item.entity_id,
+                    "actor": item.actor,
+                    "reason": item.reason,
+                    "occurred_at": item.occurred_at,
+                }
+            )
+            for item in audit_rows
+        ]
     return output
 
 

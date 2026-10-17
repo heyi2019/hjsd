@@ -55,9 +55,81 @@ class QualityIssueOut(BaseModel):
     updated_by: str
 
 
+class QualityIssueListOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[QualityIssueOut]
+    total: int = Field(ge=0)
+
+
+class QualityScanItemOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    severity: str
+    title: str
+    entity_type: str
+    entity_id: str
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class QualitySummaryOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    total: int = Field(ge=0)
+    by_severity: dict[str, int]
+    by_code: dict[str, int]
+    items: list[QualityScanItemOut]
+
+
+class QualityMetricDefinitionOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    formula: str
+    unit: str
+
+
+class QualityMetricValueOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rate: float | None = None
+    numerator: int | None = Field(default=None, ge=0)
+    denominator: int | None = Field(default=None, ge=0)
+    amount: str | None = None
+
+
+class QualityMetricItemOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    month: str
+    linked_rebate_rate: QualityMetricValueOut
+    reconciliation_completion_rate: QualityMetricValueOut
+    overdue_rate: QualityMetricValueOut
+    th_outstanding_amount: QualityMetricValueOut
+    missing_attachment_rate: QualityMetricValueOut
+
+
+class QualityMetricsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    from_: str = Field(alias="from")
+    to: str
+    definitions: dict[str, QualityMetricDefinitionOut]
+    items: list[QualityMetricItemOut]
+
+
 __all__ = [
     "QualityIssueClose",
     "QualityIssueCreate",
+    "QualityIssueListOut",
     "QualityIssueOut",
+    "QualityScanItemOut",
     "QualityIssueUpdate",
+    "QualityMetricDefinitionOut",
+    "QualityMetricItemOut",
+    "QualityMetricValueOut",
+    "QualityMetricsOut",
+    "QualitySummaryOut",
 ]

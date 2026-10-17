@@ -24,37 +24,39 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
-@router.get("/quality/exceptions")
+@router.get("/quality/exceptions", response_model=schemas.QualitySummaryOut)
 def list_quality_exceptions(
     db: Session = Depends(get_db), user: CurrentUser = read_quality
-) -> dict:
-    return service.summary(db, user=user)
+) -> schemas.QualitySummaryOut:
+    return schemas.QualitySummaryOut.model_validate(service.summary(db, user=user))
 
 
-@router.get("/quality/metrics")
+@router.get("/quality/metrics", response_model=schemas.QualityMetricsOut)
 def quality_metrics(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_quality,
-) -> dict:
+) -> schemas.QualityMetricsOut:
     """按月返回质量指标及其计算口径，数据范围与质量中心一致。"""
-    return service.metrics(db, from_date=from_date, to_date=to_date, user=user)
+    return schemas.QualityMetricsOut.model_validate(
+        service.metrics(db, from_date=from_date, to_date=to_date, user=user)
+    )
 
 
-@router.get("/quality/issues", response_model=dict)
+@router.get("/quality/issues", response_model=schemas.QualityIssueListOut)
 def list_quality_issues(
     status: str | None = Query(default=None),
     assignee_id: int | None = Query(default=None, gt=0),
     code: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_quality,
-) -> dict:
+) -> schemas.QualityIssueListOut:
     items = service.list_issues(db, status=status, assignee_id=assignee_id, code=code)
-    return {
-        "items": [schemas.QualityIssueOut.model_validate(item) for item in items],
-        "total": len(items),
-    }
+    return schemas.QualityIssueListOut(
+        items=[schemas.QualityIssueOut.model_validate(item) for item in items],
+        total=len(items),
+    )
 
 
 @router.get("/quality/issues/{issue_id}", response_model=schemas.QualityIssueOut)

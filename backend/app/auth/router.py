@@ -56,6 +56,8 @@ class UserUpdate(RequestModel):
     phone: str | None = None
     note: str | None = None
     is_active: bool | None = None
+    handover_user_id: int | None = None
+    handover_note: str | None = None
 
 
 class TeamCreate(RequestModel):
@@ -76,6 +78,8 @@ def _public(user: User) -> dict:
         "role": user.role, "owner_scope": user.owner_scope, "phone": user.phone,
         "pool_ids": user.pool_ids or [], "team_ids": user.team_ids or [],
         "is_active": user.is_active, "must_change_password": user.must_change_password,
+        "deactivated_on": user.deactivated_on.isoformat() if user.deactivated_on else None,
+        "handover_user_id": user.handover_user_id, "handover_note": user.handover_note,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 

@@ -1,7 +1,9 @@
 """Users and role assignments for the first-class login module."""
 from __future__ import annotations
 
-from sqlalchemy import Boolean, CheckConstraint, Integer, JSON, String, Text, UniqueConstraint
+from datetime import date
+
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -43,6 +45,11 @@ class User(Base, TimestampMixin):
     team_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    deactivated_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    handover_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    handover_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

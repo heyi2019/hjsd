@@ -60,6 +60,20 @@ def _scoped_user() -> CurrentUser:
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
+    def test_order_owner_must_be_active(self, seeded_db):
+        owner = seeded_db.get(User, 1)
+        owner.is_active = False
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="订单负责人必须是启用用户"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DFQ",
+                trade_date=D,
+                owner_id=owner.id,
+                actor="pytest",
+            )
+
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
         with pytest.raises(Validation, match="allow_installment_payment 必须为布尔值"):

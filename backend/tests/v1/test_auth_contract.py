@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import select
@@ -17,6 +19,7 @@ from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.core.security import hash_password
 from app.domain.users import RevokedToken, User
+from app.domain.trade import Order
 from app.core.settings import Settings
 from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
 from app.auth import service
@@ -531,6 +534,68 @@ def test_user_service_rejects_non_boolean_active_state(seeded_db):
     seeded_db.commit()
     seeded_db.refresh(user)
     assert user.is_active is True
+
+
+def test_user_deactivation_with_active_orders_requires_handover_or_retention_note(seeded_db):
+    from app.orders import service as orders_service
+
+    order = orders_service.create_order(
+        seeded_db, order_type="DFQ", trade_date=date.today(),
+        owner_id=1, actor="pytest",
+    )
+
+    with pytest.raises(Validation, match="转交或明确保留") as exc:
+        service.update_user(
+            seeded_db, 1, changes={"is_active": False}, actor="pytest"
+        )
+
+    assert exc.value.details["active_order_count"] == 1
+    seeded_db.refresh(seeded_db.get(User, 1))
+    assert seeded_db.get(User, 1).is_active is True
+    assert seeded_db.get(Order, order.id).owner_id == 1
+
+
+def test_user_deactivation_handover_moves_active_orders_and_records_audit(seeded_db):
+    from app.orders import service as orders_service
+
+    order = orders_service.create_order(
+        seeded_db, order_type="DFQ", trade_date=date.today(), owner_id=1, actor="pytest",
+    )
+    updated = service.update_user(
+        seeded_db,
+        1,
+        changes={"is_active": False, "handover_user_id": 2},
+        actor="admin",
+    )
+
+    assert updated.is_active is False
+    assert updated.handover_user_id == 2
+    assert updated.deactivated_on == date.today()
+    assert seeded_db.get(Order, order.id).owner_id == 2
+    actions = {
+        row.action for row in seeded_db.scalars(select(AuditLog)).all()
+    }
+    assert AuditAction.USER_DEACTIVATE.value in actions
+    assert AuditAction.USER_HANDOVER.value in actions
+
+
+def test_user_deactivation_rejects_inactive_handover_target(seeded_db):
+    from app.orders import service as orders_service
+
+    target = seeded_db.get(User, 2)
+    target.is_active = False
+    seeded_db.flush()
+    orders_service.create_order(
+        seeded_db, order_type="DFQ", trade_date=date.today(), owner_id=1, actor="pytest",
+    )
+
+    with pytest.raises(Validation, match="交接目标必须是启用用户"):
+        service.update_user(
+            seeded_db,
+            1,
+            changes={"is_active": False, "handover_user_id": 2},
+            actor="admin",
+        )
 
 
 def test_user_service_validates_password_and_scope_id_shapes(seeded_db):

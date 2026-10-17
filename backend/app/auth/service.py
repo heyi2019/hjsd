@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,11 +16,19 @@ from app.core.errors import AuthError, Conflict, Validation
 from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password
 from app.domain.enums import AuditAction
 from app.domain.foundation import Pool
+from app.domain.trade import Order
+from app.domain.enums import OrderStatus
 from app.domain.users import RevokedToken, Team, User
 
-_USER_FIELDS = ("username", "display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active")
+_USER_FIELDS = (
+    "username", "display_name", "role", "owner_scope", "pool_ids", "team_ids",
+    "phone", "note", "is_active", "deactivated_on", "handover_user_id", "handover_note",
+)
 _USER_MUTABLE_FIELDS = frozenset(
-    {"display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note", "is_active"}
+    {
+        "display_name", "role", "owner_scope", "pool_ids", "team_ids", "phone", "note",
+        "is_active", "handover_user_id", "handover_note",
+    }
 )
 _TEAM_MUTABLE_FIELDS = frozenset({"name", "description", "is_active"})
 
@@ -60,7 +69,23 @@ def _validate_id_list(value: object, *, label: str) -> list[int] | None:
 
 
 def _user_snapshot(user: User) -> dict[str, object]:
-    return {field: getattr(user, field) for field in _USER_FIELDS}
+    snapshot = {field: getattr(user, field) for field in _USER_FIELDS}
+    if user.deactivated_on is not None:
+        snapshot["deactivated_on"] = user.deactivated_on.isoformat()
+    return snapshot
+
+
+def _validate_handover_target(session: Session, user_id: int, target_id: object) -> User:
+    if isinstance(target_id, bool) or not isinstance(target_id, int) or target_id <= 0:
+        raise Validation("交接目标用户 ID 必须为正整数", details={"field": "handover_user_id"})
+    if target_id == user_id:
+        raise Validation("交接目标不能是本人", details={"field": "handover_user_id"})
+    target = session.get(User, target_id)
+    if target is None:
+        raise Validation("交接目标用户不存在", details={"field": "handover_user_id", "user_id": target_id})
+    if not target.is_active:
+        raise Validation("交接目标必须是启用用户", details={"field": "handover_user_id", "user_id": target_id})
+    return target
 
 
 def _team_snapshot(team: Team) -> dict[str, object]:
@@ -161,6 +186,9 @@ def update_user(
     unsupported = sorted(set(changes) - _USER_MUTABLE_FIELDS)
     if unsupported:
         raise Validation("用户更新字段不受支持", details={"fields": unsupported})
+    handover_fields = {"handover_user_id", "handover_note"} & set(changes)
+    if handover_fields and changes.get("is_active") is not False:
+        raise Validation("交接字段只能随停用提交", details={"fields": sorted(handover_fields)})
     if "pool_ids" in changes:
         changes = {**changes, "pool_ids": _validate_id_list(changes["pool_ids"], label="资金池")}
     if "team_ids" in changes:
@@ -185,7 +213,49 @@ def update_user(
         normalized_changes["is_active"] = _required_bool(
             normalized_changes["is_active"], message="启用状态必须为布尔值"
         )
+    if "handover_user_id" in normalized_changes and normalized_changes["handover_user_id"] is not None:
+        _validate_handover_target(session, user.id, normalized_changes["handover_user_id"])
+    if "handover_note" in normalized_changes and normalized_changes["handover_note"] is not None:
+        normalized_changes["handover_note"] = _required_text(
+            normalized_changes["handover_note"], message="交接说明不能为空"
+        )
+    deactivating = normalized_changes.get("is_active") is False and user.is_active
+    active_orders = []
+    if deactivating:
+        active_orders = session.scalars(
+            select(Order).where(
+                Order.owner_id == user.id,
+                Order.status == OrderStatus.ACTIVE.value,
+            )
+        ).all()
+        has_handover = normalized_changes.get("handover_user_id") is not None
+        has_retention_note = bool(normalized_changes.get("handover_note"))
+        if active_orders and not has_handover and not has_retention_note:
+            raise Validation(
+                "停用前必须转交或明确保留进行中订单",
+                details={"active_order_count": len(active_orders)},
+            )
     before = _user_snapshot(user)
+    handover_target = normalized_changes.get("handover_user_id")
+    if deactivating and handover_target is not None:
+        for order in active_orders:
+            order_before = {"owner_id": order.owner_id}
+            order.owner_id = handover_target
+            order.updated_by = actor
+            session.flush()
+            record_audit(
+                session,
+                action=AuditAction.USER_HANDOVER,
+                entity_type="order",
+                entity_id=order.id,
+                actor=actor,
+                before=order_before,
+                after={"owner_id": order.owner_id, "handover_user_id": handover_target},
+            )
+    if deactivating:
+        normalized_changes["deactivated_on"] = date.today()
+    elif normalized_changes.get("is_active") is True:
+        normalized_changes["deactivated_on"] = None
     for key, value in normalized_changes.items():
         setattr(user, key, value)
     session.flush()
@@ -198,6 +268,16 @@ def update_user(
         before=before,
         after=_user_snapshot(user),
     )
+    if deactivating:
+        record_audit(
+            session,
+            action=AuditAction.USER_DEACTIVATE,
+            entity_type="user",
+            entity_id=user.id,
+            actor=actor,
+            before=before,
+            after=_user_snapshot(user),
+        )
     return user
 
 

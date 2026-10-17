@@ -81,9 +81,15 @@ def _validate_owner_id(session: Session, owner_id: int | None) -> None:
             "客户负责人 ID 必须为正整数",
             details={"field": "owner_id", "value": owner_id},
         )
-    if session.get(User, owner_id) is None:
+    owner = session.get(User, owner_id)
+    if owner is None:
         raise Validation(
             "客户负责人不存在",
+            details={"field": "owner_id", "owner_id": owner_id},
+        )
+    if not owner.is_active:
+        raise Validation(
+            "客户负责人必须是启用用户",
             details={"field": "owner_id", "owner_id": owner_id},
         )
 

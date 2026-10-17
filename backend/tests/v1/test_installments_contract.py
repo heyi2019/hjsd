@@ -90,6 +90,28 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    def test_stock_sale_contract_records_account_operator(self, seeded_db):
+        account = _account(seeded_db, "installment-account-operator")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, amount="800")
+
+        contract = installment_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal=Decimal("1000"),
+            down_payment=Decimal("100"),
+            periods=1,
+            per_period=Decimal("900"),
+            first_due_on=TODAY,
+            actor="contract-creator",
+        )
+
+        assert contract.order_id == order.id
+        seeded_db.refresh(account)
+        assert account.status == "INSTALLMENT"
+        assert account.updated_by == "contract-creator"
+
     def test_schedule_period_no_cannot_be_negative_in_database(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, periods=1, per_period="100")

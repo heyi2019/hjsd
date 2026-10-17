@@ -229,10 +229,11 @@ class TestA05HsStockSale:
 
         installment_service.deliver(
             seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
-            delivered_on=TODAY, note="客户自行换绑凭证", actor="pytest",
+            delivered_on=TODAY, note="客户自行换绑凭证", actor="delivery-operator",
         )
         seeded_db.commit()
         assert seeded_db.get(Installment, contract.id).status == InstallmentStatus.DELIVERED.value
+        assert seeded_db.get(type(account), account.id).updated_by == "delivery-operator"
 
     def test_stock_sale_requires_hs_order(self, seeded_db):
         account = accounts_service.create_account(

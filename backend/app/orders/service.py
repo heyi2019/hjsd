@@ -1152,6 +1152,7 @@ def _post_deliver(
         account = session.get(Account, order.account_id)
         if account is not None:
             account.status = AccountStatus.SOLD.value
+            account.updated_by = actor
     order.status = transition(
         ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
     )

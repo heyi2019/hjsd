@@ -304,6 +304,7 @@ def create_installment(
 
     if account is not None:
         account.status = AccountStatus.INSTALLMENT.value
+        account.updated_by = actor
 
     record_audit(
         session,

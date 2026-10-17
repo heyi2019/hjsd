@@ -29,6 +29,12 @@ from app.domain.history import ImportBatch, ImportRow
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 
 
+def _required_text(value: Any, *, field: str, message: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation(message, details={"field": field})
+    return value.strip()
+
+
 def _validate_optional_id(value: object, *, field: str) -> int | None:
     if value is None:
         return None
@@ -86,9 +92,9 @@ def create_batch(
     note: str | None = None,
 ) -> dict[str, Any]:
     """落原始行。只保存原文，不做任何字段推断或匹配。"""
-    name = (source_name or "").strip()
-    if not name:
-        raise Validation("source_name 不能为空", details={"field": "source_name"})
+    name = _required_text(
+        source_name, field="source_name", message="source_name 不能为空"
+    )
     if not rows:
         raise Validation("导入内容为空", details={"field": "rows"})
     invalid_rows = [index for index, raw in enumerate(rows, start=1) if not isinstance(raw, dict)]
@@ -179,9 +185,9 @@ def assign_mapping(
         raise Validation("已导入的历史行不可再改映射", details={"row_id": row_id})
     order_id = _validate_optional_id(order_id, field="订单")
     account_id = _validate_optional_id(account_id, field="账号")
-    text_basis = (basis or "").strip()
-    if not text_basis:
-        raise Validation("补录关联必须填写依据", details={"field": "basis", "row_id": row_id})
+    text_basis = _required_text(
+        basis, field="basis", message="补录关联必须填写依据"
+    )
 
     if order_id is not None:
         if session.get(Order, order_id) is None:
@@ -229,9 +235,9 @@ def assign_mapping(
 def skip_row(
     session: Session, row_id: int, *, reason: str, actor: str = "system"
 ) -> dict[str, Any]:
-    text = (reason or "").strip()
-    if not text:
-        raise Validation("跳过历史行必须填写理由", details={"field": "reason"})
+    text = _required_text(
+        reason, field="reason", message="跳过历史行必须填写理由"
+    )
     row = session.get(ImportRow, row_id)
     if row is None:
         raise NotFound(f"导入行 {row_id} 不存在", details={"row_id": row_id})
@@ -534,9 +540,7 @@ def rollback_batch(
     2. 已确认（COMMITTED）批次拒绝回滚，只能走 create_correction_batch；
     3. 回滚**不删除**原始文件与审计日志，只改状态。
     """
-    text = (reason or "").strip()
-    if not text:
-        raise Validation("回滚必须填写理由", details={"field": "reason"})
+    text = _required_text(reason, field="reason", message="回滚必须填写理由")
     batch = session.get(ImportBatch, batch_id)
     if batch is None:
         raise NotFound(f"导入批次 {batch_id} 不存在", details={"batch_id": batch_id})
@@ -592,9 +596,9 @@ def create_correction_batch(
     原批次与原始行**一律不动**（只读保护），更正以新批次分层保存，
     通过 corrects_batch_id 指回原批次，形成可追溯的更正链。
     """
-    text = (reason or "").strip()
-    if not text:
-        raise Validation("更正批次必须填写理由", details={"field": "reason"})
+    text = _required_text(
+        reason, field="reason", message="更正批次必须填写理由"
+    )
     origin = session.get(ImportBatch, batch_id)
     if origin is None:
         raise NotFound(f"导入批次 {batch_id} 不存在", details={"batch_id": batch_id})

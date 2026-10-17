@@ -39,6 +39,19 @@ class TestCreateBatchGuards:
             service.create_batch(seeded_db, source_name="  ", rows=ROWS, actor="pytest")
         assert "source_name 不能为空" in str(exc.value)
 
+    def test_text_inputs_are_business_errors(self, seeded_db):
+        with pytest.raises(Validation, match="source_name 不能为空"):
+            service.create_batch(
+                seeded_db, source_name=123, rows=ROWS, actor="pytest"
+            )
+
+        batch = _batch(seeded_db)
+        row_id = _first_row_id(seeded_db, batch["id"])
+        with pytest.raises(Validation, match="补录关联必须填写依据"):
+            service.assign_mapping(
+                seeded_db, row_id, basis=123, actor="pytest"
+            )
+
     def test_empty_rows_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_batch(seeded_db, source_name="orders.xlsx", rows=[])

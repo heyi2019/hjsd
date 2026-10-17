@@ -513,6 +513,15 @@ class TestMarkOverdue:
                 seeded_db, other_contract.id, actor="risk", reason="未逾期"
             )
 
+    def test_installment_action_reasons_require_text_values(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, first_due_on=PAST)
+        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        with pytest.raises(Validation, match="违约处置必须填写原因"):
+            installment_service.mark_default(
+                seeded_db, contract.id, actor="risk", reason=123
+            )
+
     def test_waive_schedule_reduces_receivable_and_keeps_unpaid_history(
         self, seeded_db
     ):

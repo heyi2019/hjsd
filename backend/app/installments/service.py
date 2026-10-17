@@ -55,6 +55,12 @@ def _positive(value: Any, *, field: str) -> Decimal:
         raise Validation(str(exc), details={"field": field, "value": str(value)}) from exc
 
 
+def _required_text(value: Any, *, field: str, message: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise Validation(message, details={"field": field})
+    return value.strip()
+
+
 def _normalize_schedule(schedule: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     if not schedule:
         return []
@@ -440,9 +446,7 @@ def waive_schedule(
     user: CurrentUser | None = None,
 ) -> InstallmentSchedule:
     """登记经授权的期次减免，不改写原应收金额。"""
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("减免必须填写原因", details={"field": "reason"})
+    text_reason = _required_text(reason, field="reason", message="减免必须填写原因")
     installment = get_installment(session, installment_id, user)
     schedule = session.scalar(
         select(InstallmentSchedule).where(
@@ -507,9 +511,7 @@ def extend_schedule(
     user: CurrentUser | None = None,
 ) -> InstallmentSchedule:
     """修改未收期次到期日，并通过审计保留原计划日期。"""
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("展期必须填写原因", details={"field": "reason"})
+    text_reason = _required_text(reason, field="reason", message="展期必须填写原因")
     installment = get_installment(session, installment_id, user)
     schedule = session.scalar(
         select(InstallmentSchedule).where(
@@ -653,9 +655,9 @@ def mark_default(
     user: CurrentUser | None = None,
 ) -> Installment:
     """将逾期合约置为违约，保留未收计划供后续追偿（DFQ-01-08）。"""
-    text_reason = (reason or "").strip()
-    if not text_reason:
-        raise Validation("违约处置必须填写原因", details={"field": "reason"})
+    text_reason = _required_text(
+        reason, field="reason", message="违约处置必须填写原因"
+    )
     installment = get_installment(session, installment_id, user)
     if installment.status != InstallmentStatus.OVERDUE.value:
         raise Validation(

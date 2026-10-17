@@ -20,6 +20,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, RebateRecord, RebateSettlement, Reconciliation
 from app.finance import service
 from app.orders import service as orders_service
+from app.parties import service as parties_service
 from app.reporting import service as reporting_service
 
 TODAY = date(2026, 10, 4)
@@ -210,6 +211,28 @@ class TestDepositQueries:
                 paid_on=TODAY,
                 actor="pytest",
                 counterparty_id=999999,
+            )
+
+    def test_deposit_rejects_disabled_counterparty(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        counterparty = parties_service.create_counterparty(
+            seeded_db,
+            display_name="已停用押金合作方",
+            type="PEER",
+            actor="pytest",
+        )
+        parties_service.set_counterparty_status(
+            seeded_db, counterparty.id, False, actor="pytest"
+        )
+
+        with pytest.raises(Validation, match="已停用"):
+            service.create_deposit(
+                seeded_db,
+                pool_id=invest.id,
+                amount=Decimal("100"),
+                paid_on=TODAY,
+                actor="pytest",
+                counterparty_id=counterparty.id,
             )
 
     def test_return_deposit_notfound(self, seeded_db):

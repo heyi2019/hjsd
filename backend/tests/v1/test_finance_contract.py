@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
@@ -32,7 +33,11 @@ def _pool(seeded_db, code: str) -> Pool:
 
 def _active_order(seeded_db) -> int:
     order = orders_service.create_order(
-        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
+        seeded_db,
+        order_type="HS",
+        trade_date=TODAY,
+        actor="pytest",
+        account_profile={"game_account": f"finance-active-{uuid4().hex[:10]}"},
     )
     orders_service.post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
@@ -932,10 +937,20 @@ class TestFinanceApi:
             seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
         )
         own_order = orders_service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="scoped-finance", owner_id=9
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="scoped-finance",
+            owner_id=9,
+            account_profile={"game_account": "finance-own-account"},
         )
         other_order = orders_service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="other",
+            owner_id=8,
+            account_profile={"game_account": "finance-other-account"},
         )
         orders_service.post_event(
             seeded_db, own_order.id, event_type="BUY", amount=Decimal("10"),
@@ -1171,6 +1186,7 @@ class TestFinanceApi:
             trade_date=TODAY,
             actor="scoped-finance",
             owner_id=9,
+            account_profile={"game_account": "finance-settlement-account"},
         )
         orders_service.post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("100"),

@@ -30,7 +30,11 @@ class TestReports:
         from datetime import date
 
         order = order_service.create_order(
-            seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 4),
+            actor="pytest",
+            account_profile={"game_account": "m4-r2-account"},
         )
         order_service.post_event(
             seeded_db,

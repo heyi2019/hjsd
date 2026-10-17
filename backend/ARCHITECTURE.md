@@ -11,9 +11,9 @@ app/
 ├── orders/           # 订单、事件、编号
 ├── accounts/         # 账号库存和成本
 ├── installments/     # 分期合约与收款
-├── rebates/          # 返点记录与到账
+├── history/          # 历史数据导入、映射、对账与迁移审计
+├── quality/          # 数据质量扫描与异常检查
 ├── reporting/        # 只读报表
-├── migration/        # 历史迁移与审计
 ├── auth/             # 登录、令牌与用户认证
 ├── parties/          # 客户、合作方等主体
 ├── policy/            # 规则版本与策略
@@ -21,5 +21,7 @@ app/
 ```
 
 每个业务领域通常由 `router.py`、`service.py`、`schemas.py` 和测试组成；写路径统一经过 Service 事务和审计记录。
+
+返点记录、返点结算属于资金域，由 `finance` 统一维护，不再保留独立运行域；历史导入与迁移审计属于 `history`，数据质量检查属于 `quality`。
 
 旧版后端位于仓库根目录的 `archive/v0_backend/`，仅用于历史迁移参考，不参与当前运行和测试。

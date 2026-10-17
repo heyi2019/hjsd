@@ -8,6 +8,7 @@
 
 - 成功：`200/201`；校验失败：`422`；状态冲突：`409`；不存在：`404`。客户联系方式默认脱敏；读取完整联系方式须 `customer.contact.read`，修改须 `customer.contact.write`，合并须 `customer.merge`。
 - 响应错误：`{ "code": "POOL_ROUTE_MISSING", "message": "业务 HS 未配置 PROFIT 资金池", "details": {} }`。
+- 请求可携带 `X-Request-ID`（最长 64 字符）；未携带时服务端生成并在响应头返回。所有受控动作的审计记录自动保存该请求号，审计查询会回显 `request_id`。
 - 列表筛选参数按各端点的请求签名执行；日期报表支持 `from` / `to`，订单和资金接口的可用筛选以 Swagger 为准，不假定所有列表都有分页参数。
 
 ## 2. 端点

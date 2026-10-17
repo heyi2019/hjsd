@@ -61,6 +61,7 @@ def list_audit_logs(
                 "before": row.before_json,
                 "after": row.after_json,
                 "reason": row.reason,
+                "request_id": row.request_id,
                 "occurred_at": row.occurred_at.isoformat() if row.occurred_at else None,
             }
             for row in rows

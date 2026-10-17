@@ -10,8 +10,11 @@ from __future__ import annotations
 
 from datetime import date
 
+from sqlalchemy import select
+
 from app.core.audit import record_audit
 from app.domain.enums import AuditAction
+from app.domain.foundation import AuditLog
 
 TODAY = date.today()  # occurred_at 由 server_default now() 写入，必须用真实当天
 MARK = "AUDIT-CONTRACT"  # 本文件专属标记，避免与种子审计混淆
@@ -30,6 +33,36 @@ def _audit(seeded_db, *, action, actor, entity_id, entity_type="order"):
 
 
 class TestAuditLogApi:
+    def test_request_id_is_propagated_to_audit_and_response_header(
+        self, seeded_client, seeded_db, headers
+    ):
+        request_id = "audit-trace-20261017"
+        response = seeded_client.post(
+            "/api/v1/pools",
+            json={"code": "TRACE_POOL", "name": "审计追踪池"},
+            headers={**headers, "X-Request-ID": request_id},
+        )
+        assert response.status_code == 201, response.text
+        assert response.headers["x-request-id"] == request_id
+
+        log = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == AuditAction.POOL_CREATE.value,
+                AuditLog.request_id == request_id,
+            )
+            .order_by(AuditLog.id.desc())
+        )
+        assert log is not None
+
+        listed = seeded_client.get(
+            "/api/v1/audit-logs",
+            params={"entity_type": "Pool", "entity_id": log.entity_id},
+            headers=headers,
+        )
+        assert listed.status_code == 200, listed.text
+        assert listed.json()["items"][0]["request_id"] == request_id
+
     def test_query_filters_and_pagination(self, seeded_client, seeded_db, headers):
         _audit(
             seeded_db, action=AuditAction.ORDER_CREATE, actor="alice",

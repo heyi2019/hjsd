@@ -11,10 +11,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from uuid import uuid4
 
 from app.core.database import describe_engine, get_engine
 from app.core.errors import AppError, ErrorCode
 from app.core.settings import Settings, get_settings
+from app.core.request_context import reset_request_id, set_request_id
 from app.foundation.router import router as foundation_router
 from app.accounts.router import router as accounts_router
 from app.audit.router import router as audit_router
@@ -87,6 +89,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     install_exception_handlers(app)
+
+    @app.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        incoming = request.headers.get("X-Request-ID", "").strip()
+        request_id = (
+            incoming
+            if incoming and len(incoming) <= 64 and all(ord(char) >= 32 for char in incoming)
+            else uuid4().hex
+        )
+        token = set_request_id(request_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            reset_request_id(token)
+
     app.include_router(foundation_router, prefix=settings.api_prefix)
     app.include_router(parties_router, prefix=settings.api_prefix)
     app.include_router(search_router, prefix=settings.api_prefix)

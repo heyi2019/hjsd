@@ -20,6 +20,16 @@ TODAY = date.today()  # occurred_at 由 server_default now() 写入，必须用�
 MARK = "AUDIT-CONTRACT"  # 本文件专属标记，避免与种子审计混淆
 
 
+def test_audit_routes_publish_typed_response_models(app):
+    paths = app.openapi()["paths"]
+
+    logs_schema = paths["/api/v1/audit-logs"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    actions_schema = paths["/api/v1/audit-logs/actions"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+
+    assert logs_schema["$ref"].endswith("/AuditLogListOut")
+    assert actions_schema["$ref"].endswith("/AuditActionListOut")
+
+
 def _audit(seeded_db, *, action, actor, entity_id, entity_type="order"):
     record_audit(
         seeded_db,

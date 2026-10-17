@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -16,12 +16,13 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.foundation import AuditLog
+from app.audit import schemas
 
 router = APIRouter(tags=["audit"])
 read_access = require_permissions(PERM_AUDIT_READ)
 
 
-@router.get("/audit-logs")
+@router.get("/audit-logs", response_model=schemas.AuditLogListOut)
 def list_audit_logs(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
@@ -33,7 +34,7 @@ def list_audit_logs(
     to_date: date | None = Query(default=None, alias="to"),
     limit: int = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
-) -> dict[str, Any]:
+) -> schemas.AuditLogListOut:
     """按对象、动作、操作人、时间查询审计轨迹。"""
     del user
     stmt = select(AuditLog).order_by(AuditLog.id.desc())
@@ -50,35 +51,35 @@ def list_audit_logs(
     if to_date:
         stmt = stmt.where(AuditLog.occurred_at <= datetime.combine(to_date, datetime.max.time()))
     rows = db.scalars(stmt.order_by(AuditLog.id.desc()).limit(limit).offset(offset)).all()
-    return {
-        "items": [
-            {
-                "id": row.id,
-                "action": row.action,
-                "entity_type": row.entity_type,
-                "entity_id": row.entity_id,
-                "actor": row.actor,
-                "before": row.before_json,
-                "after": row.after_json,
-                "reason": row.reason,
-                "request_id": row.request_id,
-                "occurred_at": row.occurred_at.isoformat() if row.occurred_at else None,
-            }
+    return schemas.AuditLogListOut(
+        items=[
+            schemas.AuditLogOut(
+                id=row.id,
+                action=row.action,
+                entity_type=row.entity_type,
+                entity_id=row.entity_id,
+                actor=row.actor,
+                before=row.before_json,
+                after=row.after_json,
+                reason=row.reason,
+                request_id=row.request_id,
+                occurred_at=row.occurred_at,
+            )
             for row in rows
         ],
-        "total": len(rows),
-    }
+        total=len(rows),
+    )
 
 
-@router.get("/audit-logs/actions")
+@router.get("/audit-logs/actions", response_model=schemas.AuditActionListOut)
 def list_actions(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
-) -> dict[str, Any]:
+) -> schemas.AuditActionListOut:
     del db, user
     from app.domain.enums import AuditAction
 
-    return {"items": [action.value for action in AuditAction]}
+    return schemas.AuditActionListOut(items=[action.value for action in AuditAction])
 
 
 __all__ = ["router"]

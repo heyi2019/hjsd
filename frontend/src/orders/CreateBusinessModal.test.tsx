@@ -61,7 +61,7 @@ describe("CreateBusinessModal：新建业务写路径", () => {
   it("回收入口只加载已有库存账号，不提供随订单建档", async () => {
     const { container } = await openTypedModal("HS");
 
-    expect(await screen.findByLabelText("库存账号")).toBeInTheDocument();
+    expect(await screen.findByLabelText("库存编号")).toBeInTheDocument();
     expect(accountsList).toHaveBeenCalledWith({ status: "IN_STOCK" });
     expect(ordersList).not.toHaveBeenCalled();
     expect(typesList).not.toHaveBeenCalled();
@@ -69,7 +69,7 @@ describe("CreateBusinessModal：新建业务写路径", () => {
 
   it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
-    expect(await screen.findByLabelText("库存账号")).toBeInTheDocument();
+    expect(await screen.findByLabelText("库存编号")).toBeInTheDocument();
     expect(typesList).not.toHaveBeenCalled();
     expect(accountsList).toHaveBeenCalledWith({ status: "IN_STOCK" });
     expect(ordersList).not.toHaveBeenCalled();

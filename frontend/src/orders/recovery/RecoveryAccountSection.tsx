@@ -33,20 +33,22 @@ export function RecoveryAccountSection(props: {
     ...props.fieldNames,
   };
   const inventoryAccounts = props.inventoryAccounts;
+  const selectedAccountId = Form.useWatch(fieldNames.accountId);
+  const selectedAccount = inventoryAccounts?.find((account) => account.id === selectedAccountId);
   return (
     <section className="recovery-account-section recovery-entry-fields" aria-labelledby="game-account-info-title">
       <div id="game-account-info-title" className="recovery-entry-fields__title">
-        {inventoryAccounts ? "选择库存账号" : "游戏账号信息"}
+        游戏账号信息
       </div>
       {inventoryAccounts ? (
         <Form.Item
           name={fieldNames.accountId}
-          label="库存账号"
-          rules={[{ required: true, message: "请选择库存账号" }]}
-          extra={inventoryAccounts.length ? "账号资料统一维护在库存中心" : "请先到库存中心新增账号"}
+          label="库存编号"
+          rules={[{ required: true, message: "请选择库存编号" }]}
+          extra={inventoryAccounts.length ? "库存编号来自库存中心；游戏账号仅为资料字段" : "请先到库存中心新增账号"}
         >
           <Select
-            placeholder="请选择已建档库存账号"
+            placeholder="请选择已建档库存编号"
             disabled={!inventoryAccounts.length}
             options={inventoryAccounts.map((account) => ({
               value: account.id,
@@ -81,6 +83,13 @@ export function RecoveryAccountSection(props: {
           </Form.Item>
         </>
       )}
+      {inventoryAccounts && selectedAccount ? (
+        <div className="recovery-entry-fields__selected-account" aria-label="已选游戏账号信息">
+          <span>游戏账号：{selectedAccount.game_account || "未填写"}</span>
+          <span>游戏类型：{selectedAccount.game_type || "未填写"}</span>
+          <span>渠道／区服：{selectedAccount.channel_region || "未填写"}</span>
+        </div>
+      ) : null}
       {props.children}
     </section>
   );

@@ -184,12 +184,12 @@ class TestR2MonthlyPnl:
             occurred_on=D, actor="pytest",
         )
         order_service.post_event(
-            seeded_db, order.id, event_type="SELL", amount="1300.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
             seeded_db, order.id, event_type="COST", amount="200.00",
             occurred_on=EARLY, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="1300.00",
+            occurred_on=D, actor="pytest",
         )
 
         full = reporting_service.r2_monthly_pnl(seeded_db)
@@ -528,12 +528,12 @@ class TestReportsApiDateParams:
             occurred_on=D, actor="pytest",
         )
         order_service.post_event(
-            seeded_db, order.id, event_type="SELL", amount="1300.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
             seeded_db, order.id, event_type="COST", amount="200.00",
             occurred_on=EARLY, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="1300.00",
+            occurred_on=D, actor="pytest",
         )
 
         pnl = seeded_client.get(

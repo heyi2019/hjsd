@@ -63,6 +63,60 @@ export interface Customer {
   extra_values?: Record<string, unknown> | null;
 }
 
+export interface CustomerOverview {
+  order_count: number;
+  active_order_count: number;
+  completed_order_count: number;
+  cancelled_order_count: number;
+  last_trade_date?: string | null;
+  installment_paid_total: string;
+  installment_receivable_total: string;
+  installment_remaining_total: string;
+  overdue_period_count: number;
+}
+
+export interface CustomerBusiness {
+  order_id: number;
+  order_no: string;
+  order_type: string;
+  capital_type: string;
+  status: string;
+  trade_date: string;
+  owner_id?: number | null;
+  roles: string[];
+}
+
+export interface CustomerInstallment {
+  id: number;
+  inst_no: string;
+  order_id: number;
+  order_no?: string | null;
+  contract_type: string;
+  status: string;
+  principal: string;
+  total_receivable: string;
+  paid_amount: string;
+  remaining_amount: string;
+  overdue_periods: number;
+  first_due_on?: string | null;
+}
+
+export interface CustomerDetail {
+  customer: Customer;
+  overview: CustomerOverview;
+  business: CustomerBusiness[];
+  installments: CustomerInstallment[];
+  audit: Array<{
+    id: number;
+    action: string;
+    entity_type: string;
+    entity_id: string;
+    actor: string;
+    reason?: string | null;
+    occurred_at: string;
+  }>;
+}
+
 export interface Counterparty {
   id: number;
   counterparty_no: string;
@@ -375,6 +429,8 @@ export const customersApi = {
     ).then((r) => r.data),
   get: (id: number, reveal = false) =>
     api.get<Customer>(`/customers/${id}`, { params: { reveal } }).then((r) => r.data),
+  detail: (id: number, reveal = false) =>
+    api.get<CustomerDetail>(`/customers/${id}/detail`, { params: { reveal } }).then((r) => r.data),
   patch: (id: number, payload: Partial<Customer>) =>
     api.patch<Customer>(`/customers/${id}`, payload).then((r) => r.data),
   setStatus: (id: number, status: string) =>

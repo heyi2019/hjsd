@@ -1,6 +1,6 @@
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
  *  活字段（BAS-04）：字段定义来自设置页，建档/编辑表单与详情抽屉按定义动态渲染。 */
-import { Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Switch, Tabs, Typography, message } from "antd";
+import { Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -9,10 +9,14 @@ import {
   fieldsApi,
   type Counterparty,
   type Customer,
+  type CustomerBusiness,
+  type CustomerDetail,
+  type CustomerInstallment,
   type FieldDefinition,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
-import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
+import { money } from "../shared/lib/format";
+import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import {
   DataTable,
@@ -151,9 +155,14 @@ function CustomerPanel() {
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
+  const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [mergeForm] = Form.useForm();
@@ -166,12 +175,15 @@ function CustomerPanel() {
 
   const load = useCallback(async () => {
     try {
-      setRows(await customersApi.list());
+      setRows(await customersApi.list({
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, []);
+  }, [keyword, statusFilter]);
 
   useEffect(() => {
     void load();
@@ -184,6 +196,19 @@ function CustomerPanel() {
       .then(setFieldDefs)
       .catch(() => setFieldDefs([]));
   }, []);
+
+  const openDetail = async (row: Customer) => {
+    setDetailTarget(row);
+    setDetailData(null);
+    setDetailLoading(true);
+    try {
+      setDetailData(await customersApi.detail(row.id));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const submitCreate = async (values: Record<string, unknown>) => {
     try {
@@ -278,7 +303,7 @@ function CustomerPanel() {
       title: "操作",
       render: (_v, row) => (
         <Space>
-          <PermissionButton permission="customer.read" size="small" onClick={() => setDetailTarget(row)}>
+          <PermissionButton permission="customer.read" size="small" onClick={() => void openDetail(row)}>
             详情
           </PermissionButton>
           <PermissionButton
@@ -327,6 +352,40 @@ function CustomerPanel() {
           { label: "已停用", kind: "count", amount: String(rows.filter((r) => r.status === "DISABLED").length) },
         ]}
       />
+      <Space wrap className="customer-list-filters">
+        <Input.Search
+          aria-label="搜索客户"
+          value={searchInput}
+          allowClear
+          placeholder="搜索客户编号 / 名字 / 手机 / 微信 / QQ"
+          onChange={(event) => {
+            setSearchInput(event.target.value);
+            if (!event.target.value) {
+              setKeyword("");
+              setPage(1);
+            }
+          }}
+          onSearch={(value) => {
+            setKeyword(value);
+            setPage(1);
+          }}
+        />
+        <Select
+          aria-label="客户状态"
+          allowClear
+          placeholder="全部状态"
+          value={statusFilter}
+          options={[
+            { value: "ACTIVE", label: "启用中" },
+            { value: "DISABLED", label: "已停用" },
+            { value: "MERGED", label: "已合并" },
+          ]}
+          onChange={(value) => {
+            setStatusFilter(value);
+            setPage(1);
+          }}
+        />
+      </Space>
       {!compact ? <DataTable<Customer>
         columns={columns}
         rows={rows}
@@ -341,7 +400,7 @@ function CustomerPanel() {
         }}
       /> : <MobileCustomerList
         rows={rows}
-        onDetail={setDetailTarget}
+        onDetail={(row) => void openDetail(row)}
         onMerge={setMergeTarget}
         onDisable={async (row) => {
           await customersApi.setStatus(row.id, "DISABLED");
@@ -465,8 +524,11 @@ function CustomerPanel() {
       <Drawer
         title={detailTarget ? `客户档案 · ${detailTarget.customer_no}` : "客户档案"}
         open={Boolean(detailTarget)}
-        onClose={() => setDetailTarget(null)}
-        width={480}
+        onClose={() => {
+          setDetailTarget(null);
+          setDetailData(null);
+        }}
+        width={720}
         destroyOnHidden
         extra={
           detailTarget && detailTarget.status === "ACTIVE" ? (
@@ -483,7 +545,9 @@ function CustomerPanel() {
           ) : null
         }
       >
-        {detailTarget ? (
+        {detailLoading ? (
+          <div role="status" aria-label="正在加载客户详情"><Spin /></div>
+        ) : detailTarget ? (
           <>
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label="客户编号">{detailTarget.customer_no}</Descriptions.Item>
@@ -519,6 +583,57 @@ function CustomerPanel() {
                 })}
               </Descriptions>
             )}
+            {detailData ? (
+              <>
+                <Typography.Title level={5} className="ui-title-spaced">经营概览</Typography.Title>
+                <StatRow
+                  items={[
+                    { label: "关联订单", amount: detailData.overview.order_count, kind: "count" },
+                    { label: "进行中订单", amount: detailData.overview.active_order_count, kind: "count" },
+                    { label: "已完成订单", amount: detailData.overview.completed_order_count, kind: "count" },
+                    { label: "分期已收", amount: detailData.overview.installment_paid_total, kind: "money" },
+                    { label: "分期应收", amount: detailData.overview.installment_receivable_total, kind: "money" },
+                    { label: "剩余应收", amount: detailData.overview.installment_remaining_total, kind: "money", tone: "warn" },
+                    { label: "逾期期数", amount: detailData.overview.overdue_period_count, kind: "count", tone: detailData.overview.overdue_period_count > 0 ? "warn" : "plain" },
+                  ]}
+                />
+                <Typography.Title level={5} className="ui-title-spaced">关联订单</Typography.Title>
+                <DataTable<CustomerBusiness>
+                  columns={[
+                    { title: "订单", dataIndex: "order_no" },
+                    { title: "业务", render: (_value, row) => orderTypeLabel(row.order_type) },
+                    { title: "角色", render: (_value, row) => row.roles.join("、") || "-" },
+                    { title: "状态", render: (_value, row) => <StatusTag status={row.status} /> },
+                    { title: "日期", dataIndex: "trade_date" },
+                  ]}
+                  rows={detailData.business}
+                  page={1}
+                  pageSize={detailData.business.length || 1}
+                  total={detailData.business.length}
+                  onPageChange={() => undefined}
+                  pagination={false}
+                  emptyText="暂无关联订单"
+                />
+                <Typography.Title level={5} className="ui-title-spaced">分期收款</Typography.Title>
+                <DataTable<CustomerInstallment>
+                  columns={[
+                    { title: "合约", dataIndex: "inst_no" },
+                    { title: "订单", dataIndex: "order_no" },
+                    { title: "状态", render: (_value, row) => <StatusTag status={row.status} /> },
+                    { title: "已收", render: (_value, row) => `¥${money(row.paid_amount)}` },
+                    { title: "剩余", render: (_value, row) => `¥${money(row.remaining_amount)}` },
+                    { title: "逾期", render: (_value, row) => row.overdue_periods > 0 ? `逾期 ${row.overdue_periods} 期` : "-" },
+                  ]}
+                  rows={detailData.installments}
+                  page={1}
+                  pageSize={detailData.installments.length || 1}
+                  total={detailData.installments.length}
+                  onPageChange={() => undefined}
+                  pagination={false}
+                  emptyText="暂无分期合约"
+                />
+              </>
+            ) : null}
           </>
         ) : null}
       </Drawer>

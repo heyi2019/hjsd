@@ -1306,6 +1306,25 @@ class TestFinanceApi:
         assert report["total"]["transfer_in"] == Decimal("125.50")
         assert report["total"]["transfer_out"] == Decimal("125.50")
 
+    def test_transfer_service_respects_pool_scope(self, seeded_db):
+        scoped_finance = CurrentUser.build(
+            id=3,
+            username="scoped-finance",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1}),
+        )
+        with pytest.raises(NotFound, match="资金池不存在"):
+            service.create_transfer(
+                seeded_db,
+                source_pool_id=2,
+                target_pool_id=1,
+                amount=Decimal("10"),
+                occurred_on=TODAY,
+                actor="scoped-finance",
+                user=scoped_finance,
+            )
+
     def test_repair_unpaired_transfer_creates_only_missing_side(
         self, seeded_db
     ):

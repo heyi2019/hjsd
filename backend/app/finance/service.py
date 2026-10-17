@@ -874,10 +874,15 @@ def create_transfer(
     occurred_on: date,
     actor: str,
     note: str | None = None,
+    user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
     if source_pool_id == target_pool_id:
         raise Validation("转出池与转入池不能相同", details={"pool_id": source_pool_id})
+    if user is not None and (
+        not user.can_see_pool(source_pool_id) or not user.can_see_pool(target_pool_id)
+    ):
+        raise NotFound("资金池不存在", details={"pool_id": source_pool_id})
     money = _positive(amount, field="amount")
     source = foundation_service.assert_pool_usable(session, source_pool_id)
     target = foundation_service.assert_pool_usable(session, target_pool_id)

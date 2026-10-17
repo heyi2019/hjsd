@@ -304,6 +304,7 @@ def create_transfer(
         occurred_on=payload.occurred_on,
         actor=_actor(user),
         note=payload.note,
+        user=user,
     )
     return _transfer_out(db, result)
 

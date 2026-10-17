@@ -38,6 +38,17 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
+def _order_output(order, user: CurrentUser) -> schemas.OrderOut:
+    """按订单权限输出详情，避免财务/查看权限读取 DFQ 游戏密码。"""
+    output = schemas.OrderOut.model_validate(order)
+    if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
+        snapshot = dict(output.account_snapshot)
+        if "game_password" in snapshot:
+            snapshot["game_password"] = None
+        output.account_snapshot = snapshot
+    return output
+
+
 def _order_list_payload(db: Session, orders: list) -> list[dict]:
     """组装工作台摘要，避免列表页为每一行再请求详情。"""
     order_ids = [item.id for item in orders]
@@ -216,7 +227,7 @@ def create_order(
             actor=_actor(user),
             user=user,
         )
-    return schemas.OrderOut.model_validate(order)
+    return _order_output(order, user)
 
 
 @router.get("/orders/{order_id}", response_model=schemas.OrderOut)
@@ -225,7 +236,7 @@ def get_order(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> schemas.OrderOut:
-    return schemas.OrderOut.model_validate(service.get_order(db, order_id, _user))
+    return _order_output(service.get_order(db, order_id, _user), _user)
 
 
 @router.patch("/orders/{order_id}", response_model=schemas.OrderOut)
@@ -244,7 +255,7 @@ def update_order(
     order = service.update_order(
         db, order_id, actor=_actor(user), user=user, **changes
     )
-    return schemas.OrderOut.model_validate(order)
+    return _order_output(order, user)
 
 
 @router.post("/orders/{order_id}/cancel", response_model=schemas.OrderOut)
@@ -261,7 +272,7 @@ def cancel_order(
         reason=payload.reason,
         user=user,
     )
-    return schemas.OrderOut.model_validate(order)
+    return _order_output(order, user)
 
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)

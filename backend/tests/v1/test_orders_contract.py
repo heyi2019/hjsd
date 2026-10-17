@@ -911,6 +911,41 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
+    def test_viewer_order_detail_redacts_dfq_game_password(
+        self, seeded_client, headers
+    ):
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DFQ",
+                "trade_date": D.isoformat(),
+                "account_snapshot": {
+                    "game_type": "王者荣耀",
+                    "game_account": "dfq-secret-account",
+                    "game_password": "secret-password",
+                },
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        viewer = CurrentUser.build(
+            id=5,
+            username="finance-reader",
+            roles=["VIEWER"],
+            owner_scope="ALL",
+        )
+        viewer_headers = {"Authorization": f"Bearer {build_access_token(viewer)}"}
+        fetched = seeded_client.get(
+            f"/api/v1/orders/{created.json()['id']}",
+            headers=viewer_headers,
+        )
+
+        assert fetched.status_code == 200, fetched.text
+        snapshot = fetched.json()["account_snapshot"]
+        assert snapshot["game_account"] == "dfq-secret-account"
+        assert snapshot["game_password"] is None
+
     def test_order_request_rejects_removed_or_unknown_fields(
         self, seeded_client, headers
     ):

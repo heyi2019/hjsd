@@ -18,7 +18,7 @@ from app.core.database import describe_engine, get_engine
 from app.core.errors import AppError, ErrorCode
 from app.core.settings import Settings, get_settings
 from app.core.request_context import reset_request_id, set_request_id
-from app.core.schemas import HealthOut
+from app.core.schemas import EngineInfoOut, HealthOut
 from app.foundation.router import router as foundation_router
 from app.accounts.router import router as accounts_router
 from app.audit.router import router as audit_router
@@ -150,11 +150,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(teams_router, prefix=settings.api_prefix)
     app.include_router(attachments_router, prefix=settings.api_prefix)
 
-    @app.get("/", tags=["health"])
-    def root() -> dict[str, str]:
+    @app.get("/", response_model=EngineInfoOut, tags=["health"])
+    def root() -> EngineInfoOut:
         info = describe_engine(settings)
         info["docs"] = "/docs"
-        return info
+        return EngineInfoOut.model_validate(info)
 
     @app.get(
         f"{settings.api_prefix}/health",

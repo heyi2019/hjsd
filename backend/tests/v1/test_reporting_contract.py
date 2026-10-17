@@ -30,6 +30,22 @@ from app.policy import service as policy_service
 from app.parties import service as parties_service
 from app.reporting import service as reporting_service
 
+
+def test_reporting_read_routes_publish_typed_response_models(app):
+    paths = app.openapi()["paths"]
+
+    expected = {
+        "/api/v1/reports/inventory-health": "InventoryHealthOut",
+        "/api/v1/reports/monthly-pnl": "MonthlyPnlOut",
+        "/api/v1/reports/commission": "CommissionOut",
+        "/api/v1/reports/business-pnl": "BusinessPnlOut",
+        "/api/v1/reports/daily-funds": "DailyFundsOut",
+        "/api/v1/reports/order-profit": "OrderProfitOut",
+    }
+    for path, model_name in expected.items():
+        schema = paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+        assert schema["$ref"].endswith(f"/{model_name}")
+
 D = date(2026, 10, 4)        # 主测试日（与 m4 一致）
 EARLY = date(2026, 9, 15)    # 月初侧样本（用于 from 过滤）
 MID_GATE = date(2026, 10, 1)  # 月份闸门

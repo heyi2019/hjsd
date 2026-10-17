@@ -17,71 +17,79 @@ from app.core.security import (
     require_permissions,
 )
 from app.reporting import service
+from app.reporting.schemas import (
+    BusinessPnlOut,
+    CommissionOut,
+    DailyFundsOut,
+    InventoryHealthOut,
+    MonthlyPnlOut,
+    OrderProfitOut,
+)
 
 router = APIRouter(tags=["reporting"])
 read_access = require_permissions(PERM_REPORT_READ)
 export_access = require_permissions(PERM_REPORT_EXPORT)
 
 
-@router.get("/reports/inventory-health")
+@router.get("/reports/inventory-health", response_model=InventoryHealthOut)
 def inventory_health(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
-) -> dict:
+) -> InventoryHealthOut:
     """R1 库存健康表（回收与代挂进入库存，提号不进入库存）。"""
     return service.r1_inventory_health(db, user=user)
 
 
-@router.get("/reports/monthly-pnl")
+@router.get("/reports/monthly-pnl", response_model=MonthlyPnlOut)
 def monthly_pnl(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
-) -> dict:
+) -> MonthlyPnlOut:
     """R2 月度经营损益（账号 COST 不进运营费用）。"""
     return service.r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
-@router.get("/reports/commission")
+@router.get("/reports/commission", response_model=CommissionOut)
 def commission(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
-) -> dict:
+) -> CommissionOut:
     """R3 提成对账：人员可钻取到每一单。"""
     return service.r3_commission_reconciliation(db, from_date=from_date, to_date=to_date, user=user)
 
 
-@router.get("/reports/business-pnl")
+@router.get("/reports/business-pnl", response_model=BusinessPnlOut)
 def business_pnl(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
-) -> dict:
+) -> BusinessPnlOut:
     """R5 业务级损益：未归集返点独立列，不摊给业务。"""
     return service.r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
-@router.get("/reports/daily-funds")
+@router.get("/reports/daily-funds", response_model=DailyFundsOut)
 def daily_funds(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
     on: date | None = Query(default=None),
-) -> dict:
+) -> DailyFundsOut:
     """资金日报：与 FIN-01 同日口径一致。"""
     return service.daily_funds_report(db, on=on, user=user)
 
 
-@router.get("/reports/order-profit")
+@router.get("/reports/order-profit", response_model=OrderProfitOut)
 def order_profit(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
-) -> dict:
+) -> OrderProfitOut:
     """订单利润明细：合计与 R5 对应维度一致。"""
     return service.order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
 

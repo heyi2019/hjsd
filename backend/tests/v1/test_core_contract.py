@@ -474,6 +474,10 @@ class TestDatabaseLifecycle:
 
 # ------------------------------------------------------------------ 应用入口
 class TestApiV1Health:
+    def test_root_publishes_typed_response_model(self, app):
+        schema = app.openapi()["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+        assert schema["$ref"].endswith("/EngineInfoOut")
+
     def test_root_and_health_endpoints(self, client):
         root = client.get("/")
         assert root.status_code == 200, root.text

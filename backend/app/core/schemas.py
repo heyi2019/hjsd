@@ -24,4 +24,17 @@ class HealthOut(BaseModel):
     sqlite_exists: str
 
 
-__all__ = ["HealthOut", "RequestModel"]
+class EngineInfoOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    app_env: str
+    app_name: str
+    app_version: str
+    api_prefix: str
+    database: str
+    env_file: str
+    sqlite_exists: str
+    docs: str
+
+
+__all__ = ["EngineInfoOut", "HealthOut", "RequestModel"]

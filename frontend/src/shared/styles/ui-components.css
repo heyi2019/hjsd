@@ -96,7 +96,7 @@
     box-shadow var(--dur-fast) var(--ease);
 }
 .ui-entry-card:hover {
-  border-color: var(--violet-border);
+  border-color: var(--brand-border);
   box-shadow: var(--shadow-raised);
 }
 /* 直接操纵（Apple HIG）：可点卡片悬浮轻抬、按下即时缩量，松手弹簧回弹。

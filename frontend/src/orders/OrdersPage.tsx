@@ -19,7 +19,7 @@ import {
   PermissionButton,
   StatusTag,
 } from "../shared/ui";
-import { CreateBusinessModal } from "./CreateBusinessModal";
+import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import {
   DEFAULT_BUSINESS_CENTER_TAB,
   type BusinessCenterEntryTab,
@@ -138,7 +138,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [keyword, setKeyword] = useState("");
-  const [createType, setCreateType] = useState<string | undefined>();
+  const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const load = useCallback(async () => {
@@ -190,7 +190,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           <Dropdown
             menu={{
               items: BUSINESS_CREATE_ITEMS,
-              onClick: ({ key }) => setCreateType(key),
+              onClick: ({ key }) => setCreateType(key as BusinessOrderType),
             }}
             trigger={["click"]}
           >
@@ -326,7 +326,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           setCreateType(undefined);
           await load();
         }}
-        initialOrderType={createType}
+        initialOrderType={createType ?? "HS"}
       />
 
     </section>

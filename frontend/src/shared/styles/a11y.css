@@ -26,7 +26,7 @@
 }
 
 .sidebar .nav-item.active:focus-visible {
-  background: linear-gradient(135deg, var(--violet-50) 0%, var(--violet-200) 100%);
+  background: linear-gradient(135deg, var(--brand-50) 0%, var(--brand-200) 100%);
 }
 
 /* 选中项已经有自己的选中材质；焦点提示改为内嵌，避免出现第二层外框。 */

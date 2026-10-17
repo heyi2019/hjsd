@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { ordersApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
-import { CreateBusinessModal } from "../orders/CreateBusinessModal";
+import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
 export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [createType, setCreateType] = useState("HS");
+  const [createType, setCreateType] = useState<BusinessOrderType>("HS");
   const [orders, setOrders] = useState<Order[]>([]);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const loadSummary = async () => {
@@ -21,7 +21,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
     }
   };
   useEffect(() => { void loadSummary(); }, []);
-  const openCreate = (orderType: string) => {
+  const openCreate = (orderType: BusinessOrderType) => {
     setCreateType(orderType);
     setCreateOpen(true);
   };

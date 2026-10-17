@@ -32,7 +32,7 @@
   --panel-2: rgba(255, 255, 255, 0.72);
   --soft: rgba(118, 118, 128, 0.12);
   --on-accent: #fff;
-  /* 表格/列表行微交互（2026-10-13 Apple 流体）：hover 复用既有 --violet-soft（蓝系，与品牌一致）；
+  /* 表格/列表行微交互（2026-10-13 Apple 流体）：hover 复用既有 --brand-soft（蓝系，与品牌一致）；
      selected 用更强的蓝填充以区别于 hover。深色在 [data-theme=dark] 覆盖。 */
   --row-selected: rgba(10, 99, 216, 0.16);
 
@@ -60,7 +60,7 @@
   --glass-tint: color-mix(in srgb, var(--glass) 88%, transparent);
   --glass-hi-tint: color-mix(in srgb, var(--glass-hi) 90%, transparent);
 
-  /* 阴影 / 抬升（Phase 1.5 语义名 --shadow-xs/sm/md/lg、--control-height-*、--motion-* 无引用，去兼容已删除；沿用 --e1/--e2/--e3/--shadow 原始名） */
+  /* 阴影 / 抬升：统一沿用 --e1/--e2/--e3/--shadow 语义名。 */
   --e0: 0 1px 2px rgba(91, 33, 182, 0.12);
   --e1: 0 1px 2px rgba(28, 28, 30, 0.03), 0 4px 12px rgba(28, 28, 30, 0.05);
   --e2: 0 14px 34px rgba(28, 28, 30, 0.08), 0 4px 12px rgba(28, 28, 30, 0.04);
@@ -76,11 +76,11 @@
   --card-elevation: 0 10px 28px rgba(28, 28, 30, 0.07), 0 2px 8px rgba(28, 28, 30, 0.05);
   --card-top-hi: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   --accent-grad: linear-gradient(135deg, #0757c7 0%, #0a63d8 52%, #0c68d9 100%); /* 品牌蓝实底：白字在整段均保持可读对比 */
-  /* 登录页专用兼容令牌：登录门面使用浅色画布与中性输入文字。 */
+  /* 登录页专用令牌：登录门面使用浅色画布与中性输入文字。 */
   --login-canvas: #ffffff;
   --login-ink: #1c1c1e;
 
-  /* 圆角（规范名 --radius-*；旧名 --r-* / --card-radius / --ui-radius-* 已全量迁移并删除，无兼容 alias） */
+  /* 圆角：统一使用 --radius-* 规范名。 */
   --radius-sm: 9px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -106,7 +106,7 @@
   --pos-neg-70: -70px;
   --pos-neg-100: -100px;
 
-  /* 间距（规范名 --space-half..6：2/4/8/12/16/24/32；--ui-space-* 已全量迁移并删除，无兼容 alias） */
+  /* 间距：统一使用 --space-* 规范名。 */
   --space-half: 2px;
   --space-1: 4px;
   --space-2: 8px;
@@ -125,7 +125,7 @@
   --shadow-hairline: 0 1px 3px rgba(28, 28, 30, 0.18);
   --shadow-soft: 0 2px 8px rgba(28, 28, 30, 0.08);
   --shadow-raised: 0 4px 12px rgba(28, 28, 30, 0.10);
-  --shadow-button: 0 5px 13px color-mix(in srgb, var(--violet-ink) 22%, transparent);
+  --shadow-button: 0 5px 13px color-mix(in srgb, var(--brand-ink) 22%, transparent);
 
   /* 控件 */
   --ui-control-height: 44px;
@@ -332,29 +332,29 @@
   --ls-tight: -0.5px;
   --ls-tighter: -0.3px;
 
-  /* 品牌蓝点缀。为兼容复制来的组件样式，历史 --violet-* 变量名保留，值统一为蓝色。 */
-  --tint-violet: rgba(10, 99, 216, 0.12);
-  --violet-ink: #0757c7;
-  --violet-border: #b7d5fb;
-  --violet-hover: #7db5f4;
-  --violet-soft: rgba(10, 99, 216, 0.1);
+  /* 品牌蓝点缀。品牌蓝语义令牌。 */
+  --tint-brand: rgba(10, 99, 216, 0.12);
+  --brand-ink: #0757c7;
+  --brand-border: #b7d5fb;
+  --brand-hover: #7db5f4;
+  --brand-soft: rgba(10, 99, 216, 0.1);
 
-  /* 紫调字面量收口（antd 适配器清扫：零视觉变化，1:1 等价引用 styles.css/a11y.css 内硬编码 violet hex） */
-  --violet-50: #eaf3ff; /* 导航激活态最浅底 */
-  --violet-100: #f1f7ff; /* 浅蓝底 / hover */
-  --violet-200: #d6eaff; /* 导航激活态渐变止点 */
-  --violet-300: #c6def8; /* 边框（ord-line-trigger / calendar） */
-  --violet-edge-1: #c7dcef; /* login 输入边框 */
-  --violet-edge-2: #e1ebf5; /* 表格 th/td 边框 */
-  --violet-edge-3: #e7f0f9; /* 禁用按钮底 */
-  --violet-edge-4: #d6e4f1; /* 卡片 / 面板边框（多处） */
-  --violet-edge-5: #cddfec; /* 虚线分隔 */
-  --violet-edge-6: #d9e6f0; /* 网格线 / 边框 */
-  --violet-edge-7: #e1ebf4; /* 边框 */
-  --violet-edge-8: #eaf2fa; /* segments 底 */
-  --violet-surface-1: #f6faff; /* metric-card-container--violet 底 */
-  --violet-surface-2: #f9fcff; /* ord-line-panel 底 */
-  --violet-head-dark-grad: linear-gradient(120deg, rgba(8, 48, 107, 0.9), rgba(8, 32, 70, 0.78)); /* 深蓝 .view-head 品牌渐变底 */
+  /* 品牌蓝字面量收口（antd 适配器清扫：零视觉变化，1:1 等价引用 styles.css/a11y.css 内硬编码 brand hex） */
+  --brand-50: #eaf3ff; /* 导航激活态最浅底 */
+  --brand-100: #f1f7ff; /* 浅蓝底 / hover */
+  --brand-200: #d6eaff; /* 导航激活态渐变止点 */
+  --brand-300: #c6def8; /* 边框（ord-line-trigger / calendar） */
+  --brand-edge-1: #c7dcef; /* login 输入边框 */
+  --brand-edge-2: #e1ebf5; /* 表格 th/td 边框 */
+  --brand-edge-3: #e7f0f9; /* 禁用按钮底 */
+  --brand-edge-4: #d6e4f1; /* 卡片 / 面板边框（多处） */
+  --brand-edge-5: #cddfec; /* 虚线分隔 */
+  --brand-edge-6: #d9e6f0; /* 网格线 / 边框 */
+  --brand-edge-7: #e1ebf4; /* 边框 */
+  --brand-edge-8: #eaf2fa; /* segments 底 */
+  --brand-surface-1: #f6faff; /* metric-card-container--brand 底 */
+  --brand-surface-2: #f9fcff; /* ord-line-panel 底 */
+  --brand-head-dark-grad: linear-gradient(120deg, rgba(8, 48, 107, 0.9), rgba(8, 32, 70, 0.78)); /* 深蓝 .view-head 品牌渐变底 */
 
   /* 中性 / 语义字面量收口（选项1：彻底贯彻令牌优先；原 styles.css 内 #fff 等） */
   --white: #fff; /* 白底表面（卡片 / 表头 / 日历 / 图表 tip） */
@@ -372,7 +372,7 @@
   /* 经营看板趋势图横向滚动容器最小宽（2026-09-25 收口 orders.css 裸 1180px；双主题同值，不加 dark 覆盖） */
   --trend-chart-min-width: 1180px;
 
-  /* 语义色彩层（去兼容：--color-* 升为唯一权威名；旧 --ink/--muted/--line/--panel/--accent/--accent-cyan/--success/--warning/--error 已删除，值 1:1 搬运） */
+  /* 语义色彩层：--color-* 是唯一权威名。 */
   --color-text-primary: #1c1c1e;
   --color-text-secondary: #48484a;
   --color-text-tertiary: rgba(60, 60, 67, 0.38);
@@ -428,19 +428,19 @@
   --scrim-modal: rgba(8, 24, 48, 0.42);
   --scrim-drawer: rgba(15, 18, 30, 0.28);
 
-  /* 装饰光晕（全量清扫：原硬编码 violet 光晕 rgba 收口，零视觉变化） */
-  --glow-violet-a: #75aef2;
-  --glow-violet-b: #b7d5fb;
+  /* 装饰光晕（全量清扫：原硬编码 brand 光晕 rgba 收口，零视觉变化） */
+  --glow-brand-a: #75aef2;
+  --glow-brand-b: #b7d5fb;
 
   /* 表面洗色（半透明叠层，原散落 rgba 字面量；2026-09-11 收口，零视觉变化，双主题同值） */
   --wash-white-90: rgba(255, 255, 255, 0.9);
   --wash-white-78: rgba(255, 255, 255, 0.78);
   --wash-ice-90: rgba(244, 247, 253, 0.9);
   --wash-ice-96: rgba(245, 246, 251, 0.96);
-  --wash-violet-80: rgba(239, 247, 255, 0.8);
-  --wash-violet-74: rgba(232, 242, 253, 0.74);
-  /* 自动化任务表斑马纹偶数行底（2026-09-25 收口原 dangling --wash-violet-42：原稿意图紫洗底，悬空回退透明丢失斑马纹；按 --wash-violet-74 同基色、0.42 alpha 补全，零视觉变化） */
-  --wash-violet-42: rgba(232, 242, 253, 0.42);
+  --wash-brand-80: rgba(239, 247, 255, 0.8);
+  --wash-brand-74: rgba(232, 242, 253, 0.74);
+  /* 自动化任务表斑马纹偶数行底（2026-09-25 收口原 dangling --wash-brand-42：原稿意图紫洗底，悬空回退透明丢失斑马纹；按 --wash-brand-74 同基色、0.42 alpha 补全，零视觉变化） */
+  --wash-brand-42: rgba(232, 242, 253, 0.42);
   /* 细分隔线 / 静默填充（中性灰低 alpha，双主题同值） */
   --hairline-soft: rgba(60, 60, 67, 0.12);
   --fill-muted: rgba(60, 60, 67, 0.1);
@@ -450,7 +450,7 @@
   /* 布局令牌（guidelines §3：布局层，不进通用组件） */
   --sidebar-width: clamp(220px, 20vw, 300px);
   --panel-pad: 16px;
-  /* SchemaForm 单列组限宽（2026-09-25 收口原 dangling --form-max-width：作者意图为整站可调令牌但漏注册，fallback 720px 掩盖悬空；双主题同值，不加 dark 覆盖） */
+  /* SchemaForm 单列组限宽：双主题同值，不加 dark 覆盖。 */
   --form-max-width: 720px;
 
   /* 响应式断点（设计系统 Phase 3.3 统一尺度 sm/md/lg = 640/960/1280；
@@ -594,27 +594,27 @@
   --color-antd-bg-elevated: #14263e;
   --color-antd-text-placeholder: rgba(219, 234, 250, 0.55);
 
-  /* 紫调字面量收口：暗色覆盖（选项2；原 hex 未覆盖，现补齐保持令牌一致，避免浅薰衣草回退到深底） */
-  --violet-50: #13253b;
-  --violet-100: #18304b;
-  --violet-200: #1d3b5c;
-  --violet-300: #27507b;
-  --violet-edge-1: #23415f;
-  --violet-edge-2: #13253b;
-  --violet-edge-3: #18304b;
-  --violet-edge-4: #23415f;
-  --violet-edge-5: #27507b;
-  --violet-edge-6: #23415f;
-  --violet-edge-7: #13253b;
-  --violet-edge-8: #18304b;
-  --violet-surface-1: #0e1c2d;
-  --violet-surface-2: #102238;
+  /* 品牌蓝字面量收口：暗色覆盖（选项2；原 hex 未覆盖，现补齐保持令牌一致，避免浅薰衣草回退到深底） */
+  --brand-50: #13253b;
+  --brand-100: #18304b;
+  --brand-200: #1d3b5c;
+  --brand-300: #27507b;
+  --brand-edge-1: #23415f;
+  --brand-edge-2: #13253b;
+  --brand-edge-3: #18304b;
+  --brand-edge-4: #23415f;
+  --brand-edge-5: #27507b;
+  --brand-edge-6: #23415f;
+  --brand-edge-7: #13253b;
+  --brand-edge-8: #18304b;
+  --brand-surface-1: #0e1c2d;
+  --brand-surface-2: #102238;
 
   /* 暗色品牌蓝覆盖：激活态与 hover 使用更亮的蓝，避免在深色玻璃底上失去边界。 */
-  --violet-ink: #9bc9ff;
-  --violet-border: #7db5f4;
-  --violet-hover: #9bc9ff;
-  --violet-soft: rgba(90, 168, 255, 0.16);
+  --brand-ink: #9bc9ff;
+  --brand-border: #7db5f4;
+  --brand-hover: #9bc9ff;
+  --brand-soft: rgba(90, 168, 255, 0.16);
 
   /* 图表分类调色板·暗色（随浅色同系，暗态略提亮保可见） */
   --chart-1: #6aaeff;

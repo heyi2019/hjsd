@@ -134,7 +134,7 @@
   border-color: var(--color-border);
 }
 
-:root[data-theme="dark"] .metric-card-container--violet,
+:root[data-theme="dark"] .metric-card-container--brand,
 :root[data-theme="dark"] .ord-line-panel,
 :root[data-theme="dark"] .ord-day-order div,
 :root[data-theme="dark"] .ord-depth-grid div,
@@ -252,7 +252,7 @@
 }
 
 :root[data-theme="dark"] .view-head {
-  background: var(--violet-head-dark-grad);
+  background: var(--brand-head-dark-grad);
   border-color: var(--glass-border);
 }
 

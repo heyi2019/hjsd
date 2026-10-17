@@ -236,6 +236,18 @@ for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(joi
   }
 }
 
+// 规则 12：前端样式只能使用当前品牌语义，禁止保留旧视觉别名或开发兜底入口。
+// 旧的 violet 命名曾作为兼容别名长期存在，实际颜色已经是品牌蓝；继续保留会让
+// 令牌语义与业务设计不一致，也会让下一轮重构误把旧别名当成可用 API。
+const styleSource = cssFiles.map((file) => readFileSync(file, "utf8")).join("\n");
+if (/\bviolet\b/i.test(styleSource)) {
+  fail("style-alias", "样式仍保留 violet 旧视觉别名，应统一为品牌语义令牌");
+}
+const mainSource = readFileSync(join(SRC, "main.tsx"), "utf8");
+if (mainSource.includes("responsive-overrides.css")) {
+  fail("responsive-fallback", "main.tsx 仍加载开发服务器响应式兼容兜底，应归并到正式样式");
+}
+
 if (failures.length) {
   console.error(`UI 守卫未通过（${failures.length} 项）：`);
   console.error(failures.join("\n"));

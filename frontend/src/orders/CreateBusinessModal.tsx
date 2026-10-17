@@ -1,26 +1,17 @@
-/** 业务创建弹窗（从业务中心提取为共享组件，2026-10-13）。
- *  工作台「新建业务」入口卡点击后直接在本页打开，不再跳转业务中心。
- *  数据自加载：打开时才拉 业务类型/客户/合作方/账号，关闭不保留。 */
-import { Collapse, Form, Input, Modal, Space, message } from "antd";
-import { Select } from "../shared/ui";
+/** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
+import { Form, Modal, Space, message } from "antd";
 import { useEffect, useState } from "react";
 import {
-  accountsApi,
   counterpartiesApi,
   customersApi,
   ordersApi,
   poolsApi,
-  orderTypesApi,
-  type Account,
   type Counterparty,
   type Customer,
-  type Order,
-  type OrderType,
   type Pool,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
 import { ErrorBanner, PermissionButton, ResizableModal } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
@@ -32,9 +23,7 @@ import { DgOrderSection } from "./dg/DgOrderSection";
 import { DfqOrderSection } from "./dfq/DfqOrderSection";
 
 type AccountCreationOrderType = "HS" | "DG";
-type BusinessOrderType = "HS" | "TH" | "DG" | "DFQ";
-
-const ADAPTIVE_BUSINESS_TYPES = new Set<BusinessOrderType>(["HS", "TH", "DG", "DFQ"]);
+export type BusinessOrderType = "HS" | "TH" | "DG" | "DFQ";
 
 const MODAL_TITLES: Record<string, string> = {
   HS: "新建回收订单",
@@ -92,32 +81,27 @@ export function CreateBusinessModal(props: {
   onClose: () => void;
   /** 建单成功后的刷新回调（页面重新拉列表）。 */
   onCreated: () => void | Promise<void>;
-  /** 从明确业务入口打开时，直接带入业务类型，减少一次选择。 */
-  initialOrderType?: string;
+  /** 必须从明确业务入口打开，订单类型不再通过通用兼容表单选择。 */
+  initialOrderType: BusinessOrderType;
 }) {
-  const orderType = props.initialOrderType as BusinessOrderType | undefined;
-  const modalTitle = MODAL_TITLES[orderType ?? ""] ?? "新建业务";
+  const orderType = props.initialOrderType;
+  const modalTitle = MODAL_TITLES[orderType];
   const isRecovery = orderType === "HS";
   const isTh = orderType === "TH";
   const isDg = orderType === "DG";
   const isDfq = orderType === "DFQ";
-  const isAdaptiveBusiness = orderType ? ADAPTIVE_BUSINESS_TYPES.has(orderType) : false;
-  const isGeneralBusiness = !isAdaptiveBusiness;
-  const businessContext = orderType ? BUSINESS_CONTEXT[orderType] : undefined;
+  const businessContext = BUSINESS_CONTEXT[orderType];
   const needsInventoryAccountCreation = isRecovery || isDg;
-  const [types, setTypes] = useState<OrderType[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
-  const formId = isAdaptiveBusiness ? "business-order-form" : undefined;
+  const formId = "business-order-form";
 
   const resetAdaptiveModalLayout = (open: boolean) => {
-    if (!open || !isAdaptiveBusiness) return;
+    if (!open) return;
     window.requestAnimationFrame(() => {
       const modal = document.querySelector<HTMLElement>(".adaptive-business-modal .ant-modal");
       if (!modal) return;
@@ -137,21 +121,15 @@ export function CreateBusinessModal(props: {
     let cancelled = false;
     void (async () => {
       try {
-        const [typeList, customerList, cpList, accountList, poolList, orderList] = await Promise.all([
-          orderTypesApi.list(),
+        const [customerList, cpList, poolList] = await Promise.all([
           customersApi.list(),
           counterpartiesApi.list(),
-          accountsApi.list(),
           poolsApi.list(),
-          ordersApi.list(),
         ]);
         if (cancelled) return;
-        setTypes(typeList);
         setCustomers(customerList);
         setCounterparties(cpList);
-        setAccounts(accountList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-        setOrders(orderList);
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(normalizeError(error));
@@ -295,7 +273,7 @@ export function CreateBusinessModal(props: {
         ? [{ customer_id: values.customer_id as number, role: customerRole }]
         : [];
       const order = await ordersApi.create({
-        order_type: props.initialOrderType ?? values.order_type as string,
+        order_type: props.initialOrderType,
         trade_date: today(),
         listing_price: isDg && values.dg_listing_price != null ? String(values.dg_listing_price) : undefined,
         service_fee: isDg && values.dg_service_fee != null ? String(values.dg_service_fee) : undefined,
@@ -393,25 +371,25 @@ export function CreateBusinessModal(props: {
     <Modal
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
       open={props.open}
-      destroyOnHidden={isAdaptiveBusiness}
+      destroyOnHidden
       onCancel={props.onClose}
       afterOpenChange={resetAdaptiveModalLayout}
-      footer={isAdaptiveBusiness ? (
+      footer={(
         <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId}>
           创建订单
         </PermissionButton>
-      ) : null}
+      )}
       width={1200}
-      wrapClassName={isAdaptiveBusiness ? "adaptive-business-modal recovery-order-modal" : undefined}
-      modalRender={(modal) => isAdaptiveBusiness ? <ResizableModal getLayout={getRecoveryLayout} layoutAttribute="data-recovery-layout">{modal}</ResizableModal> : modal}
+      wrapClassName="adaptive-business-modal recovery-order-modal"
+      modalRender={(modal) => <ResizableModal getLayout={getRecoveryLayout} layoutAttribute="data-recovery-layout">{modal}</ResizableModal>}
     >
       <ErrorBanner error={loadError} />
       <Form
         form={form}
         id={formId}
-        layout={isAdaptiveBusiness ? "horizontal" : "vertical"}
-        labelCol={isAdaptiveBusiness ? { flex: "0 0 96px" } : undefined}
-        wrapperCol={isAdaptiveBusiness ? { flex: "1 1 auto" } : undefined}
+        layout="horizontal"
+        labelCol={{ flex: "0 0 96px" }}
+        wrapperCol={{ flex: "1 1 auto" }}
         onFinish={submit}
         initialValues={{
           order_type: props.initialOrderType,
@@ -429,70 +407,10 @@ export function CreateBusinessModal(props: {
             <span>产品：请在下方填写游戏类型</span>
           </Space>
         ) : null}
-        {isGeneralBusiness ? <>
-          <Form.Item name="order_type" label="业务类型" rules={[{ required: true }]}>
-            <Select options={types.map((type) => ({ value: type.code, label: type.name }))} />
-          </Form.Item>
-          <Form.Item name="account_id" label="关联账号（必填）">
-            <Select
-              allowClear
-              placeholder="请选择账号"
-              notFoundContent="暂无可关联库存账号；新账号请从对应业务订单创建"
-              options={accounts.map((account) => ({
-                value: account.id,
-                label: `${account.inventory_no} ${account.game_account ?? ""}`,
-              }))}
-            />
-          </Form.Item>
-        </> : isRecovery ? <RecoveryAccountSection>
+        {isRecovery ? <RecoveryAccountSection>
           <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
         </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} /> : isDg ? <DgOrderSection /> : <DfqOrderSection pools={pools} />}
-        {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : isGeneralBusiness ? <>
-          <Form.Item name="customer_id" label="客户">
-            <Select
-              allowClear
-              placeholder="请选择客户"
-              notFoundContent="暂无客户档案"
-              options={customers.map((c) => ({ value: c.id, label: c.display_name }))}
-            />
-          </Form.Item>
-        </> : null}
-        {isGeneralBusiness && <Collapse
-          ghost
-          items={[{
-            key: "more",
-            label: "更多信息（可选）",
-            children: (
-              <>
-                <Form.Item name="customer_role" label={isRecovery ? "来源方角色" : "客户角色"}>
-                  <Select options={[
-                    { value: "SELLER", label: "卖家" },
-                    { value: "BUYER", label: "买家" },
-                    { value: "CONSIGNOR", label: "委托方" },
-                    { value: "INSTALLMENT_CUSTOMER", label: "分期客户" },
-                  ]} />
-                </Form.Item>
-                <Form.Item name="counterparty_id" label="合作方（同行/供货方/平台）">
-                  <Select allowClear options={counterparties.map((c) => ({
-                    value: c.id,
-                    label: `${c.display_name}（${COUNTERPARTY_TYPE_LABEL[c.type] ?? c.type}）`,
-                  }))} />
-                </Form.Item>
-                <Form.Item name="counterparty_role" label="合作方角色">
-                  <Select options={[
-                    { value: "PEER", label: "同行" },
-                    { value: "SUPPLIER", label: "供货方" },
-                    { value: "PLATFORM", label: "平台" },
-                  ]} />
-                </Form.Item>
-                <Form.Item name="note" label="备注"><Input.TextArea rows={2} /></Form.Item>
-              </>
-            ),
-          }]}
-        />}
-        {isGeneralBusiness && <PermissionButton permission="order.create" type="primary" htmlType="submit">
-          创建订单
-        </PermissionButton>}
+        {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
       </Form>
     </Modal>
   );

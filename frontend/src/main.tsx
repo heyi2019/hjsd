@@ -20,7 +20,7 @@ import "./shared/styles/ui-components.css";
 // 提前导入会被后续规则覆盖（:active 缩量被静默吃掉，零报错）。
 import "./shared/styles/interactions.css";
 import "./shared/ui/antd-adapter.css";
-import "./shared/styles/responsive-overrides.css";
+import "./shared/styles/responsive.css";
 
 function ThemedApp() {
   const { resolvedMode } = useTheme();

@@ -447,7 +447,7 @@
 }
 
 .ui-table-wrap tbody tr:hover {
-  background: var(--violet-soft);
+  background: var(--brand-soft);
 }
 
 /* The orders workspace is narrower than the viewport because of its sidebar. */
@@ -469,7 +469,7 @@
 
 .query-btn:hover {
   border-color: var(--color-primary);
-  background: var(--tint-violet);
+  background: var(--tint-brand);
 }
 
 /* 经营数据筛选栏：采用 iOS 的轻量分段控件，避免大面积渐变抢占视觉。 */
@@ -493,13 +493,13 @@
 }
 .ord-segments button.active {
   color: var(--primary-ink);
-  background: var(--violet-soft);
+  background: var(--brand-soft);
   box-shadow: var(--shadow-hairline);
 }
 .query-btn {
   min-height: var(--ui-control-height); /* iOS HIG 触控目标 44pt */
   border-radius: var(--radius-control);
-  background: var(--violet-soft);
+  background: var(--brand-soft);
   color: var(--primary-ink);
   font-weight: 600;
 }
@@ -520,7 +520,7 @@
 .administration-container > .ui-card > h2 { display:flex; align-items:center; gap:var(--space-2); margin:0; font:var(--font-card-title); color:var(--color-text-primary); }
 .administration-container > .ui-card > h2::before { width:var(--space-half); height:var(--fs-title-2); flex:0 0 var(--space-half); border-radius:var(--radius-pill); background:var(--color-primary); content:""; }
 .administration-container > .ui-card > p { max-width:72rem; margin:var(--space-negative-2) 0 0; color:var(--color-text-secondary); }
-.administration-container > .ui-card:first-of-type { border-color:color-mix(in srgb,var(--color-primary) 24%,var(--glass-border)); background:color-mix(in srgb,var(--glass) 92%,var(--violet-soft)); }
+.administration-container > .ui-card:first-of-type { border-color:color-mix(in srgb,var(--color-primary) 24%,var(--glass-border)); background:color-mix(in srgb,var(--glass) 92%,var(--brand-soft)); }
 .administration-page .finance-form { padding:var(--space-4); border:var(--border-w) solid var(--glass-border); border-radius:var(--radius-md); background:color-mix(in srgb,var(--soft) 48%,transparent); }
 .administration-page .finance-form + .finance-form { margin-block-start:0; }
 .administration-page .permission-tree,.administration-page .scope-directory { margin:0; background:color-mix(in srgb,var(--glass) 70%,transparent); }
@@ -537,7 +537,7 @@
 }
 .permission-tree details { margin: var(--space-1) 0; }
 .permission-tree summary { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1-half) var(--space-2); border-radius: var(--radius-compact); color: var(--color-text-primary); cursor: pointer; list-style-position: inside; }
-.permission-tree summary:hover { background: var(--violet-soft); }
+.permission-tree summary:hover { background: var(--brand-soft); }
 .permission-tree-children { padding-left: var(--space-5); }
 .permission-tree-leaves { display: flex; flex-wrap: wrap; gap: var(--space-1-half) var(--space-3); padding: var(--space-1) var(--space-2) var(--space-2) var(--space-5); }
 .permission-tree-leaves label { color: var(--color-text-secondary); font-size: var(--fs-footnote); }

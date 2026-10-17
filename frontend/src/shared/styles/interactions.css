@@ -82,7 +82,7 @@
     transition-timing-function: var(--ease-spring) !important;
   }
   :where(.ant-tag-checkable):hover {
-    background: var(--violet-soft) !important;
+    background: var(--brand-soft) !important;
     color: var(--color-primary-text) !important;
   }
   :where(.ant-tag-checkable):active {
@@ -113,7 +113,7 @@
    Apple 对列表行的反馈也是高亮而非形变。 */
 @media (prefers-reduced-motion: no-preference) {
   :where(.ui-table-wrap .ant-table-tbody > tr):active > td {
-    background: var(--violet-soft);
+    background: var(--brand-soft);
   }
 }
 

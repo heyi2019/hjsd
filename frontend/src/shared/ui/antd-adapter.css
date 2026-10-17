@@ -75,7 +75,7 @@
 }
 
 :where(.ant-table-tbody > tr:hover > td) {
-  background: var(--violet-soft) !important;
+  background: var(--brand-soft) !important;
 }
 
 /* 分页 active 页码：实心品牌蓝胶囊 + 白字（A11Y E3：白字对品牌蓝渐变最浅段 5.25:1）。
@@ -123,10 +123,10 @@
 
 /* 侧栏菜单选中项：antd 默认 rgb(22,119,255) 蓝字压在 rgb(230,244,255) 浅蓝选中底上
    实测仅 3.66:1 → 改用 --primary-ink（其定义注释即「蓝色文本在浅底保持达标对比」）。
-   底色一并交给 --violet-soft，保持与项目其余选中态同一套紫调。 */
+   底色一并交给 --brand-soft，保持与项目其余选中态同一套品牌蓝。 */
 :where(.sidebar .ant-menu-item-selected) {
   color: var(--primary-ink) !important;
-  background: var(--violet-soft) !important;
+  background: var(--brand-soft) !important;
 }
 :where(.sidebar .ant-menu-item-selected .ant-menu-title-content) {
   color: var(--primary-ink) !important;
@@ -223,8 +223,8 @@
 }
 
 :where(.ant-alert-info) {
-  border-color: var(--violet-border) !important;
-  background: var(--violet-soft) !important;
+  border-color: var(--brand-border) !important;
+  background: var(--brand-soft) !important;
 }
 
 :where(.ant-alert-info .ant-alert-icon, .ant-alert-info .ant-alert-message) {
@@ -259,16 +259,16 @@
 }
 
 :where(.ant-select-item-option-selected:not(.ant-select-item-option-disabled), .ant-select-item-option-active:not(.ant-select-item-option-disabled)) {
-  background: var(--violet-soft) !important;
+  background: var(--brand-soft) !important;
   color: var(--primary-ink) !important;
 }
 
 :where(.ant-empty .ant-empty-img-simple-ellipse) {
-  fill: var(--violet-soft) !important;
+  fill: var(--brand-soft) !important;
 }
 
 :where(.ant-empty .ant-empty-img-simple-path) {
-  stroke: var(--violet-border) !important;
+  stroke: var(--brand-border) !important;
 }
 
 :where(.ant-empty) {
@@ -403,7 +403,7 @@
 }
 
 :where(.ant-input:hover, .ant-input-number:hover, .ant-select-selector:hover, .ant-picker:hover, .ant-input-affix-wrapper:hover) {
-  border-color: var(--violet-border) !important;
+  border-color: var(--brand-border) !important;
 }
 
 :where(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-select-focused .ant-select-selector, .ant-picker-focused, .ant-input-affix-wrapper-focused) {
@@ -440,7 +440,7 @@
 }
 
 :where(.ant-skeleton .ant-skeleton-content .ant-skeleton-title, .ant-skeleton .ant-skeleton-content .ant-skeleton-paragraph > li) {
-  background: linear-gradient(90deg, var(--soft), var(--violet-soft), var(--soft)) !important;
+  background: linear-gradient(90deg, var(--soft), var(--brand-soft), var(--soft)) !important;
 }
 
 /* ── Typography 标题字号接管 ──────────────────────────────────
@@ -460,7 +460,7 @@
 
 /* ── 表格 / 列表行微交互（Apple 流体 · 2026-10-13）──────────────────────
  * 设计意图（用户选「表格/列表行微交互」）：
- *   1. hover 平滑过渡 + 轻微色彩浮起（复用 --violet-soft，蓝系与品牌一致）；
+ *   1. hover 平滑过渡 + 轻微色彩浮起（复用 --brand-soft，蓝系与品牌一致）；
  *   2. 选中行用更强的蓝填充（--row-selected）区别于 hover；
  *   3. 行入场逐行 stagger 淡入（ui-row-in），仅 no-preference 生效。
  * 取舍：表格行**不做 translateY 位移**——密集行位移会互相重叠/被裁切；
@@ -482,7 +482,7 @@
   transition: background-color 160ms var(--ease-spring), transform 160ms var(--ease-spring) !important;
 }
 :where(.ant-list-item:hover) {
-  background: var(--violet-soft) !important;
+  background: var(--brand-soft) !important;
   transform: translateY(-1px);
 }
 

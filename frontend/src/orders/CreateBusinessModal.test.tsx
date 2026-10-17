@@ -47,21 +47,26 @@ beforeEach(() => {
 /** 打开弹窗，返回弹窗容器与 onCreated 探针。
  *  rc-select 只在展开后才把选项挂进 DOM，故「等选项出现」前必须先点开下拉。 */
 async function openModal(user = "admin") {
-  const onCreated = vi.fn();
-  renderApp(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} />, { user });
-  const title = await screen.findByText("新建业务");
-  const container = title.closest(".ant-modal-content") as HTMLElement;
-  return { container, onCreated };
+  return openTypedModal("HS", user);
 }
 
-async function openTypedModal(orderType: string) {
+async function openTypedModal(orderType: string, user = "admin") {
   const onCreated = vi.fn();
-  renderApp(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} initialOrderType={orderType} />, { user: "admin" });
-    const title = await screen.findByText(orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : orderType === "DFQ" ? "新建代分期订单" : "新建业务");
+  renderApp(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG" | "DFQ"} />, { user });
+    const title = await screen.findByText(orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : orderType === "DFQ" ? "新建代分期订单" : "新建业务");
   return { container: title.closest(".ant-modal-content") as HTMLElement, onCreated };
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
+  it("业务入口不再加载通用账号兼容数据", async () => {
+    const { container } = await openTypedModal("HS");
+
+    expect(container.textContent).not.toContain("关联账号（必填）");
+    expect(accountsList).not.toHaveBeenCalled();
+    expect(ordersList).not.toHaveBeenCalled();
+    expect(typesList).not.toHaveBeenCalled();
+  });
+
   it("代挂账号字段使用 dg 前缀，不复用提号字段", () => {
     expect(getAccountValues({
       dg_game_type: "王者荣耀",
@@ -84,11 +89,13 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     });
   });
 
-  it("打开后自加载选项：业务类型下拉出现 HS 回收", async () => {
+  it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
-    expect(typesList).toHaveBeenCalled();
-    await userEvent.click(container.querySelectorAll(".ant-select-selector")[0] as Element);
-    expect(await screen.findByTitle("回收")).toBeTruthy();
+    expect(await screen.findByLabelText("游戏类型")).toBeInTheDocument();
+    expect(typesList).not.toHaveBeenCalled();
+    expect(accountsList).not.toHaveBeenCalled();
+    expect(ordersList).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("关联账号（必填）");
   });
 
   it("必填校验：未选业务类型不给提交", async () => {
@@ -97,28 +104,25 @@ describe("CreateBusinessModal：新建业务写路径", () => {
     await waitFor(() => expect(ordersCreate).not.toHaveBeenCalled());
   });
 
-  it("建单提交后回传业务类型与默认成交日期，并触发 onCreated 刷新", async () => {
-    ordersCreate.mockResolvedValueOnce({ id: 3, order_no: "HS-2026-0003", status: "ACTIVE" });
-    const { container, onCreated } = await openModal();
-    await userEvent.click(container.querySelectorAll(".ant-select-selector")[0] as Element);
-    await userEvent.click(await screen.findByTitle("回收"));
-    await userEvent.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(ordersCreate).toHaveBeenCalled());
-    const payload = ordersCreate.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.order_type).toBe("HS");
-    expect(payload.trade_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
-  });
-
   it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
     ordersCreate.mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金池路由" } },
       message: "Request failed",
     });
-    const { container } = await openModal();
-    await userEvent.click(container.querySelectorAll(".ant-select-selector")[0] as Element);
-    await userEvent.click(await screen.findByTitle("回收"));
+    const { container } = await openTypedModal("TH");
+    await userEvent.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await userEvent.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await userEvent.type(screen.getByLabelText("游戏账号"), "account-1");
+    await userEvent.type(screen.getByLabelText("账号密码"), "password-1");
+    await userEvent.type(screen.getByLabelText("渠道／区服"), "安卓一区／微信");
+    await userEvent.click(container.querySelectorAll(".ant-select-selector")[5] as Element);
+    await userEvent.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
+    const amounts = screen.getAllByPlaceholderText("请输入金额");
+    await userEvent.type(amounts[0], "1000");
+    await userEvent.type(amounts[1], "1200");
+    await userEvent.click(container.querySelector(".payment-info-fields .ant-select-selector") as Element);
+    await userEvent.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await userEvent.click(screen.getByRole("button", { name: /创建订单/ }));
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
   });

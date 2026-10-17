@@ -28,6 +28,7 @@ from app.domain.enums import (
     CashflowStatus,
     DepositStatus,
     Direction,
+    EventType,
     Nature,
     OrderStatus,
     PolicyType,
@@ -40,6 +41,7 @@ from app.domain.trade import (
     Cashflow,
     Deposit,
     Order,
+    OrderEvent,
     RebateRecord,
     RebateSettlement,
     Reconciliation,
@@ -1072,6 +1074,31 @@ def create_rebate(
         raise Validation(
             f"返点类型必须为 {RebateType.values()}",
             details={"field": "rebate_type", "value": rebate_type},
+        )
+    if rebate_type == RebateType.BUY.value and order.order_type != "HS":
+        raise Validation(
+            "买号返点只能关联回收（HS）订单",
+            details={"rebate_type": rebate_type, "order_type": order.order_type},
+        )
+    required_event = {
+        RebateType.BUY.value: EventType.BUY.value,
+        RebateType.SELL.value: EventType.SELL.value,
+    }.get(rebate_type)
+    if required_event is not None and session.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == required_event,
+            OrderEvent.is_posted.is_(True),
+        )
+    ) is None:
+        label = "买号返点" if rebate_type == RebateType.BUY.value else "卖号返点"
+        raise Validation(
+            f"{label}必须关联已过账的 {required_event} 事件",
+            details={
+                "rebate_type": rebate_type,
+                "order_id": order.id,
+                "required_event": required_event,
+            },
         )
 
     base = _positive(base_amount, field="base_amount")

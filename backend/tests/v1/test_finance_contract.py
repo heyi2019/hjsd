@@ -316,6 +316,19 @@ class TestDepositQueries:
 
 
 class TestRebateGuards:
+    def test_rebate_type_must_match_source_order_event(self, seeded_db):
+        order_id = _active_order(seeded_db)
+
+        with pytest.raises(Validation, match="卖号返点必须关联已过账的 SELL"):
+            service.create_rebate(
+                seeded_db,
+                source_order_id=order_id,
+                rebate_type="SELL",
+                base_amount=Decimal("100"),
+                collected_on=TODAY,
+                actor="pytest",
+            )
+
     def test_rebate_reversal_must_reference_existing_settlement(self, seeded_db):
         order_id = _active_order(seeded_db)
         record = service.create_rebate(

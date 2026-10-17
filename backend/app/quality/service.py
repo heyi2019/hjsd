@@ -267,7 +267,16 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
             )
 
     schedule_rows = session.scalars(
-        select(InstallmentSchedule).where(
+        select(InstallmentSchedule)
+        .join(Installment, Installment.id == InstallmentSchedule.installment_id)
+        .where(
+            Installment.status.notin_(
+                (
+                    InstallmentStatus.SETTLED.value,
+                    InstallmentStatus.DELIVERED.value,
+                    InstallmentStatus.CANCELLED.value,
+                )
+            ),
             InstallmentSchedule.due_on < date.today(),
             InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
             < InstallmentSchedule.due_amount,

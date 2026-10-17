@@ -447,6 +447,29 @@ class TestDeliverGuards:
 
 # ------------------------------------------------------------------ 逾期升级
 class TestMarkOverdue:
+    def test_terminal_contract_is_not_marked_overdue(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            down_payment="0",
+            periods=1,
+            per_period="300",
+            first_due_on=PAST,
+        )
+        contract.status = InstallmentStatus.CANCELLED.value
+        seeded_db.flush()
+
+        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+
+        assert marked == 0
+        schedules = seeded_db.scalars(
+            select(InstallmentSchedule).where(
+                InstallmentSchedule.installment_id == contract.id
+            )
+        ).all()
+        assert all(row.status != ScheduleStatus.OVERDUE.value for row in schedules)
+
     def test_overdue_promotes_pending_contract(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(

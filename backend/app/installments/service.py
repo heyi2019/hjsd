@@ -785,6 +785,13 @@ def mark_overdue(
         .join(Installment, Installment.id == InstallmentSchedule.installment_id)
         .join(Order, Order.id == Installment.order_id)
         .where(
+            Installment.status.in_(
+                (
+                    InstallmentStatus.PENDING.value,
+                    InstallmentStatus.ACTIVE.value,
+                    InstallmentStatus.OVERDUE.value,
+                )
+            ),
             InstallmentSchedule.due_on < as_of,
             InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
             < InstallmentSchedule.due_amount,

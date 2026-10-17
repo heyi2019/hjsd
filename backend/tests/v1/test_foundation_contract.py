@@ -92,6 +92,25 @@ class TestPoolGuards:
 
 
 class TestOrderTypeGuards:
+    def test_activation_requires_an_active_route_to_an_active_pool(self, seeded_db):
+        order_type = service.create_order_type(
+            seeded_db,
+            code="TBR",
+            name="路由状态校验",
+            capital_type=CapitalType.PASS_THRU.value,
+            actor="pytest",
+        )
+        service.set_route(
+            seeded_db,
+            order_type_code=order_type.code,
+            portion=Portion.PRINCIPAL.value,
+            pool_code="HJ_INVEST",
+            is_active=False,
+            actor="pytest",
+        )
+        with pytest.raises(Validation, match="启用中的资金池路由"):
+            service.set_order_type_active(seeded_db, order_type.id, True, actor="pytest")
+
     def test_order_type_name_and_prefix_are_validated(self, seeded_db):
         with pytest.raises(Validation):
             service.create_order_type(

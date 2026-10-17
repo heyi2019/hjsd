@@ -408,10 +408,20 @@ def set_order_type_active(
     """启用前必须已配置资金路由（BAS-02-02 验收）。"""
     order_type = _get_order_type_or_404(session, order_type_id)
     if is_active:
-        routes = list_routes(session, order_type_id=order_type_id)
+        routes = list(
+            session.scalars(
+                select(OrderTypePool)
+                .join(Pool, Pool.id == OrderTypePool.pool_id)
+                .where(
+                    OrderTypePool.order_type_id == order_type_id,
+                    OrderTypePool.is_active.is_(True),
+                    Pool.status == PoolStatus.ACTIVE.value,
+                )
+            )
+        )
         if not routes:
             raise Validation(
-                f"业务 {order_type.code} 尚未配置资金池路由，无法启用",
+                f"业务 {order_type.code} 尚未配置启用中的资金池路由，无法启用",
                 code=ErrorCode.POOL_ROUTE_MISSING,
                 details={"order_type": order_type.code},
             )

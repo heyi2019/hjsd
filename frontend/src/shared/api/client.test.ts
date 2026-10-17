@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  api,
   DEV_USER_KEY,
+  checkBackendHealth,
   currentDevUser,
   errorMessage,
   normalizeError,
@@ -47,6 +49,16 @@ describe("normalizeError：只认 v1 统一错误结构", () => {
     expect(out.message.length).toBeGreaterThan(0);
   });
 
+  it("代理返回未结构化 500 时提示检查后端连接", () => {
+    const err = axiosError({ status: 500, responseData: "Internal Server Error" });
+    expect(normalizeError(err).message).toContain("后端");
+  });
+
+  it("健康检查返回 503 时提示后端或数据库未就绪", () => {
+    const err = axiosError({ status: 503, responseData: { status: "error", database_status: "unavailable" } });
+    expect(normalizeError(err).message).toContain("后端");
+  });
+
   it("非 axios 错误也能安全转文案（不抛错即为达标）", () => {
     expect(normalizeError("boom")).toEqual({ message: "boom" });
     // 现状：实现走 String(error)，Error 会带 "Error: " 前缀。
@@ -64,6 +76,15 @@ describe("errorMessage：展示层统一文案", () => {
   it("无 code 时只给 message", () => {
     const err = axiosError({ responseData: { message: "校验失败" } });
     expect(errorMessage(err)).toBe("校验失败");
+  });
+});
+
+describe("checkBackendHealth：启动前置检查", () => {
+  it("请求统一健康接口", async () => {
+    const request = vi.spyOn(api, "get").mockResolvedValue({ data: { status: "ok" } } as never);
+    await checkBackendHealth();
+    expect(request).toHaveBeenCalledWith("/health", { timeout: 3_000 });
+    request.mockRestore();
   });
 });
 

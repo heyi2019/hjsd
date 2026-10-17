@@ -27,6 +27,25 @@ cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1
 cd frontend && npm run dev
 ```
 
+前端代理端口由 `frontend/.env.local` 的 `VITE_BACKEND_PORT` 管理，默认是 `8123`；
+如果后端使用临时端口，前后端必须使用同一个端口，例如：
+
+```bash
+# 后端终端
+export ERP_E2E_BACKEND_PORT=18123
+cd backend && .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 18123
+```
+
+新终端中同样设置端口后启动前端：
+
+```bash
+export ERP_E2E_BACKEND_PORT=18123
+cd frontend && npm run dev
+```
+
+登录页会先检查 `/api/v1/health`。后端未启动或端口不一致时，会直接提示连接问题，
+不会再把 Vite 代理错误显示成笼统的 500。
+
 启动后：
 
 | 地址 | 用途 |

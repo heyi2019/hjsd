@@ -36,6 +36,11 @@ export async function currentUser(): Promise<SessionUser> {
   return (await api.get<SessionUser>("/auth/me")).data;
 }
 
+/** 启动/登录前置检查：确认后端和数据库已就绪。 */
+export async function checkBackendHealth(): Promise<void> {
+  await api.get("/health", { timeout: 3_000 });
+}
+
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
   await api.post("/auth/change-password", { old_password: oldPassword, new_password: newPassword });
 }
@@ -91,6 +96,17 @@ export function normalizeError(error: unknown): NormalizedError {
 
     // v1 唯一错误结构：{ code, message, details }
     if (data?.message) return { message: data.message, code: data.code };
+
+    // Vite 代理连接不上后端时会返回未结构化的 500 文本；不要把它伪装成业务错误。
+    if (
+      error.response?.status === 503
+      || (error.response?.status === 500 && (data === undefined || typeof data !== "object"))
+    ) {
+      return {
+        message: "后端服务未连接或启动异常，请检查后端服务和端口。",
+        code: "BACKEND_UNAVAILABLE",
+      };
+    }
 
     // 无响应体：后端不可达 / 超时 / 被 CORS 拒绝
     if (!error.response) {

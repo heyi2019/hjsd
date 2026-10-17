@@ -7,7 +7,11 @@ describe("开发服务器 API 转发", () => {
     const config = readFileSync(`${process.cwd()}/vite.config.ts`, "utf8");
 
     expect(config).toContain('"/api/v1"');
-    expect(config).toContain('target: "http://127.0.0.1:8123"');
+    expect(config).toContain('loadEnv(mode, process.cwd(), "")');
+    expect(config).toContain("process.env.VITE_BACKEND_PORT");
+    expect(config).toContain("process.env.ERP_E2E_BACKEND_PORT");
+    expect(config).toContain("env.VITE_BACKEND_PORT");
+    expect(config).toContain('target: `http://127.0.0.1:${backendPort}`');
     expect(config).toContain("changeOrigin: true");
   });
 });

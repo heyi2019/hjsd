@@ -1,12 +1,23 @@
 import { Button, Card, Form, Input } from "antd";
-import { useState } from "react";
-import { errorMessage } from "../shared/api/client";
+import { useEffect, useState } from "react";
+import { checkBackendHealth, errorMessage } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 
 export function LoginPage() {
   const { login } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void checkBackendHealth().catch((err) => {
+      if (active) setError(errorMessage(err));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const submit = async (values: { username: string; password: string }) => {
     try {
       setError(null);

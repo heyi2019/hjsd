@@ -23,7 +23,7 @@
 | 事件 | POST `/orders/{id}/events` | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL；动钱事件自动生成 cashflow，DELIVER 不生成 |
 | 账号 | GET `/accounts`、GET `/accounts/inventory`、GET `/accounts/{id}/execution-detail`、PATCH `/accounts/{id}` | 查看库存、执行明细和维护账号；新账号只随工作台订单创建 |
 | 分期 | GET/POST `/installments`，GET `/installments/{id}/schedules`，POST `/installments/{id}/payments`、`/settle-early`、`/default`、`/deliver`、期次 `/waive` / `/extend`，POST `/installments/mark-overdue` | `contract_type`=STOCK_SALE/ADVANCE_PURCHASE；HS 分期出售或 DFQ 代分期的计划、收款、逾期、换绑 |
-| 人员/团队 | GET/POST/PATCH `/users`、POST `/users/{id}/reset-password`，GET/POST/PATCH `/teams` | 人员、角色、数据范围、团队与停用；停用有进行中订单时，PATCH 必须携带 `handover_user_id` 或非空 `handover_note`；角色不另设 `/roles` 资源 |
+| 人员/团队 | GET/POST/PATCH `/users`、POST `/users/{id}/reset-password`，GET/POST/PATCH `/teams` | 人员、角色、数据范围、手机号唯一、入职/离职日期与停用交接；停用有进行中订单时，PATCH 必须携带 `handover_user_id` 或非空 `handover_note`；角色不另设 `/roles` 资源 |
 | 返点 | GET/POST `/rebates`，GET/POST `/rebates/{id}/settlements`，POST `/rebates/{id}/settlements/{settlement_id}/reverse` | 返点记录、分次到账、冲销与现金流 |
 | 押金 | GET/POST `/deposits`，POST `/deposits/{id}/returns`、`/losses` | 缴纳、部分退回、损失与状态 |
 | 流水/对账 | GET/POST `/cashflows`，POST `/cashflows/{id}/approve`、`/reject`、`/reverse`；GET/POST `/reconciliations`，POST `/reconciliations/{id}/resolve` | 查询与受控审核；订单事件来源流水不可手工修改；划转由 `/transfers` 原子生成成对流水 |

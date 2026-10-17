@@ -22,7 +22,7 @@ from app.domain.users import RevokedToken, Team, User
 
 _USER_FIELDS = (
     "username", "display_name", "role", "owner_scope", "pool_ids", "team_ids",
-    "phone", "note", "is_active", "deactivated_on", "handover_user_id", "handover_note",
+    "phone", "hired_on", "note", "is_active", "deactivated_on", "handover_user_id", "handover_note",
 )
 _USER_MUTABLE_FIELDS = frozenset(
     {
@@ -56,6 +56,25 @@ def _required_bool(value: object, *, message: str) -> bool:
     return value
 
 
+def _optional_phone(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise Validation("手机号必须为文本", details={"field": "phone"})
+    normalized = value.strip()
+    return normalized or None
+
+
+def _check_phone_unique(session: Session, phone: str | None, *, exclude_user_id: int | None = None) -> None:
+    if phone is None:
+        return
+    stmt = select(User.id).where(User.phone == phone)
+    if exclude_user_id is not None:
+        stmt = stmt.where(User.id != exclude_user_id)
+    if session.scalar(stmt) is not None:
+        raise Conflict("手机号已存在", details={"field": "phone"})
+
+
 def _validate_id_list(value: object, *, label: str) -> list[int] | None:
     if value is None:
         return None
@@ -70,6 +89,8 @@ def _validate_id_list(value: object, *, label: str) -> list[int] | None:
 
 def _user_snapshot(user: User) -> dict[str, object]:
     snapshot = {field: getattr(user, field) for field in _USER_FIELDS}
+    if user.hired_on is not None:
+        snapshot["hired_on"] = user.hired_on.isoformat()
     if user.deactivated_on is not None:
         snapshot["deactivated_on"] = user.deactivated_on.isoformat()
     return snapshot
@@ -146,6 +167,8 @@ def create_user(
     team_ids = _validate_id_list(team_ids, label="团队") or []
     if session.scalar(select(User).where(User.username == normalized_username)):
         raise Conflict("用户名已存在")
+    phone = _optional_phone(phone)
+    _check_phone_unique(session, phone)
     _check_pool_ids(session, pool_ids)
     _check_team_ids(session, team_ids)
     user = User(
@@ -155,6 +178,7 @@ def create_user(
         role=role,
         owner_scope=owner_scope,
         phone=phone,
+        hired_on=date.today(),
         note=note,
         pool_ids=pool_ids,
         team_ids=team_ids,
@@ -212,6 +236,11 @@ def update_user(
     if "is_active" in normalized_changes:
         normalized_changes["is_active"] = _required_bool(
             normalized_changes["is_active"], message="启用状态必须为布尔值"
+        )
+    if "phone" in normalized_changes:
+        normalized_changes["phone"] = _optional_phone(normalized_changes["phone"])
+        _check_phone_unique(
+            session, normalized_changes["phone"], exclude_user_id=user.id
         )
     if "handover_user_id" in normalized_changes and normalized_changes["handover_user_id"] is not None:
         _validate_handover_target(session, user.id, normalized_changes["handover_user_id"])

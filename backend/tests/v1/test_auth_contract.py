@@ -466,6 +466,27 @@ def test_update_user_success(client: TestClient):
     assert body["phone"] == "13800000000"
 
 
+def test_user_phone_is_unique_and_creation_records_hired_on(client: TestClient):
+    payload = {
+        "username": "phone-owner",
+        "display_name": "手机号用户",
+        "password": "password123",
+        "role": "OPERATOR",
+        "phone": "13800001111",
+    }
+    created = client.post("/api/v1/users", json=payload, headers={"X-Dev-User": "admin"})
+    assert created.status_code == 201, created.text
+    assert created.json()["hired_on"] == date.today().isoformat()
+
+    duplicate = client.post(
+        "/api/v1/users",
+        json={**payload, "username": "phone-owner-2", "display_name": "重复手机号"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    assert "手机号已存在" in duplicate.json()["message"]
+
+
 def test_user_service_rejects_unknown_and_immutable_fields(seeded_db):
     user = seeded_db.get(User, 1)
     assert user is not None

@@ -25,6 +25,7 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
+        UniqueConstraint("phone", name="uq_users_phone"),
         CheckConstraint(
             "role IN ('ADMIN', 'OPERATOR', 'FINANCE', 'AUDITOR', 'VIEWER')",
             name="role_valid",
@@ -44,6 +45,7 @@ class User(Base, TimestampMixin):
     pool_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     team_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    hired_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     deactivated_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     handover_user_id: Mapped[int | None] = mapped_column(

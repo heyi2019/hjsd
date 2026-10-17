@@ -167,6 +167,16 @@ class TestPolicyDefinitions:
 
 # ------------------------------------------------------------------ 版本
 class TestPolicyVersions:
+    def test_resolve_inputs_are_strictly_typed(self, seeded_db):
+        with pytest.raises(Validation, match="policy_code 不能为空"):
+            policy_service.resolve_version(
+                seeded_db, policy_code=123, on=D
+            )
+        with pytest.raises(Validation, match="scope_type 非法"):
+            policy_service.resolve_version(
+                seeded_db, policy_code="REBATE", on=D, scope_type=123
+            )
+
     def test_overlaps_with_exclude_version(self, seeded_db):
         definition = _make_policy(seeded_db)
         version = _publish(seeded_db, definition, frm=date(2026, 1, 1))

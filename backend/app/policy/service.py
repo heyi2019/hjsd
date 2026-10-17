@@ -383,8 +383,13 @@ def resolve_version(
     优先级：范围越具体越优先（USER > POOL > ORDER_TYPE > GLOBAL），
     同范围内取生效日期最新且不早于 on 的版本。
     """
+    code = _required_text(
+        policy_code, field="policy_code", message="policy_code 不能为空", uppercase=True
+    )
     try:
-        requested_scope = PolicyScopeType(scope_type.upper())
+        requested_scope = PolicyScopeType(
+            _required_text(scope_type, field="scope_type", message="scope_type 非法", uppercase=True)
+        )
     except ValueError as exc:
         raise Validation(
             f"scope_type 非法：{scope_type}",
@@ -405,7 +410,7 @@ def resolve_version(
             (PolicyScopeType.GLOBAL.value, None, 0),
         ]
     definitions = session.scalars(
-        select(PolicyDefinition).where(PolicyDefinition.policy_code == policy_code.upper())
+        select(PolicyDefinition).where(PolicyDefinition.policy_code == code)
     ).all()
     definitions_by_scope = {
         (definition.scope_type, definition.scope_id): definition
@@ -446,9 +451,12 @@ def make_snapshot(
 
     刻意**深拷贝** config：调用方后续改动内存里的 dict 不能影响已固化的快照。
     """
+    code = _required_text(
+        policy_code, field="policy_code", message="policy_code 不能为空", uppercase=True
+    )
     version = resolve_version(
         session,
-        policy_code=policy_code,
+        policy_code=code,
         on=on,
         scope_type=scope_type,
         scope_id=scope_id,
@@ -456,7 +464,7 @@ def make_snapshot(
     if version is None:
         return None, None
     snapshot = {
-        "policy_code": policy_code.upper(),
+        "policy_code": code,
         "version_id": version.id,
         "version": version.version,
         "effective_from": version.effective_from.isoformat(),

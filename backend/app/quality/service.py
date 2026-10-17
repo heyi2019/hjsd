@@ -215,6 +215,18 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     # TH 的净出账大于净入账即表示仍有未核销垫资。
     for order in orders:
         order_events = [event for event in events_by_order.get(order.id, []) if event.is_posted]
+        if order.order_type in {"TH", "DFQ"} and order.account_id is not None:
+            issues.append(
+                _issue(
+                    code="ORDER_ACCOUNT_LINK_INVALID",
+                    severity="HIGH",
+                    title="文本账号订单错误关联库存",
+                    entity_type="order",
+                    entity_id=order.order_no,
+                    message="TH/DFQ 的账号只能保存在订单账号快照中，不应关联库存账号。",
+                    details={"order_type": order.order_type, "account_id": order.account_id},
+                )
+            )
         if order.order_type == "TH":
             outstanding = Decimal("0.00")
             for event in order_events:

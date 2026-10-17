@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.core.security import CurrentUser, build_access_token
-from app.domain.trade import Cashflow, OrderEvent, RebateRecord
+from app.domain.trade import Account, Cashflow, OrderEvent, RebateRecord
 from app.orders import service as orders_service
 from app.quality import service
 
@@ -22,6 +22,30 @@ def _order(db, *, order_type="TH", owner_id=None):
 
 
 class TestQualityScan:
+    def test_detects_inventory_account_link_on_text_only_order(self, seeded_db):
+        account = Account(
+            inventory_no="ACC-QUALITY-LINK",
+            game_account="quality-link-account",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            status="SOLD",
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+        order = _order(seeded_db, order_type="TH")
+        order.account_id = account.id
+        seeded_db.flush()
+
+        item = next(
+            row
+            for row in service.scan(seeded_db)
+            if row["code"] == "ORDER_ACCOUNT_LINK_INVALID"
+        )
+        assert item["entity_id"] == order.order_no
+        assert item["details"] == {"order_type": "TH", "account_id": account.id}
+
     def test_detects_th_unclosed_advance(self, seeded_db):
         order = _order(seeded_db)
         orders_service.post_event(

@@ -5,10 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { UserCenterPage } from "./UserCenterPage";
 import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi } from "../shared/api/client";
+import * as client from "../shared/api/client";
 
 vi.mock("../shared/api/client", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  changePassword: vi.fn().mockResolvedValue(undefined),
+  ...(await importOriginal<typeof import("../shared/api/client")>()),
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
+  login: vi.fn(),
+  logout: vi.fn(),
+  setDevUser: vi.fn(),
+  changePassword: vi.fn(),
+  checkBackendHealth: vi.fn(),
 }));
 
 beforeEach(() => {

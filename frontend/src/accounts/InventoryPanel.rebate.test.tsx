@@ -4,39 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const accountsList = vi.fn();
-const accountsExecutionDetail = vi.fn();
-const accountsUpdateProfile = vi.fn();
-const ordersCreate = vi.fn();
-const ordersPostEvent = vi.fn();
-const customersList = vi.fn();
-const poolsList = vi.fn();
-const counterpartiesList = vi.fn();
-const rebatesCreate = vi.fn();
-const installmentsCreate = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  accountsApi: {
-    list: (...a: unknown[]) => accountsList(...a),
-    executionDetail: (...a: unknown[]) => accountsExecutionDetail(...a),
-    updateProfile: (...a: unknown[]) => accountsUpdateProfile(...a),
-  },
-  ordersApi: {
-    create: (...a: unknown[]) => ordersCreate(...a),
-    postEvent: (...a: unknown[]) => ordersPostEvent(...a),
-  },
-  customersApi: { list: (...a: unknown[]) => customersList(...a) },
-  poolsApi: { list: (...a: unknown[]) => poolsList(...a) },
-  counterpartiesApi: { list: (...a: unknown[]) => counterpartiesList(...a) },
-  rebatesApi: { create: (...a: unknown[]) => rebatesCreate(...a) },
-  installmentsApi: { create: (...a: unknown[]) => installmentsCreate(...a) },
-}));
+vi.mock("../shared/api/catalog")
 
 const accounts = [
   { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
@@ -45,15 +20,15 @@ const accounts = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  accountsList.mockResolvedValue(accounts);
-  ordersCreate.mockResolvedValue({ id: 21 });
-  ordersPostEvent.mockResolvedValue({});
-  customersList.mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  poolsList.mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
-  counterpartiesList.mockResolvedValue([]);
-  rebatesCreate.mockResolvedValue({ id: 31 });
-  installmentsCreate.mockResolvedValue({ id: 41 });
-  accountsExecutionDetail.mockResolvedValue({
+  vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.ordersApi.create).mockResolvedValue({ id: 21 });
+  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({});
+  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.rebatesApi.create).mockResolvedValue({ id: 31 });
+  vi.mocked(catalog.installmentsApi.create).mockResolvedValue({ id: 41 });
+  vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue({
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -125,12 +100,12 @@ beforeEach(() => {
       }],
     }],
   });
-  accountsUpdateProfile.mockResolvedValue(accounts[0]);
+  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue(accounts[0]);
 });
 
 describe("InventoryPanel：写入与长路径", () => {
 it("寄售可以勾选寄售平台并登记 DG 业务", async () => {
-    counterpartiesList.mockResolvedValueOnce([
+    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValueOnce([
       { id: 11, counterparty_no: "CP0011", display_name: "寄售平台A", type: "PLATFORM", status: "ACTIVE" },
       { id: 12, counterparty_no: "CP0012", display_name: "寄售平台B", type: "PLATFORM", status: "ACTIVE" },
     ]);
@@ -141,8 +116,8 @@ it("寄售可以勾选寄售平台并登记 DG 业务", async () => {
     await ui.click(screen.getByLabelText("寄售平台A"));
     await ui.click(screen.getByRole("button", { name: "确认寄售" }));
 
-    await waitFor(() => expect(ordersCreate).toHaveBeenCalled());
-    expect(ordersCreate.mock.calls[0][0]).toMatchObject({
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.ordersApi.create).mock.calls[0][0]).toMatchObject({
       order_type: "DG",
       account_id: 1,
       counterparty_roles: [{ counterparty_id: 11, role: "PLATFORM" }],
@@ -159,8 +134,8 @@ it("返点按买入与售出订单区分类型并登记", async () => {
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
-    await waitFor(() => expect(rebatesCreate).toHaveBeenCalled());
-    expect(rebatesCreate.mock.calls[0][0]).toMatchObject({
+    await waitFor(() => expect(vi.mocked(catalog.rebatesApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.rebatesApi.create).mock.calls[0][0]).toMatchObject({
       source_order_id: 23,
       rebate_type: "SELL",
       base_amount: "350.00",

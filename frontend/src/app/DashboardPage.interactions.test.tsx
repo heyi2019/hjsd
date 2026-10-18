@@ -4,23 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { DashboardPage } from "./DashboardPage";
 
+import * as catalog from "../shared/api/catalog";
 /** 2026-10-13：工作台数据总览（资金池/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
-const ordersList = vi.fn();
 
-vi.mock("../shared/api/catalog", () => ({
-  ordersApi: { list: (...a: unknown[]) => ordersList(...a) },
-  // 业务创建弹窗自加载的选项数据：给空列表即可（弹窗自身用例在 CreateBusinessModal.test.tsx）。
-  orderTypesApi: { list: vi.fn().mockResolvedValue([]) },
-  customersApi: { list: vi.fn().mockResolvedValue([]) },
-  counterpartiesApi: { list: vi.fn().mockResolvedValue([]) },
-  accountsApi: { list: vi.fn().mockResolvedValue([]) },
-}));
+vi.mock("../shared/api/catalog")
 
 beforeEach(() => {
   vi.clearAllMocks();
-  ordersList.mockResolvedValue([]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
@@ -66,7 +59,7 @@ it("数据总览已迁走：不再渲染资金池表格/统计/订单入口卡",
 
 it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {
     let resolveOrders!: (value: never[]) => void;
-    ordersList.mockReturnValueOnce(new Promise<never[]>((resolve) => {
+    vi.mocked(catalog.ordersApi.list).mockReturnValueOnce(new Promise<never[]>((resolve) => {
       resolveOrders = resolve;
     }));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);

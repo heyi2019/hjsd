@@ -2,6 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as catalog from "../shared/api/catalog";
+vi.mock("../shared/api/catalog");
 import { renderApp } from "../test/render";
 import { AppShell } from "./AppShell";
 import { navigation } from "./navigation";
@@ -48,23 +50,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
   return { deepStub, OBJECT_SHAPED };
 });
 
-vi.mock("../shared/api/catalog", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  const stub: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(actual)) {
-    if (key.endsWith("Api") && value && typeof value === "object") {
-      stub[key] = Object.fromEntries(
-        Object.keys(value as Record<string, unknown>).map((method) => {
-          const isObjectShaped = OBJECT_SHAPED.has(key) || method === "balance";
-          return [method, vi.fn().mockResolvedValue(isObjectShaped ? deepStub() : [])];
-        }),
-      );
-    } else {
-      stub[key] = value;
-    }
-  }
-  return stub;
-});
+
 
 vi.mock("../auth/UserCenterPage", () => ({
   UserCenterPage: () => <div>用户中心内容</div>,
@@ -72,6 +58,20 @@ vi.mock("../auth/UserCenterPage", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  for (const key of Object.keys(catalog)) {
+    if (!key.endsWith("Api")) continue;
+    const apiObj = (catalog as Record<string, unknown>)[key] as Record<string, unknown>;
+    if (!apiObj || typeof apiObj !== "object") continue;
+    for (const method of Object.keys(apiObj)) {
+      const fn = (apiObj as Record<string, unknown>)[method];
+      if (fn && typeof (fn as { mockResolvedValue?: unknown }).mockResolvedValue === "function") {
+        const isObjectShaped = OBJECT_SHAPED.has(key) || method === "balance";
+        (fn as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue(
+          isObjectShaped ? deepStub() : [],
+        );
+      }
+    }
+  }
 });
 
 async function renderShell(options: { user?: string } = {}) {

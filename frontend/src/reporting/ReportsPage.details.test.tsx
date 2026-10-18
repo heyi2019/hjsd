@@ -4,23 +4,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { renderLight } from "../test/render";
 import { ReportsPage } from "./ReportsPage";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
-
-const inventoryHealth = vi.fn();
-const monthlyPnl = vi.fn();
-const commission = vi.fn();
-const dailyFunds = vi.fn();
-const financeDimensions = vi.fn();
-const businessPnl = vi.fn();
-const orderProfit = vi.fn();
-const poolsList = vi.fn();
-const poolsBalance = vi.fn();
-const ordersList = vi.fn();
-const exportCsv = vi.fn();
 
 // jsdom 不执行真实下载跳转；屏蔽 anchor.click，避免导出测试留下 navigation 定时器拖住全量单测。
 beforeAll(() => {
@@ -31,53 +20,30 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-vi.mock("../shared/api/catalog", () => ({
-  reportsApi: {
-    inventoryHealth: (...a: unknown[]) => inventoryHealth(...a),
-    monthlyPnl: (...a: unknown[]) => monthlyPnl(...a),
-    commission: (...a: unknown[]) => commission(...a),
-    dailyFunds: (...a: unknown[]) => dailyFunds(...a),
-    financeDimensions: (...a: unknown[]) => financeDimensions(...a),
-    businessPnl: (...a: unknown[]) => businessPnl(...a),
-    orderProfit: (...a: unknown[]) => orderProfit(...a),
-    exportCsv: (...a: unknown[]) => exportCsv(...a),
-  },
-  // 数据中心 Tab 与报表面板同页挂载（antd Tabs 不卸载非激活面板）：必须给齐它的
-  // 取数桩，否则 poolsApi.list 等会在挂载 effect 里同步 TypeError 炸测试。
-  poolsApi: {
-    list: (...a: unknown[]) => poolsList(...a),
-    balance: (...a: unknown[]) => poolsBalance(...a),
-    create: vi.fn(),
-  },
-  ordersApi: { list: (...a: unknown[]) => ordersList(...a) },
-  qualityApi: { summary: vi.fn().mockResolvedValue({ total: 0, by_severity: {}, by_code: {}, items: [] }), list: vi.fn().mockResolvedValue({ items: [], total: 0 }) },
-  notificationsApi: { list: vi.fn().mockResolvedValue({ items: [], total: 0, unread_total: 0 }), markRead: vi.fn(), syncOverdueRebates: vi.fn() },
-  auditApi: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }), actions: vi.fn() },
-  attachmentsApi: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }), create: vi.fn(), download: vi.fn(), remove: vi.fn() },
-}));
+vi.mock("../shared/api/catalog")
 
 const emptyHealth = { generated_on: "2026-10-01", total_cost: "0.00", items: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  inventoryHealth.mockResolvedValue(emptyHealth);
-  monthlyPnl.mockResolvedValue({ items: [], total: {} });
-  commission.mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
-  dailyFunds.mockResolvedValue({ date: "2026-10-01", total: {}, items: [] });
-  financeDimensions.mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" });
-  businessPnl.mockResolvedValue({ items: [], total: {} });
-  orderProfit.mockResolvedValue({ items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
-  exportCsv.mockResolvedValue(new Blob(["csv"]));
+  vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValue(emptyHealth);
+  vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValue({ items: [], total: {} });
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  vi.mocked(catalog.reportsApi.dailyFunds).mockResolvedValue({ date: "2026-10-01", total: {}, items: [] });
+  vi.mocked(catalog.reportsApi.financeDimensions).mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" });
+  vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({ items: [], total: {} });
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  poolsList.mockResolvedValue([]);
-  poolsBalance.mockResolvedValue({
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({
     income: "0.00",
     expense: "0.00",
     cash_balance: "0.00",
     deposit_held: "0.00",
     available: "0.00",
   });
-  ordersList.mockResolvedValue([]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -86,7 +52,7 @@ async function gotoTab(label: string) {
 
 describe("ReportsPage：各报表渲染与错误态", () => {
   it("R1 库存健康：渲染账号编号与买入金额", async () => {
-    inventoryHealth.mockResolvedValueOnce({
+    vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValueOnce({
       generated_on: "2026-10-01",
       total_cost: "100.00",
       items: [
@@ -114,13 +80,13 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("R1 后端不可达 → 错误条落地（不静默空表）", async () => {
-    inventoryHealth.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.reportsApi.inventoryHealth).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<ReportsPage />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("R2 月度损益：渲染月份与销售收入", async () => {
-    monthlyPnl.mockResolvedValueOnce({
+    vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValueOnce({
       from: "2026-09",
       to: "2026-09",
       total: {},
@@ -142,7 +108,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("R5 业务损益：渲染业务与主营收入", async () => {
-    businessPnl.mockResolvedValue({
+    vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({
       items: [
         {
           order_type: "HS",
@@ -163,7 +129,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("订单利润：渲染订单号与净额", async () => {
-    orderProfit.mockResolvedValueOnce({
+    vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValueOnce({
       from: null,
       to: null,
       total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },

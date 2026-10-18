@@ -10,19 +10,21 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const { api } = vi.hoisted(() => ({
-  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
-}));
-
-vi.mock("../shared/api/client", () => ({
-  api,
-  ACCESS_TOKEN_KEY: "access_token",
-  DEV_USER_KEY: "dev_user",
-  currentDevUser: () => "admin",
-  setDevUser: vi.fn(),
+import * as client from "../shared/api/client";
+vi.mock("../shared/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../shared/api/client")>()),
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
   login: vi.fn(),
   logout: vi.fn(),
-  errorMessage: (error: unknown) => String(error),
+  setDevUser: vi.fn(),
+  changePassword: vi.fn(),
+  checkBackendHealth: vi.fn(),
 }));
 
 const user = {
@@ -37,9 +39,9 @@ const user = {
 };
 
 beforeEach(() => {
-  api.get.mockResolvedValue({ data: [user] });
-  api.post.mockResolvedValue({ data: {} });
-  api.patch.mockResolvedValue({ data: user });
+  vi.mocked(client.api).get.mockResolvedValue({ data: [user] });
+  vi.mocked(client.api).post.mockResolvedValue({ data: {} });
+  vi.mocked(client.api).patch.mockResolvedValue({ data: user });
 });
 
 describe("UsersPanel：用户管理动作", () => {
@@ -54,7 +56,7 @@ describe("UsersPanel：用户管理动作", () => {
     await ui.type(name, "新业务同事");
     await ui.click(dialog.getByRole("button", { name: /OK/ }));
 
-    await waitFor(() => expect(api.patch).toHaveBeenCalledWith("/users/7", expect.objectContaining({ display_name: "新业务同事" })));
+    await waitFor(() => expect(vi.mocked(client.api).patch).toHaveBeenCalledWith("/users/7", expect.objectContaining({ display_name: "新业务同事" })));
   });
 
   it("管理员可以停用用户并重置密码", async () => {
@@ -62,12 +64,12 @@ describe("UsersPanel：用户管理动作", () => {
 
     expect(await screen.findByText("operator01")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /停用/ }));
-    await waitFor(() => expect(api.patch).toHaveBeenCalledWith("/users/7", { is_active: false }));
+    await waitFor(() => expect(vi.mocked(client.api).patch).toHaveBeenCalledWith("/users/7", { is_active: false }));
 
     await ui.click(screen.getByRole("button", { name: /重置密码/ }));
     const resetDialog = within(screen.getByRole("dialog", { name: "重置密码：operator01" }));
     await ui.type(resetDialog.getByPlaceholderText("新密码（至少 8 位）"), "new-password");
     await ui.click(resetDialog.getByRole("button", { name: /OK/ }));
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/users/7/reset-password", { password: "new-password" }));
+    await waitFor(() => expect(vi.mocked(client.api).post).toHaveBeenCalledWith("/users/7/reset-password", { password: "new-password" }));
   });
 });

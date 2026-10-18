@@ -1,36 +1,23 @@
 import { beforeEach, vi } from "vitest";
 import type { AccountExecutionDetail } from "../shared/api/catalog";
-
-export type InventoryPanelMocks = Record<string, ReturnType<typeof vi.fn>>;
+import * as catalog from "../shared/api/catalog";
 
 export const accounts = [
   { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
   { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
-export const resetInventoryPanelMocks = (mocks: InventoryPanelMocks) => {
+export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
-  const {
-    accountsList,
-    accountsExecutionDetail,
-    accountsUpdateProfile,
-    ordersCreate,
-    ordersPostEvent,
-    customersList,
-    poolsList,
-    counterpartiesList,
-    rebatesCreate,
-    installmentsCreate,
-  } = mocks;
-  accountsList.mockResolvedValue(accounts);
-  ordersCreate.mockResolvedValue({ id: 21 });
-  ordersPostEvent.mockResolvedValue({});
-  customersList.mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  poolsList.mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
-  counterpartiesList.mockResolvedValue([]);
-  rebatesCreate.mockResolvedValue({ id: 31 });
-  installmentsCreate.mockResolvedValue({ id: 41 });
-  accountsExecutionDetail.mockResolvedValue({
+  vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.ordersApi.create).mockResolvedValue({ id: 21 });
+  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({});
+  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.rebatesApi.create).mockResolvedValue({ id: 31 });
+  vi.mocked(catalog.installmentsApi.create).mockResolvedValue({ id: 41 });
+  vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue({
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -102,11 +89,11 @@ export const resetInventoryPanelMocks = (mocks: InventoryPanelMocks) => {
       }],
     }],
   });
-  accountsUpdateProfile.mockResolvedValue(accounts[0]);
+  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue(accounts[0]);
 };
 
-export const setupInventoryPanelMocks = (mocks: InventoryPanelMocks) => {
-  beforeEach(() => resetInventoryPanelMocks(mocks));
+export const setupInventoryPanelMocks = () => {
+  beforeEach(() => resetInventoryPanelMocks());
 };
 
 export type InventoryDetailFixture = AccountExecutionDetail;

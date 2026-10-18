@@ -4,35 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { ImportWorkbench } from "./ImportWorkbench";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const batches = vi.fn();
-const rows = vi.fn();
-const preview = vi.fn();
-const reconciliation = vi.fn();
-const map = vi.fn();
-const skip = vi.fn();
-const markUnlinked = vi.fn();
-const commit = vi.fn();
-const rollback = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  importsApi: {
-    batches: (...a: unknown[]) => batches(...a),
-    rows: (...a: unknown[]) => rows(...a),
-    preview: (...a: unknown[]) => preview(...a),
-    reconciliation: (...a: unknown[]) => reconciliation(...a),
-    map: (...a: unknown[]) => map(...a),
-    skip: (...a: unknown[]) => skip(...a),
-    markUnlinked: (...a: unknown[]) => markUnlinked(...a),
-    commit: (...a: unknown[]) => commit(...a),
-    rollback: (...a: unknown[]) => rollback(...a),
-  },
-}));
+vi.mock("../shared/api/catalog")
 
 const batch = {
   id: 1,
@@ -74,15 +53,15 @@ const recon = {
 } as unknown as import("../shared/api/catalog").ReconciliationReport;
 
 beforeEach(() => {
-  batches.mockResolvedValue({ items: [batch], total: 1 });
-  rows.mockResolvedValue({ items: importRows, total: importRows.length });
-  preview.mockResolvedValue(mappingPreview);
-  reconciliation.mockResolvedValue(recon);
-  map.mockResolvedValue({});
-  skip.mockResolvedValue({});
-  markUnlinked.mockResolvedValue({});
-  commit.mockResolvedValue({ imported: 2, unmapped: 0 });
-  rollback.mockResolvedValue({});
+  vi.mocked(catalog.importsApi.batches).mockResolvedValue({ items: [batch], total: 1 });
+  vi.mocked(catalog.importsApi.rows).mockResolvedValue({ items: importRows, total: importRows.length });
+  vi.mocked(catalog.importsApi.preview).mockResolvedValue(mappingPreview);
+  vi.mocked(catalog.importsApi.reconciliation).mockResolvedValue(recon);
+  vi.mocked(catalog.importsApi.map).mockResolvedValue({});
+  vi.mocked(catalog.importsApi.skip).mockResolvedValue({});
+  vi.mocked(catalog.importsApi.markUnlinked).mockResolvedValue({});
+  vi.mocked(catalog.importsApi.commit).mockResolvedValue({ imported: 2, unmapped: 0 });
+  vi.mocked(catalog.importsApi.rollback).mockResolvedValue({});
 });
 
 it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {
@@ -107,7 +86,7 @@ it("viewer 角色无 import.manage：看不到指派/确认批次/回滚按钮",
   expect(screen.queryByRole("button", { name: /回滚/ })).toBeNull();
 });
 
-it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 map（basis 必填）", async () => {
+it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 vi.mocked(catalog.importsApi.map)（basis 必填）", async () => {
   renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("金额=100"); // 行已加载
   const assignBtns = screen.getAllByRole("button", { name: /指派/ });
@@ -118,19 +97,19 @@ it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 m
     "对账单 7 月第 9 行",
   );
   await ui.click(screen.getByRole("button", { name: /确认指派/ }));
-  await waitFor(() => expect(map).toHaveBeenCalledTimes(1));
-  expect(map.mock.calls[0][0]).toBe(10); // 行 id
-  expect(map.mock.calls[0][1]).toMatchObject({ basis: "对账单 7 月第 9 行" });
+  await waitFor(() => expect(vi.mocked(catalog.importsApi.map)).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(catalog.importsApi.map).mock.calls[0][0]).toBe(10); // 行 id
+  expect(vi.mocked(catalog.importsApi.map).mock.calls[0][1]).toMatchObject({ basis: "对账单 7 月第 9 行" });
 });
 
-it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 commit", async () => {
+it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocked(catalog.importsApi.commit)", async () => {
   renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("导入工作台");
   const commitBtn = screen.getByRole("button", { name: /确认批次/ });
   expect(commitBtn).not.toBeDisabled();
   await ui.click(commitBtn);
-  await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
-  expect(commit.mock.calls[0][0]).toBe(1); // batch id
+  await waitFor(() => expect(vi.mocked(catalog.importsApi.commit)).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(catalog.importsApi.commit).mock.calls[0][0]).toBe(1); // batch id
 });
 
 it("导入对账 Tab：切换后渲染对账 StatCard（源总行/已导入）", async () => {

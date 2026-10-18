@@ -4,27 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { RebatesPanel } from "./RebatesPanel";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const rebatesList = vi.fn();
-const rebatesCreate = vi.fn();
-const rebatesSettle = vi.fn();
-const ordersList = vi.fn();
-const poolsList = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  rebatesApi: {
-    list: (...a: unknown[]) => rebatesList(...a),
-    create: (...a: unknown[]) => rebatesCreate(...a),
-    settle: (...a: unknown[]) => rebatesSettle(...a),
-  },
-  ordersApi: { list: (...a: unknown[]) => ordersList(...a), create: vi.fn() },
-  poolsApi: { list: (...a: unknown[]) => poolsList(...a), create: vi.fn(), balance: vi.fn() },
-}));
+vi.mock("../shared/api/catalog")
 
 const rebates = [
   {
@@ -56,9 +43,9 @@ const pools = [{ id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERAT
 
 beforeEach(() => {
   vi.clearAllMocks();
-  rebatesList.mockResolvedValue(rebates);
-  ordersList.mockResolvedValue(orders);
-  poolsList.mockResolvedValue(pools);
+  vi.mocked(catalog.rebatesApi.list).mockResolvedValue(rebates);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -94,7 +81,7 @@ describe("RebatesPanel：返点记录列表", () => {
   });
 
   it("后端不可达 → 错误条落地", async () => {
-    rebatesList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<RebatesPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
@@ -117,7 +104,7 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
   });
 
   it("新增返点记录提交后回传基数字符串与返点日期", async () => {
-    rebatesCreate.mockResolvedValueOnce({ id: 3 });
+    vi.mocked(catalog.rebatesApi.create).mockResolvedValueOnce({ id: 3 });
     renderLight(<RebatesPanel />, { user: "admin" });
     await screen.findByText("HS0001-RB01");
     await ui.click(screen.getByRole("button", { name: /新增返点记录/ }));
@@ -126,15 +113,15 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
     await pickSelect(modal, 0, /HS-2026-0010/);
     await ui.type(modal.querySelector("#base_amount") as Element, "1000.00");
     await ui.click(within(modal).getByRole("button", { name: /创\s*建/ }));
-    await waitFor(() => expect(rebatesCreate).toHaveBeenCalled());
-    const payload = rebatesCreate.mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(catalog.rebatesApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(catalog.rebatesApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.source_order_id).toBe(10);
     expect(payload.base_amount).toBe("1000.00");
     expect(payload.collected_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("登记结算提交后回传到账金额与回款池", async () => {
-    rebatesSettle.mockResolvedValueOnce({ id: 9 });
+    vi.mocked(catalog.rebatesApi.settle).mockResolvedValueOnce({ id: 9 });
     renderLight(<RebatesPanel />, { user: "admin" });
     await screen.findByText("HS0001-RB01");
     await ui.click(screen.getAllByRole("button", { name: /登记结算/ })[0] as Element);
@@ -145,8 +132,8 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
     await ui.type(modal.querySelector("#gross_amount") as Element, "880.00");
     await pickSelect(modal, 0, /POOL-A/);
     await ui.click(within(modal).getByRole("button", { name: /确认结算/ }));
-    await waitFor(() => expect(rebatesSettle).toHaveBeenCalled());
-    const [id, payload] = rebatesSettle.mock.calls[0] as [number, Record<string, unknown>];
+    await waitFor(() => expect(vi.mocked(catalog.rebatesApi.settle)).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(catalog.rebatesApi.settle).mock.calls[0] as [number, Record<string, unknown>];
     expect(id).toBe(1);
     expect(payload.gross_amount).toBe("880.00");
     expect(payload.pool_id).toBe(1);

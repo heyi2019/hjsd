@@ -4,27 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InstallmentsPanel } from "./InstallmentsPanel";
 
-const installmentsList = vi.fn();
-const schedules = vi.fn();
-const dispositions = vi.fn();
-const pay = vi.fn();
-const deliver = vi.fn();
-const recover = vi.fn();
-const resale = vi.fn();
-const ordersList = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  installmentsApi: {
-    list: (...a: unknown[]) => installmentsList(...a),
-    schedules: (...a: unknown[]) => schedules(...a),
-    dispositions: (...a: unknown[]) => dispositions(...a),
-    pay: (...a: unknown[]) => pay(...a),
-    deliver: (...a: unknown[]) => deliver(...a),
-    recover: (...a: unknown[]) => recover(...a),
-    resale: (...a: unknown[]) => resale(...a),
-  },
-  ordersApi: { list: (...a: unknown[]) => ordersList(...a), create: vi.fn() },
-}));
+import * as catalog from "../shared/api/catalog";
+vi.mock("../shared/api/catalog")
 
 const installments = [
   {
@@ -53,12 +34,12 @@ const installments = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  installmentsList.mockResolvedValue(installments);
-  schedules.mockResolvedValue([
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue(installments);
+  vi.mocked(catalog.installmentsApi.schedules).mockResolvedValue([
     { id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
   ]);
-  dispositions.mockResolvedValue([]);
-  ordersList.mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
+  vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
 });
 
 describe("InstallmentsPanel：分期合约", () => {
@@ -104,7 +85,7 @@ describe("InstallmentsPanel：分期合约", () => {
   });
 
   it("SCHEDULED 合约已结清时「换绑交付」可点", async () => {
-    installmentsList.mockResolvedValueOnce([{ ...installments[0], status: "SETTLED" }]);
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValueOnce([{ ...installments[0], status: "SETTLED" }]);
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
     const deliverButtons = screen.getAllByRole("button", { name: /换绑交付/ });

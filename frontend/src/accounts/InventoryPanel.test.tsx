@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "../shared/api/catalog";
+import * as catalog from "../shared/api/catalog";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 import {
@@ -16,42 +17,9 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const mocks = vi.hoisted(() => ({
-  accountsList: vi.fn(),
-  accountsExecutionDetail: vi.fn(),
-  accountsUpdateProfile: vi.fn(),
-  ordersCreate: vi.fn(),
-  ordersPostEvent: vi.fn(),
-  customersList: vi.fn(),
-  poolsList: vi.fn(),
-  counterpartiesList: vi.fn(),
-  rebatesCreate: vi.fn(),
-  installmentsCreate: vi.fn(),
-}));
+vi.mock("../shared/api/catalog");
 
-vi.mock("../shared/api/catalog", () => ({
-  accountsApi: {
-    list: (...a: unknown[]) => mocks.accountsList(...a),
-    executionDetail: (...a: unknown[]) => mocks.accountsExecutionDetail(...a),
-    updateProfile: (...a: unknown[]) => mocks.accountsUpdateProfile(...a),
-  },
-  ordersApi: {
-    create: (...a: unknown[]) => mocks.ordersCreate(...a),
-    postEvent: (...a: unknown[]) => mocks.ordersPostEvent(...a),
-  },
-  customersApi: { list: (...a: unknown[]) => mocks.customersList(...a) },
-  poolsApi: { list: (...a: unknown[]) => mocks.poolsList(...a) },
-  counterpartiesApi: { list: (...a: unknown[]) => mocks.counterpartiesList(...a) },
-  rebatesApi: { create: (...a: unknown[]) => mocks.rebatesCreate(...a) },
-  installmentsApi: { create: (...a: unknown[]) => mocks.installmentsCreate(...a) },
-}));
-
-const {
-  accountsList,
-  accountsExecutionDetail,
-} = mocks;
-
-setupInventoryPanelMocks(mocks);
+setupInventoryPanelMocks();
 
 describe("InventoryPanel：账号台账", () => {
   it("账号台账启用横向滚动以访问右侧操作列", async () => {
@@ -184,7 +152,7 @@ describe("InventoryPanel：账号台账", () => {
       date.setDate(date.getDate() - days);
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     };
-    accountsList.mockResolvedValueOnce([
+    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([
       { ...accounts[0], id: 11, game_account: "green-account", buy_date: daysAgo(6) },
       { ...accounts[0], id: 12, game_account: "yellow-account", buy_date: daysAgo(14) },
       { ...accounts[0], id: 13, game_account: "red-account", buy_date: daysAgo(31) },
@@ -200,7 +168,7 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("回收账号售出后描述与图片入口置灰不可点", async () => {
-    accountsList.mockResolvedValueOnce([{ ...accounts[0], id: 33, status: "SOLD" }]);
+    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([{ ...accounts[0], id: 33, status: "SOLD" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     expect(screen.getByRole("button", { name: "寄售" })).toBeDisabled();
@@ -226,13 +194,13 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("后端不可达 → 错误条落地", async () => {
-    accountsList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.accountsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<InventoryPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("回收账号未售出时不显示卖号返点", async () => {
-    accountsExecutionDetail.mockResolvedValueOnce({
+    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValueOnce({
       account: accounts[0],
       orders: [{
         order_id: 21,
@@ -260,7 +228,7 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("无数据时显示「暂无账号」", async () => {
-    accountsList.mockResolvedValueOnce([]);
+    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByText("暂无账号")).toBeInTheDocument();
   });
@@ -342,7 +310,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financeTable).getByText("2026-10-17 12:30")).toBeInTheDocument();
     expect((await screen.findAllByText("HS0001")).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/CF0001/).length).toBeGreaterThan(0);
-    expect(accountsExecutionDetail).toHaveBeenCalledWith(1);
+    expect(vi.mocked(catalog.accountsApi.executionDetail)).toHaveBeenCalledWith(1);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });
 });

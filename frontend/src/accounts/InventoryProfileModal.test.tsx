@@ -5,19 +5,14 @@ import type { Account } from "../shared/api/catalog";
 import { renderLight } from "../test/render";
 import { InventoryProfileModal } from "./InventoryProfileModal";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const updateProfile = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  accountsApi: {
-    updateProfile: (...args: unknown[]) => updateProfile(...args),
-  },
-}));
+vi.mock("../shared/api/catalog")
 
 const account = {
   id: 1,
@@ -31,7 +26,7 @@ const account = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  updateProfile.mockResolvedValue({ ...account, account_description: "新描述" });
+  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue({ ...account, account_description: "新描述" });
 });
 
 describe("InventoryProfileModal", () => {
@@ -52,7 +47,7 @@ describe("InventoryProfileModal", () => {
     await ui.type(description, "新描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
 
-    await waitFor(() => expect(updateProfile).toHaveBeenCalledWith(1, { account_description: "新描述" }));
+    await waitFor(() => expect(vi.mocked(catalog.accountsApi.updateProfile)).toHaveBeenCalledWith(1, { account_description: "新描述" }));
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ account_description: "新描述" }));
   });
 });

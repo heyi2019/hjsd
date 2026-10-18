@@ -2,20 +2,13 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
 
-const gameTypesApi = vi.hoisted(() => ({
-  list: vi.fn(),
-  create: vi.fn(),
-  update: vi.fn(),
-  setActive: vi.fn(),
-  setDefault: vi.fn(),
-}));
-
-vi.mock("../../shared/api/catalog", () => ({ gameTypesApi }));
+import * as catalog from "../../shared/api/catalog";
+vi.mock("../../shared/api/catalog");
 
 describe("GameTypeSettingsPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    gameTypesApi.list.mockResolvedValue([]);
+    vi.mocked(catalog.gameTypesApi).list.mockResolvedValue([]);
   });
 
   it("does not let browser form-history values appear as game type suggestions", async () => {

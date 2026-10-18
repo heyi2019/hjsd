@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as catalog from "../shared/api/catalog";
 vi.mock("../shared/api/catalog");
+import * as client from "../shared/api/client";
 import { renderLight } from "../test/render";
 import { SettingsPage } from "./SettingsPage";
 
@@ -15,21 +16,20 @@ beforeEach(() => {
 // vi.hoisted：保证 const 在 vi.mock 工厂执行前完成初始化，避免 TDZ（直接返回对象引用会触发）。
 
 
-const { api } = vi.hoisted(() => ({
+vi.mock("../shared/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../shared/api/client")>()),
   api: {
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
   },
-}));
-
-
-
-vi.mock("../shared/api/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../shared/api/client")>()),
-  api,
-  errorMessage: (error: unknown) => String(error),
-  normalizeError: (error: unknown) => ({ message: String(error) }),
+  login: vi.fn(),
+  logout: vi.fn(),
+  setDevUser: vi.fn(),
+  changePassword: vi.fn(),
+  checkBackendHealth: vi.fn(),
 }));
 
 const orderTypes = [
@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fields);
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
-  api.get.mockResolvedValue({ data: [] });
+  vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
 it("渲染四个主数据 Tab，默认业务类型列表可见", async () => {
@@ -59,7 +59,7 @@ it("渲染四个主数据 Tab，默认业务类型列表可见", async () => {
   expect(screen.getByRole("tab", { name: "资金池" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "活字段" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "经营规则" })).toBeInTheDocument();
-  expect(api.get).not.toHaveBeenCalled();
+  expect(vi.mocked(client.api).get).not.toHaveBeenCalled();
   await ui.click(screen.getByRole("tab", { name: "业务类型" }));
   expect(await screen.findByText("HS")).toBeInTheDocument();
 });

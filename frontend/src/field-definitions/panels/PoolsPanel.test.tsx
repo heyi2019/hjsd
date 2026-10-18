@@ -2,24 +2,16 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
 
-const { poolsApi, poolAccountsApi } = vi.hoisted(() => ({
-  poolsApi: {
-    list: vi.fn(),
-  },
-  poolAccountsApi: {
-    list: vi.fn(),
-  },
-}));
-
-vi.mock("../../shared/api/catalog", () => ({ poolsApi, poolAccountsApi }));
+import * as catalog from "../../shared/api/catalog";
+vi.mock("../../shared/api/catalog");
 
 describe("PoolsPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    poolsApi.list.mockResolvedValue([
+    vi.mocked(catalog.poolsApi).list.mockResolvedValue([
       { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
     ]);
-    poolAccountsApi.list.mockResolvedValue([]);
+    vi.mocked(catalog.poolAccountsApi).list.mockResolvedValue([]);
   });
 
   it("shows and loads the pool account configuration", async () => {
@@ -28,6 +20,6 @@ describe("PoolsPanel", () => {
 
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
     expect(screen.getByText("资金池账户")).toBeInTheDocument();
-    expect(poolAccountsApi.list).toHaveBeenCalled();
+    expect(vi.mocked(catalog.poolAccountsApi).list).toHaveBeenCalled();
   });
 });

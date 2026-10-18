@@ -93,6 +93,33 @@ class OrderTypeOut(BaseModel):
     updated_at: datetime
 
 
+class GameTypeCreate(RequestModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=64)
+    sort_order: int = Field(default=0, ge=0)
+    is_default: bool = False
+
+
+class GameTypeUpdate(RequestModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    sort_order: int | None = Field(default=None, ge=0)
+
+
+class GameTypeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    sort_order: int
+    is_active: bool
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class RouteIn(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -135,6 +162,9 @@ __all__ = [
     "OrderTypeCreate",
     "OrderTypeOut",
     "OrderTypeUpdate",
+    "GameTypeCreate",
+    "GameTypeOut",
+    "GameTypeUpdate",
     "PoolCreate",
     "PoolOut",
     "PoolStatusUpdate",

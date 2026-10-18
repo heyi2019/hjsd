@@ -406,6 +406,14 @@ export interface FieldDefinition {
   options?: string[] | null;
 }
 
+export interface GameTypeOption {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  is_default: boolean;
+}
+
 export const poolsApi = {
   update: (id: number, data: Partial<Pool>) => api.patch<Pool>(`/pools/${id}`, data).then(r => r.data),
   setStatus: (id: number, status: string) => api.patch<Pool>(`/pools/${id}/status`, {status}).then(r => r.data),
@@ -424,6 +432,19 @@ export const orderTypesApi = {
     api.post<OrderType>("/order-types", payload).then((r) => r.data),
   routes: (orderTypeId: number) =>
     api.get<OrderTypeRoute[]>(`/order-types/${orderTypeId}/routes`).then((r) => r.data),
+};
+
+export const gameTypesApi = {
+  list: (params?: { include_inactive?: boolean }) =>
+    api.get<GameTypeOption[]>("/game-types", { params }).then((r) => r.data),
+  create: (payload: { name: string; sort_order?: number; is_default?: boolean }) =>
+    api.post<GameTypeOption>("/game-types", payload).then((r) => r.data),
+  update: (id: number, payload: { name?: string; sort_order?: number }) =>
+    api.patch<GameTypeOption>(`/game-types/${id}`, payload).then((r) => r.data),
+  setActive: (id: number, active: boolean) =>
+    api.patch<GameTypeOption>(`/game-types/${id}/active?active=${active}`).then((r) => r.data),
+  setDefault: (id: number, isDefault: boolean) =>
+    api.patch<GameTypeOption>(`/game-types/${id}/default?is_default=${isDefault}`).then((r) => r.data),
 };
 
 export const customersApi = {
@@ -531,7 +552,7 @@ export const ordersApi = {
 export const accountsApi = {
   list: (params?: { status?: string }) =>
     api.get<Account[]>("/accounts", { params }).then((r) => r.data),
-  updateProfile: (id: number, payload: Pick<Account, "account_description" | "account_images">) =>
+  updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "platform" | "note" | "account_description" | "account_images">>) =>
     api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api

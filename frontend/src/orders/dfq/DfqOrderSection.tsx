@@ -1,6 +1,6 @@
 import { DatePicker, Form, Input } from "antd";
 import { useEffect, useRef } from "react";
-import type { Pool } from "../../shared/api/catalog";
+import type { GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CUSTOMER_SOURCE_OPTIONS } from "../recovery/recoveryConfig";
@@ -56,14 +56,14 @@ function DfqInstallmentInfo() {
   );
 }
 
-export function DfqOrderSection(props: { pools: Pool[] }) {
+export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[] }) {
 
   return (
     <>
       <RecoveryAccountSection fieldNames={{
         gameType: "dfq_game_type", gameAccount: "dfq_game_account", gamePassword: "dfq_game_password",
         channelRegion: "dfq_channel_region", boundPhone: "dfq_bound_phone", hasSecondary: "dfq_has_secondary", accountNote: "dfq_account_note",
-      }}>
+      }} gameTypes={props.gameTypes}>
         <NestedFormSection className="nested-form-section--card dfq-section" title="分期信息" description="客户已支付部分号款，系统代付剩余号款，后续按期向客户收回">
           <DfqInstallmentInfo />
         </NestedFormSection>

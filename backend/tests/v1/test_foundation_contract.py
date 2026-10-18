@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session as SqlSession
 
 from app.core.errors import NotFound, Validation
 from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
-from app.domain.foundation import OrderTypeDef, OrderTypePool
+from app.domain.foundation import GameTypeOption, OrderTypeDef, OrderTypePool
 from app.foundation import seeds, service
 from app.orders import service as order_service
 

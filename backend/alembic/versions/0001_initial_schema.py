@@ -1,8 +1,8 @@
-"""initial schema baseline
+"""squash to 0001
 
-Revision ID: 0001
+Revision ID: b4c7a111bb42
 Revises: 
-Create Date: 2026-10-18 04:39:10.703732
+Create Date: 2026-10-18 20:46:04.220729
 
 """
 from __future__ import annotations
@@ -159,7 +159,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('batch_no', sa.String(length=32), nullable=False),
     sa.Column('source_name', sa.String(length=128), nullable=False),
-    sa.Column('source_kind', sa.String(length=32), server_default=sa.text("'STANDARD_ORDER'"), nullable=False),
+    sa.Column('source_kind', sa.String(length=32), nullable=False, server_default=sa.text("'STANDARD_ORDER'")),
     sa.Column('status', sa.String(length=16), nullable=False),
     sa.Column('row_count', sa.Integer(), nullable=False),
     sa.Column('unmapped_count', sa.Integer(), nullable=False),
@@ -221,12 +221,12 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('policy_code', sa.String(length=32), nullable=False),
     sa.Column('name', sa.String(length=128), nullable=False),
-    sa.Column('scope_type', sa.String(length=32), nullable=False),
+    sa.Column('scope_type', sa.String(length=32), nullable=False, server_default=sa.text("'GLOBAL'")),
     sa.Column('scope_id', sa.Integer(), nullable=True),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('status', sa.String(length=16), nullable=False),
-    sa.Column('created_by', sa.String(length=64), nullable=False),
-    sa.Column('updated_by', sa.String(length=64), nullable=False),
+    sa.Column('status', sa.String(length=16), nullable=False, server_default=sa.text("'DRAFT'")),
+    sa.Column('created_by', sa.String(length=64), nullable=False, server_default=sa.text("'system'")),
+    sa.Column('updated_by', sa.String(length=64), nullable=False, server_default=sa.text("'system'")),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.CheckConstraint("(scope_type = 'GLOBAL' AND scope_id IS NULL) OR (scope_type <> 'GLOBAL' AND scope_id IS NOT NULL)", name=op.f('ck_policy_definitions_policy_scope_link_valid')),
@@ -290,7 +290,7 @@ def upgrade() -> None:
     sa.Column('code', sa.String(length=64), nullable=False),
     sa.Column('name', sa.String(length=128), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text("1")),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_teams')),
@@ -301,17 +301,17 @@ def upgrade() -> None:
     sa.Column('username', sa.String(length=64), nullable=False),
     sa.Column('display_name', sa.String(length=128), nullable=False),
     sa.Column('password_hash', sa.String(length=256), nullable=False),
-    sa.Column('role', sa.String(length=32), nullable=False),
-    sa.Column('owner_scope', sa.String(length=16), nullable=False),
-    sa.Column('pool_ids', sa.JSON(), nullable=False),
-    sa.Column('team_ids', sa.JSON(), nullable=False),
+    sa.Column('role', sa.String(length=32), nullable=False, server_default=sa.text("'VIEWER'")),
+    sa.Column('owner_scope', sa.String(length=16), nullable=False, server_default=sa.text("'SELF'")),
+    sa.Column('pool_ids', sa.JSON(), nullable=False, server_default=sa.text("'[]'")),
+    sa.Column('team_ids', sa.JSON(), nullable=False, server_default=sa.text("'[]'")),
     sa.Column('phone', sa.String(length=32), nullable=True),
     sa.Column('hired_on', sa.Date(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text("1")),
     sa.Column('deactivated_on', sa.Date(), nullable=True),
     sa.Column('handover_user_id', sa.Integer(), nullable=True),
     sa.Column('handover_note', sa.Text(), nullable=True),
-    sa.Column('must_change_password', sa.Boolean(), nullable=False),
+    sa.Column('must_change_password', sa.Boolean(), nullable=False, server_default=sa.text("0")),
     sa.Column('note', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
@@ -405,8 +405,8 @@ def upgrade() -> None:
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.CheckConstraint("portion IN ('PRINCIPAL', 'PROFIT', 'GROSS')", name=op.f('ck_order_type_pools_portion_valid')),
     sa.CheckConstraint("fund_nature IS NULL OR fund_nature IN ('BUSINESS', 'EXTERNAL', 'INTERNAL')", name=op.f('ck_order_type_pools_fund_nature_valid')),
+    sa.CheckConstraint("portion IN ('PRINCIPAL', 'PROFIT', 'GROSS')", name=op.f('ck_order_type_pools_portion_valid')),
     sa.CheckConstraint('priority >= 0', name=op.f('ck_order_type_pools_route_priority_nonnegative')),
     sa.ForeignKeyConstraint(['order_type_id'], ['order_type_defs.id'], name=op.f('fk_order_type_pools_order_type_id'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['pool_id'], ['pools.id'], name=op.f('fk_order_type_pools_pool_id'), ondelete='RESTRICT'),
@@ -444,12 +444,12 @@ def upgrade() -> None:
     sa.Column('account_no', sa.String(length=64), nullable=False),
     sa.Column('account_name', sa.String(length=128), nullable=False),
     sa.Column('account_type', sa.String(length=16), nullable=False),
-    sa.Column('ownership', sa.String(length=16), server_default=sa.text("'OWNED'"), nullable=False),
-    sa.Column('opening_balance', Amount(precision=18, scale=2), server_default=sa.text("0"), nullable=False),
-    sa.Column('status', sa.String(length=16), server_default=sa.text("'ACTIVE'"), nullable=False),
+    sa.Column('ownership', sa.String(length=16), nullable=False, server_default=sa.text("'OWNED'")),
+    sa.Column('opening_balance', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("0")),
+    sa.Column('status', sa.String(length=16), nullable=False, server_default=sa.text("'ACTIVE'")),
     sa.Column('note', sa.Text(), nullable=True),
-    sa.Column('created_by', sa.String(length=64), server_default=sa.text("'system'"), nullable=False),
-    sa.Column('updated_by', sa.String(length=64), server_default=sa.text("'system'"), nullable=False),
+    sa.Column('created_by', sa.String(length=64), nullable=False, server_default=sa.text("'system'")),
+    sa.Column('updated_by', sa.String(length=64), nullable=False, server_default=sa.text("'system'")),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.CheckConstraint("account_type IN ('BANK', 'CASH', 'THIRD_PARTY')", name=op.f('ck_pool_accounts_pool_account_type_valid')),
@@ -585,7 +585,7 @@ def upgrade() -> None:
     sa.Column('source_order_id', sa.Integer(), nullable=True),
     sa.Column('paid_amount', Amount(precision=18, scale=2), nullable=False),
     sa.Column('returned_amount', Amount(precision=18, scale=2), nullable=False),
-    sa.Column('lost_amount', Amount(precision=18, scale=2), nullable=False),
+    sa.Column('lost_amount', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
     sa.Column('status', sa.String(length=24), nullable=False),
     sa.Column('paid_on', sa.Date(), nullable=False),
     sa.Column('expected_release_on', sa.Date(), nullable=True),
@@ -647,13 +647,13 @@ def upgrade() -> None:
     sa.Column('policy_snapshot', sa.JSON(), nullable=True),
     sa.Column('principal', Amount(precision=18, scale=2), nullable=False),
     sa.Column('down_payment', Amount(precision=18, scale=2), nullable=False),
-    sa.Column('service_fee', Amount(precision=18, scale=2), nullable=False),
+    sa.Column('service_fee', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
     sa.Column('periods', sa.Integer(), nullable=False),
-    sa.Column('per_period_service_fee', Amount(precision=18, scale=2), nullable=False),
+    sa.Column('per_period_service_fee', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
     sa.Column('per_period', Amount(precision=18, scale=2), nullable=False),
     sa.Column('paid_amount', Amount(precision=18, scale=2), nullable=False),
-    sa.Column('waived_amount', Amount(precision=18, scale=2), nullable=False),
-    sa.Column('bad_debt_amount', Amount(precision=18, scale=2), server_default=sa.text("'0'"), nullable=False),
+    sa.Column('waived_amount', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
+    sa.Column('bad_debt_amount', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
     sa.Column('status', sa.String(length=16), nullable=False),
     sa.Column('delivery_mode', sa.String(length=24), nullable=True),
     sa.Column('delivered_on', sa.Date(), nullable=True),
@@ -828,7 +828,7 @@ def upgrade() -> None:
     with op.batch_alter_table('rebate_records', schema=None) as batch_op:
         batch_op.create_index('ix_rebate_records_expected_status', ['expected_on', 'status'], unique=False)
         batch_op.create_index('ix_rebate_records_policy_version_id', ['policy_version_id'], unique=False)
-        batch_op.create_index('ix_rebate_source_order', ['source_order_id'], unique=False)
+        batch_op.create_index('ix_rebate_records_source_order', ['source_order_id'], unique=False)
 
     op.create_table('cashflow',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -842,7 +842,7 @@ def upgrade() -> None:
     sa.Column('category', sa.String(length=32), nullable=False),
     sa.Column('direction', sa.String(length=8), nullable=False),
     sa.Column('amount', Amount(precision=18, scale=2), nullable=False),
-    sa.Column('status', sa.String(length=16), nullable=False),
+    sa.Column('status', sa.String(length=16), nullable=False, server_default=sa.text("'APPROVED'")),
     sa.Column('order_id', sa.Integer(), nullable=True),
     sa.Column('deposit_id', sa.Integer(), nullable=True),
     sa.Column('order_event_id', sa.Integer(), nullable=True),
@@ -915,10 +915,10 @@ def upgrade() -> None:
     sa.Column('installment_id', sa.Integer(), nullable=False),
     sa.Column('period_no', sa.Integer(), nullable=False),
     sa.Column('due_on', sa.Date(), nullable=False),
-    sa.Column('service_fee_rate', Amount(precision=18, scale=2), server_default=sa.text("'0'"), nullable=False),
+    sa.Column('service_fee_rate', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
     sa.Column('due_amount', Amount(precision=18, scale=2), nullable=False),
     sa.Column('received_amount', Amount(precision=18, scale=2), nullable=False),
-    sa.Column('waived_amount', Amount(precision=18, scale=2), nullable=False),
+    sa.Column('waived_amount', Amount(precision=18, scale=2), nullable=False, server_default=sa.text("'0'")),
     sa.Column('received_on', sa.Date(), nullable=True),
     sa.Column('status', sa.String(length=16), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
@@ -932,7 +932,7 @@ def upgrade() -> None:
     sa.UniqueConstraint('installment_id', 'period_no', name='uq_installment_period')
     )
     with op.batch_alter_table('installment_schedules', schema=None) as batch_op:
-        batch_op.create_index('ix_schedules_due', ['installment_id', 'due_on', 'status'], unique=False)
+        batch_op.create_index('ix_installment_schedules_due', ['installment_id', 'due_on', 'status'], unique=False)
 
     op.create_table('rebate_settlements',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -965,7 +965,24 @@ def upgrade() -> None:
         batch_op.create_index('ix_rebate_settlements_rebate_record_id', ['rebate_record_id'], unique=False)
         batch_op.create_index('uq_rebate_settlements_reversal', ['reversal_of_id'], unique=True)
 
+    op.create_table(
+        "game_type_options",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("name", sa.String(length=64), nullable=False),
+        sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("created_by", sa.String(length=64), nullable=False),
+        sa.Column("updated_by", sa.String(length=64), nullable=False),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.CheckConstraint("sort_order >= 0", name="game_type_sort_order_nonnegative"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("name", name="uq_game_type_options_name"),
+    )
+
     # ### end Alembic commands ###
+
     from app.foundation.seeds import seed_foundation
 
     session = Session(bind=op.get_bind())
@@ -992,9 +1009,10 @@ def upgrade() -> None:
                 {"key": key, "prefix": prefix},
             )
 
-
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
+
+    op.drop_table('game_type_options')
     with op.batch_alter_table('rebate_settlements', schema=None) as batch_op:
         batch_op.drop_index('uq_rebate_settlements_reversal')
         batch_op.drop_index('ix_rebate_settlements_rebate_record_id')
@@ -1002,7 +1020,7 @@ def downgrade() -> None:
 
     op.drop_table('rebate_settlements')
     with op.batch_alter_table('installment_schedules', schema=None) as batch_op:
-        batch_op.drop_index('ix_schedules_due')
+        batch_op.drop_index('ix_installment_schedules_due')
 
     op.drop_table('installment_schedules')
     with op.batch_alter_table('installment_dispositions', schema=None) as batch_op:
@@ -1024,7 +1042,7 @@ def downgrade() -> None:
 
     op.drop_table('cashflow')
     with op.batch_alter_table('rebate_records', schema=None) as batch_op:
-        batch_op.drop_index('ix_rebate_source_order')
+        batch_op.drop_index('ix_rebate_records_source_order')
         batch_op.drop_index('ix_rebate_records_policy_version_id')
         batch_op.drop_index('ix_rebate_records_expected_status')
 

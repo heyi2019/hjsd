@@ -41,6 +41,11 @@ SEED_ORDER_TYPES: tuple[tuple[str, str, str, int, str], ...] = (
     ("DFQ", "代分期", CapitalType.CREDIT.value, 40, "代客户买号，到期账号再换绑给他（垫资型）"),
 )
 
+SEED_GAME_TYPES: tuple[tuple[str, int, bool], ...] = (
+    ("王者荣耀", 10, True),
+    ("原神", 20, False),
+)
+
 # (order_type_code, portion, pool_code)
 SEED_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("HS", Portion.PRINCIPAL.value, "HJ_INVEST"),
@@ -76,6 +81,8 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         "routes_created": 0,
         "routes_updated": 0,
         "sequences_created": 0,
+        "game_types_created": 0,
+        "game_types_skipped": 0,
     }
 
     for code, name, pool_type, ownership in SEED_POOLS:
@@ -110,6 +117,20 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
             )
             stats["order_types_created"] += 1
         ensure_sequence(session, order_type.sequence_key, order_type.sequence_prefix, 4)
+
+    for name, sort_order, is_default in SEED_GAME_TYPES:
+        existing = next((item for item in service.list_game_types(session) if item.name == name), None)
+        if existing is not None:
+            stats["game_types_skipped"] += 1
+            continue
+        service.create_game_type(
+            session,
+            name=name,
+            sort_order=sort_order,
+            is_default=is_default,
+            actor=actor,
+        )
+        stats["game_types_created"] += 1
 
     for order_type_code, portion, pool_code in SEED_ROUTES:
         order_type = service.get_order_type_by_code(session, order_type_code)
@@ -182,6 +203,10 @@ def seed_is_applied(session: Session) -> bool:
         and service.get_pool_by_code(session, "HJ_PROFIT") is not None
         and all(service.get_order_type_by_code(session, code) is not None for code in ("HS", "TH", "DG", "DFQ"))
         and _all_seed_routes_ready(session)
+        and all(
+            any(item.name == name for item in service.list_game_types(session))
+            for name, _sort_order, _is_default in SEED_GAME_TYPES
+        )
     )
 
 
@@ -193,4 +218,4 @@ def _all_seed_routes_ready(session: Session) -> bool:
     return True
 
 
-__all__ = ["SEED_ACTOR", "SEED_POOLS", "SEED_ORDER_TYPES", "SEED_ROUTES", "seed_foundation", "seed_is_applied"]
+__all__ = ["SEED_ACTOR", "SEED_POOLS", "SEED_ORDER_TYPES", "SEED_ROUTES", "SEED_GAME_TYPES", "seed_foundation", "seed_is_applied"]

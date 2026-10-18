@@ -123,6 +123,21 @@ class OrderTypeDef(Base, AuditMixin):
     )
 
 
+class GameTypeOption(Base, AuditMixin):
+    """游戏类型标准：供订单/账号录入使用的可搜索主数据。"""
+
+    __tablename__ = "game_type_options"
+    __table_args__ = (
+        CheckConstraint("sort_order >= 0", name="game_type_sort_order_nonnegative"),
+        UniqueConstraint("name", name="uq_game_type_options_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
 class OrderTypePool(Base, TimestampMixin):
     """业务↔资金池路由；按业务、份额和可选资金性质区分默认池（BAS-03-02）。"""
 
@@ -223,6 +238,7 @@ class AuditLog(Base):
 __all__ = [
     "AuditLog",
     "DocumentSequence",
+    "GameTypeOption",
     "OrderTypeDef",
     "PeriodLock",
     "OrderTypePool",

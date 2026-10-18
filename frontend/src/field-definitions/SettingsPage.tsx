@@ -9,6 +9,7 @@ import { UsersPanel } from "../users/UsersPanel";
 import { useSession } from "../shared/state/session";
 import { BusinessDictionaryPanel } from "./panels/BusinessDictionaryPanel";
 import { FieldsPanel } from "./panels/FieldsPanel";
+import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
 import { OrderTypesPanel } from "./panels/OrderTypesPanel";
 import { PoolsPanel } from "./panels/PoolsPanel";
 
@@ -31,6 +32,7 @@ export function SettingsPage() {
     { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
     { key: "pools", label: "资金池", render: () => <PoolsPanel /> },
     { key: "fields", label: "活字段", render: () => <FieldsPanel /> },
+    { key: "game-types", label: "游戏类型", render: () => <GameTypeSettingsPanel /> },
     { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
     ...(can("import.manage") ? [{ key: "imports", label: "标准导入", render: () => <ImportWorkbench embedded /> }] : []),
     ...(can("user.manage")

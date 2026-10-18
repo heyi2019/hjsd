@@ -15,6 +15,13 @@ from .order_types import (
     set_route,
     update_order_type,
 )
+from .game_types import (
+    create_game_type,
+    list_game_types,
+    set_game_type_active,
+    set_game_type_default,
+    update_game_type,
+)
 from .pools import (
     _has_cashflow,
     assert_pool_usable,
@@ -53,4 +60,9 @@ __all__ = [
     "set_route",
     "update_order_type",
     "update_pool",
+    "create_game_type",
+    "list_game_types",
+    "set_game_type_active",
+    "set_game_type_default",
+    "update_game_type",
 ]

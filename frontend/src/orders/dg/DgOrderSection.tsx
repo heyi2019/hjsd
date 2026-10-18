@@ -1,16 +1,17 @@
 import { Form, Input } from "antd";
+import type { GameTypeOption } from "../../shared/api/catalog";
 import { NestedFormField, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CUSTOMER_SOURCE_OPTIONS } from "../recovery/recoveryConfig";
 import "./DgOrderSection.css";
 
 /** 代挂前端表单：沿用统一出售事实登记，订单创建阶段只登记寄售账号与委托客户。 */
-export function DgOrderSection() {
+export function DgOrderSection(props: { gameTypes?: GameTypeOption[] }) {
   const customerSource = Form.useWatch("dg_customer_source");
   const isOtherSource = customerSource === "其他";
   return (
     <>
-      <RecoveryAccountSection />
+      <RecoveryAccountSection gameTypes={props.gameTypes} />
 
       <section className="dg-customer-section recovery-customer-fields" aria-labelledby="dg-customer-info-title">
         <div id="dg-customer-info-title" className="recovery-customer-fields__title">委托客户</div>

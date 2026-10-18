@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CreateBusinessModal } from "./CreateBusinessModal";
+import * as catalog from "../shared/api/catalog";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -10,45 +11,30 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const ordersCreate = vi.fn();
-const orderEvents = vi.fn();
-const typesList = vi.fn();
-const customersList = vi.fn();
-const counterpartiesList = vi.fn();
-const accountsList = vi.fn();
-const poolsList = vi.fn();
-const ordersList = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  ordersApi: {
-    list: (...a: unknown[]) => ordersList(...a),
-    create: (...a: unknown[]) => ordersCreate(...a),
-    postEvent: (...a: unknown[]) => orderEvents(...a),
-  },
-  orderTypesApi: { list: (...a: unknown[]) => typesList(...a) },
-  customersApi: { list: (...a: unknown[]) => customersList(...a) },
-  counterpartiesApi: { list: (...a: unknown[]) => counterpartiesList(...a) },
-  accountsApi: {
-    list: (...a: unknown[]) => accountsList(...a),
-  },
-  poolsApi: { list: (...a: unknown[]) => poolsList(...a) },
-}));
+// 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()，
+// 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
+// 与各文件 beforeEach 重新设定返回值，避免闭包捕获的 vi.fn() 在共享模块图下串扰。
+vi.mock("../shared/api/catalog");
 
 const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  typesList.mockResolvedValue(types);
-  customersList.mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  counterpartiesList.mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
-  accountsList.mockResolvedValue([
+  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
+  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
+  vi.mocked(catalog.accountsApi.list).mockResolvedValue([
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
   ]);
-  poolsList.mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
-  ordersList.mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
-  orderEvents.mockResolvedValue({ event: { id: 1 }, cashflow_no: "FLOW-0001" });
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
+  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
+    { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
+    { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
+  ]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
+  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({ event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
 
 /** 打开弹窗，返回弹窗容器与 onCreated 探针。
@@ -60,7 +46,7 @@ async function openModal(user = "admin") {
 async function openTypedModal(orderType: string, user = "admin") {
   const onCreated = vi.fn();
   renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG" | "DFQ"} />, { user });
-    const title = await screen.findByText(orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : orderType === "DFQ" ? "新建代分期订单" : "新建业务");
+  const title = await screen.findByText(orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : orderType === "DFQ" ? "新建代分期订单" : "新建业务");
   return { container: title.closest(".ant-modal-content") as HTMLElement, onCreated };
 }
 
@@ -70,29 +56,29 @@ it("回收入口内联填写游戏账号信息，不加载库存账号", async (
 
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(accountsList).not.toHaveBeenCalled();
-    expect(ordersList).not.toHaveBeenCalled();
-    expect(typesList).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.accountsApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.orderTypesApi.list)).not.toHaveBeenCalled();
   });
 
 it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(typesList).not.toHaveBeenCalled();
-    expect(accountsList).not.toHaveBeenCalled();
-    expect(ordersList).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.orderTypesApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.accountsApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });
 
 it("必填校验：未选业务类型不给提交", async () => {
     await openModal();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(ordersCreate).not.toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled());
   });
 
 it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
-    ordersCreate.mockRejectedValueOnce({
+    vi.mocked(catalog.ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金池路由" } },
       message: "Request failed",

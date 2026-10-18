@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import {
   counterpartiesApi,
   customersApi,
+  gameTypesApi,
   ordersApi,
   poolsApi,
   type Counterparty,
   type Customer,
+  type GameTypeOption,
   type Pool,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
@@ -64,6 +66,7 @@ export function CreateBusinessModal(props: {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
+  const [gameTypes, setGameTypes] = useState<GameTypeOption[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
@@ -90,15 +93,17 @@ export function CreateBusinessModal(props: {
     let cancelled = false;
     void (async () => {
       try {
-        const [customerList, cpList, poolList] = await Promise.all([
+        const [customerList, cpList, poolList, gameTypeList] = await Promise.all([
           customersApi.list(),
           counterpartiesApi.list(),
           poolsApi.list(),
+          gameTypesApi.list({ include_inactive: false }),
         ]);
         if (cancelled) return;
         setCustomers(customerList);
         setCounterparties(cpList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
+        setGameTypes(gameTypeList);
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(normalizeError(error));
@@ -119,8 +124,13 @@ export function CreateBusinessModal(props: {
       defaults.counterparty_role = "PEER";
     }
     if (isTh) defaults.supplier_source = "氪金联盟";
+    const defaultGameType = gameTypes.find((item) => item.is_default)?.name;
+    const gameTypeField = isDfq ? "dfq_game_type" : "game_type";
+    if (defaultGameType && form.getFieldValue(gameTypeField) == null) {
+      defaults[gameTypeField] = defaultGameType;
+    }
     form.setFieldsValue(defaults);
-  }, [form, isRecovery, isTh, orderType, props.open]);
+  }, [form, gameTypes, isDfq, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
     try {
@@ -373,9 +383,9 @@ export function CreateBusinessModal(props: {
             <span>产品：业务单内联登记</span>
           </Space>
         ) : null}
-        {isRecovery ? <RecoveryAccountSection>
+        {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
           <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
-        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} /> : isDg ? <DgOrderSection /> : <DfqOrderSection pools={pools} />}
+        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
         {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
       </Form>
     </Modal>

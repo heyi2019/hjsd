@@ -32,6 +32,7 @@ router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_POOL_MANAGE, require_all=False)
 manage_pools = require_permissions(PERM_POOL_MANAGE)
 manage_order_types = require_permissions(PERM_ORDER_TYPE_MANAGE)
+manage_game_types = require_permissions(PERM_ORDER_TYPE_MANAGE)
 
 
 def _actor(user: CurrentUser) -> str:
@@ -54,6 +55,68 @@ def _order_type_output(order_type) -> schemas.OrderTypeOut:
         payload.business_type = classification["business_type"]
         payload.value_added_service = classification["value_added_service"]
     return payload
+
+
+# ------------------------------------------------------------------- 游戏类型标准
+@router.get("/game-types", response_model=list[schemas.GameTypeOut])
+def list_game_types(
+    include_inactive: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = Depends(get_current_user),
+) -> list[schemas.GameTypeOut]:
+    return [
+        schemas.GameTypeOut.model_validate(item)
+        for item in service.list_game_types(db, include_inactive=include_inactive)
+    ]
+
+
+@router.post("/game-types", response_model=schemas.GameTypeOut, status_code=201)
+def create_game_type(
+    payload: schemas.GameTypeCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_game_types,
+) -> schemas.GameTypeOut:
+    item = service.create_game_type(
+        db,
+        name=payload.name,
+        sort_order=payload.sort_order,
+        is_default=payload.is_default,
+        actor=_actor(user),
+    )
+    return schemas.GameTypeOut.model_validate(item)
+
+
+@router.patch("/game-types/{game_type_id}", response_model=schemas.GameTypeOut)
+def update_game_type(
+    game_type_id: int,
+    payload: schemas.GameTypeUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_game_types,
+) -> schemas.GameTypeOut:
+    item = service.update_game_type(db, game_type_id, actor=_actor(user), **payload.model_dump(exclude_unset=True))
+    return schemas.GameTypeOut.model_validate(item)
+
+
+@router.patch("/game-types/{game_type_id}/active", response_model=schemas.GameTypeOut)
+def set_game_type_active(
+    game_type_id: int,
+    active: bool = Query(...),
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_game_types,
+) -> schemas.GameTypeOut:
+    item = service.set_game_type_active(db, game_type_id, active, actor=_actor(user))
+    return schemas.GameTypeOut.model_validate(item)
+
+
+@router.patch("/game-types/{game_type_id}/default", response_model=schemas.GameTypeOut)
+def set_game_type_default(
+    game_type_id: int,
+    is_default: bool = Query(...),
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_game_types,
+) -> schemas.GameTypeOut:
+    item = service.set_game_type_default(db, game_type_id, is_default, actor=_actor(user))
+    return schemas.GameTypeOut.model_validate(item)
 
 
 # --------------------------------------------------------------------- 资金池

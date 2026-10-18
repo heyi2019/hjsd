@@ -1,6 +1,8 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as catalog from "../shared/api/catalog";
+vi.mock("../shared/api/catalog");
 import { renderLight } from "../test/render";
 import { SettingsPage } from "./SettingsPage";
 
@@ -11,21 +13,7 @@ beforeEach(() => {
 });
 
 // vi.hoisted：保证 const 在 vi.mock 工厂执行前完成初始化，避免 TDZ（直接返回对象引用会触发）。
-const { orderTypesApi, poolsApi, fieldsApi, policyApi } = vi.hoisted(() => ({
-  orderTypesApi: { list: vi.fn(), create: vi.fn() },
-  poolsApi: { list: vi.fn(), create: vi.fn() },
-  fieldsApi: { list: vi.fn(), create: vi.fn(), setActive: vi.fn(), remove: vi.fn() },
-  policyApi: {
-    list: vi.fn(),
-    versions: vi.fn(),
-    approve: vi.fn(),
-    create: vi.fn(),
-    createVersion: vi.fn(),
-    updateDraft: vi.fn(),
-    resolve: vi.fn(),
-    allocations: vi.fn(),
-  },
-}));
+
 
 const { api } = vi.hoisted(() => ({
   api: {
@@ -35,12 +23,7 @@ const { api } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../shared/api/catalog", () => ({
-  orderTypesApi,
-  poolsApi,
-  fieldsApi,
-  policyApi,
-}));
+
 
 vi.mock("../shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../shared/api/client")>()),
@@ -63,10 +46,10 @@ const fields = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  orderTypesApi.list.mockResolvedValue(orderTypes);
-  poolsApi.list.mockResolvedValue(pools);
-  fieldsApi.list.mockResolvedValue(fields);
-  policyApi.list.mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(orderTypes);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fields);
+  vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
   api.get.mockResolvedValue({ data: [] });
 });
 

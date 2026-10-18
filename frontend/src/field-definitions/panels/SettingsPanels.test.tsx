@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as catalog from "../../shared/api/catalog";
+vi.mock("../../shared/api/catalog");
 import { renderLight } from "../../test/render";
 import { PolicySettingsPanel } from "../../policy/PolicySettingsPanel";
 import { FieldsPanel } from "./FieldsPanel";
@@ -12,22 +14,9 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const { poolsApi, fieldsApi, policyApi } = vi.hoisted(() => ({
-  poolsApi: { list: vi.fn(), create: vi.fn(), update: vi.fn() },
-  fieldsApi: { list: vi.fn(), create: vi.fn(), setActive: vi.fn(), remove: vi.fn() },
-  policyApi: {
-    list: vi.fn(),
-    versions: vi.fn(),
-    approve: vi.fn(),
-    create: vi.fn(),
-    createVersion: vi.fn(),
-    updateDraft: vi.fn(),
-    resolve: vi.fn(),
-    allocations: vi.fn(),
-  },
-}));
 
-vi.mock("../../shared/api/catalog", () => ({ poolsApi, fieldsApi, policyApi }));
+
+
 
 const pools = [
   { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
@@ -38,10 +27,14 @@ const fields = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  poolsApi.list.mockResolvedValue(pools);
-  fieldsApi.list.mockResolvedValue(fields);
-  policyApi.list.mockResolvedValue({ items: [], total: 0 });
-  policyApi.versions.mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(catalog.poolsApi).list.mockResolvedValue(pools);
+  vi.mocked(catalog.fieldsApi).list.mockResolvedValue(fields);
+  vi.mocked(catalog.policyApi).list.mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(catalog.policyApi).versions.mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(catalog.gameTypesApi).list.mockResolvedValue([
+    { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
+    { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
+  ]);
 });
 
 describe("设置面板：资金池", () => {
@@ -59,7 +52,7 @@ describe("设置面板：资金池", () => {
   });
 
   it("admin 可编辑资金池名称、用途和归属", async () => {
-    poolsApi.update.mockResolvedValue({ ...pools[0], name: "新托管池" });
+    vi.mocked(catalog.poolsApi).update.mockResolvedValue({ ...pools[0], name: "新托管池" });
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /编辑/ }));
@@ -68,7 +61,7 @@ describe("设置面板：资金池", () => {
     await ui.clear(name);
     await ui.type(name, "新托管池");
     await ui.click(within(dialog).getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(poolsApi.update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
+    await waitFor(() => expect(vi.mocked(catalog.poolsApi).update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
   });
 });
 
@@ -86,8 +79,8 @@ describe("设置面板：活字段", () => {
     expect(await screen.findByText("区域")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /删\s*除/ }));
     await ui.click(await screen.findByRole("button", { name: /确\s*定|OK/ }));
-    await waitFor(() => expect(fieldsApi.remove).toHaveBeenCalledWith(1));
-    await waitFor(() => expect(fieldsApi.list).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).remove).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).list).toHaveBeenCalledTimes(2));
   });
 
   it("TEXT 类型不展开选项输入，提交回传定义字段", async () => {
@@ -97,8 +90,8 @@ describe("设置面板：活字段", () => {
     await ui.type(screen.getByPlaceholderText("小写下划线，如 credit_level"), "credit_level");
     await ui.type(screen.getByPlaceholderText("页面显示名"), "信用评级");
     await ui.click(screen.getByRole("button", { name: /新增字段/ }));
-    await waitFor(() => expect(fieldsApi.create).toHaveBeenCalled());
-    expect(fieldsApi.create.mock.calls[0][0]).toMatchObject({
+    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).create).toHaveBeenCalled());
+    expect(vi.mocked(catalog.fieldsApi).create.mock.calls[0][0]).toMatchObject({
       entity_type: "customer",
       field_key: "credit_level",
       label: "信用评级",
@@ -113,6 +106,29 @@ describe("设置面板：经营规则", () => {
   it("挂载后渲染规则统计并加载定义", async () => {
     renderLight(<PolicySettingsPanel />, { user: "admin" });
     expect(await screen.findByText("规则总数")).toBeInTheDocument();
-    await waitFor(() => expect(policyApi.list).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(catalog.policyApi).list).toHaveBeenCalled());
+  });
+});
+
+describe("设置面板：游戏类型", () => {
+  it("展示游戏类型并可勾选默认游戏类型", async () => {
+    const { GameTypeSettingsPanel } = await import("./GameTypeSettingsPanel");
+    renderLight(<GameTypeSettingsPanel />, { user: "admin" });
+
+    expect(await screen.findByText("王者荣耀")).toBeInTheDocument();
+    await ui.click(screen.getByRole("checkbox", { name: "原神设为默认" }));
+
+    await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).setDefault).toHaveBeenCalledWith(2, true));
+  });
+
+  it("管理员可新增游戏类型", async () => {
+    const { GameTypeSettingsPanel } = await import("./GameTypeSettingsPanel");
+    renderLight(<GameTypeSettingsPanel />, { user: "admin" });
+
+    await screen.findByText("王者荣耀");
+    await ui.type(screen.getByPlaceholderText("如：王者荣耀"), "和平精英");
+    await ui.click(screen.getByRole("button", { name: /新增游戏类型/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).create).toHaveBeenCalledWith({ name: "和平精英", sort_order: 0 }));
   });
 });

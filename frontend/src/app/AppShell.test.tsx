@@ -97,6 +97,16 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台");
   });
 
+  it("点击左侧业务中心默认打开库存中心", async () => {
+    await renderShell();
+    const nav = screen.getByRole("navigation", { name: "主导航" });
+    await ui.click(within(nav).getByRole("button", { name: "业务中心" }));
+
+    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
+    expect(inventoryTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "业务台账" })).toHaveAttribute("aria-selected", "false");
+  });
+
   it("逐个点击每个导航项都能切换到对应页面（无白屏、无抛错）", async () => {
     await renderShell();
     for (const item of navigation) {

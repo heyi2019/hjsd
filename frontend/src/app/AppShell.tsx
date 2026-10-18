@@ -98,7 +98,7 @@ export function AppShell() {
               key={n.key}
               type="button"
               className={`nav-item${n.key === "operations" || n.key === "settings" ? " nav-item--secondary" : ""}${active === n.key ? " nav-item--active" : ""}`}
-              onClick={() => navigateTo(n.key)}
+              onClick={() => navigateTo(n.key, n.key === "business" ? "inventory" : undefined)}
               aria-label={n.label}
               title={n.label}
               aria-current={active === n.key ? "page" : undefined}

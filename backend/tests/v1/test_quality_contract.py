@@ -82,7 +82,7 @@ class TestQualityScan:
             for row in service.scan(seeded_db)
         )
 
-    def test_detects_th_unclosed_advance(self, seeded_db):
+    def test_th_purchase_does_not_create_removed_advance_issue(self, seeded_db):
         order = _order(seeded_db)
         orders_service.post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
@@ -90,9 +90,7 @@ class TestQualityScan:
         )
 
         result = service.summary(seeded_db)
-        item = next(row for row in result["items"] if row["code"] == "TH_UNCLOSED_ADVANCE")
-        assert item["entity_id"] == order.order_no
-        assert item["details"]["outstanding"] == "500.00"
+        assert all(row["code"] != "TH_UNCLOSED_ADVANCE" for row in result["items"])
 
     def test_detects_missing_event_cashflow_and_pool(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
@@ -164,7 +162,7 @@ class TestQualityScan:
             "available": "-120.00",
         }
 
-    def test_detects_unlinked_rebate_with_source_order(self, seeded_db):
+    def test_no_unlinked_rebate_issue_with_source_order(self, seeded_db):
         order = _order(seeded_db, order_type="DG")
         seeded_db.add(
             RebateRecord(
@@ -183,9 +181,7 @@ class TestQualityScan:
         seeded_db.flush()
 
         issues = service.scan(seeded_db)
-        item = next(row for row in issues if row["code"] == "REBATE_UNLINKED")
-        assert item["entity_id"] == "RB-UNLINKED-1"
-        assert item["details"]["source_order_id"] == order.id
+        assert all(row["code"] != "REBATE_UNLINKED" for row in issues)
 
     def test_quality_endpoint_respects_order_scope(self, seeded_client, seeded_db):
         mine = _order(seeded_db, owner_id=9)

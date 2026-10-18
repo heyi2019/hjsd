@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections import defaultdict
 from calendar import monthrange
 from datetime import date
-from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
@@ -34,7 +33,6 @@ from app.domain.trade import (
     Order,
     OrderEvent,
     Reconciliation,
-    RebateRecord,
 )
 from app.domain.quality import QualityIssue
 from app.foundation import service as foundation_service
@@ -61,11 +59,6 @@ MONEY_EVENT_TYPES = frozenset(
 )
 
 QUALITY_METRIC_DEFINITIONS: dict[str, dict[str, str]] = {
-    "linked_rebate_rate": {
-        "label": "已关联返点率",
-        "formula": "已关联返点记录数 / 返点记录总数",
-        "unit": "percent",
-    },
     "reconciliation_completion_rate": {
         "label": "对账完成率",
         "formula": "已核销对账数 / 对账总数",
@@ -75,11 +68,6 @@ QUALITY_METRIC_DEFINITIONS: dict[str, dict[str, str]] = {
         "label": "分期逾期率",
         "formula": "期末已逾期计划数 / 当月到期计划数",
         "unit": "percent",
-    },
-    "th_outstanding_amount": {
-        "label": "TH 未闭环代垫额",
-        "formula": "截至月末 TH 现金流支出 - 收入，负数按 0 计",
-        "unit": "amount",
     },
     "missing_attachment_rate": {
         "label": "缺附件率",
@@ -270,7 +258,6 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                 )
             )
 
-    # TH 的净出账大于净入账即表示仍有未核销垫资。
     for order in orders:
         order_events = [event for event in events_by_order.get(order.id, []) if event.is_posted]
         if order.order_type == "DFQ" and order.account_id is not None:
@@ -285,30 +272,6 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                     details={"order_type": order.order_type, "account_id": order.account_id},
                 )
             )
-        if order.order_type == "TH":
-            outstanding = Decimal("0.00")
-            for event in order_events:
-                if event.event_type not in MONEY_EVENT_TYPES:
-                    continue
-                flow = session.scalar(
-                    select(Cashflow).where(Cashflow.order_event_id == event.id)
-                )
-                if flow is None:
-                    continue
-                outstanding += to_money(flow.amount) if flow.direction == Direction.OUT.value else -to_money(flow.amount)
-            if outstanding > 0:
-                issues.append(
-                    _issue(
-                        code="TH_UNCLOSED_ADVANCE",
-                        severity="HIGH",
-                        title="提号垫资未闭环",
-                        entity_type="order",
-                        entity_id=order.order_no,
-                        message="提号付同行金额尚未被回款或冲销核销。",
-                        details={"outstanding": str(outstanding)},
-                    )
-                )
-
         if order.order_type == "HS" and order.capital_type == "STOCK" and order.account_id is None:
             if any(event.event_type == EventType.BUY.value and event.is_posted for event in order_events):
                 issues.append(
@@ -366,24 +329,6 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                 entity_id=installment.inst_no,
                 message=f"第 {row.period_no} 期已超过到期日且未收满。",
                 details={"period_no": row.period_no, "due_on": row.due_on.isoformat()},
-            )
-        )
-
-    rebates = session.scalars(select(RebateRecord)).all()
-    for rebate in rebates:
-        if rebate.link_status == "LINKED":
-            continue
-        if rebate.source_order_id not in order_ids:
-            continue
-        issues.append(
-            _issue(
-                code="REBATE_UNLINKED",
-                severity="MEDIUM",
-                title="返点未关联",
-                entity_type="rebate_record",
-                entity_id=rebate.rebate_no,
-                message="返点记录尚未确认有效订单关联。",
-                details={"source_order_id": rebate.source_order_id},
             )
         )
 
@@ -505,20 +450,6 @@ def metrics(
     order_by_id = {order.id: order for order in orders}
     order_ids = set(order_by_id)
 
-    rebates = list(session.scalars(select(RebateRecord)).all())
-    if user is not None and not user.is_admin and user.owner_scope != "ALL":
-        rebates = [
-            rebate
-            for rebate in rebates
-            if rebate.source_order_id in order_ids
-        ]
-    else:
-        rebates = [
-            rebate
-            for rebate in rebates
-            if rebate.source_order_id in order_ids
-        ]
-
     reconciliations = list(session.scalars(select(Reconciliation)).all())
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         reconciliations = [
@@ -577,20 +508,10 @@ def metrics(
         ).all()
     )
     attachment_refs = {(item.entity_type, item.entity_id) for item in attachments}
-    th_order_ids = {order.id for order in orders if order.order_type == "TH"}
 
     items: list[dict[str, Any]] = []
     for month in months:
         end = _month_end(month)
-        month_rebates = [
-            rebate for rebate in rebates if _in_range(rebate.collected_on, month, end)
-        ]
-        linked_rebates = sum(
-            1
-            for rebate in month_rebates
-            if rebate.link_status == "LINKED"
-        )
-
         month_reconciliations = [
             item
             for item in reconciliations
@@ -612,14 +533,6 @@ def metrics(
             for schedule in month_schedules
         )
 
-        th_outstanding = Decimal("0.00")
-        for flow in cashflows:
-            if flow.order_id not in th_order_ids or flow.occurred_on > end:
-                continue
-            amount = to_money(flow.amount)
-            th_outstanding += amount if flow.direction == Direction.OUT.value else -amount
-        th_outstanding = max(to_money(th_outstanding), Decimal("0.00"))
-
         required_refs: list[tuple[str, str]] = [
             ("order_event", event.event_no)
             for event in events
@@ -637,11 +550,6 @@ def metrics(
         items.append(
             {
                 "month": month.strftime("%Y-%m"),
-                "linked_rebate_rate": {
-                    "rate": _percentage(linked_rebates, len(month_rebates)),
-                    "numerator": linked_rebates,
-                    "denominator": len(month_rebates),
-                },
                 "reconciliation_completion_rate": {
                     "rate": _percentage(
                         resolved_reconciliations, len(month_reconciliations)
@@ -654,7 +562,6 @@ def metrics(
                     "numerator": overdue_schedules,
                     "denominator": len(month_schedules),
                 },
-                "th_outstanding_amount": {"amount": f"{th_outstanding:.2f}"},
                 "missing_attachment_rate": {
                     "rate": _percentage(missing_attachments, len(required_refs)),
                     "numerator": missing_attachments,

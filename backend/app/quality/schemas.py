@@ -107,10 +107,8 @@ class QualityMetricItemOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     month: str
-    linked_rebate_rate: QualityMetricValueOut
     reconciliation_completion_rate: QualityMetricValueOut
     overdue_rate: QualityMetricValueOut
-    th_outstanding_amount: QualityMetricValueOut
     missing_attachment_rate: QualityMetricValueOut
 
 

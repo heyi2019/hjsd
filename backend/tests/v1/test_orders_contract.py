@@ -464,15 +464,6 @@ class TestCreateOrderValidation:
             )
 
     def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
-        with pytest.raises(Validation, match="不能为负数"):
-            order_service.create_order(
-                seeded_db,
-                order_type="DG",
-                trade_date=D,
-                actor="pytest",
-                listing_price=Decimal("-1"),
-            )
-
         order = _order(seeded_db)
         with pytest.raises(Validation, match="必须大于 0"):
             order_service.post_event(
@@ -667,45 +658,15 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="订单负责人不存在"):
             _order(seeded_db, owner_id=999999)
 
-    def test_dg_commission_terms_are_persisted(self, seeded_db):
-        order = order_service.create_order(
-            seeded_db,
-            order_type="DG",
-            trade_date=D,
-            actor="pytest",
-            listing_price="1200.00",
-            service_fee="120.00",
-            commission_mode="DEDUCT_FROM_SETTLEMENT",
-            commission_payer="CONSIGNOR",
-            expected_settlement_date=date(2026, 10, 20),
-        )
-
-        assert order.listing_price == Decimal("1200.00")
-        assert order.service_fee == Decimal("120.00")
-        assert order.commission_mode == "DEDUCT_FROM_SETTLEMENT"
-        assert order.commission_payer == "CONSIGNOR"
-        assert order.expected_settlement_date == date(2026, 10, 20)
-
-    def test_dg_commission_terms_reject_unhashable_values(self, seeded_db):
-        with pytest.raises(Validation, match="抽成方式无效"):
+    def test_dg_service_rejects_removed_commission_terms(self, seeded_db):
+        with pytest.raises(TypeError, match="commission_mode"):
             order_service.create_order(
                 seeded_db,
                 order_type="DG",
                 trade_date=D,
                 actor="pytest",
-                commission_mode=[],
+                commission_mode="DEDUCT_FROM_SETTLEMENT",
                 commission_payer="CONSIGNOR",
-            )
-
-    def test_dg_service_fee_cannot_exceed_listing_price(self, seeded_db):
-        with pytest.raises(Validation, match="服务费不能超过挂售价"):
-            order_service.create_order(
-                seeded_db,
-                order_type="DG",
-                trade_date=D,
-                actor="pytest",
-                listing_price="100.00",
-                service_fee="100.01",
             )
 
     def test_dfq_account_snapshot_does_not_create_inventory_account(self, seeded_db):
@@ -835,7 +796,7 @@ class TestGetAndListOrders:
         )
         with pytest.raises(Validation, match="登记事件"):
             order_service.update_order(
-                seeded_db, order.id, actor="operator", listing_price=Decimal("300")
+                seeded_db, order.id, actor="operator", trade_date=D
             )
         updated = order_service.update_order(
             seeded_db, order.id, actor="operator", note="仅改备注"

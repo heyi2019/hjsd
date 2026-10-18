@@ -202,11 +202,6 @@ def create_order(
     *,
     order_type: str,
     trade_date: date,
-    listing_price: Any = None,
-    service_fee: Any = None,
-    commission_mode: str | None = None,
-    commission_payer: str | None = None,
-    expected_settlement_date: date | None = None,
     account_snapshot: dict[str, Any] | None = None,
     actor: str,
     account_id: int | None = None,
@@ -261,53 +256,6 @@ def create_order(
             f"capital_type 必须为 {CapitalType.values()}",
             details={"field": "capital_type", "value": selected_capital_type},
         )
-    listing_amount = (
-        _non_negative_money(listing_price, field="listing_price")
-        if listing_price is not None
-        else None
-    )
-    service_fee_amount = (
-        _non_negative_money(service_fee, field="service_fee")
-        if service_fee is not None
-        else None
-    )
-    if definition.code != "DG" and any(
-        value is not None
-        for value in (
-            listing_amount,
-            service_fee_amount,
-            commission_mode,
-            commission_payer,
-            expected_settlement_date,
-        )
-    ):
-        raise Validation("只有 DG 代挂订单可以填写代挂结算条款")
-    if definition.code == "DG":
-        if commission_mode is not None and (
-            not isinstance(commission_mode, str)
-            or commission_mode not in {
-                "DEDUCT_FROM_SETTLEMENT",
-                "SEPARATE_PAYMENT",
-            }
-        ):
-            raise Validation("代挂抽成方式无效", details={"field": "commission_mode"})
-        if commission_payer is not None and (
-            not isinstance(commission_payer, str)
-            or commission_payer not in {
-                "BUYER",
-                "CONSIGNOR",
-                "PLATFORM",
-            }
-        ):
-            raise Validation("代挂付款方无效", details={"field": "commission_payer"})
-        if (commission_mode is None) != (commission_payer is None):
-            raise Validation("代挂抽成方式和付款方必须同时填写")
-        if (
-            listing_amount is not None
-            and service_fee_amount is not None
-            and service_fee_amount > listing_amount
-        ):
-            raise Validation("服务费不能超过挂售价")
     if account_id is not None:
         account = accounts_service.get_account(session, account_id, user)
         _validate_existing_account_context(definition.code, account)
@@ -376,11 +324,6 @@ def create_order(
         order_type=definition.code,
         capital_type=selected_capital_type,
         trade_date=trade_date,
-        listing_price=listing_amount,
-        service_fee=service_fee_amount,
-        commission_mode=commission_mode,
-        commission_payer=commission_payer,
-        expected_settlement_date=expected_settlement_date,
         account_snapshot=account_snapshot,
         account_id=account_id,
         game_type=game_type,
@@ -636,11 +579,6 @@ def update_order(
     *,
     actor: str,
     trade_date: date | None | object = _UNSET,
-    listing_price: Any = _UNSET,
-    service_fee: Any = _UNSET,
-    commission_mode: str | None | object = _UNSET,
-    commission_payer: str | None | object = _UNSET,
-    expected_settlement_date: date | None | object = _UNSET,
     account_snapshot: dict[str, Any] | None | object = _UNSET,
     note: str | None | object = _UNSET,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
@@ -656,11 +594,6 @@ def update_order(
         raise Validation("订单日期不能清空", details={"field": "trade_date"})
     accounting_changes = (
         trade_date,
-        listing_price,
-        service_fee,
-        commission_mode,
-        commission_payer,
-        expected_settlement_date,
         account_snapshot,
     )
     if any(value is not _UNSET for value in accounting_changes):
@@ -673,56 +606,6 @@ def update_order(
         if posted is not None:
             raise Validation("已有登记事件的订单只能修改备注，核算字段必须通过冲销/更正")
 
-    next_listing = (
-        _non_negative_money(listing_price, field="listing_price")
-        if listing_price is not _UNSET and listing_price is not None
-        else (None if listing_price is None else order.listing_price)
-    )
-    next_service_fee = (
-        _non_negative_money(service_fee, field="service_fee")
-        if service_fee is not _UNSET and service_fee is not None
-        else (None if service_fee is None else order.service_fee)
-    )
-    next_mode = order.commission_mode if commission_mode is _UNSET else commission_mode
-    next_payer = order.commission_payer if commission_payer is _UNSET else commission_payer
-
-    if order.order_type != "DG" and any(
-        value is not _UNSET and value is not None
-        for value in (
-            listing_price,
-            service_fee,
-            commission_mode,
-            commission_payer,
-            expected_settlement_date,
-        )
-    ):
-        raise Validation("只有 DG 代挂订单可以填写代挂结算条款")
-    if order.order_type == "DG":
-        if next_mode is not None and (
-            not isinstance(next_mode, str)
-            or next_mode not in {
-                "DEDUCT_FROM_SETTLEMENT",
-                "SEPARATE_PAYMENT",
-            }
-        ):
-            raise Validation("代挂抽成方式无效", details={"field": "commission_mode"})
-        if next_payer is not None and (
-            not isinstance(next_payer, str)
-            or next_payer not in {
-                "BUYER",
-                "CONSIGNOR",
-                "PLATFORM",
-            }
-        ):
-            raise Validation("代挂付款方无效", details={"field": "commission_payer"})
-        if (next_mode is None) != (next_payer is None):
-            raise Validation("代挂抽成方式和付款方必须同时填写")
-        if (
-            next_listing is not None
-            and next_service_fee is not None
-            and next_service_fee > next_listing
-        ):
-            raise Validation("服务费不能超过挂售价")
     if account_snapshot is not _UNSET and account_snapshot is not None:
         if order.order_type != "DFQ":
             raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
@@ -730,26 +613,11 @@ def update_order(
 
     before = {
         "trade_date": order.trade_date,
-        "listing_price": order.listing_price,
-        "service_fee": order.service_fee,
-        "commission_mode": order.commission_mode,
-        "commission_payer": order.commission_payer,
-        "expected_settlement_date": order.expected_settlement_date,
         "account_snapshot": order.account_snapshot,
         "note": order.note,
     }
     if trade_date is not _UNSET:
         order.trade_date = trade_date
-    if listing_price is not _UNSET:
-        order.listing_price = next_listing
-    if service_fee is not _UNSET:
-        order.service_fee = next_service_fee
-    if commission_mode is not _UNSET:
-        order.commission_mode = commission_mode
-    if commission_payer is not _UNSET:
-        order.commission_payer = commission_payer
-    if expected_settlement_date is not _UNSET:
-        order.expected_settlement_date = expected_settlement_date
     if account_snapshot is not _UNSET:
         order.account_snapshot = account_snapshot
     if note is not _UNSET:
@@ -772,11 +640,6 @@ def update_order(
         before=_audit_value(before),
         after=_audit_value({
             "trade_date": order.trade_date,
-            "listing_price": order.listing_price,
-            "service_fee": order.service_fee,
-            "commission_mode": order.commission_mode,
-            "commission_payer": order.commission_payer,
-            "expected_settlement_date": order.expected_settlement_date,
             "account_snapshot": order.account_snapshot,
             "note": order.note,
         }),

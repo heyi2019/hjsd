@@ -6,7 +6,7 @@ from datetime import date
 from app.core.money import to_money
 from app.domain.attachments import Attachment
 from app.domain.enums import ReconciliationStatus
-from app.domain.trade import RebateRecord, Reconciliation
+from app.domain.trade import Reconciliation
 from app.orders import service as order_service
 
 
@@ -25,33 +25,8 @@ def test_quality_metrics_expose_definitions_and_monthly_trend(
         occurred_on=trade_day,
         actor="pytest",
     )
-    # 一条已关联、一条未关联，验证返点率不是固定常量。
     seeded_db.add_all(
         [
-            RebateRecord(
-                rebate_no="TH-METRIC-RB01",
-                source_order_id=th_order.id,
-                rebate_type="BUY",
-                rate=to_money("1"),
-                base_amount=to_money("100"),
-                link_status="LINKED",
-                status="OPEN",
-                collected_on=trade_day,
-                created_by="pytest",
-                updated_by="pytest",
-            ),
-            RebateRecord(
-                rebate_no="TH-METRIC-RB02",
-                source_order_id=th_order.id,
-                rebate_type="BUY",
-                rate=to_money("1"),
-                base_amount=to_money("100"),
-                link_status="UNLINKED",
-                status="OPEN",
-                collected_on=trade_day,
-                created_by="pytest",
-                updated_by="pytest",
-            ),
             Reconciliation(
                 pool_id=1,
                 reconciled_on=trade_day,
@@ -87,17 +62,14 @@ def test_quality_metrics_expose_definitions_and_monthly_trend(
     assert response.status_code == 200, response.text
     payload = response.json()
     assert set(payload["definitions"]) == {
-        "linked_rebate_rate",
         "reconciliation_completion_rate",
         "overdue_rate",
-        "th_outstanding_amount",
         "missing_attachment_rate",
     }
     assert payload["items"]
     item = payload["items"][0]
     assert item["month"] == "2026-10"
-    assert item["linked_rebate_rate"]["numerator"] == 1
-    assert item["linked_rebate_rate"]["denominator"] == 2
+    assert "linked_rebate_rate" not in item
     assert item["reconciliation_completion_rate"]["rate"] == 100
-    assert item["th_outstanding_amount"]["amount"] == "100.00"
+    assert "th_outstanding_amount" not in item
     assert item["missing_attachment_rate"]["numerator"] >= 1

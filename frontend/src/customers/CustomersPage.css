@@ -1,0 +1,4 @@
+/* Keep the filter controls visually separate from the summary cards above. */
+.customer-list-filters--separated {
+  margin-block-start: var(--space-4);
+}

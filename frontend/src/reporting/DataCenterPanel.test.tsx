@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { DataCenterPanel } from "./DataCenterPanel";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -13,18 +14,8 @@ beforeEach(() => {
 /** 数据中心用例集：2026-10-13 从「工作台资金总览」原样迁入（内容未变，只换容器）。
  *  覆盖：资金池表格、金额/计数两种统计口径、错误条必达 UI、
  *  finance.read 门控、订单入口卡计数与跳转。 */
-const poolsList = vi.fn();
-const poolsBalance = vi.fn();
-const ordersList = vi.fn();
 
-vi.mock("../shared/api/catalog", () => ({
-  poolsApi: {
-    list: (...a: unknown[]) => poolsList(...a),
-    balance: (...a: unknown[]) => poolsBalance(...a),
-    create: vi.fn(),
-  },
-  ordersApi: { list: (...a: unknown[]) => ordersList(...a) },
-}));
+vi.mock("../shared/api/catalog")
 
 const pools = [
   { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
@@ -37,6 +28,20 @@ const balance = {
   deposit_held: "100.00",
   available: "700.00",
 };
+const businessPnl = {
+  total: {
+    business_mode: null,
+    business_type: null,
+    order_count: 2,
+    main_income: "1,000.00",
+    main_cost: "200.00",
+    main_profit: "800.00",
+    settled_rebate: "0.00",
+    uncollected_rebate: "0.00",
+    full_income: "800.00",
+  },
+  items: [],
+};
 /** 入口卡计数口径：订单总数=2、进行中=1（HS ACTIVE）、提号未闭环=0（TH 已 COMPLETED）。 */
 const orders = [
   { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" },
@@ -45,9 +50,10 @@ const orders = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  poolsList.mockResolvedValue(pools);
-  poolsBalance.mockResolvedValue(balance);
-  ordersList.mockResolvedValue(orders);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(catalog.poolsApi.balance).mockResolvedValue(balance);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue(businessPnl);
 });
 
 describe("DataCenterPanel：资金总览", () => {
@@ -74,8 +80,15 @@ describe("DataCenterPanel：资金总览", () => {
     expect(card?.textContent).not.toContain("2.00");
   });
 
+  it("统计卡包含利润，并使用金额口径展示", async () => {
+    renderLight(<DataCenterPanel />, { user: "admin" });
+    await screen.findByText("利润");
+    const card = screen.getByText("利润").closest(".ui-stat");
+    expect(card?.textContent).toContain("800.00");
+  });
+
   it("后端不可达时显示错误条，不能静默显示「尚未配置资金池」", async () => {
-    poolsList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<DataCenterPanel />, { user: "admin" });
     // 关键：错误必须落到 UI。空态仍在（数据确实为空），但错误条必须出现，
     // 否则「后端没起」与「真的没数据」在页面上无法区分。
@@ -95,7 +108,7 @@ describe("DataCenterPanel：资金总览", () => {
   });
 
   it("订单接口失败不阻断资金总览：池数据仍在，错误条露出", async () => {
-    ordersList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<DataCenterPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();

@@ -4,36 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CustomersPage } from "./CustomersPage";
 
-const list = vi.fn();
-const create = vi.fn();
-const merge = vi.fn();
-const cpList = vi.fn();
-const patch = vi.fn();
-const fieldsList = vi.fn();
-const detail = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  customersApi: {
-    list: (...a: unknown[]) => list(...a),
-    create: (...a: unknown[]) => create(...a),
-    merge: (...a: unknown[]) => merge(...a),
-    patch: (...a: unknown[]) => patch(...a),
-    setStatus: vi.fn(),
-    get: vi.fn(),
-    detail: (...a: unknown[]) => detail(...a),
-  },
-  counterpartiesApi: {
-    list: (...a: unknown[]) => cpList(...a),
-    create: vi.fn(),
-    setStatus: vi.fn(),
-  },
-  fieldsApi: {
-    list: (...a: unknown[]) => fieldsList(...a),
-    create: vi.fn(),
-    setActive: vi.fn(),
-    remove: vi.fn(),
-  },
-}));
+import * as catalog from "../shared/api/catalog";
+vi.mock("../shared/api/catalog")
+vi.mock("./CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 /** 活字段定义：SELECT / MULTI_SELECT / 停用字段各一，覆盖动态渲染与历史值展示 */
 const fieldDefs = [
@@ -92,6 +65,7 @@ const customers = [
     wechat: "zhangsan",
     qq: "10001",
     status: "ACTIVE",
+    created_at: "2026-10-18T09:00:00",
     extra_values: { credit_level: "优质", legacy_note: "早期客户" },
   },
   {
@@ -102,16 +76,31 @@ const customers = [
     wechat: "",
     qq: "",
     status: "DISABLED",
+    created_at: "2026-09-30T09:00:00",
     extra_values: {},
+  },
+];
+
+const counterparties = [
+  {
+    id: 11,
+    counterparty_no: "CP-0001",
+    display_name: "同行甲",
+    type: "PEER",
+    contact_name: "李经理",
+    phone: "136****6666",
+    wechat: "peer_a",
+    qq: "20001",
+    status: "ACTIVE",
   },
 ];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  list.mockResolvedValue(customers);
-  cpList.mockResolvedValue([]);
-  fieldsList.mockResolvedValue(fieldDefs);
-  detail.mockResolvedValue({
+  vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
+  vi.mocked(catalog.customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: {
       order_count: 1,
@@ -156,18 +145,17 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
     expect(screen.getByText("CUS-0002")).toBeInTheDocument();
     expect(screen.getByText("进行中")).toBeInTheDocument(); // ACTIVE
-    // 「已停用」同时出现在统计卡与状态标签 → 用 All 变体（skill 提示的重复文案坑）
-    expect(screen.getAllByText("已停用").length).toBeGreaterThanOrEqual(1); // DISABLED
+    expect(screen.getAllByText("已拉黑").length).toBeGreaterThanOrEqual(1); // DISABLED
   });
 
   it("后端不可达时显示错误条而不是空白页", async () => {
-    list.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("业务错误码给出可执行的处置提示", async () => {
-    list.mockRejectedValueOnce({
+    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "PERMISSION_DENIED", message: "当前角色无此权限" } },
       message: "Request failed",
@@ -181,5 +169,55 @@ describe("CustomersPage：客户档案", () => {
     await screen.findByText("CUS-0001");
     expect(screen.getByRole("tab", { name: "客户档案" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /合作方/ })).toBeInTheDocument();
+  });
+
+  it("统计卡片与筛选条之间保留清晰的分组间距", async () => {
+    renderLight(<CustomersPage />);
+    await screen.findByText("CUS-0001");
+
+    const stats = document.querySelector(".ui-stat-row");
+    const filters = document.querySelector(".customer-list-filters");
+
+    expect(stats).toBeInTheDocument();
+    expect(filters).toHaveClass("customer-list-filters--separated");
+    expect(stats?.nextElementSibling).toBe(filters);
+  });
+
+  it("统计区只展示总数、本月新增和今日新增", async () => {
+    vi.setSystemTime(new Date("2026-10-18T12:00:00"));
+    renderLight(<CustomersPage />);
+    await screen.findByText("CUS-0001");
+
+    expect(screen.getByText("客户总数")).toBeInTheDocument();
+    expect(screen.getByText("本月新增客户数")).toBeInTheDocument();
+    expect(screen.getByText("今日新增客户数")).toBeInTheDocument();
+
+    const stats = document.querySelector(".ui-stat-row");
+    expect(stats?.children).toHaveLength(3);
+    expect(within(stats as HTMLElement).getByText("客户总数")).toBeInTheDocument();
+    expect(within(stats as HTMLElement).getByText("本月新增客户数")).toBeInTheDocument();
+    expect(within(stats as HTMLElement).getByText("今日新增客户数")).toBeInTheDocument();
+    expect(within(stats as HTMLElement).getByText("2")).toBeInTheDocument();
+    expect(within(stats as HTMLElement).getAllByText("1")).toHaveLength(2);
+  });
+
+  it("合作方复用客户的详情、编辑和拉黑操作", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
+    vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0]);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    const panel = await screen.findByRole("tabpanel");
+    expect(within(panel).getByText("CP-0001")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /详情/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /拉黑/ })).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: /详情/ }));
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText("合作方档案 · CP-0001")).toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
   });
 });

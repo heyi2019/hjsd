@@ -3,7 +3,7 @@
 import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { poolsApi, ordersApi, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
+import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
@@ -26,6 +26,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [orders, setOrders] = useState<Order[]>([]);
+  const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
 
@@ -41,6 +42,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       // 订单计数与资金总览同源加载：订单接口失败时池数据已落 state，仍可渲染，
       // 错误经同一 ErrorBanner 露出，不静默显示 0。
       setOrders(await ordersApi.list());
+      setBusinessPnl(await reportsApi.businessPnl());
       setLoadError(null);
     } catch (error) {
       // 必须落到 UI：后端不可达时若只 console.error，页面会静默显示
@@ -135,6 +137,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
         items={[
           { label: "可用余额合计", amount: totalAvailable },
           { label: "押金占用", amount: totalDeposit },
+          { label: "利润", amount: businessPnl?.total.full_income ?? "-", tone: "auto" },
         ]}
       />
       <StatRow

@@ -190,6 +190,7 @@ def to_customer_out(
         "source": customer.source,
         "owner_id": customer.owner_id,
         "status": customer.status,
+        "created_at": customer.created_at,
         "tags": customer.tags,
         "note": customer.note,
         "merged_into_id": customer.merged_into_id,

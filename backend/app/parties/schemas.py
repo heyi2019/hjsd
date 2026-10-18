@@ -72,6 +72,7 @@ class CustomerOut(BaseModel):
     source: str | None = None
     owner_id: int | None = None
     status: str
+    created_at: datetime
     tags: list[str] | None = None
     note: str | None = None
     merged_into_id: int | None = None

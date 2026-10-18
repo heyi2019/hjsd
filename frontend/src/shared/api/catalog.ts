@@ -57,6 +57,7 @@ export interface Customer {
   source?: string | null;
   note?: string | null;
   status: string;
+  created_at?: string | null;
   contact_masked?: boolean;
   merged_into_id?: number | null;
   /** 活字段值：field_key → 值，由设置页字段定义驱动（BAS-04） */
@@ -129,6 +130,8 @@ export interface Counterparty {
   qq?: string | null;
   source?: string | null;
   note?: string | null;
+  created_at?: string;
+  extra_values?: Record<string, unknown>;
 }
 
 export interface Order {
@@ -448,6 +451,9 @@ export const counterpartiesApi = {
     api.get<Counterparty[]>("/counterparties", { params }).then((r) => r.data),
   create: (payload: Partial<Counterparty>) =>
     api.post<Counterparty>("/counterparties", payload).then((r) => r.data),
+  get: (id: number) => api.get<Counterparty>(`/counterparties/${id}`).then((r) => r.data),
+  patch: (id: number, payload: Partial<Counterparty>) =>
+    api.patch<Counterparty>(`/counterparties/${id}`, payload).then((r) => r.data),
   setStatus: (id: number, active: boolean) =>
     api.patch<Counterparty>(`/counterparties/${id}/status`, { active }).then((r) => r.data),
 };

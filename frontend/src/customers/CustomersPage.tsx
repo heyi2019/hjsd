@@ -15,9 +15,10 @@ import {
   type FieldDefinition,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
-import { money } from "../shared/lib/format";
+import { money, today } from "../shared/lib/format";
 import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
+import "./CustomersPage.css";
 import {
   DataTable,
   ErrorBanner,
@@ -35,6 +36,19 @@ function formatExtraValue(value: unknown): string {
   return String(value);
 }
 
+function customerDateKey(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function customerStatusLabel(status: string): string | undefined {
+  return status === "DISABLED" ? "已拉黑" : undefined;
+}
+
 function MobileCustomerList(props: {
   rows: Customer[];
   onDetail: (row: Customer) => void;
@@ -46,12 +60,12 @@ function MobileCustomerList(props: {
     <div className="customers-mobile-list" aria-label="客户列表">
       {props.rows.map((row) => (
         <article className="customers-mobile-card" key={row.id}>
-          <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} /></div>
+          <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} label={customerStatusLabel(row.status)} /></div>
           <dl><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div><div><dt>手机</dt><dd>{row.phone || "-"}</dd></div></dl>
           <Space size="small">
             <PermissionButton permission="customer.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
             <PermissionButton permission="customer.merge" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onMerge(row)}>合并</PermissionButton>
-            <PermissionButton permission="customer.update" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onDisable(row)}>停用</PermissionButton>
+            <PermissionButton permission="customer.update" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onDisable(row)}>拉黑</PermissionButton>
           </Space>
         </article>
       ))}
@@ -59,15 +73,24 @@ function MobileCustomerList(props: {
   );
 }
 
-function MobileCounterpartyList(props: { rows: Counterparty[]; onToggle: (row: Counterparty) => void }) {
+function MobileCounterpartyList(props: {
+  rows: Counterparty[];
+  onDetail: (row: Counterparty) => void;
+  onEdit: (row: Counterparty) => void;
+  onToggle: (row: Counterparty) => void;
+}) {
   if (!props.rows.length) return <div className="customers-mobile-empty muted">暂无合作方</div>;
   return (
     <div className="customers-mobile-list" aria-label="合作方列表">
       {props.rows.map((row) => (
         <article className="customers-mobile-card" key={row.id}>
-          <div className="customers-mobile-card__topline"><strong>{row.counterparty_no} · {row.display_name}</strong><StatusTag status={row.status} /></div>
+          <div className="customers-mobile-card__topline"><strong>{row.counterparty_no} · {row.display_name}</strong><StatusTag status={row.status} label={row.status === "DISABLED" ? "已拉黑" : undefined} /></div>
           <dl><div><dt>类型</dt><dd>{COUNTERPARTY_TYPE_LABEL[row.type] ?? row.type}</dd></div><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div></dl>
-          <PermissionButton permission="counterparty.manage" size="small" onClick={() => props.onToggle(row)}>{row.status === "ACTIVE" ? "停用" : "启用"}</PermissionButton>
+          <Space size="small">
+            <PermissionButton permission="counterparty.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
+            <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onEdit(row)}>编辑</PermissionButton>
+            <PermissionButton permission="counterparty.manage" size="small" onClick={() => props.onToggle(row)}>{row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}</PermissionButton>
+          </Space>
         </article>
       ))}
     </div>
@@ -280,7 +303,7 @@ function CustomerPanel() {
     { title: "手机", dataIndex: "phone" },
     { title: "微信", dataIndex: "wechat" },
     { title: "QQ", dataIndex: "qq" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={customerStatusLabel(v)} /> },
     {
       title: "活字段",
       key: "extra_values",
@@ -320,16 +343,20 @@ function CustomerPanel() {
             disabled={row.status !== "ACTIVE"}
             onClick={async () => {
               await customersApi.setStatus(row.id, "DISABLED");
-              message.success("客户已停用，历史关系保留");
+              message.success("客户已拉黑，历史关系保留");
               await load();
             }}
           >
-            停用
+            拉黑
           </PermissionButton>
         </Space>
       ),
     },
   ];
+
+  const currentDate = today();
+  const newThisMonthCount = rows.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
+  const newTodayCount = rows.filter((row) => customerDateKey(row.created_at) === currentDate).length;
 
   return (
     <Card
@@ -343,16 +370,16 @@ function CustomerPanel() {
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
-        联系方式默认脱敏；完整联系方式按权限展示并记录读取审计。停用/已合并客户不可作为新订单参与方。
+        联系方式默认脱敏；完整联系方式按权限展示并记录读取审计。拉黑/已合并客户不可作为新订单参与方。
       </Typography.Paragraph>
       <StatRow
         items={[
           { label: "客户总数", kind: "count", amount: String(rows.length) },
-          { label: "启用中", kind: "count", amount: String(rows.filter((r) => r.status === "ACTIVE").length) },
-          { label: "已停用", kind: "count", amount: String(rows.filter((r) => r.status === "DISABLED").length) },
+          { label: "本月新增客户数", kind: "count", amount: String(newThisMonthCount) },
+          { label: "今日新增客户数", kind: "count", amount: String(newTodayCount) },
         ]}
       />
-      <Space wrap className="customer-list-filters">
+      <Space wrap className="customer-list-filters customer-list-filters--separated">
         <Input.Search
           aria-label="搜索客户"
           value={searchInput}
@@ -377,7 +404,7 @@ function CustomerPanel() {
           value={statusFilter}
           options={[
             { value: "ACTIVE", label: "启用中" },
-            { value: "DISABLED", label: "已停用" },
+            { value: "DISABLED", label: "已拉黑" },
             { value: "MERGED", label: "已合并" },
           ]}
           onChange={(value) => {
@@ -404,7 +431,7 @@ function CustomerPanel() {
         onMerge={setMergeTarget}
         onDisable={async (row) => {
           await customersApi.setStatus(row.id, "DISABLED");
-          message.success("客户已停用，历史关系保留");
+          message.success("客户已拉黑，历史关系保留");
           await load();
         }}
       />}
@@ -668,8 +695,13 @@ function CounterpartyPanel() {
   const compact = useCompactLayout();
   const [rows, setRows] = useState<Counterparty[]>([]);
   const [open, setOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Counterparty | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Counterparty | null>(null);
+  const [detailData, setDetailData] = useState<Counterparty | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
 
   const load = useCallback(async () => {
     try {
@@ -683,6 +715,19 @@ function CounterpartyPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const openDetail = async (row: Counterparty) => {
+    setDetailTarget(row);
+    setDetailData(null);
+    setDetailLoading(true);
+    try {
+      setDetailData(await counterpartiesApi.get(row.id));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const submit = async (values: Record<string, unknown>) => {
     try {
@@ -702,24 +747,53 @@ function CounterpartyPanel() {
     }
   };
 
+  const submitEdit = async (values: Record<string, unknown>) => {
+    if (!editTarget) return;
+    try {
+      await counterpartiesApi.patch(editTarget.id, {
+        display_name: values.display_name as string,
+        contact_name: values.contact_name as string,
+        phone: values.phone as string,
+        wechat: values.wechat as string,
+        qq: values.qq as string,
+        note: (values.note as string) || null,
+      });
+      message.success("合作方已更新");
+      setEditTarget(null);
+      editForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
   const columns: ColumnsType<Counterparty> = [
     { title: "编号", dataIndex: "counterparty_no" },
     { title: "名称", dataIndex: "display_name" },
     { title: "类型", dataIndex: "type", render: (v: string) => COUNTERPARTY_TYPE_LABEL[v] ?? v },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={v === "DISABLED" ? "已拉黑" : undefined} /> },
     {
       title: "操作",
       render: (_v, row) => (
-        <PermissionButton
-          permission="counterparty.manage"
-          size="small"
-          onClick={async () => {
-            await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
-            await load();
-          }}
-        >
-          {row.status === "ACTIVE" ? "停用" : "启用"}
-        </PermissionButton>
+        <Space>
+          <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row)}>
+            详情
+          </PermissionButton>
+          <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => setEditTarget(row)}>
+            编辑
+          </PermissionButton>
+          <PermissionButton
+            permission="counterparty.manage"
+            size="small"
+            onClick={async () => {
+              await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
+              message.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
+              await load();
+            }}
+          >
+            {row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}
+          </PermissionButton>
+        </Space>
       ),
     },
   ];
@@ -736,7 +810,7 @@ function CounterpartyPanel() {
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
-        同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可停用。
+        同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。
       </Typography.Paragraph>
       {!compact ? <DataTable<Counterparty>
         columns={columns}
@@ -748,8 +822,11 @@ function CounterpartyPanel() {
         onPageChange={() => undefined}
       /> : <MobileCounterpartyList
         rows={rows}
+        onDetail={(row) => void openDetail(row)}
+        onEdit={setEditTarget}
         onToggle={async (row) => {
           await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
+          message.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
           await load();
         }}
       />}
@@ -781,6 +858,102 @@ function CounterpartyPanel() {
           </PermissionButton>
         </Form>
       </Modal>
+
+      <Modal
+        title={editTarget ? `编辑合作方 · ${editTarget.counterparty_no}` : "编辑合作方"}
+        open={Boolean(editTarget)}
+        onCancel={() => {
+          setEditTarget(null);
+          editForm.resetFields();
+        }}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          colon={false}
+          className="form-no-colon"
+          onFinish={submitEdit}
+          initialValues={
+            editTarget
+              ? {
+                  display_name: editTarget.display_name,
+                  contact_name: editTarget.contact_name ?? "",
+                  phone: editTarget.phone ?? "",
+                  wechat: editTarget.wechat ?? "",
+                  qq: editTarget.qq ?? "",
+                  note: editTarget.note ?? "",
+                }
+              : undefined
+          }
+        >
+          <Form.Item name="display_name" label="名称" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <div className="form-cols-2">
+            <Form.Item name="contact_name" label="联系人">
+              <Input />
+            </Form.Item>
+            <Form.Item name="phone" label="手机号">
+              <Input />
+            </Form.Item>
+            <Form.Item name="wechat" label="微信号">
+              <Input />
+            </Form.Item>
+            <Form.Item name="qq" label="QQ">
+              <Input />
+            </Form.Item>
+          </div>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
+            保存
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Drawer
+        title={detailTarget ? `合作方档案 · ${detailTarget.counterparty_no}` : "合作方档案"}
+        open={Boolean(detailTarget)}
+        onClose={() => {
+          setDetailTarget(null);
+          setDetailData(null);
+        }}
+        width={640}
+        destroyOnHidden
+        extra={
+          detailTarget && detailTarget.status === "ACTIVE" ? (
+            <PermissionButton
+              permission="counterparty.manage"
+              size="small"
+              onClick={() => {
+                setEditTarget(detailTarget);
+                setDetailTarget(null);
+              }}
+            >
+              编辑
+            </PermissionButton>
+          ) : null
+        }
+      >
+        {detailLoading ? (
+          <div role="status" aria-label="正在加载合作方详情"><Spin /></div>
+        ) : detailData ? (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="合作方编号">{detailData.counterparty_no}</Descriptions.Item>
+            <Descriptions.Item label="名称">{detailData.display_name}</Descriptions.Item>
+            <Descriptions.Item label="类型">{COUNTERPARTY_TYPE_LABEL[detailData.type] ?? detailData.type}</Descriptions.Item>
+            <Descriptions.Item label="联系人">{detailData.contact_name || "-"}</Descriptions.Item>
+            <Descriptions.Item label="手机">{detailData.phone || "-"}</Descriptions.Item>
+            <Descriptions.Item label="微信">{detailData.wechat || "-"}</Descriptions.Item>
+            <Descriptions.Item label="QQ">{detailData.qq || "-"}</Descriptions.Item>
+            <Descriptions.Item label="状态"><StatusTag status={detailData.status} label={detailData.status === "DISABLED" ? "已拉黑" : undefined} /></Descriptions.Item>
+            <Descriptions.Item label="备注">{detailData.note || "-"}</Descriptions.Item>
+          </Descriptions>
+        ) : null}
+      </Drawer>
     </Card>
   );
 }

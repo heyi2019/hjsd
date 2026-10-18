@@ -282,6 +282,7 @@ export function InventoryPanel() {
           pageSize={pageSize}
           total={visibleRows.length}
           controlledPaging
+          scroll={{ x: "max-content" }}
           expandable={{
             expandedRowKeys: expandedAccountIds,
             expandedRowRender: (row) => (

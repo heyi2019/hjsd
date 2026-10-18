@@ -54,6 +54,15 @@ const {
 setupInventoryPanelMocks(mocks);
 
 describe("InventoryPanel：账号台账", () => {
+  it("账号台账启用横向滚动以访问右侧操作列", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByRole("columnheader", { name: "订单号" });
+
+    expect(document.querySelector(".ui-datatable .ant-table-content")).toHaveStyle({
+      overflowX: "auto",
+    });
+  });
+
   it("提供库存导出入口，并按当前库存字段生成 CSV", async () => {
     expect(buildInventoryCsv(accounts)).toContain(
       "订单号,业务,类型,产品,账号标识,平台,成本,库存状态",
@@ -161,7 +170,7 @@ describe("InventoryPanel：账号台账", () => {
 
   it("渲染账号编号、标识与状态标签", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
-    expect(await screen.findByText("订单号")).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "订单号" })).toBeInTheDocument();
     expect(await screen.findByText("HS-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("TH-2026-0002")).toBeInTheDocument();
     expect(screen.getAllByText("在库").length).toBeGreaterThanOrEqual(1);

@@ -131,4 +131,20 @@ describe("设置面板：游戏类型", () => {
 
     await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).create).toHaveBeenCalledWith({ name: "和平精英", sort_order: 0 }));
   });
+
+  it("管理员可编辑游戏类型名称和排序", async () => {
+    const { GameTypeSettingsPanel } = await import("./GameTypeSettingsPanel");
+    renderLight(<GameTypeSettingsPanel />, { user: "admin" });
+
+    await screen.findByText("王者荣耀");
+    await ui.click(screen.getByRole("button", { name: "编辑王者荣耀" }));
+    await ui.clear(screen.getByPlaceholderText("如：王者荣耀"));
+    await ui.type(screen.getByPlaceholderText("如：王者荣耀"), "王者荣耀手游");
+    await ui.click(screen.getByRole("button", { name: /保存游戏类型/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).update).toHaveBeenCalledWith(1, {
+      name: "王者荣耀手游",
+      sort_order: 10,
+    }));
+  });
 });

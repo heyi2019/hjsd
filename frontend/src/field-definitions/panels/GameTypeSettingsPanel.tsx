@@ -7,6 +7,7 @@ import { ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../
 
 export function GameTypeSettingsPanel() {
   const [rows, setRows] = useState<GameTypeOption[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
 
@@ -25,13 +26,30 @@ export function GameTypeSettingsPanel() {
 
   const submit = async (values: { game_type_name: string; sort_order?: number }) => {
     try {
-      await gameTypesApi.create({ name: values.game_type_name, sort_order: Number(values.sort_order ?? 0) });
-      message.success("游戏类型已新增");
+      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? 0) };
+      if (editingId === null) {
+        await gameTypesApi.create(payload);
+        message.success("游戏类型已新增");
+      } else {
+        await gameTypesApi.update(editingId, payload);
+        message.success("游戏类型已更新");
+      }
+      setEditingId(null);
       form.resetFields();
       await load();
     } catch (err) {
       setError(normalizeError(err));
     }
+  };
+
+  const startEditing = (row: GameTypeOption) => {
+    setEditingId(row.id);
+    form.setFieldsValue({ game_type_name: row.name, sort_order: row.sort_order });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    form.resetFields();
   };
 
   const run = async (action: () => Promise<unknown>) => {
@@ -67,14 +85,24 @@ export function GameTypeSettingsPanel() {
       title: "操作",
       render: (_value, row) => (
         <PermissionGate permission="order-type.manage">
-          <PermissionButton
-            permission="order-type.manage"
-            size="small"
-            disabled={row.is_default}
-            onClick={() => void run(() => gameTypesApi.setActive(row.id, !row.is_active))}
-          >
-            {row.is_active ? "停用" : "启用"}
-          </PermissionButton>
+          <span className="ui-inline-actions">
+            <PermissionButton
+              permission="order-type.manage"
+              size="small"
+              aria-label={`编辑${row.name}`}
+              onClick={() => startEditing(row)}
+            >
+              编辑
+            </PermissionButton>
+            <PermissionButton
+              permission="order-type.manage"
+              size="small"
+              disabled={row.is_default}
+              onClick={() => void run(() => gameTypesApi.setActive(row.id, !row.is_active))}
+            >
+              {row.is_active ? "停用" : "启用"}
+            </PermissionButton>
+          </span>
         </PermissionGate>
       ),
     },
@@ -102,8 +130,15 @@ export function GameTypeSettingsPanel() {
             <InputNumber min={0} />
           </Form.Item>
           <Form.Item>
-            <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">新增游戏类型</PermissionButton>
+            <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
+              {editingId === null ? "新增游戏类型" : "保存游戏类型"}
+            </PermissionButton>
           </Form.Item>
+          {editingId !== null && (
+            <Form.Item>
+              <PermissionButton permission="order-type.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
+            </Form.Item>
+          )}
         </Form>
       </PermissionGate>
     </Card>

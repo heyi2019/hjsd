@@ -270,6 +270,7 @@ class OrderEvent(Base, AuditMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    operator_user_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     event_no: Mapped[str] = mapped_column(String(32), nullable=False)
     order_id: Mapped[int] = mapped_column(
         ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False

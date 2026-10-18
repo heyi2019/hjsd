@@ -1,6 +1,6 @@
-import { Descriptions, Image, Space, Spin, Typography } from "antd";
+import { Descriptions, Image, Input, Select, Space, Spin, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
+import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
 import { executionActionLabel } from "../shared/lib/format";
 import { DataTable, MoneyText, StatusTag } from "../shared/ui";
 import {
@@ -22,6 +22,7 @@ type InventoryFinanceRow = {
   poolName: string;
   rebateStatus?: string;
   expectedRebate?: string;
+  event?: AccountExecutionEvent | null;
 };
 
 type InventoryExecutionRow = {
@@ -31,6 +32,7 @@ type InventoryExecutionRow = {
   amount: string;
   operator: string;
   note: string;
+  event: AccountExecutionEvent;
 };
 
 function dateTimeMinute(value: string | null | undefined): string {
@@ -67,10 +69,20 @@ export function InventoryDetail({
   row,
   detail,
   loading,
+  editing,
+  onEdit,
+  eventDrafts,
+  onEventEdit,
+  employees = [],
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
   loading: boolean;
+  editing?: Account | null;
+  onEdit?: (account: Account) => void;
+  eventDrafts?: Record<number, { amount: string; note: string | null; operator_user_ids?: number[] }>;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
+  employees?: EmployeeOption[];
 }) {
   const sourceOrder = detail?.orders[0];
   if (loading && !detail) return <Spin size="small" />;
@@ -93,6 +105,7 @@ export function InventoryDetail({
       rate: "-",
       occurredAt: dateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
       poolName: cashflow.pool_name || "未分配资金池",
+      event,
     })),
     ...rebateItems.map(({ order, rebate }) => ({
       key: `rebate-${rebate.id}`,
@@ -127,7 +140,7 @@ export function InventoryDetail({
       align: "right",
       render: (value: string, financeRow) => (
         <div className="inventory-finance-table__amount">
-          <MoneyText value={value} />
+          {editing && financeRow.event && ["BUY", "SELL", "COST"].includes(financeRow.event.event_type) ? <Input aria-label={`编辑资金金额 ${financeRow.financeNo}`} inputMode="decimal" value={eventDrafts?.[financeRow.event.id]?.amount ?? value} onChange={(e) => onEventEdit?.(financeRow.event!, { amount: e.target.value })} /> : <MoneyText value={value} />}
           {financeRow.expectedRebate ? <Typography.Text type="secondary">预计返点 {financeRow.expectedRebate}</Typography.Text> : null}
         </div>
       ),
@@ -146,16 +159,17 @@ export function InventoryDetail({
       action: `${event.event_no} · ${executionActionLabel(event.event_type, order.order_type)}`,
       occurredAt: dateTimeMinute(event.occurred_at ?? event.occurred_on),
       amount: event.amount,
-      operator: event.operator || "-",
+      operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",
       note: event.note || "-",
+      event,
     }))
   )) ?? [];
   const executionColumns: ColumnsType<InventoryExecutionRow> = [
     { title: "动作", dataIndex: "action", key: "action" },
     { title: "动作时间", dataIndex: "occurredAt", key: "occurredAt" },
-    { title: "操作人", dataIndex: "operator", key: "operator" },
-    { title: "金额", dataIndex: "amount", key: "amount", align: "right", render: (value: string) => <MoneyText value={value} /> },
-    { title: "备注", dataIndex: "note", key: "note" },
+    { title: "操作人", dataIndex: "operator", key: "operator", render: (value: string, item) => editing ? <Select mode="multiple" aria-label={`编辑执行操作人 ${item.event.event_no}`} placeholder={value} value={eventDrafts?.[item.event.id]?.operator_user_ids ?? item.event.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => onEventEdit?.(item.event, { operator_user_ids: ids })} /> : value },
+    { title: "金额", dataIndex: "amount", key: "amount", align: "right", render: (value: string, item) => editing && item.event.cashflow && ["BUY", "SELL", "COST"].includes(item.event.event_type) ? <Input aria-label={`编辑执行金额 ${item.event.event_no}`} inputMode="decimal" value={eventDrafts?.[item.event.id]?.amount ?? value} onChange={(e) => onEventEdit?.(item.event, { amount: e.target.value })} /> : <MoneyText value={value} /> },
+    { title: "备注", dataIndex: "note", key: "note", render: (value: string, item) => editing && item.event.cashflow && ["BUY", "SELL", "COST"].includes(item.event.event_type) ? <Input aria-label={`编辑执行备注 ${item.event.event_no}`} value={eventDrafts?.[item.event.id]?.note ?? item.event.note ?? ""} onChange={(e) => onEventEdit?.(item.event, { note: e.target.value })} /> : value },
   ];
 
   return <div className="inventory-detail">
@@ -166,10 +180,10 @@ export function InventoryDetail({
       <Descriptions.Item label="下架时间">{eventDate(detail, "CANCEL")}</Descriptions.Item>
       <Descriptions.Item label="寄售时间">{platformListingDate(detail)}</Descriptions.Item>
       <Descriptions.Item label="寄售平台">{consignmentPlatforms(detail)}</Descriptions.Item>
-      <Descriptions.Item label="账号密码">{row.game_password ? <Typography.Text copyable>{row.game_password}</Typography.Text> : "-"}</Descriptions.Item>
-      <Descriptions.Item label="渠道 / 区服">{row.channel_region || "-"}</Descriptions.Item>
-      <Descriptions.Item label="绑定手机号">{row.bound_phone || "-"}</Descriptions.Item>
-      <Descriptions.Item label="有无二次" span={3}>{row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无"}</Descriptions.Item>
+      <Descriptions.Item label="账号密码">{editing ? <Input.Password aria-label="编辑账号密码" value={editing.game_password ?? ""} onChange={(e) => onEdit?.({ ...editing, game_password: e.target.value })} /> : row.game_password ? <Typography.Text copyable>{row.game_password}</Typography.Text> : "-"}</Descriptions.Item>
+      <Descriptions.Item label="渠道 / 区服">{editing ? <Input aria-label="编辑渠道区服" value={editing.channel_region ?? ""} onChange={(e) => onEdit?.({ ...editing, channel_region: e.target.value })} /> : row.channel_region || "-"}</Descriptions.Item>
+      <Descriptions.Item label="绑定手机号">{editing ? <Input aria-label="编辑绑定手机号" value={editing.bound_phone ?? ""} onChange={(e) => onEdit?.({ ...editing, bound_phone: e.target.value })} /> : row.bound_phone || "-"}</Descriptions.Item>
+      <Descriptions.Item label="有无二次" span={3}>{editing ? <Select aria-label="编辑有无二次" allowClear value={editing.has_secondary == null ? undefined : editing.has_secondary ? "有" : "无"} options={[{ value: "有", label: "有" }, { value: "无", label: "无" }]} onChange={(v) => onEdit?.({ ...editing, has_secondary: v == null ? null : v === "有" })} /> : row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无"}</Descriptions.Item>
       {PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? "") ? <>
         <Descriptions.Item label="账号描述" span={3}>{row.account_description || "-"}</Descriptions.Item>
         <Descriptions.Item label="账号图片" span={3}>
@@ -178,7 +192,7 @@ export function InventoryDetail({
           ))}</Space></Image.PreviewGroup> : "-"}
         </Descriptions.Item>
       </> : null}
-      <Descriptions.Item label="备注">{row.note || "-"}</Descriptions.Item>
+      <Descriptions.Item label="备注">{editing ? <Input aria-label="编辑备注" value={editing.note ?? ""} onChange={(e) => onEdit?.({ ...editing, note: e.target.value })} /> : row.note || "-"}</Descriptions.Item>
     </Descriptions>
     <div className="inventory-execution-list">
       <Typography.Text strong>执行明细</Typography.Text>

@@ -16,7 +16,9 @@ from app.core.database import get_db
 from app.core.schemas import RequestModel
 from app.core.security import (
     PERM_FINANCE_READ,
+    PERM_FINANCE_ORDER_EVENT_POST,
     PERM_ORDER_CREATE,
+    PERM_ORDER_UPDATE,
     CurrentUser,
     owner_scope_filter,
     require_permissions,
@@ -25,6 +27,7 @@ from app.accounts import service
 from app.parties import service as parties_service
 from app.domain.foundation import Pool
 from app.domain.parties import Counterparty, OrderCounterpartyRole
+from app.domain.users import User
 from app.domain.trade import (
     Account,
     Cashflow,
@@ -32,12 +35,19 @@ from app.domain.trade import (
     OrderEvent,
     RebateRecord,
     RebateSettlement,
+    Installment,
+    Reconciliation,
 )
+from app.core.audit import record_audit
+from app.core.errors import Conflict, NotFound, Validation
+from app.core.periods import assert_period_open
+from app.orders import service as orders_service
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
+edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
 
 
 class AccountOut(BaseModel):
@@ -79,6 +89,97 @@ class AccountProfileUpdate(RequestModel):
     account_images: list[str] | None = Field(default=None, max_length=9)
     note: str | None = None
     extra_values: dict[str, object] | None = None
+
+
+class ExecutionEditItem(RequestModel):
+    id: int = Field(gt=0)
+    expected_amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
+    amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
+    note: str | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
+
+
+class ExecutionEditRequest(RequestModel):
+    events: list[ExecutionEditItem] = Field(max_length=100)
+    profile: AccountProfileUpdate | None = None
+
+
+@router.patch("/accounts/{account_id}/execution-edit")
+def update_execution_detail(
+    account_id: int, payload: ExecutionEditRequest,
+    db: Session = Depends(get_db), user: CurrentUser = edit_execution,
+) -> dict[str, bool]:
+    account = service.get_account(db, account_id, user)
+    db.scalar(select(Account).where(Account.id == account_id).with_for_update())
+    if len({item.id for item in payload.events}) != len(payload.events):
+        raise Validation("同一执行记录不能重复修改")
+    changes = []
+    cost_delta = Decimal("0")
+    for item in payload.events:
+        event = db.scalar(select(OrderEvent).where(OrderEvent.id == item.id).with_for_update())
+        order = orders_service.get_order(db, event.order_id, user) if event else None
+        if event is None or order is None or order.account_id != account_id or not event.is_posted:
+            raise NotFound("执行记录不存在")
+        if Decimal(str(event.amount)) != item.expected_amount:
+            raise Conflict("执行记录已被修改，请刷新后重试")
+        if item.operator_user_ids is not None:
+            ids = item.operator_user_ids
+            if len(set(ids)) != len(ids):
+                raise Validation("操作人不能重复选择")
+            valid = set(db.scalars(select(User.id).where(User.id.in_(ids), User.is_active.is_(True))).all())
+            if valid != set(ids):
+                raise Validation("所选操作人不存在或已停用")
+        flow = db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id).with_for_update())
+        if flow is not None and not user.can_see_pool(flow.pool_id):
+            raise NotFound("关联资金流水不存在")
+        if item.amount == Decimal(str(event.amount)):
+            changes.append((event, flow, item))
+            continue
+        if event.event_type not in {"BUY", "SELL", "COST"} or item.amount <= 0:
+            raise Validation("该类型执行记录暂不支持修改金额")
+        if flow is None:
+            raise NotFound("关联资金流水不存在")
+        if Decimal(str(flow.amount)) != Decimal(str(event.amount)):
+            raise Validation("执行记录与关联流水金额不一致，请先核对")
+        assert_period_open(db, event.occurred_on, operation="修改执行记录")
+        assert_period_open(db, flow.occurred_on, operation="修改资金流水")
+        if (event.offset_event_id is not None or flow.reversal_of_id is not None
+            or db.scalar(select(OrderEvent.id).where(OrderEvent.offset_event_id == event.id)) is not None
+            or db.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)) is not None):
+            raise Validation("已冲销或被冲销的记录不能直接修改")
+        if db.scalar(select(Installment.id).where(Installment.order_id == order.id)) is not None:
+            raise Validation("关联分期的记录不能直接修改，请先处理分期")
+        if db.scalar(select(RebateRecord.id).where(RebateRecord.source_order_id == order.id)) is not None:
+            raise Validation("关联返点的记录不能直接修改，请先核对返点")
+        if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on)) is not None:
+            raise Validation("资金池已有后续对账记录，不能直接修改")
+        if event.event_type in {"BUY", "COST"}:
+            cost_delta += item.amount - Decimal(str(event.amount))
+        changes.append((event, flow, item))
+    if Decimal(str(account.cost_amount)) + cost_delta < 0:
+        raise Validation("修改后库存成本不能为负数")
+    if payload.profile is not None:
+        account = service.update_account_profile(db, account_id, actor=user.username, user=user,
+            **payload.profile.model_dump(exclude_unset=True))
+    for event, flow, item in changes:
+        before = {"amount": str(event.amount), "note": event.note, "operator_user_ids": event.operator_user_ids, "flow_amount": str(flow.amount) if flow else None, "flow_note": flow.note if flow else None}
+        amount_changed = item.amount != Decimal(str(event.amount))
+        event.amount = item.amount
+        if "note" in item.model_fields_set:
+            event.note = item.note
+        if item.operator_user_ids is not None:
+            event.operator_user_ids = item.operator_user_ids
+        event.updated_by = user.username
+        if flow is not None and amount_changed:
+            flow.amount = item.amount
+            flow.updated_by = user.username
+        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_event_edit", entity_id=event.id, actor=user.username,
+                     before=before, after={"amount": str(item.amount), "note": event.note, "operator_user_ids": event.operator_user_ids, "flow_amount": str(flow.amount) if flow else None, "flow_note": flow.note if flow else None})
+    account.cost_amount = Decimal(str(account.cost_amount)) + cost_delta
+    if changes:
+        account.updated_by = user.username
+    db.flush()
+    return {"ok": True}
 
 
 class AccountInventoryOut(BaseModel):
@@ -136,6 +237,8 @@ class ExecutionEventOut(BaseModel):
     note: str | None = None
     cashflow: ExecutionCashflowOut | None = None
     operator: str
+    operator_user_ids: list[int] | None = None
+    operator_names: list[str] = Field(default_factory=list)
 
 
 class ExecutionCounterpartyOut(BaseModel):
@@ -454,6 +557,8 @@ def execution_detail(
                     operator=flow.created_by,
                 )
             )
+    operator_ids = {uid for event in events for uid in (event.operator_user_ids or [])}
+    operator_names = {user.id: user.display_name for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()} if operator_ids else {}
     events_by_order: dict[int, list[ExecutionEventOut]] = {}
     for event in events:
         events_by_order.setdefault(event.order_id, []).append(
@@ -474,6 +579,8 @@ def execution_detail(
                 note=event.note,
                 cashflow=flow_by_event.get(event.id),
                 operator=event.created_by,
+                operator_user_ids=event.operator_user_ids,
+                operator_names=[operator_names.get(uid, f"用户 {uid}") for uid in (event.operator_user_ids or [])],
             )
         )
     return AccountExecutionDetailOut(

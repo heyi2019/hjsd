@@ -1,9 +1,9 @@
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Input, Select, Space, message } from "antd";
+import { Card, Input, Modal, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
-import { accountsApi, type Account, type AccountExecutionDetail } from "../shared/api/catalog";
+import { accountsApi, employeesApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
@@ -47,6 +47,10 @@ export function InventoryPanel() {
   const [expandedAccountIds, setExpandedAccountIds] = useState<Key[]>([]);
   const [exporting, setExporting] = useState(false);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const load = useCallback(async () => {
     try {
       const list = await accountsApi.list(status ? { status } : undefined);
@@ -160,9 +164,13 @@ export function InventoryPanel() {
               type="link"
               size="small"
               aria-label="编辑"
+              disabled={editingAccount !== null}
               onClick={(event) => {
                 event.stopPropagation();
-                openProfile(row, "all");
+                setEditingAccount({ ...row });
+                setEventDrafts({});
+                void employeesApi.list().then(setEmployees).catch((error) => setError(normalizeError(error)));
+                void loadExecution(row);
               }}
             >
               编辑
@@ -199,10 +207,58 @@ export function InventoryPanel() {
     },
   ];
 
+  async function saveInline() {
+    if (!editingAccount) return;
+    setSavingAccount(true);
+    try {
+      const { id, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note } = editingAccount;
+      const profile = { game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note };
+      const events = Object.values(eventDrafts).filter((draft) => {
+        const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
+        return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
+      });
+      if (events.length) {
+        await accountsApi.updateExecution(id, { profile, events });
+        setEditingAccount(null);
+        setEventDrafts({});
+        try {
+          const detail = await accountsApi.executionDetail(id);
+          setExecutionDetails((current) => ({ ...current, [id]: detail }));
+          setRows((current) => current.map((row) => row.id === id ? { ...row, ...detail.account } : row));
+        } catch (refreshError) {
+          setExecutionDetails((current) => { const next = { ...current }; delete next[id]; return next; });
+          setError(normalizeError(refreshError));
+          message.warning("修改已保存，但刷新明细失败，请重新加载");
+        }
+      } else {
+        const updated = await accountsApi.updateProfile(id, profile);
+        setRows((current) => current.map((row) => row.id === id ? { ...row, ...updated } : row));
+      }
+      setEditingAccount(null);
+      setEventDrafts({});
+      message.success("修改已保存");
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setSavingAccount(false);
+    }
+  }
+
+  function updateEventDraft(event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) {
+    setEventDrafts((current) => ({ ...current, [event.id]: {
+      ...(current[event.id] ?? { id: event.id, expected_amount: event.amount, amount: event.amount, note: event.note ?? null }),
+      ...changes,
+    } }));
+  }
+
   async function handleExpand(expanded: boolean, row: Account) {
     const rowKey = String(row.id);
-    setExpandedAccountIds((current) => expanded ? [...current, rowKey] : current.filter((id) => id !== rowKey));
-    if (!expanded || executionDetails[row.id] || executionLoading[row.id]) return;
+    setExpandedAccountIds((current) => expanded ? Array.from(new Set([...current, rowKey])) : current.filter((id) => id !== rowKey));
+    if (expanded) await loadExecution(row);
+  }
+
+  async function loadExecution(row: Account) {
+    if (executionDetails[row.id] || executionLoading[row.id]) return;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
       const detail = await accountsApi.executionDetail(row.id);
@@ -323,6 +379,16 @@ export function InventoryPanel() {
           await load();
         }}
       />
+      <Modal title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); } }}>
+        {editingAccount ? <>
+          <Space wrap>
+            <Input aria-label="编辑账号标识" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
+            <Input aria-label="编辑产品" value={editingAccount.game_type ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_type: e.target.value })} />
+            <Input aria-label="编辑平台" value={editingAccount.platform ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, platform: e.target.value })} />
+          </Space>
+          <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} />
+        </> : null}
+      </Modal>
       <InventoryProfileModal
         target={profileTarget}
         onClose={() => setProfileTarget(null)}

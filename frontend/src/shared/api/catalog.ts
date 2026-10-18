@@ -248,6 +248,8 @@ export interface AccountExecutionEvent {
   note?: string | null;
   cashflow?: AccountExecutionCashflow | null;
   operator: string;
+  operator_user_ids?: number[] | null;
+  operator_names?: string[];
 }
 
 export interface AccountExecutionCounterparty {
@@ -549,6 +551,11 @@ export const ordersApi = {
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
 };
 
+export interface EmployeeOption { id: number; username: string; display_name: string; is_active: boolean }
+export const employeesApi = {
+  list: () => api.get<EmployeeOption[]>("/users").then((r) => r.data),
+};
+
 export const accountsApi = {
   list: (params?: { status?: string }) =>
     api.get<Account[]>("/accounts", { params }).then((r) => r.data),
@@ -560,6 +567,8 @@ export const accountsApi = {
       .then((r) => r.data),
   executionDetail: (id: number) =>
     api.get<AccountExecutionDetail>(`/accounts/${id}/execution-detail`).then((r) => r.data),
+  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[] }) =>
+    api.patch<{ ok: boolean }>(`/accounts/${id}/execution-edit`, payload).then((r) => r.data),
 };
 
 export const installmentsApi = {

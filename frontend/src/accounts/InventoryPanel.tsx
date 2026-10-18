@@ -379,13 +379,22 @@ export function InventoryPanel() {
           await load();
         }}
       />
-      <Modal title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); } }}>
+      <Modal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); } }}>
         {editingAccount ? <>
-          <Space wrap>
-            <Input aria-label="编辑账号标识" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
-            <Input aria-label="编辑产品" value={editingAccount.game_type ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_type: e.target.value })} />
-            <Input aria-label="编辑平台" value={editingAccount.platform ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, platform: e.target.value })} />
-          </Space>
+          <div className="inventory-edit-core" aria-label="核心账号资料">
+            <label>
+              <span>账号标识</span>
+              <Input aria-label="编辑账号标识" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
+            </label>
+            <label>
+              <span>产品</span>
+              <Input aria-label="编辑产品" value={editingAccount.game_type ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_type: e.target.value })} />
+            </label>
+            <label>
+              <span>平台</span>
+              <Input aria-label="编辑平台" value={editingAccount.platform ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, platform: e.target.value })} />
+            </label>
+          </div>
           <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} />
         </> : null}
       </Modal>

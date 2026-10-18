@@ -51,4 +51,30 @@ describe("InventoryDetail", () => {
     expect(within(panel).getByText("买号本金")).toBeInTheDocument();
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
+
+  it("编辑执行明细时操作员选择器保持可读宽度", () => {
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        events: [{
+          id: 1,
+          event_no: "EV0001",
+          event_type: "BUY",
+          amount: "100.00",
+          occurred_at: "2026-10-15T10:20:00",
+          operator: "admin",
+          operator_user_ids: [7],
+          note: "回收登记",
+          cashflow: { flow_no: "CF0001", direction: "OUT", amount: "100.00" },
+        }],
+        rebates: [],
+      }],
+    } as unknown as AccountExecutionDetail;
+
+    render(<InventoryDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
+    expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
+  });
 });

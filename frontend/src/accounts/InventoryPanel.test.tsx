@@ -178,6 +178,24 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByRole("button", { name: "账号图片" })).toBeDisabled();
   });
 
+  it("编辑账号时默认只展示核心资料输入，低频资料收纳到更多资料", async () => {
+    vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑账号标识")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑产品")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑平台")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑账号密码")).not.toBeVisible();
+    expect(screen.getByLabelText("编辑绑定手机号")).not.toBeVisible();
+
+    await ui.click(screen.getByText("更多账号资料"));
+    expect(screen.getByLabelText("编辑账号密码")).toBeVisible();
+    expect(screen.getByLabelText("编辑绑定手机号")).toBeVisible();
+  });
+
   it("统计卡：在库/分期中为计数，占用成本为金额（只统计在库+分期中）", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("在库 / 分期中");
@@ -292,10 +310,13 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financeSummary).getByText("总支出")).toBeInTheDocument();
     expect(within(financeSummary).getByText("总收入")).toBeInTheDocument();
     const financeHeaders = within(financePanel).getAllByRole("columnheader");
-    for (const name of ["类型", "订单号", "资金编号", "方向", "金额", "比例", "时间"]) {
+    for (const name of ["类型", "方向", "金额", "比例", "时间"]) {
       const header = financeHeaders.find((item) => item.textContent?.trim() === name);
       expect(header).toHaveAccessibleName(name);
     }
+    expect(within(financePanel).queryByText("HS0001", { exact: true })).toBeNull();
+    expect(within(financePanel).queryByText("CF0001", { exact: true })).toBeNull();
+    expect(within(executionTable).queryByText("EV0001", { exact: true })).toBeNull();
     expect(within(financeSummary).getByText("100.00")).toBeInTheDocument();
     expect(within(financeSummary).getByText("350.00")).toBeInTheDocument();
     const financeTable = financePanel.querySelector(".inventory-finance-table") as HTMLElement;
@@ -308,8 +329,6 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financeTable).getByText("1,000.00")).toBeInTheDocument();
     expect(within(financeTable).getByText("5.00%")).toBeInTheDocument();
     expect(within(financeTable).getByText("2026-10-17 12:30")).toBeInTheDocument();
-    expect((await screen.findAllByText("HS0001")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/CF0001/).length).toBeGreaterThan(0);
     expect(vi.mocked(catalog.accountsApi.executionDetail)).toHaveBeenCalledWith(1);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });

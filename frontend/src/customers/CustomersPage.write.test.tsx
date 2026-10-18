@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
+import { message } from "antd";
 import { CustomersPage } from "./CustomersPage";
 
 import * as catalog from "../shared/api/catalog";
@@ -97,6 +98,7 @@ describe("CustomersPage：权限门控与写操作", () => {
   });
 
   it("重复候选不拦截，只提示（创建仍成功）", async () => {
+    const warningSpy = vi.spyOn(message, "warning");
     vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
@@ -104,7 +106,10 @@ describe("CustomersPage：权限门控与写操作", () => {
     await ui.type(await screen.findByLabelText("名字"), "李四");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
     await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
-    expect(await screen.findByText(/重复候选/)).toBeInTheDocument();
+    // 只提示：message.warning 携带「重复候选」文案（renderLight 未用 antd <App>，静态 message 不进 React 树，故不查 DOM 文本）
+    expect(warningSpy).toHaveBeenCalledWith(expect.stringContaining("重复候选"));
+    // 未拦截：创建成功后走成功分支刷新列表（customersApi.list 第 2 次调用）
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.list)).toHaveBeenCalledTimes(2));
   });
 
   it("客户详情加载经营概览、关联订单和分期收款", async () => {

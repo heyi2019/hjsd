@@ -644,6 +644,8 @@ export const fieldsApi = {
     api.get<FieldDefinition[]>("/field-definitions", { params }).then((r) => r.data),
   create: (payload: Partial<FieldDefinition>) =>
     api.post<FieldDefinition>("/field-definitions", payload).then((r) => r.data),
+  update: (id: number, payload: Partial<FieldDefinition>) =>
+    api.patch<FieldDefinition>(`/field-definitions/${id}`, payload).then((r) => r.data),
   setActive: (id: number, active: boolean) =>
     api.patch<FieldDefinition>(`/field-definitions/${id}/active?active=${active}`).then((r) => r.data),
   /** 删除字段定义：有历史值返回 409，只能停用（BAS-04-03） */

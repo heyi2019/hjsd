@@ -18,6 +18,7 @@ const parseOptions = (raw: unknown): string[] | undefined => {
 
 export function FieldsPanel() {
   const [rows, setRows] = useState<FieldDefinition[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const fieldType = Form.useWatch("field_type", form);
@@ -37,21 +38,53 @@ export function FieldsPanel() {
 
   const submit = async (values: Record<string, unknown>) => {
     try {
-      await fieldsApi.create({
-        entity_type: values.entity_type as string,
-        field_key: values.field_key as string,
-        label: values.label as string,
-        field_type: (values.field_type as string) ?? "TEXT",
-        options: needsOptions ? parseOptions(values.options) : undefined,
-        required: Boolean(values.required),
-        sort_order: Number(values.sort_order ?? 0),
-      });
-      message.success("活字段已创建");
+      const sortOrder = Number(values.sort_order ?? 0);
+      const required = Boolean(values.required);
+      const options = needsOptions ? (parseOptions(values.options) ?? []) : undefined;
+      if (editingId === null) {
+        await fieldsApi.create({
+          entity_type: values.entity_type as string,
+          field_key: values.field_key as string,
+          label: values.label as string,
+          field_type: (values.field_type as string) ?? "TEXT",
+          options,
+          required,
+          sort_order: sortOrder,
+        });
+        message.success("活字段已创建");
+      } else {
+        await fieldsApi.update(editingId, {
+          label: values.label as string,
+          options,
+          required,
+          sort_order: sortOrder,
+        });
+        message.success("活字段已更新");
+      }
+      setEditingId(null);
       form.resetFields();
       await load();
     } catch (err) {
       setError(normalizeError(err));
     }
+  };
+
+  const startEditing = (row: FieldDefinition) => {
+    setEditingId(row.id);
+    form.setFieldsValue({
+      entity_type: row.entity_type,
+      field_key: row.field_key,
+      label: row.label,
+      field_type: row.field_type,
+      options: row.options?.join("，") ?? "",
+      required: Boolean(row.required),
+      sort_order: row.sort_order,
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    form.resetFields();
   };
 
   const columns: ColumnsType<FieldDefinition> = [
@@ -70,16 +103,26 @@ export function FieldsPanel() {
       title: "操作",
       render: (_v, row) => (
         <PermissionGate permission="field-definition.manage">
-          <PermissionButton
-            permission="field-definition.manage"
-            size="small"
-            onClick={async () => {
-              await fieldsApi.setActive(row.id, !row.is_active);
-              await load();
-            }}
-          >
-            {row.is_active ? "停用" : "启用"}
-          </PermissionButton>
+          <span className="ui-inline-actions">
+            <PermissionButton
+              permission="field-definition.manage"
+              size="small"
+              aria-label={`编辑${row.label}`}
+              onClick={() => startEditing(row)}
+            >
+              编辑
+            </PermissionButton>
+            <PermissionButton
+              permission="field-definition.manage"
+              size="small"
+              onClick={async () => {
+                await fieldsApi.setActive(row.id, !row.is_active);
+                await load();
+              }}
+            >
+              {row.is_active ? "停用" : "启用"}
+            </PermissionButton>
+          </span>
           <Popconfirm
             title={`删除字段「${row.label}」`}
             description="无历史值才可删除；已有历史值只能停用（历史值保留）"
@@ -127,13 +170,13 @@ export function FieldsPanel() {
             <Select options={ENTITY_TYPE_OPTIONS} className="ui-control-width-120" disabled />
           </Form.Item>
           <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
-            <Input placeholder="小写下划线，如 credit_level" />
+            <Input placeholder="小写下划线，如 credit_level" disabled={editingId !== null} />
           </Form.Item>
           <Form.Item name="label" label="标签" rules={[{ required: true }]}>
             <Input placeholder="页面显示名" />
           </Form.Item>
           <Form.Item name="field_type" label="类型">
-            <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" />
+            <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" disabled={editingId !== null} />
           </Form.Item>
           {needsOptions && (
             <Form.Item name="options" label="选项">
@@ -143,8 +186,15 @@ export function FieldsPanel() {
           <Form.Item name="required" label="必填" valuePropName="checked"><Switch /></Form.Item>
           <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
           <Form.Item>
-            <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">新增字段</PermissionButton>
+            <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">
+              {editingId === null ? "新增字段" : "保存字段"}
+            </PermissionButton>
           </Form.Item>
+          {editingId !== null && (
+            <Form.Item>
+              <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
+            </Form.Item>
+          )}
         </Form>
       </PermissionGate>
     </Card>

@@ -100,6 +100,25 @@ describe("设置面板：活字段", () => {
       sort_order: 0,
     });
   });
+
+  it("管理员可编辑活字段标签和排序", async () => {
+    const field = { ...fields[0], required: false, sort_order: 3 };
+    vi.mocked(catalog.fieldsApi).list.mockResolvedValue([field]);
+    const { FieldsPanel } = await import("./FieldsPanel");
+    renderLight(<FieldsPanel />, { user: "admin" });
+
+    await screen.findByText("区域");
+    await ui.click(screen.getByRole("button", { name: "编辑区域" }));
+    await ui.clear(screen.getByPlaceholderText("页面显示名"));
+    await ui.type(screen.getByPlaceholderText("页面显示名"), "客户区域");
+    await ui.click(screen.getByRole("button", { name: /保存字段/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).update).toHaveBeenCalledWith(1, {
+      label: "客户区域",
+      required: false,
+      sort_order: 3,
+    }));
+  });
 });
 
 describe("设置面板：经营规则", () => {

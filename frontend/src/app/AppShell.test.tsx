@@ -1,9 +1,16 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderApp } from "../test/render";
 import { AppShell } from "./AppShell";
 import { navigation } from "./navigation";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 /** 把 catalog 里所有 *Api 的方法统一桩掉：默认返回空数组，个别接口在用例里覆盖。
  *  目的：让「导航可达性」测试不依赖后端，只验证页面能挂载、不崩、标题正确。 */
@@ -59,13 +66,24 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
   return stub;
 });
 
+vi.mock("../auth/UserCenterPage", () => ({
+  UserCenterPage: () => <div>用户中心内容</div>,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
+async function renderShell(options: { user?: string } = {}) {
+  await act(async () => {
+    renderApp(<AppShell />, options);
+    await Promise.resolve();
+  });
+}
+
 describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => {
-  it("侧栏渲染全部导航入口（限定在 nav 内，避开页面同名按钮）", () => {
-    renderApp(<AppShell />);
+  it("侧栏渲染全部导航入口（限定在 nav 内，避开页面同名按钮）", async () => {
+    await renderShell();
     const nav = screen.getByRole("navigation", { name: "主导航" });
     const labels = [...nav.querySelectorAll(".nav-item")].map((b) => b.textContent?.trim());
     for (const item of navigation) {
@@ -74,19 +92,19 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     expect(nav.querySelectorAll(".nav-item").length).toBe(navigation.length);
   });
 
-  it("默认落工作台，标题区显示当前页名", () => {
-    renderApp(<AppShell />);
+  it("默认落工作台，标题区显示当前页名", async () => {
+    await renderShell();
     expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台");
   });
 
   it("逐个点击每个导航项都能切换到对应页面（无白屏、无抛错）", async () => {
-    renderApp(<AppShell />);
+    await renderShell();
     for (const item of navigation) {
       const nav = screen.getByRole("navigation", { name: "主导航" });
       const target = [...nav.querySelectorAll(".nav-item")].find((b) =>
         b.textContent?.includes(item.label),
       ) as Element;
-      await userEvent.click(target);
+      await ui.click(target);
       await waitFor(() =>
         expect(document.querySelector(".topbar__page")?.textContent).toBe(item.label),
       );
@@ -99,16 +117,24 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     }
   });
 
-  it("当前页签带 aria-current=page", () => {
-    renderApp(<AppShell />);
+  it("当前页签带 aria-current=page", async () => {
+    await renderShell();
     const current = document.querySelector('[aria-current="page"]');
     expect(current?.textContent).toContain("工作台");
   });
 });
 
 describe("AppShell：角色展示与退出", () => {
-  it("顶栏角色为只读文本（管理员配置，无下拉选择器）", () => {
-    renderApp(<AppShell />, { user: "admin" });
+  it("顶栏用户中心入口可打开弹窗", async () => {
+    await renderShell({ user: "admin" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await ui.click(screen.getByRole("button", { name: "用户中心" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("用户中心内容")).toBeInTheDocument();
+  });
+
+  it("顶栏角色为只读文本（管理员配置，无下拉选择器）", async () => {
+    await renderShell({ user: "admin" });
     const topbar = document.querySelector(".topbar") as HTMLElement;
     expect(within(topbar).getByText("当前角色（开发态）")).toBeTruthy();
     expect(within(topbar).getByText("系统管理员")).toBeTruthy();
@@ -116,8 +142,8 @@ describe("AppShell：角色展示与退出", () => {
     expect(topbar.querySelector(".ant-select-selector")).toBeNull();
   });
 
-  it("DEV 态顶栏也常驻退出登录按钮", () => {
-    renderApp(<AppShell />, { user: "admin" });
+  it("DEV 态顶栏也常驻退出登录按钮", async () => {
+    await renderShell({ user: "admin" });
     const topbar = document.querySelector(".topbar") as HTMLElement;
     expect(within(topbar).getByRole("button", { name: "退出登录" })).toBeTruthy();
   });

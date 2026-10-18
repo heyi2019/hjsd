@@ -97,14 +97,18 @@ export function normalizeError(error: unknown): NormalizedError {
     // v1 唯一错误结构：{ code, message, details }
     if (data?.message) return { message: data.message, code: data.code };
 
-    // Vite 代理连接不上后端时会返回未结构化的 500 文本；不要把它伪装成业务错误。
-    if (
-      error.response?.status === 503
-      || (error.response?.status === 500 && (data === undefined || typeof data !== "object"))
-    ) {
+    // 数据库未就绪时后端明确返回 503；500 则表示接口执行异常，不能误报成连接失败。
+    if (error.response?.status === 503) {
       return {
         message: "后端服务未连接或启动异常，请检查后端服务和端口。",
         code: "BACKEND_UNAVAILABLE",
+      };
+    }
+
+    if (error.response?.status === 500 && (data === undefined || typeof data !== "object")) {
+      return {
+        message: "后端接口返回异常，请查看后端日志。",
+        code: "BACKEND_ERROR",
       };
     }
 

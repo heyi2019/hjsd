@@ -412,7 +412,12 @@ def r1_inventory_health(
                 "extra_values": account_extra_values.get(account.id, {}),
             }
         )
-    return {"generated_on": today.isoformat(), "items": items, "total": len(items)}
+    return {
+        "generated_on": today.isoformat(),
+        "items": items,
+        "total": len(items),
+        "total_cost": sum((item["total_cost"] for item in items), ZERO),
+    }
 
 
 # --------------------------------------------------------------------- R2 月度

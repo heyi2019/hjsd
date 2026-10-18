@@ -49,9 +49,12 @@ describe("normalizeError：只认 v1 统一错误结构", () => {
     expect(out.message.length).toBeGreaterThan(0);
   });
 
-  it("代理返回未结构化 500 时提示检查后端连接", () => {
+  it("后端返回未结构化 500 时提示接口异常而不是误报连接失败", () => {
     const err = axiosError({ status: 500, responseData: "Internal Server Error" });
-    expect(normalizeError(err).message).toContain("后端");
+    expect(normalizeError(err)).toEqual({
+      message: "后端接口返回异常，请查看后端日志。",
+      code: "BACKEND_ERROR",
+    });
   });
 
   it("健康检查返回 503 时提示后端或数据库未就绪", () => {

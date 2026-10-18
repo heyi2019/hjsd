@@ -165,6 +165,29 @@ def _month_item(data: dict, month: str) -> dict:
 
 # --------------------------------------------------------------------- R1 库存
 class TestR1Inventory:
+    def test_inventory_health_api_accepts_missing_platform_and_returns_total_cost(
+        self, seeded_db, seeded_client, headers
+    ):
+        account = Account(
+            game_account="report-null-platform",
+            inventory_type="RECOVERY",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("125.00"),
+            platform=None,
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        response = seeded_client.get("/api/v1/reports/inventory-health", headers=headers)
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        row = next(item for item in payload["items"] if item["account_id"] == account.id)
+        assert row["platform"] is None
+        assert payload["total_cost"] == "125.00"
+
     def test_inventory_health_includes_account_live_fields(self, seeded_db):
         account = account_service.create_account(
             seeded_db,

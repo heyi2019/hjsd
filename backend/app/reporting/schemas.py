@@ -14,7 +14,7 @@ class ReportModel(BaseModel):
 class InventoryHealthItemOut(ReportModel):
     account_id: int
     game_account: str
-    platform: str
+    platform: str | None = None
     business: str | None = None
     status: str
     buy_amount: Decimal
@@ -31,6 +31,7 @@ class InventoryHealthOut(ReportModel):
     generated_on: str
     items: list[InventoryHealthItemOut]
     total: int
+    total_cost: Decimal
 
 
 class MonthlyPnlItemOut(ReportModel):

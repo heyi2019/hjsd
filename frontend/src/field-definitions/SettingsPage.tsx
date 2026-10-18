@@ -15,6 +15,7 @@ import { PoolsPanel } from "./panels/PoolsPanel";
 export function SettingsPage() {
   const { can } = useSession();
   const [compact, setCompact] = useState(false);
+  const [activeTab, setActiveTab] = useState("business-dictionary");
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 960px)");
@@ -26,19 +27,19 @@ export function SettingsPage() {
   }, []);
 
   const items = [
-    { key: "business-dictionary", label: "业务字典", children: <BusinessDictionaryPanel /> },
-    { key: "order-types", label: "业务类型", children: <OrderTypesPanel /> },
-    { key: "pools", label: "资金池", children: <PoolsPanel /> },
-    { key: "fields", label: "活字段", children: <FieldsPanel /> },
-    { key: "policies", label: "经营规则", children: <PolicySettingsPanel /> },
-    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", children: <ImportWorkbench embedded /> }] : []),
+    { key: "business-dictionary", label: "业务字典", render: () => <BusinessDictionaryPanel /> },
+    { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
+    { key: "pools", label: "资金池", render: () => <PoolsPanel /> },
+    { key: "fields", label: "活字段", render: () => <FieldsPanel /> },
+    { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
+    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", render: () => <ImportWorkbench embedded /> }] : []),
     ...(can("user.manage")
       ? [
-          { key: "users", label: "人员与权限", children: <UsersPanel /> },
-          { key: "teams", label: "团队管理", children: <TeamsPanel /> },
+          { key: "users", label: "人员与权限", render: () => <UsersPanel /> },
+          { key: "teams", label: "团队管理", render: () => <TeamsPanel /> },
         ]
       : []),
-    { key: "appearance", label: "外观", children: <AppearancePanel /> },
+    { key: "appearance", label: "外观", render: () => <AppearancePanel /> },
   ];
 
   return (
@@ -46,8 +47,13 @@ export function SettingsPage() {
       <Tabs
         className="settings-tabs"
         tabPosition={compact ? "top" : "left"}
-        defaultActiveKey="business-dictionary"
-        items={items}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={items.map(({ render, ...item }) => ({
+          ...item,
+          // 隐藏 Tab 不挂载，避免打开设置页时提前请求所有管理数据。
+          children: activeTab === item.key ? render() : null,
+        }))}
       />
     </section>
   );

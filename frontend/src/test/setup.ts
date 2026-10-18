@@ -1,6 +1,13 @@
 // vitest 入口会同时注册 matchers 并扩展 expect 的类型（jest-dom v7 提供 vitest.d.ts）
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { resetTestBrowserState } from "./browser-state";
+
+afterEach(() => {
+  cleanup();
+  resetTestBrowserState();
+});
 
 // jsdom polyfills for APIs antd v5 touches during render/unmount.
 

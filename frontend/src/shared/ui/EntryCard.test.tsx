@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EntryCard, EntryRow } from "./EntryCard";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 describe("EntryCard：可点击入口卡", () => {
   it("点击触发 onClick", async () => {
@@ -9,7 +15,7 @@ describe("EntryCard：可点击入口卡", () => {
     render(<EntryCard title="订单总数" value="72" description="点击进入业务中心" onClick={onClick} />);
     expect(screen.getByText("订单总数")).toBeInTheDocument();
     expect(screen.getByText("72")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /订单总数/ }));
+    await ui.click(screen.getByRole("button", { name: /订单总数/ }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
@@ -18,8 +24,8 @@ describe("EntryCard：可点击入口卡", () => {
     render(<EntryCard title="新建业务" description="打开登记弹窗" onClick={onClick} />);
     const card = screen.getByRole("button", { name: /新建业务/ });
     card.focus();
-    await userEvent.keyboard("{Enter}");
-    await userEvent.keyboard(" ");
+    await ui.keyboard("{Enter}");
+    await ui.keyboard(" ");
     expect(onClick).toHaveBeenCalledTimes(2);
   });
 

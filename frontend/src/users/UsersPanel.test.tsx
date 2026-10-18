@@ -1,8 +1,14 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderApp } from "../test/render";
+import { renderLight } from "../test/render";
 import { UsersPanel } from "./UsersPanel";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 const { api } = vi.hoisted(() => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
@@ -38,8 +44,7 @@ beforeEach(() => {
 
 describe("UsersPanel：用户管理动作", () => {
   it("管理员可以编辑用户并提交更新", async () => {
-    const ui = userEvent.setup();
-    renderApp(<UsersPanel />, { user: "admin" });
+    renderLight(<UsersPanel />, { user: "admin" });
 
     expect(await screen.findByText("operator01")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /编辑/ }));
@@ -53,8 +58,7 @@ describe("UsersPanel：用户管理动作", () => {
   });
 
   it("管理员可以停用用户并重置密码", async () => {
-    const ui = userEvent.setup();
-    renderApp(<UsersPanel />, { user: "admin" });
+    renderLight(<UsersPanel />, { user: "admin" });
 
     expect(await screen.findByText("operator01")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /停用/ }));

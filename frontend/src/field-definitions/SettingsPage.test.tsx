@@ -1,7 +1,14 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderApp } from "../test/render";
+import { renderLight } from "../test/render";
 import { SettingsPage } from "./SettingsPage";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 // vi.hoisted：保证 const 在 vi.mock 工厂执行前完成初始化，避免 TDZ（直接返回对象引用会触发）。
 const { orderTypesApi, poolsApi, fieldsApi, policyApi } = vi.hoisted(() => ({
@@ -20,11 +27,26 @@ const { orderTypesApi, poolsApi, fieldsApi, policyApi } = vi.hoisted(() => ({
   },
 }));
 
+const { api } = vi.hoisted(() => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+  },
+}));
+
 vi.mock("../shared/api/catalog", () => ({
   orderTypesApi,
   poolsApi,
   fieldsApi,
   policyApi,
+}));
+
+vi.mock("../shared/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../shared/api/client")>()),
+  api,
+  errorMessage: (error: unknown) => String(error),
+  normalizeError: (error: unknown) => ({ message: String(error) }),
 }));
 
 const orderTypes = [
@@ -40,24 +62,27 @@ const fields = [
 ] as unknown as import("../shared/api/catalog").FieldDefinition[];
 
 beforeEach(() => {
+  vi.clearAllMocks();
   orderTypesApi.list.mockResolvedValue(orderTypes);
   poolsApi.list.mockResolvedValue(pools);
   fieldsApi.list.mockResolvedValue(fields);
   policyApi.list.mockResolvedValue({ items: [], total: 0 });
+  api.get.mockResolvedValue({ data: [] });
 });
 
 it("渲染四个主数据 Tab，默认业务类型列表可见", async () => {
-  renderApp(<SettingsPage />, { user: "admin" });
+  renderLight(<SettingsPage />, { user: "admin" });
   expect(await screen.findByRole("tab", { name: "业务类型" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "资金池" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "活字段" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "经营规则" })).toBeInTheDocument();
-  // 默认激活业务类型 Tab → 列表渲染
+  expect(api.get).not.toHaveBeenCalled();
+  await ui.click(screen.getByRole("tab", { name: "业务类型" }));
   expect(await screen.findByText("HS")).toBeInTheDocument();
 });
 
 it("业务分类明确分期归自营、代分期归分销", async () => {
-  renderApp(<SettingsPage />, { user: "admin" });
+  renderLight(<SettingsPage />, { user: "admin" });
   expect(await screen.findByText(/分期：本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
   expect(screen.getByText(/代分期：他人账号售出，本方提供代付或分期服务/)).toBeInTheDocument();
   expect(screen.getAllByText(/生成 DFQ 业务订单号/)).toHaveLength(2);

@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DataTable } from "./DataTable";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 interface Row {
   id: number;
@@ -80,7 +86,7 @@ describe("DataTable：两种分页模式", () => {
     );
     const next = document.querySelector(".ant-pagination-next");
     expect(next).toBeTruthy();
-    await userEvent.click(next as Element);
+    await ui.click(next as Element);
     expect(onPageChange).toHaveBeenCalled();
     expect(onPageChange.mock.calls[0][0]).toBe(2);
   });
@@ -94,7 +100,7 @@ describe("DataTable：两种分页模式", () => {
     const next = document.querySelector(".ant-pagination-next");
     expect(next).toBeTruthy();
     expect(screen.queryByText("第11行")).toBeNull();
-    await userEvent.click(next as Element);
+    await ui.click(next as Element);
     expect(await screen.findByText("第11行")).toBeInTheDocument();
     expect(onPageChange).not.toHaveBeenCalled();
   });

@@ -7,6 +7,32 @@ import { fileURLToPath } from "node:url";
 // 落地失败点。若项目是 CJS（无 "type": "module"），可改回 resolve(__dirname, ...)。
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
+// 轻量纯逻辑测试可以安全并行；涉及大量 antd/jsdom 交互的页面测试共用
+// 一个 worker，避免多个大型 DOM 树同时争抢机器资源导致超时和重试。
+const fastTests = [
+  "src/test/fixtures.test.ts",
+  "src/accounts/inventory-export.test.ts",
+  "src/accounts/inventory-logic.test.ts",
+  "src/shared/api/*.test.ts",
+  "src/shared/lib/*.test.ts",
+  "src/vite.config.test.ts",
+];
+
+// 日常反馈层：覆盖登录、权限、主工作台、订单写路径、报表和设置等关键面，
+// 不包含库存/客户/资金等长链路全量页面回归。
+const quickTests = [
+  "src/app/DashboardPage.test.tsx",
+  "src/app/DashboardPage.interactions.test.tsx",
+  "src/auth/LoginPage.test.tsx",
+  "src/auth/UserCenterPage.test.tsx",
+  "src/field-definitions/SettingsPage.test.tsx",
+  "src/orders/CreateBusinessModal.test.tsx",
+  "src/orders/CreateBusinessModal.distribution.test.tsx",
+  "src/policy/PolicySettingsPanel.test.tsx",
+  "src/reporting/ReportsPage.test.tsx",
+  "src/shared/state/session.test.tsx",
+];
+
 // Antd v5 + jsdom reliable test config.
 // Three settings are mandatory (see SKILL.md):
 //   1. resolve.mainFields forces antd ESM build (antd/es) instead of CJS (antd/lib)
@@ -41,6 +67,53 @@ export default defineConfig({
         inline: true,
       },
     },
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "fast",
+          // Vitest 5 多 project 同时运行（如 `vitest run`）必须各自声明唯一 groupOrder，
+          // 否则报 "Provide unique 'sequence.groupOrder' for them"。
+          sequence: { groupOrder: 1 },
+          include: fastTests,
+          pool: "forks",
+          maxWorkers: 3,
+          minWorkers: 1,
+          retry: 0,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "quick",
+          sequence: { groupOrder: 2 },
+          include: quickTests,
+          pool: "forks",
+          maxWorkers: 2,
+          minWorkers: 1,
+          retry: 0,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "react",
+          sequence: { groupOrder: 3 },
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: [
+            "src/test/fixtures.test.ts",
+            "src/accounts/inventory-export.test.ts",
+            "src/accounts/inventory-logic.test.ts",
+            "src/shared/api/*.test.ts",
+            "src/shared/lib/*.test.ts",
+            "src/vite.config.test.ts",
+            ...quickTests,
+          ],
+          pool: "forks",
+          maxWorkers: 1,
+          minWorkers: 1,
+        },
+      },
+    ],
   },
 });

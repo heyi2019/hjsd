@@ -169,7 +169,7 @@ export function InventoryDetail({
       <Descriptions.Item label="账号密码">{row.game_password ? <Typography.Text copyable>{row.game_password}</Typography.Text> : "-"}</Descriptions.Item>
       <Descriptions.Item label="渠道 / 区服">{row.channel_region || "-"}</Descriptions.Item>
       <Descriptions.Item label="绑定手机号">{row.bound_phone || "-"}</Descriptions.Item>
-      <Descriptions.Item label="有无二次">{row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无"}</Descriptions.Item>
+      <Descriptions.Item label="有无二次" span={3}>{row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无"}</Descriptions.Item>
       {PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? "") ? <>
         <Descriptions.Item label="账号描述" span={3}>{row.account_description || "-"}</Descriptions.Item>
         <Descriptions.Item label="账号图片" span={3}>

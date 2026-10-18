@@ -1,8 +1,14 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderApp } from "../test/render";
+import { renderLight } from "../test/render";
 import { ImportWorkbench } from "./ImportWorkbench";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 const batches = vi.fn();
 const rows = vi.fn();
@@ -80,7 +86,7 @@ beforeEach(() => {
 });
 
 it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {
-  renderApp(<ImportWorkbench />, { user: "admin" });
+  renderLight(<ImportWorkbench />, { user: "admin" });
   expect(await screen.findByText("导入工作台")).toBeInTheDocument();
   // 默认批次详情加载：原始行表格出现（raw 渲染 "金额=100"；操作列出现「指派」）
   expect(await screen.findByText("金额=100")).toBeInTheDocument();
@@ -94,7 +100,7 @@ it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {
 });
 
 it("viewer 角色无 import.manage：看不到指派/确认批次/回滚按钮", async () => {
-  renderApp(<ImportWorkbench />, { user: "viewer" });
+  renderLight(<ImportWorkbench />, { user: "viewer" });
   await screen.findByText("导入工作台");
   expect(screen.queryByRole("button", { name: /指派/ })).toBeNull();
   expect(screen.queryByRole("button", { name: /确认批次/ })).toBeNull();
@@ -102,35 +108,35 @@ it("viewer 角色无 import.manage：看不到指派/确认批次/回滚按钮",
 });
 
 it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 map（basis 必填）", async () => {
-  renderApp(<ImportWorkbench />, { user: "admin" });
+  renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("金额=100"); // 行已加载
   const assignBtns = screen.getAllByRole("button", { name: /指派/ });
-  await userEvent.click(assignBtns[0]);
+  await ui.click(assignBtns[0]);
   await screen.findByText(/人工指派 · 第 1 行/); // 抽屉标题（避免与卡片说明段重复）
-  await userEvent.type(
+  await ui.type(
     screen.getByPlaceholderText("如：对账单 7 月第 9 行 / 客户确认记录"),
     "对账单 7 月第 9 行",
   );
-  await userEvent.click(screen.getByRole("button", { name: /确认指派/ }));
+  await ui.click(screen.getByRole("button", { name: /确认指派/ }));
   await waitFor(() => expect(map).toHaveBeenCalledTimes(1));
   expect(map.mock.calls[0][0]).toBe(10); // 行 id
   expect(map.mock.calls[0][1]).toMatchObject({ basis: "对账单 7 月第 9 行" });
 });
 
 it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 commit", async () => {
-  renderApp(<ImportWorkbench />, { user: "admin" });
+  renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("导入工作台");
   const commitBtn = screen.getByRole("button", { name: /确认批次/ });
   expect(commitBtn).not.toBeDisabled();
-  await userEvent.click(commitBtn);
+  await ui.click(commitBtn);
   await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
   expect(commit.mock.calls[0][0]).toBe(1); // batch id
 });
 
 it("导入对账 Tab：切换后渲染对账 StatCard（源总行/已导入）", async () => {
-  renderApp(<ImportWorkbench />, { user: "admin" });
+  renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("导入工作台");
-  await userEvent.click(screen.getByRole("tab", { name: "导入对账" }));
+  await ui.click(screen.getByRole("tab", { name: "导入对账" }));
   // 该 Tab 内的 StatCard 标签（区别于顶部 StatRow 的「源行数」）
   const panel = screen.getByRole("tabpanel", { name: "导入对账" });
   expect(within(panel).getByText("源总行")).toBeInTheDocument();

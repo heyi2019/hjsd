@@ -1059,6 +1059,33 @@
   gap: var(--space-2);
 }
 
+/* 资金流水筛选项较多：桌面端按语义宽度收敛，避免每个字段被 flex 拉满；窄屏再自然堆叠。 */
+.funds-cashflow-filters {
+  display: flex;
+  align-items: center;
+  margin-block-end: var(--space-4);
+}
+.funds-cashflow-filters > * { min-width: 0; width: 100%; }
+.funds-cashflow-filters > :first-child {
+  flex: 1 1 var(--col-w-240);
+  max-width: var(--col-w-280);
+}
+.funds-cashflow-filters > :not(:first-child) {
+  flex: 0 1 var(--col-w-140);
+  max-width: var(--col-w-140);
+}
+.funds-cashflow-filters .ant-select { width: 100%; }
+
+@media (--bp-md) {
+  .funds-cashflow-filters > * {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+@media (--bp-sm) {
+  .funds-cashflow-filters > * { flex-basis: 100%; }
+}
+
 .ui-admin-table .ant-table-wrapper { margin-block: 0; }
 
 /* Shared form geometry: page files choose semantic widths, never inline pixels. */

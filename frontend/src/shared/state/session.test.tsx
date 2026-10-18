@@ -1,9 +1,15 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderApp } from "../../test/render";
+import { renderLight } from "../../test/render";
 import { DEV_USER_KEY } from "../api/client";
 import { ALL_PERMISSIONS, ROLE_PERMISSIONS, type Permission, useSession } from "./session";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 /** 探针组件：把 session 暴露成可断言的文本，避免在测试里重复写 Context 样板。 */
 function Probe() {
@@ -27,30 +33,30 @@ beforeEach(() => {
 
 describe("SessionProvider：角色 → 权限", () => {
   it("admin 拥有全部权限点", () => {
-    renderApp(<Probe />, { user: "admin" });
+    renderLight(<Probe />, { user: "admin" });
     expect(screen.getByTestId("perm-count").textContent).toBe(String(ALL_PERMISSIONS.length));
     expect(screen.getByTestId("can-create").textContent).toBe("true");
   });
 
   it("operator 能建单但不能审批异常（operator 无 order.exception.approve）", () => {
-    renderApp(<Probe />, { user: "operator" });
+    renderLight(<Probe />, { user: "operator" });
     expect(screen.getByTestId("can-create").textContent).toBe("true");
     expect(screen.getByTestId("can-approve").textContent).toBe("false");
   });
 
   it("viewer 不能建单（只读角色）", () => {
-    renderApp(<Probe />, { user: "viewer" });
+    renderLight(<Probe />, { user: "viewer" });
     expect(screen.getByTestId("can-create").textContent).toBe("false");
   });
 
   it("finance 可读财务但不可改客户", () => {
-    renderApp(<Probe />, { user: "finance" });
+    renderLight(<Probe />, { user: "finance" });
     const probe = screen.getByTestId("user");
     expect(probe.textContent).toBe("finance");
   });
 
   it("未知角色回落为空权限，不崩且 can 恒 false", () => {
-    renderApp(<Probe />, { user: "nobody" });
+    renderLight(<Probe />, { user: "nobody" });
     expect(screen.getByTestId("perm-count").textContent).toBe("0");
     expect(screen.getByTestId("can-create").textContent).toBe("false");
   });
@@ -66,9 +72,9 @@ describe("SessionProvider：角色 → 权限", () => {
 
 describe("switchUser：切换角色", () => {
   it("切换后权限立即生效并持久化到 localStorage", async () => {
-    renderApp(<Probe />, { user: "admin" });
+    renderLight(<Probe />, { user: "admin" });
     expect(screen.getByTestId("can-create").textContent).toBe("true");
-    await userEvent.click(screen.getByRole("button", { name: "切到财务" }));
+    await ui.click(screen.getByRole("button", { name: "切到财务" }));
     expect(screen.getByTestId("user").textContent).toBe("finance");
     expect(localStorage.getItem(DEV_USER_KEY)).toBe("finance");
     expect(screen.getByTestId("can-approve").textContent).toBe("false");
@@ -91,7 +97,7 @@ describe("useSession 边界", () => {
   });
 
   it("权限码类型收窄：不存在的权限调用不抛错，返回 false", () => {
-    renderApp(<Probe />, { user: "admin" });
+    renderLight(<Probe />, { user: "admin" });
     const codes: Permission[] = ["order.create", "audit.read"];
     expect(codes.every((c) => ALL_PERMISSIONS.includes(c))).toBe(true);
   });

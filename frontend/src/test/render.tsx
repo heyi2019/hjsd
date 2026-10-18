@@ -24,6 +24,19 @@ export function AllProviders({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * 轻量页面渲染器：保留 antd 与权限上下文，跳过主题/玻璃状态层。
+ * 大多数页面测试不读取这两个状态，避免每个用例重复启动 matchMedia、
+ * localStorage 读写和 documentElement 样式同步。
+ */
+export function LightProviders({ children }: { children: ReactNode }) {
+  return (
+    <ConfigProvider locale={zhCN} button={{ autoInsertSpace: false }}>
+      <SessionProvider>{children}</SessionProvider>
+    </ConfigProvider>
+  );
+}
+
 /** 以指定 dev 角色渲染组件；user 会先写入 localStorage，SessionProvider 据此解析权限。 */
 export function renderApp(
   ui: ReactElement,
@@ -32,4 +45,13 @@ export function renderApp(
   const { user, ...rest } = options;
   if (user !== undefined) localStorage.setItem(DEV_USER_KEY, user);
   return render(ui, { wrapper: AllProviders, ...rest });
+}
+
+export function renderLight(
+  ui: ReactElement,
+  options: { user?: string } & Omit<RenderOptions, "wrapper"> = {},
+): RenderResult {
+  const { user, ...rest } = options;
+  if (user !== undefined) localStorage.setItem(DEV_USER_KEY, user);
+  return render(ui, { wrapper: LightProviders, ...rest });
 }

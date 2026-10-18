@@ -1,8 +1,14 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderApp } from "../test/render";
+import { renderLight } from "../test/render";
 import { OrdersPage } from "./OrdersPage";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 const ordersList = vi.fn();
 const typesList = vi.fn();
@@ -45,14 +51,14 @@ beforeEach(() => {
 });
 
 async function openLedger() {
-  renderApp(<OrdersPage />, { user: "admin" });
+  renderLight(<OrdersPage />, { user: "admin" });
   await screen.findByRole("tab", { name: "业务台账" });
   await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
 }
 
 describe("OrdersPage：四类业务台账", () => {
   it("顶部不再重复展示业务中心标题与说明", async () => {
-    renderApp(<OrdersPage />);
+    renderLight(<OrdersPage />);
     await screen.findByRole("tab", { name: "业务台账" });
     expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
     expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂、代分期分别承载不同业务。")).toBeNull();
@@ -82,7 +88,7 @@ describe("OrdersPage：四类业务台账", () => {
     ]);
 
     await openLedger();
-    await userEvent.type(screen.getByLabelText("搜索订单"), "批量验收");
+    await ui.type(screen.getByLabelText("搜索订单"), "批量验收");
 
     expect(screen.getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
     expect(screen.queryByText("HS-2026-0001")).toBeNull();
@@ -101,12 +107,12 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("加载失败时展示错误条", async () => {
     ordersList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
-    renderApp(<OrdersPage />);
+    renderLight(<OrdersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("业务中心保留库存、台账与分期回款视图，不展示独立返点页签", async () => {
-    renderApp(<OrdersPage />);
+    renderLight(<OrdersPage />);
     await screen.findByRole("tab", { name: "业务台账" });
     for (const label of ["库存中心", "业务台账", "分期与回款"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
@@ -115,22 +121,22 @@ describe("OrdersPage：四类业务台账", () => {
   });
 
   it("新建订单菜单提供回收、提号、代挂、代分期四个表单", async () => {
-    renderApp(<OrdersPage />, { user: "admin" });
+    renderLight(<OrdersPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务台账" });
-    await userEvent.click(screen.getByRole("button", { name: /新建订单/ }));
+    await ui.click(screen.getByRole("button", { name: /新建订单/ }));
     for (const label of ["新建回收订单", "新建提号订单", "新建代挂订单", "新建代分期订单"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
   });
 
   it("移除没有明确业务含义的通用登记事件入口", async () => {
-    renderApp(<OrdersPage />, { user: "admin" });
+    renderLight(<OrdersPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务台账" });
     expect(screen.queryByRole("button", { name: /登记事件/ })).toBeNull();
   });
 
   it("忽略已废弃的业务中心页签参数并回到业务台账", async () => {
-    renderApp(<OrdersPage initialTab={"th" as "inventory"} />);
+    renderLight(<OrdersPage initialTab={"th" as "inventory"} />);
     const tab = await screen.findByRole("tab", { name: "业务台账" });
     expect(tab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("HS-2026-0001")).length).toBeGreaterThan(0);

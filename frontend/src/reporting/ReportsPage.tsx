@@ -57,6 +57,7 @@ const REPORT_LABEL: Record<string, string> = {
 };
 
 export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void }) {
+  const [activeTab, setActiveTab] = useState("r1");
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
@@ -82,6 +83,22 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
     }
     setExportError(lastError);
   };
+  const tabItems = [
+    { key: "r1", label: "库存 R1", render: () => <InventoryReport /> },
+    { key: "r2", label: "月度损益 R2", render: () => <MonthlyPnl /> },
+    { key: "r3", label: "提成对账 R3", render: () => <Commission /> },
+    { key: "r4", label: "资金日报 R4", render: () => <DailyFunds /> },
+    { key: "r5", label: "业务损益 R5", render: () => <BusinessPnl /> },
+    { key: "finance-dimensions", label: "资金属性分析", render: () => <FinanceDimensions /> },
+    { key: "profit", label: "订单利润", render: () => <OrderProfit /> },
+    { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },
+    { key: "quality", label: "质量中心", render: () => <QualityPanel /> },
+    { key: "notifications", label: "系统提醒", render: () => <NotificationsPanel /> },
+    { key: "search", label: "全局搜索", render: () => <SearchPanel /> },
+    { key: "audit", label: "审计记录", render: () => <AuditPanel /> },
+    { key: "attachments", label: "附件中心", render: () => <AttachmentPanel /> },
+  ];
+
   return (
     <section className="ui-stack">
       <Card className="glass" title="报表导出">
@@ -109,22 +126,13 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
         {exportError ? <Typography.Text type="danger">{exportError}</Typography.Text> : null}
       </Card>
       <Tabs
-        defaultActiveKey="r1"
-        items={[
-          { key: "r1", label: "库存 R1", children: <InventoryReport /> },
-          { key: "r2", label: "月度损益 R2", children: <MonthlyPnl /> },
-          { key: "r3", label: "提成对账 R3", children: <Commission /> },
-          { key: "r4", label: "资金日报 R4", children: <DailyFunds /> },
-          { key: "r5", label: "业务损益 R5", children: <BusinessPnl /> },
-          { key: "finance-dimensions", label: "资金属性分析", children: <FinanceDimensions /> },
-          { key: "profit", label: "订单利润", children: <OrderProfit /> },
-          { key: "data-center", label: "数据中心", children: <DataCenterPanel onNavigate={onNavigate} /> },
-          { key: "quality", label: "质量中心", children: <QualityPanel /> },
-          { key: "notifications", label: "系统提醒", children: <NotificationsPanel /> },
-          { key: "search", label: "全局搜索", children: <SearchPanel /> },
-          { key: "audit", label: "审计记录", children: <AuditPanel /> },
-          { key: "attachments", label: "附件中心", children: <AttachmentPanel /> },
-        ]}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems.map(({ render, ...item }) => ({
+          ...item,
+          // 隐藏 Tab 不挂载：避免首屏同时发起 13 组请求，也避免切换无关页面时产生状态更新。
+          children: activeTab === item.key ? render() : null,
+        }))}
       />
     </section>
   );

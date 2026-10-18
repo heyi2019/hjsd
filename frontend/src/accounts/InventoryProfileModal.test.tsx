@@ -2,8 +2,14 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account } from "../shared/api/catalog";
-import { renderApp } from "../test/render";
+import { renderLight } from "../test/render";
 import { InventoryProfileModal } from "./InventoryProfileModal";
+
+let ui: ReturnType<typeof userEvent.setup>;
+
+beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
+});
 
 const updateProfile = vi.fn();
 
@@ -31,7 +37,7 @@ beforeEach(() => {
 describe("InventoryProfileModal", () => {
   it("按账号描述模式提交资料并回传更新结果", async () => {
     const onSaved = vi.fn();
-    renderApp(
+    renderLight(
       <InventoryProfileModal
         target={{ account, mode: "description" }}
         onClose={vi.fn()}
@@ -42,9 +48,9 @@ describe("InventoryProfileModal", () => {
     );
 
     const description = screen.getByPlaceholderText("补充账号等级、资源、限制等信息");
-    await userEvent.clear(description);
-    await userEvent.type(description, "新描述");
-    await userEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await ui.clear(description);
+    await ui.type(description, "新描述");
+    await ui.click(screen.getByRole("button", { name: /保存/ }));
 
     await waitFor(() => expect(updateProfile).toHaveBeenCalledWith(1, { account_description: "新描述" }));
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ account_description: "新描述" }));

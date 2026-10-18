@@ -1,7 +1,7 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Select, Tabs, message } from "antd";
+import { Card, Form, Input, Modal, Select, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   cashflowsApi,
   depositsApi,
@@ -64,6 +64,13 @@ export function FundsPage() {
   const [rejectTarget, setRejectTarget] = useState<Cashflow | null>(null);
   const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
+  const [unmatchedTarget, setUnmatchedTarget] = useState<Reconciliation | null>(null);
+  const [cashflowKeyword, setCashflowKeyword] = useState("");
+  const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
+  const [cashflowDirection, setCashflowDirection] = useState<string | undefined>();
+  const [cashflowStatus, setCashflowStatus] = useState<string | undefined>();
+  const [cashflowFrom, setCashflowFrom] = useState("");
+  const [cashflowTo, setCashflowTo] = useState("");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [depositForm] = Form.useForm();
@@ -106,6 +113,9 @@ export function FundsPage() {
         pool_id: Number(values.pool_id),
         amount: values.amount as string,
         paid_on: values.paid_on as string,
+        counterparty_id: values.counterparty_id ? Number(values.counterparty_id) : undefined,
+        source_order_id: values.source_order_id ? Number(values.source_order_id) : undefined,
+        expected_release_on: values.expected_release_on as string | undefined,
         note: values.note as string,
       });
       message.success("押金占用已登记，不影响经营损益");
@@ -251,6 +261,24 @@ export function FundsPage() {
     .reduce((sum, balance) => sum + Number(balance.deposit_held), 0)
     .toFixed(2);
 
+  const visibleCashflows = useMemo(() => {
+    const keyword = cashflowKeyword.trim().toLowerCase();
+    return cashflows.filter((row) => {
+      const searchable = [row.order_no, row.flow_no, row.category, row.note]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        (!keyword || searchable.includes(keyword))
+        && (cashflowPoolId == null || row.pool_id === cashflowPoolId)
+        && (!cashflowDirection || row.direction === cashflowDirection)
+        && (!cashflowStatus || row.status === cashflowStatus)
+        && (!cashflowFrom || row.occurred_on >= cashflowFrom)
+        && (!cashflowTo || row.occurred_on <= cashflowTo)
+      );
+    });
+  }, [cashflowDirection, cashflowFrom, cashflowKeyword, cashflowPoolId, cashflowStatus, cashflowTo, cashflows]);
+
   const poolColumns: ColumnsType<Pool> = [
     { title: "资金池", dataIndex: "name", render: (_v, row) => `${row.name}（${row.code}）` },
     { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
@@ -283,6 +311,19 @@ export function FundsPage() {
       dataIndex: "paid_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
+    },
+    {
+      title: "对手方",
+      render: (_v, row) => row.counterparty_id == null ? "—" : `#${row.counterparty_id}`,
+    },
+    {
+      title: "来源订单",
+      render: (_v, row) => row.source_order_id == null ? "—" : `#${row.source_order_id}`,
+    },
+    {
+      title: "预计释放",
+      dataIndex: "expected_release_on",
+      render: (v: string | null | undefined) => v || "—",
     },
     {
       title: "已释放",
@@ -378,11 +419,11 @@ export function FundsPage() {
     },
   ];
 
-  const totalFlowIncome = cashflows
+  const totalFlowIncome = visibleCashflows
     .filter((row) => row.direction === "IN")
     .reduce((sum, row) => sum + Number(row.amount), 0)
     .toFixed(2);
-  const totalFlowExpense = cashflows
+  const totalFlowExpense = visibleCashflows
     .filter((row) => row.direction === "OUT")
     .reduce((sum, row) => sum + Number(row.amount), 0)
     .toFixed(2);
@@ -397,9 +438,16 @@ export function FundsPage() {
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
     {
       title: "操作",
-      render: (_v, row) => row.status === "OPEN" ? (
-        <PermissionButton permission="deposit.post" size="small" onClick={() => setResolveTarget(row)}>核销</PermissionButton>
-      ) : null,
+      render: (_v, row) => (
+        <>
+          {row.status === "OPEN" ? (
+            <PermissionButton permission="finance.read" size="small" onClick={() => setUnmatchedTarget(row)}>查看未达流水</PermissionButton>
+          ) : null}
+          {row.status === "OPEN" ? (
+            <PermissionButton permission="deposit.post" size="small" onClick={() => setResolveTarget(row)}>核销</PermissionButton>
+          ) : null}
+        </>
+      ),
     },
   ];
 
@@ -447,18 +495,27 @@ export function FundsPage() {
             label: "流水",
             children: (
               <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
+                <div className="ui-filter-bar funds-cashflow-filters">
+                  <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
+                  <Select aria-label="流水资金池" allowClear value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+                  <Select aria-label="流水方向" allowClear value={cashflowDirection} placeholder="全部收支" options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} onChange={setCashflowDirection} />
+                  <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={[{ value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已审核" }, { value: "REJECTED", label: "已拒绝" }]} onChange={setCashflowStatus} />
+                  <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
+                  <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
+                </div>
                 <StatRow
                   items={[
                     { label: "总收入", amount: totalFlowIncome },
                     { label: "总支出", amount: totalFlowExpense },
+                    { label: "当前结果", kind: "count", amount: visibleCashflows.length },
                   ]}
                 />
                 <DataTable<Cashflow>
                   columns={cashflowColumns}
-                  rows={cashflows}
+                  rows={visibleCashflows}
                   page={1}
                   pageSize={10}
-                  total={cashflows.length}
+                  total={visibleCashflows.length}
                   emptyText="暂无资金流水"
                   onPageChange={() => undefined}
                 />
@@ -524,10 +581,19 @@ export function FundsPage() {
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}>
             <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
+          <Form.Item name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
+            <Input inputMode="numeric" />
+          </Form.Item>
+          <Form.Item name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">
+            <Input inputMode="numeric" />
+          </Form.Item>
           <Form.Item name="amount" label="占用金额" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           <Form.Item name="paid_on" label="占用日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="expected_release_on" label="预计释放日期">
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item name="note" label="说明">
@@ -623,6 +689,21 @@ export function FundsPage() {
             确认释放
           </PermissionButton>
         </Form>
+      </Modal>
+
+      <Modal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>
+        <Typography.Paragraph type="secondary">
+          对账记录标记的流水 ID：{unmatchedTarget?.unmatched_flow_ids?.join(", ") || "—"}
+        </Typography.Paragraph>
+        <DataTable<Cashflow>
+          columns={cashflowColumns.filter((column) => column.title !== "操作")}
+          rows={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)) : []}
+          page={1}
+          pageSize={10}
+          total={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)).length : 0}
+          emptyText="当前列表未加载到对应流水"
+          onPageChange={() => undefined}
+        />
       </Modal>
     </section>
   );

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { renderApp } from "../../test/render";
+import { renderLight } from "../../test/render";
 import { StatusTag } from "./StatusTag";
 import { statusColor } from "../lib/format";
 
@@ -62,7 +62,7 @@ describe("StatusTag：文案承载语义，颜色只是辅助", () => {
   });
 
   it("金额相关状态不影响渲染（组件不参与金额计算）", () => {
-    renderApp(<StatusTag status="PARTIALLY_SETTLED" />);
+    renderLight(<StatusTag status="PARTIALLY_SETTLED" />);
     expect(screen.getByText("部分结算")).toBeInTheDocument();
   });
 });

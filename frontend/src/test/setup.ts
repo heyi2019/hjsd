@@ -5,6 +5,21 @@ import { cleanup } from "@testing-library/react";
 import { resetTestBrowserState } from "./browser-state";
 
 afterEach(() => {
+  // 清空所有 mock 的调用记录与一次性返回值队列（mockResolvedValueOnce 等），
+  // 为后续启用 isolate:false 复用模块图扫清 mock 共享泄漏；配合各文件 beforeEach 重新设定返回值。
+  vi.resetAllMocks();
+  // resetAllMocks 会清掉下面 setup 里 window.matchMedia 这个 vi.fn() 桩，必须重建，
+  // 否则 antd responsiveObserver 调用 matchMedia(...).matches 直接崩溃。
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
   cleanup();
   resetTestBrowserState();
   // antd 浮动层（Select/Modal/message/notification/Drawer/Popover/Tooltip/DatePicker 等）

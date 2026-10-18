@@ -12,7 +12,9 @@ export function PoolsPanel() {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const [accountEditForm] = Form.useForm();
   const [editing, setEditing] = useState<Pool | null>(null);
+  const [editingAccount, setEditingAccount] = useState<PoolAccount | null>(null);
   const load = useCallback(async () => {
     try {
       setRows(await poolsApi.list());
@@ -65,6 +67,24 @@ export function PoolsPanel() {
     }
   };
 
+  const updateAccount = async (values: Record<string, unknown>) => {
+    if (!editingAccount) return;
+    try {
+      await poolAccountsApi.update(editingAccount.id, {
+        account_name: String(values.account_name),
+        account_type: String(values.account_type),
+        ownership: String(values.ownership),
+        opening_balance: String(values.opening_balance ?? "0.00"),
+      });
+      message.success("资金池账户已更新");
+      setEditingAccount(null);
+      accountEditForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
   const columns: ColumnsType<Pool> = [
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
@@ -82,7 +102,25 @@ export function PoolsPanel() {
     { title: "期初余额", dataIndex: "opening_balance" },
     { title: "当前余额", dataIndex: "current_balance" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
-    { title: "操作", render: (_v, row) => <PermissionButton permission="pool.manage" size="small" onClick={async () => { try { await poolAccountsApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE"); await load(); } catch (err) { setError(normalizeError(err)); } }}>{row.status === "ACTIVE" ? "停用" : "启用"}</PermissionButton> },
+    {
+      title: "操作",
+      render: (_v, row) => (
+        <>
+          <PermissionButton
+            permission="pool.manage"
+            size="small"
+            aria-label={`编辑${row.account_no}`}
+            onClick={() => {
+              setEditingAccount(row);
+              accountEditForm.setFieldsValue(row);
+            }}
+          >
+            编辑
+          </PermissionButton>
+          <PermissionButton permission="pool.manage" size="small" onClick={async () => { try { await poolAccountsApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE"); await load(); } catch (err) { setError(normalizeError(err)); } }}>{row.status === "ACTIVE" ? "停用" : "启用"}</PermissionButton>
+        </>
+      ),
+    },
   ];
 
   return (
@@ -144,6 +182,22 @@ export function PoolsPanel() {
           </Form>
         </PermissionGate>
       </Card>
+      <Modal
+        title={editingAccount ? `编辑资金账户 · ${editingAccount.account_no}` : "编辑资金账户"}
+        open={Boolean(editingAccount)}
+        onCancel={() => { setEditingAccount(null); accountEditForm.resetFields(); }}
+        onOk={() => void accountEditForm.submit()}
+        okText="保存"
+      >
+        <Form layout="vertical" form={accountEditForm} onFinish={updateAccount}>
+          <Form.Item label="账户编号"><Input value={editingAccount?.account_no} disabled /></Form.Item>
+          <Form.Item label="资金池"><Input value={editingAccount ? rows.find((pool) => pool.id === editingAccount.pool_id)?.name : undefined} disabled /></Form.Item>
+          <Form.Item name="account_name" label="账户名称" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="account_type" label="类型" rules={[{ required: true }]}><Select options={[{ value: "BANK", label: "银行" }, { value: "CASH", label: "现金" }, { value: "THIRD_PARTY", label: "第三方" }]} /></Form.Item>
+          <Form.Item name="ownership" label="归属" rules={[{ required: true }]}><Select options={[{ value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" }]} /></Form.Item>
+          <Form.Item name="opening_balance" label="期初余额" rules={[{ required: true }]}><Input /></Form.Item>
+        </Form>
+      </Modal>
     </Card>
   );
 }

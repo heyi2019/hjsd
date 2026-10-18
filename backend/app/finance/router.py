@@ -89,6 +89,24 @@ def set_pool_account_status(
     return _pool_account_out(db, row)
 
 
+@router.patch("/pool-accounts/{account_id}", response_model=schemas.PoolAccountOut)
+def update_pool_account(
+    account_id: int,
+    payload: schemas.PoolAccountUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_pool_accounts,
+) -> schemas.PoolAccountOut:
+    row = service.update_pool_account(
+        db,
+        account_id,
+        actor=_actor(user),
+        **payload.model_dump(exclude_unset=True),
+    )
+    if not user.can_see_pool(row.pool_id):
+        raise NotFound("资金账户不存在")
+    return _pool_account_out(db, row)
+
+
 @router.post("/pool-accounts/batch-status", response_model=list[schemas.PoolAccountOut])
 def batch_set_pool_account_status(
     payload: schemas.PoolAccountBatchStatus,

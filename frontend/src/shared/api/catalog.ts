@@ -995,6 +995,7 @@ export interface SearchResult { id: number; type: string; code: string; title: s
 export const poolAccountsApi = {
   list: () => api.get<PoolAccount[]>("/pool-accounts").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<PoolAccount>("/pool-accounts", data).then(r => r.data),
+  update: (id: number, data: Record<string, unknown>) => api.patch<PoolAccount>(`/pool-accounts/${id}`, data).then(r => r.data),
   setStatus: (id: number, status: string) => api.patch<PoolAccount>(`/pool-accounts/${id}/status`, { status }).then(r => r.data),
   batchStatus: (data: { account_ids: number[]; status: string; reason: string }) => api.post<PoolAccount[]>("/pool-accounts/batch-status", data).then(r => r.data),
 };

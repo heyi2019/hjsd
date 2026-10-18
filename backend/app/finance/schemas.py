@@ -30,6 +30,16 @@ class PoolAccountCreate(RequestModel):
     note: str | None = None
 
 
+class PoolAccountUpdate(RequestModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    account_name: str | None = Field(default=None, min_length=1, max_length=128)
+    account_type: str | None = Field(default=None, min_length=1, max_length=16)
+    ownership: str | None = Field(default=None, min_length=1, max_length=16)
+    opening_balance: Decimal | None = Field(default=None, ge=0)
+    note: str | None = None
+
+
 class PoolAccountBatchStatus(RequestModel):
     account_ids: list[int] = Field(min_length=1, max_length=100)
     status: str = Field(min_length=1, max_length=16)

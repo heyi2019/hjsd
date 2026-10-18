@@ -99,6 +99,40 @@ def test_pool_account_api_create_list_and_disable(client, headers, seeded_db):
     assert disabled.json()["status"] == "DISABLED"
 
 
+def test_pool_account_api_update_profile(client, headers, seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    created = client.post(
+        "/api/v1/pool-accounts",
+        headers=headers,
+        json={
+            "pool_id": pool.id,
+            "account_no": "API-EDIT-001",
+            "account_name": "待编辑账户",
+            "account_type": "BANK",
+            "ownership": "OWNED",
+            "opening_balance": "10.00",
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    updated = client.patch(
+        f"/api/v1/pool-accounts/{created.json()['id']}",
+        headers=headers,
+        json={
+            "account_name": "已编辑账户",
+            "account_type": "CASH",
+            "ownership": "CUSTODY",
+            "opening_balance": "12.00",
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["account_no"] == "API-EDIT-001"
+    assert updated.json()["account_name"] == "已编辑账户"
+    assert updated.json()["account_type"] == "CASH"
+    assert updated.json()["ownership"] == "CUSTODY"
+    assert updated.json()["opening_balance"] == "12.00"
+
+
 def test_pool_account_reconciliation_scopes_balance_and_list_filter(seeded_db):
     from app.finance.cashflows import approve_cashflow, create_cashflow
     from app.finance.reconciliation import create_reconciliation, list_reconciliations

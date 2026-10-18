@@ -87,6 +87,66 @@ def list_pool_accounts(session: Session, *, pool_id: int | None = None) -> list[
     return list(session.scalars(stmt).all())
 
 
+def update_pool_account(
+    session: Session,
+    account_id: int,
+    *,
+    actor: str,
+    account_name: str | None = None,
+    account_type: str | None = None,
+    ownership: str | None = None,
+    opening_balance: Decimal | None = None,
+    note: str | None = None,
+) -> PoolAccount:
+    account = session.get(PoolAccount, account_id)
+    if account is None:
+        raise NotFound("资金账户不存在", details={"account_id": account_id})
+    before = {
+        "account_name": account.account_name,
+        "account_type": account.account_type,
+        "ownership": account.ownership,
+        "opening_balance": str(account.opening_balance),
+        "note": account.note,
+    }
+    if account_name is not None:
+        normalized_name = account_name.strip()
+        if not normalized_name:
+            raise Validation("账户名称不能为空")
+        account.account_name = normalized_name
+    if account_type is not None:
+        normalized_type = account_type.strip().upper()
+        if normalized_type not in ACCOUNT_TYPES:
+            raise Validation("账户类型无效", details={"account_type": normalized_type})
+        account.account_type = normalized_type
+    if ownership is not None:
+        normalized_ownership = ownership.strip().upper()
+        if normalized_ownership not in ACCOUNT_OWNERSHIPS:
+            raise Validation("账户归属无效", details={"ownership": normalized_ownership})
+        account.ownership = normalized_ownership
+    if opening_balance is not None:
+        account.opening_balance = to_money(opening_balance)
+    if note is not None:
+        account.note = note
+    account.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.POOL_UPDATE,
+        entity_type="pool_account",
+        entity_id=account.account_no,
+        actor=actor,
+        before=before,
+        after={
+            "account_name": account.account_name,
+            "account_type": account.account_type,
+            "ownership": account.ownership,
+            "opening_balance": str(account.opening_balance),
+            "note": account.note,
+        },
+    )
+    return account
+
+
 def pool_account_balance(session: Session, account: PoolAccount) -> Decimal:
     signed_amount = case(
         (Cashflow.direction == "IN", Cashflow.amount),
@@ -159,4 +219,4 @@ def batch_set_pool_account_status(
     return [by_id[account_id] for account_id in account_ids]
 
 
-__all__ = ["batch_set_pool_account_status", "create_pool_account", "get_pool", "list_pool_accounts", "pool_account_balance", "set_pool_account_status"]
+__all__ = ["batch_set_pool_account_status", "create_pool_account", "get_pool", "list_pool_accounts", "pool_account_balance", "set_pool_account_status", "update_pool_account"]

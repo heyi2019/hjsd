@@ -4,23 +4,37 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { OrdersPage } from "./OrdersPage";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const ordersList = vi.fn();
-const typesList = vi.fn();
-const accountsList = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  ordersApi: { list: (...a: unknown[]) => ordersList(...a), create: vi.fn(), patch: vi.fn(), get: vi.fn() },
-  orderTypesApi: { list: (...a: unknown[]) => typesList(...a), create: vi.fn() },
-  customersApi: { list: vi.fn(), create: vi.fn(), merge: vi.fn(), patch: vi.fn(), setStatus: vi.fn(), get: vi.fn() },
-  counterpartiesApi: { list: vi.fn(), create: vi.fn(), setStatus: vi.fn() },
-  accountsApi: { list: (...a: unknown[]) => accountsList(...a), create: vi.fn() },
-}));
+vi.mock("../shared/api/catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/api/catalog")>();
+  const METHODS = [
+    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
+    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
+    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
+    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+  ];
+  const mk = (api: Record<string, unknown>) => {
+    const o: Record<string, unknown> = { ...api };
+    for (const m of METHODS) {
+      if (m in o) o[m] = vi.fn();
+    }
+    return o;
+  };
+  const out: Record<string, unknown> = { ...actual };
+  for (const key of Object.keys(actual)) {
+    const v = (actual as Record<string, unknown>)[key];
+    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
+      out[key] = mk(v as Record<string, unknown>);
+    }
+  }
+  return out as unknown as typeof actual;
+});
 
 const orders = [
   {
@@ -45,9 +59,17 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
-  ordersList.mockResolvedValue(orders);
-  typesList.mockResolvedValue(types);
-  accountsList.mockResolvedValue([]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
+  vi.mocked(catalog.accountsApi.list).mockResolvedValue([]);
+  // 子面板（库存中心 / 分期与回款）本套件不覆盖：让其同步抛错，与改造前「工厂未导出该 API」的行为一致
+  // ——这样它们不会去消费 ordersApi.list 的一次性 mock，也不会拖慢渲染。
+  vi.mocked(catalog.employeesApi.list).mockImplementation(() => {
+    throw new Error("employeesApi 不在本套件覆盖范围");
+  });
+  vi.mocked(catalog.installmentsApi.list).mockImplementation(() => {
+    throw new Error("installmentsApi 不在本套件覆盖范围");
+  });
 });
 
 async function openLedger() {
@@ -74,7 +96,7 @@ describe("OrdersPage：四类业务台账", () => {
   });
 
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
-    ordersList.mockResolvedValueOnce([
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
       ...orders,
       {
         id: 3,
@@ -106,7 +128,7 @@ describe("OrdersPage：四类业务台账", () => {
   });
 
   it("加载失败时展示错误条", async () => {
-    ordersList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });

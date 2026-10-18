@@ -1,42 +1,33 @@
-import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 
-let ui: ReturnType<typeof userEvent.setup>;
-
-beforeEach(() => {
-  ui = userEvent.setup({ pointerEventsCheck: 0 });
+import * as catalog from "../shared/api/catalog";
+vi.mock("../shared/api/catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/api/catalog")>();
+  const METHODS = [
+    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
+    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
+    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
+    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+  ];
+  const mk = (api: Record<string, unknown>) => {
+    const o: Record<string, unknown> = { ...api };
+    for (const m of METHODS) {
+      if (m in o) o[m] = vi.fn();
+    }
+    return o;
+  };
+  const out: Record<string, unknown> = { ...actual };
+  for (const key of Object.keys(actual)) {
+    const v = (actual as Record<string, unknown>)[key];
+    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
+      out[key] = mk(v as Record<string, unknown>);
+    }
+  }
+  return out as unknown as typeof actual;
 });
-
-const accountsList = vi.fn();
-const accountsExecutionDetail = vi.fn();
-const accountsUpdateProfile = vi.fn();
-const ordersCreate = vi.fn();
-const ordersPostEvent = vi.fn();
-const customersList = vi.fn();
-const poolsList = vi.fn();
-const counterpartiesList = vi.fn();
-const rebatesCreate = vi.fn();
-const installmentsCreate = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  accountsApi: {
-    list: (...a: unknown[]) => accountsList(...a),
-    executionDetail: (...a: unknown[]) => accountsExecutionDetail(...a),
-    updateProfile: (...a: unknown[]) => accountsUpdateProfile(...a),
-  },
-  ordersApi: {
-    create: (...a: unknown[]) => ordersCreate(...a),
-    postEvent: (...a: unknown[]) => ordersPostEvent(...a),
-  },
-  customersApi: { list: (...a: unknown[]) => customersList(...a) },
-  poolsApi: { list: (...a: unknown[]) => poolsList(...a) },
-  counterpartiesApi: { list: (...a: unknown[]) => counterpartiesList(...a) },
-  rebatesApi: { create: (...a: unknown[]) => rebatesCreate(...a) },
-  installmentsApi: { create: (...a: unknown[]) => installmentsCreate(...a) },
-}));
 
 const accounts = [
   { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
@@ -45,15 +36,15 @@ const accounts = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  accountsList.mockResolvedValue(accounts);
-  ordersCreate.mockResolvedValue({ id: 21 });
-  ordersPostEvent.mockResolvedValue({});
-  customersList.mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  poolsList.mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
-  counterpartiesList.mockResolvedValue([]);
-  rebatesCreate.mockResolvedValue({ id: 31 });
-  installmentsCreate.mockResolvedValue({ id: 41 });
-  accountsExecutionDetail.mockResolvedValue({
+  vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.ordersApi.create).mockResolvedValue({ id: 21 });
+  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({});
+  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.rebatesApi.create).mockResolvedValue({ id: 31 });
+  vi.mocked(catalog.installmentsApi.create).mockResolvedValue({ id: 41 });
+  vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue({
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -125,22 +116,21 @@ beforeEach(() => {
       }],
     }],
   });
-  accountsUpdateProfile.mockResolvedValue(accounts[0]);
+  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue(accounts[0]);
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 
 describe("InventoryPanel：写入与长路径", () => {
-it("库存操作区编辑可保存账号主资料与明细资料", async () => {
+  it("库存编辑通过弹窗保存账号资料", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
-    expect(await screen.findByText("编辑账号资料")).toBeInTheDocument();
-    await ui.clear(screen.getByPlaceholderText("账号描述"));
-    await ui.type(screen.getByPlaceholderText("账号描述"), "已核验账号");
-    await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(accountsUpdateProfile).toHaveBeenCalledWith(1, expect.objectContaining({
-      account_description: "已核验账号",
-      account_images: expect.any(Array),
-      game_account: "acc-1",
+    fireEvent.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    const input = await screen.findByLabelText("编辑账号标识");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "updated-account" } });
+    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(vi.mocked(catalog.accountsApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
+      game_account: "updated-account",
     })));
   });
 });

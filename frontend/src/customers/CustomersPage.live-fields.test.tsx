@@ -4,42 +4,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CustomersPage } from "./CustomersPage";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const list = vi.fn();
-const create = vi.fn();
-const merge = vi.fn();
-const cpList = vi.fn();
-const patch = vi.fn();
-const fieldsList = vi.fn();
-const detail = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  customersApi: {
-    list: (...a: unknown[]) => list(...a),
-    create: (...a: unknown[]) => create(...a),
-    merge: (...a: unknown[]) => merge(...a),
-    patch: (...a: unknown[]) => patch(...a),
-    setStatus: vi.fn(),
-    get: vi.fn(),
-    detail: (...a: unknown[]) => detail(...a),
-  },
-  counterpartiesApi: {
-    list: (...a: unknown[]) => cpList(...a),
-    create: vi.fn(),
-    setStatus: vi.fn(),
-  },
-  fieldsApi: {
-    list: (...a: unknown[]) => fieldsList(...a),
-    create: vi.fn(),
-    setActive: vi.fn(),
-    remove: vi.fn(),
-  },
-}));
+vi.mock("../shared/api/catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/api/catalog")>();
+  const mk = (api: Record<string, unknown>) => {
+    const o: Record<string, unknown> = { ...api };
+    for (const m of ["list","get","create","update","patch","post","postEvent","remove","setStatus","setActive","resolve","release","settle","approve","reject","reverse","close","convert","detail","allocations","setAllocations","balance","executionDetail","updateProfile","updateExecution","merge","search"]) {
+      if (m in o) o[m] = vi.fn();
+    }
+    return o;
+  };
+  return {
+    ...actual,
+    customersApi: mk(actual.customersApi),
+    counterpartiesApi: mk(actual.counterpartiesApi),
+    fieldsApi: mk(actual.fieldsApi),
+    leadsApi: mk(actual.leadsApi),
+  };
+});
 
 /** 活字段定义：SELECT / MULTI_SELECT / 停用字段各一，覆盖动态渲染与历史值展示 */
 const fieldDefs = [
@@ -114,10 +102,11 @@ const customers = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  list.mockResolvedValue(customers);
-  cpList.mockResolvedValue([]);
-  fieldsList.mockResolvedValue(fieldDefs);
-  detail.mockResolvedValue({
+  vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.leadsApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
+  vi.mocked(catalog.customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: {
       order_count: 1,
@@ -161,19 +150,19 @@ describe("CustomersPage：活字段（BAS-04）", () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     expect(await screen.findByText(/信用评级：优质/)).toBeInTheDocument();
-    await waitFor(() => expect(fieldsList).toHaveBeenCalledWith({ entity_type: "customer" }));
+    await waitFor(() => expect(vi.mocked(catalog.fieldsApi.list)).toHaveBeenCalledWith({ entity_type: "customer" }));
   });
 
   it("新建弹窗动态渲染活字段控件，提交时回传 extra_values", async () => {
-    create.mockResolvedValueOnce({ customer: { id: 3 }, duplicate_candidates: [] });
+    vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 3 }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
     await ui.type(await screen.findByLabelText("名字"), "王五");
     await ui.type(await screen.findByLabelText("转介绍人"), "老王");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
-    await waitFor(() => expect(create).toHaveBeenCalled());
-    expect(create.mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
   });
 
   it("详情抽屉展示活字段值，停用字段标注保留历史值", async () => {
@@ -188,7 +177,7 @@ describe("CustomersPage：活字段（BAS-04）", () => {
   });
 
   it("活字段定义接口失败不阻断客户页渲染", async () => {
-    fieldsList.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.fieldsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />, { user: "admin" });
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
   });

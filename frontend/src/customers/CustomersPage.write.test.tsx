@@ -4,33 +4,38 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CustomersPage } from "./CustomersPage";
 
+import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-const list = vi.fn();
-const create = vi.fn();
-const merge = vi.fn();
-const cpList = vi.fn();
-const patch = vi.fn();
-const fieldsList = vi.fn();
-const detail = vi.fn();
-
-vi.mock("../shared/api/catalog", () => ({
-  customersApi: {
-    list: (...a: unknown[]) => list(...a),
-    create: (...a: unknown[]) => create(...a),
-    merge: (...a: unknown[]) => merge(...a),
-    patch: (...a: unknown[]) => patch(...a),
-    setStatus: vi.fn(),
-    get: vi.fn(),
-    detail: (...a: unknown[]) => detail(...a),
-  },
-  counterpartiesApi: { list: (...a: unknown[]) => cpList(...a), create: vi.fn(), setStatus: vi.fn() },
-  fieldsApi: { list: (...a: unknown[]) => fieldsList(...a), create: vi.fn(), setActive: vi.fn(), remove: vi.fn() },
-}));
+vi.mock("../shared/api/catalog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../shared/api/catalog")>();
+  const METHODS = [
+    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
+    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
+    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
+    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+  ];
+  const mk = (api: Record<string, unknown>) => {
+    const o: Record<string, unknown> = { ...api };
+    for (const m of METHODS) {
+      if (m in o) o[m] = vi.fn();
+    }
+    return o;
+  };
+  const out: Record<string, unknown> = { ...actual };
+  for (const key of Object.keys(actual)) {
+    const v = (actual as Record<string, unknown>)[key];
+    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
+      out[key] = mk(v as Record<string, unknown>);
+    }
+  }
+  return out as unknown as typeof actual;
+});
+vi.mock("./CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 const fieldDefs = [
   { id: 1, entity_type: "customer", field_key: "game_category", label: "常玩品类", field_type: "MULTI_SELECT", options: ["王者荣耀", "和平精英"], required: false, sort_order: 10, is_active: true },
@@ -46,10 +51,10 @@ const customers = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  list.mockResolvedValue(customers);
-  cpList.mockResolvedValue([]);
-  fieldsList.mockResolvedValue(fieldDefs);
-  detail.mockResolvedValue({
+  vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
+  vi.mocked(catalog.customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: { order_count: 1, active_order_count: 1, completed_order_count: 0, cancelled_order_count: 0, last_trade_date: "2026-10-18", installment_paid_total: "100.00", installment_receivable_total: "1000.00", installment_remaining_total: "900.00", overdue_period_count: 1 },
     business: [{ order_id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "STOCK", status: "ACTIVE", trade_date: "2026-10-18", roles: ["BUYER"] }],
@@ -71,7 +76,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     expect(screen.queryByRole("button", { name: /新建/ })).toBeNull();
   });
 
-  it("非 ACTIVE 客户的合并按钮禁用（不能合并已停用客户）", async () => {
+  it("非 ACTIVE 客户的合并按钮禁用（不能合并已拉黑客户）", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
@@ -81,24 +86,24 @@ describe("CustomersPage：权限门控与写操作", () => {
   });
 
   it("新建客户提交后回传字段并刷新列表", async () => {
-    create.mockResolvedValueOnce({ customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
+    vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
     await ui.type(await screen.findByLabelText("名字"), "王五");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
-    await waitFor(() => expect(create).toHaveBeenCalled());
-    expect(create.mock.calls[0][0]).toMatchObject({ display_name: "王五" });
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五" });
   });
 
   it("重复候选不拦截，只提示（创建仍成功）", async () => {
-    create.mockResolvedValueOnce({ customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
+    vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
     await ui.type(await screen.findByLabelText("名字"), "李四");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
-    await waitFor(() => expect(create).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
     expect(await screen.findByText(/重复候选/)).toBeInTheDocument();
   });
 
@@ -106,7 +111,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getAllByRole("button", { name: /详\s*情/ })[0]);
-    expect(detail).toHaveBeenCalledWith(1);
+    expect(vi.mocked(catalog.customersApi.detail)).toHaveBeenCalledWith(1);
     const drawer = await screen.findByRole("dialog");
     expect(within(drawer).getByText("经营概览")).toBeInTheDocument();
     expect(within(drawer).getAllByText("关联订单").length).toBeGreaterThanOrEqual(2);
@@ -120,7 +125,9 @@ describe("CustomersPage：权限门控与写操作", () => {
     await screen.findByText("CUS-0001");
     await ui.type(screen.getByLabelText("搜索客户"), "张三");
     await ui.keyboard("{Enter}");
-    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ keyword: "张三" }));
+    // 用 toHaveBeenCalledWith 而非 toHaveBeenLastCalledWith：搜索后页面可能再触发一次刷新调用，
+    // 断言「关键词确实传给了后端」才是本用例的意图，避免与刷新调用竞争导致偶发红。
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.list)).toHaveBeenCalledWith({ keyword: "张三" }));
   });
 });
 

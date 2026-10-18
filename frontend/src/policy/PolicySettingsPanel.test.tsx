@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -31,9 +31,44 @@ const draftVersions = [
 beforeEach(() => {
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: definitions, total: definitions.length });
   vi.mocked(catalog.policyApi.versions).mockResolvedValue({ items: draftVersions, total: draftVersions.length });
-  vi.mocked(catalog.policyApi.approve).mockResolvedValue({});
-  vi.mocked(catalog.policyApi.createVersion).mockResolvedValue({});
-  vi.mocked(catalog.policyApi.create).mockResolvedValue({});
+  vi.mocked(catalog.policyApi.approve).mockResolvedValue(draftVersions[0]);
+  vi.mocked(catalog.policyApi.createVersion).mockResolvedValue(draftVersions[0]);
+  vi.mocked(catalog.policyApi.create).mockResolvedValue(definitions[0]);
+});
+
+it("空列表仍能从新建规则开始，并提交规则定义", async () => {
+  vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
+  const created = { ...definitions[0], id: 2, policy_code: "INSTALLMENT", name: "分期规则" };
+  vi.mocked(catalog.policyApi.create).mockResolvedValue(created);
+
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await ui.click(await screen.findByRole("button", { name: /新建规则/ }));
+  await ui.type(screen.getByLabelText("规则编码"), "INSTALLMENT");
+  await ui.type(screen.getByLabelText("规则名称"), "分期规则");
+  await ui.click(screen.getByRole("button", { name: /创建规则/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.policyApi.create)).toHaveBeenCalledWith({
+    policy_code: "INSTALLMENT",
+    name: "分期规则",
+    scope_type: "GLOBAL",
+    description: undefined,
+  }));
+});
+
+it("新建版本先填写生效期和规则参数，再提交非空配置", async () => {
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("REBATE_RATE");
+  await ui.click(screen.getByRole("button", { name: /新建版本/ }));
+  const config = screen.getByLabelText("规则参数");
+  fireEvent.change(config, { target: { value: '{"rate":"5"}' } });
+  await ui.click(screen.getByRole("button", { name: /保存版本/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.policyApi.createVersion)).toHaveBeenCalledWith(1, {
+    effective_from: expect.any(String),
+    effective_to: undefined,
+    config: { rate: "5" },
+    note: undefined,
+  }));
 });
 
 it("渲染经营规则标题、统计卡与规则定义表格，并默认加载首个规则的版本", async () => {

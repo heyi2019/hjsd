@@ -1122,3 +1122,5 @@
 .ui-control-min-180 { min-width: var(--col-w-180); }
 .ui-title-spaced { margin-block-start: var(--space-4); }
 .ui-drawer-actions { justify-content: flex-end; width: 100%; }
+.policy-version-date-row { width: 100%; }
+.policy-version-date-row__item { flex: 1; }

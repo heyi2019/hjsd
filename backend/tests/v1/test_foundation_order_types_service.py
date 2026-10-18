@@ -66,6 +66,28 @@ class TestRoutes:
         assert before_total == after_total
         assert service.resolve_default_pool(seeded_db, "HS", Portion.PRINCIPAL.value).code == "HJ_PROFIT"
 
+    def test_fund_nature_route_precedes_legacy_portion_route(self, seeded_db):
+        service.set_route(
+            seeded_db,
+            order_type_code="HS",
+            portion=Portion.PRINCIPAL.value,
+            fund_nature="BUSINESS",
+            pool_code="HJ_PROFIT",
+            actor="pytest",
+        )
+        seeded_db.commit()
+
+        assert (
+            service.resolve_default_pool(
+                seeded_db,
+                "HS",
+                Portion.PRINCIPAL.value,
+                fund_nature="BUSINESS",
+            ).code
+            == "HJ_PROFIT"
+        )
+        assert service.resolve_default_pool(seeded_db, "HS", Portion.PRINCIPAL.value).code == "HJ_INVEST"
+
     def test_route_to_disabled_pool_rejected(self, seeded_db):
         service.set_pool_status(
             seeded_db,

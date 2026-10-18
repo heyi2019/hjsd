@@ -22,4 +22,7 @@ EXPOSE 8123
 
 # 启动时：先执行迁移（幂等），再起服务。
 # DATABASE_URL 等由 compose 的 env_file 注入，优先级高于任何 .env。
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8123"]
+# 迁移已压平为单基线 0001，旧库（版本戳 0002~0023）无法再 upgrade；
+# 故 upgrade 失败时交给 stamp_baseline.py：只有确认库结构与 ORM 等价才对齐版本戳，
+# 结构真的落后则报错退出，避免把缺表的库伪装成已迁移。
+CMD ["sh", "-c", "alembic upgrade head || python scripts/stamp_baseline.py && uvicorn app.main:app --host 0.0.0.0 --port 8123"]

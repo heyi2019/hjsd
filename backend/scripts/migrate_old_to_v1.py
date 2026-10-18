@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""一次性 ETL：旧 ECS schema（0009 时代）→ 当前 v1 schema（head=0021）。
+"""一次性 ETL：旧 ECS schema（0009 时代）→ 当前 v1 schema（head=0001 单基线）。
 
 用法：
     python migrate_old_to_v1.py OLD_DB NEW_DB [--ref-db REF_NEW_DB]
 
 前置条件：
-    * NEW_DB 已通过 `alembic upgrade head` 建好空表（当前 schema=0021，37 张数据表）。
+    * NEW_DB 已通过 `alembic upgrade head` 建好空表（当前 schema=0001 单基线，37 张数据表）。
     * OLD_DB 为旧 0009 时代数据库（29 张表）。
     * REF_NEW_DB（可选）为已完整 seed 的当前库，用于补齐 OLD_DB 缺失的
       document_sequences 键。

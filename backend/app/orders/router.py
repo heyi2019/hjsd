@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
@@ -316,10 +316,29 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
 def list_orders(
     order_type: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
+    owner_id: int | None = Query(default=None, gt=0),
+    pool_id: int | None = Query(default=None, gt=0),
+    keyword: str | None = Query(default=None, max_length=128),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> list[schemas.OrderListOut]:
-    orders = service.list_orders(db, order_type=order_type, status=status, user=_user)
+    orders = service.list_orders(
+        db,
+        order_type=order_type,
+        status=status,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        owner_id=owner_id,
+        pool_id=pool_id,
+        keyword=keyword,
+        limit=limit,
+        offset=offset,
+        user=_user,
+    )
     return [schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders)]
 
 

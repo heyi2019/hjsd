@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import RequestModel
-from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, PoolType, Portion
+from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
 
 
 class PoolCreate(RequestModel):
@@ -96,7 +96,8 @@ class OrderTypeOut(BaseModel):
 class RouteIn(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    portion: Portion
+    portion: Portion = Portion.GROSS
+    fund_nature: FundNature | None = None
     pool_code: str = Field(min_length=2, max_length=64)
     priority: int = 0
 
@@ -105,6 +106,7 @@ class RouteOut(BaseModel):
     id: int
     order_type_code: str
     portion: str
+    fund_nature: str | None = None
     pool_code: str
     pool_name: str
     priority: int

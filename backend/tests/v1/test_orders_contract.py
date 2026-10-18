@@ -917,6 +917,30 @@ class TestGetAndListOrders:
         # 无 user 不过滤：两张单都可见
         assert len(order_service.list_orders(seeded_db)) == 2
 
+    def test_list_orders_supports_workbench_date_owner_keyword_filters(
+        self, seeded_client, seeded_db, headers
+    ):
+        mine = _order(seeded_db, owner_id=9, trade_date=date(2026, 10, 3))
+        mine.game_account = "workbench-keyword-account"
+        _order(seeded_db, order_type="TH", owner_id=1, trade_date=date(2026, 10, 4))
+        seeded_db.flush()
+
+        response = seeded_client.get(
+            "/api/v1/orders",
+            params={
+                "trade_date_from": "2026-10-03",
+                "trade_date_to": "2026-10-03",
+                "owner_id": 9,
+                "keyword": "workbench-keyword",
+                "limit": 10,
+                "offset": 0,
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        assert [item["id"] for item in response.json()] == [mine.id]
+
 
 # ------------------------------------------------------------------ 事件入参
 class TestPostEventValidation:

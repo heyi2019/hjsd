@@ -266,10 +266,13 @@ def post_event(
                 },
             )
         cancel_fully_consumed = money >= remaining
+    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+        order.order_type, event_type
+    )
     resolved_pool_id = (
         pool_id
         or (offset.pool_id if offset is not None else None)
-        or _resolve_pool(session, order, portion).id
+        or _resolve_pool(session, order, portion, fund_nature=fund_nature).id
     )
     if user is not None and not user.can_see_pool(resolved_pool_id):
         raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
@@ -302,10 +305,6 @@ def post_event(
 
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
-
-    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
-        order.order_type, event_type
-    )
 
     flow = Cashflow(
         flow_no=next_cashflow_no(
@@ -661,13 +660,25 @@ def _post_deliver(
     return event, None
 
 
-def _resolve_pool(session: Session, order: Order, portion: str) -> Pool:
-    pool = foundation_service.resolve_default_pool(session, order.order_type, portion)
+def _resolve_pool(
+    session: Session,
+    order: Order,
+    portion: str,
+    *,
+    fund_nature: str | None = None,
+) -> Pool:
+    pool = foundation_service.resolve_default_pool(
+        session, order.order_type, portion, fund_nature=fund_nature
+    )
     if pool is None:
         raise Validation(
             f"业务 {order.order_type} 未配置 {portion} 资金池路由",
             code=ErrorCode.POOL_ROUTE_MISSING,
-            details={"order_type": order.order_type, "portion": portion},
+            details={
+                "order_type": order.order_type,
+                "portion": portion,
+                "fund_nature": fund_nature,
+            },
         )
     return pool
 

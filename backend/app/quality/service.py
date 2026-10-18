@@ -24,6 +24,7 @@ from app.domain.enums import (
     InstallmentStatus,
     Nature,
     ReconciliationStatus,
+    QualityIssueStatus,
 )
 from app.domain.attachments import Attachment
 from app.domain.trade import (
@@ -35,6 +36,7 @@ from app.domain.trade import (
     Reconciliation,
     RebateRecord,
 )
+from app.domain.quality import QualityIssue
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 
@@ -412,6 +414,41 @@ def summary(session: Session, *, user: CurrentUser | None = None) -> dict[str, A
     }
 
 
+def scan_and_record(
+    session: Session,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> list[QualityIssue]:
+    """将本次扫描发现的异常责任化落库，已存在的未关闭工单不重复创建。"""
+    created: list[QualityIssue] = []
+    for item in scan(session, user=user):
+        duplicate = session.scalar(
+            select(QualityIssue).where(
+                QualityIssue.code == item["code"],
+                QualityIssue.entity_type == item["entity_type"],
+                QualityIssue.entity_id == item["entity_id"],
+                QualityIssue.status != QualityIssueStatus.CLOSED.value,
+            )
+        )
+        if duplicate is not None:
+            continue
+        created.append(
+            create_issue(
+                session,
+                code=item["code"],
+                severity=item["severity"],
+                title=item["title"],
+                entity_type=item["entity_type"],
+                entity_id=item["entity_id"],
+                message=item["message"],
+                details=item.get("details"),
+                actor=actor,
+            )
+        )
+    return created
+
+
 def _month_start(value: date) -> date:
     return value.replace(day=1)
 
@@ -643,6 +680,7 @@ __all__ = [
     "list_issues",
     "metrics",
     "scan",
+    "scan_and_record",
     "summary",
     "update_issue",
 ]

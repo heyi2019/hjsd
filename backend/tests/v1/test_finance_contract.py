@@ -160,6 +160,42 @@ class TestDepositQueries:
                 source_order_id=999999,
             )
 
+    def test_cashflow_list_filters_accounting_dimensions(self, seeded_client, seeded_db, headers):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        first = service.create_cashflow(
+            seeded_db,
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            direction="IN",
+            nature="EXTERNAL_IN",
+            category="CUSTOMER_RECEIPT",
+            amount=Decimal("100"),
+            note="第一笔",
+            actor="pytest",
+        )
+        second = service.create_cashflow(
+            seeded_db,
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            direction="OUT",
+            nature="BUSINESS_OUT",
+            category="OPERATING_COST",
+            amount=Decimal("20"),
+            note="第二笔",
+            actor="pytest",
+        )
+        seeded_db.flush()
+
+        response = seeded_client.get(
+            "/api/v1/cashflows",
+            params={"nature": "EXTERNAL_IN", "category": "CUSTOMER_RECEIPT"},
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        assert [item["id"] for item in response.json()] == [first.id]
+        assert second.id not in [item["id"] for item in response.json()]
+
     def test_positive_amounts_are_business_errors_in_service(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(Validation, match="必须大于 0"):

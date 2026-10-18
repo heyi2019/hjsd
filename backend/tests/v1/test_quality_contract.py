@@ -36,6 +36,32 @@ def _order(db, *, order_type="TH", owner_id=None):
 
 
 class TestQualityScan:
+    def test_scan_and_record_persists_deduplicated_open_issues(self, seeded_db):
+        order = _order(seeded_db, order_type="HS")
+        event = OrderEvent(
+            event_no="HS-SCAN-RECORD-EVENT",
+            order_id=order.id,
+            event_type="BUY",
+            amount=Decimal("100"),
+            portion="PRINCIPAL",
+            occurred_on=TODAY,
+            pool_id=None,
+            is_posted=True,
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(event)
+        seeded_db.flush()
+
+        first = service.scan_and_record(seeded_db, actor="pytest")
+        second = service.scan_and_record(seeded_db, actor="pytest")
+
+        assert any(item.code == "EVENT_POOL_MISSING" for item in first)
+        assert len(second) == 0
+        assert len(
+            service.list_issues(seeded_db, code="EVENT_POOL_MISSING")
+        ) == 1
+
     def test_does_not_flag_inventory_account_link_on_th_order(self, seeded_db):
         account = Account(
             game_account="quality-link-account",

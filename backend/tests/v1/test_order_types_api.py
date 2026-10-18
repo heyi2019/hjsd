@@ -81,6 +81,29 @@ def test_route_upsert_is_idempotent(client, seeded_db, headers):
     assert len(principal_routes) == 1
 
 
+def test_route_can_be_keyed_by_fund_nature(client, seeded_db, headers):
+    response = client.post(
+        f"{ORDER_TYPES}/HS/routes",
+        json={"portion": "PRINCIPAL", "fund_nature": "BUSINESS", "pool_code": "HJ_PROFIT"},
+        headers=headers,
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["portion"] == "PRINCIPAL"
+    assert body["fund_nature"] == "BUSINESS"
+    assert body["pool_code"] == "HJ_PROFIT"
+
+    routes = client.get(f"{ORDER_TYPES}/1/routes", headers=headers).json()
+    assert len(
+        [
+            item
+            for item in routes
+            if item["portion"] == "PRINCIPAL" and item["fund_nature"] == "BUSINESS"
+        ]
+    ) == 1
+
+
 def test_unknown_business_route_returns_404(client, headers):
     response = client.post(
         f"{ORDER_TYPES}/ZZ/routes", json={"portion": "PROFIT", "pool_code": "HJ_PROFIT"}, headers=headers

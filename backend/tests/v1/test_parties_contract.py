@@ -270,6 +270,34 @@ class TestListAndGetCustomers:
         assert any(item["action"] == AuditAction.CUSTOMER_CREATE.value for item in detail["audit"])
         assert any(item["request_id"] == request_id for item in detail["audit"])
 
+    def test_customer_detail_applies_order_owner_scope(self, seeded_db):
+        customer = _customer(seeded_db, "范围客户", owner_id=9)
+        mine = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 10),
+            owner_id=9,
+            customer_roles=[(customer.id, "BUYER")],
+            actor="pytest",
+        )
+        foreign = orders_service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=date(2026, 10, 11),
+            owner_id=1,
+            customer_roles=[(customer.id, "BUYER")],
+            actor="pytest",
+        )
+
+        detail = service.get_customer_detail(seeded_db, customer.id, _scoped_user())
+        summary = service.get_customer_activity_summary(
+            seeded_db, [customer.id], _scoped_user()
+        )
+
+        assert {item["order_id"] for item in detail["business"]} == {mine.id}
+        assert summary[customer.id]["active_order_count"] == 1
+        assert foreign.id not in {item["order_id"] for item in detail["business"]}
+
 
 # ------------------------------------------------------------------ 客户更新
 class TestUpdateCustomer:

@@ -105,6 +105,8 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 column["name"] for column in inspect(connection).get_columns("quality_issues")
             }
             assert "assignee_id" not in quality_columns
+            route_columns = {column["name"] for column in inspect(connection).get_columns("order_type_pools")}
+            assert "fund_nature" in route_columns
             cashflow_sql = connection.execute(
                 text("SELECT sql FROM sqlite_master WHERE type='table' AND name='cashflow'")
             ).scalar_one()
@@ -174,7 +176,7 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0023 (head)"
+    assert result.stdout.strip() == "0002 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

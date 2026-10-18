@@ -14,7 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 from pydantic import ValidationError as PydanticValidationError
 from app.core.audit import record_audit
@@ -580,18 +580,54 @@ def list_order_links(
 
 def list_orders(
     session: Session, *, order_type: str | None = None, status: str | None = None,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    owner_id: int | None = None,
+    pool_id: int | None = None,
+    keyword: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
     user: CurrentUser | None = None,
 ) -> list[Order]:
-    stmt = select(Order)
+    stmt = select(Order).outerjoin(Account, Account.id == Order.account_id)
     if order_type:
         stmt = stmt.where(Order.order_type == order_type)
     if status:
         stmt = stmt.where(Order.status == status)
+    if trade_date_from is not None:
+        stmt = stmt.where(Order.trade_date >= trade_date_from)
+    if trade_date_to is not None:
+        stmt = stmt.where(Order.trade_date <= trade_date_to)
+    if owner_id is not None:
+        stmt = stmt.where(Order.owner_id == owner_id)
+    if pool_id is not None:
+        stmt = stmt.where(
+            exists(
+                select(OrderEvent.id).where(
+                    OrderEvent.order_id == Order.id,
+                    OrderEvent.pool_id == pool_id,
+                )
+            )
+        )
+    if keyword and keyword.strip():
+        pattern = f"%{keyword.strip()}%"
+        stmt = stmt.where(
+            or_(
+                Order.order_no.ilike(pattern),
+                Order.game_account.ilike(pattern),
+                Account.game_account.ilike(pattern),
+                Order.note.ilike(pattern),
+            )
+        )
     if user is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:
             stmt = stmt.where(scope)
-    return list(session.scalars(stmt.order_by(Order.id)).all())
+    return list(
+        session.scalars(
+            stmt.order_by(Order.id).limit(limit).offset(offset)
+        ).unique().all()
+    )
 
 
 def update_order(

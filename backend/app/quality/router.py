@@ -31,6 +31,16 @@ def list_quality_exceptions(
     return schemas.QualitySummaryOut.model_validate(service.summary(db, user=user))
 
 
+@router.post("/quality/scan", response_model=list[schemas.QualityIssueOut])
+def scan_quality_and_record(
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_quality,
+) -> list[schemas.QualityIssueOut]:
+    """执行质量扫描并将新发现的异常写入工单台账。"""
+    items = service.scan_and_record(db, actor=_actor(user), user=user)
+    return [schemas.QualityIssueOut.model_validate(item) for item in items]
+
+
 @router.get("/quality/metrics", response_model=schemas.QualityMetricsOut)
 def quality_metrics(
     from_date: date | None = Query(default=None, alias="from"),

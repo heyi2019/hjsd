@@ -611,6 +611,11 @@ def list_cashflows(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
+    nature: str | None = None,
+    fund_nature: str | None = None,
+    accounting_attribute: str | None = None,
+    category: str | None = None,
+    created_by: str | None = None,
     limit: int = 100,
     offset: int = 0,
     user: CurrentUser | None = None,
@@ -655,6 +660,16 @@ def list_cashflows(
                 details={"field": "status", "value": status},
             ) from exc
         stmt = stmt.where(Cashflow.status == status)
+    if nature is not None:
+        stmt = stmt.where(Cashflow.nature == nature)
+    if fund_nature is not None:
+        stmt = stmt.where(Cashflow.fund_nature == fund_nature)
+    if accounting_attribute is not None:
+        stmt = stmt.where(Cashflow.accounting_attribute == accounting_attribute)
+    if category is not None:
+        stmt = stmt.where(Cashflow.category == category)
+    if created_by is not None:
+        stmt = stmt.where(Cashflow.created_by == created_by)
 
     rows: list[dict[str, Any]] = []
     for flow, order_no in session.execute(stmt).all():

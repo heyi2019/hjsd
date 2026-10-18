@@ -30,7 +30,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.core.money import Amount
 from app.domain.base import AuditMixin, TimestampMixin
-from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, PoolType, Portion
+from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
 
 
 class Pool(Base, AuditMixin):
@@ -124,7 +124,7 @@ class OrderTypeDef(Base, AuditMixin):
 
 
 class OrderTypePool(Base, TimestampMixin):
-    """业务↔资金池多对多路由；同一业务同一份额仅一条有效默认路由（BAS-03-02）。"""
+    """业务↔资金池路由；按业务、份额和可选资金性质区分默认池（BAS-03-02）。"""
 
     __tablename__ = "order_type_pools"
     __table_args__ = (
@@ -133,8 +133,14 @@ class OrderTypePool(Base, TimestampMixin):
             f"portion IN {Portion.values()!r}".replace("[", "(").replace("]", ")"),
             name="portion_valid",
         ),
+        CheckConstraint(
+            f"fund_nature IS NULL OR fund_nature IN {FundNature.values()!r}".replace("[", "(").replace("]", ")"),
+            name="fund_nature_valid",
+        ),
         CheckConstraint("priority >= 0", name="route_priority_nonnegative"),
-        UniqueConstraint("order_type_id", "portion", name="uq_order_type_pools_route"),
+        UniqueConstraint(
+            "order_type_id", "portion", "fund_nature", name="uq_order_type_pools_route"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -145,6 +151,7 @@ class OrderTypePool(Base, TimestampMixin):
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
     portion: Mapped[str] = mapped_column(String(16), nullable=False)
+    fund_nature: Mapped[str | None] = mapped_column(String(16), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

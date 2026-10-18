@@ -231,7 +231,9 @@ def list_customers(
 
 
 def get_customer_activity_summary(
-    session: Session, customer_ids: Sequence[int]
+    session: Session,
+    customer_ids: Sequence[int],
+    user: CurrentUser | None = None,
 ) -> dict[int, dict[str, Any]]:
     """从订单参与关系与事件时间线汇总客户列表的经营摘要。"""
     ids = {customer_id for customer_id in customer_ids if isinstance(customer_id, int)}
@@ -249,11 +251,13 @@ def get_customer_activity_summary(
     active_order_ids_by_customer: dict[int, set[int]] = {
         customer_id: set() for customer_id in ids
     }
-    rows = session.execute(
-        select(OrderCustomerRole, Order).join(
-            Order, Order.id == OrderCustomerRole.order_id
-        ).where(OrderCustomerRole.customer_id.in_(ids))
-    ).all()
+    stmt = select(OrderCustomerRole, Order).join(
+        Order, Order.id == OrderCustomerRole.order_id
+    ).where(OrderCustomerRole.customer_id.in_(ids))
+    scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = session.execute(stmt).all()
     for role_row, order in rows:
         item = summary[role_row.customer_id]
         if role_row.role not in item["order_roles"]:
@@ -267,10 +271,15 @@ def get_customer_activity_summary(
         ):
             item["last_interaction_at"] = order.created_at
 
+    event_stmt = select(OrderCustomerRole.customer_id, OrderEvent.created_at).join(
+        OrderEvent, OrderEvent.order_id == OrderCustomerRole.order_id
+    ).join(Order, Order.id == OrderCustomerRole.order_id).where(
+        OrderCustomerRole.customer_id.in_(ids)
+    )
+    if scope is not None:
+        event_stmt = event_stmt.where(scope)
     event_rows = session.execute(
-        select(OrderCustomerRole.customer_id, OrderEvent.created_at)
-        .join(OrderEvent, OrderEvent.order_id == OrderCustomerRole.order_id)
-        .where(OrderCustomerRole.customer_id.in_(ids))
+        event_stmt
     ).all()
     for customer_id, created_at in event_rows:
         if created_at and (
@@ -304,11 +313,14 @@ def get_customer_detail(
     订单、分期金额和逾期数均从业务事实表实时汇总；这里不保存任何手工汇总值。
     """
     customer = get_customer(session, customer_id, user)
+    role_stmt = select(OrderCustomerRole, Order).join(
+        Order, Order.id == OrderCustomerRole.order_id
+    ).where(OrderCustomerRole.customer_id == customer.id)
+    scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
+    if scope is not None:
+        role_stmt = role_stmt.where(scope)
     role_rows = session.execute(
-        select(OrderCustomerRole, Order)
-        .join(Order, Order.id == OrderCustomerRole.order_id)
-        .where(OrderCustomerRole.customer_id == customer.id)
-        .order_by(Order.trade_date.desc(), Order.id.desc())
+        role_stmt.order_by(Order.trade_date.desc(), Order.id.desc())
     ).all()
 
     business_by_order: dict[int, dict[str, Any]] = {}

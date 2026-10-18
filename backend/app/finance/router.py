@@ -239,6 +239,11 @@ def list_cashflows(
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
     status: str | None = Query(default=None),
+    nature: str | None = Query(default=None),
+    fund_nature: str | None = Query(default=None),
+    accounting_attribute: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    created_by: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -257,6 +262,14 @@ def list_cashflows(
             occurred_from=occurred_from,
             occurred_to=occurred_to,
             status=status,
+            nature=nature.strip().upper() if nature else None,
+            fund_nature=fund_nature.strip().upper() if fund_nature else None,
+            accounting_attribute=(
+                accounting_attribute.strip().upper()
+                if accounting_attribute else None
+            ),
+            category=category.strip().upper() if category else None,
+            created_by=created_by,
             limit=limit,
             offset=offset,
             user=user,
@@ -271,6 +284,14 @@ def list_cashflows(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         status=status,
+        nature=nature.strip().upper() if nature else None,
+        fund_nature=fund_nature.strip().upper() if fund_nature else None,
+        accounting_attribute=(
+            accounting_attribute.strip().upper()
+            if accounting_attribute else None
+        ),
+        category=category.strip().upper() if category else None,
+        created_by=created_by,
         limit=limit,
         offset=offset,
         user=user,

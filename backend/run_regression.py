@@ -10,12 +10,50 @@ ROOT = Path(__file__).resolve().parent
 PYTHON = ROOT / ".venv" / "bin" / "python"
 
 GROUPS = {
+    "smoke": [
+        "tests/v1/test_main_contract.py",
+        "tests/v1/test_api_contract.py",
+        "tests/v1/test_request_schema_contract.py",
+        "tests/v1/test_money_float_guard.py",
+        "tests/v1/test_numbering.py",
+        "tests/v1/test_state_machine.py",
+    ],
     "p0": [
         "tests/v1/test_order_types_api.py",
         "tests/v1/test_orders_contract.py",
         "tests/v1/test_orders.py",
         "tests/v1/test_installments_contract.py",
         "tests/v1/test_reporting_contract.py",
+        "tests/v1/test_m2.py",
+        "tests/v1/test_m4.py",
+    ],
+    "foundation": [
+        "tests/v1/test_foundation_contract.py",
+        "tests/v1/test_foundation_order_types_service.py",
+        "tests/v1/test_foundation_pools_service.py",
+        "tests/v1/test_order_types_api.py",
+        "tests/v1/test_pools_api.py",
+        "tests/v1/test_pool_accounts_contract.py",
+        "tests/v1/test_field_definition_rules_contract.py",
+        "tests/v1/test_live_fields_contract.py",
+        "tests/v1/test_numbering.py",
+        "tests/v1/test_settings.py",
+    ],
+    "accounts": [
+        "tests/v1/test_accounts_contract.py",
+    ],
+    "orders": [
+        "tests/v1/test_core_contract.py",
+        "tests/v1/test_orders_contract.py",
+        "tests/v1/test_orders.py",
+        "tests/v1/test_orders_events_service.py",
+        "tests/v1/test_state_machine.py",
+        "tests/v1/test_api_contract.py",
+        "tests/v1/test_request_schema_contract.py",
+        "tests/v1/test_bughunt.py",
+    ],
+    "installments": [
+        "tests/v1/test_installments_contract.py",
         "tests/v1/test_m2.py",
         "tests/v1/test_m4.py",
     ],
@@ -28,15 +66,60 @@ GROUPS = {
         "tests/v1/test_period_lock_contract.py",
         "tests/v1/test_pool_accounts_contract.py",
         "tests/v1/test_rebate_rules_contract.py",
+        "tests/v1/test_money.py",
+        "tests/v1/test_money_float_guard.py",
+    ],
+    "parties": [
+        "tests/v1/test_parties.py",
+        "tests/v1/test_parties_contract.py",
+        "tests/v1/test_parties_fields_service.py",
+        "tests/v1/test_leads_contract.py",
+    ],
+    "reporting": [
+        "tests/v1/test_reporting_contract.py",
+    ],
+    "policy": [
+        "tests/v1/test_m5_policy.py",
+        "tests/v1/test_policy_contract.py",
     ],
     "governance": [
         "tests/v1/test_quality_contract.py",
+        "tests/v1/test_quality_issue_contract.py",
+        "tests/v1/test_quality_issues_service.py",
+        "tests/v1/test_quality_metrics_contract.py",
         "tests/v1/test_notifications_contract.py",
         "tests/v1/test_search_contract.py",
         "tests/v1/test_attachments_contract.py",
         "tests/v1/test_audit_contract.py",
     ],
+    "imports": [
+        "tests/v1/test_import_landing.py",
+        "tests/v1/test_import_mapping.py",
+        "tests/v1/test_imports_contract.py",
+        "tests/v1/test_migration.py",
+    ],
+    "auth": [
+        "tests/v1/test_auth_contract.py",
+        "tests/v1/test_main_contract.py",
+        "tests/v1/test_backup_restore.py",
+    ],
 }
+
+
+def unique_paths(groups: list[str]) -> list[str]:
+    """保持分组声明顺序，同时去掉跨组复用的测试文件。"""
+    seen: set[str] = set()
+    paths: list[str] = []
+    for group in groups:
+        for path in GROUPS[group]:
+            if path not in seen:
+                seen.add(path)
+                paths.append(path)
+    return paths
+
+
+def all_paths() -> list[str]:
+    return unique_paths(list(GROUPS))
 
 
 def changed_paths() -> list[str]:
@@ -52,17 +135,46 @@ def changed_paths() -> list[str]:
 
 def groups_for_changes(paths: list[str]) -> list[str]:
     selected: set[str] = set()
+    test_groups = {
+        test_path: group
+        for group, test_paths in GROUPS.items()
+        if group != "smoke"
+        for test_path in test_paths
+    }
     for path in paths:
         if path.startswith("frontend/"):
             continue
-        if path.startswith("backend/app/finance/") or "finance" in path or "pool_account" in path:
+        if path.startswith("backend/tests/"):
+            relative_test_path = path.removeprefix("backend/")
+            if relative_test_path in test_groups:
+                selected.add(test_groups[relative_test_path])
+            else:
+                selected.update(name for name in GROUPS if name not in {"smoke", "p0"})
+            continue
+        if path.startswith("backend/app/foundation/") or "foundation" in path or "order_type" in path or "pool" in path or "live_field" in path:
+            selected.add("foundation")
+        if "account" in path:
+            selected.add("accounts")
+        if path.startswith("backend/app/trade/") or any(token in path for token in ("order", "state_machine", "request_schema")):
+            selected.add("orders")
+        if "bughunt" in path:
+            selected.add("orders")
+        if "installment" in path or path.endswith("/test_m2.py") or path.endswith("/test_m4.py"):
+            selected.add("installments")
+        if path.startswith("backend/app/finance/") or "finance" in path or "pool_account" in path or "rebate" in path or "period_lock" in path:
             selected.add("finance")
-        if any(token in path for token in ("orders", "installments", "reporting", "foundation", "accounts")):
-            selected.add("p0")
+        if any(token in path for token in ("parties", "leads")):
+            selected.add("parties")
+        if "report" in path:
+            selected.add("reporting")
+        if "policy" in path:
+            selected.add("policy")
         if any(token in path for token in ("quality", "notifications", "search", "attachments", "audit")):
             selected.add("governance")
-        if path.startswith("backend/tests/") and not selected:
-            selected.update(GROUPS)
+        if any(token in path for token in ("import", "migration", "history")):
+            selected.add("imports")
+        if any(token in path for token in ("auth", "backup_restore", "main_contract", "settings")):
+            selected.add("auth")
     return [name for name in GROUPS if name in selected]
 
 
@@ -79,7 +191,7 @@ def main() -> int:
             print("未发现需要回归的前后端业务代码变更")
             return 0
         print(f"按变更自动选择分组：{', '.join(selected)}")
-        paths = [path for name in selected for path in GROUPS[name]]
+        paths = unique_paths(selected)
         if frontend_changed:
             print("按变更自动选择前端关键 E2E")
         if args.list:
@@ -96,7 +208,7 @@ def main() -> int:
             return subprocess.run(["npm", "run", "test:regression:fast"], cwd=ROOT.parent / "frontend", check=False).returncode
         return 0
     else:
-        paths = [path for group in GROUPS.values() for path in group] if args.group == "all" else GROUPS[args.group]
+        paths = all_paths() if args.group == "all" else GROUPS[args.group]
     if args.list:
         print("\n".join(paths))
         return 0

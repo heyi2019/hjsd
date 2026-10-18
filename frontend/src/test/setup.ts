@@ -7,6 +7,13 @@ import { resetTestBrowserState } from "./browser-state";
 afterEach(() => {
   cleanup();
   resetTestBrowserState();
+  // antd 浮动层（Select/Modal/message/notification/Drawer/Popover/Tooltip/DatePicker 等）
+  // 渲染到 document.body 而非 RTL container，cleanup() 只卸 RTL 容器；isolate:false 下
+  // jsdom 跨文件复用时这些残留节点会干扰后续用例（如弹窗下拉选项查询超时）。此处兜底
+  // 清空 body 全部子节点——等价于 isolate:true 每次重建 document 的效果，对所有 portal 类型通用。
+  while (document.body.firstElementChild) {
+    document.body.removeChild(document.body.firstElementChild);
+  }
 });
 
 // jsdom polyfills for APIs antd v5 touches during render/unmount.

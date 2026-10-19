@@ -65,25 +65,21 @@ beforeEach(() => {
 });
 
 describe("CustomersPage：权限门控与写操作", () => {
-  it("admin 可见「新建客户」入口", async () => {
+  it("admin 可见「新建客户」入口，且非 ACTIVE 客户合并按钮禁用", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
+    // 合并两个同为 admin 上下文的静态断言，省一次完整 antd 挂载
     expect(screen.getByRole("button", { name: /新建/ })).toBeInTheDocument();
+    const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
+    expect(mergeButtons.length).toBe(2);
+    expect(mergeButtons.some((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
+    expect(mergeButtons.some((b) => (b as HTMLButtonElement).disabled)).toBe(true);
   });
 
   it("viewer 无 customer.create 权限 → 新建入口不渲染", async () => {
     renderLight(<CustomersPage />, { user: "viewer" });
     await screen.findByText("CUS-0001");
     expect(screen.queryByRole("button", { name: /新建/ })).toBeNull();
-  });
-
-  it("非 ACTIVE 客户的合并按钮禁用（不能合并已拉黑客户）", async () => {
-    renderLight(<CustomersPage />, { user: "admin" });
-    await screen.findByText("CUS-0001");
-    const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
-    expect(mergeButtons.length).toBe(2);
-    expect(mergeButtons.some((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
-    expect(mergeButtons.some((b) => (b as HTMLButtonElement).disabled)).toBe(true);
   });
 
   it("新建客户提交后回传字段并刷新列表", async () => {

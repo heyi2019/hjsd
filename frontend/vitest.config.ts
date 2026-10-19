@@ -122,7 +122,10 @@ export default defineConfig({
             "src/vite.config.test.ts",
             ...quickTests,
           ],
-          pool: "forks",
+          // [2026-10-20 实测] forks → threads：酸测 5 文件 31 用例中位数 29.37s → 25.57s（~13%），
+          // 且两组区间不重叠（threads 24.17~26.96 vs forks 27.62~31.12）。threads 复用 worker
+          // 线程而非每次 fork 进程，省下进程创建开销；正确性零回归（31/31 两次全绿）。
+          pool: "threads",
           maxWorkers: 1,
           minWorkers: 1,
         },

@@ -24,7 +24,7 @@ from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import require_non_negative, require_positive, to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.core.numbering import allocate_number
-from app.core.state_machine import ACCOUNT_TRANSITIONS, INSTALLMENT_TRANSITIONS, transition
+from app.core.state_machine import ACCOUNT_TRANSITIONS, INSTALLMENT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.policy import service as policy_service
 from app.domain.enums import (
     AccountStatus,
@@ -635,6 +635,137 @@ def pay(
     return installment, schedule
 
 
+def cancel_installment(
+    session: Session,
+    installment_id: int,
+    *,
+    cancelled_on: date,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """终止交付前分期并登记原路退款。
+
+    PAYMENT 逐笔用 CANCEL 冲销，沿用每笔收款的资金池。
+    分期账号的回流/结束由合约类型决定：HS、DG 回库存，TH 直接失效。
+    """
+    text_reason = _required_text(reason, field="reason", message="取消分期必须填写原因")
+    installment = get_installment(session, installment_id, user)
+    cancellable = {
+        InstallmentStatus.PENDING.value,
+        InstallmentStatus.ACTIVE.value,
+        InstallmentStatus.OVERDUE.value,
+        InstallmentStatus.SETTLED.value,
+    }
+    if installment.status not in cancellable:
+        raise Conflict(
+            f"合约 {installment.inst_no} 状态 {installment.status}，不能取消交易",
+            code=ErrorCode.ORDER_STATUS_CONFLICT,
+            details={"inst_no": installment.inst_no, "status": installment.status},
+        )
+
+    order = session.get(Order, installment.order_id)
+    if order is None:
+        raise NotFound("分期合约所属订单不存在", details={"order_id": installment.order_id})
+    if order.status != "ACTIVE":
+        raise Conflict(
+            f"订单 {order.order_no} 当前状态 {order.status}，不能取消分期",
+            code=ErrorCode.ORDER_STATUS_CONFLICT,
+            details={"order_no": order.order_no, "status": order.status},
+        )
+
+    event_ids: list[int] = []
+    refund_amount = Decimal("0")
+    reversed_amount = Decimal("0")
+    original_events = session.scalars(
+        select(OrderEvent)
+        .where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == EventType.PAYMENT.value,
+            OrderEvent.is_posted.is_(True),
+        )
+        .order_by(OrderEvent.id)
+    ).all()
+    for original in original_events:
+        cancelled = sum(
+            (
+                to_money(item.amount)
+                for item in session.scalars(
+                    select(OrderEvent).where(
+                        OrderEvent.offset_event_id == original.id,
+                        OrderEvent.event_type == EventType.CANCEL.value,
+                        OrderEvent.is_posted.is_(True),
+                    )
+                ).all()
+            ),
+            Decimal("0"),
+        )
+        remaining = to_money(original.amount) - cancelled
+        if remaining <= 0:
+            continue
+        reversal, _flow = orders_service.post_event(
+            session,
+            order.id,
+            event_type=EventType.CANCEL.value,
+            amount=remaining,
+            occurred_on=cancelled_on,
+            actor=actor,
+            portion=original.portion,
+            offset_event_id=original.id,
+            reason=text_reason,
+            note=f"取消交易原路退款：{installment.inst_no}",
+            user=user,
+            allow_installment_cancel=True,
+            defer_order_cancel=True,
+        )
+        event_ids.append(reversal.id)
+        refund_amount += remaining
+
+    order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+    installment.status = transition(
+        INSTALLMENT_TRANSITIONS, installment.status, "CANCEL", entity="分期合约"
+    )
+    account_status: str | None = None
+    if order.account_id is not None:
+        account = session.get(Account, order.account_id)
+        if account is None:
+            raise NotFound("分期合约关联账号不存在", details={"account_id": order.account_id})
+        action = (
+            "CANCEL_END"
+            if installment.contract_type == InstallmentContractType.PICKUP_SALE.value
+            else "CANCEL_STOCK"
+        )
+        account.status = transition(ACCOUNT_TRANSITIONS, account.status, action, entity="账号")
+        account.updated_by = actor
+        account_status = account.status
+    installment.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.INSTALLMENT_CANCEL,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        actor=actor,
+        after={
+            "status": installment.status,
+            "order_status": order.status,
+            "account_status": account_status,
+            "refund_amount": str(refund_amount),
+            "reversed_amount": str(reversed_amount),
+            "cancel_event_ids": event_ids,
+        },
+        reason=text_reason,
+    )
+    return {
+        "installment": installment,
+        "order_status": order.status,
+        "account_status": account_status,
+        "refund_amount": refund_amount,
+        "reversed_amount": reversed_amount,
+        "cancel_event_ids": event_ids,
+    }
+
+
 def waive_schedule(
     session: Session,
     installment_id: int,
@@ -1222,6 +1353,7 @@ def mark_overdue(
 
 
 __all__ = [
+    "cancel_installment",
     "create_installment",
     "deliver",
     "extend_schedule",

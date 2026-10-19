@@ -19,14 +19,17 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
+    AccountStatus,
     AuditAction,
     DeliveryMode,
+    Direction,
+    EventType,
     InstallmentContractType,
     InstallmentStatus,
     ScheduleStatus,
 )
 from app.domain.foundation import AuditLog
-from app.domain.trade import Account, Installment, InstallmentDisposition, InstallmentSchedule, Order
+from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposition, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
 from app.installments import service as installment_service
 from app.installments import router as installments_router
@@ -40,6 +43,7 @@ PAST = date(2026, 9, 1)
 
 def test_installment_action_routes_use_declared_response_types():
     assert get_type_hints(installments_router.pay_installment)["return"] == schemas.PaymentResult
+    assert get_type_hints(installments_router.cancel_installment)["return"] == schemas.InstallmentCancelResult
     assert get_type_hints(installments_router.mark_overdue)["return"] == schemas.MarkOverdueOut
     assert get_type_hints(installments_router.recover_installment_account)["return"] == schemas.DispositionOut
     assert get_type_hints(installments_router.resale_installment_account)["return"] == schemas.DispositionOut
@@ -448,19 +452,176 @@ class TestGetAndListInstallments:
         assert [c.id for c in by_order] == [contract_b.id]
         assert contract_a.id not in [c.id for c in by_order]
 
-    def test_installment_scope_follows_order_owner(self, seeded_db):
-        scoped_user = CurrentUser.build(
-            id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
-        )
-        own_order = _order(seeded_db, owner_id=9)
-        other_order = _order(seeded_db, owner_id=8)
-        own_contract = _contract(seeded_db, own_order.id)
-        other_contract = _contract(seeded_db, other_order.id)
 
-        visible = installment_service.list_installments(seeded_db, user=scoped_user)
-        assert [item.id for item in visible] == [own_contract.id]
-        with pytest.raises(NotFound):
-            installment_service.get_installment(seeded_db, other_contract.id, scoped_user)
+def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db):
+    account = _account(seeded_db, "cancel-stock-installment")
+    purchase = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, purchase.id, amount="800")
+    sale = _order(seeded_db, order_type="HS", account_id=account.id)
+    contract = _contract(
+        seeded_db,
+        sale.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000",
+        down_payment="100",
+        periods=1,
+        per_period="900",
+    )
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
+    )
+    payment = seeded_db.scalar(
+        select(OrderEvent).where(
+            OrderEvent.order_id == sale.id,
+            OrderEvent.event_type == "PAYMENT",
+        )
+    )
+    assert payment is not None
+
+    result = installment_service.cancel_installment(
+        seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
+    )
+
+    seeded_db.refresh(contract)
+    seeded_db.refresh(sale)
+    seeded_db.refresh(account)
+    cancel = seeded_db.scalar(
+        select(OrderEvent).where(
+            OrderEvent.order_id == sale.id,
+            OrderEvent.event_type == "CANCEL",
+            OrderEvent.offset_event_id.isnot(None),
+        )
+    )
+    assert result["refund_amount"] == Decimal("100.00")
+    assert contract.status == InstallmentStatus.CANCELLED.value
+    assert sale.status == "CANCELLED"
+    assert account.status == AccountStatus.IN_STOCK.value
+    assert cancel is not None
+    assert cancel.offset_event_id == payment.id
+    assert cancel.amount == Decimal("100.00")
+    assert seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == cancel.id)).direction == Direction.OUT.value
+
+
+def test_cancel_dfq_refunds_customer_without_reversing_historical_buy(seeded_db):
+    order = _order(seeded_db, order_type="DFQ")
+    contract = _contract(
+        seeded_db,
+        order.id,
+        contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+        principal="500",
+        down_payment="100",
+        periods=1,
+        per_period="400",
+    )
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
+    )
+    advance, _flow = orders_service.post_event(
+        seeded_db,
+        order.id,
+        event_type="BUY",
+        amount=Decimal("400"),
+        occurred_on=TODAY,
+        actor="pytest",
+    )
+
+    result = installment_service.cancel_installment(
+        seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消代分期"
+    )
+
+    seeded_db.refresh(contract)
+    seeded_db.refresh(order)
+    reversals = seeded_db.scalars(
+        select(OrderEvent).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == "CANCEL",
+        ).order_by(OrderEvent.id)
+    ).all()
+    assert result["refund_amount"] == Decimal("100.00")
+    assert result["reversed_amount"] == Decimal("0.00")
+    assert contract.status == InstallmentStatus.CANCELLED.value
+    assert order.status == "CANCELLED"
+    assert len(reversals) == 1
+    assert reversals[0].offset_event_id != advance.id
+    assert reversals[0].amount == Decimal("100.00")
+
+
+@pytest.mark.parametrize(
+    ("order_type", "contract_type", "business_mode", "inventory_type", "expected_status"),
+    [
+        ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP", AccountStatus.VOID.value),
+        ("DG", "CONSIGNMENT_SALE", "DISTRIBUTION", "CONSIGNMENT", AccountStatus.IN_STOCK.value),
+    ],
+)
+def test_cancel_distribution_installment_uses_business_specific_account_result(
+    seeded_db, order_type, contract_type, business_mode, inventory_type, expected_status
+):
+    from app.accounts import service as accounts_service
+
+    account = accounts_service.create_account(
+        seeded_db,
+        game_account=f"cancel-{order_type.lower()}-installment",
+        business_mode=business_mode,
+        inventory_type=inventory_type,
+        actor="pytest",
+    )
+    order = _order(seeded_db, order_type=order_type, account_id=account.id)
+    contract = _contract(
+        seeded_db,
+        order.id,
+        contract_type=contract_type,
+        principal="100",
+        down_payment="0",
+        periods=1,
+        per_period="100",
+    )
+
+    installment_service.cancel_installment(
+        seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消分期"
+    )
+
+    seeded_db.refresh(account)
+    assert account.status == expected_status
+
+
+def test_installment_payment_cannot_be_cancelled_through_generic_event_endpoint(seeded_db):
+    order = _order(seeded_db)
+    contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="100", principal="100")
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest"
+    )
+    payment = seeded_db.scalar(
+        select(OrderEvent).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == EventType.PAYMENT.value,
+        )
+    )
+    assert payment is not None
+    with pytest.raises(Validation, match="分期取消流程"):
+        orders_service.post_event(
+            seeded_db,
+            order.id,
+            event_type=EventType.CANCEL.value,
+            amount=Decimal("100"),
+            occurred_on=TODAY,
+            actor="pytest",
+            offset_event_id=payment.id,
+            reason="绕过服务层",
+        )
+
+def test_installment_scope_follows_order_owner(seeded_db):
+    scoped_user = CurrentUser.build(
+        id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
+    )
+    own_order = _order(seeded_db, owner_id=9)
+    other_order = _order(seeded_db, owner_id=8)
+    own_contract = _contract(seeded_db, own_order.id)
+    other_contract = _contract(seeded_db, other_order.id)
+
+    visible = installment_service.list_installments(seeded_db, user=scoped_user)
+    assert [item.id for item in visible] == [own_contract.id]
+    with pytest.raises(NotFound):
+        installment_service.get_installment(seeded_db, other_contract.id, scoped_user)
 
 
 # ------------------------------------------------------------------ 收款守卫

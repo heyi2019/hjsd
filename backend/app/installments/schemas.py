@@ -90,6 +90,11 @@ class DefaultIn(RequestModel):
     reason: str = Field(min_length=1)
 
 
+class CancelIn(RequestModel):
+    cancelled_on: date
+    reason: str = Field(min_length=1)
+
+
 class DispositionIn(RequestModel):
     occurred_on: date
     note: str = Field(min_length=1)
@@ -133,18 +138,29 @@ class PaymentResult(BaseModel):
     schedule: ScheduleOut
 
 
+class InstallmentCancelResult(BaseModel):
+    installment: InstallmentOut
+    order_status: str
+    account_status: str | None = None
+    refund_amount: Decimal
+    reversed_amount: Decimal
+    cancel_event_ids: list[int] = Field(default_factory=list)
+
+
 class MarkOverdueOut(BaseModel):
     marked: int
 
 
 __all__ = [
     "DeliverIn",
+    "CancelIn",
     "DefaultIn",
     "DispositionIn",
     "DispositionOut",
     "EarlySettlementIn",
     "InstallmentCreate",
     "InstallmentOut",
+    "InstallmentCancelResult",
     "MarkOverdueOut",
     "PaymentIn",
     "PaymentResult",

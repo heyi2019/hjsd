@@ -164,7 +164,7 @@ export function CreateBusinessModal(props: {
             occurred_on: today(),
             portion: "PRINCIPAL",
             pool_id: values.dfq_payment_pool_id as number,
-            note: `代付剩余号款｜付款对象：${String(values.dfq_payment_recipient || "供货方")}${values.dfq_payment_note ? `｜${String(values.dfq_payment_note)}` : ""}`,
+            note: `付款：剩余号款｜付款对象：${String(values.dfq_payment_recipient || "供货方")}${values.dfq_payment_note ? `｜${String(values.dfq_payment_note)}` : ""}`,
           },
           installment: {
             contract_type: "ADVANCE_PURCHASE",

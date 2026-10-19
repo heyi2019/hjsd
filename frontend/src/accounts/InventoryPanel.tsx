@@ -1,9 +1,9 @@
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Input, Modal, Select, Space, message } from "antd";
+import { Card, Dropdown, Input, Modal, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
-import { accountsApi, employeesApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
+import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
@@ -49,6 +49,12 @@ export function InventoryPanel() {
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [savingAccount, setSavingAccount] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
+  const [installmentCancelTarget, setInstallmentCancelTarget] = useState<{ account: Account; installmentId: number; contractType: string } | null>(null);
+  const [cancelAmount, setCancelAmount] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  const [cancellingInstallment, setCancellingInstallment] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const load = useCallback(async () => {
@@ -78,6 +84,158 @@ export function InventoryPanel() {
 
   function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
+  }
+
+  function openEditor(account: Account) {
+    setEditingAccount({ ...account });
+    setEventDrafts({});
+    void employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause)));
+    void loadExecution(account);
+  }
+
+  function findCancelableSale(detail: AccountExecutionDetail) {
+    for (const order of [...detail.orders].reverse()) {
+      for (const event of [...order.events].reverse()) {
+        if (event.event_type !== "SELL") continue;
+        const cancelledAmount = order.events
+          .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
+          .reduce((sum, item) => sum + Number(item.amount), 0);
+        const remaining = Number(event.amount) - cancelledAmount;
+        if (remaining > 0) {
+          return {
+            orderId: order.order_id,
+            eventId: event.id,
+            amount: remaining.toFixed(2),
+            portion: event.portion,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function openCancellation(account: Account) {
+    try {
+      const detail = executionDetails[account.id] ?? await accountsApi.executionDetail(account.id);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const sale = findCancelableSale(detail);
+      if (!sale) {
+        message.warning("未找到可退款的售出流水，请先检查交易明细");
+        return;
+      }
+      setCancelTarget({ account, ...sale });
+      setCancelAmount(sale.amount);
+      setCancelReason("");
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
+  async function openInstallmentCancellation(account: Account) {
+    try {
+      const detail = executionDetails[account.id] ?? await accountsApi.executionDetail(account.id);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const order = [...detail.orders].reverse().find((item) => item.status === "ACTIVE");
+      if (!order) {
+        message.warning("未找到进行中的分期订单");
+        return;
+      }
+      const contracts = await installmentsApi.list({ order_id: order.order_id });
+      const contract = contracts.find((item) => ["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(item.status));
+      if (!contract) {
+        message.warning("未找到可终止的分期合约");
+        return;
+      }
+      setInstallmentCancelTarget({ account, installmentId: contract.id, contractType: contract.contract_type });
+      setCancelReason("");
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
+  async function submitCancellation() {
+    if (!cancelTarget) return;
+    if (!cancelAmount.trim() || Number(cancelAmount) <= 0) {
+      message.error("请输入有效的退款金额");
+      return;
+    }
+    if (!cancelReason.trim()) {
+      message.error("请填写退款原因");
+      return;
+    }
+    setCancelling(true);
+    try {
+      await ordersApi.postEvent(cancelTarget.orderId, {
+        event_type: "CANCEL",
+        amount: cancelAmount.trim(),
+        occurred_on: new Date().toISOString().slice(0, 10),
+        portion: cancelTarget.portion,
+        offset_event_id: cancelTarget.eventId,
+        reason: cancelReason.trim(),
+        note: "取消交易，原路退款",
+      });
+      message.success(cancelTarget.account.inventory_type === "PICKUP"
+        ? "退款已登记，提号交易已结束"
+        : "退款已登记，账号已回到在库");
+      const accountId = cancelTarget.account.id;
+      setCancelTarget(null);
+      setCancelAmount("");
+      setCancelReason("");
+      setExecutionDetails((current) => {
+        const next = { ...current };
+        delete next[accountId];
+        return next;
+      });
+      await load();
+    } catch (cause) {
+      setError(normalizeError(cause));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  async function submitInstallmentCancellation() {
+    if (!installmentCancelTarget || !cancelReason.trim()) {
+      message.error("请填写退款原因");
+      return;
+    }
+    setCancellingInstallment(true);
+    try {
+      await installmentsApi.cancel(installmentCancelTarget.installmentId, {
+        cancelled_on: new Date().toISOString().slice(0, 10),
+        reason: cancelReason.trim(),
+      });
+      message.success(installmentCancelTarget.contractType === "PICKUP_SALE" ? "退款已登记，提号交易已结束" : "退款已登记，账号已回到库存");
+      const accountId = installmentCancelTarget.account.id;
+      setInstallmentCancelTarget(null);
+      setCancelReason("");
+      setExecutionDetails((current) => {
+        const next = { ...current };
+        delete next[accountId];
+        return next;
+      });
+      await load();
+    } catch (cause) {
+      setError(normalizeError(cause));
+    } finally {
+      setCancellingInstallment(false);
+    }
+  }
+
+  function handleMoreAction(key: string, row: Account) {
+    if (key === "remove") {
+      message.info("下架请按来源订单执行下架流程");
+      return;
+    }
+    if (key === "cancel") {
+      void (row.status === "INSTALLMENT" ? openInstallmentCancellation(row) : openCancellation(row));
+      return;
+    }
+    if (key === "description") {
+      openProfile(row, "description");
+      return;
+    }
+    if (key === "images") openProfile(row, "images");
   }
 
   const columns: ColumnsType<Account> = [
@@ -167,40 +325,34 @@ export function InventoryPanel() {
               disabled={editingAccount !== null}
               onClick={(event) => {
                 event.stopPropagation();
-                setEditingAccount({ ...row });
-                setEventDrafts({});
-                void employeesApi.list().then(setEmployees).catch((error) => setError(normalizeError(error)));
-                void loadExecution(row);
+                openEditor(row);
               }}
             >
               编辑
             </PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              aria-label="账号描述"
-              disabled={row.status === "SOLD"}
-              onClick={(event) => {
-                event.stopPropagation();
-                openProfile(row, "description");
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomRight"
+              menu={{
+                items: [
+                  { key: "remove", label: "下架", disabled: row.status === "SOLD" },
+                  { key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true, disabled: !["SOLD", "INSTALLMENT"].includes(row.status) },
+                  { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
+                  { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
+                ],
+                onClick: ({ key }) => handleMoreAction(key, row),
               }}
             >
-              账号描述
-            </PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              aria-label="账号图片"
-              disabled={row.status === "SOLD"}
-              onClick={(event) => {
-                event.stopPropagation();
-                openProfile(row, "images");
-              }}
-            >
-              账号图片
-            </PermissionButton>
+              <PermissionButton
+                permission="order.create"
+                type="link"
+                size="small"
+                aria-label="更多"
+                onClick={(event) => event.stopPropagation()}
+              >
+                更多
+              </PermissionButton>
+            </Dropdown>
           </> : null}
         </Space>
       ),
@@ -379,6 +531,50 @@ export function InventoryPanel() {
           await load();
         }}
       />
+      <Modal
+        title="退款登记"
+        open={Boolean(cancelTarget)}
+        okText="确认退款并取消交易"
+        cancelText="返回"
+        confirmLoading={cancelling}
+        onOk={() => void submitCancellation()}
+        onCancel={() => { if (!cancelling) setCancelTarget(null); }}
+      >
+        {cancelTarget ? <div className="ui-stack">
+          <p className="muted">
+            交易 {cancelTarget.account.source_order_no || "-"} 将按原售出流水和原资金池原路退款。
+            {cancelTarget.account.inventory_type === "PICKUP" ? "提号取消后直接结束，不回库存。" : "取消后账号回到库存。"}
+          </p>
+          <label>
+            <span>退款金额</span>
+            <Input aria-label="退款金额" inputMode="decimal" value={cancelAmount} onChange={(event) => setCancelAmount(event.target.value)} />
+          </label>
+          <label>
+            <span>退款原因</span>
+            <Input.TextArea aria-label="取消原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入退款原因" />
+          </label>
+        </div> : null}
+      </Modal>
+      <Modal
+        title="退款登记"
+        open={Boolean(installmentCancelTarget)}
+        okText="确认退款并终止分期"
+        cancelText="返回"
+        confirmLoading={cancellingInstallment}
+        onOk={() => void submitInstallmentCancellation()}
+        onCancel={() => { if (!cancellingInstallment) setInstallmentCancelTarget(null); }}
+      >
+        {installmentCancelTarget ? <div className="ui-stack">
+          <p className="muted">
+            分期收款将按原资金池原路退款。
+            {installmentCancelTarget.contractType === "PICKUP_SALE" ? "提号取消后账号直接结束。" : installmentCancelTarget.contractType === "ADVANCE_PURCHASE" ? "取消后终止分期合约。" : "取消后账号回到库存。"}
+          </p>
+          <label>
+            <span>取消原因</span>
+            <Input.TextArea aria-label="分期取消原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入退款及取消原因" />
+          </label>
+        </div> : null}
+      </Modal>
       <Modal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); } }}>
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">

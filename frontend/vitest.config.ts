@@ -64,6 +64,10 @@ export default defineConfig({
     minWorkers: 1,
     server: {
       deps: {
+        // 为让 rc-motion / rc-resize-observer 的零动效桩（src/test/*-stub.tsx，经
+        // resolve.alias 重定向）不被 esbuild 预打包流程丢掉，必须禁用整树预打包。
+        // 代价：34 个 react 文件各自重 transform 整棵 antd ESM → 全量 ~5min。
+        // 根治（恢复预打包同时保桩）风险高，已原型验证回归，暂搁置，见 MEMORY.md。
         inline: true,
       },
     },

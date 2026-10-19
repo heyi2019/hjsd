@@ -3,21 +3,24 @@ import { Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Se
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
+  installmentsApi,
   ordersApi,
   orderTypesApi,
   policyApi,
+  type Installment,
   type Order,
   type OrderType,
 } from "../shared/api/catalog";
 import { api, normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
-import { executionActionLabel, money } from "../shared/lib/format";
+import { executionActionLabel, money, today } from "../shared/lib/format";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import {
   DataTable,
   ErrorBanner,
   PermissionButton,
+  PermissionGate,
   StatusTag,
 } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
@@ -144,12 +147,17 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
+  const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelForm] = Form.useForm();
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundForm] = Form.useForm();
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
+  const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
 
   const load = useCallback(async () => {
@@ -166,13 +174,15 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     }
   }, []);
 
-  const openAllocations = async () => {
-    if (!selectedOrder) return;
+  const openAllocations = async (sourceOrder?: Order) => {
     try {
+      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
+      if (!order) return;
       const [result, userResult] = await Promise.all([
-        policyApi.allocations(selectedOrder.id),
+        policyApi.allocations(order.id),
         api.get<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>("/users"),
       ]);
+      setActionOrder(order);
       setUsers(userResult.data.filter((item) => item.is_active));
       const byType = Object.fromEntries(result.items.map((item) => [item.allocation_type, item]));
       allocationForm.setFieldsValue({
@@ -189,11 +199,100 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     }
   };
 
+  const openRefund = async (sourceOrder?: Order) => {
+    try {
+      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
+      if (!order) return;
+      setActionOrder(order);
+      refundForm.resetFields();
+      setRefundOpen(true);
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    }
+  };
+
   const openOrder = async (order: Order) => {
     try {
       setSelectedOrder(await ordersApi.get(order.id));
     } catch (error) {
       message.error(normalizeError(error).message);
+    }
+  };
+
+  const openCancelTransaction = async (sourceOrder?: Order) => {
+    try {
+      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
+      if (!order) return;
+      if (order.installment_principal) {
+        const contracts = await installmentsApi.list({ order_id: order.id });
+        const target = contracts.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
+        if (!target) {
+          message.error("未找到可取消的分期合约");
+          return;
+        }
+        setCancelInstallmentTarget(target);
+        setCancelOrderTarget(null);
+      } else {
+        setCancelOrderTarget(order);
+        setCancelInstallmentTarget(null);
+      }
+      cancelForm.setFieldsValue({ cancelled_on: today() });
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    }
+  };
+
+  const closeCancelTransaction = () => {
+    setCancelOrderTarget(null);
+    setCancelInstallmentTarget(null);
+    cancelForm.resetFields();
+  };
+
+  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string }) => {
+    const installment = cancelInstallmentTarget;
+    const order = cancelOrderTarget;
+    if (!installment && !order) return;
+    setCancelSubmitting(true);
+    try {
+      if (installment) {
+        const result = await installmentsApi.cancel(installment.id, values);
+        const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
+        message.success(
+          installment.contract_type === "PICKUP_SALE"
+            ? `${refundSummary}，提号交易已结束`
+            : installment.contract_type === "ADVANCE_PURCHASE"
+              ? `${refundSummary}，代分期交易已结束`
+              : `${refundSummary}，账号已回到库存`,
+        );
+        if (result.order_status === "CANCELLED") await load();
+      } else {
+        if (!order) return;
+        const postedEvents = (order.events ?? []).filter((event) => event.is_posted);
+        const reversible = [...postedEvents]
+          .reverse()
+          .find((event) => ["BUY", "COST", "SELL"].includes(event.event_type));
+        if (reversible) {
+          const result = await ordersApi.postEvent(order.id, {
+            event_type: "CANCEL",
+            amount: reversible.amount,
+            occurred_on: values.cancelled_on,
+            offset_event_id: reversible.id,
+            reason: values.reason,
+            note: "取消交易原路退款",
+          });
+          message.success(`取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退款`);
+        } else {
+          await ordersApi.cancel(order.id, { reason: values.reason });
+          message.success("交易已取消，无已登记款项需要退款");
+        }
+        await load();
+      }
+      closeCancelTransaction();
+      setSelectedOrder(null);
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    } finally {
+      setCancelSubmitting(false);
     }
   };
 
@@ -218,7 +317,39 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
     { title: "日期", dataIndex: "trade_date" },
-    { title: "操作", key: "actions", render: (_, order) => <Typography.Link onClick={() => void openOrder(order)}>查看详情</Typography.Link> },
+    {
+      title: "操作",
+      key: "actions",
+      render: (_, order) => (
+        <Space size="small">
+          <Typography.Link onClick={() => void openOrder(order)}>查看详情</Typography.Link>
+          <PermissionGate permission="order.event.post">
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  { key: "allocation", label: "利润分配" },
+                  { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
+                  {
+                    key: "cancel",
+                    label: "取消交易",
+                    danger: true,
+                    disabled: !["ACTIVE", "COMPLETED"].includes(order.status),
+                  },
+                ],
+                onClick: ({ key }) => {
+                  if (key === "allocation") void openAllocations(order);
+                  if (key === "refund") void openRefund(order);
+                  if (key === "cancel") void openCancelTransaction(order);
+                },
+              }}
+            >
+              <Typography.Link>更多⌄</Typography.Link>
+            </Dropdown>
+          </PermissionGate>
+        </Space>
+      ),
+    },
   ];
 
   return (
@@ -360,10 +491,23 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         ) : null}
         {selectedOrder ? (
           <Space className="ui-form-spaced" wrap>
-              <PermissionButton permission="policy.manage" onClick={() => void openAllocations()}>利润分配</PermissionButton>
-            {["ACTIVE", "COMPLETED"].includes(selectedOrder.status) ? (
-              <PermissionButton permission="order.event.post" onClick={() => { refundForm.resetFields(); setRefundOpen(true); }}>登记退款</PermissionButton>
-            ) : null}
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [
+                  { key: "allocation", label: "利润分配" },
+                  { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
+                  { key: "cancel", label: "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
+                ],
+                onClick: ({ key }) => {
+                  if (key === "allocation") void openAllocations();
+                  if (key === "refund") void openRefund();
+                  if (key === "cancel") void openCancelTransaction();
+                },
+              }}
+            >
+              <PermissionButton permission="order.event.post">更多⌄</PermissionButton>
+            </Dropdown>
             {selectedOrder.account_id ? (
               <Typography.Link onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
                 去库存中心
@@ -379,17 +523,44 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       </Drawer>
 
       <Modal
-        title={selectedOrder ? `利润分配 · ${selectedOrder.order_no}` : "利润分配"}
+        title={cancelInstallmentTarget ? `取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `取消交易 · ${cancelOrderTarget.order_no}` : "取消交易"}
+        open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
+        confirmLoading={cancelSubmitting}
+        onCancel={closeCancelTransaction}
+        okText="确认取消交易"
+        onOk={() => void cancelForm.submit()}
+      >
+        <Form form={cancelForm} layout="vertical" onFinish={submitCancelTransaction}>
+          <Typography.Paragraph type="secondary">
+            {cancelInstallmentTarget
+              ? cancelInstallmentTarget.contract_type === "PICKUP_SALE"
+                ? "按已收款原资金池退款，提号取消后交易直接结束。"
+                : cancelInstallmentTarget.contract_type === "ADVANCE_PURCHASE"
+                  ? "按已收款原资金池退款，取消后终止代分期交易。"
+                  : "按已收款原资金池退款，取消后账号回到库存。"
+              : "有已登记动作时冲销最后一笔可冲销动作并按原资金池退款；没有登记款项时仅取消交易。"}
+          </Typography.Paragraph>
+          <Form.Item name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
+            <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={actionOrder ? `利润分配 · ${actionOrder.order_no}` : "利润分配"}
         open={allocationOpen}
         confirmLoading={allocationSubmitting}
-        onCancel={() => setAllocationOpen(false)}
+        onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
       >
         <Form
           form={allocationForm}
           layout="vertical"
           onFinish={async (values: { allocations: Array<{ allocation_type: "BUY" | "SELL" | "OPERATION" | "COMPANY"; user_id?: number; role: string; allocation_rate: string }> }) => {
-            if (!selectedOrder) return;
+            if (!actionOrder) return;
             const rows = values.allocations ?? [];
             const total = rows.reduce((sum, row) => sum + Number(row.allocation_rate || 0), 0);
             if (Math.abs(total - 100) > 0.001) {
@@ -398,7 +569,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             }
             setAllocationSubmitting(true);
             try {
-              await policyApi.setAllocations(selectedOrder.id, rows.map((row) => ({
+              await policyApi.setAllocations(actionOrder.id, rows.map((row) => ({
                 allocation_type: row.allocation_type,
                 user_id: row.allocation_type === "OPERATION" ? Number(row.user_id) : null,
                 role: row.role,
@@ -406,6 +577,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               })));
               message.success("利润分配已保存");
               setAllocationOpen(false);
+              setActionOrder(null);
             } catch (error) {
               message.error(normalizeError(error).message);
             } finally {
@@ -443,20 +615,20 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       </Modal>
 
       <Modal
-        title={selectedOrder ? `登记退款 · ${selectedOrder.order_no}` : "登记退款"}
+        title={actionOrder ? `登记退款 · ${actionOrder.order_no}` : "登记退款"}
         open={refundOpen}
         confirmLoading={refundSubmitting}
-        onCancel={() => setRefundOpen(false)}
+        onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
         onOk={() => void refundForm.submit()}
       >
         <Form
           form={refundForm}
           layout="vertical"
           onFinish={async (values: { amount: string; reason: string; refund_responsibility: string }) => {
-            if (!selectedOrder) return;
+            if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
-              await ordersApi.postEvent(selectedOrder.id, {
+              await ordersApi.postEvent(actionOrder.id, {
                 event_type: "REFUND",
                 amount: values.amount,
                 occurred_on: new Date().toISOString().slice(0, 10),
@@ -465,6 +637,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               });
               message.success("退款已登记");
               setRefundOpen(false);
+              setActionOrder(null);
               await load();
             } catch (error) {
               message.error(normalizeError(error).message);

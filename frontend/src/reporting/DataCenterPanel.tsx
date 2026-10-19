@@ -1,5 +1,5 @@
 /** 数据中心：今日资金与业务总览（原工作台数据内容，2026-10-13 迁入「经营中心」Tab）。
- *  现金头寸、可用余额、押金与提号代垫分列展示，禁止混用（FIN-01-03）。 */
+ *  现金头寸、可用余额和押金分列展示，禁止混用（FIN-01-03）。 */
 import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";

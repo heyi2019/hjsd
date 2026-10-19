@@ -46,9 +46,9 @@ function DfqInstallmentInfo() {
   return (
     <AdaptiveFormGrid>
       <NestedFormField label="账号号价"><Form.Item noStyle name="dfq_purchase_price"><MoneyInput placeholder="账号全款基础价格" /></Form.Item></NestedFormField>
-      <NestedFormField label="代分期金额"><Form.Item noStyle name="dfq_total_amount"><MoneyInput placeholder="客户未付的剩余号款" /></Form.Item></NestedFormField>
-      <NestedFormField label="客户已付金额"><Form.Item noStyle name="dfq_down_payment"><MoneyInput placeholder="客户已支付的部分号款" /></Form.Item></NestedFormField>
-      <NestedFormField label="手续费总额"><Form.Item noStyle name="dfq_service_fee"><MoneyInput placeholder="代付服务手续费" /></Form.Item></NestedFormField>
+      <NestedFormField label="借款本金"><Form.Item noStyle name="dfq_total_amount"><MoneyInput placeholder="客户借款的剩余号款" /></Form.Item></NestedFormField>
+      <NestedFormField label="客户首付款"><Form.Item noStyle name="dfq_down_payment"><MoneyInput placeholder="客户已支付的部分号款" /></Form.Item></NestedFormField>
+      <NestedFormField label="手续费总额"><Form.Item noStyle name="dfq_service_fee"><MoneyInput placeholder="分期服务手续费" /></Form.Item></NestedFormField>
       <NestedFormField label="分期期数"><Form.Item noStyle name="dfq_periods" initialValue={1}><Input className="dfq-periods-control" inputMode="numeric" placeholder="请输入期数" /></Form.Item></NestedFormField>
       <NestedFormField label="每期手续费"><Form.Item noStyle name="dfq_period_service_fee"><MoneyInput placeholder="按手续费总额/期数计算，可修改" /></Form.Item></NestedFormField>
       <NestedFormField label="每期金额"><Form.Item noStyle name="dfq_period_amount"><MoneyInput placeholder="请输入金额" /></Form.Item></NestedFormField>
@@ -64,7 +64,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
         gameType: "dfq_game_type", gameAccount: "dfq_game_account", gamePassword: "dfq_game_password",
         channelRegion: "dfq_channel_region", boundPhone: "dfq_bound_phone", hasSecondary: "dfq_has_secondary", accountNote: "dfq_account_note",
       }} gameTypes={props.gameTypes}>
-        <NestedFormSection className="nested-form-section--card dfq-section" title="分期信息" description="客户已支付部分号款，系统代付剩余号款，后续按期向客户收回">
+        <NestedFormSection className="nested-form-section--card dfq-section" title="借款与分期信息" description="登记客户首付款、借款本金及后续分期还款">
           <DfqInstallmentInfo />
         </NestedFormSection>
         <NestedFormSection className="nested-form-section--card dfq-section" title="分期计划" description="每期到期日可单独自定义">

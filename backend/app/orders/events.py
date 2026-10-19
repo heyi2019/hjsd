@@ -22,6 +22,7 @@ from app.domain.enums import (
     CapitalType,
     Direction,
     EventType,
+    InventoryType,
     InstallmentContractType,
     InstallmentDispositionAction,
     Nature,
@@ -87,6 +88,8 @@ def post_event(
     user: CurrentUser | None = None,
     allow_installment_payment: bool = False,
     allow_installment_delivery: bool = False,
+    allow_installment_cancel: bool = False,
+    defer_order_cancel: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
     from .service import get_order
@@ -97,6 +100,14 @@ def post_event(
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"
     )
+    allow_installment_cancel = _required_bool(
+        allow_installment_cancel, field="allow_installment_cancel"
+    )
+    defer_order_cancel = _required_bool(
+        defer_order_cancel, field="defer_order_cancel"
+    )
+    if defer_order_cancel and not allow_installment_cancel:
+        raise Validation("defer_order_cancel 只能用于分期取消流程")
     try:
         EventType(event_type)
     except ValueError as exc:
@@ -166,6 +177,7 @@ def post_event(
         offset_event_id=offset_event_id,
         reason=reason,
         allow_installment_payment=allow_installment_payment,
+        allow_installment_cancel=allow_installment_cancel,
     )
 
     if event_type == EventType.DELIVER.value:
@@ -354,7 +366,7 @@ def post_event(
             ORDER_TRANSITIONS, order.status, "BUY", entity="订单"
         )
     if event_type == EventType.CANCEL.value and (
-        offset is None or cancel_fully_consumed
+        (offset is None or cancel_fully_consumed) and not defer_order_cancel
     ):
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件
         order.status = transition(
@@ -453,6 +465,7 @@ def _assert_event_allowed(
     offset_event_id: int | None = None,
     reason: str | None = None,
     allow_installment_payment: bool = False,
+    allow_installment_cancel: bool = False,
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
@@ -520,10 +533,16 @@ def _assert_event_allowed(
         if offset_event_id is not None:
             offset = _get_offset_event(session, offset_event_id, order_id=order.id)
             if offset.event_type == EventType.PAYMENT.value:
-                raise Validation(
-                    "分期收款不能直接冲销，请通过分期收款更正流程处理",
-                    details={"offset_event_id": offset_event_id},
+                if not allow_installment_cancel:
+                    raise Validation(
+                        "分期收款不能直接冲销，请通过分期取消流程处理",
+                        details={"offset_event_id": offset_event_id},
+                    )
+                installment = session.scalar(
+                    select(Installment).where(Installment.order_id == order.id)
                 )
+                if installment is None:
+                    raise Validation("PAYMENT 冲销必须关联分期合约")
 
 
 
@@ -735,9 +754,14 @@ def _apply_account_effect(
                 account.status = transition(
                     ACCOUNT_TRANSITIONS,
                     account.status,
-                    "CANCEL_SELL",
+                    "CANCEL_SELL_END" if account.inventory_type == InventoryType.PICKUP.value else "CANCEL_SELL",
                     entity="账号",
                 )
+            if actor is not None:
+                account.updated_by = actor
+            return
+        if offset_event is not None and offset_event.event_type == EventType.PAYMENT.value:
+            # 分期收款取消只产生原路退款现金流，不改写账号成本。
             if actor is not None:
                 account.updated_by = actor
             return

@@ -97,7 +97,7 @@ it("代挂建单沿用统一出售流程，不展示独立结算字段", async (
 it("代分期表单展示金额、可自定义期次和付款信息", async () => {
     const { container } = await openTypedModal("DFQ");
 
-    expect(screen.getByText("分期信息")).toBeInTheDocument();
+    expect(screen.getByText("借款与分期信息")).toBeInTheDocument();
     expect(screen.getByText("手续费总额：")).toBeInTheDocument();
     expect(screen.getByText("每期手续费：")).toBeInTheDocument();
     expect(screen.getByText("分期计划")).toBeInTheDocument();

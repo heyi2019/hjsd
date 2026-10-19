@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -14,7 +14,7 @@ beforeEach(() => {
 vi.mock("../shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/api/catalog")>();
   const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
+    "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
@@ -72,8 +72,8 @@ beforeEach(() => {
   });
 });
 
-async function openLedger() {
-  renderLight(<OrdersPage />, { user: "admin" });
+async function openLedger(user?: string) {
+  renderLight(<OrdersPage />, user ? { user } : undefined);
   await screen.findByRole("tab", { name: "业务台账" });
   await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
 }
@@ -127,6 +127,21 @@ describe("OrdersPage：四类业务台账", () => {
     }
   });
 
+  it("操作列提供更多菜单入口", async () => {
+    await openLedger("admin");
+
+    expect(screen.getAllByText("更多⌄")).toHaveLength(2);
+  });
+
+  it("行级更多菜单提供利润分配、登记退款和取消交易", async () => {
+    await openLedger("admin");
+    fireEvent.click(screen.getAllByText("更多⌄")[0]);
+
+    expect(await screen.findByText("利润分配")).toBeInTheDocument();
+    expect(await screen.findByText("登记退款")).toBeInTheDocument();
+    expect(await screen.findByText("取消交易")).toBeInTheDocument();
+  });
+
   it("加载失败时展示错误条", async () => {
     vi.mocked(catalog.ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
@@ -155,6 +170,26 @@ describe("OrdersPage：四类业务台账", () => {
     renderLight(<OrdersPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务台账" });
     expect(screen.queryByRole("button", { name: /登记事件/ })).toBeNull();
+  });
+
+  it("订单操作通过更多菜单进入取消交易并提交原因", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValueOnce({ ...orders[0], events: [] });
+    vi.mocked(catalog.ordersApi.cancel).mockResolvedValueOnce({ ...orders[0], status: "CANCELLED" });
+
+    await openLedger("admin");
+    fireEvent.click(screen.getAllByText("查看详情")[0]);
+    await screen.findByText("订单详情 · HS-2026-0001");
+    fireEvent.click(screen.getByRole("button", { name: /更多/ }));
+    fireEvent.click(await screen.findByText("取消交易"));
+
+    expect(await screen.findByText("取消交易 · HS-2026-0001")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("取消原因"), { target: { value: "客户取消" } });
+    fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.cancel)).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ reason: "客户取消" }),
+    ));
   });
 
   it("忽略已废弃的业务中心页签参数并回到业务台账", async () => {

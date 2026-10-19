@@ -496,6 +496,8 @@ export const ordersApi = {
     api.get<Order[]>("/orders", { params }).then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
+  cancel: (orderId: number, payload: { reason: string }) =>
+    api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
   create: (payload: {
     order_type: string;
     trade_date: string;

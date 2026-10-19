@@ -12,7 +12,7 @@ import {
   type Schedule,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
-import { INSTALLMENT_STATUS_LABEL, today } from "../shared/lib/format";
+import { INSTALLMENT_STATUS_LABEL, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import {
   DataTable,
@@ -49,10 +49,12 @@ function ContractTable({
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
+  const [cancelForm] = Form.useForm();
 
   const load = useCallback(async () => {
     try {
@@ -125,6 +127,29 @@ function ContractTable({
       message.success("逾期账号已登记回收");
       setRecoverTarget(null);
       recoverForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitCancel = async (values: Record<string, unknown>) => {
+    if (!cancelTarget) return;
+    try {
+      const result = await installmentsApi.cancel(cancelTarget.id, {
+        cancelled_on: values.cancelled_on as string,
+        reason: values.reason as string,
+      });
+      const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
+      message.success(
+        cancelTarget.contract_type === "PICKUP_SALE"
+          ? `${refundSummary}，提号账号已结束`
+          : cancelTarget.contract_type === "ADVANCE_PURCHASE"
+            ? `${refundSummary}，代分期已结束`
+            : `${refundSummary}，账号已回到库存`,
+      );
+      setCancelTarget(null);
+      cancelForm.resetFields();
       await load();
     } catch (err) {
       setError(normalizeError(err));
@@ -247,6 +272,18 @@ function ContractTable({
             }}
           >
             登记回收
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            danger
+            disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
+            onClick={() => {
+              setCancelTarget(row);
+              cancelForm.setFieldsValue({ cancelled_on: today() });
+            }}
+          >
+            终止分期并退款
           </PermissionButton>
           {row.status === "CLOSED"
             && (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
@@ -401,6 +438,32 @@ function ContractTable({
           </Typography.Paragraph>
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
             确认交付
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={cancelTarget ? `退款登记 · ${cancelTarget.inst_no}` : "退款登记"}
+        open={Boolean(cancelTarget)}
+        onCancel={() => setCancelTarget(null)}
+        footer={null}
+      >
+        <Form form={cancelForm} layout="vertical" onFinish={submitCancel}>
+          <Typography.Paragraph type="secondary">
+            {cancelTarget?.contract_type === "PICKUP_SALE"
+              ? "按已收款原资金池退款，提号取消后账号直接结束。"
+              : cancelTarget?.contract_type === "ADVANCE_PURCHASE"
+                ? "按已收款原资金池退款，取消后终止分期合约。"
+                : "按已收款原资金池退款，取消后账号回到库存。"}
+          </Typography.Paragraph>
+          <Form.Item name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="reason" label="取消原因" rules={[{ required: true }]}>
+            <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
+          </Form.Item>
+          <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit">
+            确认退款并终止分期
           </PermissionButton>
         </Form>
       </Modal>

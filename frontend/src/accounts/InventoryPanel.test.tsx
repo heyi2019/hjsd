@@ -42,10 +42,24 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
     expect(screen.getByText("提号")).toBeInTheDocument();
-    for (const label of ["售出", "寄售", "下架", "返点", "账号描述", "账号图片"]) {
+    for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
+    await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
+    expect(await screen.findByRole("menuitem", { name: "取消交易" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
+  });
+
+  it("更多菜单收纳下架、取消交易、账号描述和账号图片", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
+
+    for (const label of ["下架", "取消交易", "账号描述", "账号图片"]) {
+      expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
+    }
   });
 
   it("导出时接入库存详情字段", () => {
@@ -172,10 +186,11 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     expect(screen.getByRole("button", { name: "寄售" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "下架" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "编辑" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "账号描述" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "账号图片" })).toBeDisabled();
+    await ui.click(screen.getByRole("button", { name: "更多" }));
+    expect(screen.getByRole("menuitem", { name: "下架" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "账号描述" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "账号图片" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("编辑账号时默认只展示核心资料输入，低频资料收纳到更多资料", async () => {

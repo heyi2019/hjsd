@@ -1,3 +1,4 @@
+import { message } from "antd";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -94,6 +95,33 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await ui.click(within(modal).getByRole("button", { name: /确认交付/ }));
     await waitFor(() => expect(vi.mocked(catalog.installmentsApi.deliver)).not.toHaveBeenCalled());
+  });
+
+  it("交付前可以登记退款并终止分期", async () => {
+    const successSpy = vi.spyOn(message, "success");
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValueOnce([
+      { ...installments[0], status: "ACTIVE" },
+    ]);
+    vi.mocked(catalog.installmentsApi.cancel).mockResolvedValueOnce({
+      installment: { ...installments[0], status: "CANCELLED" },
+      order_status: "CANCELLED",
+      account_status: "IN_STOCK",
+      refund_amount: "50.00",
+      reversed_amount: "0.00",
+      cancel_event_ids: [3],
+    });
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    await ui.click(screen.getByRole("button", { name: /终止分期并退款/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("取消原因"), "客户取消");
+    await ui.click(within(modal).getByRole("button", { name: /确认退款并终止分期/ }));
+    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.cancel)).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ reason: "客户取消", cancelled_on: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
+    ));
+    expect(successSpy).toHaveBeenCalledWith("退款已登记：¥50.00，账号已回到库存");
+    successSpy.mockRestore();
   });
 
   it("viewer 无 order.event.post → 收款/交付入口全部不渲染", async () => {

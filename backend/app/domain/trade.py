@@ -548,7 +548,7 @@ class InstallmentSchedule(Base, TimestampMixin):
             name="schedule_status_valid",
         ),
         UniqueConstraint("installment_id", "period_no", name="uq_installment_period"),
-        Index("ix_schedules_due", "installment_id", "due_on", "status"),
+        Index("ix_installment_schedules_due", "installment_id", "due_on", "status"),
         CheckConstraint(
             "due_amount >= 0 AND received_amount >= 0 AND waived_amount >= 0",
             name="amount_nonneg",
@@ -665,7 +665,7 @@ class RebateRecord(Base, AuditMixin):
             name="rebate_type_valid",
         ),
         UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
-        Index("ix_rebate_source_order", "source_order_id"),
+        Index("ix_rebate_records_source_order", "source_order_id"),
         Index("ix_rebate_records_expected_status", "expected_on", "status"),
         CheckConstraint(
             "rate >= 0 AND base_amount >= 0",

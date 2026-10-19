@@ -10,7 +10,7 @@
 |---|---|
 | capital_type | STOCK / ZERO / CREDIT；默认取业务定义，可单笔覆盖 |
 | event_type | BUY / COST / SELL / PAYMENT / DELIVER / TRANSFER / CANCEL；`DELIVER` 为分期结清后的无金额交付事件；返点不是订单事件 |
-| installment.contract_type | STOCK_SALE（HS 已买入库存分期出售，可不产生分期收益）/ ADVANCE_PURCHASE（DFQ 代客户买号，每期均包含分期收益）；合约类型必须与来源订单一致 |
+| installment.contract_type | STOCK_SALE（HS 已买入库存分期出售，可不产生分期收益）/ ADVANCE_PURCHASE（DFQ 代分期，客户向本方借款并按合约分期还款，每期均包含分期收益）；合约类型必须与来源订单一致 |
 | installment.delivery_mode | PLATFORM_OPERATOR（平台/本方操作换绑）/ CUSTOMER_SELF（客户自行换绑）；必须留换绑凭证 |
 | DG 代挂结算 | 沿用统一出售 `SELL` 事实登记卖出金额和订单利润；寄售方通过 `CONSIGNOR` 关联，平台沿用账号/出售事实的平台信息；不配置抽成比例或单独结算公式 |
 | customers.status | ACTIVE / DISABLED / MERGED；MERGED 仅保留历史关联，不可作为新订单参与方 |

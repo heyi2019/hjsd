@@ -55,6 +55,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
 
 /**
  * 执行动作统一文案：底层事件编码保持稳定，页面不再直接暴露 BUY/SELL/DELIVER。
+ * 代分期的 BUY 仍是兼容性事件编码，页面只展示为“付款”；借款本金由业务字段和资金属性表达。
  * 买入交付和售出交付结合订单类型判断：代分期是向客户完成售出交付，其余交付语义归入买入交付。
  */
 export const EXECUTION_ACTION_LABEL: Record<string, string> = {
@@ -77,6 +78,8 @@ export function executionActionLabel(
   orderType?: string | null,
 ): string {
   if (!eventType) return "-";
+  if (eventType === "BUY" && orderType === "DFQ") return "付款";
+  if (eventType === "PAYMENT" && orderType === "DFQ") return "还款（分期）";
   if (eventType === "DELIVER") return orderType === "DFQ" ? "售出交付" : "买入交付";
   return EXECUTION_ACTION_LABEL[eventType] ?? eventType;
 }

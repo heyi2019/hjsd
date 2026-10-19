@@ -177,6 +177,34 @@ def pay_installment(
 
 
 @router.post(
+    "/installments/{installment_id}/cancel",
+    response_model=schemas.InstallmentCancelResult,
+)
+def cancel_installment(
+    installment_id: int,
+    payload: schemas.CancelIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_payment,
+) -> schemas.InstallmentCancelResult:
+    result = service.cancel_installment(
+        db,
+        installment_id,
+        cancelled_on=payload.cancelled_on,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return schemas.InstallmentCancelResult(
+        installment=_installment_output(db, result["installment"]),
+        order_status=result["order_status"],
+        account_status=result["account_status"],
+        refund_amount=result["refund_amount"],
+        reversed_amount=result["reversed_amount"],
+        cancel_event_ids=result["cancel_event_ids"],
+    )
+
+
+@router.post(
     "/installments/{installment_id}/settle-early", response_model=schemas.InstallmentOut
 )
 def settle_early_installment(

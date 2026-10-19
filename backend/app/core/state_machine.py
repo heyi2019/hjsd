@@ -24,11 +24,18 @@ ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
 ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     # 同一账号允许再次买入，作为重新入库事件保留历史轨迹。
     "IN_STOCK": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "INSTALLMENT", "SELL": "SOLD", "INSTALLMENT": "INSTALLMENT", "VOID": "VOID"},
-    "INSTALLMENT": {"DELIVER": "SOLD", "RECOVER": "IN_STOCK", "VOID": "VOID"},
+    "INSTALLMENT": {
+        "DELIVER": "SOLD",
+        "RECOVER": "IN_STOCK",
+        "CANCEL_STOCK": "IN_STOCK",
+        "CANCEL_END": "VOID",
+        "VOID": "VOID",
+    },
     "SOLD": {
         "BUY_STOCK": "IN_STOCK",
         "BUY_CREDIT": "INSTALLMENT",
         "CANCEL_SELL": "IN_STOCK",
+        "CANCEL_SELL_END": "VOID",
     },
     "VOID": {},
 }
@@ -40,14 +47,15 @@ INSTALLMENT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
         "SETTLE": "SETTLED",
         "CANCEL": "CANCELLED",
     },
-    "ACTIVE": {"PAYMENT": "ACTIVE", "MARK_OVERDUE": "OVERDUE", "SETTLE": "SETTLED", "DEFAULT": "DEFAULTED"},
+    "ACTIVE": {"PAYMENT": "ACTIVE", "MARK_OVERDUE": "OVERDUE", "SETTLE": "SETTLED", "DEFAULT": "DEFAULTED", "CANCEL": "CANCELLED"},
     "OVERDUE": {
         "PAYMENT": "OVERDUE",
         "SETTLE": "SETTLED",
         "DEFAULT": "DEFAULTED",
         "CLOSE": "CLOSED",
+        "CANCEL": "CANCELLED",
     },
-    "SETTLED": {"DELIVER": "DELIVERED"},
+    "SETTLED": {"DELIVER": "DELIVERED", "CANCEL": "CANCELLED"},
     "DELIVERED": {},
     "DEFAULTED": {"PAYMENT": "DEFAULTED", "CLOSE": "CLOSED"},
     "CLOSED": {},

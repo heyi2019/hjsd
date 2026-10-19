@@ -1334,6 +1334,35 @@ class TestAccountEffect:
         assert account.cost_amount == Decimal("500.00")
         assert account.status == AccountStatus.IN_STOCK.value
 
+    def test_cancel_pickup_sell_ends_without_returning_to_inventory(self, seeded_db):
+        account = Account(
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+        order = _order(seeded_db, order_type="TH", account_id=account.id)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1.00",
+            occurred_on=D, actor="pytest", pool_id=1,
+        )
+        sell, _ = order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="800.00",
+            occurred_on=D, actor="pytest", pool_id=2,
+        )
+
+        order_service.post_event(
+            seeded_db, order.id, event_type="CANCEL", amount="800.00",
+            occurred_on=D, actor="pytest", offset_event_id=sell.id,
+            reason="提号售出撤销",
+        )
+
+        assert account.status == AccountStatus.VOID.value
+
     def test_payment_event_cannot_bypass_installment_service(self, seeded_db):
         order = _order(seeded_db, order_type="DFQ")
         installments_service.create_installment(

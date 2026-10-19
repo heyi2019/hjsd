@@ -566,7 +566,23 @@
 | RULE-INST-10 | DFQ-01-06 | 展期 | 处置动作 | 新到期日必须晚于原到期日并填写原因，不设次数和最长天数限制 |
 | RULE-INST-11 | DFQ-01-08、HS-01-06 | 回收后转售 | 处置动作 | 可全款或分期转售，原分期应收不被覆盖 |
 
-### A.6 资金属性与核算属性
+### A.6 订单状态机
+
+| 规则编号 | 关联功能编号 | 当前状态 | 触发动作/事件 | 下一状态 | 规则 |
+|---|---|---|---|---|---|
+| RULE-ORD-01 | ORD-01-02 | 创建 | 新建订单 | `ACTIVE` | 订单创建即进入进行中，状态由后端状态机维护。 |
+| RULE-ORD-02 | ORD-02-02 | `ACTIVE` | `BUY`、`COST`、`PAYMENT` | `ACTIVE` | 登记事实但未形成订单终态；DFQ 页面动作“付款”底层仍记录 `BUY`。 |
+| RULE-ORD-03 | ORD-02-02 | `ACTIVE` | `SELL` | `COMPLETED` | 非分期订单完成售出；DG 直接从 `ACTIVE` 进入本路径。 |
+| RULE-ORD-04 | ORD-02-02 | `ACTIVE` | `DELIVER` | `COMPLETED` | 分期合约达到交付前提后完成交付；交付事件不产生现金流。 |
+| RULE-ORD-05 | ORD-02-03 | `ACTIVE` | `CANCEL` | `CANCELLED` | 取消未完成交易；必须填写原因，有资金事实时生成反向事实并显示退款金额。 |
+| RULE-ORD-06 | ORD-02-03 | `COMPLETED` | `CANCEL` | `CANCELLED` | 已完成售出需要完整冲销时使用；必须关联被冲销事件，不能直接改状态。 |
+| RULE-ORD-07 | ORD-02-02 | `COMPLETED` | `REFUND` | `COMPLETED` | 交付后全部或部分退款不改变订单完成状态，原收入和收款事实保留。 |
+| RULE-ORD-08 | ORD-02-02 | `COMPLETED` | `BUY` | `ACTIVE` | 仅 HS/TH 且无分期合约时允许重新买入，重新开启业务周期并保留历史。 |
+| RULE-ORD-09 | ORD-02-02、ORD-02-03 | `CANCELLED` | 任意业务动作 | 拒绝 | 取消是终态，不再接受新的业务事件。 |
+
+主路径：HS/TH 全款为 `ACTIVE → BUY → SELL → COMPLETED`；HS/TH 分期为 `ACTIVE → BUY/PAYMENT → DELIVER → COMPLETED`；DG 全款为 `ACTIVE → SELL → COMPLETED`，DG 分期为 `ACTIVE → PAYMENT → DELIVER → COMPLETED`；DFQ 为 `ACTIVE → BUY（付款）→ PAYMENT → DELIVER → COMPLETED`。取消路径为 `ACTIVE` 或 `COMPLETED → CANCELLED`，并同步订单事件、资金流水、账号和分期合约状态。
+
+### A.7 资金属性与核算属性
 
 | 数据编号 | 关联功能编号 | 属性层级 | 取值 | 含义 |
 |---|---|---|---|---|
@@ -591,7 +607,7 @@
 | DATA-FIN-19 | FIN-03-02 | 核算属性 | INTERNAL_TRANSFER | 资金池或账户内部调拨 |
 | DATA-FIN-20 | FIN-02-05、REB-01-05 | 核算属性 | REVERSAL | 对原资金事实的反向冲销 |
 
-### A.7 返点与利润分配规则
+### A.8 返点与利润分配规则
 
 | 编号 | 关联功能编号 | 规则项 | 规则内容 |
 |---|---|---|---|

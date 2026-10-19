@@ -16,7 +16,7 @@ export function ThSupplierSection() {
       <Form.Item className="recovery-order-modal__party-field" name="supplier_source" label="供货方来源" rules={[{ required: true, message: "请选择供货方来源" }]}>
         <Select placeholder="请选择供货方来源" options={SUPPLIER_SOURCE_OPTIONS} />
       </Form.Item>
-      <Form.Item className="recovery-order-modal__party-field recovery-customer-source-other" name="supplier_source_other" label="其他来源">
+      <Form.Item className="recovery-order-modal__party-field recovery-customer-source-other" name="supplier_source_other" label="其他来源" rules={supplierSource === "其他" ? [{ required: true, whitespace: true, message: "请输入供货方来源" }] : []}>
         <Input disabled={supplierSource !== "其他"} placeholder={supplierSource === "其他" ? "请输入来源名称" : "选择其他后可填写"} />
       </Form.Item>
       <div className="recovery-customer-contacts">

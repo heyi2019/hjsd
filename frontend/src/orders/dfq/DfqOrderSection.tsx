@@ -1,4 +1,4 @@
-import { DatePicker, Form, Input } from "antd";
+import { DatePicker, Form, Input, Modal } from "antd";
 import { useEffect, useRef } from "react";
 import type { GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
@@ -8,6 +8,8 @@ import "./DfqOrderSection.css";
 
 function DfqInstallmentInfo() {
   const form = Form.useFormInstance();
+  const purchasePrice = Form.useWatch("dfq_purchase_price", form);
+  const downPayment = Form.useWatch("dfq_down_payment", form);
   const totalAmount = Form.useWatch("dfq_total_amount", form);
   const serviceFee = Form.useWatch("dfq_service_fee", form);
   const periods = Form.useWatch("dfq_periods", form);
@@ -15,6 +17,20 @@ function DfqInstallmentInfo() {
   const periodAmount = Form.useWatch("dfq_period_amount", form);
   const lastAutoValue = useRef<number | undefined>();
   const lastAutoAmount = useRef<number | undefined>();
+
+  useEffect(() => {
+    if (purchasePrice === undefined || purchasePrice === "") {
+      form.setFieldValue("dfq_total_amount", undefined);
+      return;
+    }
+    const price = Number(purchasePrice);
+    const down = Number(downPayment || 0);
+    if (Number.isFinite(price) && Number.isFinite(down) && price >= 0 && down >= 0 && down <= price) {
+      form.setFieldValue("dfq_total_amount", Number((price - down).toFixed(2)));
+    } else {
+      form.setFieldValue("dfq_total_amount", undefined);
+    }
+  }, [form, purchasePrice, downPayment]);
 
   useEffect(() => {
     const total = Number(serviceFee);
@@ -31,11 +47,11 @@ function DfqInstallmentInfo() {
 
   useEffect(() => {
     const remainingAmount = Number(totalAmount);
-    const fee = Number(serviceFee);
+    const fee = Number(serviceFee || 0);
     const count = Number(periods);
     if (!Number.isFinite(remainingAmount) || !Number.isFinite(fee) || !Number.isFinite(count) || count <= 0) return;
 
-    const nextAmount = Number(((remainingAmount + fee) / count).toFixed(2));
+    const nextAmount = Math.ceil((Math.round(remainingAmount * 100) + Math.round(fee * 100)) / count) / 100;
     const isAutoValue = periodAmount === undefined || periodAmount === lastAutoAmount.current;
     if (isAutoValue) {
       form.setFieldValue("dfq_period_amount", nextAmount);
@@ -45,18 +61,28 @@ function DfqInstallmentInfo() {
 
   return (
     <AdaptiveFormGrid>
-      <NestedFormField label="账号号价"><Form.Item noStyle name="dfq_purchase_price"><MoneyInput placeholder="账号全款基础价格" /></Form.Item></NestedFormField>
-      <NestedFormField label="借款本金"><Form.Item noStyle name="dfq_total_amount"><MoneyInput placeholder="客户借款的剩余号款" /></Form.Item></NestedFormField>
-      <NestedFormField label="客户首付款"><Form.Item noStyle name="dfq_down_payment"><MoneyInput placeholder="客户已支付的部分号款" /></Form.Item></NestedFormField>
-      <NestedFormField label="手续费总额"><Form.Item noStyle name="dfq_service_fee"><MoneyInput placeholder="分期服务手续费" /></Form.Item></NestedFormField>
-      <NestedFormField label="分期期数"><Form.Item noStyle name="dfq_periods" initialValue={1}><Input className="dfq-periods-control" inputMode="numeric" placeholder="请输入期数" /></Form.Item></NestedFormField>
-      <NestedFormField label="每期手续费"><Form.Item noStyle name="dfq_period_service_fee"><MoneyInput placeholder="按手续费总额/期数计算，可修改" /></Form.Item></NestedFormField>
-      <NestedFormField label="每期金额"><Form.Item noStyle name="dfq_period_amount"><MoneyInput placeholder="请输入金额" /></Form.Item></NestedFormField>
+      <NestedFormField label="账号号价"><Form.Item name="dfq_purchase_price" rules={[{ required: true, message: "请输入账号号价" }, { validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("请输入非负金额"); } }]}><MoneyInput placeholder="账号全款基础价格" /></Form.Item></NestedFormField>
+      <NestedFormField label="借款本金"><Form.Item noStyle name="dfq_total_amount"><MoneyInput placeholder="客户借款的剩余号款" readOnly /></Form.Item></NestedFormField>
+      <NestedFormField label="客户首付款"><Form.Item name="dfq_down_payment" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > Number(form.getFieldValue("dfq_purchase_price")))) throw new Error("首付款不能为负数或超过账号号价"); } }]}><MoneyInput placeholder="客户已支付的部分号款" /></Form.Item></NestedFormField>
+      <NestedFormField label="手续费总额"><Form.Item name="dfq_service_fee" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("手续费必须为非负金额"); } }]}><MoneyInput placeholder="分期服务手续费" /></Form.Item></NestedFormField>
+      <NestedFormField label="分期期数"><Form.Item name="dfq_periods" initialValue={1} rules={[{ validator: async (_, value) => {
+        const count = Number(value);
+        if (!Number.isInteger(count) || count <= 0 || count > 120) throw new Error("期数必须为 1 至 120 的整数");
+        if ((form.getFieldValue("dfq_schedule") ?? []).length !== count) throw new Error("分期计划数量须与期数一致");
+      } }]}><Input className="dfq-periods-control" inputMode="numeric" placeholder="请输入期数" /></Form.Item></NestedFormField>
+      <NestedFormField label="每期手续费"><Form.Item name="dfq_period_service_fee" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("每期手续费必须为非负金额"); } }]}><MoneyInput placeholder="按手续费总额/期数计算，可修改" /></Form.Item></NestedFormField>
+      <NestedFormField label="每期金额"><Form.Item name="dfq_period_amount" rules={[{ validator: async (_, value) => {
+        const count = Number(periods), total = Number(totalAmount) + Number(serviceFee || 0), amount = Number(value);
+        if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(totalAmount) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配");
+      } }]}><MoneyInput placeholder="请输入金额" /></Form.Item>
+        {totalAmount != null && Number(periods) > 0 && periodAmount != null && Number.isFinite(Number(periodAmount)) && <span>最后一期：{((Math.round((Number(totalAmount) + Number(serviceFee || 0)) * 100) - Math.round(Number(periodAmount) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元</span>}
+      </NestedFormField>
     </AdaptiveFormGrid>
   );
 }
 
 export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[] }) {
+  const form = Form.useFormInstance();
 
   return (
     <>
@@ -75,9 +101,10 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
                   <div className="dfq-schedule-row" key={field.key}>
                     <span className="dfq-schedule-row__period">第 {index + 1} 期</span>
                     <Form.Item name={[field.name, "due_on"]} label="到期日" rules={[{ required: true, message: "请选择到期日" }]}><DatePicker placeholder="请选择日期" /></Form.Item>
-                    <Form.Item name={[field.name, "service_fee_rate"]} label="本期费率"><Input suffix="%" inputMode="decimal" placeholder="可选填" /></Form.Item>
-                    <Form.Item name={[field.name, "note"]} label="期次备注"><Input placeholder="可选填" /></Form.Item>
-                    {fields.length > 1 && <button type="button" className="dfq-schedule-row__remove" onClick={() => remove(field.name)}>删除</button>}
+                    {fields.length > 1 && <button type="button" className="dfq-schedule-row__remove" onClick={() => {
+                      if (form.getFieldValue(["dfq_schedule", field.name, "due_on"])) Modal.confirm({ title: "删除已填写的期次？", onOk: () => remove(field.name) });
+                      else remove(field.name);
+                    }}>删除</button>}
                   </div>
                 ))}
                 <button type="button" className="dfq-schedule-list__add" onClick={() => add({})}>+ 添加期次</button>

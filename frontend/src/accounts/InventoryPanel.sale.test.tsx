@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
+import { InventorySaleModal } from "./InventorySaleModal";
 
 import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
@@ -98,6 +99,16 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.accountsApi.updateProfile), accounts[0]);
 });
 
+it("库存分期售出展示最后一期尾差", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  await ui.type(screen.getByLabelText("售出金额"), "1000");
+  await ui.click(screen.getByText("分期付款"));
+  await ui.clear(screen.getByLabelText("分期期数"));
+  await ui.type(screen.getByLabelText("分期期数"), "3");
+  expect(await screen.findByText("最后一期：333.32 元")).toBeInTheDocument();
+});
+
 describe("InventoryPanel：写入与长路径", () => {
 it("自营在库账号可以售出并登记 HS 售出事件", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -173,6 +184,8 @@ it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 
     await ui.click(await screen.findByText("买家A"));
     await ui.type(screen.getByPlaceholderText("请输入金额"), "200");
     fireEvent.click(screen.getByText("分期付款"));
+    await ui.clear(screen.getByLabelText("分期期数"));
+    await ui.type(screen.getByLabelText("分期期数"), "2");
     await ui.clear(screen.getByLabelText("每期金额"));
     await ui.type(screen.getByLabelText("每期金额"), "100");
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
@@ -200,6 +213,8 @@ it("提号库存从库存中心售出时可选择分期", async () => {
     await ui.click(await screen.findByText("买家A"));
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1200");
     fireEvent.click(screen.getByText("分期付款"));
+    await ui.clear(screen.getByLabelText("分期期数"));
+    await ui.type(screen.getByLabelText("分期期数"), "2");
     await ui.clear(screen.getByLabelText("每期金额"));
     await ui.type(screen.getByLabelText("每期金额"), "600");
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));

@@ -71,6 +71,7 @@ class OrderInstallmentCreate(BaseModel):
     periods: int = Field(gt=0)
     per_period_service_fee: Decimal = Field(default=Decimal("0"), ge=0)
     per_period: Decimal = Field(default=Decimal("0"), ge=0)
+    adjust_final_period: bool = False
     first_due_on: date
     delivery_mode: str | None = None
     note: str | None = None

@@ -374,6 +374,7 @@ def get_customer_detail(
         receivable = (
             to_money(item.down_payment)
             + to_money(item.per_period) * int(item.periods)
+            + to_money(item.final_period_adjustment or 0)
             - to_money(item.waived_amount)
         )
         paid = to_money(item.paid_amount)

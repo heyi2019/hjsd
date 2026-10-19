@@ -526,6 +526,7 @@ class Installment(Base, AuditMixin):
     periods: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     per_period_service_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     per_period: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    final_period_adjustment: Mapped[object] = mapped_column(Amount, nullable=False, default=0, server_default="0")
     paid_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     waived_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     bad_debt_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)

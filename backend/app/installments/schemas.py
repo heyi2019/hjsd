@@ -27,6 +27,7 @@ class InstallmentCreate(RequestModel):
     periods: int = Field(gt=0)
     per_period_service_fee: Decimal = Decimal("0")
     per_period: Decimal = Decimal("0")
+    adjust_final_period: bool = False
     first_due_on: date
     delivery_mode: str | None = None
     note: str | None = None

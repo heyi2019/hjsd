@@ -168,7 +168,8 @@ export function CreateBusinessModal(props: {
           },
           installment: {
             contract_type: "ADVANCE_PURCHASE",
-            principal: String(values.dfq_total_amount ?? 0),
+            adjust_final_period: true,
+            principal: String(values.dfq_purchase_price ?? 0),
             down_payment: String(values.dfq_down_payment ?? 0),
             service_fee: String(values.dfq_service_fee ?? 0),
             periods: Number(values.dfq_periods ?? 1),
@@ -204,7 +205,7 @@ export function CreateBusinessModal(props: {
         );
         const customer = existingCustomer ?? (await customersApi.create({
           display_name: customerNickname as string,
-          contact_name: values[`${customerPrefix}customer_contact_name`] as string,
+          contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
           phone: values[`${customerPrefix}customer_phone`] as string,
           wechat: values[`${customerPrefix}customer_wechat`] as string,
           qq: values[`${customerPrefix}customer_qq`] as string,
@@ -367,6 +368,32 @@ export function CreateBusinessModal(props: {
         labelCol={{ flex: "0 0 96px" }}
         wrapperCol={{ flex: "1 1 auto" }}
         onFinish={submit}
+        onValuesChange={(changed) => {
+          if ("dfq_periods" in changed) {
+            const count = Number(changed.dfq_periods);
+            const schedule = (form.getFieldValue("dfq_schedule") ?? []) as Array<{ due_on?: unknown }>;
+            if (Number.isInteger(count) && count > 0 && count <= 120 && count !== schedule.length) {
+              const apply = () => form.setFieldValue("dfq_schedule", count > schedule.length
+                ? [...schedule, ...Array.from({ length: count - schedule.length }, () => ({}))]
+                : schedule.slice(0, count));
+              if (count < schedule.length && schedule.slice(count).some((item) => item?.due_on)) {
+                Modal.confirm({ title: "减少期数会删除已填写的到期日", okText: "确认删除", cancelText: "保留期次", content: "确认删除超出期数的计划吗？", onOk: apply, onCancel: () => form.setFieldValue("dfq_periods", schedule.length) });
+              } else apply();
+            }
+          }
+          const clear: Record<string, undefined> = {};
+          for (const [source, other] of [["customer_source", "customer_source_other"], ["dg_customer_source", "dg_customer_source_other"], ["supplier_source", "supplier_source_other"]]) {
+            if (source in changed && changed[source] !== "其他") clear[other] = undefined;
+          }
+          if ("intermediary_fee" in changed && !(Number(changed.intermediary_fee) > 0)) {
+            clear.intermediary_platform = undefined;
+            clear.intermediary_type = undefined;
+            clear.compensation_type = undefined;
+          } else if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
+            clear.compensation_type = undefined;
+          }
+          if (Object.keys(clear).length) form.setFieldsValue(clear);
+        }}
         initialValues={{
           order_type: props.initialOrderType,
           ...(isRecovery

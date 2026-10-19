@@ -77,6 +77,7 @@ def create_installment(
         periods=payload.periods,
         per_period_service_fee=payload.per_period_service_fee,
         per_period=payload.per_period,
+        adjust_final_period=payload.adjust_final_period,
         first_due_on=payload.first_due_on,
         actor=_actor(user),
         user=user,

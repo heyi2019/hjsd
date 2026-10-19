@@ -1601,3 +1601,15 @@ class TestInstallmentsApi:
         )
         assert resale is not None
         assert resale.related_order_id == resale_order.id
+
+
+def test_final_period_absorbs_rounding_difference(seeded_db):
+    order = _order(seeded_db, order_type="DFQ")
+    contract = _contract(seeded_db, order.id, principal="1000", down_payment="0", periods=3, per_period="333.34", adjust_final_period=True)
+    schedules = seeded_db.scalars(select(InstallmentSchedule).where(InstallmentSchedule.installment_id == contract.id).order_by(InstallmentSchedule.period_no)).all()
+    assert [item.due_amount for item in schedules] == [Decimal("0"), Decimal("333.34"), Decimal("333.34"), Decimal("333.32")]
+    assert installment_service.total_receivable(contract) == Decimal("1000.00")
+    for number, amount in [(1, "333.34"), (2, "333.34"), (3, "333.32")]:
+        installment_service.pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
+    assert contract.status == InstallmentStatus.SETTLED.value
+    assert contract.paid_amount == Decimal("1000.00")

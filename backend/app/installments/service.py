@@ -234,6 +234,7 @@ def total_receivable(installment: Installment) -> Decimal:
     return (
         to_money(installment.down_payment)
         + to_money(installment.per_period) * int(installment.periods)
+        + to_money(installment.final_period_adjustment or 0)
         - to_money(installment.waived_amount)
     )
 
@@ -256,6 +257,7 @@ def create_installment(
     schedule: list[dict[str, Any]] | None = None,
     extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
+    adjust_final_period: bool = False,
 ) -> Installment:
     if first_due_on is None:
         raise Validation("首期应还日期必填", details={"field": "first_due_on"})
@@ -388,6 +390,10 @@ def create_installment(
             },
         )
 
+    adjustment = principal_amount + service_fee_amount - total_schedule_amount if adjust_final_period else Decimal("0")
+    if per_period_amount + adjustment < 0:
+        raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
+
     # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约
     order_type_definition = foundation_service.get_order_type_by_code(
         session, order.order_type
@@ -411,6 +417,7 @@ def create_installment(
         periods=periods,
         per_period_service_fee=per_period_service_fee_amount,
         per_period=per_period_amount,
+        final_period_adjustment=adjustment,
         paid_amount=Decimal("0"),
         waived_amount=Decimal("0"),
         bad_debt_amount=Decimal("0"),
@@ -450,7 +457,7 @@ def create_installment(
                 period_no=index,
                 due_on=schedule_dates.get(index, _add_months(first_due_on, index - 1)),
                 service_fee_rate=schedule_rates.get(index, Decimal("0")),
-                due_amount=per_period_amount,
+                due_amount=per_period_amount + (adjustment if index == periods else Decimal("0")),
                 received_amount=Decimal("0"),
                 waived_amount=Decimal("0"),
                 status=ScheduleStatus.PENDING.value,

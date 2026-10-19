@@ -550,6 +550,7 @@ export const ordersApi = {
     };
     installment?: {
       contract_type: string;
+      adjust_final_period?: boolean;
       principal: string;
       down_payment: string;
       service_fee: string;
@@ -607,7 +608,7 @@ export const installmentsApi = {
   resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
-  create: (payload: Partial<Installment> & { first_due_on: string; schedule?: InstallmentScheduleInput[] }) =>
+  create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[] }) =>
     api.post<Installment>("/installments", payload).then((r) => r.data),
   schedules: (id: number) =>
     api.get<Schedule[]>(`/installments/${id}/schedules`).then((r) => r.data),

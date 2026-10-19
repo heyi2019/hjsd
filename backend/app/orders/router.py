@@ -417,6 +417,7 @@ def create_order(
             periods=payload.installment.periods,
             per_period_service_fee=payload.installment.per_period_service_fee,
             per_period=payload.installment.per_period,
+            adjust_final_period=payload.installment.adjust_final_period,
             first_due_on=payload.installment.first_due_on,
             delivery_mode=payload.installment.delivery_mode,
             note=payload.installment.note,

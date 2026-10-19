@@ -95,6 +95,108 @@ it("代挂建单沿用统一出售流程，不展示独立结算字段", async (
     expect(screen.queryByLabelText("建立代挂分期合同")).toBeNull();
   });
 
+it("代挂新客户保存填写的姓名", async () => {
+    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 12, display_name: "新客户" } });
+    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 8, order_no: "DG-8", status: "ACTIVE" });
+    await openTypedModal("DG");
+    await ui.type(screen.getByLabelText("客户昵称"), "新客户");
+    await ui.type(document.querySelector<HTMLInputElement>("#dg_customer_contact")!, "李明");
+    await ui.type(screen.getByLabelText("游戏账号"), "test-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "一区");
+    await ui.click(screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("其他来源"), "介绍");
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({ contact_name: "李明" })));
+  });
+
+it("提号选择其他来源时必须填写具体来源", async () => {
+    await openTypedModal("TH");
+    await ui.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    expect(await screen.findByText("请输入供货方来源")).toBeInTheDocument();
+  });
+
+it("切换供货方来源后清除其他来源的旧值", async () => {
+    await openTypedModal("TH");
+    const selector = screen.getByLabelText("供货方来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!;
+    await ui.click(selector);
+    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("其他来源"), "旧来源");
+    await ui.click(selector);
+    await ui.click(await screen.findByText("同行", { selector: ".ant-select-item-option-content" }));
+    await ui.click(selector);
+    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    expect(screen.getByLabelText("其他来源")).toHaveValue("");
+  });
+
+it("代分期不展示无法保存的期次字段", async () => {
+    await openTypedModal("DFQ");
+    expect(screen.queryByText("本期费率")).toBeNull();
+    expect(screen.queryByText("期次备注")).toBeNull();
+  });
+
+it("代分期根据号价和首付计算借款本金", async () => {
+    await openTypedModal("DFQ");
+    await ui.type(screen.getByPlaceholderText("账号全款基础价格"), "1000");
+    await ui.type(screen.getByPlaceholderText("客户已支付的部分号款"), "200");
+    expect(screen.getByPlaceholderText("客户借款的剩余号款")).toHaveValue("800");
+  });
+
+it("代分期显示最后一期承担尾差", async () => {
+    await openTypedModal("DFQ");
+    await ui.type(screen.getByPlaceholderText("账号全款基础价格"), "1000");
+    const periods = screen.getByPlaceholderText("请输入期数");
+    await ui.clear(periods);
+    await ui.type(periods, "3");
+    expect(await screen.findByText("最后一期：333.32 元")).toBeInTheDocument();
+  });
+
+it("增加代分期期数时自动补充分期计划", async () => {
+    await openTypedModal("DFQ");
+    const periods = screen.getByPlaceholderText("请输入期数");
+    await ui.clear(periods);
+    await ui.type(periods, "3");
+    expect(screen.getByText("第 3 期")).toBeInTheDocument();
+  });
+
+it("减少期数前确认删除已填写的到期日", async () => {
+    await openTypedModal("DFQ");
+    const periods = screen.getByPlaceholderText("请输入期数");
+    await ui.clear(periods);
+    await ui.type(periods, "2");
+    await ui.type(screen.getAllByPlaceholderText("请选择日期")[1], "2026-11-01{enter}");
+    await ui.clear(periods);
+    await ui.type(periods, "1");
+    expect((await screen.findAllByText("减少期数会删除已填写的到期日")).length).toBeGreaterThan(0);
+    await ui.click(screen.getByRole("button", { name: /保留期次/ }));
+    expect(periods).toHaveValue("2");
+    expect(screen.getByText("第 2 期")).toBeInTheDocument();
+  });
+
+it("代分期不接受负手续费", async () => {
+    await openTypedModal("DFQ");
+    await ui.type(screen.getByPlaceholderText("分期服务手续费"), "-1");
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    expect(await screen.findByText("手续费必须为非负金额")).toBeInTheDocument();
+  });
+
+it("代分期期数必须为正整数且与计划数量一致", async () => {
+    await openTypedModal("DFQ");
+    const periods = screen.getByPlaceholderText("请输入期数");
+    await ui.clear(periods);
+    await ui.type(periods, "2");
+    await ui.click(screen.getByRole("button", { name: /添加期次/ }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    expect(await screen.findByText("分期计划数量须与期数一致")).toBeInTheDocument();
+    await ui.clear(periods);
+    await ui.type(periods, "1.5");
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    expect(await screen.findByText("期数必须为 1 至 120 的整数")).toBeInTheDocument();
+  });
+
 it("代分期表单展示金额、可自定义期次和付款信息", async () => {
     const { container } = await openTypedModal("DFQ");
 

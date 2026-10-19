@@ -72,7 +72,7 @@ export function InventorySaleModal(props: {
     const fee = Number(serviceFee);
     const count = Number(periods);
     if (![principal, firstPayment, fee, count].every(Number.isFinite) || count <= 0) return;
-    const nextValue = Number(((principal - firstPayment + fee) / count).toFixed(2));
+    const nextValue = Math.ceil((Math.round(principal * 100) - Math.round(firstPayment * 100) + Math.round(fee * 100)) / count) / 100;
     const isAutoValue = perPeriod === undefined || perPeriod === lastAutoPeriodAmount.current;
     if (isAutoValue) {
       form.setFieldValue("per_period", nextValue);
@@ -118,6 +118,7 @@ export function InventorySaleModal(props: {
           : today();
         await installmentsApi.create({
           order_id: order.id,
+          adjust_final_period: true,
           contract_type: props.account.inventory_type === "PICKUP"
             ? "PICKUP_SALE"
             : props.account.inventory_type === "CONSIGNMENT"
@@ -176,7 +177,7 @@ export function InventorySaleModal(props: {
             notFoundContent="暂无可用客户"
           />
         </Form.Item>
-        <Form.Item name="amount" label="售出金额" rules={[{ required: true, message: "请输入售出金额" }]}>
+        <Form.Item name="amount" label="售出金额" rules={[{ required: true, message: "请输入售出金额" }, { validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}>
           <MoneyInput placeholder="请输入金额" />
         </Form.Item>
         <Form.Item name="payment_method" label="付款方式" initialValue="FULL">
@@ -190,7 +191,7 @@ export function InventorySaleModal(props: {
           />
         </Form.Item>
         {paymentMethod === "FULL" ? (
-          <Form.Item name="pool_id" label="收款资金账户" rules={[{ required: true, message: "请选择收款资金账户" }]}> 
+          <Form.Item name="pool_id" label="收款资金账户" rules={[{ required: true, message: "请选择收款资金账户" }]}>
             <Select
               placeholder="请选择收款资金账户"
               options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
@@ -200,23 +201,26 @@ export function InventorySaleModal(props: {
         ) : (
           <div className="inventory-sale-installment-fields">
             <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
-            <Form.Item name="down_payment" label="首付金额" initialValue="0">
+            <Form.Item name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}>
               <MoneyInput placeholder="没有首付填 0" />
             </Form.Item>
-            <Form.Item name="service_fee" label="分期服务费总额" initialValue="0">
+            <Form.Item name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}>
               <MoneyInput placeholder="可选填" />
             </Form.Item>
-            <Form.Item name="periods" label="分期期数" initialValue={1} rules={[{ required: true, message: "请输入分期期数" }]}> 
+            <Form.Item name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}>
               <Input inputMode="numeric" placeholder="请输入期数" />
             </Form.Item>
-            <Form.Item name="per_period_service_fee" label="每期服务费">
+            <Form.Item name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}>
               <MoneyInput placeholder="按服务费总额/期数计算" />
             </Form.Item>
             <Form.Item
               name="per_period"
               label="每期金额"
-              rules={[{ required: true, message: "请输入每期金额" }]}
-              extra={defaultPeriodAmount ? `按售出金额减首付自动参考：${defaultPeriodAmount}` : undefined}
+              rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => {
+                const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value);
+                if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配");
+              } }]}
+              extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}
             >
               <MoneyInput placeholder="请输入每期应收" />
             </Form.Item>

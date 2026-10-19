@@ -242,6 +242,7 @@ export interface AccountExecutionEvent {
   amount: string;
   occurred_on: string;
   occurred_at?: string | null;
+  offset_event_id?: number | null;
   portion: string;
   delivery_mode?: string | null;
   is_posted: boolean;
@@ -323,6 +324,15 @@ export interface Installment {
   delivery_mode?: string | null;
   delivered_on?: string | null;
   note?: string | null;
+}
+
+export interface InstallmentCancelResult {
+  installment: Installment;
+  order_status: string;
+  account_status?: string | null;
+  refund_amount: string;
+  reversed_amount: string;
+  cancel_event_ids: number[];
 }
 
 export interface InstallmentScheduleInput {
@@ -592,6 +602,8 @@ export const installmentsApi = {
         payload,
       )
       .then((r) => r.data),
+  cancel: (id: number, payload: { cancelled_on: string; reason: string }) =>
+    api.post<InstallmentCancelResult>(`/installments/${id}/cancel`, payload).then((r) => r.data),
   deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string }) =>
     api.post<Installment>(`/installments/${id}/deliver`, payload).then((r) => r.data),
 };
@@ -984,7 +996,6 @@ export interface RouteImpactPreview { changed: boolean; historical_impact: Recor
 export interface InstallmentDisposition { id: number; installment_id: number; account_id: number; action: string; occurred_on: string; related_order_id?: number | null; note: string }
 export interface FinanceDimensionRow { pool_id: number; pool_code: string; pool_name: string; pool_account_id?: number | null; account_no?: string | null; account_name?: string | null; fund_nature: string; accounting_attribute: string; direction: string; flow_count: number; amount: string; signed_amount: string }
 export interface FinanceDimensionReport { items: FinanceDimensionRow[]; total_amount: string; total_signed_amount: string }
-export interface PoolAccount { id: number; pool_id: number; account_no: string; account_name: string; account_type: string; ownership: string; opening_balance: string; current_balance: string; status: string }
 export interface Reconciliation { id: number; pool_id: number; pool_account_id?: number | null; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; unmatched_flow_ids?: number[]; note?: string | null }
 export interface AttachmentItem { id: number; attachment_no: string; file_name: string; size_bytes: number; created_by: string }
 export interface Lead { id: number; lead_no: string; customer_id: number; request_type: string; budget?: string | null; target: string; status: string }
@@ -992,13 +1003,6 @@ export interface QualityIssue { id: number; issue_no: string; severity: string; 
 export interface QualitySummary { total: number; by_severity: Record<string, number> }
 export interface NotificationItem { id: number; notification_no: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
 export interface SearchResult { id: number; type: string; code: string; title: string; subtitle?: string | null; route: string }
-export const poolAccountsApi = {
-  list: () => api.get<PoolAccount[]>("/pool-accounts").then(r => r.data),
-  create: (data: Record<string, unknown>) => api.post<PoolAccount>("/pool-accounts", data).then(r => r.data),
-  update: (id: number, data: Record<string, unknown>) => api.patch<PoolAccount>(`/pool-accounts/${id}`, data).then(r => r.data),
-  setStatus: (id: number, status: string) => api.patch<PoolAccount>(`/pool-accounts/${id}/status`, { status }).then(r => r.data),
-  batchStatus: (data: { account_ids: number[]; status: string; reason: string }) => api.post<PoolAccount[]>("/pool-accounts/batch-status", data).then(r => r.data),
-};
 export const transfersApi = { create: (data: Record<string, unknown>) => api.post("/transfers", data).then(r => r.data) };
 export const reconciliationsApi = {
   list: () => api.get<Reconciliation[]>("/reconciliations").then(r => r.data),

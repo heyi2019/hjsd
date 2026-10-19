@@ -64,36 +64,11 @@ describe("设置面板：资金池", () => {
     await waitFor(() => expect(vi.mocked(catalog.poolsApi).update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
   });
 
-  it("admin 可编辑资金池账户资料", async () => {
-    const account = {
-      id: 7,
-      pool_id: 1,
-      account_no: "BANK-001",
-      account_name: "经营主账户",
-      account_type: "BANK",
-      ownership: "OWNED",
-      opening_balance: "100.00",
-      current_balance: "100.00",
-      status: "ACTIVE",
-    };
-    vi.mocked(catalog.poolAccountsApi).list.mockResolvedValue([account]);
-    vi.mocked(catalog.poolAccountsApi).update.mockResolvedValue({ ...account, account_name: "现金账户" });
+  it("设置资金池不再展示资金池账户功能", async () => {
     renderLight(<PoolsPanel />, { user: "admin" });
 
-    expect(await screen.findByText("BANK-001")).toBeInTheDocument();
-    await ui.click(screen.getByRole("button", { name: "编辑BANK-001" }));
-    const dialog = screen.getByRole("dialog", { name: /编辑资金账户/ });
-    const accountName = within(dialog).getAllByRole("textbox")[2];
-    await ui.clear(accountName);
-    await ui.type(accountName, "现金账户");
-    await ui.click(within(dialog).getByRole("button", { name: /保存/ }));
-
-    await waitFor(() => expect(vi.mocked(catalog.poolAccountsApi).update).toHaveBeenCalledWith(7, expect.objectContaining({
-      account_name: "现金账户",
-      account_type: "BANK",
-      ownership: "OWNED",
-      opening_balance: "100.00",
-    })));
+    expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
+    expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
   });
 });
 

@@ -8,13 +8,11 @@ import {
   poolsApi,
   transfersApi,
   reconciliationsApi,
-  poolAccountsApi,
   type Reconciliation,
   type Cashflow,
   type Deposit,
   type Pool,
   type PoolBalance,
-  type PoolAccount,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
@@ -39,7 +37,7 @@ const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   SELF_DIRECT_COST: "自营直接成本",
   TH_DIRECT_COST: "提号/代挂直接成本",
   TH_REVENUE: "提号/代挂收入",
-  DFQ_PRINCIPAL: "代分期本金",
+  DFQ_PRINCIPAL: "代分期借款本金",
   SERVICE_REVENUE: "增值服务收入",
   REBATE_INCOME: "返点收入",
   OPERATING_EXPENSE: "运营费用",
@@ -55,7 +53,6 @@ export function FundsPage() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
-  const [poolAccounts, setPoolAccounts] = useState<PoolAccount[]>([]);
   const [depositOpen, setDepositOpen] = useState(false);
   const [cashflowOpen, setCashflowOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -94,7 +91,6 @@ export function FundsPage() {
       setDeposits(await depositsApi.list());
       setCashflows(await cashflowsApi.list({ limit: 500 }));
       setReconciliations(await reconciliationsApi.list());
-      setPoolAccounts(await poolAccountsApi.list());
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -149,7 +145,6 @@ export function FundsPage() {
       const direction = String(values.direction ?? "IN");
       await cashflowsApi.create({
         pool_id: Number(values.pool_id),
-        pool_account_id: values.pool_account_id == null ? undefined : Number(values.pool_account_id),
         occurred_on: values.occurred_on as string,
         direction,
         nature: fundNature === "EXTERNAL" ? "EXTERNAL_IN" : fundNature === "INTERNAL" ? "INTERNAL" : direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
@@ -220,7 +215,6 @@ export function FundsPage() {
       const rawIds = String(values.unmatched_flow_ids ?? "").trim();
       await reconciliationsApi.create({
         pool_id: Number(values.pool_id),
-        pool_account_id: values.pool_account_id ? Number(values.pool_account_id) : undefined,
         reconciled_on: values.reconciled_on as string,
         account_label: values.account_label as string,
         statement_balance: values.statement_balance as string,
@@ -608,7 +602,6 @@ export function FundsPage() {
       <Modal title="新增独立资金流水" open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
         <Form form={cashflowForm} layout="vertical" onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <Form.Item name="pool_account_id" label="资金池账户"><Select allowClear options={poolAccounts.map((account) => ({ value: account.id, label: `${account.account_name}（${account.account_no}）` }))} /></Form.Item>
           <Form.Item name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
           <Form.Item name="direction" label="收支方向" rules={[{ required: true }]}><Select options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} /></Form.Item>
           <Form.Item name="fund_nature" label="资金性质" rules={[{ required: true }]}><Select options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>

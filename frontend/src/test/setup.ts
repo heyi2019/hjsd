@@ -69,3 +69,22 @@ if (typeof window.getComputedStyle === "function") {
     return style;
   }) as typeof window.getComputedStyle;
 }
+
+// 测试性能优化（2026-10-19）：禁用 @ant-design/cssinjs 的样式注入与哈希计算。
+// 背景：antd v5 每次 renderLight 都会把整页样式以 <style> 注入 jsdom head，
+// 且 useStyleRegister 要算 :where 选择器哈希——这是 jsdom 下每挂载 ~8s 的主因
+// （实测占 OrdersPage 全文件 ~100s 的 92%）。jsdom 只验证 DOM 结构/交互，
+// 计算样式由 ui_guards（lint 期）+ agent-browser（真机）把关，测试层不需要真实样式。
+// 安全性：antd 静态 class（如 ant-alert / ant-tabs-tab）由组件直接应用，不依赖 cssinjs，
+// 因此 .ant-* 类选择器断言照常生效；仅跳过 <style> 注入与哈希计算。
+// 影响：全量 test:full 301.87s → 59.32s（~5.1×），OrdersPage 12 用例 ~101s → ~8s（~12×），零回归。
+vi.mock("@ant-design/cssinjs", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    StyleProvider: ({ children }: { children?: unknown }) => children ?? null,
+    useStyleRegister: () => [(node: unknown) => node, "css-mock-hash"],
+    extractStyle: () => "",
+    createCache: () => ({}) as unknown,
+  };
+});

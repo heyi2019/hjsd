@@ -64,10 +64,12 @@ export default defineConfig({
     minWorkers: 1,
     server: {
       deps: {
-        // 为让 rc-motion / rc-resize-observer 的零动效桩（src/test/*-stub.tsx，经
-        // resolve.alias 重定向）不被 esbuild 预打包流程丢掉，必须禁用整树预打包。
-        // 代价：34 个 react 文件各自重 transform 整棵 antd ESM → 全量 ~5min。
-        // 根治（恢复预打包同时保桩）风险高，已原型验证回归，暂搁置，见 MEMORY.md。
+        // [2026-10-19 实测] 曾试全局 partial inline ["rc-motion","rc-resize-observer"]：InventoryPanel.sale 不超时（cssinjs no-op 后），
+        // 但 ImportWorkbench/UsersPanel 的 Modal/Tab 交互用例确定性失败（找不到 dialog/tabpanel 元素）。
+        // 根因：esbuild 预打包不应用 Vite resolve.alias → antd 内部引用的 rc-motion 回到真实有动效包，
+        // jsdom 下 transitionend 不触发 → Popup 卡 enter 状态不显示。这正是 inline:true 注释"桩被预打包丢"的真因。
+        // 故整树内联，确保 alias 桩对所有依赖（含 antd 子路径）生效。react 墙剩余主因 = inline:true 每文件重 transform，
+        // 已被 cssinjs no-op（aa3885a）切掉 92% 样式注入开销，全量 301→59s，已足够；partial inline 不可行，勿再试。
         inline: true,
       },
     },

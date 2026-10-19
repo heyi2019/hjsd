@@ -64,12 +64,19 @@ export default defineConfig({
     minWorkers: 1,
     server: {
       deps: {
-        // [2026-10-19 实测] 曾试全局 partial inline ["rc-motion","rc-resize-observer"]：InventoryPanel.sale 不超时（cssinjs no-op 后），
-        // 但 ImportWorkbench/UsersPanel 的 Modal/Tab 交互用例确定性失败（找不到 dialog/tabpanel 元素）。
-        // 根因：esbuild 预打包不应用 Vite resolve.alias → antd 内部引用的 rc-motion 回到真实有动效包，
-        // jsdom 下 transitionend 不触发 → Popup 卡 enter 状态不显示。这正是 inline:true 注释"桩被预打包丢"的真因。
-        // 故整树内联，确保 alias 桩对所有依赖（含 antd 子路径）生效。react 墙剩余主因 = inline:true 每文件重 transform，
-        // 已被 cssinjs no-op（aa3885a）切掉 92% 样式注入开销，全量 301→59s，已足够；partial inline 不可行，勿再试。
+        // [2026-10-20 实测更正] 旧注释把失败归因于「esbuild 预打包不应用 resolve.alias、inline 非
+        // true 即触发优化器崩溃」——该归因错误。真实机制：Vitest 5.0.3 的 esbuild 优化器默认完全关闭
+        // （deps.optimizer.ssr.enabled ??= false，resolveOptimizerConfig 返回 disabled），
+        // server.deps.inline 只决定「外部化（node 原生 import）还是内联（Vite transform）」，
+        // 与预打包无关。外部化的代价是 node 原生 import 绕过 resolve.alias 与 vi.mock。
+        // 故整树内联，确保 alias 桩与 vi.mock 对 antd 子路径生效。
+        // 已实测并否决的两条路（勿再试）：
+        //   1) 全外部化（留空/undefined）：@ant-design/cssinjs no-op 桩失效 = 丢失 aa3885a 的 5×
+        //      提速来源，且 InventoryPanel.sale 等交互用例确定性失败。
+        //   2) 用 theme.token.motion=false 替换 rc-motion 桩：功能可行（Modal/Tab/静态 Modal.confirm
+        //      均绿），但全量反而更慢（基线 78.85s → 94~100s）：真实 rc-motion 比桩多出的 transform
+        //      成本大于省下的 transitionend 等待。桩本就是最优解。
+        // 注：不能写 inline:false —— matchPattern 会对 false 做 for...of，抛 TypeError。
         inline: true,
       },
     },

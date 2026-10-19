@@ -52,6 +52,8 @@ const reactShards = [
     files: [
       "src/app/AppShell.test.tsx",
       "src/field-definitions/panels/SettingsPanels.test.tsx",
+      "src/field-definitions/panels/GameTypeSettingsPanel.test.tsx",
+      "src/field-definitions/panels/PoolsPanel.test.tsx",
       "src/reporting/DataCenterPanel.test.tsx",
       "src/users/UsersPanel.test.tsx",
       "src/reporting/ReportsPage.details.test.tsx",

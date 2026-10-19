@@ -548,6 +548,14 @@ export const ordersApi = {
       portion?: string;
       note?: string;
     };
+    initial_costs?: {
+      amount: string;
+      occurred_on: string;
+      pool_id?: number;
+      portion?: string;
+      flow_category?: string;
+      note?: string;
+    }[];
     installment?: {
       contract_type: string;
       adjust_final_period?: boolean;

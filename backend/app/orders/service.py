@@ -197,6 +197,20 @@ def _validate_participant_roles(
 
 
 # --------------------------------------------------------------------- 订单
+def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None) -> Account:
+    mode, inventory_type = {
+        "HS": ("SELF", "RECOVERY"),
+        "TH": ("DISTRIBUTION", "PICKUP"),
+        "DG": ("DISTRIBUTION", "CONSIGNMENT"),
+    }[order_type]
+    return accounts_service.create_account(
+        session, game_account=game_account, actor=actor, game_type=game_type,
+        business_mode=mode, inventory_type=inventory_type, game_password=game_password,
+        channel_region=channel_region, bound_phone=bound_phone,
+        has_secondary=has_secondary, note=account_note,
+    )
+
+
 def create_order(
     session: Session,
     *,
@@ -318,6 +332,13 @@ def create_order(
         # policy_version_id 只存一个主版本（返点优先），完整参数在 policy_snapshot 里
         if primary_version_id is None:
             primary_version_id = version_id
+
+    if definition.code == "DG" and account_id is None and game_account:
+        account_id = _create_inline_inventory_account(
+            session, order_type=definition.code, game_account=game_account, actor=actor,
+            game_type=game_type, game_password=game_password, channel_region=channel_region,
+            bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+        ).id
 
     order = Order(
         order_no=foundation_service.next_order_no(session, definition),

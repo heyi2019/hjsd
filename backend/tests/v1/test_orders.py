@@ -306,6 +306,45 @@ class TestA03DgZeroCapital:
 
 
 class TestEventRules:
+    @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP")])
+    def test_inline_purchase_creates_inventory(self, seeded_db, order_type, inventory_type):
+        order = service.create_order(
+            seeded_db,
+            order_type=order_type,
+            trade_date=TODAY,
+            actor="pytest",
+            game_account="inline-recovery-account",
+        )
+
+        assert order.account_id is None
+        event, _ = service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount=Decimal("100"),
+            occurred_on=TODAY,
+            actor="pytest",
+        )
+
+        assert event.event_type == "BUY"
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert account.game_account == "inline-recovery-account"
+        assert account.inventory_type == inventory_type
+        assert account.status == "IN_STOCK"
+        assert account.cost_amount == Decimal("100.00")
+
+    def test_inline_consignment_creates_inventory(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
+            game_account="inline-consignment-account",
+        )
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert account.inventory_type == "CONSIGNMENT"
+        assert account.status == "IN_STOCK"
+        assert account.cost_amount == Decimal("0.00")
+
     def test_dg_cannot_post_buy_or_cost(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
@@ -323,20 +362,22 @@ class TestEventRules:
                 )
             assert "代挂业务不允许" in str(exc.value)
 
-    def test_th_cannot_post_cost(self, seeded_db):
+    def test_th_can_post_cost(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
 
-        with pytest.raises(Validation, match="提号业务不允许 COST"):
-            service.post_event(
-                seeded_db,
-                order.id,
-                event_type="COST",
-                amount=Decimal("100"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
+        event, flow = service.post_event(
+            seeded_db,
+            order.id,
+            event_type="COST",
+            amount=Decimal("100"),
+            occurred_on=TODAY,
+            actor="pytest",
+            flow_category="FEE",
+        )
+        assert event.event_type == "COST"
+        assert flow.accounting_attribute == "TH_DIRECT_COST"
 
     def test_hs_cannot_add_cost_after_account_is_sold(self, seeded_db):
         account = _new_account(seeded_db, game_account="sold-cost-guard")

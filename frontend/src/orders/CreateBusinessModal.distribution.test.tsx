@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.accountsApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
@@ -74,10 +74,10 @@ it("提号建单：复用回收费用与付款结构，并登记供货方", asyn
     expect(payload.account).toBeUndefined();
     expect(payload.account_id).toBeUndefined();
     expect(payload.customer_roles).toEqual([]);
-    expect(payload.counterparty_roles).toEqual([{ counterparty_id: 2, role: "SUPPLIER" }]);
+    expect(payload.counterparty_roles).toEqual([{ counterparty_id: 2, role: "PEER" }]);
     expect(payload.note).toBe("供货方来源：氪金联盟｜预期收买家：1200");
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(catalog.ordersApi.postEvent).mock.calls[0][1]).toMatchObject({ event_type: "BUY", amount: "1000", pool_id: 1 });
+    expect(payload.initial_buy).toMatchObject({ amount: "1000", pool_id: 1 });
+    expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });
 

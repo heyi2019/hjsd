@@ -92,7 +92,7 @@ def post_event(
     defer_order_cancel: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
-    from .service import get_order
+    from .service import _create_inline_inventory_account, get_order
 
     allow_installment_payment = _required_bool(
         allow_installment_payment, field="allow_installment_payment"
@@ -169,6 +169,15 @@ def post_event(
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"order_no": order.order_no, "current_status": order.status},
         )
+
+    if order.order_type in {"HS", "TH"} and event_type == EventType.BUY.value and order.account_id is None and order.game_account:
+        account = _create_inline_inventory_account(
+            session, order_type=order.order_type, game_account=order.game_account, actor=actor,
+            game_type=order.game_type, game_password=order.game_password,
+            channel_region=order.channel_region, bound_phone=order.bound_phone,
+            has_secondary=order.has_secondary, account_note=order.account_note,
+        )
+        order.account_id = account.id
 
     _assert_event_allowed(
         session,
@@ -495,8 +504,6 @@ def _assert_event_allowed(
             AccountStatus.VOID.value,
         }:
             raise Validation("已售账号不能新增 COST")
-    if order.order_type == "TH" and event_type == EventType.COST.value:
-        raise Validation("提号业务不允许 COST 事件")
     if order.order_type == "DFQ" and event_type == EventType.SELL.value:
         raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
     if order.order_type in {"TH", "DG"} and event_type == EventType.SELL.value:

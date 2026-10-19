@@ -226,7 +226,9 @@ export function CreateBusinessModal(props: {
           : values.note as string;
       let counterpartyId = values.counterparty_id as number | undefined;
       if (isTh && values.supplier_nickname) {
-        const role = "SUPPLIER";
+        // TH 的业务角色是同行（PEER）；页面仍以“供货方”展示业务称呼。
+        // 后端按订单参与方契约校验 TH 只能使用 PEER。
+        const role = "PEER";
         const existingCounterparty = counterparties.find((item) =>
           item.display_name === values.supplier_nickname && item.type === role,
         );
@@ -245,11 +247,23 @@ export function CreateBusinessModal(props: {
         counterpartyId = counterparty.id;
       }
       const customerRole = isRecovery ? "SELLER" : isDg ? "CONSIGNOR" : String(values.customer_role ?? "BUYER");
-      const counterpartyRole = isTh ? "SUPPLIER" : String(values.counterparty_role ?? "PEER");
+      const counterpartyRole = isTh ? "PEER" : String(values.counterparty_role ?? "PEER");
       const customerRoles = values.customer_id
         ? [{ customer_id: values.customer_id as number, role: customerRole }]
         : [];
-      const order = await ordersApi.create({
+      const initialCosts = (isRecovery || isTh) ? [
+        ...(Number(values.intermediary_fee) > 0 ? [{
+          amount: String(values.intermediary_fee), occurred_on: today(), portion: "PRINCIPAL",
+          pool_id: values.payment_pool_id as number, flow_category: "FEE",
+          note: `${isTh ? "提号中介费" : "中介费"}｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
+        }] : []),
+        ...(Number(values.other_fee_amount) > 0 ? [{
+          amount: String(values.other_fee_amount), occurred_on: today(), portion: "PRINCIPAL",
+          pool_id: values.payment_pool_id as number, flow_category: "OTHER",
+          note: `${String(values.other_fee_name || (isTh ? "其他" : "其他费用"))}｜收款对象：${String(values.other_fee_recipient ?? "")}`,
+        }] : []),
+      ] : [];
+      await ordersApi.create({
         order_type: props.initialOrderType,
         trade_date: today(),
         account_snapshot: undefined,
@@ -271,70 +285,15 @@ export function CreateBusinessModal(props: {
               },
             ]
           : [],
+        initial_buy: (isRecovery || isTh) ? {
+          amount: String((isRecovery ? values.recovery_price : values.th_purchase_amount) ?? 0),
+          occurred_on: today(), portion: "PRINCIPAL", pool_id: values.payment_pool_id as number,
+          note: isRecovery
+            ? `回收价｜付款对象：${String(values.payment_recipient || "卖家")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`
+            : `提号｜付${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
+        } : undefined,
+        initial_costs: initialCosts,
       });
-      if (isRecovery) {
-        await ordersApi.postEvent(order.id, {
-          event_type: "BUY",
-          amount: String(values.recovery_price ?? 0),
-          occurred_on: today(),
-          portion: "PRINCIPAL",
-          pool_id: values.payment_pool_id as number,
-          note: `回收价｜付款对象：${String(values.payment_recipient || "卖家")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
-        });
-        if (Number(values.intermediary_fee) > 0) {
-          await ordersApi.postEvent(order.id, {
-            event_type: "COST",
-            amount: String(values.intermediary_fee),
-            occurred_on: today(),
-            portion: "PRINCIPAL",
-            pool_id: values.payment_pool_id as number,
-            flow_category: "FEE",
-            note: `中介费｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
-          });
-        }
-        if (Number(values.other_fee_amount) > 0) {
-          await ordersApi.postEvent(order.id, {
-            event_type: "COST",
-            amount: String(values.other_fee_amount),
-            occurred_on: today(),
-            portion: "PRINCIPAL",
-            pool_id: values.payment_pool_id as number,
-            flow_category: "OTHER",
-            note: `${String(values.other_fee_name || "其他费用")}｜收款对象：${String(values.other_fee_recipient ?? "")}`,
-          });
-        }
-      } else if (isTh) {
-        await ordersApi.postEvent(order.id, {
-          event_type: "BUY",
-          amount: String(values.th_purchase_amount ?? 0),
-          occurred_on: today(),
-          portion: "PRINCIPAL",
-          pool_id: values.payment_pool_id as number,
-          note: `提号｜付${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
-        });
-        if (Number(values.intermediary_fee) > 0) {
-          await ordersApi.postEvent(order.id, {
-            event_type: "COST",
-            amount: String(values.intermediary_fee),
-            occurred_on: today(),
-            portion: "PRINCIPAL",
-            pool_id: values.payment_pool_id as number,
-            flow_category: "FEE",
-            note: `提号中介费｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
-          });
-        }
-        if (Number(values.other_fee_amount) > 0) {
-          await ordersApi.postEvent(order.id, {
-            event_type: "COST",
-            amount: String(values.other_fee_amount),
-            occurred_on: today(),
-            portion: "PRINCIPAL",
-            pool_id: values.payment_pool_id as number,
-            flow_category: "OTHER",
-            note: `${String(values.other_fee_name || "其他")}｜收款对象：${String(values.other_fee_recipient ?? "")}`,
-          });
-        }
-      }
       message.success(isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建");
       props.onClose();
       form.resetFields();

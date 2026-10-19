@@ -42,6 +42,7 @@ _ORDER_EVENT_ATTRIBUTES: dict[tuple[str, str], str] = {
     ("HS", "PAYMENT"): AccountingAttribute.SELF_REVENUE.value,
     ("HS", "CANCEL"): AccountingAttribute.REVERSAL.value,
     ("TH", "BUY"): AccountingAttribute.TH_DIRECT_COST.value,
+    ("TH", "COST"): AccountingAttribute.TH_DIRECT_COST.value,
     ("TH", "SELL"): AccountingAttribute.TH_REVENUE.value,
     ("TH", "PAYMENT"): AccountingAttribute.TH_REVENUE.value,
     ("TH", "CANCEL"): AccountingAttribute.REVERSAL.value,

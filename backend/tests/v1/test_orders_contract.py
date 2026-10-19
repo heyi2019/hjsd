@@ -39,6 +39,40 @@ from app.orders import service as order_service
 D = date(2026, 10, 4)
 
 
+@pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP"), ("DG", "CONSIGNMENT")])
+def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db, headers, order_type, inventory_type):
+    payload = {
+        "order_type": order_type, "trade_date": D.isoformat(),
+        "game_account": f"inline-api-{order_type}",
+    }
+    if order_type != "DG":
+        payload["initial_buy"] = {"amount": "100", "occurred_on": D.isoformat()}
+        payload["initial_costs"] = [{"amount": "10", "occurred_on": D.isoformat(), "flow_category": "FEE"}]
+    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    assert response.status_code == 201, response.text
+    account = seeded_db.get(Account, response.json()["account_id"])
+    assert account is not None
+    assert account.inventory_type == inventory_type
+    assert account.cost_amount == Decimal("110.00" if order_type != "DG" else "0.00")
+
+
+def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_engine, headers, monkeypatch):
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+    from app.core import database
+
+    monkeypatch.setattr(database, "get_session_factory", lambda: sessionmaker(bind=v1_engine))
+    with TestClient(app) as client:
+        response = client.post("/api/v1/orders", headers=headers, json={
+            "order_type": "HS", "trade_date": D.isoformat(), "game_account": "rollback-inline",
+            "initial_buy": {"amount": "100", "occurred_on": D.isoformat()},
+            "initial_costs": [{"amount": "0", "occurred_on": D.isoformat()}],
+        })
+    assert response.status_code == 422, response.text
+    assert seeded_db.scalar(select(Account).where(Account.game_account == "rollback-inline")) is None
+    assert seeded_db.scalar(select(Order).where(Order.game_account == "rollback-inline")) is None
+
+
 def _order(seeded_db, *, order_type="HS", account_id=None, owner_id=None, trade_date=D):
     if order_type == "HS" and account_id is None:
         account_id = accounts_service.create_account(

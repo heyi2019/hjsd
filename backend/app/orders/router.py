@@ -353,7 +353,7 @@ def create_order(
         raise Validation("TH/DG 分期必须在出售动作中选择付款方式并建立分期合约")
     if payload.initial_buy is None and payload.installment is not None and normalized_order_type != "DG":
         raise Validation("TH/DFQ 分期订单必须同时提交初始买入和分期合约")
-    if payload.initial_buy is not None and payload.installment is None:
+    if payload.initial_buy is not None and payload.installment is None and normalized_order_type == "DFQ":
         raise Validation("初始买入和分期合约必须同时提交")
     expected_contract_type = {
         "DFQ": "ADVANCE_PURCHASE",
@@ -365,8 +365,15 @@ def create_order(
             f"{normalized_order_type} 订单必须使用 {expected_contract_type} 分期合约",
             details={"contract_type": payload.installment.contract_type},
         )
-    if payload.initial_buy is not None and normalized_order_type not in {"DFQ", "TH"}:
-        raise Validation("只有 DFQ 或 TH 订单可以在创建时提交初始买入和分期合约")
+    if payload.initial_buy is not None and normalized_order_type not in {"DFQ", "HS", "TH"}:
+        raise Validation("只有 DFQ、HS 或 TH 订单可以在创建时提交初始买入")
+    if payload.initial_costs and (normalized_order_type not in {"HS", "TH"} or payload.initial_buy is None):
+        raise Validation("初始费用仅适用于同时提交初始买入的回收或提号订单")
+    if normalized_order_type in {"HS", "TH"} and payload.initial_buy is not None:
+        if not (user.has(PERM_ORDER_EVENT_POST) or user.has(PERM_FINANCE_ORDER_EVENT_POST)):
+            raise PermissionDenied("无权登记买入事件")
+        if payload.initial_costs and not user.has(PERM_ORDER_EVENT_POST):
+            raise PermissionDenied("无权登记费用事件")
     owner_id = (
         payload.owner_id
         if user.is_admin or user.owner_scope == "ALL"
@@ -441,6 +448,12 @@ def create_order(
             portion=payload.initial_buy.portion,
             note=payload.initial_buy.note,
             user=user,
+        )
+    for cost in payload.initial_costs:
+        service.post_event(
+            db, order.id, event_type="COST", amount=cost.amount,
+            occurred_on=cost.occurred_on, actor=_actor(user), pool_id=cost.pool_id,
+            portion=cost.portion, flow_category=cost.flow_category, note=cost.note, user=user,
         )
     return _order_output(db, order, user)
 

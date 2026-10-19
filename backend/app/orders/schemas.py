@@ -52,6 +52,10 @@ class InitialBuyCreate(BaseModel):
     note: str | None = None
 
 
+class InitialCostCreate(InitialBuyCreate):
+    flow_category: str | None = None
+
+
 class OrderInstallmentScheduleCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -100,6 +104,7 @@ class OrderCreate(BaseModel):
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
     counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
     initial_buy: InitialBuyCreate | None = None
+    initial_costs: list[InitialCostCreate] = Field(default_factory=list)
     installment: OrderInstallmentCreate | None = None
 
 

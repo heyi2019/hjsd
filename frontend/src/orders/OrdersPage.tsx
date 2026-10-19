@@ -305,6 +305,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
     initialTab === "inventory" ? "inventory" : DEFAULT_BUSINESS_CENTER_TAB,
   );
+  const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
 
   const ledgerColumns: ColumnsType<Order> = [
     { title: "订单号", dataIndex: "order_no" },
@@ -374,7 +375,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel />,
+            children: <InventoryPanel refreshKey={inventoryRefreshKey} />,
           },
           {
             key: "ledger",
@@ -663,6 +664,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         onClose={() => setCreateType(undefined)}
         onCreated={async () => {
           setCreateType(undefined);
+          setInventoryRefreshKey((key) => key + 1);
           await load();
         }}
         initialOrderType={createType ?? "HS"}

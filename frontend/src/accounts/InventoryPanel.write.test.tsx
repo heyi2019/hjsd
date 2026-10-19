@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
@@ -125,7 +125,7 @@ describe("InventoryPanel：写入与长路径", () => {
   it("库存编辑通过弹窗保存账号资料", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    fireEvent.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
     const input = await screen.findByLabelText("编辑账号标识");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "updated-account" } });

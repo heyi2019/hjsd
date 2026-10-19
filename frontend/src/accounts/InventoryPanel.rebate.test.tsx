@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -112,7 +112,7 @@ it("寄售可以勾选寄售平台并登记 DG 业务", async () => {
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    await ui.click(screen.getAllByRole("button", { name: "寄售" })[0]);
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "寄售" }));
     expect(await screen.findByText("登记寄售")).toBeInTheDocument();
     await ui.click(screen.getByLabelText("寄售平台A"));
     await ui.click(screen.getByRole("button", { name: "确认寄售" }));
@@ -128,7 +128,7 @@ it("寄售可以勾选寄售平台并登记 DG 业务", async () => {
 it("返点按买入与售出订单区分类型并登记", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    await ui.click(screen.getAllByRole("button", { name: "返点" })[0]);
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
     expect(screen.getByLabelText("买号返点（对应回收）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeEnabled();

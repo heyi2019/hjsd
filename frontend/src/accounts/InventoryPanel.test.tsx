@@ -23,6 +23,16 @@ vi.mock("../shared/api/catalog");
 setupInventoryPanelMocks();
 
 describe("InventoryPanel：账号台账", () => {
+  it("建单后刷新库存并把新账号放在第一页", async () => {
+    const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
+    await screen.findByText("acc-1");
+    const newer = { ...accounts[0], id: 99, game_account: "new-account", source_order_no: "HS-NEW" };
+    vi.mocked(catalog.accountsApi.list).mockResolvedValue([...accounts, newer]);
+    rerender(<InventoryPanel refreshKey={1} />);
+    await screen.findByText("new-account");
+    const rows = screen.getAllByRole("row");
+    expect(within(rows[1]).getByText("new-account")).toBeInTheDocument();
+  });
   it("账号台账启用横向滚动以访问右侧操作列", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByRole("columnheader", { name: "订单号" });
@@ -270,7 +280,7 @@ describe("InventoryPanel：账号台账", () => {
   it("展开库存订单可以查询完整执行明细与资金流水", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
+    fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
     expect(await screen.findByText("执行明细")).toBeInTheDocument();
     const detailPanel = document.querySelector(".inventory-detail") as HTMLElement;
     const accountSummary = detailPanel.querySelector(".ant-descriptions") as HTMLElement;

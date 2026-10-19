@@ -30,7 +30,7 @@ import {
 } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 
-export function InventoryPanel() {
+export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [rows, setRows] = useState<Account[]>([]);
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
@@ -60,7 +60,7 @@ export function InventoryPanel() {
   const load = useCallback(async () => {
     try {
       const list = await accountsApi.list(status ? { status } : undefined);
-      setRows(list);
+      setRows([...list].sort((a, b) => b.id - a.id));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -69,7 +69,11 @@ export function InventoryPanel() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refreshKey]);
+
+  useEffect(() => {
+    if (refreshKey > 0) setPage(1);
+  }, [refreshKey]);
 
   const visibleRows = rows.filter((row) => {
     const matchesBusiness = !businessMode || row.business_mode === businessMode;

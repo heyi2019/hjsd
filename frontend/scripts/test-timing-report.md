@@ -171,3 +171,67 @@
 **⚠️ 运维陷阱（本轮踩中，务必记录）**：`scripts/test-full-sharded.mjs` 的 react 分片 `concurrency=2` 在**某个分片崩溃时不会杀掉并发的兄弟分片** → 它们变孤儿进程，持续占用 `node_modules/.vite` 优化器锁 + 吃 CPU。后续每次 `test:full` 的新分片与孤儿争用 → 复用 `includes` 崩溃 → 又产生更多孤儿，连锁雪崩（表现为"基线突然连续崩溃"）。**现象**：`npm run test:full` 早期退出（exit 1）、日志只到 `RUN v5.0.3` 即止、`includes` 错误计数为 0（纯 fork worker stderr）。**解救**：`ps aux | grep -E "test-full-sharded|vitest run --project=react"` 揪出本项目 7:xxPM 的孤儿 PID，`kill -9` 全部 + `rm -rf node_modules/.vite`，再跑即恢复（实测 61.50s 绿）。**注意**：勿误杀其它项目/旧日期的 esbuild service 进程。
 
 **结论**：react 墙剩余主因（`inline:true` 每文件重 transform）在当前 Vitest 5.0.3 + 优化器崩溃下**无法消除**。cssinjs no-op（`aa3885a`）已切掉 92% 样式注入开销，全量 301→59s（~5×）已达稳态；当前 ~59s 全量 + 日常 fast+quick ~56s 反馈足够快，**本轮优化到此收口**。任何进一步砍 react 墙都需先解决 Vitest 5.0.3 的 esbuild 优化器崩溃（或换测试运行器），属高风险项目、不在本次范围。
+
+---
+
+## 2026-10-20 复测更正（推翻上节「优化器崩溃」结论，并否决外部化路线）
+
+### 一、旧结论「esbuild 优化器崩溃」是错误归因
+
+上节 #3/#4 把失败归因于「esbuild 预打包不应用 `resolve.alias`，且 `inline` 取任何非 `true` 值都会触发
+优化器 `Cannot read properties of undefined (reading 'includes')` 硬崩溃」。**实测证伪**：
+
+- Vitest 5.0.3 的 esbuild 优化器**默认完全关闭**：`dist/chunks/index.DpLw24bj.js:14529-14532` 将
+  `deps.optimizer.ssr.enabled ??= false`、`client.enabled ??= false`；`resolveOptimizerConfig`(:7780)
+  在 `enabled !== true` 时返回 `{disabled:true, entries:[]}` → `{noDiscovery:true, include:[], entries:[]}`。
+  本项目未配 `deps.optimizer`，**esbuild 预打包从未发生**。
+- `server.deps.inline` 只喂给 `VitestResolver._shouldExternalize`(:6196)，决定「外部化（node 原生 import）
+  还是内联（Vite transform）」，**与 esbuild 预打包无关**。
+- 故当年那次"崩溃"实为**孤儿进程占 `node_modules/.vite` 锁的污染假象**（见上节运维陷阱）。
+
+### 二、真实机制 + 外部化路线实测否决
+
+外部化的代价是 node 原生 import **同时绕过 `resolve.alias` 与 `vi.mock`**。实测：
+
+- 删掉 `inline` 键（= 全外部化）→ `@ant-design/cssinjs` 的 no-op 桩**失效**，即直接丢掉 `aa3885a` 的
+  5× 提速来源；且 `InventoryPanel.sale` 2 个用例确定性失败（`expected "vi.fn()" to be called at least once`）。
+- `inline:false` 不能写：`matchPattern` 会对 `false` 做 `for...of`，抛 `TypeError: patterns is not iterable`。
+
+### 三、motion:false 替换 rc-motion 桩：功能可行但更慢，已否决
+
+`theme={{token:{motion:false}}}` 经 antd `MotionWrapper` → rc-motion `Provider` context → `CSSMotion`
+直接 `STATUS_NONE`，是**运行时 React Context、不依赖模块解析**，故对外部化免疫。实测 `ImportWorkbench`
+/ `UsersPanel`（Modal/Tab）/ 静态 `Modal.confirm`（`CreateBusinessModal.distribution` 13/13）**全绿**，
+功能上完全可替代 rc-motion 桩。但全量反而更慢（见下表），故否决。
+
+> 副产品：`FundsPage.write` 的 `toBeGreaterThanOrEqual(2)` 是**过拟合到桩的假象**——有桩时 2 个匹配中
+> 有 1 个在 `OUTSIDE_MODAL`（桩残留的重复表格行），真实 rc-motion 下只有模态内 1 个。已回退该断言改动
+> （桩保留后原断言照常通过）。
+
+### 四、⚠️ 所有历史耗时刻度都不可信：transform 冷热缓存差 ~10×
+
+| 场景 | 耗时 |
+|---|---|
+| 酸测 5 文件，清 `.vite` 后首跑 | 189.00s |
+| 酸测 5 文件，热缓存再跑（同一份代码） | **29.56s** |
+| `test:quick` 单独冷跑 | 144.37s |
+| `test:quick` 在全量里热跑 | ~14s |
+
+改配置或源码会让 transform 缓存失效 →「改完立刻测」必然偏慢、看着像退化。
+**本文件里所有单次计时刻度（含 59.32s / 123.7s / 192.6s）只能当量级参考，不可用于判定提速或退化。**
+
+### 五、本次全量对照（同条件、同一脚本 `test-full-sharded.mjs`）
+
+| 配置 | 全量耗时 | 结果 |
+|---|---|---|
+| 基线（HEAD，`inline:true` + 双桩） | **78.85s** | 51 文件 0 失败 |
+| motion:false + 移除 rc-motion 桩 | 99.97s / 94.20s | 0 失败 |
+
+方向一致指向"移除桩更慢"，但鉴于上节 ~10× 的缓存噪声，**该差异不足以作为严格结论**；
+**决定性依据是正确性**：外部化会破坏用例，故路线否决。
+
+### 六、结论与现状
+
+`inline: true` + 两个 alias 桩 + cssinjs no-op 仍是唯一安全且最快的组合。
+本轮只落地**注释更正**（提交 `208ee20`），功能代码零改动；工作树除并行会话在制文件外干净。
+react 墙在当前 Vitest 5.0.3 下无法消除，进一步优化需换测试运行器或修 Vite 优化器，属高风险独立项目。

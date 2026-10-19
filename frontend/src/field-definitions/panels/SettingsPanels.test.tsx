@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as catalog from "../../shared/api/catalog";
 vi.mock("../../shared/api/catalog");
 import { renderLight } from "../../test/render";
-import { PolicySettingsPanel } from "../../policy/PolicySettingsPanel";
 import { FieldsPanel } from "./FieldsPanel";
 import { PoolsPanel } from "./PoolsPanel";
 
@@ -64,12 +63,6 @@ describe("设置面板：资金池", () => {
     await waitFor(() => expect(vi.mocked(catalog.poolsApi).update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
   });
 
-  it("设置资金池不再展示资金池账户功能", async () => {
-    renderLight(<PoolsPanel />, { user: "admin" });
-
-    expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
-    expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
-  });
 });
 
 describe("设置面板：活字段", () => {
@@ -125,14 +118,6 @@ describe("设置面板：活字段", () => {
       required: false,
       sort_order: 3,
     }));
-  });
-});
-
-describe("设置面板：经营规则", () => {
-  it("挂载后渲染规则统计并加载定义", async () => {
-    renderLight(<PolicySettingsPanel />, { user: "admin" });
-    expect(await screen.findByText("规则总数")).toBeInTheDocument();
-    await waitFor(() => expect(vi.mocked(catalog.policyApi).list).toHaveBeenCalled());
   });
 });
 

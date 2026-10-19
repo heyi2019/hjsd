@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { DataCenterPanel } from "./DataCenterPanel";
+import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -51,7 +52,7 @@ const orders = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue(balance);
+  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue(businessPnl);
 });

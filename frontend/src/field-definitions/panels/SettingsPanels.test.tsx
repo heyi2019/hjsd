@@ -6,6 +6,7 @@ vi.mock("../../shared/api/catalog");
 import { renderLight } from "../../test/render";
 import { FieldsPanel } from "./FieldsPanel";
 import { PoolsPanel } from "./PoolsPanel";
+import { resolveMock } from "../../test/mock-api";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -27,7 +28,7 @@ const fields = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.poolsApi).list.mockResolvedValue(pools);
-  vi.mocked(catalog.fieldsApi).list.mockResolvedValue(fields);
+  resolveMock(vi.mocked(catalog.fieldsApi).list, fields);
   vi.mocked(catalog.policyApi).list.mockResolvedValue({ items: [], total: 0 });
   vi.mocked(catalog.policyApi).versions.mockResolvedValue({ items: [], total: 0 });
   vi.mocked(catalog.gameTypesApi).list.mockResolvedValue([

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { ImportWorkbench } from "./ImportWorkbench";
+import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -53,15 +54,15 @@ const recon = {
 } as unknown as import("../shared/api/catalog").ReconciliationReport;
 
 beforeEach(() => {
-  vi.mocked(catalog.importsApi.batches).mockResolvedValue({ items: [batch], total: 1 });
-  vi.mocked(catalog.importsApi.rows).mockResolvedValue({ items: importRows, total: importRows.length });
-  vi.mocked(catalog.importsApi.preview).mockResolvedValue(mappingPreview);
-  vi.mocked(catalog.importsApi.reconciliation).mockResolvedValue(recon);
-  vi.mocked(catalog.importsApi.map).mockResolvedValue({});
-  vi.mocked(catalog.importsApi.skip).mockResolvedValue({});
-  vi.mocked(catalog.importsApi.markUnlinked).mockResolvedValue({});
-  vi.mocked(catalog.importsApi.commit).mockResolvedValue({ imported: 2, unmapped: 0 });
-  vi.mocked(catalog.importsApi.rollback).mockResolvedValue({});
+  resolveMock(vi.mocked(catalog.importsApi.batches), { items: [batch], total: 1 });
+  resolveMock(vi.mocked(catalog.importsApi.rows), { items: importRows, total: importRows.length });
+  resolveMock(vi.mocked(catalog.importsApi.preview), mappingPreview);
+  resolveMock(vi.mocked(catalog.importsApi.reconciliation), recon);
+  resolveMock(vi.mocked(catalog.importsApi.map), {});
+  resolveMock(vi.mocked(catalog.importsApi.skip), {});
+  resolveMock(vi.mocked(catalog.importsApi.markUnlinked), {});
+  resolveMock(vi.mocked(catalog.importsApi.commit), { imported: 2, unmapped: 0 });
+  resolveMock(vi.mocked(catalog.importsApi.rollback), {});
 });
 
 it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {

@@ -14,6 +14,9 @@ const installments = [
     contract_type: "STOCK_SALE",
     order_id: 10,
     down_payment: "100.00",
+    principal: "300.00",
+    service_fee: "0.00",
+    per_period_service_fee: "0.00",
     per_period: "50.00",
     periods: 4,
     paid_amount: "150.00",
@@ -25,6 +28,9 @@ const installments = [
     contract_type: "STOCK_SALE",
     order_id: 10,
     down_payment: "0.00",
+    principal: "200.00",
+    service_fee: "0.00",
+    per_period_service_fee: "0.00",
     per_period: "100.00",
     periods: 2,
     paid_amount: "200.00",
@@ -36,7 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue(installments);
   vi.mocked(catalog.installmentsApi.schedules).mockResolvedValue([
-    { id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
+    { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
   ]);
   vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);

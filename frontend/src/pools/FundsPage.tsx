@@ -7,6 +7,7 @@ import {
   depositsApi,
   poolsApi,
   transfersApi,
+  periodLocksApi,
   reconciliationsApi,
   type Reconciliation,
   type Cashflow,
@@ -53,6 +54,7 @@ export function FundsPage() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
+  const [periodLocks, setPeriodLocks] = useState<import("../shared/api/catalog").PeriodLock[]>([]);
   const [depositOpen, setDepositOpen] = useState(false);
   const [cashflowOpen, setCashflowOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -61,6 +63,9 @@ export function FundsPage() {
   const [rejectTarget, setRejectTarget] = useState<Cashflow | null>(null);
   const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
+  const [lossTarget, setLossTarget] = useState<Deposit | null>(null);
+  const [repairTarget, setRepairTarget] = useState<Cashflow | null>(null);
+  const [periodLockOpen, setPeriodLockOpen] = useState(false);
   const [unmatchedTarget, setUnmatchedTarget] = useState<Reconciliation | null>(null);
   const [cashflowKeyword, setCashflowKeyword] = useState("");
   const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
@@ -78,6 +83,9 @@ export function FundsPage() {
   const [resolveForm] = Form.useForm();
   const [rejectForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
+  const [lossForm] = Form.useForm();
+  const [repairForm] = Form.useForm();
+  const [periodLockForm] = Form.useForm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +99,7 @@ export function FundsPage() {
       setDeposits(await depositsApi.list());
       setCashflows(await cashflowsApi.list({ limit: 500 }));
       setReconciliations(await reconciliationsApi.list());
+      setPeriodLocks(await periodLocksApi.list());
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -133,6 +142,24 @@ export function FundsPage() {
       message.success("押金释放已登记");
       setReturnTarget(null);
       returnForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitLoss = async (values: Record<string, unknown>) => {
+    if (!lossTarget) return;
+    try {
+      await depositsApi.loss(lossTarget.id, {
+        amount: values.amount as string,
+        lost_on: values.lost_on as string,
+        category: values.category as string,
+        reason: values.reason as string,
+      });
+      message.success("押金损失已登记");
+      setLossTarget(null);
+      lossForm.resetFields();
       await load();
     } catch (err) {
       setError(normalizeError(err));
@@ -210,6 +237,34 @@ export function FundsPage() {
     }
   };
 
+  const submitRepair = async (values: Record<string, unknown>) => {
+    if (!repairTarget?.transfer_id) return;
+    try {
+      await transfersApi.repair(repairTarget.transfer_id, {
+        counterpart_pool_id: Number(values.counterpart_pool_id),
+        reason: values.reason as string,
+      });
+      message.success("单边划转已修复");
+      setRepairTarget(null);
+      repairForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitPeriodLock = async (values: Record<string, unknown>) => {
+    try {
+      await periodLocksApi.create({ period: values.period as string, note: values.note as string });
+      message.success("账期已锁定");
+      setPeriodLockOpen(false);
+      periodLockForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
   const submitReconciliation = async (values: Record<string, unknown>) => {
     try {
       const rawIds = String(values.unmatched_flow_ids ?? "").trim();
@@ -273,6 +328,19 @@ export function FundsPage() {
     });
   }, [cashflowDirection, cashflowFrom, cashflowKeyword, cashflowPoolId, cashflowStatus, cashflowTo, cashflows]);
 
+  const transferAnomalies = useMemo(() => {
+    const grouped = new Map<string, Cashflow[]>();
+    for (const row of cashflows) {
+      if (!row.transfer_id) continue;
+      const rows = grouped.get(row.transfer_id) ?? [];
+      rows.push(row);
+      grouped.set(row.transfer_id, rows);
+    }
+    return [...grouped.entries()]
+      .filter(([, rows]) => rows.length === 1)
+      .map(([transfer_id, rows]) => ({ transfer_id, flow: rows[0] }));
+  }, [cashflows]);
+
   const poolColumns: ColumnsType<Pool> = [
     { title: "资金池", dataIndex: "name", render: (_v, row) => `${row.name}（${row.code}）` },
     { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
@@ -326,28 +394,47 @@ export function FundsPage() {
       render: (v: string) => <MoneyText value={v} />,
     },
     {
+      title: "已损失",
+      dataIndex: "lost_amount",
+      align: "right",
+      render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} />,
+    },
+    {
       title: "剩余",
       align: "right",
       render: (_v, row) => (
-        <MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount)).toFixed(2)} />
+        <MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)} />
       ),
     },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} /> },
     {
       title: "操作",
-      width: 100,
+      width: 190,
       render: (_v, row) => (
-        <PermissionButton
-          permission="deposit.post"
-          size="small"
-          disabled={row.status === "RETURNED"}
-          onClick={() => {
-            setReturnTarget(row);
-            returnForm.setFieldsValue({ released_on: today() });
-          }}
-        >
-          释放
-        </PermissionButton>
+        <>
+          <PermissionButton
+            permission="deposit.post"
+            size="small"
+            disabled={row.status === "RETURNED" || row.status === "LOST"}
+            onClick={() => {
+              setReturnTarget(row);
+              returnForm.setFieldsValue({ released_on: today() });
+            }}
+          >
+            释放
+          </PermissionButton>
+          <PermissionButton
+            permission="deposit.post"
+            size="small"
+            disabled={row.status === "RETURNED" || row.status === "LOST"}
+            onClick={() => {
+              setLossTarget(row);
+              lossForm.setFieldsValue({ lost_on: today() });
+            }}
+          >
+            登记损失
+          </PermissionButton>
+        </>
       ),
     },
   ];
@@ -443,6 +530,32 @@ export function FundsPage() {
         </>
       ),
     },
+  ];
+
+  const transferAnomalyColumns: ColumnsType<{ transfer_id: string; flow: Cashflow }> = [
+    { title: "划转号", dataIndex: "transfer_id" },
+    { title: "现有流水", render: (_v, row) => row.flow.flow_no },
+    { title: "资金池", render: (_v, row) => pools.find((pool) => pool.id === row.flow.pool_id)?.name ?? row.flow.pool_id },
+    { title: "方向", render: (_v, row) => row.flow.direction === "IN" ? "转入" : "转出" },
+    { title: "金额", align: "right", render: (_v, row) => <MoneyText value={row.flow.amount} /> },
+    {
+      title: "操作",
+      render: (_v, row) => (
+        <PermissionButton permission="finance.transfer" size="small" onClick={() => {
+          repairForm.resetFields();
+          setRepairTarget(row.flow);
+        }}>
+          修复划转
+        </PermissionButton>
+      ),
+    },
+  ];
+
+  const periodLockColumns: ColumnsType<import("../shared/api/catalog").PeriodLock> = [
+    { title: "账期", dataIndex: "period" },
+    { title: "锁定时间", dataIndex: "locked_at", render: (v: string | undefined) => v ? new Date(v).toLocaleString("zh-CN") : "—" },
+    { title: "锁定人", dataIndex: "locked_by" },
+    { title: "说明", dataIndex: "note", render: (v: string | null | undefined) => v || "—" },
   ];
 
   return (
@@ -560,6 +673,36 @@ export function FundsPage() {
                   onPageChange={() => undefined}
                 />
               </Card>
+            ),
+          },
+          {
+            key: "controls",
+            label: "异常与月结",
+            children: (
+              <div className="ui-stack">
+                <Card className="glass" title="单边划转异常">
+                  <DataTable
+                    columns={transferAnomalyColumns}
+                    rows={transferAnomalies}
+                    page={1}
+                    pageSize={10}
+                    total={transferAnomalies.length}
+                    emptyText="暂无单边划转异常"
+                    onPageChange={() => undefined}
+                  />
+                </Card>
+                <Card className="glass" title="月结锁定" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
+                  <DataTable
+                    columns={periodLockColumns}
+                    rows={periodLocks}
+                    page={1}
+                    pageSize={10}
+                    total={periodLocks.length}
+                    emptyText="暂无已锁定账期"
+                    onPageChange={() => undefined}
+                  />
+                </Card>
+              </div>
             ),
           },
           {
@@ -681,6 +824,37 @@ export function FundsPage() {
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit">
             确认释放
           </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal title="登记押金损失" open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)} footer={null}>
+        <Form form={lossForm} layout="vertical" onFinish={submitLoss}>
+          <Form.Item name="amount" label="损失金额" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="lost_on" label="损失日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
+          <Form.Item name="category" label="费用分类" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="reason" label="损失原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">确认损失</PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal title="修复单边划转" open={Boolean(repairTarget)} onCancel={() => setRepairTarget(null)} footer={null}>
+        <Typography.Paragraph type="secondary">
+          划转号：{repairTarget?.transfer_id}；现有流水：{repairTarget?.flow_no}
+        </Typography.Paragraph>
+        <Form form={repairForm} layout="vertical" onFinish={submitRepair}>
+          <Form.Item name="counterpart_pool_id" label="缺失对端资金池" rules={[{ required: true }]}>
+            <Select options={pools.filter((pool) => pool.id !== repairTarget?.pool_id).map((pool) => ({ value: pool.id, title: `${pool.name}（${pool.code}）`, label: `${pool.name}（${pool.code}）` }))} />
+          </Form.Item>
+          <Form.Item name="reason" label="修复原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <PermissionButton permission="finance.transfer" type="primary" htmlType="submit">确认修复</PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal title="锁定账期" open={periodLockOpen} onCancel={() => setPeriodLockOpen(false)} footer={null}>
+        <Form form={periodLockForm} layout="vertical" onFinish={submitPeriodLock}>
+          <Form.Item name="period" label="会计账期" rules={[{ required: true }, { pattern: /^\d{4}-\d{2}$/, message: "请输入 YYYY-MM" }]}><Input placeholder="YYYY-MM" /></Form.Item>
+          <Form.Item name="note" label="说明"><Input.TextArea rows={3} /></Form.Item>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">确认锁定</PermissionButton>
         </Form>
       </Modal>
 

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "node scripts/ui_guards.mjs && tsc && vite build",
+    "build": "node scripts/ui_guards.mjs && tsc -p tsconfig.app.json && vite build",
     "check": "node scripts/ui_guards.mjs && tsc",
     "test": "vitest run --project=quick",
     "test:fast": "vitest run --project=fast",

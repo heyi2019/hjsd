@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { RebatesPanel } from "./RebatesPanel";
+import { resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -104,7 +105,7 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
   });
 
   it("新增返点记录提交后回传基数字符串与返点日期", async () => {
-    vi.mocked(catalog.rebatesApi.create).mockResolvedValueOnce({ id: 3 });
+    resolveMockOnce(vi.mocked(catalog.rebatesApi.create), { id: 3 });
     renderLight(<RebatesPanel />, { user: "admin" });
     await screen.findByText("HS0001-RB01");
     await ui.click(screen.getByRole("button", { name: /新增返点记录/ }));
@@ -121,7 +122,7 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
   });
 
   it("登记结算提交后回传到账金额与回款池", async () => {
-    vi.mocked(catalog.rebatesApi.settle).mockResolvedValueOnce({ id: 9 });
+    resolveMockOnce(vi.mocked(catalog.rebatesApi.settle), { id: 9 });
     renderLight(<RebatesPanel />, { user: "admin" });
     await screen.findByText("HS0001-RB01");
     await ui.click(screen.getAllByRole("button", { name: /登记结算/ })[0] as Element);

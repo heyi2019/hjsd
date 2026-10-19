@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CreateBusinessModal } from "./CreateBusinessModal";
 import * as catalog from "../shared/api/catalog";
+import { resolveMock, resolveMockOnce } from "../test/mock-api";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -22,18 +23,18 @@ beforeEach(() => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
-  vi.mocked(catalog.accountsApi.list).mockResolvedValue([
+  resolveMock(vi.mocked(catalog.accountsApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
   ]);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
   ]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
-  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({ event: { id: 1 }, cashflow_no: "FLOW-0001" });
+  resolveMock(vi.mocked(catalog.ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
 
 /** 打开弹窗，返回弹窗容器与 onCreated 探针。
@@ -51,7 +52,7 @@ async function openTypedModal(orderType: string, user = "admin") {
 
 describe("CreateBusinessModal：新建业务写路径", () => {
 it("提号建单：复用回收费用与付款结构，并登记供货方", async () => {
-    vi.mocked(catalog.ordersApi.create).mockResolvedValueOnce({ id: 8, order_no: "TH-2026-0008", status: "ACTIVE" });
+    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 8, order_no: "TH-2026-0008", status: "ACTIVE" });
     const { container, onCreated } = await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");

@@ -4,7 +4,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "docs" / "ERP_功能需求报告_v1.0.md"
+SOURCE = ROOT / "docs" / "archive" / "ERP_功能需求报告_v1.0_已合并.md"
 OUTPUT = ROOT / "docs" / "ERP_功能需求报告_v1.0.html"
 
 
@@ -26,7 +26,7 @@ def inline(text):
     text = escape(text, quote=False).replace("&lt;br&gt;", "<br>")
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(r"`(.+?)`", r"<code>\1</code>", text)
-    text = re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', text)
+    text = re.sub(r"\[(.+?)\]\((.+?)\)", lambda m: f'<a href="{re.sub(r"^\.\./", "", m.group(2))}">{m.group(1)}</a>', text)
     return text
 
 
@@ -54,6 +54,9 @@ def render():
     while i < len(lines):
         line = lines[i]
         if not line.strip():
+            i += 1
+            continue
+        if line.startswith("> **归档说明**"):
             i += 1
             continue
         if line.startswith("|") and i + 1 < len(lines) and is_separator(lines[i + 1]):

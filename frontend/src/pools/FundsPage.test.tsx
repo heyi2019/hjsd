@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { FundsPage } from "./FundsPage";
+import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -58,9 +59,10 @@ const cashflows = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue(balance);
-  vi.mocked(catalog.depositsApi.list).mockResolvedValue(deposits);
-  vi.mocked(catalog.cashflowsApi.list).mockResolvedValue(cashflows);
+  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
+  resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
+  resolveMock(vi.mocked(catalog.cashflowsApi.list), cashflows);
+  vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([]);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
   // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致

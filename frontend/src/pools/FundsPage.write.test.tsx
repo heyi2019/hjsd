@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { FundsPage } from "./FundsPage";
+import { resolveMock, resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -15,7 +16,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/api/catalog")>();
   const METHODS = [
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
+    "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
   ];
@@ -50,9 +51,10 @@ const cashflows = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue(balance);
-  vi.mocked(catalog.depositsApi.list).mockResolvedValue(deposits);
-  vi.mocked(catalog.cashflowsApi.list).mockResolvedValue(cashflows);
+  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
+  resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
+  resolveMock(vi.mocked(catalog.cashflowsApi.list), cashflows);
+  vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([]);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
   // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
@@ -70,7 +72,7 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 
 describe("FundsPage：资金写路径", () => {
   it("新增押金占用提交后回传金额与日期", async () => {
-    vi.mocked(catalog.depositsApi.create).mockResolvedValueOnce({ id: 12 });
+    resolveMockOnce(vi.mocked(catalog.depositsApi.create), { id: 12 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByText(/POOL-A/);
     await ui.click(screen.getByRole("tab", { name: "押金" }));
@@ -103,5 +105,62 @@ describe("FundsPage：资金写路径", () => {
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     await ui.click(await screen.findByRole("button", { name: /查看未达流水/ }));
     expect((await screen.findAllByText("HS0001-CF-BUY-01")).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("押金损失登记提交原金额、日期、分类和原因", async () => {
+    resolveMockOnce(vi.mocked(catalog.depositsApi.loss), { id: 91 });
+    renderLight(<FundsPage />, { user: "finance" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /登记损失/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
+    await ui.type(modal.querySelector("#category") ?? modal, "违约损失");
+    await ui.type(modal.querySelector("#reason") ?? modal, "对手方未按约返还");
+    await ui.click(screen.getByRole("button", { name: /确认损失/ }));
+    await waitFor(() => expect(vi.mocked(catalog.depositsApi.loss)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.depositsApi.loss).mock.calls[0]).toEqual([11, {
+      amount: "100.00",
+      lost_on: expect.any(String),
+      category: "违约损失",
+      reason: "对手方未按约返还",
+    }]);
+  });
+
+  it("单边划转可选择对端资金池并提交修复原因", async () => {
+    resolveMockOnce(vi.mocked(catalog.cashflowsApi.list), [{ ...cashflows[0], transfer_id: "TRF-001" }]);
+    vi.mocked(catalog.transfersApi.repair).mockResolvedValueOnce({ transfer_id: "TRF-001" });
+    renderLight(<FundsPage />, { user: "finance" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "异常与月结" }));
+    await ui.click(await screen.findByRole("button", { name: /修复划转/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await pickSelect(modal, 0, /POOL-B/);
+    await ui.type(modal.querySelector("#reason") ?? modal, "补齐转入侧流水");
+    await ui.click(screen.getByRole("button", { name: /确认修复/ }));
+    await waitFor(() => expect(vi.mocked(catalog.transfersApi.repair)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.transfersApi.repair).mock.calls[0]).toEqual(["TRF-001", {
+      counterpart_pool_id: 2,
+      reason: "补齐转入侧流水",
+    }]);
+  });
+
+  it("月结锁定提交账期和说明", async () => {
+    vi.mocked(catalog.periodLocksApi.create).mockResolvedValueOnce({ id: 31, period: "2026-10", locked_by: "finance" });
+    renderLight(<FundsPage />, { user: "finance" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "异常与月结" }));
+    await ui.click(await screen.findByRole("button", { name: /锁定账期/ }, { timeout: 5000 }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    const period = modal.querySelector("#period") as HTMLInputElement;
+    await ui.clear(period);
+    await ui.type(period, "2026-10");
+    await ui.type(modal.querySelector("#note") ?? modal, "10 月对账完成");
+    await ui.click(screen.getByRole("button", { name: /确认锁定/ }));
+    await waitFor(() => expect(vi.mocked(catalog.periodLocksApi.create)).toHaveBeenCalled(), { timeout: 5000 });
+    expect(vi.mocked(catalog.periodLocksApi.create).mock.calls[0]).toEqual([{
+      period: "2026-10",
+      note: "10 月对账完成",
+    }]);
   });
 });

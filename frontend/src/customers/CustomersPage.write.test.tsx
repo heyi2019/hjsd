@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { message } from "antd";
 import { CustomersPage } from "./CustomersPage";
+import { resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -83,7 +84,7 @@ describe("CustomersPage：权限门控与写操作", () => {
   });
 
   it("新建客户提交后回传字段并刷新列表", async () => {
-    vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
+    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
@@ -95,7 +96,7 @@ describe("CustomersPage：权限门控与写操作", () => {
 
   it("重复候选不拦截，只提示（创建仍成功）", async () => {
     const warningSpy = vi.spyOn(message, "warning");
-    vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
+    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));

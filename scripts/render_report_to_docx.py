@@ -11,7 +11,7 @@ from docx.shared import Cm, Inches, Pt, RGBColor
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "docs" / "ERP_功能需求报告_v1.0.md"
+SOURCE = ROOT / "docs" / "archive" / "ERP_功能需求报告_v1.0_已合并.md"
 OUTPUT = ROOT / "docs" / "ERP_功能需求报告_v1.0.docx"
 
 
@@ -67,10 +67,10 @@ def set_repeat_table_header(row):
 
 
 def set_run_font(run, size=9.5, bold=False, color="000000"):
-    run.font.name = "STSong"
-    run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "STSong")
-    run._element.get_or_add_rPr().rFonts.set(qn("w:ascii"), "Arial")
-    run._element.get_or_add_rPr().rFonts.set(qn("w:hAnsi"), "Arial")
+    run.font.name = "Arial Unicode MS"
+    run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), "Arial Unicode MS")
+    run._element.get_or_add_rPr().rFonts.set(qn("w:ascii"), "Arial Unicode MS")
+    run._element.get_or_add_rPr().rFonts.set(qn("w:hAnsi"), "Arial Unicode MS")
     run.font.size = Pt(size)
     run.font.bold = bold
     run.font.color.rgb = RGBColor.from_string(color)
@@ -169,15 +169,15 @@ def build():
     section.right_margin = Cm(1.35)
 
     normal = doc.styles["Normal"]
-    normal.font.name = "STSong"
-    normal._element.rPr.rFonts.set(qn("w:eastAsia"), "STSong")
+    normal.font.name = "Arial Unicode MS"
+    normal._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial Unicode MS")
     normal.font.size = Pt(9.5)
     normal.paragraph_format.space_after = Pt(4)
     normal.paragraph_format.line_spacing = 1.15
     for name, size in (("Heading 1", 14), ("Heading 2", 11.5), ("Heading 3", 10.5)):
         style = doc.styles[name]
-        style.font.name = "STSong"
-        style._element.rPr.rFonts.set(qn("w:eastAsia"), "STSong")
+        style.font.name = "Arial Unicode MS"
+        style._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial Unicode MS")
         style.font.size = Pt(size)
         style.font.bold = True
         style.font.color.rgb = RGBColor(0, 0, 0)
@@ -189,6 +189,9 @@ def build():
     while i < len(lines):
         line = lines[i]
         if not line.strip():
+            i += 1
+            continue
+        if line.startswith("> **归档说明**"):
             i += 1
             continue
         if line.startswith("|") and i + 1 < len(lines) and is_separator(lines[i + 1]):

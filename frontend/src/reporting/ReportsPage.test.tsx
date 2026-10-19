@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { ReportsPage } from "./ReportsPage";
+import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -32,17 +33,17 @@ const emptyHealth = { generated_on: "2026-10-01", total_cost: "0.00", items: [] 
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValue(emptyHealth);
-  vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValue({ items: [], total: {} });
-  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
-  vi.mocked(catalog.reportsApi.dailyFunds).mockResolvedValue({ date: "2026-10-01", total: {}, items: [] });
-  vi.mocked(catalog.reportsApi.financeDimensions).mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" });
-  vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({ items: [], total: {} });
-  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
-  vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
+  resolveMock(vi.mocked(catalog.reportsApi.inventoryHealth), emptyHealth);
+  resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
+  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
+  resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(catalog.reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({
+  resolveMock(vi.mocked(catalog.poolsApi.balance), {
     income: "0.00",
     expense: "0.00",
     cash_balance: "0.00",

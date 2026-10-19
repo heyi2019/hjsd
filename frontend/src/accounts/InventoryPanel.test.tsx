@@ -10,6 +10,7 @@ import {
   setupInventoryPanelMocks,
 } from "./InventoryPanel.test.fixtures";
 import { buildInventoryCsv } from "./inventory-export";
+import { resolveMockOnce } from "../test/mock-api";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -233,7 +234,7 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("回收账号未售出时不显示卖号返点", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValueOnce({
+    resolveMockOnce(vi.mocked(catalog.accountsApi.executionDetail), {
       account: accounts[0],
       orders: [{
         order_id: 21,

@@ -365,6 +365,23 @@ export interface Deposit {
   note?: string | null;
 }
 
+export interface PeriodLock {
+  id: number;
+  period: string;
+  locked_at?: string;
+  locked_by: string;
+  note?: string | null;
+}
+
+export interface TransferResult {
+  transfer_id: string;
+  source_pool_id?: number;
+  target_pool_id?: number;
+  amount?: string;
+  occurred_on?: string;
+  cashflows?: Cashflow[];
+}
+
 export interface Cashflow {
   status: string;
   id: number;
@@ -617,6 +634,8 @@ export const depositsApi = {
     api.post<Deposit>("/deposits", payload).then((r) => r.data),
   release: (id: number, payload: { amount: string; released_on: string }) =>
     api.post<Deposit>(`/deposits/${id}/returns`, payload).then((r) => r.data),
+  loss: (id: number, payload: { amount: string; lost_on: string; category: string; reason: string }) =>
+    api.post<Cashflow>(`/deposits/${id}/losses`, payload).then((r) => r.data),
 };
 
 export const cashflowsApi = {
@@ -1005,7 +1024,15 @@ export interface QualityIssue { id: number; issue_no: string; severity: string; 
 export interface QualitySummary { total: number; by_severity: Record<string, number> }
 export interface NotificationItem { id: number; notification_no: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
 export interface SearchResult { id: number; type: string; code: string; title: string; subtitle?: string | null; route: string }
-export const transfersApi = { create: (data: Record<string, unknown>) => api.post("/transfers", data).then(r => r.data) };
+export const transfersApi = {
+  create: (data: Record<string, unknown>) => api.post<TransferResult>("/transfers", data).then(r => r.data),
+  repair: (transferId: string, data: { counterpart_pool_id: number; reason: string }) =>
+    api.post<TransferResult>(`/transfers/${transferId}/repair`, data).then(r => r.data),
+};
+export const periodLocksApi = {
+  list: () => api.get<PeriodLock[]>("/period-locks").then((r) => r.data),
+  create: (data: { period: string; note?: string }) => api.post<PeriodLock>("/period-locks", data).then((r) => r.data),
+};
 export const reconciliationsApi = {
   list: () => api.get<Reconciliation[]>("/reconciliations").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Reconciliation>("/reconciliations", data).then(r => r.data),

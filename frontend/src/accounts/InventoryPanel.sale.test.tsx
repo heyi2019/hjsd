@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 
 import * as catalog from "../shared/api/catalog";
+import { resolveMock, resolveMockOnce } from "../test/mock-api";
 vi.mock("../shared/api/catalog")
 
 const accounts = [
@@ -15,14 +16,14 @@ const accounts = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
-  vi.mocked(catalog.ordersApi.create).mockResolvedValue({ id: 21 });
-  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({});
-  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
+  resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
+  resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.rebatesApi.create).mockResolvedValue({ id: 31 });
-  vi.mocked(catalog.installmentsApi.create).mockResolvedValue({ id: 41 });
-  vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue({
+  resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
+  resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
+  resolveMock(vi.mocked(catalog.accountsApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -94,7 +95,7 @@ beforeEach(() => {
       }],
     }],
   });
-  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue(accounts[0]);
+  resolveMock(vi.mocked(catalog.accountsApi.updateProfile), accounts[0]);
 });
 
 describe("InventoryPanel：写入与长路径", () => {
@@ -131,7 +132,7 @@ it("自营在库账号可以售出并登记 HS 售出事件", async () => {
 
 it("代挂账号售出按货源类型生成 DG 订单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([
+    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [
       { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -161,7 +162,7 @@ it("代挂账号售出按货源类型生成 DG 订单", async () => {
 
 it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 SELL", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([
+    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [
       { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -187,7 +188,7 @@ it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 
 
 it("提号库存从库存中心售出时可选择分期", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([
+    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [
       { id: 6, game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -214,7 +215,7 @@ it("提号库存从库存中心售出时可选择分期", async () => {
 
 it("取消交易按原售出流水原路冲销并退款", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([{ ...accounts[1], inventory_type: "PICKUP" }]);
+    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-2");
 

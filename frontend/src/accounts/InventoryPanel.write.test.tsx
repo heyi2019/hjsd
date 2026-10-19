@@ -4,6 +4,7 @@ import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 
 import * as catalog from "../shared/api/catalog";
+import { resolveMock } from "../test/mock-api";
 vi.mock("../shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/api/catalog")>();
   const METHODS = [
@@ -37,14 +38,14 @@ const accounts = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
-  vi.mocked(catalog.ordersApi.create).mockResolvedValue({ id: 21 });
-  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({});
-  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
+  resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
+  resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.rebatesApi.create).mockResolvedValue({ id: 31 });
-  vi.mocked(catalog.installmentsApi.create).mockResolvedValue({ id: 41 });
-  vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue({
+  resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
+  resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
+  resolveMock(vi.mocked(catalog.accountsApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -116,7 +117,7 @@ beforeEach(() => {
       }],
     }],
   });
-  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue(accounts[0]);
+  resolveMock(vi.mocked(catalog.accountsApi.updateProfile), accounts[0]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 

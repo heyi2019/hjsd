@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CustomersPage } from "./CustomersPage";
+import { resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -154,7 +155,7 @@ describe("CustomersPage：活字段（BAS-04）", () => {
   });
 
   it("新建弹窗动态渲染活字段控件，提交时回传 extra_values", async () => {
-    vi.mocked(catalog.customersApi.create).mockResolvedValueOnce({ customer: { id: 3 }, duplicate_candidates: [] });
+    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 3 }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));

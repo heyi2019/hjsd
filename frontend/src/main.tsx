@@ -1,6 +1,7 @@
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import { createRoot } from "react-dom/client";
+import { HashRouter } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { GlassProvider } from "./shared/state/glass";
 import { SessionProvider } from "./shared/state/session";
@@ -36,7 +37,9 @@ function ThemedApp() {
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
     <GlassProvider>
-      <ThemedApp />
+      <HashRouter>
+        <ThemedApp />
+      </HashRouter>
     </GlassProvider>
   </ThemeProvider>,
 );

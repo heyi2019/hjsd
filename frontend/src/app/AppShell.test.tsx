@@ -7,6 +7,7 @@ vi.mock("../shared/api/catalog");
 import { renderApp } from "../test/render";
 import { AppShell } from "./AppShell";
 import { navigation } from "./navigation";
+import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -74,9 +75,15 @@ beforeEach(() => {
   }
 });
 
-async function renderShell(options: { user?: string } = {}) {
+async function renderShell(options: { user?: string; initialPath?: string } = {}) {
+  const { initialPath = "/dashboard", ...rest } = options;
   await act(async () => {
-    renderApp(<AppShell />, options);
+    renderApp(
+      <MemoryRouter initialEntries={[initialPath]}>
+        <AppShell />
+      </MemoryRouter>,
+      rest,
+    );
     await Promise.resolve();
   });
 }
@@ -131,6 +138,19 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     await renderShell();
     const current = document.querySelector('[aria-current="page"]');
     expect(current?.textContent).toContain("工作台");
+  });
+
+  it("空路径 '/' 重定向到工作台（URL 决定落点）", async () => {
+    await renderShell({ initialPath: "/" });
+    await waitFor(() =>
+      expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台"),
+    );
+  });
+
+  it("业务中心 URL 带 tab 段时深链到对应子页（库存中心）", async () => {
+    await renderShell({ initialPath: "/business/inventory" });
+    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
+    expect(inventoryTab).toHaveAttribute("aria-selected", "true");
   });
 });
 

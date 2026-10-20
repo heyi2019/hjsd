@@ -1,5 +1,6 @@
 import { Modal, Popconfirm, Space } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
@@ -31,29 +32,52 @@ const PAGES: Record<string, ComponentType<PageProps>> = {
 };
 
 export function AppShell() {
-  const [active, setActive] = useState("dashboard");
-  const [businessInitialTab, setBusinessInitialTab] = useState<BusinessCenterEntryTab | undefined>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // 路由化：落点由 URL 唯一决定（深链 / 刷新 / 前进后退可用），不再用 useState 记忆。
+  const segments = location.pathname.split("/").filter(Boolean);
+  const rawActive = segments[0] ?? "dashboard";
+  const active = navigation.some((e) => e.key === rawActive) ? rawActive : "dashboard";
+  const businessTab = active === "business" ? (segments[1] as BusinessCenterEntryTab | undefined) : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { user, authenticated, mustChangePassword, logout } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
-  const Page = PAGES[active] ?? DashboardPage;
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
-    if (key === "business") setBusinessInitialTab(tab);
-    setActive(key);
+    navigate(`/${key}${tab ? `/${tab}` : ""}`);
   };
+  // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
+  useEffect(() => {
+    if (location.pathname === "/" || location.pathname === "") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [location.pathname, navigate]);
+  // keep-alive：访问过的页面持续挂载，仅非激活态隐藏（display:none），避免切导航重挂载丢状态。
+  const [visited, setVisited] = useState<Set<string>>(() => new Set(["dashboard"]));
+  useEffect(() => {
+    setVisited((prev) => (prev.has(active) ? prev : new Set(prev).add(active)));
+  }, [active]);
+  // 转场重放：不再靠 key 重挂载（那会丢状态），改用 reflow 技巧重放 .page-enter 弹簧入场。
+  const pageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    el.classList.remove("page-enter");
+    void el.offsetWidth; // 强制 reflow，使动画重新触发
+    el.classList.add("page-enter");
+  }, [active]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        navigateTo("business");
+        navigateTo("business", "inventory");
         return;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [navigateTo]);
 
   // iOS 26 Scroll Edge Effect：按滚动位置写入上下渐隐距离，内容触边时才渐隐。
   // 未溢出时两值均为 0，mask 退化为全不透明（见 navigation.css 的 .nav-list）。
@@ -179,20 +203,34 @@ export function AppShell() {
           </Space>
         </header>
         <main className="page-content">
-          {/* 工作台单独渲染（纯动作入口）；其余页面走 PAGES 映射并收 onNavigate，
-              供数据中心入口卡跳转业务中心；无跳转需求的页面忽略该 prop。
-              key={active} 让每次导航切换重挂载 .page-enter，重放 Apple 弹簧入场转场。 */}
+          {/* 路由化 + keep-alive：
+              1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
+              2) 访问过的页面持续挂载，仅非激活态 display:none，避免切导航重挂载丢状态（原 key={active} 的副作用）。
+              3) 转场弹簧入场改由 pageRef + reflow 重放（见上方 useEffect），不再靠重挂载。 */}
           <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}>
-            <div className="page-enter" key={active}>
-              {active === "dashboard" ? (
-                <DashboardPage onNavigate={navigateTo} />
-              ) : (
-                <Page
-                  onNavigate={navigateTo}
-                  initialTab={active === "business" ? businessInitialTab : undefined}
-                />
-              )}
-            </div>
+            {[...visited, active].filter((k, i, a) => a.indexOf(k) === i).map((key) => {
+              const isActive = key === active;
+              const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
+              if (!PageComponent) return null;
+              return (
+                <div
+                  key={key}
+                  ref={isActive ? pageRef : undefined}
+                  className={`page-slot${isActive ? " page-enter" : ""}`}
+                  style={{ display: isActive ? "block" : "none" }}
+                  aria-hidden={!isActive}
+                >
+                  {key === "dashboard" ? (
+                    <DashboardPage onNavigate={navigateTo} />
+                  ) : (
+                    <PageComponent
+                      onNavigate={navigateTo}
+                      initialTab={key === "business" ? businessTab : undefined}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </Suspense>
         </main>
       </div>

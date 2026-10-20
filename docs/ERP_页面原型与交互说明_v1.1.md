@@ -323,7 +323,17 @@ Tab 栏右侧固定「新建订单⌄」下拉（`order.create`）：新建回�
 | P0-8 业务中心入口落点不一致 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | 落点统一由 URL 决定；侧栏/⌘K/数据中心入口均落 `/business/inventory`（库存中心），与 `businessCenter.ts` 默认台账的差异通过入口显式传 tab 消解；切导航不再重置子 Tab（keep-alive 保留上次所在子页）。 |
 | P0-7 流水服务端分页 + 移除 500 硬截断 | ✅ 已闭环（批次二 2026-10-20） | 后端 `/cashflows` 改返回 `CashflowListOut{items, total}`，支持 `occurred_from`/`occurred_to` 服务端日期过滤 + `limit`/`offset` 分页（上限 2000），`total` 为命中总数；前端 `FundsPage` 移除 `limit:500` 硬截断，日期区间改为服务端传参（`fetchCashflows` 用 ref 持有当前值，全局 `load()` 刷新仍套用当前区间），表格保留客户端关键词/资金池/方向/状态筛选与 `DataTable` 客户端分页；原「仅加载最近 500 条」警告改为「共 Y 笔 / 已加载 X 笔」提示，超上限才警示；`transferAnomalies` 单边划转与「未达流水」钻取仍基于完整已加载集合，对账/导出数据完整性保留。 |
 
-**仍开放（架构级/大改动）：** P1-9/10/11/12/13/14/16/18/19/20（多为筛选/分页保留、滚动定位、未保存提示、窄屏列宽、批量回执等体验打磨）。
+| P1-9 DataTable 非受控翻页越界 | ✅ 已闭环（数据表重构 2026-10-20） | DataTable 非受控分页已在 `props.page` 变化时重置内部页码（`DataTable.tsx:63-69`），筛选后 `setPage(1)` 不再停留空白页；OrdersPage 的 `DataTable` 已传 `page`+`loading`，原越界缺口已不成立。 |
+| P1-11 详情抽屉关闭不刷新列表 | ✅ 已闭环（架构层面 2026-10-20） | 订单/客户详情抽屉均为只读视图（Descriptions + 动作记录），写操作经独立弹窗（取消/退款/分配/拉黑等）完成并触发列表刷新，关闭抽屉无需额外刷新；原缺口在当前架构下已不成立。 |
+| P1-12 部分 DataTable 未传 loading | ✅ 已闭环（2026-10-20） | FundsPage 6 张表（资金池/流水/押金/对账/单边划转/月结）+ CustomersPage 主表 + InstallmentsPanel + RebatesPanel 均补 `loading={loading}` 透传，取数期间显示加载态不再闪空态。 |
+| P1-13 建单弹窗关闭残留输入 | ✅ 已闭环（2026-10-20） | `CreateBusinessModal` 增 `useEffect`：`props.open` 变 false 时 `form.resetFields()`，消除 antd Form `preserve` 默认导致的取消/点遮罩关闭后残留上次输入。 |
+| P1-14 校验失败不滚动定位 | ✅ 已闭环（2026-10-20） | 共享 `FormDrawer` 与 `CreateBusinessModal` 长表单（DFQ 可达 120 期）的 `<Form>` 加 `scrollToFirstError`，校验失败自动滚动到首个错误字段，底部报错可见。 |
+| P1-16 押金释放/损失弹窗信息 | ✅ 已闭环（2026-10-20） | 押金释放弹窗补「占用合计/已释放/已损失/剩余可释放」+ 后果提示与超额校验（释放金额不得超过剩余可释放额）；损失弹窗补不可撤销提示。 |
+| P1-18 未保存改动静默丢弃 | ✅ 已闭环（2026-10-20，关键长表单） | `CreateBusinessModal` 关闭时若 `form.isFieldsTouched()` 弹 `Modal.confirm` 二次确认，避免未保存输入静默丢失（其余短表单后续按需补齐）。 |
+| P1-19 多表未配 scroll x | ✅ 已闭环（2026-10-20） | CustomersPage 主表、QualityPanel、RebatesPanel、InstallmentsPanel 补 `scroll={{ x: "max-content" }}`，窄屏列宽挤压时横向滚动，宽屏不触发。 |
+| P1-20 批量关闭工单回执 | ✅ 已闭环（2026-10-20） | `QualityPanel` 批量关闭回显实际关闭条数（超 50 条提示分批），失败时除 ErrorBanner 外补 `message.error` 回执。 |
+
+**仍开放（架构级/大改动）：** P1-10（报表/设置 Tab 不挂载是**有意**性能优化——避免首屏 13 组报表请求、避免切换无关页面产生状态更新；筛选状态保留需对 13 张报表 + 设置各 Tab 做状态提升或改为 keep-alive，权衡较大，待裁决）。
 
 ### 正面基线（回归时不得破坏）
 

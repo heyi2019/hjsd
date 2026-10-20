@@ -55,6 +55,7 @@ function ContractTable({
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [payForm] = Form.useForm();
@@ -63,6 +64,7 @@ function ContractTable({
   const [cancelForm] = Form.useForm();
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [list, orderList] = await Promise.all([installmentsApi.list(), ordersApi.list()]);
       const filtered = list.filter((item) => item.contract_type === contractType);
@@ -82,6 +84,8 @@ function ContractTable({
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
+    } finally {
+      setLoading(false);
     }
   }, [contractType]);
 
@@ -337,9 +341,11 @@ function ContractTable({
         <DataTable<Installment>
           columns={columns}
           rows={rows}
+          loading={loading}
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
+          scroll={{ x: "max-content" }}
           emptyText="暂无分期合约"
           onPageChange={() => undefined}
           expandable={{

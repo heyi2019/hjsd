@@ -73,6 +73,12 @@ export function CreateBusinessModal(props: {
   const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
 
+  // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
+  // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
+  useEffect(() => {
+    if (!props.open) form.resetFields();
+  }, [props.open, form]);
+
   const resetAdaptiveModalLayout = (open: boolean) => {
     if (!open) return;
     window.requestAnimationFrame(() => {
@@ -312,7 +318,20 @@ export function CreateBusinessModal(props: {
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
       open={props.open}
       destroyOnHidden
-      onCancel={props.onClose}
+      onCancel={() => {
+        if (form.isFieldsTouched()) {
+          Modal.confirm({
+            title: "放弃未保存的建单内容？",
+            content: "表单已填写但未提交，关闭后将丢失本次输入。",
+            okText: "放弃",
+            cancelText: "继续编辑",
+            okButtonProps: { danger: true },
+            onOk: () => props.onClose(),
+          });
+        } else {
+          props.onClose();
+        }
+      }}
       afterOpenChange={resetAdaptiveModalLayout}
       footer={(
         <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting}>
@@ -328,6 +347,7 @@ export function CreateBusinessModal(props: {
         form={form}
         id={formId}
         layout="horizontal"
+        scrollToFirstError
         labelCol={{ flex: "0 0 96px" }}
         wrapperCol={{ flex: "1 1 auto" }}
         onFinish={submit}

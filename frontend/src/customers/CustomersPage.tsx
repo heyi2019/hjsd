@@ -182,6 +182,7 @@ function CustomerPanel() {
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchInput, setSearchInput] = useState("");
@@ -198,6 +199,7 @@ function CustomerPanel() {
   );
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setRows(await customersApi.list({
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
@@ -206,6 +208,8 @@ function CustomerPanel() {
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
+    } finally {
+      setLoading(false);
     }
   }, [keyword, statusFilter]);
 
@@ -421,10 +425,12 @@ function CustomerPanel() {
       {!compact ? <DataTable<Customer>
         columns={columns}
         rows={rows}
+        loading={loading}
         page={page}
         pageSize={pageSize}
         total={rows.length}
         className="customer-table"
+        scroll={{ x: "max-content" }}
         emptyText="暂无客户档案"
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);

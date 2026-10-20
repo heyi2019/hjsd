@@ -45,12 +45,14 @@ export function RebatesPanel() {
   const [createOpen, setCreateOpen] = useState(false);
   const [settleTarget, setSettleTarget] = useState<Rebate | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [form] = Form.useForm();
   const [settleForm] = Form.useForm();
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [list, orderList, poolList] = await Promise.all([
         rebatesApi.list(),
@@ -63,6 +65,8 @@ export function RebatesPanel() {
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -189,9 +193,11 @@ export function RebatesPanel() {
         <DataTable<Rebate>
           columns={columns}
           rows={rows}
+          loading={loading}
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
+          scroll={{ x: "max-content" }}
           emptyText="暂无返点记录"
           onPageChange={() => undefined}
         />

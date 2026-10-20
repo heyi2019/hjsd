@@ -66,16 +66,22 @@ export function QualityPanel() {
   };
 
   const batchCloseIssues = async (values: Record<string, unknown>) => {
-    const ids = rows.filter((row) => row.status !== "CLOSED").map((row) => row.id).slice(0, 50);
+    const openIds = rows.filter((row) => row.status !== "CLOSED").map((row) => row.id);
+    const ids = openIds.slice(0, 50);
+    const capped = openIds.length > ids.length;
     if (!ids.length) { message.info("暂无可批量关闭的工单"); return; }
     setBatchClosing(true);
     try {
       await qualityApi.batchClose({ issue_ids: ids, resolution: values.resolution as string, evidence: values.evidence as string });
-      message.success("质量工单已批量关闭");
+      message.success(`已批量关闭 ${ids.length} 个未关闭工单${capped ? "（仅处理前 50 条，剩余请再次操作）" : ""}`);
       setBatchCloseOpen(false);
       batchCloseForm.resetFields();
       await load();
-    } catch (err) { setError(normalizeError(err)); }
+    } catch (err) {
+      const normalized = normalizeError(err);
+      setError(normalized);
+      message.error(`批量关闭失败：${normalized.message}`);
+    }
     finally { setBatchClosing(false); }
   };
 
@@ -94,7 +100,7 @@ export function QualityPanel() {
       <ErrorBanner error={error} onRetry={() => void load()} />
       <StatRow items={[{ label: "异常总数", kind: "count", amount: String(summary?.total ?? 0) }, { label: "高严重度", kind: "count", amount: String(summary?.by_severity?.HIGH ?? 0), tone: "warn" }]} />
       <Card className="glass" title="质量异常工单" extra={<PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton>}>
-        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
+        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} scroll={{ x: "max-content" }} emptyText="暂无质量异常" onPageChange={() => undefined} />
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <Modal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>

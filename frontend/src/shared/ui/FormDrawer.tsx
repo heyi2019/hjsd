@@ -57,6 +57,7 @@ export function FormDrawer(props: {
       <Form
         form={form}
         layout="vertical"
+        scrollToFirstError
         initialValues={Object.fromEntries(
           props.fields
             .filter((f) => f.initialValue !== undefined)

@@ -608,6 +608,7 @@ export function FundsPage() {
                   pageSize={10}
                   total={pools.length}
                   emptyText="尚未配置资金池"
+                  loading={loading}
                   onPageChange={() => undefined}
                 />
               </Card>
@@ -648,6 +649,7 @@ export function FundsPage() {
                   pageSize={10}
                   total={visibleCashflows.length}
                   emptyText="暂无资金流水"
+                  loading={loading}
                   onPageChange={() => undefined}
                 />
               </Card>
@@ -677,6 +679,7 @@ export function FundsPage() {
                   pageSize={10}
                   total={deposits.length}
                   emptyText="暂无押金占用"
+                  loading={loading}
                   onPageChange={() => undefined}
                 />
               </Card>
@@ -694,6 +697,7 @@ export function FundsPage() {
                   pageSize={10}
                   total={reconciliations.length}
                   emptyText="暂无对账记录"
+                  loading={loading}
                   onPageChange={() => undefined}
                 />
               </Card>
@@ -711,8 +715,9 @@ export function FundsPage() {
                     page={1}
                     pageSize={10}
                     total={transferAnomalies.length}
-                    emptyText="暂无单边划转异常"
-                    onPageChange={() => undefined}
+                  emptyText="暂无单边划转异常"
+                  loading={loading}
+                  onPageChange={() => undefined}
                   />
                 </Card>
                 <Card className="glass" title="月结锁定" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
@@ -723,6 +728,7 @@ export function FundsPage() {
                     pageSize={10}
                     total={periodLocks.length}
                     emptyText="暂无已锁定账期"
+                    loading={loading}
                     onPageChange={() => undefined}
                   />
                 </Card>
@@ -846,8 +852,32 @@ export function FundsPage() {
         footer={null}
       >
         <InlineError error={write.error} />
+        {returnTarget ? (
+          <Typography.Paragraph type="secondary">
+            押金占用合计 <MoneyText value={returnTarget.paid_amount} />；已释放 <MoneyText value={returnTarget.returned_amount} />；已损失 <MoneyText value={returnTarget.lost_amount ?? "0.00"} />；剩余可释放 <MoneyText value={(Number(returnTarget.paid_amount) - Number(returnTarget.returned_amount) - Number(returnTarget.lost_amount ?? 0)).toFixed(2)} strong />。
+          </Typography.Paragraph>
+        ) : null}
+        <Typography.Paragraph type="warning">
+          释放后相应减少押金占用，操作不可撤销；释放金额不得超过剩余可释放额。
+        </Typography.Paragraph>
           <Form form={returnForm} layout="vertical" onFinish={submitReturn}>
-          <Form.Item name="amount" label="释放金额" rules={requiredMoneyRules("释放金额")}>
+          <Form.Item
+            name="amount"
+            label="释放金额"
+            rules={[
+              ...requiredMoneyRules("释放金额"),
+              () => ({
+                validator(_rule, value) {
+                  if (!returnTarget || !value) return Promise.resolve();
+                  const max = Number(returnTarget.paid_amount) - Number(returnTarget.returned_amount) - Number(returnTarget.lost_amount ?? 0);
+                  if (Number(value) > max + 1e-9) {
+                    return Promise.reject(new Error(`释放金额不得超过剩余可释放额 ¥${max.toFixed(2)}`));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
             <MoneyInput />
           </Form.Item>
           <Form.Item name="released_on" label="释放日期" rules={[{ required: true }]}>
@@ -861,6 +891,9 @@ export function FundsPage() {
 
       <Modal title="登记押金损失" open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)} footer={null}>
         <InlineError error={write.error} />
+        <Typography.Paragraph type="warning">
+          登记损失后该押金占用相应扣减，操作不可撤销，请核对金额与费用分类。
+        </Typography.Paragraph>
           <Form form={lossForm} layout="vertical" onFinish={submitLoss}>
           <Form.Item name="amount" label="损失金额" rules={requiredMoneyRules("损失金额")}><MoneyInput /></Form.Item>
           <Form.Item name="lost_on" label="损失日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>

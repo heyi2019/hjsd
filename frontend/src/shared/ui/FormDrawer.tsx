@@ -1,6 +1,7 @@
 /** 资金操作抽屉：金额类动作必须走抽屉/弹窗提交，禁止列表内直接登记。 */
 import { Button, Drawer, Form, Input, InputNumber, Select, Space } from "antd";
 import type { ReactNode } from "react";
+import { InlineError } from "./InlineError";
 
 export interface DrawerField {
   name: string;
@@ -20,6 +21,7 @@ export function FormDrawer(props: {
   submitting?: boolean;
   submitText?: string;
   extra?: ReactNode;
+  error?: { message: string; code?: string } | null;
   onClose: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -87,6 +89,7 @@ export function FormDrawer(props: {
         ))}
       </Form>
       {props.extra}
+      <InlineError error={props.error} />
     </Drawer>
   );
 }

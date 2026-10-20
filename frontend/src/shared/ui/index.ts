@@ -8,6 +8,8 @@ export { EntryCard, EntryRow } from "./EntryCard";
 export { MoneyText } from "./MoneyText";
 export { StatusTag } from "./StatusTag";
 export { PermissionButton, PermissionGate } from "./PermissionButton";
+export { ConfirmButton } from "./ConfirmButton";
+export { InlineError } from "./InlineError";
 export { FormDrawer } from "./FormDrawer";
 export { ErrorBanner } from "./ErrorBanner";
 export { NestedFormField, NestedFormSection } from "./NestedFormSection";

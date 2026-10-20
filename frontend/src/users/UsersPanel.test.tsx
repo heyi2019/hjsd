@@ -59,15 +59,22 @@ describe("UsersPanel：用户管理动作", () => {
     await waitFor(() => expect(vi.mocked(client.api).patch).toHaveBeenCalledWith("/users/7", expect.objectContaining({ display_name: "新业务同事" })));
   });
 
-  it("管理员可以停用用户并重置密码", async () => {
+  // 停用与重置密码拆成两个用例：停用现在带 Popconfirm，弹层残留会干扰后续点击。
+  it("管理员停用用户需二次确认", async () => {
     renderLight(<UsersPanel />, { user: "admin" });
 
     expect(await screen.findByText("operator01")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /停用/ }));
+    await ui.click(await screen.findByRole("button", { name: /确认/ }));
     await waitFor(() => expect(vi.mocked(client.api).patch).toHaveBeenCalledWith("/users/7", { is_active: false }));
+  });
 
+  it("管理员可以重置密码", async () => {
+    renderLight(<UsersPanel />, { user: "admin" });
+
+    expect(await screen.findByText("operator01")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /重置密码/ }));
-    const resetDialog = within(screen.getByRole("dialog", { name: "重置密码：operator01" }));
+    const resetDialog = within(await screen.findByRole("dialog", { name: "重置密码：operator01" }));
     await ui.type(resetDialog.getByPlaceholderText("新密码（至少 8 位）"), "new-password");
     await ui.click(resetDialog.getByRole("button", { name: /OK/ }));
     await waitFor(() => expect(vi.mocked(client.api).post).toHaveBeenCalledWith("/users/7/reset-password", { password: "new-password" }));

@@ -1,7 +1,7 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
 import { Card, Form, Input, Modal, Select, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cashflowsApi,
   depositsApi,
@@ -58,6 +58,7 @@ export function FundsPage() {
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
+  const [cashflowTotal, setCashflowTotal] = useState(0);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [periodLocks, setPeriodLocks] = useState<import("../shared/api/catalog").PeriodLock[]>([]);
   const [depositOpen, setDepositOpen] = useState(false);
@@ -94,6 +95,24 @@ export function FundsPage() {
   const [repairForm] = Form.useForm();
   const [periodLockForm] = Form.useForm();
 
+  // 用 ref 持有最新日期筛选值，使全局 load()（含写操作后刷新）也能套用当前日期区间。
+  const cashflowFromRef = useRef(cashflowFrom);
+  cashflowFromRef.current = cashflowFrom;
+  const cashflowToRef = useRef(cashflowTo);
+  cashflowToRef.current = cashflowTo;
+
+  // 资金流水：日期区间改为服务端过滤（移除 500 硬截断），total 为服务端命中总数。
+  const fetchCashflows = useCallback(async () => {
+    const result = await cashflowsApi.list({
+      occurred_from: cashflowFromRef.current || undefined,
+      occurred_to: cashflowToRef.current || undefined,
+      limit: 2000,
+      offset: 0,
+    });
+    setCashflows(result.items);
+    setCashflowTotal(result.total);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -104,7 +123,7 @@ export function FundsPage() {
       );
       setBalances(Object.fromEntries(entries));
       setDeposits(await depositsApi.list());
-      setCashflows(await cashflowsApi.list({ limit: 500 }));
+      await fetchCashflows();
       setReconciliations(await reconciliationsApi.list());
       setPeriodLocks(await periodLocksApi.list());
       setError(null);
@@ -113,7 +132,7 @@ export function FundsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchCashflows]);
 
   useEffect(() => {
     void load();
@@ -606,10 +625,15 @@ export function FundsPage() {
                   <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={[{ value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已审核" }, { value: "REJECTED", label: "已拒绝" }]} onChange={setCashflowStatus} />
                   <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
                   <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
+                  <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
                 </div>
-                {cashflows.length >= 500 ? (
-                  <Typography.Text type="warning">流水仅加载最近 500 条，请用日期区间缩小范围以查看更早数据。</Typography.Text>
-                ) : null}
+                {cashflowTotal > cashflows.length ? (
+                  <Typography.Text type="warning">
+                    共匹配 {cashflowTotal} 笔，已加载 {cashflows.length} 笔（单次上限 2000 条，请用日期区间缩小范围）。
+                  </Typography.Text>
+                ) : (
+                  <Typography.Text type="secondary">共 {cashflowTotal} 笔资金流水。</Typography.Text>
+                )}
                 <StatRow
                   items={[
                     { label: "总收入", amount: totalFlowIncome },

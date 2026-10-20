@@ -660,7 +660,7 @@ export const cashflowsApi = {
     occurred_to?: string;
     limit?: number;
     offset?: number;
-  }) => api.get<Cashflow[]>("/cashflows", { params }).then((r) => r.data),
+  }) => api.get<{ items: Cashflow[]; total: number }>("/cashflows", { params }).then((r) => r.data),
 };
 
 export const rebatesApi = {

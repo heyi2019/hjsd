@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -619,14 +619,14 @@ def list_cashflows(
     limit: int = 100,
     offset: int = 0,
     user: CurrentUser | None = None,
-) -> list[dict[str, Any]]:
-    """统一查询资金明细，直接返回订单号，避免前端按日期和金额猜来源。"""
+) -> tuple[list[dict[str, Any]], int]:
+    """统一查询资金明细，直接返回订单号，避免前端按日期和金额猜来源。
+
+    返回 (本页明细, 命中总数)；总数用于前端判断是否还有更多数据。
+    """
     stmt = (
         select(Cashflow, Order.order_no)
         .outerjoin(Order, Order.id == Cashflow.order_id)
-        .order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc())
-        .limit(limit)
-        .offset(offset)
     )
     if pool_id is not None:
         if user is not None and not user.can_see_pool(pool_id):
@@ -671,8 +671,13 @@ def list_cashflows(
     if created_by is not None:
         stmt = stmt.where(Cashflow.created_by == created_by)
 
+    total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows: list[dict[str, Any]] = []
-    for flow, order_no in session.execute(stmt).all():
+    for flow, order_no in session.execute(
+        stmt.order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all():
         if flow.order_event_id is not None:
             source = "ORDER_EVENT"
         elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
@@ -720,7 +725,7 @@ def list_cashflows(
     )
     for row in rows:
         row["extra_values"] = extras.get(row["id"], {})
-    return rows
+    return rows, total
 
 __all__ = [
     "approve_cashflow",

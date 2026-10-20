@@ -122,7 +122,7 @@ def test_supported_live_field_entities_round_trip_through_api(
     cashflow_list = seeded_client.get("/api/v1/cashflows", headers=headers)
     assert any(
         item["extra_values"] == {"cashflow_note": "测试支出"}
-        for item in cashflow_list.json()
+        for item in cashflow_list.json()["items"]
     )
 
     order = orders_service.create_order(

@@ -193,8 +193,8 @@ class TestDepositQueries:
         )
 
         assert response.status_code == 200, response.text
-        assert [item["id"] for item in response.json()] == [first.id]
-        assert second.id not in [item["id"] for item in response.json()]
+        assert [item["id"] for item in response.json()["items"]] == [first.id]
+        assert second.id not in [item["id"] for item in response.json()["items"]]
 
     def test_positive_amounts_are_business_errors_in_service(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -1128,7 +1128,7 @@ class TestFinanceApi:
         )
 
         deposits = service.list_deposits(seeded_db, user=scoped)
-        cashflows = service.list_cashflows(seeded_db, user=scoped)
+        cashflows, _ = service.list_cashflows(seeded_db, user=scoped)
 
         assert deposits
         assert {item.pool_id for item in deposits} == {1}
@@ -1173,7 +1173,64 @@ class TestFinanceApi:
             headers=scoped_headers,
         )
         assert response.status_code == 200, response.text
-        assert [row["flow_no"] for row in response.json()] == ["CF-PAGE-1"]
+        assert [row["flow_no"] for row in response.json()["items"]] == ["CF-PAGE-1"]
+
+    def test_cashflow_list_total_counts_all_matching_rows(
+        self, seeded_client, seeded_db
+    ):
+        """分页响应中的 total 必须等于命中总数（而非本页条数），前端据此判断还有更多。"""
+        scoped = CurrentUser.build(
+            id=11,
+            username="scoped-finance-total",
+            roles=["FINANCE"],
+            owner_scope="SELF",
+            pool_ids=frozenset({1, 2}),
+        )
+        scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
+        seeded_db.add_all(
+            [
+                Cashflow(
+                    flow_no="CF-TOTAL-1", pool_id=1, occurred_on=date(2026, 10, 1),
+                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("1"),
+                    created_by="pytest", updated_by="pytest",
+                ),
+                Cashflow(
+                    flow_no="CF-TOTAL-2", pool_id=2, occurred_on=date(2026, 10, 2),
+                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("2"),
+                    created_by="pytest", updated_by="pytest",
+                ),
+                Cashflow(
+                    flow_no="CF-TOTAL-3", pool_id=1, occurred_on=date(2026, 10, 3),
+                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("3"),
+                    created_by="pytest", updated_by="pytest",
+                ),
+            ]
+        )
+        seeded_db.flush()
+
+        # 翻完所有页，收集 flow_no，验证 total 一致且不被截断。
+        collected: list[str] = []
+        offset = 0
+        page_total = None
+        while True:
+            page = seeded_client.get(
+                "/api/v1/cashflows",
+                params={"limit": 2, "offset": offset},
+                headers=scoped_headers,
+            )
+            assert page.status_code == 200, page.text
+            body = page.json()
+            if page_total is None:
+                page_total = body["total"]
+            else:
+                assert body["total"] == page_total
+            collected.extend(row["flow_no"] for row in body["items"])
+            if not body["items"] or len(collected) >= page_total:
+                break
+            offset += 2
+        assert page_total is not None and page_total >= 3
+        for expected in ("CF-TOTAL-1", "CF-TOTAL-2", "CF-TOTAL-3"):
+            assert expected in collected
 
     def test_scoped_cashflow_order_filter_respects_order_owner(
         self, seeded_client, seeded_db
@@ -1242,9 +1299,9 @@ class TestFinanceApi:
         )
 
         assert own.status_code == 200, own.text
-        assert [row["flow_no"] for row in own.json()] == ["CF-SCOPE-OWN"]
+        assert [row["flow_no"] for row in own.json()["items"]] == ["CF-SCOPE-OWN"]
         assert foreign.status_code == 200, foreign.text
-        assert foreign.json() == []
+        assert foreign.json()["items"] == []
 
     def test_scoped_operator_cannot_write_rebate_for_other_order(
         self, seeded_client, seeded_db
@@ -1532,7 +1589,7 @@ class TestFinanceApi:
         response = seeded_client.get("/api/v1/cashflows", headers=headers)
 
         assert response.status_code == 200, response.text
-        rows = response.json()
+        rows = response.json()["items"]
         assert {row["category"] for row in rows} >= {"BUY", "REBATE", "DEPOSIT_HOLD"}
         assert all("order_no" in row for row in rows)
         assert all(row["order_no"] is not None for row in rows)

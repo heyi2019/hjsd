@@ -61,7 +61,7 @@ beforeEach(() => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
-  resolveMock(vi.mocked(catalog.cashflowsApi.list), cashflows);
+  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length });
   vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([]);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);

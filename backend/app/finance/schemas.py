@@ -144,6 +144,13 @@ class CashflowOut(BaseModel):
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
+class CashflowListOut(BaseModel):
+    """资金流水分页响应：返回本页明细与命中总数，便于前端判断是否还有更多。"""
+
+    items: list[CashflowOut]
+    total: int = Field(ge=0)
+
+
 class CashflowCreate(RequestModel):
     pool_id: int
     pool_account_id: int | None = None
@@ -300,6 +307,7 @@ __all__ = [
     "PeriodLockCreate",
     "PeriodLockOut",
     "CashflowOut",
+    "CashflowListOut",
     "CashflowCreate",
     "CashflowReject",
     "CashflowReverse",

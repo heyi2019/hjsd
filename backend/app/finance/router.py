@@ -249,7 +249,7 @@ def _transfer_out(db: Session, result: dict) -> schemas.TransferOut:
     )
 
 
-@router.get("/cashflows", response_model=list[schemas.CashflowOut])
+@router.get("/cashflows", response_model=schemas.CashflowListOut)
 def list_cashflows(
     pool_id: int | None = Query(default=None),
     order_id: int | None = Query(default=None),
@@ -262,17 +262,17 @@ def list_cashflows(
     accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
-) -> list[schemas.CashflowOut]:
+) -> schemas.CashflowListOut:
     if pool_id is not None and not user.can_see_pool(pool_id):
-        return []
+        return schemas.CashflowListOut(items=[], total=0)
     if pool_id is None and not (user.is_admin or user.owner_scope == "ALL"):
         if not user.pool_ids:
-            return []
-        items = service.list_cashflows(
+            return schemas.CashflowListOut(items=[], total=0)
+        items, total = service.list_cashflows(
             db,
             pool_ids=sorted(user.pool_ids),
             order_id=order_id,
@@ -292,9 +292,12 @@ def list_cashflows(
             offset=offset,
             user=user,
         )
-        return [_cashflow_out(db, item) for item in items]
+        return schemas.CashflowListOut(
+            items=[_cashflow_out(db, item) for item in items],
+            total=total,
+        )
 
-    items = service.list_cashflows(
+    items, total = service.list_cashflows(
         db,
         pool_id=pool_id,
         order_id=order_id,
@@ -314,7 +317,10 @@ def list_cashflows(
         offset=offset,
         user=user,
     )
-    return [_cashflow_out(db, item) for item in items]
+    return schemas.CashflowListOut(
+        items=[_cashflow_out(db, item) for item in items],
+        total=total,
+    )
 
 
 @router.post("/cashflows", response_model=schemas.CashflowOut, status_code=201)

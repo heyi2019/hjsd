@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
-  resolveMock(vi.mocked(catalog.cashflowsApi.list), cashflows);
+  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length });
   vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([]);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
@@ -128,7 +128,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("单边划转可选择对端资金池并提交修复原因", async () => {
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.list), [{ ...cashflows[0], transfer_id: "TRF-001" }]);
+    resolveMockOnce(vi.mocked(catalog.cashflowsApi.list), { items: [{ ...cashflows[0], transfer_id: "TRF-001" }], total: 1 });
     vi.mocked(catalog.transfersApi.repair).mockResolvedValueOnce({ transfer_id: "TRF-001" });
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByText(/POOL-A/);

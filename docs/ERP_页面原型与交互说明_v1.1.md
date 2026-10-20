@@ -321,8 +321,9 @@ Tab 栏右侧固定「新建订单⌄」下拉（`order.create`）：新建回�
 | P0-1 无 URL 路由 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | `main.tsx` 接入 `HashRouter`；`AppShell` 落点改由 `useLocation/useNavigate` 驱动，深链/刷新/前进后退可用；空路径重定向 `/dashboard`；业务中心支持 `/business/inventory` 深链子页。 |
 | P0-2 切导航重挂载丢状态 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | 移除 `key={active}` 重挂载，改为 keep-alive：访问过的页面常驻挂载、非激活态 `display:none`（+`aria-hidden`），筛选/分页/子 Tab/滚动位置切走再回保留；转场弹簧入场用 `pageRef`+reflow 重放 `.page-enter`，不再靠重挂载。 |
 | P0-8 业务中心入口落点不一致 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | 落点统一由 URL 决定；侧栏/⌘K/数据中心入口均落 `/business/inventory`（库存中心），与 `businessCenter.ts` 默认台账的差异通过入口显式传 tab 消解；切导航不再重置子 Tab（keep-alive 保留上次所在子页）。 |
+| P0-7 流水服务端分页 + 移除 500 硬截断 | ✅ 已闭环（批次二 2026-10-20） | 后端 `/cashflows` 改返回 `CashflowListOut{items, total}`，支持 `occurred_from`/`occurred_to` 服务端日期过滤 + `limit`/`offset` 分页（上限 2000），`total` 为命中总数；前端 `FundsPage` 移除 `limit:500` 硬截断，日期区间改为服务端传参（`fetchCashflows` 用 ref 持有当前值，全局 `load()` 刷新仍套用当前区间），表格保留客户端关键词/资金池/方向/状态筛选与 `DataTable` 客户端分页；原「仅加载最近 500 条」警告改为「共 Y 笔 / 已加载 X 笔」提示，超上限才警示；`transferAnomalies` 单边划转与「未达流水」钻取仍基于完整已加载集合，对账/导出数据完整性保留。 |
 
-**仍开放（架构级/大改动）：** P0-7 服务端分页与 500 条硬截断（流水 `FundsPage` 硬 `limit:500`，属数据正确性，已排期批次二，待并行会话 FundsPage WIP 合入后实施，避免冲突）；P1-9/10/11/12/13/14/16/18/19/20（多为筛选/分页保留、滚动定位、未保存提示、窄屏列宽、批量回执等体验打磨）。
+**仍开放（架构级/大改动）：** P1-9/10/11/12/13/14/16/18/19/20（多为筛选/分页保留、滚动定位、未保存提示、窄屏列宽、批量回执等体验打磨）。
 
 ### 正面基线（回归时不得破坏）
 

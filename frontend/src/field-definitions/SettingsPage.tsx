@@ -17,6 +17,8 @@ export function SettingsPage() {
   const { can } = useSession();
   const [compact, setCompact] = useState(false);
   const [activeTab, setActiveTab] = useState("business-dictionary");
+  // 标准导入的批次选择提升到父级：SettingsPage 的 Tab 非挂载，切换后回到导入页仍能保留上次所选批次。
+  const [importBatchId, setImportBatchId] = useState<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 960px)");
@@ -34,7 +36,7 @@ export function SettingsPage() {
     { key: "fields", label: "活字段", render: () => <FieldsPanel /> },
     { key: "game-types", label: "游戏类型", render: () => <GameTypeSettingsPanel /> },
     { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
-    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", render: () => <ImportWorkbench embedded /> }] : []),
+    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", render: () => <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} /> }] : []),
     ...(can("user.manage")
       ? [
           { key: "users", label: "人员与权限", render: () => <UsersPanel /> },

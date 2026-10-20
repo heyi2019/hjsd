@@ -1,7 +1,7 @@
 /** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。 */
 import { Card, Input, Select, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
 import { QualityPanel } from "../quality/QualityPanel";
 import { NotificationsPanel } from "../notifications/NotificationsPanel";
@@ -56,6 +56,9 @@ const REPORT_LABEL: Record<string, string> = {
   "order-profit": "订单利润",
 };
 
+/** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
+type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
+
 export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void }) {
   const [activeTab, setActiveTab] = useState("r1");
   const [exportError, setExportError] = useState<string | null>(null);
@@ -63,6 +66,19 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
   const [exportTo, setExportTo] = useState("");
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
+  // 报表视图统计周期：提升到父级，避免切换 Tab（非挂载）后筛选条件丢失。
+  const [reportFrom, setReportFrom] = useState("");
+  const [reportTo, setReportTo] = useState("");
+  const reportRange: ReportRange = {
+    params: { from: reportFrom || undefined, to: reportTo || undefined },
+    picker: (
+      <Space size="small">
+        <Input type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} className="ui-control-width-date" />
+        <span className="muted">至</span>
+        <Input type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} className="ui-control-width-date" />
+      </Space>
+    ),
+  };
   const exportSelected = async () => {
     if (selectedReports.length === 0) {
       setExportError("请至少勾选一项报表");
@@ -91,12 +107,12 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
   };
   const tabItems = [
     { key: "r1", label: "库存 R1", render: () => <InventoryReport /> },
-    { key: "r2", label: "月度损益 R2", render: () => <MonthlyPnl /> },
-    { key: "r3", label: "提成对账 R3", render: () => <Commission /> },
+    { key: "r2", label: "月度损益 R2", render: () => <MonthlyPnl range={reportRange} /> },
+    { key: "r3", label: "提成对账 R3", render: () => <Commission range={reportRange} /> },
     { key: "r4", label: "资金日报 R4", render: () => <DailyFunds /> },
-    { key: "r5", label: "业务损益 R5", render: () => <BusinessPnl /> },
-    { key: "finance-dimensions", label: "资金属性分析", render: () => <FinanceDimensions /> },
-    { key: "profit", label: "订单利润", render: () => <OrderProfit /> },
+    { key: "r5", label: "业务损益 R5", render: () => <BusinessPnl range={reportRange} /> },
+    { key: "finance-dimensions", label: "资金属性分析", render: () => <FinanceDimensions range={reportRange} /> },
+    { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
     { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },
     { key: "quality", label: "质量中心", render: () => <QualityPanel /> },
     { key: "notifications", label: "系统提醒", render: () => <NotificationsPanel /> },
@@ -167,22 +183,7 @@ function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
   return { data, loading, error, reload };
 }
 
-/** 区间选择用原生日期输入：避免为了一个筛选器把 dayjs 拉成显式依赖。 */
-function useRange() {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const params: { from?: string; to?: string } = {};
-  if (from) params.from = from;
-  if (to) params.to = to;
-  const picker = (
-    <Space size="small">
-      <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="ui-control-width-date" />
-      <span className="muted">至</span>
-      <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="ui-control-width-date" />
-    </Space>
-  );
-  return { params, picker };
-}
+/** 区间选择已提升到父级（reportRange），各报表通过 range 属性复用父级统计周期。 */
 
 
 function InventoryReport() {
@@ -238,8 +239,8 @@ function InventoryReport() {
   );
 }
 
-function MonthlyPnl() {
-  const { params, picker } = useRange();
+function MonthlyPnl({ range }: { range: ReportRange }) {
+  const { params, picker } = range;
   const { data, loading, error, reload } = useReport<MonthlyPnlReport>(
     () => reportsApi.monthlyPnl(params),
     [params.from, params.to],
@@ -282,8 +283,8 @@ function MonthlyPnl() {
   );
 }
 
-function Commission() {
-  const { params, picker } = useRange();
+function Commission({ range }: { range: ReportRange }) {
+  const { params, picker } = range;
   const { data, loading, error, reload } = useReport<CommissionReport>(
     () => reportsApi.commission(params),
     [params.from, params.to],
@@ -374,8 +375,8 @@ function DailyFunds() {
   );
 }
 
-function FinanceDimensions() {
-  const { params, picker } = useRange();
+function FinanceDimensions({ range }: { range: ReportRange }) {
+  const { params, picker } = range;
   const { data, loading, error, reload } = useReport<FinanceDimensionReport>(
     () => reportsApi.financeDimensions(params),
     [params.from, params.to],
@@ -415,8 +416,8 @@ function FinanceDimensions() {
   );
 }
 
-function BusinessPnl() {
-  const { params, picker } = useRange();
+function BusinessPnl({ range }: { range: ReportRange }) {
+  const { params, picker } = range;
   const { data, loading, error, reload } = useReport<BusinessPnlReport>(
     () => reportsApi.businessPnl(params),
     [params.from, params.to],
@@ -474,8 +475,8 @@ function BusinessPnl() {
   );
 }
 
-function OrderProfit() {
-  const { params, picker } = useRange();
+function OrderProfit({ range }: { range: ReportRange }) {
+  const { params, picker } = range;
   const { data, loading, error, reload } = useReport<OrderProfitReport>(
     () => reportsApi.orderProfit(params),
     [params.from, params.to],

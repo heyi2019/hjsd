@@ -82,9 +82,28 @@ function downloadImportTemplate(sourceKind: string) {
   URL.revokeObjectURL(url);
 }
 
-export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
+export function ImportWorkbench({
+  embedded = false,
+  batchId: batchIdProp,
+  onBatchIdChange,
+}: {
+  embedded?: boolean;
+  /** 受控批次选择：由父级（如 SettingsPage）持有，避免 Tab 非挂载时丢失筛选。 */
+  batchId?: number | null;
+  onBatchIdChange?: (id: number | null) => void;
+}) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
-  const [batchId, setBatchId] = useState<number | null>(null);
+  const isBatchControlled = batchIdProp !== undefined;
+  const [internalBatchId, setInternalBatchId] = useState<number | null>(null);
+  const batchId = isBatchControlled ? (batchIdProp as number | null) : internalBatchId;
+  const setBatchId = useCallback(
+    (value: number | null) => {
+      const next = value ?? null;
+      if (!isBatchControlled) setInternalBatchId(next);
+      onBatchIdChange?.(next);
+    },
+    [isBatchControlled, onBatchIdChange],
+  );
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [preview, setPreview] = useState<MappingPreview | null>(null);
   const [report, setReport] = useState<ReconciliationReport | null>(null);
@@ -106,7 +125,7 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
     try {
       const data = await importsApi.batches();
       setBatches(data.items);
-      setBatchId((prev) => prev ?? data.items[0]?.id ?? null);
+      if (batchId === null) setBatchId(data.items[0]?.id ?? null);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));

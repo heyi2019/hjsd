@@ -332,8 +332,9 @@ Tab 栏右侧固定「新建订单⌄」下拉（`order.create`）：新建回�
 | P1-18 未保存改动静默丢弃 | ✅ 已闭环（2026-10-20，关键长表单） | `CreateBusinessModal` 关闭时若 `form.isFieldsTouched()` 弹 `Modal.confirm` 二次确认，避免未保存输入静默丢失（其余短表单后续按需补齐）。 |
 | P1-19 多表未配 scroll x | ✅ 已闭环（2026-10-20） | CustomersPage 主表、QualityPanel、RebatesPanel、InstallmentsPanel 补 `scroll={{ x: "max-content" }}`，窄屏列宽挤压时横向滚动，宽屏不触发。 |
 | P1-20 批量关闭工单回执 | ✅ 已闭环（2026-10-20） | `QualityPanel` 批量关闭回显实际关闭条数（超 50 条提示分批），失败时除 ErrorBanner 外补 `message.error` 回执。 |
+| P1-10 报表/设置 Tab 强制卸载丢筛选 | ✅ 已闭环（2026-10-20，方案 A） | 保持 Tab 非挂载（性能优先），仅把带筛选的报表/设置 Tab 的筛选 state 提升到父级：`ReportsPage` 的 5 张区间报表（月度损益/提成对账/资金属性/业务损益/订单利润）共用父级 `reportFrom`/`reportTo` 统计周期（移除 `useRange`），切换 Tab 后筛选保留；`SettingsPage` 把 `ImportWorkbench` 的批次选择 `batchId` 提升到父级并改为受控可选（保留「未选时默认首个批次」语义）。导出筛选（`exportFrom/To`）保持独立不变。 |
 
-**仍开放（架构级/大改动）：** P1-10（报表/设置 Tab 不挂载是**有意**性能优化——避免首屏 13 组报表请求、避免切换无关页面产生状态更新；筛选状态保留需对 13 张报表 + 设置各 Tab 做状态提升或改为 keep-alive，权衡较大，待裁决）。
+**仍开放（架构级/大改动）：** 无（P0/P1 全部闭环）。报表/设置 Tab 不挂载属有意性能优化，P1-10 按方案 A 仅提升筛选 state 到父级，已保留筛选且不损失首屏性能。
 
 ### 正面基线（回归时不得破坏）
 

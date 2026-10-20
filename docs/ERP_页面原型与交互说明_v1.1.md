@@ -38,11 +38,15 @@
 
 ## 2. 应用外壳与全局交互
 
-### 2.1 无 URL 路由（重要）
+### 2.1 路由（HashRouter，2026-10-20 路由批次接入）
 
-前端**不存在页面路由**。`main.tsx:36` 直接渲染 `<AppShell />`，未挂载 `BrowserRouter`；`react-router-dom` 虽在 `package.json` 声明，但 `src` 内零引用。当前页面由 `AppShell.tsx:34` 的 `useState("dashboard")` 持有。
+前端已引入客户端路由。`main.tsx:40-42` 用 `<HashRouter>` 包裹 `<ThemedApp />`，为整个应用提供路由上下文；`AppShell.tsx:3` 通过 `useLocation`/`useNavigate` 驱动界面。
 
-**直接后果**：刷新、浏览器后退/前进、直接输入 URL 一律回到工作台；页面无法分享链接、无法收藏深层位置。V1.0 文档中的 `/dashboard`、`/business` 等路径**均不存在**，本章后续一律用**页面键**指代。
+- **落点由 URL 决定**：`AppShell.tsx:39-40` 从 hash 第一段解析 `active`（非法/空路径回退 `dashboard`）；空路径重定向 `/dashboard`（`navigateTo` 内的 `navigate("/dashboard", { replace: true })`，`AppShell.tsx:53`）。
+- **深链可用**：刷新、浏览器后退/前进、直接输入 `#/business/inventory` 均可定位到具体页面与子 Tab；业务中心支持 `/business/inventory` 深链库存中心。
+- **零服务端改造**：采用 hash 模式（非 BrowserRouter），无需 Nginx history fallback；E2E 的 `page.goto("/")` 仍可用。
+
+> 注意：V1.0 文档中的页面路径现在**真实存在**（以 hash 形式），本章后续仍用**页面键**指代一级导航，子页用 `key/tab` 二级路径。
 
 ### 2.2 一级入口
 
@@ -57,9 +61,9 @@
 | `operations` | 经营中心 | `ReportsPage` | `React.lazy` |
 | `settings` | 设置 | `SettingsPage` | `React.lazy` |
 
-懒加载页面统一挂 `Suspense`（`AppShell.tsx:177`），降级文案「正在打开…」。
+懒加载页面统一挂 `Suspense`（`AppShell.tsx:210` 路由渲染块），降级文案「正在打开…」。页面以 keep-alive 插槽渲染（见 2.5），访问过的页面常驻挂载，仅非激活态隐藏。
 
-### 2.3 顶栏（`AppShell.tsx:124-172`）
+### 2.3 顶栏（AppShell 顶栏区，`AppShell.tsx` 约 110–185）
 
 | 元素 | 行为 |
 |---|---|
@@ -71,13 +75,15 @@
 
 ### 2.4 快捷键与移动端
 
-- **⌘/Ctrl + K**：直达业务中心（`AppShell.tsx:47-56`）。
-- **窄屏「管理」入口**：侧栏底部按钮 → Modal，仅含经营中心、设置、用户中心（`AppShell.tsx:201-231`）。
-- 侧栏滚动做 iOS 26 边缘渐隐：按滚动位置写入 `--edge-top/--edge-bottom`（`AppShell.tsx:58-83`）。
+- **⌘/Ctrl + K**：直达业务中心库存 Tab（`AppShell.tsx:72-80` 的快捷键监听 + `navigateTo("business","inventory")`）。
+- **窄屏「管理」入口**：侧栏底部按钮 → Modal，仅含经营中心、设置、用户中心（`AppShell.tsx:255-265` 的列表项 `navigateTo`）。
+- 侧栏滚动做 iOS 26 边缘渐隐：按滚动位置写入 `--edge-top/--edge-bottom`（AppShell 侧栏滚动逻辑）。
 
-### 2.5 页面切换的转场与代价
+### 2.5 页面切换转场与状态保留
 
-`AppShell.tsx:178` 用 `<div className="page-enter" key={active}>`，每次切导航都**卸载重建**页面组件并重放弹簧入场动画。代价是：切走再回到同一页面，**筛选、分页、当前 Tab、滚动位置全部重置**。这是当前最影响连续作业的外壳行为（见第 10 章 P0-2）。
+`AppShell.tsx:206-234` 的路由渲染块采用 **keep-alive**：访问过的页面持续挂载，仅非激活态 `display:none`（并加 `aria-hidden`，从 a11y 树排除）。因此切走再回到同一页面，**筛选、分页、当前子 Tab、滚动位置全部保留**——这是路由批次对原 P0-2 的修复。
+
+转场弹簧入场仍由 `.page-enter` 类驱动，但**不再靠 `key={active}` 重挂载**（重挂载会丢状态），而是 `AppShell.tsx:61-68` 用 `pageRef` + 移除/重加 `page-enter` 类的 reflow 技巧重放动画。
 
 ### 2.6 权限门控
 
@@ -312,8 +318,11 @@ Tab 栏右侧固定「新建订单⌄」下拉（`order.create`）：新建回�
 | P0-6 裸金额 `Input` 无校验 | ✅ 已闭环 | 新增 `shared/lib/validators.ts`（`moneyRules`/`requiredMoneyRules`/`percentRules`）+ `MoneyInput`；`FundsPage`、`InstallmentsPanel`、`RebatesPanel`、`InventoryPanel`、`OrdersPage` 退款、库存三类弹窗、`CustomerLeadPanel` 预算、`AdditionalFeeFields`、`ThFeeSection`、`DfqOrderSection` 全部改为 `MoneyInput` 并挂校验。 |
 | P1-15 客户拉黑无解封入口 | ✅ 已闭环 | 桌面端 `CustomersPage:341` 早有 toggle；本轮补齐**手机端** `MobileCustomerList` 第 69 行：由「仅 ACTIVE 可拉黑」改为 `row.status === "ACTIVE" ? "拉黑" : "解除拉黑"` 切换，与合作方手机端 `:93` 一致。 |
 | P1-17 `Typography.Link` 键盘不可达 | ✅ 已闭环 | `OrdersPage` 等处的「查看详情／更多」由 `Typography.Link` 改为 `Button`，键盘可达（此前回归测试已覆盖）。 |
+| P0-1 无 URL 路由 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | `main.tsx` 接入 `HashRouter`；`AppShell` 落点改由 `useLocation/useNavigate` 驱动，深链/刷新/前进后退可用；空路径重定向 `/dashboard`；业务中心支持 `/business/inventory` 深链子页。 |
+| P0-2 切导航重挂载丢状态 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | 移除 `key={active}` 重挂载，改为 keep-alive：访问过的页面常驻挂载、非激活态 `display:none`（+`aria-hidden`），筛选/分页/子 Tab/滚动位置切走再回保留；转场弹簧入场用 `pageRef`+reflow 重放 `.page-enter`，不再靠重挂载。 |
+| P0-8 业务中心入口落点不一致 | ✅ 已闭环（路由批次 2026-10-20，`60a08ff`） | 落点统一由 URL 决定；侧栏/⌘K/数据中心入口均落 `/business/inventory`（库存中心），与 `businessCenter.ts` 默认台账的差异通过入口显式传 tab 消解；切导航不再重置子 Tab（keep-alive 保留上次所在子页）。 |
 
-**仍开放（架构级/大改动，不在本次交互整改范围）：** P0-1 无 URL 路由、P0-2 切导航重挂载丢状态、P0-7 服务端分页与 500 条硬截断、P0-8 入口落点不一致；P1-9/10/11/12/13/14/16/18/19/20（多为筛选/分页保留、滚动定位、未保存提示、窄屏列宽、批量回执等体验打磨）。
+**仍开放（架构级/大改动）：** P0-7 服务端分页与 500 条硬截断（流水 `FundsPage` 硬 `limit:500`，属数据正确性，已排期批次二，待并行会话 FundsPage WIP 合入后实施，避免冲突）；P1-9/10/11/12/13/14/16/18/19/20（多为筛选/分页保留、滚动定位、未保存提示、窄屏列宽、批量回执等体验打磨）。
 
 ### 正面基线（回归时不得破坏）
 

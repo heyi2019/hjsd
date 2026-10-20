@@ -407,3 +407,15 @@ class TestFoundationApi:
         assert payload["proposed_route"]["pool_code"] == "HJ_PROFIT"
         assert payload["historical_impact"]["order_count"] == 1
         assert payload["historical_impact"]["unchanged"] is True
+
+    def test_update_pool_endpoint_applies_ownership_enum_to_value(
+        self, seeded_client, seeded_db, headers
+    ):
+        pool = _pool(seeded_db, "TMPOWN")
+        response = seeded_client.patch(
+            f"/api/v1/pools/{pool.id}",
+            json={"ownership": "CUSTODY"},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["ownership"] == "CUSTODY"

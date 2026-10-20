@@ -105,3 +105,72 @@ class TestRoutes:
                 actor="pytest",
             )
         assert exc.value.code == ErrorCode.POOL_DISABLED
+
+
+class TestOrderTypeValidationGuards:
+    """补齐 create_order_type / set_route / route_impact_preview /
+    resolve_default_pool 中仅经 service 直调才可触达的防御校验分支。"""
+
+    def test_create_rejects_non_string_sequence_prefix(self, db):
+        with pytest.raises(AppError):
+            service.create_order_type(
+                db,
+                code="QX",
+                name="非串前缀",
+                capital_type=CapitalType.STOCK.value,
+                sequence_prefix=123,
+                actor="pytest",
+            )
+
+    def test_set_route_rejects_invalid_fund_nature(self, seeded_db):
+        with pytest.raises(AppError) as exc:
+            service.set_route(
+                seeded_db,
+                order_type_code="HS",
+                portion=Portion.PRINCIPAL.value,
+                pool_code="HJ_INVEST",
+                fund_nature="BOGUS",
+                actor="pytest",
+            )
+        assert "fund_nature" in str(exc.value)
+
+    def test_impact_preview_rejects_invalid_portion(self, seeded_db):
+        with pytest.raises(AppError) as exc:
+            service.route_impact_preview(
+                seeded_db,
+                order_type_code="HS",
+                portion="BOGUS",
+                pool_code="HJ_INVEST",
+            )
+        assert "portion" in str(exc.value)
+
+    def test_impact_preview_rejects_invalid_fund_nature(self, seeded_db):
+        with pytest.raises(AppError) as exc:
+            service.route_impact_preview(
+                seeded_db,
+                order_type_code="HS",
+                portion=Portion.PRINCIPAL.value,
+                pool_code="HJ_INVEST",
+                fund_nature="BOGUS",
+            )
+        assert "fund_nature" in str(exc.value)
+
+    def test_impact_preview_rejects_disabled_pool(self, seeded_db):
+        pool = service.get_pool_by_code(seeded_db, "HJ_INVEST")
+        service.set_pool_status(seeded_db, pool.id, PoolStatus.DISABLED.value, actor="pytest")
+        seeded_db.commit()
+        with pytest.raises(AppError) as exc:
+            service.route_impact_preview(
+                seeded_db,
+                order_type_code="HS",
+                portion=Portion.PRINCIPAL.value,
+                pool_code="HJ_INVEST",
+            )
+        assert "已停用" in str(exc.value)
+
+    def test_resolve_default_pool_rejects_invalid_fund_nature(self, seeded_db):
+        with pytest.raises(AppError) as exc:
+            service.resolve_default_pool(
+                seeded_db, "HS", Portion.PRINCIPAL.value, fund_nature="BOGUS"
+            )
+        assert "fund_nature" in str(exc.value)

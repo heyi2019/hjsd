@@ -60,6 +60,14 @@ export function DataTable<T>(props: {
     if (!controlled && props.pageSize) setInnerSize(props.pageSize);
   }, [controlled, props.pageSize]);
 
+  useEffect(() => {
+    // 前端分页时同步调用方的页码期望。
+    // 此前 DataTable 自管 innerPage，把调用方「筛选变了 → setPage(1)」的信号整个吞掉：
+    // 结果集变少后仍停在第 N 页，表现为空白页。这里让外部 page 变化能重置内部页码。
+    if (controlled) return;
+    if (props.page && props.page !== innerPage) setInnerPage(props.page);
+  }, [controlled, props.page, innerPage]);
+
   if (props.loading) {
     return (
       <div className="ui-table-loading" role="status" aria-live="polite" aria-busy="true" aria-label="正在加载数据">

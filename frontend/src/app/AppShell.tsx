@@ -216,8 +216,7 @@ export function AppShell() {
                 <div
                   key={key}
                   ref={isActive ? pageRef : undefined}
-                  className={`page-slot${isActive ? " page-enter" : ""}`}
-                  style={{ display: isActive ? "block" : "none" }}
+                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
                   aria-hidden={!isActive}
                 >
                   {key === "dashboard" ? (

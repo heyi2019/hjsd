@@ -7,15 +7,15 @@
 import { Alert } from "antd";
 import type { NormalizedError } from "../api/client";
 
-export function InlineError(props: { error: NormalizedError | null | undefined; style?: React.CSSProperties }) {
+export function InlineError(props: { error: NormalizedError | null | undefined }) {
   if (!props.error) return null;
   return (
     <Alert
       type="error"
       showIcon
       role="alert"
+      className="inline-error"
       message={props.error.message}
-      style={{ marginBottom: 12, ...props.style }}
     />
   );
 }

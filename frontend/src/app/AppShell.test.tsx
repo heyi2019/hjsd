@@ -73,6 +73,9 @@ beforeEach(() => {
       }
     }
   }
+  // 资金流水接口返回分页包裹体（items/total），与 Batch 2 后 FundsPage 的消费方式对齐；
+  // 通用兜底只给 []，会导致 response.items 为 undefined 进而 .filter 崩溃。
+  vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {

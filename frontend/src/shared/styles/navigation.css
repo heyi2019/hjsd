@@ -308,3 +308,8 @@
   white-space: nowrap;
 }
 .topbar-role-name { color: var(--color-text-primary); }
+
+/* keep-alive 页面槽：激活态正常渲染（弹簧入场），非激活态隐藏但保持挂载（避免切导航重挂载丢状态）。
+   原 display 用内联 style 控制，违反 ui_guards 规则 11（禁止内联样式），迁移到此处。 */
+.page-slot { display: block; }
+.page-slot--hidden { display: none; }

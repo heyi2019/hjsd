@@ -1124,3 +1124,6 @@
 .ui-drawer-actions { justify-content: flex-end; width: 100%; }
 .policy-version-date-row { width: 100%; }
 .policy-version-date-row__item { flex: 1; }
+
+/* 容器内错误提示（Modal / Drawer 内部）下边距：原用内联 style 控制，迁移到此处（ui_guards 规则 11）。 */
+.inline-error { margin-block-end: var(--space-3); }

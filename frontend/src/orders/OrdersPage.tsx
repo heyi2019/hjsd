@@ -1,5 +1,5 @@
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Button, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
+import { Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -56,7 +56,7 @@ function MobileOrderList(props: {
             <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
             <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
           </dl>
-          <Button type="link" onClick={() => props.onSelect(order)}>查看详情</Button>
+          <PermissionButton permission="order.event.post" type="link" onClick={() => props.onSelect(order)}>查看详情</PermissionButton>
         </article>
       ))}
     </div>
@@ -325,7 +325,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       key: "actions",
       render: (_, order) => (
         <Space size="small">
-          <Button type="link" onClick={() => void openOrder(order)}>查看详情</Button>
+          <PermissionButton permission="order.event.post" type="link" onClick={() => void openOrder(order)}>查看详情</PermissionButton>
           <PermissionGate permission="order.event.post">
             <Dropdown
               trigger={["click"]}
@@ -347,7 +347,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 },
               }}
             >
-              <Button type="link">更多⌄</Button>
+              <PermissionButton permission="order.event.post" type="link">更多⌄</PermissionButton>
             </Dropdown>
           </PermissionGate>
         </Space>
@@ -512,14 +512,14 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               <PermissionButton permission="order.event.post">更多⌄</PermissionButton>
             </Dropdown>
             {selectedOrder.account_id ? (
-              <Button type="link" onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
+              <PermissionButton permission="order.event.post" type="link" onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
                 去库存中心
-            </Button>
+            </PermissionButton>
             ) : null}
             {selectedOrder.installment_principal ? (
-              <Button type="link" onClick={() => { setActiveTab("collections"); setSelectedOrder(null); }}>
+              <PermissionButton permission="order.event.post" type="link" onClick={() => { setActiveTab("collections"); setSelectedOrder(null); }}>
                 去分期与回款
-            </Button>
+            </PermissionButton>
             ) : null}
           </Space>
         ) : null}

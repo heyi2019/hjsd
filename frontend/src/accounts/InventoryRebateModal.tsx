@@ -9,6 +9,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
+import { moneyRules, percentRules } from "../shared/lib/validators";
 import { ErrorBanner, MoneyInput, PermissionButton } from "../shared/ui";
 
 type RebateKind = "BUY" | "SELL";
@@ -40,6 +41,7 @@ export function InventoryRebateModal(props: {
 }) {
   const [detail, setDetail] = useState<AccountExecutionDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
@@ -81,6 +83,7 @@ export function InventoryRebateModal(props: {
     const kind = values.rebate_type?.[0];
     const order = kind ? sourceOrder(detail, kind) : undefined;
     if (!kind || !order) return;
+    setSubmitting(true);
     try {
       await rebatesApi.create({
         source_order_id: order.order_id,
@@ -97,6 +100,8 @@ export function InventoryRebateModal(props: {
       await props.onCreated();
     } catch (cause) {
       setError(normalizeError(cause));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -107,7 +112,7 @@ export function InventoryRebateModal(props: {
       destroyOnHidden
       onCancel={props.onClose}
       footer={
-        <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" onClick={() => form.submit()}>
+        <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} onClick={() => form.submit()}>
           确认登记
         </PermissionButton>
       }
@@ -141,11 +146,11 @@ export function InventoryRebateModal(props: {
             name="base_amount"
             label="返点金额"
             extra="按此金额 × 返点比例计算预计返点"
-            rules={[{ required: true, message: "请输入返点金额" }]}
+            rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
           >
-            <MoneyInput />
+            <MoneyInput placeholder="请输入返点金额" />
           </Form.Item>
-          <Form.Item name="rate" label="返点比例" initialValue="0">
+          <Form.Item name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
             <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
           </Form.Item>
           <Form.Item name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>

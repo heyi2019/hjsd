@@ -1,5 +1,5 @@
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
+import { Button, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -14,11 +14,13 @@ import {
 import { api, normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
+import { requiredMoneyRules, percentRules } from "../shared/lib/validators";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import {
   DataTable,
   ErrorBanner,
+  MoneyInput,
   PermissionButton,
   PermissionGate,
   StatusTag,
@@ -54,7 +56,7 @@ function MobileOrderList(props: {
             <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
             <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
           </dl>
-          <Typography.Link onClick={() => props.onSelect(order)}>查看详情</Typography.Link>
+          <Button type="link" onClick={() => props.onSelect(order)}>查看详情</Button>
         </article>
       ))}
     </div>
@@ -323,7 +325,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       key: "actions",
       render: (_, order) => (
         <Space size="small">
-          <Typography.Link onClick={() => void openOrder(order)}>查看详情</Typography.Link>
+          <Button type="link" onClick={() => void openOrder(order)}>查看详情</Button>
           <PermissionGate permission="order.event.post">
             <Dropdown
               trigger={["click"]}
@@ -345,7 +347,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 },
               }}
             >
-              <Typography.Link>更多⌄</Typography.Link>
+              <Button type="link">更多⌄</Button>
             </Dropdown>
           </PermissionGate>
         </Space>
@@ -510,14 +512,14 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               <PermissionButton permission="order.event.post">更多⌄</PermissionButton>
             </Dropdown>
             {selectedOrder.account_id ? (
-              <Typography.Link onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
+              <Button type="link" onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
                 去库存中心
-              </Typography.Link>
+            </Button>
             ) : null}
             {selectedOrder.installment_principal ? (
-              <Typography.Link onClick={() => { setActiveTab("collections"); setSelectedOrder(null); }}>
+              <Button type="link" onClick={() => { setActiveTab("collections"); setSelectedOrder(null); }}>
                 去分期与回款
-              </Typography.Link>
+            </Button>
             ) : null}
           </Space>
         ) : null}
@@ -529,6 +531,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
         okText="确认取消交易"
+        okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >
         <Form form={cancelForm} layout="vertical" onFinish={submitCancelTransaction}>
@@ -608,7 +611,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   )}
                 </Form.Item>
                 <Form.Item {...field} name={[field.name, "role"]} hidden><Input /></Form.Item>
-                <Form.Item {...field} name={[field.name, "allocation_rate"]} label="比例" rules={[{ required: true }]}><Input suffix="%" inputMode="decimal" /></Form.Item>
+                <Form.Item {...field} name={[field.name, "allocation_rate"]} label="比例" rules={[{ required: true, message: "请输入比例" }, ...percentRules("比例")]}><Input suffix="%" inputMode="decimal" /></Form.Item>
               </Space>
             ))}
           </Form.List>
@@ -647,8 +650,8 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             }
           }}
         >
-          <Form.Item name="amount" label="退款金额" rules={[{ required: true, message: "请输入退款金额" }]}>
-            <Input inputMode="decimal" placeholder="请输入退款金额" />
+          <Form.Item name="amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
+            <MoneyInput placeholder="请输入退款金额" />
           </Form.Item>
           <Form.Item name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
             <AntSelect options={["COMPANY", "CUSTOMER", "CONSIGNOR", "PLATFORM", "OTHER"].map((value) => ({ value, label: { COMPANY: "公司", CUSTOMER: "客户", CONSIGNOR: "寄售方", PLATFORM: "平台", OTHER: "其他" }[value] }))} />

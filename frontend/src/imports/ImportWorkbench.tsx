@@ -18,9 +18,11 @@ import {
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import {
+  ConfirmButton,
   DataTable,
   ErrorBanner,
   FormDrawer,
+  InlineError,
   MoneyText,
   PageHeader,
   PermissionButton,
@@ -245,15 +247,22 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
         }))}
         onChange={setBatchId}
       />
-      <PermissionButton
+      <ConfirmButton
         permission="import.manage"
         type="primary"
-        loading={acting}
+        danger
         disabled={!canRollback}
-        onClick={() => current && act(() => importsApi.commit(current.id))}
+        title="确认导入批次"
+        description="确认后批次状态将变为「已确认」并锁定映射。确认前请确保所有未映射、未裁决项已处理。"
+        okText="确认提交批次"
+        onConfirm={async () => {
+          if (!current) return;
+          await importsApi.commit(current.id);
+          await refreshAll();
+        }}
       >
         确认批次
-      </PermissionButton>
+      </ConfirmButton>
       <PermissionButton
         permission="import.manage"
         danger
@@ -453,6 +462,8 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
           { name: "account_id", label: "关联库存编号 ID（可空）", kind: "number" as const },
         ]}
         submitText="确认指派"
+        submitting={acting}
+        error={error}
         onClose={() => setMapTarget(null)}
         onSubmit={(values) => {
           const target = mapTarget;
@@ -510,6 +521,7 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
           }).catch(() => undefined);
         }}
       >
+        <InlineError error={error} />
         <Form form={importForm} layout="vertical">
           <Form.Item name="source_name" label="数据名称" rules={[{ required: true, message: "请输入数据名称" }]}>
             <Input placeholder="例如：2026年10月订单导入" />
@@ -556,6 +568,8 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
         title={`标记单边划转 · 第 ${unlinkedTarget?.row_no ?? ""} 行`}
         fields={[{ name: "note", label: "说明", kind: "textarea" as const }]}
         submitText="确认标记"
+        submitting={acting}
+        error={error}
         onClose={() => setUnlinkedTarget(null)}
         onSubmit={(values) => {
           const target = unlinkedTarget;
@@ -577,6 +591,8 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
         title={`跳过 · 第 ${skipTarget?.row_no ?? ""} 行`}
         fields={[{ name: "reason", label: "跳过理由", required: true, kind: "textarea" as const }]}
         submitText="确认跳过"
+        submitting={acting}
+        error={error}
         onClose={() => setSkipTarget(null)}
         onSubmit={(values) => {
           const target = skipTarget;
@@ -593,6 +609,8 @@ export function ImportWorkbench({ embedded = false }: { embedded?: boolean }) {
         title={`回滚批次 · ${rollbackTarget?.batch_no ?? ""}`}
         fields={[{ name: "reason", label: "回滚理由", required: true, kind: "textarea" as const }]}
         submitText="确认回滚"
+        submitting={acting}
+        error={error}
         onClose={() => setRollbackTarget(null)}
         onSubmit={(values) => {
           const target = rollbackTarget;

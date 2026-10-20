@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { DataTable, ErrorBanner, PermissionButton, StatRow, StatusTag } from "../shared/ui";
+import { DataTable, ErrorBanner, InlineError, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 
 export function QualityPanel() {
   const [summary, setSummary] = useState<QualitySummary | null>(null);
@@ -16,6 +16,9 @@ export function QualityPanel() {
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [batchCloseForm] = Form.useForm();
+  const [creating, setCreating] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [batchClosing, setBatchClosing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -31,6 +34,7 @@ export function QualityPanel() {
   useEffect(() => { void load(); }, [load]);
 
   const createIssue = async (values: Record<string, unknown>) => {
+    setCreating(true);
     try {
       await qualityApi.create({
         code: values.code as string,
@@ -45,10 +49,12 @@ export function QualityPanel() {
       createForm.resetFields();
       await load();
     } catch (err) { setError(normalizeError(err)); }
+    finally { setCreating(false); }
   };
 
   const closeIssue = async (values: Record<string, unknown>) => {
     if (!closeTarget) return;
+    setClosing(true);
     try {
       await qualityApi.close(closeTarget.id, { resolution: values.resolution as string, evidence: values.evidence as string });
       message.success("质量工单已关闭");
@@ -56,11 +62,13 @@ export function QualityPanel() {
       closeForm.resetFields();
       await load();
     } catch (err) { setError(normalizeError(err)); }
+    finally { setClosing(false); }
   };
 
   const batchCloseIssues = async (values: Record<string, unknown>) => {
     const ids = rows.filter((row) => row.status !== "CLOSED").map((row) => row.id).slice(0, 50);
     if (!ids.length) { message.info("暂无可批量关闭的工单"); return; }
+    setBatchClosing(true);
     try {
       await qualityApi.batchClose({ issue_ids: ids, resolution: values.resolution as string, evidence: values.evidence as string });
       message.success("质量工单已批量关闭");
@@ -68,6 +76,7 @@ export function QualityPanel() {
       batchCloseForm.resetFields();
       await load();
     } catch (err) { setError(normalizeError(err)); }
+    finally { setBatchClosing(false); }
   };
 
   const columns: ColumnsType<QualityIssue> = [
@@ -89,6 +98,7 @@ export function QualityPanel() {
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <Modal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+        <InlineError error={createOpen ? error : null} />
         <Form form={createForm} layout="vertical" onFinish={createIssue}>
           <Form.Item name="code" label="异常编码" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={[{ value: "LOW", label: "低" }, { value: "MEDIUM", label: "中" }, { value: "HIGH", label: "高" }, { value: "CRITICAL", label: "严重" }]} /></Form.Item>
@@ -96,21 +106,23 @@ export function QualityPanel() {
           <Form.Item name="entity_type" label="对象类型" rules={[{ required: true }]}><Input placeholder="order / account / customer" /></Form.Item>
           <Form.Item name="entity_id" label="对象编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="message" label="问题描述" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">创建工单</PermissionButton>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={creating}>创建工单</PermissionButton>
         </Form>
       </Modal>
       <Modal title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
+        <InlineError error={closeTarget ? error : null} />
         <Form form={closeForm} layout="vertical" onFinish={closeIssue}>
           <Form.Item name="resolution" label="处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">确认关闭</PermissionButton>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
         </Form>
       </Modal>
       <Modal title="批量关闭质量工单" open={batchCloseOpen} onCancel={() => setBatchCloseOpen(false)} footer={null}>
+        <InlineError error={batchCloseOpen ? error : null} />
         <Form form={batchCloseForm} layout="vertical" onFinish={batchCloseIssues}>
           <Form.Item name="resolution" label="批量处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} placeholder="将应用到当前列表中最多 50 条未关闭工单" /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">确认批量关闭</PermissionButton>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
         </Form>
       </Modal>
     </section>

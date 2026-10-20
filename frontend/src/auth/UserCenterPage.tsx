@@ -11,6 +11,7 @@ import { DEV_ROLES, ROLE_PERMISSIONS, useSession } from "../shared/state/session
 export function UserCenterPage({ onClose }: { onClose?: () => void }) {
   const { user, changePassword, logout } = useSession();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const roleLabel = DEV_ROLES.find((r) => r.value === user)?.label ?? user;
   const permissions = ROLE_PERMISSIONS[user] ?? [];
@@ -22,12 +23,15 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
     }
     try {
       setError(null);
+      setSubmitting(true);
       await changePassword(values.old_password, values.new_password);
       message.success("密码已更新");
       form.resetFields();
     } catch (err) {
       // 出错保留已填内容（含旧密码），仅顶部横幅提示，不清空表单。
       setError(normalizeError(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -67,7 +71,7 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
           <Form.Item name="confirm_password" label="确认新密码" rules={[{ required: true }]}>
             <Input.Password autoComplete="new-password" />
           </Form.Item>
-          <Button type="primary" htmlType="submit">保存新密码</Button>
+          <Button type="primary" htmlType="submit" loading={submitting}>保存新密码</Button>
           <Button type="link" onClick={() => { onClose?.(); void logout(); }}>退出登录</Button>
         </Form>
       </Card>

@@ -8,6 +8,7 @@ import { normalizeError } from "../shared/api/client";
 import {
   DataTable,
   ErrorBanner,
+  MoneyInput,
   MoneyText,
   PermissionButton,
   StatRow,
@@ -159,7 +160,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
 
   async function submitCancellation() {
     if (!cancelTarget) return;
-    if (!cancelAmount.trim() || Number(cancelAmount) <= 0) {
+    if (!cancelAmount.trim() || Number.isNaN(Number(cancelAmount)) || Number(cancelAmount) <= 0) {
       message.error("请输入有效的退款金额");
       return;
     }
@@ -551,7 +552,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           </p>
           <label>
             <span>退款金额</span>
-            <Input aria-label="退款金额" inputMode="decimal" value={cancelAmount} onChange={(event) => setCancelAmount(event.target.value)} />
+            <MoneyInput aria-label="退款金额" inputMode="decimal" value={cancelAmount} onChange={(event) => setCancelAmount(event.target.value)} />
           </label>
           <label>
             <span>退款原因</span>

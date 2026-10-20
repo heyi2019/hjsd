@@ -68,6 +68,7 @@ export function CreateBusinessModal(props: {
   const [pools, setPools] = useState<Pool[]>([]);
   const [gameTypes, setGameTypes] = useState<GameTypeOption[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
@@ -133,6 +134,7 @@ export function CreateBusinessModal(props: {
   }, [form, gameTypes, isDfq, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
+    setSubmitting(true);
     try {
       if (isDfq) {
         const customer = await customersApi.create({
@@ -300,6 +302,8 @@ export function CreateBusinessModal(props: {
       await props.onCreated();
     } catch (error) {
       setLoadError(normalizeError(error));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -311,7 +315,7 @@ export function CreateBusinessModal(props: {
       onCancel={props.onClose}
       afterOpenChange={resetAdaptiveModalLayout}
       footer={(
-        <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId}>
+        <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting}>
           创建订单
         </PermissionButton>
       )}

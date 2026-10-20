@@ -32,6 +32,7 @@ export function InventorySaleModal(props: {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
@@ -100,6 +101,7 @@ export function InventorySaleModal(props: {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
+    setSubmitting(true);
     try {
       const order = await ordersApi.create({
         order_type: resolveSaleOrderType(props.account.inventory_type),
@@ -150,6 +152,8 @@ export function InventorySaleModal(props: {
       await props.onCreated();
     } catch (cause) {
       setError(normalizeError(cause));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -160,7 +164,7 @@ export function InventorySaleModal(props: {
       destroyOnHidden
       onCancel={props.onClose}
       footer={
-        <PermissionButton permission="order.create" type="primary" onClick={() => form.submit()}>
+        <PermissionButton permission="order.create" type="primary" loading={submitting} onClick={() => form.submit()}>
           确认售出
         </PermissionButton>
       }

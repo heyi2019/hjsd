@@ -62,24 +62,30 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
   const exportSelected = async () => {
     if (selectedReports.length === 0) {
       setExportError("请至少勾选一项报表");
       return;
     }
+    setExporting(true);
     let lastError: string | null = null;
-    for (const name of selectedReports) {
-      try {
-        const blob = await reportsApi.exportCsv(name, { from: exportFrom || undefined, to: exportTo || undefined });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = `${name}.csv`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        lastError = normalizeError(err).message;
+    try {
+      for (const name of selectedReports) {
+        try {
+          const blob = await reportsApi.exportCsv(name, { from: exportFrom || undefined, to: exportTo || undefined });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = `${name}.csv`;
+          anchor.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          lastError = normalizeError(err).message;
+        }
       }
+    } finally {
+      setExporting(false);
     }
     setExportError(lastError);
   };
@@ -119,7 +125,7 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
             className="ui-control-width-import"
             maxTagCount="responsive"
           />
-          <PermissionButton permission="report.export" onClick={() => void exportSelected()}>
+          <PermissionButton permission="report.export" loading={exporting} onClick={() => void exportSelected()}>
             导出
           </PermissionButton>
         </div>

@@ -22,6 +22,7 @@ import "./CustomersPage.css";
 import {
   DataTable,
   ErrorBanner,
+  ConfirmButton,
   PermissionButton,
   PermissionGate,
   StatRow,
@@ -65,7 +66,7 @@ function MobileCustomerList(props: {
           <Space size="small">
             <PermissionButton permission="customer.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
             <PermissionButton permission="customer.merge" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onMerge(row)}>合并</PermissionButton>
-            <PermissionButton permission="customer.update" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onDisable(row)}>拉黑</PermissionButton>
+            <PermissionButton permission="customer.update" size="small" onClick={() => props.onDisable(row)}>{row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}</PermissionButton>
           </Space>
         </article>
       ))}
@@ -337,18 +338,22 @@ function CustomerPanel() {
           >
             合并
           </PermissionButton>
-          <PermissionButton
+          <ConfirmButton
             permission="customer.update"
             size="small"
-            disabled={row.status !== "ACTIVE"}
-            onClick={async () => {
-              await customersApi.setStatus(row.id, "DISABLED");
-              message.success("客户已拉黑，历史关系保留");
+            title={row.status === "ACTIVE" ? "拉黑该客户" : "解除拉黑"}
+            description={row.status === "ACTIVE"
+              ? "拉黑后不可作为新订单参与方；历史订单、分期与需求保留。"
+              : "解除后可重新作为新订单参与方。"}
+            danger={row.status === "ACTIVE"}
+            onConfirm={async () => {
+              await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
+              message.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
               await load();
             }}
           >
-            拉黑
-          </PermissionButton>
+            {row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}
+          </ConfirmButton>
         </Space>
       ),
     },
@@ -430,8 +435,8 @@ function CustomerPanel() {
         onDetail={(row) => void openDetail(row)}
         onMerge={setMergeTarget}
         onDisable={async (row) => {
-          await customersApi.setStatus(row.id, "DISABLED");
-          message.success("客户已拉黑，历史关系保留");
+          await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
+          message.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
           await load();
         }}
       />}
@@ -782,17 +787,22 @@ function CounterpartyPanel() {
           <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => setEditTarget(row)}>
             编辑
           </PermissionButton>
-          <PermissionButton
+          <ConfirmButton
             permission="counterparty.manage"
             size="small"
-            onClick={async () => {
+            title={row.status === "ACTIVE" ? "拉黑该合作方" : "解除拉黑"}
+            description={row.status === "ACTIVE"
+              ? "拉黑后不可作为新订单对手方；有历史参与关系的仅可拉黑，不可删除。"
+              : "解除后可重新作为新订单对手方。"}
+            danger={row.status === "ACTIVE"}
+            onConfirm={async () => {
               await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
               message.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
               await load();
             }}
           >
             {row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}
-          </PermissionButton>
+          </ConfirmButton>
         </Space>
       ),
     },

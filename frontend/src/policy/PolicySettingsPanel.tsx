@@ -17,6 +17,7 @@ import {
   DataTable,
   ErrorBanner,
   PageHeader,
+  ConfirmButton,
   PermissionButton,
   StatRow,
   StatusTag,
@@ -223,16 +224,19 @@ export function PolicySettingsPanel() {
           >
             编辑
           </PermissionButton>
-          <PermissionButton
+          <ConfirmButton
             permission="policy.approve"
             size="small"
             type="primary"
-            loading={acting}
             disabled={row.status !== "DRAFT"}
-            onClick={() => void act(() => policyApi.approve(row.id, {}))}
+            title="发布该规则版本"
+            description="发布后对生效日之后的新单生效；已发布版本不可修改，只能新建版本。"
+            onConfirm={async () => {
+              await act(() => policyApi.approve(row.id, {}));
+            }}
           >
             发布
-          </PermissionButton>
+          </ConfirmButton>
         </Space>
       ),
     },

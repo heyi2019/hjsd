@@ -18,6 +18,7 @@ export function InventoryConsignmentModal(props: {
 }) {
   const [platforms, setPlatforms] = useState<Counterparty[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
 
@@ -41,6 +42,7 @@ export function InventoryConsignmentModal(props: {
   const submit = async (values: { platform_ids?: number[] }) => {
     if (!props.account) return;
     const selected = platforms.filter((platform) => values.platform_ids?.includes(platform.id));
+    setSubmitting(true);
     try {
       await ordersApi.create({
         order_type: "DG",
@@ -58,6 +60,8 @@ export function InventoryConsignmentModal(props: {
       await props.onCreated();
     } catch (cause) {
       setError(normalizeError(cause));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -68,7 +72,7 @@ export function InventoryConsignmentModal(props: {
       destroyOnHidden
       onCancel={props.onClose}
       footer={
-        <PermissionButton permission="order.create" type="primary" aria-label="确认寄售" onClick={() => form.submit()}>
+        <PermissionButton permission="order.create" type="primary" aria-label="确认寄售" loading={submitting} onClick={() => form.submit()}>
           确认寄售
         </PermissionButton>
       }

@@ -4,7 +4,8 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { DataTable, ErrorBanner, MoneyText, PermissionButton, StatRow, StatusTag } from "../shared/ui";
+import { DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, StatRow, StatusTag } from "../shared/ui";
+import { moneyRules } from "../shared/lib/validators";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -15,6 +16,7 @@ export function CustomerLeadPanel() {
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [acting, setActing] = useState(false);
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [convertForm] = Form.useForm();
@@ -31,19 +33,32 @@ export function CustomerLeadPanel() {
 
   const createLead = async (values: Record<string, unknown>) => {
     try {
+      setError(null);
+      setActing(true);
       await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string });
       message.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
     } catch (err) { setError(normalizeError(err)); }
+    finally { setActing(false); }
   };
   const closeLead = async (values: Record<string, unknown>) => {
     if (!closeTarget) return;
-    try { await leadsApi.close(closeTarget.id, values.reason as string); message.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load(); }
+    try {
+      setError(null);
+      setActing(true);
+      await leadsApi.close(closeTarget.id, values.reason as string); message.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
+    }
     catch (err) { setError(normalizeError(err)); }
+    finally { setActing(false); }
   };
   const convertLead = async (values: Record<string, unknown>) => {
     if (!convertTarget) return;
-    try { await leadsApi.convert(convertTarget.id, Number(values.order_id)); message.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load(); }
+    try {
+      setError(null);
+      setActing(true);
+      await leadsApi.convert(convertTarget.id, Number(values.order_id)); message.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
+    }
     catch (err) { setError(normalizeError(err)); }
+    finally { setActing(false); }
   };
 
   const columns: ColumnsType<Lead> = [
@@ -66,17 +81,17 @@ export function CustomerLeadPanel() {
       <Form form={createForm} layout="vertical" onFinish={createLead}>
         <Form.Item name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></Form.Item>
         <Form.Item name="request_type" label="需求类型" rules={[{ required: true }]}><Select options={Object.entries(REQUEST_TYPE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>
-        <Form.Item name="budget" label="预算"><Input /></Form.Item>
+        <Form.Item name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></Form.Item>
         <Form.Item name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
         <Form.Item name="note" label="备注"><Input.TextArea rows={2} /></Form.Item>
-        <PermissionButton permission="customer.create" type="primary" htmlType="submit">创建需求</PermissionButton>
+        <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>创建需求</PermissionButton>
       </Form>
     </Modal>
     <Modal title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
-      <Form form={closeForm} layout="vertical" onFinish={closeLead}><Form.Item name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item><PermissionButton permission="customer.update" type="primary" htmlType="submit">确认关闭</PermissionButton></Form>
+      <Form form={closeForm} layout="vertical" onFinish={closeLead}><Form.Item name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item><PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton></Form>
     </Modal>
     <Modal title="需求转单" open={Boolean(convertTarget)} onCancel={() => setConvertTarget(null)} footer={null}>
-      <Form form={convertForm} layout="vertical" onFinish={convertLead}><Form.Item name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></Form.Item><PermissionButton permission="customer.create" type="primary" htmlType="submit">确认转单</PermissionButton></Form>
+      <Form form={convertForm} layout="vertical" onFinish={convertLead}><Form.Item name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></Form.Item><PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton></Form>
     </Modal>
   </section>;
 }

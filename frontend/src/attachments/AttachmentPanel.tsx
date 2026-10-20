@@ -4,7 +4,7 @@ import type { UploadProps } from "antd";
 import { useState } from "react";
 import { attachmentsApi, type AttachmentItem } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { DataTable, ErrorBanner, PermissionButton } from "../shared/ui";
+import { DataTable, ConfirmButton, ErrorBanner, PermissionButton } from "../shared/ui";
 import type { ColumnsType } from "antd/es/table";
 
 function fileToBase64(file: File): Promise<string> {
@@ -20,6 +20,6 @@ export function AttachmentPanel() {
   const uploadProps: UploadProps = { showUploadList: false, beforeUpload: async (file) => { try { await attachmentsApi.create({ entity_type: entityType, entity_id: entityId.trim(), file_name: file.name, content_type: file.type || "application/octet-stream", content_base64: await fileToBase64(file) }); message.success("附件已上传"); await load(); } catch (err) { setError(normalizeError(err)); } return false; } };
   const download = async (row: AttachmentItem) => { try { const blob = await attachmentsApi.download(row.id); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = row.file_name; anchor.click(); URL.revokeObjectURL(url); } catch (err) { setError(normalizeError(err)); } };
   const remove = async (row: AttachmentItem) => { try { await attachmentsApi.remove(row.id); message.success("附件已删除"); await load(); } catch (err) { setError(normalizeError(err)); } };
-  const columns: ColumnsType<AttachmentItem> = [{ title: "附件编号", dataIndex: "attachment_no" }, { title: "文件名", dataIndex: "file_name" }, { title: "大小", render: (_v, row) => `${row.size_bytes} B` }, { title: "上传人", dataIndex: "created_by" }, { title: "操作", render: (_v, row) => <><PermissionButton permission="finance.read" size="small" onClick={() => void download(row)}>下载</PermissionButton><PermissionButton permission="order.update" size="small" onClick={() => void remove(row)}>删除</PermissionButton></> }];
+  const columns: ColumnsType<AttachmentItem> = [{ title: "附件编号", dataIndex: "attachment_no" }, { title: "文件名", dataIndex: "file_name" }, { title: "大小", render: (_v, row) => `${row.size_bytes} B` }, { title: "上传人", dataIndex: "created_by" }, { title: "操作", render: (_v, row) => <><PermissionButton permission="finance.read" size="small" onClick={() => void download(row)}>下载</PermissionButton><ConfirmButton permission="order.update" size="small" danger title="删除附件" description="删除后不可恢复，确定要删除该附件吗？" okText="删除" onConfirm={async () => { await remove(row); }}>删除</ConfirmButton></> }];
   return <section className="ui-stack"><ErrorBanner error={error} onRetry={() => void load()} /><Card className="glass" title="附件中心"><div className="ui-filter-bar"><Input value={entityType} onChange={(event) => setEntityType(event.target.value)} placeholder="对象类型" /><Input value={entityId} onChange={(event) => setEntityId(event.target.value)} placeholder="对象编号" onPressEnter={() => void load()} /><PermissionButton permission="finance.read" onClick={() => void load()}>查询</PermissionButton><Upload {...uploadProps} disabled={!entityId.trim()}><PermissionButton permission="order.update">上传附件</PermissionButton></Upload></div><DataTable<AttachmentItem> columns={columns} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无附件" onPageChange={() => undefined} /></Card></section>;
 }

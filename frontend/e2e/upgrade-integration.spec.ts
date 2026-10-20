@@ -17,11 +17,15 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
   expect(delivered.status()).toBe(200);
   await page.goto("/");
   await navItem(page, "业务中心").click();
+  // 业务中心默认落 URL 指定的 Tab（导航进来是 #/business/inventory 库存中心），
+  // 「搜索订单」只在「业务台账」面板内，必须先切 Tab。
+  await page.getByRole("tab", { name: "业务台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
   await page.getByRole("row").filter({ hasText: order.order_no }).getByText("查看详情").click();
   const drawer = page.locator(".ant-drawer-content");
-  await expect(drawer.getByRole("button", { name: "登记退款" })).toBeVisible({timeout: 3000});
-  await drawer.getByRole("button", { name: "登记退款" }).click();
+  // 「登记退款」收在 Drawer 的「更多⌄」下拉菜单里，不是直接渲染的按钮。
+  await drawer.getByRole("button", { name: /更多/ }).click();
+  await page.getByRole("menuitem", { name: "登记退款" }).click();
   const modal = page.locator(".ant-modal-content");
   await modal.getByPlaceholder("请输入退款金额").fill("30");
   await modal.getByPlaceholder("请输入退款原因").fill("联调退款");
@@ -43,9 +47,14 @@ test("利润分配页面保存四项比例并允许同一人承担多个动作",
   expect(buy.status()).toBe(201);
   await page.goto("/");
   await navItem(page, "业务中心").click();
+  // 业务中心默认落 URL 指定的 Tab（导航进来是 #/business/inventory 库存中心），
+  // 「搜索订单」只在「业务台账」面板内，必须先切 Tab。
+  await page.getByRole("tab", { name: "业务台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
   await page.getByRole("row").filter({ hasText: order.order_no }).getByText("查看详情").click();
-  await page.locator(".ant-drawer-content").getByRole("button", { name: "利润分配" }).click();
+  // 「利润分配」同样收在 Drawer 的「更多⌄」下拉菜单内。
+  await page.locator(".ant-drawer-content").getByRole("button", { name: /更多/ }).click();
+  await page.getByRole("menuitem", { name: "利润分配" }).click();
   const modal = page.locator(".ant-modal-content");
   await expect(modal.getByText("利润分配 ·", { exact: false })).toBeVisible();
   const rows = modal.locator(".orders-allocation-row");
@@ -113,9 +122,10 @@ test("页面售出绑定操作人，返点到账保留收入并单独记录手�
   const settlement = page.waitForResponse(r => r.url().endsWith(`/rebates/${rebate.id}/settlements`) && r.request().method() === "POST");
   await settle.getByRole("button", { name: "确认结算" }).click();
   expect((await settlement).status()).toBe(201);
+  // /cashflows 返回 { items, total } 信封，不是裸数组。
   const flows = await (await request.get(`${base}/cashflows?order_id=${order.id}`, { headers })).json();
-  const income = flows.find((f: { category: string }) => f.category === "REBATE");
-  const fee = flows.find((f: { category: string }) => f.category === "REBATE_FEE");
+  const income = flows.items.find((f: { category: string }) => f.category === "REBATE");
+  const fee = flows.items.find((f: { category: string }) => f.category === "REBATE_FEE");
   expect([income.direction, Number(income.amount), income.accounting_attribute]).toEqual(["IN", 100, "REBATE_INCOME"]);
   expect([fee.direction, Number(fee.amount), fee.accounting_attribute]).toEqual(["OUT", 10, "OPERATING_EXPENSE"]);
 });

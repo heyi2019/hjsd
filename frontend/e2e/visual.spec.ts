@@ -1,4 +1,34 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+
+/**
+ * 等元素几何位置连续两次采样一致再动手。
+ * 原因：antd 弹窗入场是 scale 动画、页面还有弹簧入场，固定 waitForTimeout 在快机器上会
+ * 恰好卡在动画中间态——此时 getBoundingClientRect 返回缩放后的假尺寸（1200×0.2=240）与假位置，
+ * 拖动/缩放断言会随机红绿（实测同一用例两次跑一红一绿）。
+ */
+async function waitStableGeometry(locator: Locator) {
+  // 第一判据：入场 scale 动画是否真的结束——transform 回到单位矩阵。
+  // 只在低负载时「连续两次采样一致」不够：全量跑时动画偶发卡顿，两帧相同会被误判为已稳定。
+  await expect
+    .poll(() => locator.evaluate((node) => getComputedStyle(node).transform), { timeout: 8000 })
+    .toMatch(/^(none|matrix\(1,\s*0,\s*0,\s*1)/);
+  // 第二判据：几何位置连续两次采样一致（覆盖页面弹簧入场等非 transform 动效）。
+  await expect
+    .poll(
+      async () => {
+        const read = () =>
+          locator.evaluate((node) => {
+            const rect = node.getBoundingClientRect();
+            return `${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.width)},${Math.round(rect.height)}`;
+          });
+        const first = await read();
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return first === (await read());
+      },
+      { timeout: 8000 },
+    )
+    .toBe(true);
+}
 
 /**
  * 视觉回归基线：只截取稳定的工作台壳层，不依赖真实后端数据。
@@ -12,6 +42,9 @@ test.describe("UI visual regression", () => {
       animations: "disabled",
       caret: "hide",
       fullPage: true,
+      // 「今日关注」两个计数取自真实库数据，别的 spec 写订单后数字会变（47px 抖动）。
+      // 遮掉动态数值，只锁布局与排版。
+      mask: [page.locator(".dashboard-summary .ui-stat__value")],
     });
   });
 
@@ -23,6 +56,8 @@ test.describe("UI visual regression", () => {
       animations: "disabled",
       caret: "hide",
       fullPage: true,
+      // 同 desktop：遮掉随库数据变化的计数。
+      mask: [page.locator(".dashboard-summary .ui-stat__value")],
     });
   });
 
@@ -47,21 +82,27 @@ test.describe("UI visual regression", () => {
     ]) {
       await page.setViewportSize(viewport);
       await page.goto("/");
-      await page.getByRole("button", { name: /回收账号/ }).click();
+      await page.getByRole("button", { name: /自营·回收/ }).click();
       const modal = page.locator(".recovery-order-modal");
       await expect(modal.getByText("游戏账号信息")).toBeVisible();
-      await page.waitForTimeout(350);
+      // 等弹窗算好响应式布局（data-recovery-layout）且几何位置稳定后再测量。
+      await expect(modal.locator(".ant-modal")).toHaveAttribute("data-recovery-layout", /.+/);
+      await waitStableGeometry(modal.locator(".ant-modal"));
 
       const overflow = await modal.evaluate((node) => {
         const body = node.querySelector(".ant-modal-body");
         const entry = node.querySelector(".recovery-entry-fields");
-        const password = entry?.querySelectorAll("input")[2];
+        // 用字段 id 定位密码框：entry 内第 1 个 input 是「游戏类型」Select 的搜索框（宽度仅 1px 级），
+        // 按 index 取会误命中，必须按 antd Form.Item name 生成的 id 精确取。
+        const password = entry?.querySelector<HTMLInputElement>('input#game_password');
         if (!body || !entry || !password) return { valid: false };
         const columns = getComputedStyle(entry).gridTemplateColumns.trim().split(/\s+/).length;
         return {
           valid: true,
           entryOverflow: entry.scrollWidth > entry.clientWidth + 1,
-          passwordWidth: (password as HTMLInputElement).getBoundingClientRect().width,
+          // 用 offsetWidth（布局宽度）而非 getBoundingClientRect：
+          // antd 弹窗入场是 scale 动画，rect 会返回缩放后尺寸（159×0.2≈31.8）造成假失败。
+          passwordWidth: password.offsetWidth,
           columns,
         };
       });
@@ -70,7 +111,7 @@ test.describe("UI visual regression", () => {
       expect(overflow.entryOverflow).toBe(false);
       expect(overflow.passwordWidth).toBeGreaterThanOrEqual(viewport.width <= 900 ? 110 : 140);
       expect(overflow.columns).toBe(viewport.width >= 1440 ? 4 : viewport.width <= 640 ? 1 : 2);
-      const paymentRows = modal.locator(".recovery-payment-fields > .ant-form-item .ant-form-item-row");
+      const paymentRows = modal.locator(".payment-info-fields > .ant-form-item .ant-form-item-row");
       await expect(paymentRows.first()).toHaveCSS("flex-wrap", "nowrap");
       const submit = modal.getByRole("button", { name: "创建订单" });
       const body = modal.locator(".ant-modal-body");
@@ -87,10 +128,12 @@ test.describe("UI visual regression", () => {
   test("回收页桌面弹窗可用普通鼠标拖动", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    await page.getByRole("button", { name: /回收账号/ }).click();
+    await page.getByRole("button", { name: /自营·回收/ }).click();
     const shell = page.locator(".resizable-modal__drag-shell");
     const modal = page.locator(".recovery-order-modal .ant-modal");
-    await page.waitForTimeout(350);
+    // 等待响应式布局落定：入场 scale 动画期间 getBoundingClientRect 会返回 1200×0.2 的假宽度。
+    await expect(modal).toHaveAttribute("data-recovery-layout", /.+/);
+    await waitStableGeometry(modal);
     const before = await modal.evaluate((node) => node.getBoundingClientRect().toJSON());
     const handle = page.locator(".resizable-modal__drag-handle");
     const point = await handle.evaluate((node) => {
@@ -111,13 +154,19 @@ test.describe("UI visual regression", () => {
   test("回收页桌面弹窗四角可缩放", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    await page.getByRole("button", { name: /回收账号/ }).click();
+    await page.getByRole("button", { name: /自营·回收/ }).click();
     const modal = page.locator(".recovery-order-modal .ant-modal");
     await expect(modal).toBeVisible();
     await expect(page.locator(".resizable-modal__resize-handle--se")).toBeVisible();
-    await page.waitForTimeout(500);
+    await expect(modal).toHaveAttribute("data-recovery-layout", /.+/);
+    await waitStableGeometry(modal);
+    // 再等弹窗撑到初始宽度：入场动画期间 offsetWidth 可能仍是压缩态，
+    // 拿它推算拖拽距离会把弹窗一路拖成 single（实测全量跑时随机出现）。
+    await expect
+      .poll(() => modal.evaluate((node) => (node as HTMLElement).offsetWidth), { timeout: 8000 })
+      .toBeGreaterThan(1000);
     for (const [targetWidth, layout] of [[1100, "three"], [900, "double"], [600, "single"]] as const) {
-      const currentWidth = await modal.evaluate((node) => node.getBoundingClientRect().width);
+      const currentWidth = await modal.evaluate((node) => (node as HTMLElement).offsetWidth);
       const handle = page.locator(".resizable-modal__resize-handle--se");
       const point = await handle.evaluate((node) => {
         const rect = node.getBoundingClientRect();
@@ -143,13 +192,19 @@ test.describe("UI visual regression", () => {
       ["n", 0, -100, "height"],
     ] as const) {
       await page.goto("/");
-      await page.getByRole("button", { name: /回收账号/ }).click();
+      await page.getByRole("button", { name: /自营·回收/ }).click();
       const modal = page.locator(".recovery-order-modal .ant-modal");
       const handle = page.locator(`.resizable-modal__resize-handle--${direction}`);
       await expect(modal).toBeVisible();
       await expect(handle).toBeVisible();
-      await page.waitForTimeout(350);
-      const before = await modal.evaluate((node) => node.getBoundingClientRect().toJSON());
+      await expect(modal).toHaveAttribute("data-recovery-layout", /.+/);
+      await waitStableGeometry(modal);
+      await waitStableGeometry(handle);
+      // 用 offsetWidth/offsetHeight（布局尺寸）：入场 scale 动画期间 getBoundingClientRect 会返回缩放后的假尺寸。
+      const before = await modal.evaluate((node) => {
+        const el = node as HTMLElement;
+        return { width: el.offsetWidth, height: el.offsetHeight };
+      });
       const point = await handle.evaluate((node) => {
         const rect = node.getBoundingClientRect();
         return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -158,7 +213,10 @@ test.describe("UI visual regression", () => {
       await page.mouse.down();
       await page.mouse.move(point.x + deltaX, point.y + deltaY, { steps: 8 });
       await page.mouse.up();
-      const after = await modal.evaluate((node) => node.getBoundingClientRect().toJSON());
+      const after = await modal.evaluate((node) => {
+        const el = node as HTMLElement;
+        return { width: el.offsetWidth, height: el.offsetHeight };
+      });
       if (dimension === "width") {
         expect(after.width).toBeLessThan(before.width - 50);
       } else {
@@ -170,7 +228,10 @@ test.describe("UI visual regression", () => {
   test("登录页 desktop", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "退出登录" }).click();
-    await expect(page.getByRole("heading", { name: "宜游轩 ERP" })).toBeVisible();
+    // 顶栏「退出登录」包在 Popconfirm 内：第一次点击只弹确认框，必须再点「退出」才真正登出。
+    // 注意 antd 会给两字按钮自动插空格（DOM 文本是「退 出」），只能用正则匹配，且锚定避免命中「退出登录」。
+    await page.getByRole("button", { name: /^退\s*出$/ }).click();
+    await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
     await expect(page).toHaveScreenshot("login-desktop.png", {
       animations: "disabled",
       caret: "hide",
@@ -184,7 +245,7 @@ test.describe("UI visual regression", () => {
     await page.getByRole("button", { name: "用户中心" }).click();
     await expect(page.getByRole("dialog", { name: "用户中心" })).toBeVisible();
     await page.getByRole("dialog", { name: "用户中心" }).getByRole("button", { name: "退出登录" }).click();
-    await expect(page.getByRole("heading", { name: "宜游轩 ERP" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
     await expect(page).toHaveScreenshot("login-mobile.png", {
       animations: "disabled",
       caret: "hide",

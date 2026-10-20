@@ -12,6 +12,18 @@ import { defineConfig, devices } from "@playwright/test";
  * `/api/v1/**` 返回安全 stub（空列表/空对象），验证「真渲染路径」而非降级。
  * fallback 用例刻意不拦截，验证后端不可达时页面仍渲染外壳（不白屏）。
  */
+
+// E2E 隔离联调端口：8123 被用户常驻的「黑金时代生产 dev 后端」占用（连生产库
+// heijin_erp_v1.db），E2E 必须独占 8124，彻底绕开生产库。可用环境变量覆盖：
+//   ERP_E2E_BACKEND_PORT  后端监听端口（默认 8124）
+//   ERP_E2E_API_BASE      测试进程内后端基址（默认 http://127.0.0.1:8124/api/v1）
+// 所有 e2e spec 通过 process.env.ERP_E2E_API_BASE 读取后端基址，故在此显式注入，
+// 保证与 backend webServer 端口严格一致。
+const E2E_BACKEND_PORT = process.env.ERP_E2E_BACKEND_PORT ?? "8124";
+const E2E_API_BASE =
+  process.env.ERP_E2E_API_BASE ?? `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1`;
+process.env.ERP_E2E_API_BASE = E2E_API_BASE;
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30000,
@@ -25,26 +37,27 @@ export default defineConfig({
     headless: true,
     trace: "on-first-retry",
   },
-  // 可用 ERP_E2E_BACKEND_PORT / ERP_E2E_API_BASE 指向隔离联调服务；默认保持本地 8123。
   metadata: {
-    backendPort: process.env.ERP_E2E_BACKEND_PORT ?? "8123",
+    backendPort: E2E_BACKEND_PORT,
+    apiBase: E2E_API_BASE,
   },
   webServer: [
     {
-      command: `VITE_API_BASE=${process.env.ERP_E2E_API_BASE ?? "/api/v1"} npx vite --port 5180 --strictPort`,
+      command: `VITE_API_BASE=${E2E_API_BASE} npx vite --port 5180 --strictPort`,
       url: "http://localhost:5180",
       // 端口空闲则起新实例；若已有 vite 在 5180 则复用。
       reuseExistingServer: true,
       timeout: 120000,
     },
     {
-      // 联调 e2e（auth-login / integration）需要真实后端。自动拉起 uvicorn，
-      // 绑 0.0.0.0 以便前端 .env.local 的 LAN IP（192.168.124.12:8123）也能到达；
-      // 若 8123 已有实例则复用（reuseExistingServer）。本机 8000 被 Docker 占用，用 8123。
-      command:
-        `cd /Users/aries/黑金时代/backend && /Users/aries/Applications/Python_3.13/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${process.env.ERP_E2E_BACKEND_PORT ?? "8123"}`,
-      url: `http://127.0.0.1:${process.env.ERP_E2E_BACKEND_PORT ?? "8123"}/api/v1/auth/me`,
-      reuseExistingServer: true,
+      // 联调 e2e（auth-login / integration / business-write / crud）需要真实后端。
+      // 通过 e2e_backend.sh 重建**独立 E2E 库**（heijin_erp_e2e.db），绝不写入
+      // 生产库 heijin_erp_v1.db；每次运行都迁移 + 种子 + 起 uvicorn。
+      // reuseExistingServer:false 保证每次强制重建，避免脏数据累积或复用错库。
+      // 独占 8124，绕开 8123 的生产 dev 后端。
+      command: `bash /Users/aries/黑金时代/backend/scripts/e2e_backend.sh`,
+      url: `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1/auth/me`,
+      reuseExistingServer: false,
       timeout: 120000,
     },
   ],

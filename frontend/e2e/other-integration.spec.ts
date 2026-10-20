@@ -59,7 +59,7 @@ test("代分期页面收款结清后交付，不重复产生流水", async ({ pa
   expect(deliveryResponse.status()).toBe(200);
   expect((await deliveryResponse.json()).status).toBe("DELIVERED");
   const flowsAfter = await (await request.get(`${base}/cashflows?order_id=${order.id}`, { headers })).json();
-  expect(flowsAfter.length).toBe(flowsBefore.length);
+  expect(flowsAfter.items.length).toBe(flowsBefore.items.length);
   await expect(delivery).toBeHidden();
 });
 
@@ -85,6 +85,8 @@ test("资金流水页面提交审核并审核通过", async ({ page }) => {
   await expect(row.getByText("待审核")).toBeVisible({ timeout: 2000 });
   const approve = page.waitForResponse(r => r.url().endsWith(`/cashflows/${flow.id}/approve`) && r.request().method() === "POST");
   await row.getByRole("button", { name: /审\s*核/ }).click();
+  // 「审核」用 ConfirmButton 包了 Popconfirm（okText=确认审核），必须二次确认才会真正提交。
+  await page.getByRole("button", { name: /确\s*认\s*审\s*核/ }).click();
   const approved = await approve;
   expect(approved.status()).toBe(200);
   expect((await approved.json()).status).toBe("APPROVED");

@@ -17,11 +17,15 @@ import { orderTypeLabel } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
+  InlineError,
+  MoneyInput,
   MoneyText,
   PermissionButton,
   StatRow,
   StatusTag,
 } from "../shared/ui";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { requiredMoneyRules } from "../shared/lib/validators";
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -51,6 +55,8 @@ function ContractTable({
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
+  const write = useAsyncAction();
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
@@ -85,75 +91,67 @@ function ContractTable({
 
   const submitPay = async (values: Record<string, unknown>) => {
     if (!payTarget) return;
-    try {
-      await installmentsApi.pay(payTarget.id, {
-        amount: values.amount as string,
-        paid_on: values.paid_on as string,
-        period_no: values.period_no === undefined ? undefined : Number(values.period_no),
-      });
-      message.success("收款已登记");
-      setPayTarget(null);
-      payForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    await write.run(async () => {
+        await installmentsApi.pay(payTarget.id, {
+          amount: values.amount as string,
+          paid_on: values.paid_on as string,
+          period_no: values.period_no === undefined ? undefined : Number(values.period_no),
+        });
+        message.success("收款已登记");
+        setPayTarget(null);
+        payForm.resetFields();
+        await load();
+    });
   };
 
   const submitDeliver = async (values: Record<string, unknown>) => {
     if (!deliverTarget) return;
-    try {
-      await installmentsApi.deliver(deliverTarget.id, {
-        delivery_mode: values.delivery_mode as string,
-        delivered_on: values.delivered_on as string,
-        note: values.note as string,
-      });
-      message.success("已完成交付，不新增现金流");
-      setDeliverTarget(null);
-      deliverForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    await write.run(async () => {
+        await installmentsApi.deliver(deliverTarget.id, {
+          delivery_mode: values.delivery_mode as string,
+          delivered_on: values.delivered_on as string,
+          note: values.note as string,
+        });
+        message.success("已完成交付，不新增现金流");
+        setDeliverTarget(null);
+        deliverForm.resetFields();
+        await load();
+    });
   };
 
   const submitRecover = async (values: Record<string, unknown>) => {
     if (!recoverTarget) return;
-    try {
-      await installmentsApi.recover(recoverTarget.id, {
-        occurred_on: values.occurred_on as string,
-        note: values.note as string,
-      });
-      message.success("逾期账号已登记回收");
-      setRecoverTarget(null);
-      recoverForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    await write.run(async () => {
+        await installmentsApi.recover(recoverTarget.id, {
+          occurred_on: values.occurred_on as string,
+          note: values.note as string,
+        });
+        message.success("逾期账号已登记回收");
+        setRecoverTarget(null);
+        recoverForm.resetFields();
+        await load();
+    });
   };
 
   const submitCancel = async (values: Record<string, unknown>) => {
     if (!cancelTarget) return;
-    try {
-      const result = await installmentsApi.cancel(cancelTarget.id, {
-        cancelled_on: values.cancelled_on as string,
-        reason: values.reason as string,
-      });
-      const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
-      message.success(
-        cancelTarget.contract_type === "PICKUP_SALE"
-          ? `${refundSummary}，提号账号已结束`
-          : cancelTarget.contract_type === "ADVANCE_PURCHASE"
-            ? `${refundSummary}，代分期已结束`
-            : `${refundSummary}，账号已回到库存`,
-      );
-      setCancelTarget(null);
-      cancelForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    await write.run(async () => {
+        const result = await installmentsApi.cancel(cancelTarget.id, {
+          cancelled_on: values.cancelled_on as string,
+          reason: values.reason as string,
+        });
+        const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
+        message.success(
+          cancelTarget.contract_type === "PICKUP_SALE"
+            ? `${refundSummary}，提号账号已结束`
+            : cancelTarget.contract_type === "ADVANCE_PURCHASE"
+              ? `${refundSummary}，代分期已结束`
+              : `${refundSummary}，账号已回到库存`,
+        );
+        setCancelTarget(null);
+        cancelForm.resetFields();
+        await load();
+    });
   };
 
   // 只读展示口径：总应收 = 首付 + 每期 × 期数。
@@ -241,6 +239,7 @@ function ContractTable({
             size="small"
             disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
             onClick={() => {
+              payForm.resetFields();
               setPayTarget(row);
               payForm.setFieldsValue({ paid_on: today() });
             }}
@@ -253,6 +252,7 @@ function ContractTable({
             type="primary"
             disabled={row.status !== "SETTLED"}
             onClick={() => {
+              deliverForm.resetFields();
               setDeliverTarget(row);
               deliverForm.setFieldsValue({ delivered_on: today() });
             }}
@@ -267,6 +267,7 @@ function ContractTable({
               || (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
             }
             onClick={() => {
+              recoverForm.resetFields();
               setRecoverTarget(row);
               recoverForm.setFieldsValue({ occurred_on: today() });
             }}
@@ -279,6 +280,7 @@ function ContractTable({
             danger
             disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
             onClick={() => {
+              cancelForm.resetFields();
               setCancelTarget(row);
               cancelForm.setFieldsValue({ cancelled_on: today() });
             }}
@@ -371,7 +373,8 @@ function ContractTable({
         onCancel={() => setPayTarget(null)}
         footer={null}
       >
-        <Form form={payForm} layout="vertical" onFinish={submitPay}>
+        <InlineError error={write.error} />
+          <Form form={payForm} layout="vertical" onFinish={submitPay}>
           <Form.Item name="period_no" label="期次（0=首付，留空按到期顺序）">
             <Select
               allowClear
@@ -381,13 +384,13 @@ function ContractTable({
               }))}
             />
           </Form.Item>
-          <Form.Item name="amount" label="本次实收" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="amount" label="本次实收" rules={requiredMoneyRules("本次实收")}>
+            <MoneyInput />
           </Form.Item>
           <Form.Item name="paid_on" label="收款日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认收款
           </PermissionButton>
         </Form>
@@ -399,14 +402,15 @@ function ContractTable({
         onCancel={() => setRecoverTarget(null)}
         footer={null}
       >
-        <Form form={recoverForm} layout="vertical" onFinish={submitRecover}>
+        <InlineError error={write.error} />
+          <Form form={recoverForm} layout="vertical" onFinish={submitRecover}>
           <Form.Item name="occurred_on" label="回收日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item name="note" label="回收说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit">
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
           </PermissionButton>
         </Form>
@@ -418,7 +422,8 @@ function ContractTable({
         onCancel={() => setDeliverTarget(null)}
         footer={null}
       >
-        <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
+        <InlineError error={write.error} />
+          <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
           <Form.Item name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
             <Select
               options={[
@@ -436,7 +441,7 @@ function ContractTable({
           <Typography.Paragraph type="secondary">
             仅已结清合约可交付；DELIVER 无金额、不生成现金流，不再确认收入。
           </Typography.Paragraph>
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认交付
           </PermissionButton>
         </Form>
@@ -448,7 +453,8 @@ function ContractTable({
         onCancel={() => setCancelTarget(null)}
         footer={null}
       >
-        <Form form={cancelForm} layout="vertical" onFinish={submitCancel}>
+        <InlineError error={write.error} />
+          <Form form={cancelForm} layout="vertical" onFinish={submitCancel}>
           <Typography.Paragraph type="secondary">
             {cancelTarget?.contract_type === "PICKUP_SALE"
               ? "按已收款原资金池退款，提号取消后账号直接结束。"
@@ -462,7 +468,7 @@ function ContractTable({
           <Form.Item name="reason" label="取消原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </Form.Item>
-          <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit">
+          <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit" loading={write.pending}>
             确认退款并终止分期
           </PermissionButton>
         </Form>

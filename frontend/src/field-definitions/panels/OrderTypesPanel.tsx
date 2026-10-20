@@ -5,7 +5,7 @@ import { orderTypesApi, type OrderType } from "../../shared/api/catalog";
 import { poolsApi, type Pool, type RouteImpactPreview } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
-import { DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function OrderTypesPanel() {
   const [rows, setRows] = useState<OrderType[]>([]);
@@ -67,7 +67,18 @@ export function OrderTypesPanel() {
         <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
       ),
     },
-    { title: "操作", render: (_v, row) => <PermissionGate permission="order-type.manage"><button type="button" className="ui-button ui-button--small" onClick={() => { setEditTarget(row); editForm.setFieldsValue(row); }}>编辑</button><button type="button" className="ui-button ui-button--small" onClick={() => void toggleActive(row)}>{row.is_active ? "停用" : "启用"}</button><button type="button" className="ui-button ui-button--small" onClick={() => { setPreviewTarget(row); setPreview(null); }}>影响预览</button></PermissionGate> },
+    { title: "操作", render: (_v, row) => <PermissionGate permission="order-type.manage"><button type="button" className="ui-button ui-button--small" onClick={() => { setEditTarget(row); editForm.setFieldsValue(row); }}>编辑</button><ConfirmButton
+              permission="order-type.manage"
+              size="small"
+              title={row.is_active ? `停用业务类型「${row.name}」` : `启用业务类型「${row.name}」`}
+              description={row.is_active
+                ? "停用后无法新建该类型订单；已有订单与历史数据不受影响。"
+                : "启用后可重新新建该类型订单。"}
+              danger={row.is_active}
+              onConfirm={() => toggleActive(row)}
+            >
+              {row.is_active ? "停用" : "启用"}
+            </ConfirmButton><button type="button" className="ui-button ui-button--small" onClick={() => { setPreviewTarget(row); setPreview(null); }}>影响预览</button></PermissionGate> },
   ];
 
   return (

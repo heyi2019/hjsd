@@ -2,7 +2,7 @@ import { Card, Form, Input, Modal, Select, Space, message } from "antd";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../shared/api/client";
 import { poolsApi, type Pool } from "../shared/api/catalog";
-import { DataTable, PermissionButton } from "../shared/ui";
+import { ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 
 type User = { id: number; username: string; display_name: string; role: string; owner_scope: string; pool_ids: number[]; team_ids: number[]; is_active: boolean; must_change_password: boolean };
@@ -53,7 +53,18 @@ export function UsersPanel() {
         { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" },
         { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
         { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" },
-        { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><PermissionButton permission="user.manage" size="small" onClick={() => toggleUser(user)}>{user.is_active ? "停用" : "启用"}</PermissionButton><PermissionButton permission="user.manage" size="small" onClick={() => setResetting(user)}>重置密码</PermissionButton></Space> },
+        { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><ConfirmButton
+              permission="user.manage"
+              size="small"
+              title={user.is_active ? "停用该用户" : "启用该用户"}
+              description={user.is_active
+                ? "停用后该用户立即无法登录，其在途业务不受影响。"
+                : "启用后该用户可重新登录。"}
+              danger={user.is_active}
+              onConfirm={() => toggleUser(user)}
+            >
+              {user.is_active ? "停用" : "启用"}
+            </ConfirmButton><PermissionButton permission="user.manage" size="small" onClick={() => setResetting(user)}>重置密码</PermissionButton></Space> },
       ]}
     />
     <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { poolsApi, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
-import { DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function PoolsPanel() {
   const [rows, setRows] = useState<Pool[]>([]);
@@ -69,7 +69,18 @@ export function PoolsPanel() {
     { title: "类型", dataIndex: "pool_type", render: (v: string) => POOL_TYPE_LABEL[v] ?? v },
     { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
-    { title: "操作", render: (_v, row) => <><PermissionButton permission="pool.manage" size="small" onClick={() => { setEditing(row); editForm.setFieldsValue(row); }}>{"编辑"}</PermissionButton><PermissionButton permission="pool.manage" size="small" onClick={() => void toggleStatus(row)}>{row.status === "ACTIVE" ? "停用" : "启用"}</PermissionButton></> },
+    { title: "操作", render: (_v, row) => <><PermissionButton permission="pool.manage" size="small" onClick={() => { setEditing(row); editForm.setFieldsValue(row); }}>{"编辑"}</PermissionButton><ConfirmButton
+              permission="pool.manage"
+              size="small"
+              title={row.status === "ACTIVE" ? "停用该资金池" : "启用该资金池"}
+              description={row.status === "ACTIVE"
+                ? "停用后该池不可入账，收款、划转与押金登记都会失败。请先确认池内余额与在途流水已处理。"
+                : "启用后该池可重新入账。"}
+              danger={row.status === "ACTIVE"}
+              onConfirm={() => toggleStatus(row)}
+            >
+              {row.status === "ACTIVE" ? "停用" : "启用"}
+            </ConfirmButton></> },
   ];
   return (
     <Card className="glass" title="资金池主数据">

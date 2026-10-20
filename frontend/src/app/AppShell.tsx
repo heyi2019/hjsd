@@ -1,4 +1,4 @@
-import { Modal, Space } from "antd";
+import { Modal, Popconfirm, Space } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
@@ -167,7 +167,15 @@ export function AppShell() {
               <span className="muted">当前角色{import.meta.env.DEV ? "（开发态）" : ""}</span>
               <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === user)?.label ?? user}</span>
             </span>
-            <button type="button" className="topbar-action topbar-action--logout" onClick={() => void logout()}>退出登录</button>
+            <Popconfirm
+              title="退出登录"
+              description="退出后需要重新登录才能继续操作。"
+              okText="退出"
+              cancelText="取消"
+              onConfirm={() => void logout()}
+            >
+              <button type="button" className="topbar-action topbar-action--logout">退出登录</button>
+            </Popconfirm>
           </Space>
         </header>
         <main className="page-content">

@@ -20,13 +20,18 @@ import { today } from "../shared/lib/format";
 import { POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import {
+  ConfirmButton,
   DataTable,
   ErrorBanner,
+  InlineError,
+  MoneyInput,
   MoneyText,
   PermissionButton,
   StatRow,
   StatusTag,
 } from "../shared/ui";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { requiredMoneyRules } from "../shared/lib/validators";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
   BUSINESS: "本方经营",
@@ -74,6 +79,8 @@ export function FundsPage() {
   const [cashflowFrom, setCashflowFrom] = useState("");
   const [cashflowTo, setCashflowTo] = useState("");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
+  const write = useAsyncAction();
   const [loading, setLoading] = useState(false);
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();
@@ -113,7 +120,7 @@ export function FundsPage() {
   }, [load]);
 
   const submitDeposit = async (values: Record<string, unknown>) => {
-    try {
+    await write.run(async () => {
       await depositsApi.create({
         pool_id: Number(values.pool_id),
         amount: values.amount as string,
@@ -127,15 +134,14 @@ export function FundsPage() {
       setDepositOpen(false);
       depositForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitReturn = async (values: Record<string, unknown>) => {
     if (!returnTarget) return;
-    try {
-      await depositsApi.release(returnTarget.id, {
+    const targetId = returnTarget.id;
+    await write.run(async () => {
+      await depositsApi.release(targetId, {
         amount: values.amount as string,
         released_on: values.released_on as string,
       });
@@ -143,15 +149,14 @@ export function FundsPage() {
       setReturnTarget(null);
       returnForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitLoss = async (values: Record<string, unknown>) => {
     if (!lossTarget) return;
-    try {
-      await depositsApi.loss(lossTarget.id, {
+    const targetId = lossTarget.id;
+    await write.run(async () => {
+      await depositsApi.loss(targetId, {
         amount: values.amount as string,
         lost_on: values.lost_on as string,
         category: values.category as string,
@@ -161,13 +166,11 @@ export function FundsPage() {
       setLossTarget(null);
       lossForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitCashflow = async (values: Record<string, unknown>) => {
-    try {
+    await write.run(async () => {
       const fundNature = String(values.fund_nature ?? "BUSINESS");
       const direction = String(values.direction ?? "IN");
       await cashflowsApi.create({
@@ -185,28 +188,25 @@ export function FundsPage() {
       setCashflowOpen(false);
       cashflowForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const reviewCashflow = async (action: "approve" | "reject", row: Cashflow, reason?: string) => {
-    try {
+    await write.run(async () => {
       if (action === "approve") await cashflowsApi.approve(row.id);
       else await cashflowsApi.reject(row.id, reason ?? "");
       message.success(action === "approve" ? "流水已审核" : "流水已拒绝");
       setRejectTarget(null);
       rejectForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const reverseCashflow = async (values: Record<string, unknown>) => {
     if (!reverseTarget) return;
-    try {
-      await cashflowsApi.reverse(reverseTarget.id, {
+    const targetId = reverseTarget.id;
+    await write.run(async () => {
+      await cashflowsApi.reverse(targetId, {
         reversed_on: values.reversed_on as string,
         reason: values.reason as string,
       });
@@ -214,13 +214,11 @@ export function FundsPage() {
       setReverseTarget(null);
       reverseForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitTransfer = async (values: Record<string, unknown>) => {
-    try {
+    await write.run(async () => {
       await transfersApi.create({
         source_pool_id: Number(values.source_pool_id),
         target_pool_id: Number(values.target_pool_id),
@@ -232,15 +230,14 @@ export function FundsPage() {
       setTransferOpen(false);
       transferForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitRepair = async (values: Record<string, unknown>) => {
     if (!repairTarget?.transfer_id) return;
-    try {
-      await transfersApi.repair(repairTarget.transfer_id, {
+    const targetId = repairTarget.transfer_id;
+    await write.run(async () => {
+      await transfersApi.repair(targetId, {
         counterpart_pool_id: Number(values.counterpart_pool_id),
         reason: values.reason as string,
       });
@@ -248,25 +245,21 @@ export function FundsPage() {
       setRepairTarget(null);
       repairForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitPeriodLock = async (values: Record<string, unknown>) => {
-    try {
+    await write.run(async () => {
       await periodLocksApi.create({ period: values.period as string, note: values.note as string });
       message.success("账期已锁定");
       setPeriodLockOpen(false);
       periodLockForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const submitReconciliation = async (values: Record<string, unknown>) => {
-    try {
+    await write.run(async () => {
       const rawIds = String(values.unmatched_flow_ids ?? "").trim();
       await reconciliationsApi.create({
         pool_id: Number(values.pool_id),
@@ -281,22 +274,19 @@ export function FundsPage() {
       setReconciliationOpen(false);
       reconciliationForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   const resolveReconciliation = async (values: Record<string, unknown>) => {
     if (!resolveTarget) return;
-    try {
-      await reconciliationsApi.resolve(resolveTarget.id, values.reason as string);
+    const targetId = resolveTarget.id;
+    await write.run(async () => {
+      await reconciliationsApi.resolve(targetId, values.reason as string);
       message.success("对账差异已核销");
       setResolveTarget(null);
       resolveForm.resetFields();
       await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    });
   };
 
   // 只读合计：仅用于统计卡展示，不回流到任何写路径。
@@ -474,9 +464,16 @@ export function FundsPage() {
       render: (_v, row) => (
         <>
           {row.status === "PENDING" && (
-            <PermissionButton permission="deposit.post" size="small" onClick={() => void reviewCashflow("approve", row)}>
+            <ConfirmButton
+              permission="deposit.post"
+              size="small"
+              title="审核通过这笔流水"
+              description="审核后流水计入损益且不可撤销。如金额有误，请先冲销或拒绝。"
+              okText="确认审核"
+              onConfirm={() => reviewCashflow("approve", row)}
+            >
               审核
-            </PermissionButton>
+            </ConfirmButton>
           )}
           {row.status === "PENDING" && (
             <PermissionButton permission="deposit.post" size="small" onClick={() => setRejectTarget(row)}>
@@ -610,6 +607,9 @@ export function FundsPage() {
                   <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
                   <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
                 </div>
+                {cashflows.length >= 500 ? (
+                  <Typography.Text type="warning">流水仅加载最近 500 条，请用日期区间缩小范围以查看更早数据。</Typography.Text>
+                ) : null}
                 <StatRow
                   items={[
                     { label: "总收入", amount: totalFlowIncome },
@@ -714,7 +714,8 @@ export function FundsPage() {
       />
 
       <Modal title="新增押金占用" open={depositOpen} onCancel={() => setDepositOpen(false)} footer={null}>
-        <Form form={depositForm} layout="vertical" onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
+        <InlineError error={write.error} />
+          <Form form={depositForm} layout="vertical" onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}>
             <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
@@ -724,8 +725,8 @@ export function FundsPage() {
           <Form.Item name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">
             <Input inputMode="numeric" />
           </Form.Item>
-          <Form.Item name="amount" label="占用金额" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
+            <MoneyInput />
           </Form.Item>
           <Form.Item name="paid_on" label="占用日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
@@ -736,73 +737,79 @@ export function FundsPage() {
           <Form.Item name="note" label="说明">
             <Input.TextArea rows={2} />
           </Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             提交
           </PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="新增独立资金流水" open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
-        <Form form={cashflowForm} layout="vertical" onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
+        <InlineError error={write.error} />
+          <Form form={cashflowForm} layout="vertical" onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <Form.Item name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
           <Form.Item name="direction" label="收支方向" rules={[{ required: true }]}><Select options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} /></Form.Item>
           <Form.Item name="fund_nature" label="资金性质" rules={[{ required: true }]}><Select options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>
           <Form.Item name="accounting_attribute" label="核算属性" rules={[{ required: true }]}><Select options={Object.entries(ACCOUNTING_ATTRIBUTE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>
           <Form.Item name="category" label="类别" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="amount" label="金额" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></Form.Item>
           <Form.Item name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">提交审核</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交审核</PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="资金池划转" open={transferOpen} onCancel={() => setTransferOpen(false)} footer={null}>
-        <Form form={transferForm} layout="vertical" onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
+        <InlineError error={write.error} />
+          <Form form={transferForm} layout="vertical" onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
           <Form.Item name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <Form.Item name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <Form.Item name="amount" label="划转金额" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></Form.Item>
           <Form.Item name="occurred_on" label="划转日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
           <Form.Item name="note" label="说明"><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="finance.transfer" type="primary" htmlType="submit">确认划转</PermissionButton>
+          <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认划转</PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="新增资金对账" open={reconciliationOpen} onCancel={() => setReconciliationOpen(false)} footer={null}>
-        <Form form={reconciliationForm} layout="vertical" onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
+        <InlineError error={write.error} />
+          <Form form={reconciliationForm} layout="vertical" onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <Form.Item name="reconciled_on" label="对账日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
           <Form.Item name="account_label" label="对账账户" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="statement_balance" label="账面余额" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></Form.Item>
           <Form.Item name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></Form.Item>
           <Form.Item name="reason" label="差异原因"><Input.TextArea rows={2} /></Form.Item>
           <Form.Item name="note" label="说明"><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">提交对账</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交对账</PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="核销对账差异" open={Boolean(resolveTarget)} onCancel={() => setResolveTarget(null)} footer={null}>
-        <Form form={resolveForm} layout="vertical" onFinish={resolveReconciliation}>
+        <InlineError error={write.error} />
+          <Form form={resolveForm} layout="vertical" onFinish={resolveReconciliation}>
           <Form.Item name="reason" label="处理说明" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">确认核销</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认核销</PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="拒绝资金流水" open={Boolean(rejectTarget)} onCancel={() => setRejectTarget(null)} footer={null}>
-        <Form form={rejectForm} layout="vertical" onFinish={(values) => rejectTarget && void reviewCashflow("reject", rejectTarget, values.reason as string)}>
+        <InlineError error={write.error} />
+          <Form form={rejectForm} layout="vertical" onFinish={(values) => rejectTarget && void reviewCashflow("reject", rejectTarget, values.reason as string)}>
           <Form.Item name="reason" label="拒绝原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">确认拒绝</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认拒绝</PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="冲销资金流水" open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)} footer={null}>
-        <Form form={reverseForm} layout="vertical" onFinish={reverseCashflow}>
+        <InlineError error={write.error} />
+          <Form form={reverseForm} layout="vertical" onFinish={reverseCashflow}>
           <Form.Item name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item name="reason" label="冲销原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} />
           </Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认冲销
           </PermissionButton>
         </Form>
@@ -814,26 +821,28 @@ export function FundsPage() {
         onCancel={() => setReturnTarget(null)}
         footer={null}
       >
-        <Form form={returnForm} layout="vertical" onFinish={submitReturn}>
-          <Form.Item name="amount" label="释放金额" rules={[{ required: true }]}>
-            <Input />
+        <InlineError error={write.error} />
+          <Form form={returnForm} layout="vertical" onFinish={submitReturn}>
+          <Form.Item name="amount" label="释放金额" rules={requiredMoneyRules("释放金额")}>
+            <MoneyInput />
           </Form.Item>
           <Form.Item name="released_on" label="释放日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认释放
           </PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="登记押金损失" open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)} footer={null}>
-        <Form form={lossForm} layout="vertical" onFinish={submitLoss}>
-          <Form.Item name="amount" label="损失金额" rules={[{ required: true }]}><Input /></Form.Item>
+        <InlineError error={write.error} />
+          <Form form={lossForm} layout="vertical" onFinish={submitLoss}>
+          <Form.Item name="amount" label="损失金额" rules={requiredMoneyRules("损失金额")}><MoneyInput /></Form.Item>
           <Form.Item name="lost_on" label="损失日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
           <Form.Item name="category" label="费用分类" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="reason" label="损失原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">确认损失</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认损失</PermissionButton>
         </Form>
       </Modal>
 
@@ -841,20 +850,22 @@ export function FundsPage() {
         <Typography.Paragraph type="secondary">
           划转号：{repairTarget?.transfer_id}；现有流水：{repairTarget?.flow_no}
         </Typography.Paragraph>
-        <Form form={repairForm} layout="vertical" onFinish={submitRepair}>
+        <InlineError error={write.error} />
+          <Form form={repairForm} layout="vertical" onFinish={submitRepair}>
           <Form.Item name="counterpart_pool_id" label="缺失对端资金池" rules={[{ required: true }]}>
             <Select options={pools.filter((pool) => pool.id !== repairTarget?.pool_id).map((pool) => ({ value: pool.id, title: `${pool.name}（${pool.code}）`, label: `${pool.name}（${pool.code}）` }))} />
           </Form.Item>
           <Form.Item name="reason" label="修复原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="finance.transfer" type="primary" htmlType="submit">确认修复</PermissionButton>
+          <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认修复</PermissionButton>
         </Form>
       </Modal>
 
       <Modal title="锁定账期" open={periodLockOpen} onCancel={() => setPeriodLockOpen(false)} footer={null}>
-        <Form form={periodLockForm} layout="vertical" onFinish={submitPeriodLock}>
+        <InlineError error={write.error} />
+          <Form form={periodLockForm} layout="vertical" onFinish={submitPeriodLock}>
           <Form.Item name="period" label="会计账期" rules={[{ required: true }, { pattern: /^\d{4}-\d{2}$/, message: "请输入 YYYY-MM" }]}><Input placeholder="YYYY-MM" /></Form.Item>
           <Form.Item name="note" label="说明"><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit">确认锁定</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认锁定</PermissionButton>
         </Form>
       </Modal>
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fieldsApi, type FieldDefinition } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { ENTITY_TYPE_LABEL, FIELD_TYPE_LABEL } from "../../shared/lib/labels";
-import { DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const ENTITY_TYPE_OPTIONS = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
@@ -112,16 +112,21 @@ export function FieldsPanel() {
             >
               编辑
             </PermissionButton>
-            <PermissionButton
+            <ConfirmButton
               permission="field-definition.manage"
               size="small"
-              onClick={async () => {
+              title={row.is_active ? `停用字段「${row.label}」` : `启用字段「${row.label}」`}
+              description={row.is_active
+                ? "停用后该字段从所有表单消失，已填写的历史值保留。"
+                : "启用后该字段重新出现在表单中。"}
+              danger={row.is_active}
+              onConfirm={async () => {
                 await fieldsApi.setActive(row.id, !row.is_active);
                 await load();
               }}
             >
               {row.is_active ? "停用" : "启用"}
-            </PermissionButton>
+            </ConfirmButton>
           </span>
           <Popconfirm
             title={`删除字段「${row.label}」`}

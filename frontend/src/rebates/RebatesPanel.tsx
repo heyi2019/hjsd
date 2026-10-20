@@ -16,12 +16,15 @@ import { orderTypeLabel } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
+  InlineError,
   MoneyInput,
   MoneyText,
   PermissionButton,
   StatRow,
   StatusTag,
 } from "../shared/ui";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -42,6 +45,8 @@ export function RebatesPanel() {
   const [createOpen, setCreateOpen] = useState(false);
   const [settleTarget, setSettleTarget] = useState<Rebate | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
+  const write = useAsyncAction();
   const [form] = Form.useForm();
   const [settleForm] = Form.useForm();
 
@@ -66,39 +71,35 @@ export function RebatesPanel() {
   }, [load]);
 
   const submitCreate = async (values: Record<string, unknown>) => {
-    try {
-      await rebatesApi.create({
-        source_order_id: Number(values.source_order_id),
-        rebate_type: values.rebate_type as "BUY" | "SELL",
-        base_amount: values.base_amount as string,
-        rate: (values.rate as string) ?? "0",
-        collected_on: values.collected_on as string,
-      });
-      message.success("返点记录已创建");
-      setCreateOpen(false);
-      form.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    await write.run(async () => {
+        await rebatesApi.create({
+          source_order_id: Number(values.source_order_id),
+          rebate_type: values.rebate_type as "BUY" | "SELL",
+          base_amount: values.base_amount as string,
+          rate: (values.rate as string) ?? "0",
+          collected_on: values.collected_on as string,
+        });
+        message.success("返点记录已创建");
+        setCreateOpen(false);
+        form.resetFields();
+        await load();
+    });
   };
 
   const submitSettle = async (values: Record<string, unknown>) => {
     if (!settleTarget) return;
-    try {
-      await rebatesApi.settle(settleTarget.id, {
-        gross_amount: values.gross_amount as string,
-        platform_fee: (values.platform_fee as string) ?? "0",
-        settled_on: values.settled_on as string,
-        pool_id: Number(values.pool_id),
-      });
-      message.success("返点结算已登记");
-      setSettleTarget(null);
-      settleForm.resetFields();
-      await load();
-    } catch (err) {
-      setError(normalizeError(err));
-    }
+    await write.run(async () => {
+        await rebatesApi.settle(settleTarget.id, {
+          gross_amount: values.gross_amount as string,
+          platform_fee: (values.platform_fee as string) ?? "0",
+          settled_on: values.settled_on as string,
+          pool_id: Number(values.pool_id),
+        });
+        message.success("返点结算已登记");
+        setSettleTarget(null);
+        settleForm.resetFields();
+        await load();
+    });
   };
 
   const pending = rows.filter((row) => row.status !== "SETTLED").length;
@@ -147,6 +148,7 @@ export function RebatesPanel() {
           size="small"
           disabled={row.status === "SETTLED"}
           onClick={() => {
+            settleForm.resetFields();
             setSettleTarget(row);
             settleForm.setFieldsValue({ settled_on: today() });
           }}
@@ -175,7 +177,10 @@ export function RebatesPanel() {
           <PermissionButton
             permission="order.event.post"
             type="primary"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              form.resetFields();
+              setCreateOpen(true);
+            }}
           >
             新增返点记录
           </PermissionButton>
@@ -193,9 +198,8 @@ export function RebatesPanel() {
       </Card>
 
       <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
-        <Form
-          form={form}
-          layout="vertical"
+        <InlineError error={write.error} />
+        <Form form={form} layout="vertical"
           onFinish={submitCreate}
           initialValues={{ collected_on: today(), rebate_type: "BUY" }}
         >
@@ -214,10 +218,10 @@ export function RebatesPanel() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="base_amount" label="返点金额" rules={[{ required: true }]}>
+          <Form.Item name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}>
             <MoneyInput />
           </Form.Item>
-          <Form.Item name="rate" label="返点比例">
+          <Form.Item name="rate" label="返点比例" rules={percentRules("返点比例")}>
             <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
           </Form.Item>
           <Form.Item name="collected_on" label="返点日期" rules={[{ required: true }]}>
@@ -226,7 +230,7 @@ export function RebatesPanel() {
           <Typography.Paragraph type="secondary">
             新返点必须关联来源订单；返点不能独立创建为订单（REB-01-02）。
           </Typography.Paragraph>
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             创建
           </PermissionButton>
         </Form>
@@ -238,12 +242,13 @@ export function RebatesPanel() {
         onCancel={() => setSettleTarget(null)}
         footer={null}
       >
+        <InlineError error={write.error} />
         <Form form={settleForm} layout="vertical" onFinish={submitSettle}>
-          <Form.Item name="gross_amount" label="到账金额" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="gross_amount" label="到账金额" rules={requiredMoneyRules("到账金额")}>
+            <MoneyInput />
           </Form.Item>
-          <Form.Item name="platform_fee" label="平台手续费（自动生成费用流水）">
-            <Input />
+          <Form.Item name="platform_fee" label="平台手续费（自动生成费用流水）" rules={requiredMoneyRules("平台手续费").slice(1)}>
+            <MoneyInput />
           </Form.Item>
           <Form.Item name="pool_id" label="回款池" rules={[{ required: true }]}>
             <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
@@ -251,7 +256,7 @@ export function RebatesPanel() {
           <Form.Item name="settled_on" label="到账日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认结算
           </PermissionButton>
         </Form>

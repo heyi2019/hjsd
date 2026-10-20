@@ -3,7 +3,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function GameTypeSettingsPanel() {
   const [rows, setRows] = useState<GameTypeOption[]>([]);
@@ -94,14 +94,19 @@ export function GameTypeSettingsPanel() {
             >
               编辑
             </PermissionButton>
-            <PermissionButton
+            <ConfirmButton
               permission="order-type.manage"
               size="small"
               disabled={row.is_default}
-              onClick={() => void run(() => gameTypesApi.setActive(row.id, !row.is_active))}
+              title={row.is_active ? `停用游戏类型「${row.name}」` : `启用游戏类型「${row.name}」`}
+              description={row.is_active
+                ? "停用后新建订单与账号不再带出该类型；已有数据保留。"
+                : "启用后新建表单可重新选择该类型。"}
+              danger={row.is_active}
+              onConfirm={() => run(() => gameTypesApi.setActive(row.id, !row.is_active))}
             >
               {row.is_active ? "停用" : "启用"}
-            </PermissionButton>
+            </ConfirmButton>
           </span>
         </PermissionGate>
       ),

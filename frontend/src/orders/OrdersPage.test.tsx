@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -179,7 +179,8 @@ describe("OrdersPage：四类业务台账", () => {
     await openLedger("admin");
     fireEvent.click(screen.getAllByText("查看详情")[0]);
     await screen.findByText("订单详情 · HS-2026-0001");
-    fireEvent.click(screen.getByRole("button", { name: /更多/ }));
+    const drawer = screen.getByRole("dialog");
+    fireEvent.click(within(drawer).getByRole("button", { name: /更多/ }));
     fireEvent.click(await screen.findByText("取消交易"));
 
     expect(await screen.findByText("取消交易 · HS-2026-0001")).toBeInTheDocument();

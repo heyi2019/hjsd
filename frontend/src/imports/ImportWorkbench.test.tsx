@@ -109,6 +109,8 @@ it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocke
   const commitBtn = screen.getByRole("button", { name: /确认批次/ });
   expect(commitBtn).not.toBeDisabled();
   await ui.click(commitBtn);
+  // 确认批次是显著不可逆动作，现已要求二次确认。
+  await ui.click(await screen.findByRole("button", { name: /确认提交批次/ }));
   await waitFor(() => expect(vi.mocked(catalog.importsApi.commit)).toHaveBeenCalledTimes(1));
   expect(vi.mocked(catalog.importsApi.commit).mock.calls[0][0]).toBe(1); // batch id
 });

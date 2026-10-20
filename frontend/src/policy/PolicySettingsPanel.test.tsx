@@ -101,6 +101,8 @@ it("审批流程：admin 点「发布」（DRAFT 版本可点）→ 调用 vi.mo
   const publish = await screen.findByRole("button", { name: /发布/ }, { timeout: 10000 });
   expect(publish).not.toBeDisabled();
   await ui.click(publish);
+  // 发布是破坏性/不可逆操作，现已要求二次确认。
+  await ui.click(await screen.findByRole("button", { name: /确认/ }));
   await waitFor(() => expect(vi.mocked(catalog.policyApi.approve)).toHaveBeenCalledTimes(1));
   expect(vi.mocked(catalog.policyApi.approve).mock.calls[0][0]).toBe(1); // version id
 });

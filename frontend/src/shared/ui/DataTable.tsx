@@ -8,7 +8,7 @@
  */
 import { Empty, Spin, Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface ListQuery {
   page: number;
@@ -53,6 +53,11 @@ export function DataTable<T>(props: {
   const [innerPage, setInnerPage] = useState(1);
   const [innerSize, setInnerSize] = useState(props.pageSize ?? 10);
   const controlled = props.controlledPaging === true;
+  // 记录调用方上一次传入的 page 值：仅当该值「真的发生变化」时才重置内部页码。
+  // 不依赖 innerPage 判断，否则内部翻页（onChange→setInnerPage）会被立刻拉回 props.page，
+  // 形成反馈闭环，使客户端自管翻页永远停在首页（行 11 永不出现）。回归见 DataTable.test
+  // 用例“前端分页（默认）内部自管翻页，不回调调用方”。
+  const prevPageRef = useRef(props.page);
 
   useEffect(() => {
     // 前端分页：尊重调用方期望的每页大小（缺省 10）；prop 变化时同步，覆盖初始值。
@@ -61,12 +66,15 @@ export function DataTable<T>(props: {
   }, [controlled, props.pageSize]);
 
   useEffect(() => {
-    // 前端分页时同步调用方的页码期望。
-    // 此前 DataTable 自管 innerPage，把调用方「筛选变了 → setPage(1)」的信号整个吞掉：
-    // 结果集变少后仍停在第 N 页，表现为空白页。这里让外部 page 变化能重置内部页码。
+    // 前端分页时同步调用方的页码期望：仅当「调用方把 page 改成了新值」（如筛选变化后
+    // setPage(1)）才重置内部页码，避免吞掉翻页信号导致空白页。
+    // 依赖只放 [controlled, props.page] —— 不放 innerPage，否则内部翻页会被立即拉回。
     if (controlled) return;
-    if (props.page && props.page !== innerPage) setInnerPage(props.page);
-  }, [controlled, props.page, innerPage]);
+    if (props.page && props.page !== prevPageRef.current) {
+      prevPageRef.current = props.page;
+      setInnerPage(props.page);
+    }
+  }, [controlled, props.page]);
 
   if (props.loading) {
     return (

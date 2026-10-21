@@ -35,7 +35,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="page-error-boundary" role="alert">
           <div className="page-error-boundary__title">页面渲染出错</div>
-          <p className="page-error-boundary__msg">{this.state.error.message || "未知错误"}</p>
+          <p className="page-error-boundary__msg">
+            {import.meta.env.DEV
+              ? (this.state.error.message || "未知错误")
+              : "页面出现意外错误，请点「重试」恢复；若反复出现请联系管理员。"}
+          </p>
           <button
             type="button"
             className="ui-button ui-button--primary"

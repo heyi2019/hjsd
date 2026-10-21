@@ -72,3 +72,45 @@ cd frontend && npm run check && npm run build
 - 变更关联至少一个功能编号，例如 `CUS-01-02`。
 - 涉及接口时更新 API 文档、错误码/状态机和对应测试。
 - 涉及表结构时新增 Alembic revision，更新数据字典和 DDL；不得手改生产 schema。
+
+## 6. E2E 端到端测试（Playwright）
+
+前端 E2E 采用 Playwright + Chromium，配置见 `frontend/playwright.config.ts`，用例在 `frontend/e2e/*.spec.ts`。开发态（`import.meta.env.DEV`）零登录直进 `AppShell`，E2E 全部在 dev server 下运行，无需真实 token。
+
+### 运行方式
+
+```bash
+cd frontend
+./node_modules/.bin/playwright test                 # 全量
+./node_modules/.bin/playwright test e2e/smoke.spec.ts   # 单文件
+```
+
+`playwright.config.ts` 的 `webServer` 会自动拉起两个服务，无需手工启后端：
+
+| 服务 | 端口 | 说明 |
+|---|---:|---|
+| 前端 dev server | 5180 | `vite --strictPort`；若已占用则复用 |
+| E2E 后端 | 8124 | `backend/scripts/e2e_backend.sh` 每次重建**独立库 `heijin_erp_e2e.db`** |
+
+**端口隔离是硬约束**：8123 为你常驻的「生产 dev 后端」（连 `heijin_erp_v1.db`），E2E 严禁复用它的库，故固定走 8124。可用 `ERP_E2E_BACKEND_PORT` / `ERP_E2E_API_BASE` 覆盖。
+
+### 浏览器
+
+Playwright 1.64.0 + Chromium。若报 `Executable doesn't exist`，执行 `./node_modules/.bin/playwright install chromium`；本机浏览器缓存可能不在默认 `~/.cache/ms-playwright`，以 `PLAYWRIGHT_BROWSERS_PATH` 为准。
+
+### 当前基线（2026-10-21 实测）
+
+- 全量 **50 / 50 通过，约 1.2 分钟**（10 个 spec：smoke / auth-login / business-write / crud / integration / other-integration / role-switch / fallback / upgrade-integration / visual）。
+- 串行执行（`workers:1`、`fullyParallel:false`），antd 下拉与真实浏览器状态并行易互相干扰。
+
+### 视觉快照策略
+
+`visual.spec.ts` 对工作台、登录页做像素基线比对。**有意的 UI 改动**（配色令牌、间距）会使快照过期，此时：
+
+1. 先看 `test-results/**/…-diff.png`，确认差异仅限本次改动区域（避免把回归当基线批准）；
+2. 再 `./node_modules/.bin/playwright test e2e/visual.spec.ts --update-snapshots` 重生成；
+3. 复跑全量确认 50/50 绿，并把快照随改动一并提交。
+
+### 提交前
+
+E2E 与单测分开：单测（`vitest`）测逻辑，E2E 守主干（导航可达、外壳不白屏、关键写路径）。二者都要绿才算通过。

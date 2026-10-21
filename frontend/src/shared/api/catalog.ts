@@ -660,7 +660,15 @@ export const cashflowsApi = {
     occurred_to?: string;
     limit?: number;
     offset?: number;
-  }) => api.get<{ items: Cashflow[]; total: number }>("/cashflows", { params }).then((r) => r.data),
+  }) =>
+    // 兼容两种后端契约：分页对象 {items,total}（当前 main）与旧版裸数组，
+    // 避免任一形态下 result.items 为 undefined 引发 `.filter is not a function` 类整页崩溃。
+    api.get<{ items: Cashflow[]; total: number } | Cashflow[]>("/cashflows", { params }).then((r) => {
+      const data = r.data as unknown;
+      if (Array.isArray(data)) return { items: data as Cashflow[], total: (data as Cashflow[]).length };
+      const obj = data as { items?: Cashflow[]; total?: number };
+      return { items: obj.items ?? [], total: obj.total ?? 0 };
+    }),
 };
 
 export const rebatesApi = {

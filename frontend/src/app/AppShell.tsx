@@ -9,6 +9,26 @@ import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
+
+/** 业务中心子页记忆：切走再切回时恢复到上次停留的子页，而非强制「库存中心」。 */
+const BIZ_TAB_KEY = "erp:businessTab";
+type StoredTab = BusinessCenterEntryTab | null;
+function getStoredBizTab(): StoredTab {
+  try {
+    const v = sessionStorage.getItem(BIZ_TAB_KEY);
+    return (v as StoredTab) ?? null;
+  } catch {
+    return null;
+  }
+}
+function setStoredBizTab(tab: BusinessCenterEntryTab): void {
+  try {
+    sessionStorage.setItem(BIZ_TAB_KEY, tab);
+  } catch {
+    /* sessionStorage 不可用时静默降级，不影响导航 */
+  }
+}
 
 const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
@@ -38,13 +58,20 @@ export function AppShell() {
   const segments = location.pathname.split("/").filter(Boolean);
   const rawActive = segments[0] ?? "dashboard";
   const active = navigation.some((e) => e.key === rawActive) ? rawActive : "dashboard";
-  const businessTab = active === "business" ? (segments[1] as BusinessCenterEntryTab | undefined) : undefined;
+  const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
+  // 业务中心子页：URL 显式带子页则用它（并记忆）；否则恢复上次记忆，首次默认库存中心。
+  const businessTab = active === "business" ? (rawBizTab ?? getStoredBizTab() ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const { user, authenticated, mustChangePassword, logout } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
+    // 回到业务中心但不指定子页时，恢复上次停留的子页（避免被强制回库存中心）。
+    if (key === "business" && !tab) {
+      navigate(`/business/${getStoredBizTab() ?? "inventory"}`);
+      return;
+    }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
   };
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
@@ -58,6 +85,10 @@ export function AppShell() {
   useEffect(() => {
     setVisited((prev) => (prev.has(active) ? prev : new Set(prev).add(active)));
   }, [active]);
+  // 业务中心子页落点记忆：URL 显式带子页时持久化，供「切走再切回」恢复。
+  useEffect(() => {
+    if (active === "business" && rawBizTab) setStoredBizTab(rawBizTab);
+  }, [active, rawBizTab]);
   // 转场重放：不再靠 key 重挂载（那会丢状态），改用 reflow 技巧重放 .page-enter 弹簧入场。
   const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -122,7 +153,7 @@ export function AppShell() {
               key={n.key}
               type="button"
               className={`nav-item${n.key === "operations" || n.key === "settings" ? " nav-item--secondary" : ""}${active === n.key ? " nav-item--active" : ""}`}
-              onClick={() => navigateTo(n.key, n.key === "business" ? "inventory" : undefined)}
+              onClick={() => navigateTo(n.key)}
               aria-label={n.label}
               title={n.label}
               aria-current={active === n.key ? "page" : undefined}
@@ -213,21 +244,22 @@ export function AppShell() {
               const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
               if (!PageComponent) return null;
               return (
-                <div
-                  key={key}
-                  ref={isActive ? pageRef : undefined}
-                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
-                  aria-hidden={!isActive}
-                >
-                  {key === "dashboard" ? (
-                    <DashboardPage onNavigate={navigateTo} />
-                  ) : (
-                    <PageComponent
-                      onNavigate={navigateTo}
-                      initialTab={key === "business" ? businessTab : undefined}
-                    />
-                  )}
-                </div>
+                <ErrorBoundary key={key} name={key}>
+                  <div
+                    ref={isActive ? pageRef : undefined}
+                    className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
+                    aria-hidden={!isActive}
+                  >
+                    {key === "dashboard" ? (
+                      <DashboardPage onNavigate={navigateTo} />
+                    ) : (
+                      <PageComponent
+                        onNavigate={navigateTo}
+                        initialTab={key === "business" ? businessTab : undefined}
+                      />
+                    )}
+                  </div>
+                </ErrorBoundary>
               );
             })}
           </Suspense>

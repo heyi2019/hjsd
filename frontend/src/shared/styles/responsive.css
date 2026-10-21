@@ -41,6 +41,9 @@
 
 @media (max-width: 640px) {
   .app-shell { display: block; }
+  /* 杜绝页面级横向平移：宽内容在各自容器内滚动，而非撑破视口（实测 375px 下 scrollWidth 445）。 */
+  html, body { overflow-x: hidden; }
+  .page-content { overflow-x: auto; max-width: 100%; }
   .sidebar {
     position: fixed;
     inset-inline: 0;
@@ -106,6 +109,7 @@
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
+  .ant-table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
   .ant-table-wrapper .ant-table { min-width: var(--sz-680); }
   /* 业务台账移动端保留核心字段，详情信息进入卡片，避免核心动作被推到屏外。 */
   .orders-ledger .ant-table { min-width: 0 !important; width: 100%; }

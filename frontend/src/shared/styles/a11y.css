@@ -40,3 +40,70 @@
 .sidebar .nav-level-four button:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* ── 触控目标最小 24×24（WCAG 2.5.8 AA）──
+   覆盖表格行内小图标按钮与行内文字动作（如「查看详情」56×17、18×18 图标按钮）。
+   仅作用于表格单元格与图标独占按钮，避免改动筛选条等紧凑控件外观。 */
+.ant-table-cell .ant-btn,
+.ant-table-cell a.ant-typography,
+.ant-table-cell a[role="button"] {
+  min-height: var(--ui-control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ant-btn:has(> .anticon) {
+  min-width: var(--ui-control-height-sm);
+  min-height: var(--ui-control-height-sm);
+  padding-inline: var(--space-1);
+}
+/* antd 表格行展开/折叠图标默认 18×18，补到 24×24 满足触控目标（WCAG 2.5.8）。
+   必须用 .ant-table 前缀提升到 (0,2,0)：antd v5 在运行时把组件样式注入到
+   <head> 末尾，单类选择器 .ant-table-row-expand-icon 与其等特异性、晚写覆盖，
+   会导致 24px 规则被 18px 覆盖（后写覆盖陷阱）。 */
+.ant-table .ant-table-row-expand-icon {
+  width: var(--ui-control-height-sm);
+  height: var(--ui-control-height-sm);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 页面级错误边界降级 UI（ErrorBoundary 接住单页崩溃，防整壳白屏）── */
+.page-error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-5);
+  padding: var(--space-5);
+  max-width: 40rem;
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
+}
+.page-error-boundary__title {
+  margin: 0;
+  font: var(--font-section);
+  color: var(--color-error);
+}
+.page-error-boundary__msg {
+  margin: 0;
+  font: var(--font-body-s);
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}
+.page-error-boundary button {
+  min-height: var(--ui-control-height);
+  padding-inline: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--accent-deep);
+  color: var(--on-accent);
+  font: var(--font-body-s);
+  cursor: pointer;
+}

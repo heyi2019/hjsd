@@ -53,6 +53,7 @@
 .degrade-switch .theme-switch-label,
 .sidebar-foot {
   font: var(--font-nav-caption);
+  color: var(--color-text-secondary);
 }
 
 /* 设置层级：数据治理/AI/账号是一级，数据治理下的三个页面是二级。 */
@@ -259,7 +260,7 @@
   padding-top: var(--space-2);
   border-top: var(--border-w) solid var(--color-border);
   font: var(--font-nav-caption);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
 }
 
 /* 顶栏：复用 .view-head 玻璃稀释底 + 装饰光斑，这里补两行式标题结构。 */

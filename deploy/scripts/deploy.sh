@@ -13,6 +13,13 @@ fi
 echo "==> 构建镜像"
 docker compose build
 
+echo "==> 迁移前备份正式库"
+docker compose run --rm backend \
+  python /app/scripts/backup_db.py \
+  --db /app/data/heijin_erp_v1.db \
+  --out-dir /app/data/backups \
+  --keep 30
+
 echo "==> 执行数据库迁移"
 docker compose run --rm backend alembic upgrade head
 

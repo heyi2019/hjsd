@@ -115,3 +115,32 @@ class TestPools:
         actions = {row.action for row in rows}
         assert AuditAction.POOL_CREATE.value in actions
         assert AuditAction.POOL_UPDATE.value in actions
+
+    def test_update_pool_applies_extra_values(self, db, monkeypatch):
+        """覆盖 update_pool 的 extra_values 分支（pools.py:114）。"""
+        pool = service.create_pool(db, code="TMPEV", name="活字段池", actor="pytest")
+        db.commit()
+        captured: dict = {}
+
+        def _spy(session, *, entity_type, entity_id, values, require_all=False):
+            captured["entity_type"] = entity_type
+            captured["entity_id"] = entity_id
+            captured["values"] = dict(values)
+            return {}
+
+        monkeypatch.setattr(pools_service.parties_service, "set_extra_values", _spy)
+        updated = service.update_pool(
+            db, pool.id, actor="pytest", extra_values={"game": "王者"}
+        )
+        assert updated.name == "活字段池"
+        assert captured["entity_type"] == "pool"
+        assert captured["entity_id"] == pool.id
+        assert captured["values"] == {"game": "王者"}
+
+    def test_assert_pool_usable_returns_active_pool(self, db):
+        """覆盖 assert_pool_usable 的成功返回路径（pools.py:189）。"""
+        pool = service.create_pool(db, code="TMPAU", name="可用池", actor="pytest")
+        db.commit()
+        result = service.assert_pool_usable(db, pool.id)
+        assert result.id == pool.id
+        assert result.status == PoolStatus.ACTIVE.value

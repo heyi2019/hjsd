@@ -59,6 +59,11 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 column["name"] for column in inspect(connection).get_columns("installments")
             }
             assert "account_id" not in installment_columns
+            assert "final_period_adjustment" in installment_columns
+            event_columns = {
+                column["name"] for column in inspect(connection).get_columns("order_events")
+            }
+            assert "operator_user_ids" in event_columns
             disposition_columns = {
                 column["name"]: column["default"]
                 for column in inspect(connection).get_columns("installment_dispositions")
@@ -176,7 +181,7 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0003_installment_adjustment (head)"
+    assert result.stdout.strip() == "0001 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

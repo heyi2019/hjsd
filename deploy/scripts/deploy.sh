@@ -13,6 +13,9 @@ fi
 echo "==> 构建镜像"
 docker compose build
 
+echo "==> 执行数据库迁移"
+docker compose run --rm backend alembic upgrade head
+
 echo "==> 启动服务"
 docker compose up -d
 

@@ -16,6 +16,17 @@ frontend/test-results/
 *.db-wal
 *.db-shm
 
+# 测试覆盖率产物（曾被 02:15 checkout checkpoint 误收，特此显式忽略）
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# Playwright 报告与浏览器缓存产物
+/frontend/playwright-report/
+/frontend/playwright/.cache/
+
 # 运行期目录：日志、运行时状态、监控数据、截图产物，不入版本库
 /logs/*
 !/logs/.gitkeep

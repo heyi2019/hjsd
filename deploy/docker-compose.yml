@@ -1,6 +1,6 @@
 # 宜游轩 ERP 生产编排
 # 用法（在 deploy/ 目录）：
-#   cp env/.env.production.example .env   # 填入正式 PostgreSQL/JWT/CORS 配置
+#   cp env/.env.production.example .env   # 填入 JWT_SECRET_KEY 等生产配置
 #   docker compose build
 #   docker compose up -d
 services:
@@ -10,6 +10,8 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env            # 生产环境变量（含 JWT_SECRET_KEY / DATABASE_URL / CORS_ORIGINS）
+    volumes:
+      - erp_db:/app/data   # 当前正式库为 ECS 上的 SQLite v1 文件
     expose:
       - "8123"
     restart: unless-stopped
@@ -30,3 +32,6 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  erp_db:

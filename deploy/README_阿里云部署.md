@@ -152,6 +152,6 @@ docker compose exec -T backend tar czf - -C /app data > erp_db_$(date +%F).tar.g
 
 1. **JWT_SECRET_KEY 必须替换**，否则任何人可伪造 token。
 2. **CORS_ORIGINS** 填真实域名；同源反代下也可留空，但显式更安全。
-3. **正式库**：正式环境使用独立 PostgreSQL；部署前由脚本执行 `alembic upgrade head`，应用容器不挂载本地 SQLite 数据卷。SQLite 仅用于本地开发和 E2E 测试。
+3. **正式库**：当前正式环境为 ECS 上的 SQLite v1 持久化库，部署前由脚本执行 `alembic upgrade head` 并保留数据卷；PostgreSQL 仅作为后续迁移目标，迁移完成前不得直接切换。
 4. **备份**：SQLite 是单文件，按第六节定期打包 `data` 卷即可；换 PG 后改用 `pg_dump`。
 5. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离，配置已强制校验，勿手动改 `DATABASE_URL` 指向旧库。

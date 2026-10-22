@@ -31,6 +31,52 @@ def _indexes(connection: sqlite3.Connection, table: str) -> set[str]:
     return {row[1] for row in connection.execute(f"PRAGMA index_list({table})")}
 
 
+def _has_route_unique_constraint(connection: sqlite3.Connection) -> bool:
+    for _, index, unique, *_ in connection.execute("PRAGMA index_list(order_type_pools)"):
+        if unique and {row[2] for row in connection.execute(f"PRAGMA index_info({index})")} == {
+            "order_type_id",
+            "portion",
+            "fund_nature",
+        }:
+            return True
+    return False
+
+
+def _rebuild_order_type_pools(connection: sqlite3.Connection) -> None:
+    """SQLite 无法直接替换 UNIQUE 约束，故保留数据后重建此小型路由表。"""
+    connection.execute("PRAGMA foreign_keys=OFF")
+    try:
+        connection.executescript(
+            """
+            CREATE TABLE order_type_pools__baseline (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                order_type_id INTEGER NOT NULL,
+                pool_id INTEGER NOT NULL,
+                portion VARCHAR(16) NOT NULL,
+                fund_nature VARCHAR(16),
+                priority INTEGER NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT ck_order_type_pools_fund_nature_valid CHECK (fund_nature IS NULL OR fund_nature IN ('BUSINESS', 'EXTERNAL', 'INTERNAL')),
+                CONSTRAINT ck_order_type_pools_portion_valid CHECK (portion IN ('PRINCIPAL', 'PROFIT', 'GROSS')),
+                CONSTRAINT ck_order_type_pools_route_priority_nonnegative CHECK (priority >= 0),
+                CONSTRAINT fk_order_type_pools_order_type_id FOREIGN KEY(order_type_id) REFERENCES order_type_defs(id) ON DELETE CASCADE,
+                CONSTRAINT fk_order_type_pools_pool_id FOREIGN KEY(pool_id) REFERENCES pools(id) ON DELETE RESTRICT,
+                CONSTRAINT uq_order_type_pools_route UNIQUE (order_type_id, portion, fund_nature)
+            );
+            INSERT INTO order_type_pools__baseline (id, order_type_id, pool_id, portion, fund_nature, priority, is_active, created_at, updated_at)
+            SELECT id, order_type_id, pool_id, portion, fund_nature, priority, is_active, created_at, updated_at
+            FROM order_type_pools;
+            DROP TABLE order_type_pools;
+            ALTER TABLE order_type_pools__baseline RENAME TO order_type_pools;
+            CREATE INDEX ix_order_type_pools_pool_id ON order_type_pools (pool_id);
+            """
+        )
+    finally:
+        connection.execute("PRAGMA foreign_keys=ON")
+
+
 def repair(path: Path) -> list[str]:
     """补齐基线缺口，返回本次实际执行的修复项。"""
     actions: list[str] = []
@@ -75,9 +121,20 @@ def repair(path: Path) -> list[str]:
             ("rebate_records", "ix_rebate_records_source_order", "source_order_id"),
         )
         for table, index, columns in indexes:
+            legacy_index = {
+                "ix_installment_schedules_due": "ix_schedules_due",
+                "ix_rebate_records_source_order": "ix_rebate_source_order",
+            }[index]
+            if legacy_index in _indexes(connection, table):
+                connection.execute(f"DROP INDEX {legacy_index}")
+                actions.append(f"移除旧索引 {legacy_index}")
             if index not in _indexes(connection, table):
                 connection.execute(f"CREATE INDEX {index} ON {table} ({columns})")
                 actions.append(f"新增索引 {index}")
+
+        if not _has_route_unique_constraint(connection):
+            _rebuild_order_type_pools(connection)
+            actions.append("重建 order_type_pools 三字段唯一约束")
     return actions
 
 

@@ -43,7 +43,7 @@ const businessPnl = {
   },
   items: [],
 };
-/** 入口卡计数口径：订单总数=2、进行中=1（HS ACTIVE）、提号未闭环=0（TH 已 COMPLETED）。 */
+/** 入口卡计数口径：订单总数=2、进行中=1（HS ACTIVE）。 */
 const orders = [
   { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" },
   { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
@@ -117,7 +117,7 @@ describe("DataCenterPanel：资金总览", () => {
 });
 
 describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）", () => {
-  it("渲染三张订单统计入口卡：总数/进行中/提号未闭环", async () => {
+  it("渲染订单统计入口卡：总数/进行中", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("订单总数");
     const total = screen.getByText("订单总数").closest(".ui-entry-card");
@@ -128,7 +128,7 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
       .map((el) => el.closest(".ui-entry-card"))
       .find(Boolean);
     expect(active?.textContent).toContain("1");
-    expect(screen.getByText("提号未闭环").closest(".ui-entry-card")?.textContent).toContain("0");
+    expect(screen.queryByText("提号未闭环")).toBeNull();
   });
 
   it("点击入口卡跳转业务中心（onNavigate 带 business）", async () => {

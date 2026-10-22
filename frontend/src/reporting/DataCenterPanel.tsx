@@ -65,9 +65,8 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   const totalAvailable = sum((b) => b?.available);
   const totalDeposit = sum((b) => b?.deposit_held);
 
-  // 业务计数口径：ACTIVE 表示进行中；提号单 ACTIVE 表示未闭环。
+  // 业务计数口径：ACTIVE 表示进行中。
   const activeCount = orders.filter((o) => o.status === "ACTIVE").length;
-  const thOpenCount = orders.filter((o) => o.order_type === "TH" && o.status === "ACTIVE").length;
 
   const columns: ColumnsType<PoolRow> = [
     {
@@ -121,13 +120,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
         <EntryCard
           title="进行中"
           value={String(activeCount)}
-          description="点击进入业务中心 · 业务台账"
-          onClick={() => onNavigate?.("business")}
-        />
-        <EntryCard
-          title="提号未闭环"
-          value={String(thOpenCount)}
-          tone={thOpenCount ? "warn" : "plain"}
           description="点击进入业务中心 · 业务台账"
           onClick={() => onNavigate?.("business")}
         />

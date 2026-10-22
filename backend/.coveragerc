@@ -1,0 +1,16 @@
+[run]
+# 只度量应用代码；测试与虚拟环境不计入
+source = app
+omit =
+    */tests/*
+    */.venv/*
+
+[report]
+# 闸门依据：显示缺失行号，便于定位回归
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    @abstractmethod

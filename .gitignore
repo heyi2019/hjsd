@@ -19,6 +19,7 @@ frontend/test-results/
 # 测试覆盖率产物（曾被 02:15 checkout checkpoint 误收，特此显式忽略）
 .coverage
 .coverage.*
+coverage.json
 coverage.xml
 htmlcov/
 .pytest_cache/

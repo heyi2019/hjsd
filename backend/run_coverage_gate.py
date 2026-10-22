@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""覆盖率闸门：锁定四域后端行覆盖率，防回归。
+
+按既定目标（foundation / finance / reporting / core 均 100% 可达代码）强制：
+- foundation / core / reporting：缺失行数必须为 0（100%）。
+- finance：缺失行数 ≤ 7（7 行为已核实不可达防御/死代码，见提交 d399b1f 说明：
+  rebates.py:398/432 外键保证悬空引用不存在、reconciliation.py:153 死代码、
+  transfers.py:133/145-148 业务不变量保证）。
+
+为什么不用 coverage 自带的 fail_under：
+fail_under 是全局单阈值，无法表达「finance 允许 7 行不可达缺口」这类
+按包差异化的闸门。故解析 `coverage json` 按包聚合后逐包判定。
+
+用法：
+    python3 run_coverage_gate.py            # 跑全量 tests/v1 + 校验闸门（CI/收口用）
+    python3 run_coverage_gate.py --report   # 只打印当前覆盖率，不失败（本地巡检用）
+
+与既有纪律一致：
+- 全量基线（纳入全部 touching 测试），避免孤立假缺口（foundation Task #5 教训）。
+- 使用当前解释器环境（.venv 内须已装 coverage）。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+BACKEND = Path(__file__).resolve().parent
+PY = sys.executable  # 与当前解释器同环境（应在 .venv 内）
+
+# 四域闸门阈值：包前缀 -> 允许的最大缺失行数
+GATES = {
+    "app/foundation": 0,
+    "app/core": 0,
+    "app/reporting": 0,
+    "app/finance": 7,
+}
+
+FULL_SUITE = ["tests/v1"]
+COV_JSON = BACKEND / "coverage.json"
+
+
+def _run(cmd: list[str]) -> None:
+    print("+ " + " ".join(cmd), flush=True)
+    subprocess.run(cmd, cwd=BACKEND, check=True)
+
+
+def collect_coverage() -> Path:
+    """跑全量测试并生成 coverage.json，返回 json 路径。"""
+    for f in (BACKEND / ".coverage", COV_JSON):
+        if f.exists():
+            f.unlink()
+    _run([PY, "-m", "coverage", "run", "-m", "pytest", *FULL_SUITE, "-q"])
+    _run([PY, "-m", "coverage", "json", "-o", str(COV_JSON)])
+    return COV_JSON
+
+
+def aggregate(cov_json: Path) -> dict[str, dict[str, int]]:
+    """按包前缀聚合语句数与缺失行数。"""
+    data = json.loads(cov_json.read_text(encoding="utf-8"))
+    agg: dict[str, dict[str, int]] = {
+        pkg: {"statements": 0, "missing": 0} for pkg in GATES
+    }
+    for path, info in data.get("files", {}).items():
+        summary = info.get("summary", {})
+        num = summary.get("num_statements", 0)
+        miss = summary.get("missing_lines", 0)
+        for pkg in GATES:
+            if path == pkg or path.startswith(pkg + "/"):
+                agg[pkg]["statements"] += num
+                agg[pkg]["missing"] += miss
+                break
+    return agg
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="四域后端覆盖率闸门")
+    ap.add_argument(
+        "--report",
+        action="store_true",
+        help="只打印覆盖率，不失败（本地巡检）",
+    )
+    args = ap.parse_args()
+
+    cov_json = collect_coverage()
+    agg = aggregate(cov_json)
+
+    print("\n覆盖率闸门结果：")
+    print(f"{'包':<22}{'语句':>8}{'缺失':>8}{'覆盖':>10}{'上限':>8}  结论")
+    all_ok = True
+    for pkg, max_missing in GATES.items():
+        st = agg[pkg]["statements"]
+        mi = agg[pkg]["missing"]
+        pct = (st - mi) / st * 100 if st else 100.0
+        passed = mi <= max_missing
+        all_ok = all_ok and passed
+        flag = "PASS" if passed else "FAIL"
+        print(f"{pkg:<22}{st:>8}{mi:>8}{pct:>9.1f}%{max_missing:>8}  {flag}")
+
+    if args.report:
+        return 0
+    if not all_ok:
+        print(
+            "\n❌ 覆盖率闸门未通过：存在域跌破允许缺失上限，请补测试或核查不可达标注。",
+            file=sys.stderr,
+        )
+        return 1
+    print("\n✅ 覆盖率闸门通过：四域均满足既定阈值（foundation/core/reporting=100%，finance≤7 缺失）。")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

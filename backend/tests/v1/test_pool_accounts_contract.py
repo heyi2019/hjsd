@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.core.errors import Validation
+from app.core.errors import Conflict, NotFound, Validation
 from app.finance import pool_accounts
 
 
@@ -202,3 +202,140 @@ def test_pool_account_batch_status_is_atomic_and_audited(client, headers, seeded
     assert invalid.status_code == 404
     seeded_db.expire_all()
     assert seeded_db.get(type(first), first.id).status == "DISABLED"
+
+
+def test_get_pool_rejects_unknown_code(seeded_db):
+    with pytest.raises(NotFound):
+        pool_accounts.get_pool(seeded_db, "NO_SUCH_POOL")
+
+
+def test_create_pool_account_rejects_unknown_pool(seeded_db):
+    with pytest.raises(NotFound, match="资金池不存在"):
+        pool_accounts.create_pool_account(
+            seeded_db, pool_id=999999, account_no="X1", account_name="x",
+            account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+        )
+
+
+def test_create_pool_account_rejects_disabled_pool(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    pool.status = "DISABLED"
+    seeded_db.flush()
+    try:
+        with pytest.raises(Validation, match="停用资金池不能新增账户"):
+            pool_accounts.create_pool_account(
+                seeded_db, pool_id=pool.id, account_no="DIS-001", account_name="x",
+                account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+            )
+    finally:
+        pool.status = "ACTIVE"
+        seeded_db.flush()
+
+
+def test_create_pool_account_rejects_blank_name(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    with pytest.raises(Validation, match="账户编号和名称必填"):
+        pool_accounts.create_pool_account(
+            seeded_db, pool_id=pool.id, account_no="", account_name="",
+            account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+        )
+
+
+def test_create_pool_account_rejects_invalid_type(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    with pytest.raises(Validation, match="账户类型无效"):
+        pool_accounts.create_pool_account(
+            seeded_db, pool_id=pool.id, account_no="T1", account_name="x",
+            account_type="ZZ", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+        )
+
+
+def test_create_pool_account_rejects_duplicate_no(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    pool_accounts.create_pool_account(
+        seeded_db, pool_id=pool.id, account_no="DUP-001", account_name="x",
+        account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+    )
+    with pytest.raises(Conflict, match="账户编号已存在"):
+        pool_accounts.create_pool_account(
+            seeded_db, pool_id=pool.id, account_no="DUP-001", account_name="y",
+            account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+        )
+
+
+def test_create_pool_account_rejects_negative_balance(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    with pytest.raises(Validation, match="期初余额不能为负数"):
+        pool_accounts.create_pool_account(
+            seeded_db, pool_id=pool.id, account_no="NEG-001", account_name="x",
+            account_type="BANK", ownership="OWNED", opening_balance=Decimal("-1"), actor="t",
+        )
+
+
+def test_update_pool_account_rejects_unknown(seeded_db):
+    with pytest.raises(NotFound, match="资金账户不存在"):
+        pool_accounts.update_pool_account(seeded_db, 999999, account_name="x", actor="t")
+
+
+def test_update_pool_account_rejects_blank_name(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    acc = pool_accounts.create_pool_account(
+        seeded_db, pool_id=pool.id, account_no="UP-001", account_name="原",
+        account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+    )
+    with pytest.raises(Validation, match="账户名称不能为空"):
+        pool_accounts.update_pool_account(seeded_db, acc.id, account_name="  ", actor="t")
+
+
+def test_update_pool_account_rejects_invalid_type_and_ownership(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    acc = pool_accounts.create_pool_account(
+        seeded_db, pool_id=pool.id, account_no="UP-002", account_name="原",
+        account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+    )
+    with pytest.raises(Validation, match="账户类型无效"):
+        pool_accounts.update_pool_account(seeded_db, acc.id, account_type="ZZ", actor="t")
+    with pytest.raises(Validation, match="账户归属无效"):
+        pool_accounts.update_pool_account(seeded_db, acc.id, ownership="ZZ", actor="t")
+
+
+def test_update_pool_account_sets_note(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    acc = pool_accounts.create_pool_account(
+        seeded_db, pool_id=pool.id, account_no="UP-003", account_name="原",
+        account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+    )
+    updated = pool_accounts.update_pool_account(seeded_db, acc.id, note="备注", actor="t")
+    assert updated.note == "备注"
+
+
+def test_set_pool_account_status_rejects_invalid(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    acc = pool_accounts.create_pool_account(
+        seeded_db, pool_id=pool.id, account_no="ST-001", account_name="x",
+        account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+    )
+    with pytest.raises(Validation, match="账户状态无效"):
+        pool_accounts.set_pool_account_status(seeded_db, acc.id, status="ZZ", actor="t")
+
+
+def test_set_pool_account_status_rejects_unknown(seeded_db):
+    with pytest.raises(NotFound, match="资金账户不存在"):
+        pool_accounts.set_pool_account_status(seeded_db, 999999, status="DISABLED", actor="t")
+
+
+def test_batch_set_pool_account_status_validation(seeded_db):
+    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
+    acc = pool_accounts.create_pool_account(
+        seeded_db, pool_id=pool.id, account_no="BVAL-001", account_name="x",
+        account_type="BANK", ownership="OWNED", opening_balance=Decimal("0"), actor="t",
+    )
+    with pytest.raises(Validation, match="账户状态无效"):
+        pool_accounts.batch_set_pool_account_status(
+            seeded_db, [acc.id], status="ZZ", reason="r", actor="t")
+    with pytest.raises(Validation, match="账户 ID 必须为 1-100 个且不能重复"):
+        pool_accounts.batch_set_pool_account_status(
+            seeded_db, [acc.id, acc.id], status="DISABLED", reason="r", actor="t")
+    with pytest.raises(Validation, match="批量变更必须填写原因"):
+        pool_accounts.batch_set_pool_account_status(
+            seeded_db, [acc.id], status="DISABLED", reason="  ", actor="t")

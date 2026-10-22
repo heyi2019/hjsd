@@ -21,6 +21,7 @@ frontend/test-results/
 .coverage.*
 coverage.json
 coverage.xml
+coverage/
 htmlcov/
 .pytest_cache/
 

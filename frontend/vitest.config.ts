@@ -131,5 +131,22 @@ export default defineConfig({
         },
       },
     ],
+    // 覆盖率仅在使用 `vitest run --coverage` 时激活，不影响日常测试运行。
+    // 量化前端薄弱页用：provider v8（与 esbuild transform 兼容，零额外依赖）。
+    coverage: {
+      provider: "v8",
+      reportsDirectory: "./coverage",
+      reporter: ["text", "json-summary", "json", "html"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/test/**",
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.spec.{ts,tsx}",
+        "src/main.tsx",
+        "src/vite-env.d.ts",
+        "src/vite.config.test.ts",
+        "**/*.d.ts",
+      ],
+    },
   },
 });

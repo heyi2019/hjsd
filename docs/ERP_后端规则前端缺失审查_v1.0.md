@@ -34,7 +34,25 @@
 | #13（部分） | 月结按钮门控 | `FundsPage.tsx:723` 由 `deposit.post` 改为 `finance.period.lock` | FundsPage 8+6 passed |
 | — | 文档同步 | `docs/ERP_权限矩阵_v1.0.md` 补两行权限点并标注代码为权威源 | — |
 
-**未修**：第 2 组（8 个状态机动作入口）、第 3 组（能力类新增页面）属页面级工作，未在本轮实施。第 12 条按勘误降级为 #62，未改代码。
+**未修**：第 12 条按勘误降级为 #62，未改代码。
+
+## 0.2 第二轮处置状态（2026-10-24 已实施）
+
+第 2 组（8 个状态机动作入口）与第 3 组（4 个能力页面）全部落地，共 10 个文件、两个提交（`9303fe3` 动作入口、`bd86485` 配置域）：
+
+| 组 | 修复内容 | 改动 | 验证 |
+|---|---|---|---|
+| 第 2 组 | 分期 5 动作 | `InstallmentsPanel.tsx`：提前结清、违约登记、期次减免、期次展期、逾期标记（批量），全部调后端既有 POST 端点；期次列表新增应收/减免/宽限列 | installments 11/11 |
+| 第 2 组 | 返点冲销 + 结算明细 | `RebatesPanel.tsx`：reverse 入口、结算明细、`expected_on` 逾期列与统计 | rebates 8/8 |
+| 第 2 组 | 订单关联 | `OrdersPage.tsx`：详情抽屉关联单区块 + 新建关联（SOURCE/FOLLOW_UP + split_ratio/split_amount） | orders+accounts 109 |
+| 第 2 组 | 已售账号再买入 | `InventoryPanel.tsx`：「更多⌄」→ 再买入（仅 SOLD），走后端 BUY 事件触发 SOLD→BUY_STOCK→IN_STOCK | 同上 |
+| 第 3 组 | 池内账户主数据 | 新增 `pools/PoolAccountsPanel.tsx`，FundsPage 加「池内账户」Tab；pool-accounts 5 端点全接入（列表/池筛选/新建/编辑/启停）；归属 OWNED/CUSTODY/THIRD_PART 标注「计入权益/只计头寸」 | pools 8+6 |
+| 第 3 组 | 业务类型新建 + 资金路由 | `OrderTypesPanel.tsx`：新建类型（code/名称/资金性质/编号前缀/排序）；「路由」Modal 配置份额+资金性质→资金池+优先级；影响预览补传 fund_nature | field-definitions 26 |
+| 第 3 组 | 导入更正批次 | `ImportWorkbench.tsx`：已确认批次「更正」入口（JSON 行数组+理由），走后端 corrections，原批次只读、更正分层可追溯 | imports 22 |
+
+配套修正：`catalog.ts` 补 `poolAccountsApi`、`orderTypesApi.setRoute`、`OrderLink` 类型与 `fund_nature` 参数；`OrderTypesPanel.test.tsx` 同步 2 个因行为变更滞后的断言。
+
+**遗留（未在范围）**：分期违约登记的业务必要性（DEFAULTED 全链路）建议业务侧确认后启用；`OrderLink` 无删除入口（后端亦未提供）。
 
 ---
 

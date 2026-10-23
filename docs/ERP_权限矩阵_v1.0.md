@@ -27,6 +27,8 @@
 | `order.exception.approve` | 是 | 否 | 否 | 是 | 否 | 包括 DG 混合单、未结清交付、减免/展期 |
 | `finance.read` | 是 | 本人相关 | 按池 | 按范围 | 聚合只读 | 资金详情按资金池范围控制 |
 | `finance.transfer` / `deposit.post` | 是 | 否 | 按池 | 否 | 否 | 划转必须原子生成一出一入；双人复核由审批流程实现 |
+| `finance.order.event.post` | 是 | 否 | 按池 | 否 | 否 | 财务侧登记回款/付款事件；与 `order.event.post` 区分，经办人只有后者 |
+| `finance.period.lock` | 是 | 否 | 是 | 否 | 否 | 月结锁定账期；锁定后该月记账/反记账一律拒绝。前端「锁定账期」按钮由此权限门控（2026-10-23 修正：此前误用 `deposit.post`） |
 | `policy.manage` / `policy.approve` | 是 | 否 | 否 | 是 | 否 | 规则只能新版本生效，已用版本不可改 |
 | `field-definition.manage` | 是 | 否 | 否 | 否 | 否 | 不得创建核算字段 |
 | `audit.read` | 是 | 本人操作 | 本池操作 | 审批相关 | 否 | 审计日志不可编辑或删除 |
@@ -42,3 +44,5 @@
 | 报表 | 团队 + 资金池范围 | 无 `finance.read` 时不展示金额明细 |
 
 权限不足统一返回 `403 PERMISSION_DENIED`；越权对象不泄露是否存在，返回 `404 RESOURCE_NOT_FOUND`。联系人字段、客户合并、资金动作、规则审批、订单事件和活字段定义均必须写 `audit_logs`。
+
+> 权威清单以 `backend/app/core/security.py` 的 `ALL_PERMISSIONS`（27 点）与 `ROLE_PERMISSIONS` 为准；前端 `frontend/src/shared/state/session.tsx` 已于 2026-10-23 对齐后端（`finance.order.event.post`、`finance.period.lock` 两点此前缺失）。本表为粗粒度说明，逐点差异以代码为准。

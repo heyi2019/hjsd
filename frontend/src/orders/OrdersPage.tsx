@@ -9,6 +9,7 @@ import {
   policyApi,
   type Installment,
   type Order,
+  type OrderLink,
   type OrderType,
 } from "../shared/api/catalog";
 import { api, normalizeError } from "../shared/api/client";
@@ -160,6 +161,10 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
+  const [links, setLinks] = useState<OrderLink[]>([]);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkSubmitting, setLinkSubmitting] = useState(false);
+  const [linkForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
 
   const load = useCallback(async () => {
@@ -216,8 +221,32 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const openOrder = async (order: Order) => {
     try {
       setSelectedOrder(await ordersApi.get(order.id));
+      // 关联单失败不阻断详情展示。
+      setLinks(await ordersApi.links(order.id).catch(() => []));
     } catch (error) {
       message.error(normalizeError(error).message);
+    }
+  };
+
+  const submitLink = async (values: Record<string, unknown>) => {
+    if (!selectedOrder) return;
+    setLinkSubmitting(true);
+    try {
+      await ordersApi.createLink(selectedOrder.id, {
+        related_order_id: Number(values.related_order_id),
+        relation_type: values.relation_type as "SOURCE" | "FOLLOW_UP",
+        split_ratio: values.split_ratio ? String(values.split_ratio) : undefined,
+        split_amount: values.split_amount ? String(values.split_amount) : undefined,
+        note: values.note as string | undefined,
+      });
+      message.success("订单关联已建立");
+      setLinkOpen(false);
+      linkForm.resetFields();
+      setLinks(await ordersApi.links(selectedOrder.id));
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    } finally {
+      setLinkSubmitting(false);
     }
   };
 
@@ -493,6 +522,40 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           </div>
         ) : null}
         {selectedOrder ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>关联订单</Typography.Text>
+            <PermissionButton
+              permission="order.update"
+              size="small"
+              onClick={() => {
+                linkForm.resetFields();
+                setLinkOpen(true);
+              }}
+            >
+              新建关联
+            </PermissionButton>
+            {links.length ? (
+              links.map((link) => (
+                <div key={link.id} className="orders-event-row">
+                  <span>{link.direction === "incoming" ? "来源单" : "后续单"}</span>
+                  <span>
+                    {link.direction === "incoming" ? link.source_order_no : link.target_order_no}
+                  </span>
+                  <span>
+                    {link.split_ratio
+                      ? `${link.split_ratio}%`
+                      : link.split_amount
+                        ? `¥${money(link.split_amount)}`
+                        : "-"}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <Typography.Text type="secondary">暂无关联订单</Typography.Text>
+            )}
+          </div>
+        ) : null}
+        {selectedOrder ? (
           <Space className="ui-form-spaced" wrap>
             <Dropdown
               trigger={["click"]}
@@ -549,6 +612,56 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           </Form.Item>
           <Form.Item name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={selectedOrder ? `新建订单关联 · ${selectedOrder.order_no}` : "新建订单关联"}
+        open={linkOpen}
+        confirmLoading={linkSubmitting}
+        onCancel={() => setLinkOpen(false)}
+        okText="建立关联"
+        onOk={() => void linkForm.submit()}
+      >
+        <Form form={linkForm} layout="vertical" onFinish={submitLink}>
+          <Typography.Paragraph type="secondary">
+            关联单用于把同一真实交易拆分的上下游订单串起来；分成口径作为关系快照保存，不会改写订单自身金额。
+          </Typography.Paragraph>
+          <Form.Item
+            name="related_order_id"
+            label="关联订单"
+            rules={[{ required: true, message: "请选择关联订单" }]}
+          >
+            <AntSelect
+              showSearch
+              placeholder="请选择订单"
+              optionFilterProp="label"
+              options={orders
+                .filter((item) => item.id !== selectedOrder?.id)
+                .map((item) => ({
+                  value: item.id,
+                  label: `${item.order_no}${item.party_name ? ` · ${item.party_name}` : ""}`,
+                }))}
+            />
+          </Form.Item>
+          <Form.Item name="relation_type" label="关系" rules={[{ required: true, message: "请选择关系" }]}>
+            <AntSelect
+              placeholder="请选择关系"
+              options={[
+                { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" },
+                { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="split_ratio" label="分成比例（%）" tooltip="与分成金额二选一，按交易拆分口径填写">
+            <Input placeholder="例如 60" />
+          </Form.Item>
+          <Form.Item name="split_amount" label="分成金额（元）" tooltip="与分成比例二选一">
+            <Input placeholder="例如 1000.00" />
+          </Form.Item>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={2} placeholder="关联说明（选填）" />
           </Form.Item>
         </Form>
       </Modal>

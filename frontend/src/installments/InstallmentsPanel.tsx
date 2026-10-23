@@ -1,6 +1,6 @@
 /** 分期：按业务合约类型分列，支持 HS / DFQ / TH / DG 的收款与风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, message } from "antd";
+import { Button, Card, Form, Input, Modal, Select, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -26,6 +26,16 @@ import {
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
+import { useSession } from "../shared/state/session";
+
+/** 期次状态与合约状态取值不同（PENDING/PARTIAL/PAID/OVERDUE/WAIVED），单独映射，避免复用合约标签出现裸英文。 */
+const SCHEDULE_STATUS_LABEL: Record<string, string> = {
+  PENDING: "待收",
+  PARTIAL: "部分收款",
+  PAID: "已收",
+  OVERDUE: "逾期",
+  WAIVED: "已减免",
+};
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -48,12 +58,19 @@ function ContractTable({
 }) {
   const [rows, setRows] = useState<Installment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const { can } = useSession();
+  // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
+  const settlePermission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
   const [schedules, setSchedules] = useState<Record<number, Schedule[]>>({});
   const [dispositions, setDispositions] = useState<Record<number, InstallmentDisposition[]>>({});
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
+  const [settleTarget, setSettleTarget] = useState<Installment | null>(null);
+  const [defaultTarget, setDefaultTarget] = useState<Installment | null>(null);
+  const [waiveTarget, setWaiveTarget] = useState<Schedule | null>(null);
+  const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
@@ -62,6 +79,10 @@ function ContractTable({
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
+  const [settleForm] = Form.useForm();
+  const [defaultForm] = Form.useForm();
+  const [waiveForm] = Form.useForm();
+  const [extendForm] = Form.useForm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +178,62 @@ function ContractTable({
         await load();
     });
   };
+
+  const submitSettleEarly = async (values: Record<string, unknown>) => {
+    if (!settleTarget) return;
+    await write.run(async () => {
+        await installmentsApi.settleEarly(settleTarget.id, {
+          paid_on: values.paid_on as string,
+          pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
+          note: values.note as string | undefined,
+        });
+        message.success("已提前结清，剩余应收一次性收清");
+        setSettleTarget(null);
+        settleForm.resetFields();
+        await load();
+    });
+  };
+
+  const submitDefault = async (values: Record<string, unknown>) => {
+    if (!defaultTarget) return;
+    await write.run(async () => {
+        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string });
+        message.success("已登记违约，合约进入 DEFAULTED");
+        setDefaultTarget(null);
+        defaultForm.resetFields();
+        await load();
+    });
+  };
+
+  const submitWaive = async (values: Record<string, unknown>) => {
+    if (!waiveTarget) return;
+    await write.run(async () => {
+        await installmentsApi.waiveSchedule(waiveTarget.installment_id, waiveTarget.period_no, {
+          amount: values.amount as string,
+          waived_on: values.waived_on as string,
+          reason: values.reason as string,
+        });
+        message.success("期次减免已登记");
+        setWaiveTarget(null);
+        waiveForm.resetFields();
+        await load();
+    });
+  };
+
+  const submitExtend = async (values: Record<string, unknown>) => {
+    if (!extendTarget) return;
+    await write.run(async () => {
+        await installmentsApi.extendSchedule(extendTarget.installment_id, extendTarget.period_no, {
+          new_due_on: values.new_due_on as string,
+          reason: values.reason as string,
+        });
+        message.success("期次展期已登记");
+        setExtendTarget(null);
+        extendForm.resetFields();
+        await load();
+    });
+  };
+
 
   // 总应收以后端下发的 total_receivable 为准（口径唯一来源）：
   // 首付 + 每期 × 期数 + 末期调整 − 减免。旧接口无该字段时回落本地计算。
@@ -294,6 +371,32 @@ function ContractTable({
           >
             终止分期并退款
           </PermissionButton>
+          {/* 后端 settle-early 允许 order.event.post 或 finance.order.event.post（任一）；
+              PermissionButton 只接受单个权限码，故按当前用户实际持有的那个码门控。 */}
+          <PermissionButton
+            permission={settlePermission}
+            size="small"
+            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
+            onClick={() => {
+              settleForm.resetFields();
+              setSettleTarget(row);
+              settleForm.setFieldsValue({ paid_on: today() });
+            }}
+          >
+            提前结清
+          </PermissionButton>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            danger
+            disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
+            onClick={() => {
+              defaultForm.resetFields();
+              setDefaultTarget(row);
+            }}
+          >
+            登记违约
+          </PermissionButton>
           {row.status === "CLOSED"
             && (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
             && !(dispositions[row.id] ?? []).some((item) => item.action === "RESELL") ? (
@@ -319,7 +422,43 @@ function ContractTable({
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={INSTALLMENT_STATUS_LABEL[v] ?? v} /> },
+    {
+      title: "已减免",
+      dataIndex: "waived_amount",
+      align: "right",
+      render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
+    },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={SCHEDULE_STATUS_LABEL[v] ?? v} /> },
+    {
+      title: "操作",
+      render: (_v, schedule) => (
+        <Space>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            disabled={["PAID", "WAIVED"].includes(schedule.status)}
+            onClick={() => {
+              waiveForm.resetFields();
+              setWaiveTarget(schedule);
+              waiveForm.setFieldsValue({ waived_on: today() });
+            }}
+          >
+            减免
+          </PermissionButton>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            disabled={["PAID", "WAIVED"].includes(schedule.status)}
+            onClick={() => {
+              extendForm.resetFields();
+              setExtendTarget(schedule);
+            }}
+          >
+            展期
+          </PermissionButton>
+        </Space>
+      ),
+    },
   ];
 
   return (
@@ -482,19 +621,127 @@ function ContractTable({
           </PermissionButton>
         </Form>
       </Modal>
+
+      <Modal
+        title={settleTarget ? `提前结清 · ${settleTarget.inst_no}` : "提前结清"}
+        open={Boolean(settleTarget)}
+        onCancel={() => setSettleTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        <Form form={settleForm} layout="vertical" onFinish={submitSettleEarly}>
+          <Typography.Paragraph type="secondary">
+            一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金池时按原收款资金池入账。
+          </Typography.Paragraph>
+          <Form.Item name="paid_on" label="结清日期" rules={[{ required: true, message: "请选择结清日期" }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={2} placeholder="可选" />
+          </Form.Item>
+          <PermissionButton permission={settlePermission} type="primary" htmlType="submit" loading={write.pending}>
+            确认提前结清
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={defaultTarget ? `登记违约 · ${defaultTarget.inst_no}` : "登记违约"}
+        open={Boolean(defaultTarget)}
+        onCancel={() => setDefaultTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        <Form form={defaultForm} layout="vertical" onFinish={submitDefault}>
+          <Typography.Paragraph type="secondary">
+            登记后合约进入 DEFAULTED，仅可继续收款或关闭，不可再交付。
+          </Typography.Paragraph>
+          <Form.Item name="reason" label="违约原因" rules={[{ required: true, message: "请填写违约原因" }]}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <PermissionButton permission="order.exception.approve" type="primary" danger htmlType="submit" loading={write.pending}>
+            确认登记违约
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={waiveTarget ? `期次减免 · 第 ${waiveTarget.period_no} 期` : "期次减免"}
+        open={Boolean(waiveTarget)}
+        onCancel={() => setWaiveTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        <Form form={waiveForm} layout="vertical" onFinish={submitWaive}>
+          <Typography.Paragraph type="secondary">
+            已收款部分不可减免，减免额不得超过该期未收金额；减免后该期不再计入催收。
+          </Typography.Paragraph>
+          <Form.Item name="amount" label="减免金额" rules={requiredMoneyRules("减免金额")}>
+            <MoneyInput />
+          </Form.Item>
+          <Form.Item name="waived_on" label="减免日期" rules={[{ required: true, message: "请选择减免日期" }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="reason" label="减免原因" rules={[{ required: true, message: "请填写减免原因" }]}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+            确认减免
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={extendTarget ? `期次展期 · 第 ${extendTarget.period_no} 期（原到期 ${extendTarget.due_on}）` : "期次展期"}
+        open={Boolean(extendTarget)}
+        onCancel={() => setExtendTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        <Form form={extendForm} layout="vertical" onFinish={submitExtend}>
+          <Typography.Paragraph type="secondary">
+            新到期日必须晚于原到期日；逾期期次展期后回到 PENDING。
+          </Typography.Paragraph>
+          <Form.Item name="new_due_on" label="新到期日" rules={[{ required: true, message: "请选择新到期日" }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="reason" label="展期原因" rules={[{ required: true, message: "请填写展期原因" }]}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+            确认展期
+          </PermissionButton>
+        </Form>
+      </Modal>
     </section>
   );
 }
 
 export function InstallmentsPanel() {
   const [reloadKey, setReloadKey] = useState(0);
+  const write = useAsyncAction();
+  // 逾期标记是全局动作（后端按 as_of 扫描全部合约），故放在 Tab 外层并触发全量刷新。
+  const runMarkOverdue = async () => {
+    await write.run(async () => {
+      const result = await installmentsApi.markOverdue();
+      message.success(
+        result.marked > 0 ? `已标记 ${result.marked} 笔逾期` : "当前无新增逾期合约",
+      );
+      setReloadKey((key) => key + 1);
+    });
+  };
   return (
     <Tabs
       defaultActiveKey="stock"
       tabBarExtraContent={
-        <PermissionButton permission="finance.read" size="small" onClick={() => setReloadKey((key) => key + 1)}>
-          刷新
-        </PermissionButton>
+        <Space>
+          <PermissionButton permission="order.event.post" size="small" loading={write.pending} onClick={() => void runMarkOverdue()}>
+            标记逾期
+          </PermissionButton>
+          <PermissionButton permission="finance.read" size="small" onClick={() => setReloadKey((key) => key + 1)}>
+            刷新
+          </PermissionButton>
+        </Space>
       }
       items={[
         {

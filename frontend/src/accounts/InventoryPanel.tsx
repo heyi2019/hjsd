@@ -5,6 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
+import { today } from "../shared/lib/format";
 import {
   DataTable,
   ErrorBanner,
@@ -43,6 +44,10 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [saleTarget, setSaleTarget] = useState<Account | null>(null);
   const [consignmentTarget, setConsignmentTarget] = useState<Account | null>(null);
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
+  const [rebuyTarget, setRebuyTarget] = useState<Account | null>(null);
+  const [rebuyAmount, setRebuyAmount] = useState("");
+  const [rebuyNote, setRebuyNote] = useState("");
+  const [rebuying, setRebuying] = useState(false);
   const [executionDetails, setExecutionDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [executionLoading, setExecutionLoading] = useState<Record<number, boolean>>({});
   const [expandedAccountIds, setExpandedAccountIds] = useState<Key[]>([]);
@@ -241,6 +246,42 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
       return;
     }
     if (key === "images") openProfile(row, "images");
+    if (key === "rebuy") {
+      setRebuyAmount("");
+      setRebuyNote("");
+      setRebuyTarget(row);
+    }
+  }
+
+  const submitRebuy = async () => {
+    if (!rebuyTarget) return;
+    if (!rebuyAmount || Number(rebuyAmount) <= 0) {
+      message.error("请输入有效的买入金额");
+      return;
+    }
+    setRebuying(true);
+    try {
+      const order = await ordersApi.create({
+        order_type: "HS",
+        trade_date: today(),
+        account_id: rebuyTarget.id,
+        note: rebuyNote || undefined,
+      });
+      await ordersApi.postEvent(order.id, {
+        event_type: "BUY",
+        amount: rebuyAmount,
+        occurred_on: today(),
+        portion: "PRINCIPAL",
+        note: rebuyNote || undefined,
+      });
+      message.success("账号已重新买入入库");
+      setRebuyTarget(null);
+      await load();
+    } catch (cause) {
+      message.error(normalizeError(cause).message);
+    } finally {
+      setRebuying(false);
+    }
   }
 
   const columns: ColumnsType<Account> = [
@@ -536,6 +577,30 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           await load();
         }}
       />
+      <Modal
+        title={rebuyTarget ? `再买入 · ${rebuyTarget.game_account}` : "再买入"}
+        open={Boolean(rebuyTarget)}
+        okText="确认买入入库"
+        cancelText="返回"
+        confirmLoading={rebuying}
+        onOk={() => void submitRebuy()}
+        onCancel={() => { if (!rebuying) setRebuyTarget(null); }}
+      >
+        {rebuyTarget ? <div className="ui-stack">
+          <p className="muted">
+            已售账号重新买回库存：将新建一笔回购订单并登记买入动作，账号状态回到「在库」，
+            历史售出轨迹保留，成本按买入金额累加。
+          </p>
+          <label>
+            <span>买入金额</span>
+            <MoneyInput aria-label="买入金额" inputMode="decimal" value={rebuyAmount} onChange={(event) => setRebuyAmount(event.target.value)} />
+          </label>
+          <label>
+            <span>备注</span>
+            <Input.TextArea aria-label="再买入备注" rows={3} value={rebuyNote} onChange={(event) => setRebuyNote(event.target.value)} placeholder="回购原因（选填）" />
+          </label>
+        </div> : null}
+      </Modal>
       <Modal
         title="退款登记"
         open={Boolean(cancelTarget)}

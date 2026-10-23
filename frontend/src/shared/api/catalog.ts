@@ -32,6 +32,7 @@ export interface OrderType {
   is_active: boolean;
   description?: string | null;
   sort_order?: number;
+  sequence_prefix?: string | null;
 }
 
 /** 业务 → 资金池路由（get_order_type routes）。份额可选集必须由它决定：
@@ -40,6 +41,7 @@ export interface OrderTypeRoute {
   id: number;
   order_type_code: string;
   portion: string;
+  fund_nature?: string | null;
   pool_code: string;
   pool_name: string;
   priority: number;
@@ -179,6 +181,22 @@ export interface OrderEvent {
   delivery_mode?: string | null;
   is_posted: boolean;
   operator?: string;
+}
+
+/** 订单上下游关联：拆分口径作为关系快照保存，不改写订单金额。 */
+export interface OrderLink {
+  id: number;
+  source_order_id: number;
+  source_order_no: string;
+  target_order_id: number;
+  target_order_no: string;
+  relation_type: string;
+  /** 以当前订单视角给出方向：outgoing=本单是来源单，incoming=本单是后续单。 */
+  direction: string;
+  split_ratio?: string | null;
+  split_amount?: string | null;
+  note?: string | null;
+  created_at?: string;
 }
 
 export interface EventPostResult {
@@ -349,8 +367,10 @@ export interface Schedule {
   installment_id: number;
   period_no: number;
   due_on: string;
+  service_fee_rate?: string;
   due_amount: string;
   received_amount: string;
+  waived_amount?: string;
   status: string;
 }
 
@@ -410,10 +430,21 @@ export interface Rebate {
   rebate_no: string;
   source_order_id?: number | null;
   rebate_type: "BUY" | "SELL" | "UNSPECIFIED" | string;
+  channel?: string | null;
   rate: string;
   base_amount: string;
+  link_status?: string;
   status: string;
   collected_on: string;
+  /** 预计到账日：晚于该日仍未结清即逾期（后端 /rebates/overdue 判定）。 */
+  expected_on?: string | null;
+  note?: string | null;
+  created_at?: string;
+  operator?: string;
+}
+
+export interface RebateOverdue extends Rebate {
+  overdue_days: number;
 }
 
 export interface Settlement {
@@ -424,6 +455,10 @@ export interface Settlement {
   platform_fee: string;
   net_amount: string;
   settled_on: string;
+  cashflow_id?: number | null;
+  /** 非空表示本笔结算已被冲销（指向原结算）。 */
+  reversal_of_id?: number | null;
+  note?: string | null;
 }
 
 export interface FieldDefinition {
@@ -459,12 +494,52 @@ export const poolsApi = {
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
   setActive: (id: number, is_active: boolean) => api.patch<OrderType>(`/order-types/${id}/active`, {is_active}).then(r => r.data),
-  impactPreview: (code: string, portion: string, pool_code: string) => api.get<RouteImpactPreview>(`/order-types/${code}/routes/impact-preview`, {params: {portion, pool_code}}).then(r => r.data),
+  impactPreview: (code: string, portion: string, pool_code: string, fund_nature?: string) => api.get<RouteImpactPreview>(`/order-types/${code}/routes/impact-preview`, {params: {portion, pool_code, fund_nature}}).then(r => r.data),
   list: () => api.get<OrderType[]>("/order-types").then((r) => r.data),
   create: (payload: Partial<OrderType>) =>
     api.post<OrderType>("/order-types", payload).then((r) => r.data),
   routes: (orderTypeId: number) =>
     api.get<OrderTypeRoute[]>(`/order-types/${orderTypeId}/routes`).then((r) => r.data),
+  setRoute: (
+    code: string,
+    payload: { portion: string; pool_code: string; fund_nature?: string | null; priority?: number },
+  ) =>
+    api.post<OrderTypeRoute>(`/order-types/${code}/routes`, payload).then((r) => r.data),
+};
+
+/** 资金池内账户（银行/支付渠道）主数据：归属决定计入权益还是仅计头寸。 */
+export interface PoolAccount {
+  id: number;
+  pool_id: number;
+  account_no: string;
+  account_name: string;
+  account_type: string;
+  ownership: string;
+  opening_balance: string;
+  current_balance: string;
+  status: string;
+  note?: string | null;
+  created_at?: string;
+}
+
+export const poolAccountsApi = {
+  list: (poolId?: number) =>
+    api.get<PoolAccount[]>("/pool-accounts", { params: { pool_id: poolId } }).then((r) => r.data),
+  create: (payload: {
+    pool_id: number;
+    account_no: string;
+    account_name: string;
+    account_type: string;
+    ownership: string;
+    opening_balance: string;
+    note?: string;
+  }) => api.post<PoolAccount>("/pool-accounts", payload).then((r) => r.data),
+  update: (
+    id: number,
+    payload: { account_name?: string; account_type?: string; ownership?: string; opening_balance?: string; note?: string },
+  ) => api.patch<PoolAccount>(`/pool-accounts/${id}`, payload).then((r) => r.data),
+  setStatus: (id: number, status: string) =>
+    api.patch<PoolAccount>(`/pool-accounts/${id}/status`, undefined, { params: { status } }).then((r) => r.data),
 };
 
 export const gameTypesApi = {
@@ -517,6 +592,18 @@ export const ordersApi = {
     api.get<Order[]>("/orders", { params }).then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
+  links: (orderId: number) =>
+    api.get<OrderLink[]>(`/orders/${orderId}/links`).then((r) => r.data),
+  createLink: (
+    orderId: number,
+    payload: {
+      related_order_id: number;
+      relation_type: "SOURCE" | "FOLLOW_UP";
+      split_ratio?: string;
+      split_amount?: string;
+      note?: string;
+    },
+  ) => api.post<OrderLink>(`/orders/${orderId}/links`, payload).then((r) => r.data),
   cancel: (orderId: number, payload: { reason: string }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
   create: (payload: {
@@ -636,6 +723,16 @@ export const installmentsApi = {
       .then((r) => r.data),
   cancel: (id: number, payload: { cancelled_on: string; reason: string }) =>
     api.post<InstallmentCancelResult>(`/installments/${id}/cancel`, payload).then((r) => r.data),
+  settleEarly: (id: number, payload: { paid_on: string; pool_id?: number; note?: string }) =>
+    api.post<Installment>(`/installments/${id}/settle-early`, payload).then((r) => r.data),
+  markDefault: (id: number, payload: { reason: string }) =>
+    api.post<Installment>(`/installments/${id}/default`, payload).then((r) => r.data),
+  waiveSchedule: (id: number, periodNo: number, payload: { amount: string; waived_on: string; reason: string }) =>
+    api.post<Schedule>(`/installments/${id}/schedules/${periodNo}/waive`, payload).then((r) => r.data),
+  extendSchedule: (id: number, periodNo: number, payload: { new_due_on: string; reason: string }) =>
+    api.post<Schedule>(`/installments/${id}/schedules/${periodNo}/extend`, payload).then((r) => r.data),
+  markOverdue: (asOf?: string) =>
+    api.post<{ marked: number }>("/installments/mark-overdue", undefined, { params: asOf ? { as_of: asOf } : undefined }).then((r) => r.data),
   deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string }) =>
     api.post<Installment>(`/installments/${id}/deliver`, payload).then((r) => r.data),
 };
@@ -691,6 +788,19 @@ export const rebatesApi = {
     id: number,
     payload: { gross_amount: string; settled_on: string; pool_id: number; platform_fee?: string },
   ) => api.post<Settlement>(`/rebates/${id}/settlements`, payload).then((r) => r.data),
+  /** 预计到账逾期清单（后端按 as_of 判定，返回逾期天数）。 */
+  overdue: (asOf?: string) =>
+    api.get<RebateOverdue[]>("/rebates/overdue", { params: asOf ? { as_of: asOf } : undefined }).then((r) => r.data),
+  settlements: (id: number) =>
+    api.get<Settlement[]>(`/rebates/${id}/settlements`).then((r) => r.data),
+  reverseSettlement: (
+    id: number,
+    settlementId: number,
+    payload: { reversed_on: string; reason: string },
+  ) =>
+    api
+      .post<Settlement>(`/rebates/${id}/settlements/${settlementId}/reverse`, payload)
+      .then((r) => r.data),
 };
 
 export const fieldsApi = {

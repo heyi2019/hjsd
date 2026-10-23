@@ -43,7 +43,9 @@ it("空列表仍能从新建规则开始，并提交规则定义", async () => {
 
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await ui.click(await screen.findByRole("button", { name: /新建规则/ }));
-  await ui.type(screen.getByLabelText("规则编码"), "INSTALLMENT");
+  // 规则编码已改为受控枚举 Select（与后端 PolicyType 对齐），不再是自由文本输入
+  fireEvent.mouseDown(screen.getByLabelText("规则编码"));
+  await ui.click(await screen.findByText("INSTALLMENT 分期"));
   await ui.type(screen.getByLabelText("规则名称"), "分期规则");
   await ui.click(screen.getByRole("button", { name: /创建规则/ }));
 
@@ -89,7 +91,7 @@ it("admin 可见「新建版本」；viewer 无 policy.manage 看不到", async 
   expect(screen.getByRole("button", { name: /新建版本/ })).toBeInTheDocument();
 });
 
-it("viewer 无 policy.vi.mocked(catalog.policyApi.approve)：看不到「发布」按钮", async () => {
+it("viewer 无 policy.approve：看不到「发布」按钮", async () => {
   renderLight(<PolicySettingsPanel />, { user: "viewer" });
   await screen.findByText("v1", {}, { timeout: 10000 });
   expect(screen.queryByRole("button", { name: /发布/ })).toBeNull();
@@ -107,10 +109,11 @@ it("审批流程：admin 点「发布」（DRAFT 版本可点）→ 调用 vi.mo
   expect(vi.mocked(catalog.policyApi.approve).mock.calls[0][0]).toBe(1); // version id
 });
 
-it("auditor 有 policy.vi.mocked(catalog.policyApi.approve) 但无 policy.manage：可见发布、不可见新建版本", async () => {
+it("auditor 有 policy.approve 且（与后端一致）有 policy.manage：发布与新建版本均可见", async () => {
   renderLight(<PolicySettingsPanel />, { user: "auditor" });
   await screen.findAllByText("REBATE_RATE");
   // 版本表随 vi.mocked(catalog.policyApi.versions) 加载渲染，「发布」按钮需等待
   expect(await screen.findByRole("button", { name: /发布/ }, { timeout: 10000 })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /新建版本/ })).toBeNull();
+  // 后端 ROLE_PERMISSIONS.auditor 含 policy.manage（core/security.py），前端对齐后端口径
+  expect(screen.getByRole("button", { name: /新建版本/ })).toBeInTheDocument();
 });

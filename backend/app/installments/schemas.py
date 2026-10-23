@@ -5,8 +5,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
+from app.core.money import to_money
 from app.core.schemas import RequestModel
 
 
@@ -51,12 +52,28 @@ class InstallmentOut(BaseModel):
     paid_amount: Decimal
     waived_amount: Decimal
     bad_debt_amount: Decimal
+    final_period_adjustment: Decimal = Decimal("0")
     status: str
     delivery_mode: str | None = None
     delivered_on: date | None = None
     first_due_on: date | None = None
     note: str | None = None
     extra_values: dict[str, Any] = Field(default_factory=dict)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_receivable(self) -> Decimal:
+        """总应收（口径唯一来源，前端只读不再自行计算）。
+
+        与 service.total_receivable 保持一致：
+        首付 + 每期 × 期数 + 末期调整 − 减免。
+        """
+        return (
+            to_money(self.down_payment)
+            + to_money(self.per_period) * int(self.periods)
+            + to_money(self.final_period_adjustment or 0)
+            - to_money(self.waived_amount)
+        )
 
 
 class ScheduleOut(BaseModel):

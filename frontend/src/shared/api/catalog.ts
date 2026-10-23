@@ -320,6 +320,10 @@ export interface Installment {
   per_period: string;
   paid_amount: string;
   bad_debt_amount?: string;
+  waived_amount?: string;
+  final_period_adjustment?: string;
+  /** 总应收：首付 + 每期 × 期数 + 末期调整 − 减免，由后端下发，前端不自行推导。 */
+  total_receivable?: string;
   status: string;
   delivery_mode?: string | null;
   delivered_on?: string | null;

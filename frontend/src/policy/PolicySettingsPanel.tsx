@@ -30,6 +30,17 @@ const SCOPE_OPTIONS = [
   { value: "POOL", label: "按资金池" },
 ];
 
+/** 规则编码必须与后端 PolicyType 一致：后端按固定编码消费快照（返点/提成/分期），
+ * 编码拼错不会报错，只会静默取不到规则，因此这里强制枚举选择。 */
+const POLICY_CODE_OPTIONS = [
+  { value: "REBATE", label: "REBATE 返点" },
+  { value: "COMMISSION", label: "COMMISSION 提成" },
+  { value: "INSTALLMENT", label: "INSTALLMENT 分期" },
+  { value: "WRITE_DOWN", label: "WRITE_DOWN 跌价" },
+  { value: "REFUND", label: "REFUND 退款" },
+  { value: "DG_MIXED", label: "DG_MIXED DG 混合单默认策略" },
+];
+
 type DefinitionFormValues = {
   policy_code: string;
   name: string;
@@ -351,8 +362,8 @@ export function PolicySettingsPanel() {
         onOk={() => void definitionForm.submit()}
       >
         <Form form={definitionForm} layout="vertical" onFinish={submitDefinition}>
-          <Form.Item name="policy_code" label="规则编码" rules={[{ required: true, message: "请输入规则编码" }]}>
-            <Input placeholder="例如 REBATE_RATE" />
+          <Form.Item name="policy_code" label="规则编码" rules={[{ required: true, message: "请选择规则编码" }]}>
+            <Select options={POLICY_CODE_OPTIONS} placeholder="选择规则编码（与后端 PolicyType 一致）" />
           </Form.Item>
           <Form.Item name="name" label="规则名称" rules={[{ required: true, message: "请输入规则名称" }]}>
             <Input placeholder="例如 返点比例" />

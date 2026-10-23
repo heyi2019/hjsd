@@ -158,9 +158,12 @@ function ContractTable({
     });
   };
 
-  // 只读展示口径：总应收 = 首付 + 每期 × 期数。
+  // 总应收以后端下发的 total_receivable 为准（口径唯一来源）：
+  // 首付 + 每期 × 期数 + 末期调整 − 减免。旧接口无该字段时回落本地计算。
   const receivable = (row: Installment) =>
-    Number(row.down_payment) + Number(row.per_period) * row.periods;
+    row.total_receivable != null
+      ? Number(row.total_receivable)
+      : Number(row.down_payment) + Number(row.per_period) * row.periods + Number(row.final_period_adjustment ?? 0) - Number(row.waived_amount ?? 0);
 
   const totalReceivable = rows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
   const totalPaid = rows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);

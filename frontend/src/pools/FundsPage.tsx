@@ -720,7 +720,7 @@ export function FundsPage() {
                   onPageChange={() => undefined}
                   />
                 </Card>
-                <Card className="glass" title="月结锁定" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
+                <Card className="glass" title="月结锁定" extra={<PermissionButton permission="finance.period.lock" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
                   <DataTable
                     columns={periodLockColumns}
                     rows={periodLocks}

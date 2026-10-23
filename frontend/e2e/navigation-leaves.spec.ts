@@ -1,0 +1,148 @@
+import { expect, test, type Page } from "@playwright/test";
+import { navItem } from "./support/api-stub";
+
+/**
+ * 全叶子走查：smoke.spec.ts 只覆盖「6 个一级导航可达（外壳）」，本 spec 补齐
+ * **二级 Tab 叶子**——每个中心的内层 Tab 逐个点入，断言：
+ *   1) 该 Tab 获得 aria-selected="true"（真的切过去了，不是点到外壳）；
+ *   2) 激活面板可见且非空（挂载出内容，不是白屏/空 pane）；
+ *   3) 全程无未捕获 pageerror（前端崩了会在这里现形）。
+ *
+ * 与 smoke 一样走**真实后端 + DEV 态零登录**（smoke 同口径：AppShell 在 DEV 态
+ * 挂载即可用，登录/JWT 链路由 auth-login.spec.ts 守），不拦 API——数据层由
+ * business-write / finance-write-ui 等写路径 spec 负责，本 spec 只守
+ * 「每个叶子都能开」这条主干。
+ *
+ * 维护提示：Tab 文案来自各页面源码（OrdersPage/CustomersPage/FundsPage/
+ * ReportsPage/SettingsPage 的 Tab 定义数组）。页面增删 Tab 时同步改这里，
+ * 新增叶子当天就能被走查覆盖。
+ */
+
+const CENTERS = [
+  {
+    nav: "业务中心",
+    tabs: ["库存中心", "业务台账", "分期与回款"],
+  },
+  {
+    nav: "客户中心",
+    tabs: ["客户档案", "合作方（同行/供货方/平台）", "客户需求池"],
+  },
+  {
+    nav: "资金中心",
+    tabs: ["总览", "流水", "押金", "对账", "异常与月结", "返点"],
+  },
+  {
+    nav: "经营中心",
+    tabs: [
+      "库存 R1",
+      "月度损益 R2",
+      "提成对账 R3",
+      "资金日报 R4",
+      "业务损益 R5",
+      "资金属性分析",
+      "订单利润",
+      "数据中心",
+      "质量中心",
+      "系统提醒",
+      "全局搜索",
+      "审计记录",
+      "附件中心",
+    ],
+  },
+  {
+    nav: "设置",
+    tabs: [
+      "业务字典",
+      "业务类型",
+      "资金池",
+      "活字段",
+      "游戏类型",
+      "经营规则",
+      "标准导入",
+      "人员与权限",
+      "团队管理",
+      "外观",
+    ],
+  },
+] as const;
+
+/**
+ * antd 会给中文 Tab 文案插入空格（与「退 出」按钮同源），故 accessible name
+ * 用逐字符 `\s*` 容错匹配，避免 exact 匹配被插空格打断。
+ */
+function tabByName(page: Page, label: string) {
+  return page.getByRole("tab", { name: new RegExp(`^${label.split("").join("\\s*")}$`) });
+}
+
+/**
+ * 点击某个 Tab 并确认选中，自动处理 antd 的**溢出收纳**与高负载下的点击丢失。
+ *
+ * 坑 1（溢出收纳）：经营中心 13 个 Tab 在 1280 视口下总宽超限，antd 把尾部 Tab
+ * （如「质量中心」，实测 x=1286 已超出视口）收进「更多 ⌄」下拉——nav 里残留的
+ * 元素点击不生效（aria-selected 恒 false）。判定用几何位置：tab 右缘越过视口
+ * 右侧预留区（-80px 给 more 按钮留位）即走「更多 → 下拉项」路径。
+ *
+ * 坑 2（点击被吞）：全量跑时机器高负载（实测 load 27），页面数据渲染期间 antd
+ * Tabs 重排会吞掉点击——locator 解析成功、click 不报错，但 aria-selected 仍为
+ * false（订单利润 Tab 实测 24 次采样均 false）。故点击后校验，未生效则重试；
+ * 溢出判定每次 attempt 重算（布局随负载漂移，不能一次定死）。
+ */
+async function clickTab(page: Page, label: string) {
+  const tab = tabByName(page, label);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const box = await tab.boundingBox().catch(() => null);
+    const viewportWidth = page.viewportSize()?.width ?? 1280;
+    const overflowed = !!box && box.x + box.width > viewportWidth - 80;
+
+    if (overflowed) {
+      await page.locator(".ant-tabs-nav-more").first().click();
+      await page
+        .locator(".ant-tabs-dropdown-menu-item", { hasText: label })
+        .first()
+        .click();
+    } else {
+      await tab.scrollIntoViewIfNeeded();
+      await tab.click();
+    }
+
+    if ((await tab.getAttribute("aria-selected").catch(() => null)) === "true") {
+      return;
+    }
+  }
+  // 三次未生效：交回调用方的 expect(tab).toHaveAttribute 产出明确失败，
+  // 不在此处 force click——那会把「真的点不上」伪装成通过。
+}
+
+async function enterApp(page: Page) {
+  await page.goto("/");
+  await expect(navItem(page, "工作台")).toBeVisible();
+}
+
+for (const center of CENTERS) {
+  test(`全叶子走查：${center.nav}（${center.tabs.length} 个 Tab）`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+
+    await enterApp(page);
+    await navItem(page, center.nav).click();
+    await expect(page.locator(".topbar__page")).toHaveText(center.nav);
+
+    for (const label of center.tabs) {
+      await clickTab(page, label);
+      const tab = tabByName(page, label);
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+
+      // 激活面板可见：不能直接用 .ant-tabs-tabpane-active——页面存在嵌套 Tabs
+      // （如「标准导入」内部还有 原始行/映射预览/导入对账 子 Tab），类选择器会
+      // 命中多个触发 strict mode violation。按 tabpanel 的 accessible name
+      // （aria-labelledby → 外层 tab）定位，天然限定到被点的这个叶子。
+      const pane = page.getByRole("tabpanel", {
+        name: new RegExp(`^${label.split("").join("\\s*")}$`),
+      });
+      await expect(pane).toBeVisible();
+    }
+
+    expect(errors).toEqual([]);
+  });
+}

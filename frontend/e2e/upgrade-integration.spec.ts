@@ -72,6 +72,9 @@ test("利润分配页面保存四项比例并允许同一人承担多个动作",
   expect(saved.items.find((x: { allocation_type: string }) => x.allocation_type === "COMPANY").user_id).toBeNull();
 });
 
+// 全量跑时前面已累积十余个写用例（e2e 库数据量上去后订单创建 + 返点到账 +
+// 手续费 + 审计链变慢），单跑 ~16s 但全量曾贴 30s 超时边界偶发红，故显式放宽。
+test.slow();
 test("页面售出绑定操作人，返点到账保留收入并单独记录手续费", async ({ page, request }) => {
   const accountList = await (await request.get(`${base}/accounts`, { headers })).json();
   const account = accountList.find((a: { inventory_type: string; status: string; game_account: string }) => a.inventory_type === "CONSIGNMENT" && a.status === "IN_STOCK" && a.game_account);

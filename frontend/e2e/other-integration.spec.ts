@@ -1,5 +1,22 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { navItem } from "./support/api-stub";
+
+/**
+ * 填表并校验值真的落进去了。
+ *
+ * 坑：全量跑时机器高负载（实测 load 27），antd 受控输入偶发被 React 重渲染吞掉
+ * fill——DOM 节点在 fill 落值前后被替换，字段空着但 fill 不报错；随后表单校验
+ * 挡住提交，等 POST 响应 30s 超时（「资金流水页面提交审核」实测：金额空 +
+ * invalid，摘要却正常）。故 fill 后校验 inputValue，丢失则重填一次，仍失败
+ * 由 toHaveValue 给出明确报错。
+ */
+async function fillChecked(locator: Locator, value: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await locator.fill(value);
+    if ((await locator.inputValue().catch(() => "")) === value) return;
+  }
+  await expect(locator).toHaveValue(value);
+}
 
 test("资金中心页面划转后生成一收一支的内部资金流水", async ({ page }) => {
   await page.goto("/");
@@ -72,7 +89,7 @@ test("资金流水页面提交审核并审核通过", async ({ page }) => {
   await dialog.locator(".ant-select-selector").first().click();
   await page.getByTitle("投资款荷包（HJ_INVEST）").last().click();
   await dialog.getByLabel("类别").fill("UI_TEST");
-  await dialog.getByLabel("金额", { exact: true }).fill("12");
+  await fillChecked(dialog.getByLabel("金额", { exact: true }), "12");
   await dialog.getByLabel("摘要").fill("页面联调资金审核");
   const create = page.waitForResponse(r => r.url().endsWith("/cashflows") && r.request().method() === "POST");
   await dialog.getByRole("button", { name: "提交审核" }).click();

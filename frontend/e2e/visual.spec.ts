@@ -9,8 +9,10 @@ import { expect, test, type Locator } from "@playwright/test";
 async function waitStableGeometry(locator: Locator) {
   // 第一判据：入场 scale 动画是否真的结束——transform 回到单位矩阵。
   // 只在低负载时「连续两次采样一致」不够：全量跑时动画偶发卡顿，两帧相同会被误判为已稳定。
+  // 轮询窗口按全量实测放宽：机器 load 27 时 rc-motion 的 rAF 动画可停滞 8s 以上
+  // （四边可缩放实测卡在 matrix(0.2) 直至 30s 测试超时），8s 窗口不够。
   await expect
-    .poll(() => locator.evaluate((node) => getComputedStyle(node).transform), { timeout: 8000 })
+    .poll(() => locator.evaluate((node) => getComputedStyle(node).transform), { timeout: 15000 })
     .toMatch(/^(none|matrix\(1,\s*0,\s*0,\s*1)/);
   // 第二判据：几何位置连续两次采样一致（覆盖页面弹簧入场等非 transform 动效）。
   await expect
@@ -25,7 +27,7 @@ async function waitStableGeometry(locator: Locator) {
         await new Promise((resolve) => setTimeout(resolve, 120));
         return first === (await read());
       },
-      { timeout: 8000 },
+      { timeout: 12000 },
     )
     .toBe(true);
 }
@@ -184,6 +186,9 @@ test.describe("UI visual regression", () => {
   });
 
   test("回收页桌面弹窗四边可缩放", async ({ page }) => {
+    // 4 个方向各自 goto + 开窗 + 等动画收敛 + 拖动，默认 30s 在全量负载下不够
+    // （实测一次 30s 超时），慢速化三倍预算。
+    test.slow();
     await page.setViewportSize({ width: 1440, height: 900 });
     for (const [direction, deltaX, deltaY, dimension] of [
       ["e", -100, 0, "width"],

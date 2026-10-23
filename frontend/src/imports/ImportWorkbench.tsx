@@ -114,6 +114,7 @@ export function ImportWorkbench({
   const [unlinkedTarget, setUnlinkedTarget] = useState<ImportRow | null>(null);
   const [skipTarget, setSkipTarget] = useState<ImportRow | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<ImportBatch | null>(null);
+  const [correctionTarget, setCorrectionTarget] = useState<ImportBatch | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<UploadFile | null>(null);
   const [importing, setImporting] = useState(false);
@@ -188,6 +189,8 @@ export function ImportWorkbench({
 
   const canRollback =
     current !== null && ["DRAFT", "MAPPED"].includes(current.status);
+  // 已确认批次禁止回滚，只能以更正批次分层保存（MIG-01-08）。
+  const canCorrect = current !== null && current.status === "COMMITTED";
 
   const rowColumns: ColumnsType<ImportRow> = [
     { title: "行号", dataIndex: "row_no", width: 70 },
@@ -289,6 +292,13 @@ export function ImportWorkbench({
         onClick={() => current && setRollbackTarget(current)}
       >
         回滚
+      </PermissionButton>
+      <PermissionButton
+        permission="import.manage"
+        disabled={!canCorrect}
+        onClick={() => current && setCorrectionTarget(current)}
+      >
+        更正
       </PermissionButton>
     </Space>
   );
@@ -642,6 +652,52 @@ export function ImportWorkbench({
         extra={
           <p className="ui-drawer-hint">
             回滚是逻辑操作：原始行与审计日志全部保留，不删除任何数据。
+          </p>
+        }
+      />
+
+      <FormDrawer
+        open={correctionTarget !== null}
+        title={`更正批次 · ${correctionTarget?.batch_no ?? ""}`}
+        fields={[
+          {
+            name: "rows",
+            label: "更正内容（JSON 行数组）",
+            required: true,
+            kind: "textarea" as const,
+            placeholder: '[{"row_no": 3, "amount": "123.45"}, {"row_no": 7, "note": "补充说明"}]',
+          },
+          { name: "reason", label: "更正理由", required: true, kind: "textarea" as const },
+        ]}
+        submitText="提交更正批次"
+        submitting={acting}
+        error={error}
+        onClose={() => setCorrectionTarget(null)}
+        onSubmit={(values) => {
+          const target = correctionTarget;
+          if (!target) return;
+          let rows: Record<string, unknown>[];
+          try {
+            rows = JSON.parse(String(values.rows ?? "[]"));
+            if (!Array.isArray(rows) || rows.length === 0) {
+              message.error("更正内容必须是非空 JSON 数组");
+              return;
+            }
+          } catch {
+            message.error("更正内容不是合法 JSON，请检查格式");
+            return;
+          }
+          void act(async () => {
+            await importsApi.createCorrection(target.id, {
+              rows: rows as Record<string, unknown>[],
+              reason: String(values.reason ?? ""),
+            });
+            setCorrectionTarget(null);
+          });
+        }}
+        extra={
+          <p className="ui-drawer-hint">
+            已确认批次的原批次与原始行一律只读；更正以新批次分层保存，通过 corrects_batch_no 指回原批次，形成可追溯更正链。
           </p>
         }
       />

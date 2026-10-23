@@ -137,7 +137,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     await pickSelect(modal, "目标资金池", "主资金池（POOL-A）");
     await ui.click(within(modal).getByRole("button", { name: /生成预览/ }));
     await waitFor(() =>
-      expect(catalog.orderTypesApi.impactPreview).toHaveBeenCalledWith("HS", "PRINCIPAL", "POOL-A")
+      expect(catalog.orderTypesApi.impactPreview).toHaveBeenCalledWith("HS", "PRINCIPAL", "POOL-A", undefined)
     );
     expect(await within(modal).findByText(/将发生变化/)).toBeInTheDocument();
     expect(within(modal).getByText(/将影响未来 3 单/)).toBeInTheDocument();
@@ -157,7 +157,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
 
   it("无主数据维护权限时隐藏操作按钮并给出提示", async () => {
     renderLight(<OrderTypesPanel />, { user: "operator" });
-    expect(await screen.findByText("当前角色无主数据维护权限。")).toBeInTheDocument();
+    expect(await screen.findByText("当前角色无主数据维护权限，仅可查看。")).toBeInTheDocument();
     const row = await rowOf("HS");
     expect(within(row).queryByRole("button", { name: /编辑/ })).toBeNull();
     expect(within(row).queryByRole("button", { name: /停用/ })).toBeNull();

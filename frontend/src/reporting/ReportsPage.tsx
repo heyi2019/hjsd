@@ -26,7 +26,8 @@ import {
   type OrderProfitRow,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
-import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
+import { today } from "../shared/lib/format";
+import { ACCOUNTING_ATTRIBUTE_LABEL, BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, FUND_NATURE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
@@ -331,9 +332,10 @@ function Commission({ range }: { range: ReportRange }) {
 }
 
 function DailyFunds() {
+  const [reportOn, setReportOn] = useState(today());
   const { data, loading, error, reload } = useReport<DailyFundsReport>(
-    () => reportsApi.dailyFunds(),
-    [],
+    () => reportsApi.dailyFunds({ on: reportOn }),
+    [reportOn],
   );
   const columns: ColumnsType<DailyFundsRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 150 },
@@ -351,7 +353,11 @@ function DailyFunds() {
     },
   ];
   return (
-    <Card className="glass" title={`资金日报 R4 · ${data?.date ?? ""}`}>
+    <Card
+      className="glass"
+      title={`资金日报 R4 · ${data?.date ?? ""}`}
+      extra={<Input type="date" aria-label="资金日报日期" value={reportOn} onChange={(event) => setReportOn(event.target.value)} className="ui-control-width-date" />}
+    >
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Note>与 FIN-01 同日口径一致：押金单列，不并入经营收支。</Note>
       <StatRow
@@ -384,8 +390,8 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
   const columns: ColumnsType<FinanceDimensionRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 130 },
     { title: "资金账户", dataIndex: "account_name", render: (v: string | null, row) => v ? `${v}（${row.account_no ?? "-"}）` : "未指定账户" },
-    { title: "资金性质", dataIndex: "fund_nature", width: 120 },
-    { title: "核算属性", dataIndex: "accounting_attribute", width: 160 },
+    { title: "资金性质", dataIndex: "fund_nature", width: 120, render: (v: string) => FUND_NATURE_LABEL[v] ?? v },
+    { title: "核算属性", dataIndex: "accounting_attribute", width: 160, render: (v: string) => ACCOUNTING_ATTRIBUTE_LABEL[v] ?? v },
     { title: "现金方向", dataIndex: "direction", width: 90, render: (v: string) => v === "IN" ? "收入" : "支出" },
     { title: "笔数", dataIndex: "flow_count", align: "right", width: 80 },
     { title: "发生额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },

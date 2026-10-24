@@ -33,27 +33,7 @@ import {
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
-
-const FUND_NATURE_LABEL: Record<string, string> = {
-  BUSINESS: "本方经营",
-  EXTERNAL: "外部/受托",
-  INTERNAL: "内部调拨",
-};
-const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
-  SELF_REVENUE: "自营收入",
-  SELF_DIRECT_COST: "自营直接成本",
-  TH_DIRECT_COST: "提号/代挂直接成本",
-  TH_REVENUE: "提号/代挂收入",
-  DFQ_PRINCIPAL: "代分期借款本金",
-  SERVICE_REVENUE: "增值服务收入",
-  REBATE_INCOME: "返点收入",
-  OPERATING_EXPENSE: "运营费用",
-  DEPOSIT: "押金/保证金",
-  EXTERNAL_FUNDING: "外部资金",
-  INTERNAL_TRANSFER: "内部调拨",
-  REVERSAL: "冲销",
-  REFUND: "退款",
-};
+import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
 
 // 与 backend/app/finance/attributes.py 的 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE 保持一致：
 // 资金性质决定可用核算属性，非法组合后端直接 422，此处事前收窄避免误选。
@@ -548,6 +528,18 @@ export function FundsPage() {
     },
     { title: "来源", dataIndex: "source" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={({ PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" } as Record<string, string>)[v]} /> },
+    {
+      title: "审核追溯",
+      width: 190,
+      render: (_v, row) => (
+        <span className="muted">
+          {row.reviewed_by
+            ? `${row.reviewed_by}${row.reviewed_at ? ` · ${row.reviewed_at.replace("T", " ").slice(0, 16)}` : ""}`
+            : "—"}
+          {row.reversal_of_id ? ` · 冲销#${row.reversal_of_id}` : ""}
+        </span>
+      ),
+    },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
@@ -604,7 +596,7 @@ export function FundsPage() {
     { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已审核流水，剔除待审核/已拒绝">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
     { title: "账面余额", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
     { title: "差异", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={RECONCILIATION_STATUS_LABEL[v] ?? v} /> },
     {
       title: "操作",
       render: (_v, row) => (

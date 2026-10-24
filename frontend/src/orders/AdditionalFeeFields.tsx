@@ -29,6 +29,7 @@ export function AdditionalFeeFields() {
         <NestedFormField className="recovery-fee-field" label="其他"><Form.Item noStyle name="other_fee_name"><Input className="recovery-fee-control" placeholder="例如：打赏" /></Form.Item></NestedFormField>
         <NestedFormField className="recovery-fee-field" label="金额"><Form.Item noStyle name="other_fee_amount"><MoneyInput className="recovery-fee-control" placeholder="金额" /></Form.Item></NestedFormField>
         <NestedFormField className="recovery-fee-field" label="收款对象"><Form.Item noStyle name="other_fee_recipient"><Input className="recovery-fee-control" placeholder="可选填" /></Form.Item></NestedFormField>
+        <NestedFormField className="recovery-fee-field" label="设计费"><Form.Item noStyle name="design_fee"><MoneyInput className="recovery-fee-control" aria-label="设计费" placeholder="金额" /></Form.Item></NestedFormField>
       </AdaptiveFormGrid>
     </NestedFormSection>
   );

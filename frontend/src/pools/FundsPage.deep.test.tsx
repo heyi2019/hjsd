@@ -55,6 +55,7 @@ const deposits = [
 const cashflows = [
   { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
   { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 3, flow_no: "HS0001-CF-CXL-01", pool_id: 1, occurred_on: "2026-10-18", nature: "BUSINESS_OUT", category: "CXL", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", status: "APPROVED", reviewed_by: "admin", reviewed_at: "2026-10-18T09:30:00", reversal_of_id: 1, fund_nature: "BUSINESS", accounting_attribute: "REVERSAL" },
 ];
 
 beforeEach(() => {
@@ -212,6 +213,29 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.source_pool_id).toBe(1);
     expect(payload.target_pool_id).toBe(2);
     expect(payload.amount).toBe("100.00");
+  });
+
+  it("对账状态列显示未核销/已核销（对齐后端 ReconciliationStatus 语义）", async () => {
+    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([
+      { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
+      { id: 32, pool_id: 1, reconciled_on: "2026-10-17", account_label: "经营账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "RESOLVED" },
+    ]);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    expect(await screen.findByText("未核销")).toBeInTheDocument();
+    expect(screen.getByText("已核销")).toBeInTheDocument();
+    // 不再出现质量域语义的「未结算/已处置」
+    expect(screen.queryByText("已处置")).toBeNull();
+  });
+
+  it("流水审核追溯列展示审核人/审核时间/冲销来源", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    // 单元格为多文本节点拼接（审核人 · 时间 · 冲销来源），用 textContent 函数匹配器断言整串；
+    // td 与内层 span textContent 相同，用 findAllByText 规避 multiple elements。
+    expect((await screen.findAllByText((_content, element) => element?.textContent === "admin · 2026-10-18 09:30 · 冲销#1")).length).toBeGreaterThan(0);
   });
 
   it("新增对账提交：未达流水 ID 按逗号解析为数组", async () => {

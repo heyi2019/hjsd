@@ -272,6 +272,11 @@ export function CreateBusinessModal(props: {
           pool_id: values.payment_pool_id as number, flow_category: "OTHER",
           note: `${String(values.other_fee_name || (isTh ? "其他" : "其他费用"))}｜收款对象：${String(values.other_fee_recipient ?? "")}`,
         }] : []),
+        ...(Number(values.design_fee) > 0 ? [{
+          amount: String(values.design_fee), occurred_on: today(), portion: "PRINCIPAL",
+          pool_id: values.payment_pool_id as number, flow_category: "DESIGN",
+          note: "设计费",
+        }] : []),
       ] : [];
       await ordersApi.create({
         order_type: props.initialOrderType,

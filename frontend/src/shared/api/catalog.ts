@@ -531,6 +531,8 @@ export interface Cashflow {
   pool_id: number;
   occurred_on: string;
   nature: string;
+  fund_nature?: string;
+  accounting_attribute?: string;
   category: string;
   direction: "IN" | "OUT" | string;
   amount: string;
@@ -540,6 +542,10 @@ export interface Cashflow {
   order_event_id?: number | null;
   transfer_id?: string | null;
   source: string;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  reversal_of_id?: number | null;
+  operator?: string;
   note?: string | null;
 }
 
@@ -1353,7 +1359,7 @@ export const qualityApi = {
   batchClose: (data: { issue_ids: number[]; resolution: string; evidence: string }) => api.post<QualityIssue[]>("/quality/issues/batch-close", data).then(r => r.data),
 };
 export const notificationsApi = {
-  list: (params: { limit: number }) => api.get<{ items: NotificationItem[]; unread_total: number }>("/notifications", { params }).then(r => r.data),
+  list: (params: { limit: number; unread_only?: boolean }) => api.get<{ items: NotificationItem[]; unread_total: number }>("/notifications", { params }).then(r => r.data),
   markRead: (id: number) => api.post<NotificationItem>(`/notifications/${id}/read`).then(r => r.data),
   syncOverdueRebates: () => api.post<{ created: number }>("/notifications/sync-overdue-rebates").then(r => r.data),
 };

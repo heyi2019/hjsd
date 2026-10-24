@@ -111,6 +111,37 @@ export const NATURE_LABEL: Record<string, string> = {
   INTERNAL: "内部调拨",
 };
 
+/** 资金所有权性质（FundNature 三值）：与 backend/app/domain/enums.py FundNature 一致。 */
+export const FUND_NATURE_LABEL: Record<string, string> = {
+  BUSINESS: "本方经营",
+  EXTERNAL: "外部/受托",
+  INTERNAL: "内部调拨",
+};
+
+/** 核算属性（AccountingAttribute 13 值）：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
+export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
+  SELF_REVENUE: "自营收入",
+  SELF_DIRECT_COST: "自营直接成本",
+  TH_DIRECT_COST: "提号/代挂直接成本",
+  TH_REVENUE: "提号/代挂收入",
+  DFQ_PRINCIPAL: "代分期借款本金",
+  SERVICE_REVENUE: "增值服务收入",
+  REBATE_INCOME: "返点收入",
+  OPERATING_EXPENSE: "运营费用",
+  DEPOSIT: "押金/保证金",
+  EXTERNAL_FUNDING: "外部资金",
+  INTERNAL_TRANSFER: "内部调拨",
+  REVERSAL: "冲销",
+  REFUND: "退款",
+};
+
+/** 日对账快照状态（ReconciliationStatus）：OPEN=差异待处理（未核销）、RESOLVED=差异已处理（已核销）。
+ *  注意 OPEN/RESOLVED 与质量域共用，不能改 StatusTag 全局映射，只能在对账调用点显式传 label。 */
+export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
+  OPEN: "未核销",
+  RESOLVED: "已核销",
+};
+
 /** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 全量对齐（79 项）。 */
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
   POOL_CREATE: "新建资金池",

@@ -51,4 +51,13 @@ describe("NotificationsPanel：系统提醒", () => {
     await ui.click(screen.getByRole("button", { name: /同步返点逾期提醒/ }));
     await waitFor(() => expect(catalog.notificationsApi.syncOverdueRebates).toHaveBeenCalled());
   });
+
+  it("勾选仅看未读 → list 带 unread_only 重新拉取", async () => {
+    renderLight(<NotificationsPanel />, { user: "admin" });
+    await screen.findByText("N001");
+    await ui.click(screen.getByRole("checkbox", { name: /仅看未读/ }));
+    await waitFor(() => expect(catalog.notificationsApi.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ unread_only: true }),
+    ));
+  });
 });

@@ -27,6 +27,7 @@ const LABELS: Record<string, string> = {
   LINKED: "已关联",
   UNLINKED: "未关联",
   ORPHAN: "孤儿",
+  UNLINKED_TRANSFER: "单边划转未关联",
   BLOCKER: "阻断",
   HIGH: "高",
   MEDIUM: "中",
@@ -47,6 +48,11 @@ const LABELS: Record<string, string> = {
   // 经营规则版本状态（PolicyStatus）
   EXPIRED: "已失效",
   SUPERSEDED: "已被取代",
+  // 客户需求状态（LeadStatus：OPEN/CLOSED 与对账、质量域共用，仅补 CONVERTED 独有码）
+  CONVERTED: "已转化",
+  // 系统提醒已读态（前端本地码，后端无对应枚举）
+  READ: "已读",
+  UNREAD: "未读",
 };
 
 export function StatusTag(props: { status: string; label?: string; color?: string }) {

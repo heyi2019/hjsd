@@ -24,11 +24,12 @@ export function GameTypeSettingsPanel() {
     void load();
   }, [load]);
 
-  const submit = async (values: { game_type_name: string; sort_order?: number }) => {
+  const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean }) => {
     try {
       const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? 0) };
       if (editingId === null) {
-        await gameTypesApi.create(payload);
+        // 后端 create 支持 is_default（自动清其他默认项）；update 不支持，编辑态不传。
+        await gameTypesApi.create(values.is_default ? { ...payload, is_default: true } : payload);
         message.success("游戏类型已新增");
       } else {
         await gameTypesApi.update(editingId, payload);
@@ -134,6 +135,11 @@ export function GameTypeSettingsPanel() {
           <Form.Item name="sort_order" label="排序">
             <InputNumber min={0} />
           </Form.Item>
+          {editingId === null ? (
+            <Form.Item name="is_default" valuePropName="checked" label="默认类型">
+              <Checkbox>新建表单自动带出（保存后其他类型取消默认）</Checkbox>
+            </Form.Item>
+          ) : null}
           <Form.Item>
             <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
               {editingId === null ? "新增游戏类型" : "保存游戏类型"}

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -92,6 +92,16 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(screen.getAllByText("可用余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
   });
 
+  it("R4 资金日报：切换日期带 on 参数重新拉取（#56）", async () => {
+    vi.mocked(catalog.reportsApi.dailyFunds).mockClear();
+    renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("资金日报 R4");
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenCalled());
+    const dateInput = screen.getByLabelText("资金日报日期");
+    fireEvent.change(dateInput, { target: { value: "2026-10-08" } });
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
+  });
+
   it("资金属性分析：渲染资金账户 / 方向 / 净方向金额", async () => {
     resolveMockOnce(vi.mocked(catalog.reportsApi.financeDimensions), {
       items: [
@@ -100,7 +110,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
           account_name: "经营账户",
           account_no: "A1",
           fund_nature: "BUSINESS",
-          accounting_attribute: "SELF",
+          accounting_attribute: "SELF_REVENUE",
           direction: "IN",
           flow_count: 3,
           amount: "100.00",
@@ -114,6 +124,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("资金属性分析");
     await screen.findByText("经营账户（A1）"); // account_name 拼接 account_no
     expect(screen.getByText("收入")).toBeInTheDocument(); // direction === IN
+    expect(screen.getByText("本方经营")).toBeInTheDocument(); // fund_nature 中文映射（#60）
+    expect(screen.getByText("自营收入")).toBeInTheDocument(); // accounting_attribute 中文映射（#60）
     expect(screen.getAllByText("净方向金额").length).toBeGreaterThanOrEqual(1);
   });
 

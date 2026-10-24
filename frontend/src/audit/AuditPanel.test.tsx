@@ -9,7 +9,7 @@ import type { AuditLogRow } from "../shared/api/catalog";
 vi.mock("../shared/api/catalog");
 
 const rows: AuditLogRow[] = [
-  { id: 1, occurred_at: "2026-10-01", actor: "admin", action: "CREATE", entity_type: "order", entity_id: "10", reason: null },
+  { id: 1, occurred_at: "2026-10-01", actor: "admin", action: "ORDER_CREATE", entity_type: "order", entity_id: "10", reason: null },
 ];
 
 let ui: ReturnType<typeof userEvent.setup>;
@@ -17,13 +17,16 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   vi.mocked(catalog.auditApi.list).mockResolvedValue({ items: rows, total: rows.length });
+  vi.mocked(catalog.auditApi.actions).mockResolvedValue(["ORDER_CREATE"]);
 });
 
 describe("AuditPanel：审计记录", () => {
   it("加载并展示审计行", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     expect(await screen.findByText("admin")).toBeInTheDocument();
-    expect(screen.getByText("CREATE")).toBeInTheDocument();
+    // 动作与对象类型均按中文标签渲染（AUDIT_ACTION_LABEL / ENTITY_TYPE_LABEL）
+    expect(screen.getByText("新建订单")).toBeInTheDocument();
+    expect(screen.getByText("订单")).toBeInTheDocument();
   });
 
   it("加载失败展示错误横幅", async () => {

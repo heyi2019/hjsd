@@ -1,5 +1,5 @@
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
-import { Card, Form, Input, Modal, Select, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualitySummary } from "../shared/api/catalog";
@@ -19,6 +19,8 @@ export function QualityPanel() {
   const [creating, setCreating] = useState(false);
   const [closing, setClosing] = useState(false);
   const [batchClosing, setBatchClosing] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -85,21 +87,51 @@ export function QualityPanel() {
     finally { setBatchClosing(false); }
   };
 
+  const updateIssueStatus = async (row: QualityIssue, status: "IN_PROGRESS") => {
+    setUpdating(true);
+    try {
+      await qualityApi.update(row.id, { status });
+      message.success("工单已进入处理中");
+      await load();
+    } catch (err) { setError(normalizeError(err)); }
+    finally { setUpdating(false); }
+  };
+
+  const scanIssues = async () => {
+    setScanning(true);
+    try {
+      const created = await qualityApi.scan();
+      message.success(created.length > 0 ? `扫描发现 ${created.length} 个新异常，已生成工单` : "扫描完成，未发现新异常");
+      await load();
+    } catch (err) { setError(normalizeError(err)); }
+    finally { setScanning(false); }
+  };
+
   const columns: ColumnsType<QualityIssue> = [
     { title: "工单号", dataIndex: "issue_no" },
     { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} /> },
     { title: "标题", dataIndex: "title" },
     { title: "对象", render: (_v, row) => `${row.entity_type}:${row.entity_id}` },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={({ OPEN: "待处理", IN_PROGRESS: "处理中", CLOSED: "已关闭" } as Record<string, string>)[v]} /> },
     { title: "问题", dataIndex: "message" },
-    { title: "操作", render: (_v, row) => row.status !== "CLOSED" ? <PermissionButton permission="order.exception.approve" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton> : null },
+    {
+      title: "操作",
+      render: (_v, row) => row.status === "OPEN" ? (
+        <Space>
+          <PermissionButton permission="order.exception.approve" size="small" loading={updating} onClick={() => void updateIssueStatus(row, "IN_PROGRESS")}>开始处理</PermissionButton>
+          <PermissionButton permission="order.exception.approve" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
+        </Space>
+      ) : row.status === "IN_PROGRESS" ? (
+        <PermissionButton permission="order.exception.approve" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
+      ) : null,
+    },
   ];
 
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
       <StatRow items={[{ label: "异常总数", kind: "count", amount: String(summary?.total ?? 0) }, { label: "高严重度", kind: "count", amount: String(summary?.by_severity?.HIGH ?? 0), tone: "warn" }]} />
-      <Card className="glass" title="质量异常工单" extra={<PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton>}>
+      <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.exception.approve" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
         <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} scroll={{ x: "max-content" }} emptyText="暂无质量异常" onPageChange={() => undefined} />
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>

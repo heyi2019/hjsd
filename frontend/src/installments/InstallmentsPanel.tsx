@@ -169,9 +169,7 @@ function ContractTable({
         message.success(
           cancelTarget.contract_type === "PICKUP_SALE"
             ? `${refundSummary}，提号账号已结束`
-            : cancelTarget.contract_type === "ADVANCE_PURCHASE"
-              ? `${refundSummary}，代分期已结束`
-              : `${refundSummary}，账号已回到库存`,
+            : `${refundSummary}，账号已回到库存`,
         );
         setCancelTarget(null);
         cancelForm.resetFields();
@@ -428,6 +426,12 @@ function ContractTable({
       align: "right",
       render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
     },
+    {
+      title: "服务费率",
+      dataIndex: "service_fee_rate",
+      align: "right",
+      render: (v: string | undefined) => (v == null || v === "" ? "—" : `${v}%`),
+    },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={SCHEDULE_STATUS_LABEL[v] ?? v} /> },
     {
       title: "操作",
@@ -606,9 +610,7 @@ function ContractTable({
           <Typography.Paragraph type="secondary">
             {cancelTarget?.contract_type === "PICKUP_SALE"
               ? "按已收款原资金池退款，提号取消后账号直接结束。"
-              : cancelTarget?.contract_type === "ADVANCE_PURCHASE"
-                ? "按已收款原资金池退款，取消后终止分期合约。"
-                : "按已收款原资金池退款，取消后账号回到库存。"}
+              : "按已收款原资金池退款，取消后账号回到库存。"}
           </Typography.Paragraph>
           <Form.Item name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />

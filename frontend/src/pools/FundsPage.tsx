@@ -17,7 +17,7 @@ import {
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
+import { NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import { PoolAccountsPanel } from "./PoolAccountsPanel";
 import {
@@ -100,6 +100,9 @@ export function FundsPage() {
   const [cashflowStatus, setCashflowStatus] = useState<string | undefined>();
   const [cashflowFrom, setCashflowFrom] = useState("");
   const [cashflowTo, setCashflowTo] = useState("");
+  const [cashflowFundNature, setCashflowFundNature] = useState("");
+  const [cashflowAttribute, setCashflowAttribute] = useState("");
+  const [cashflowCategory, setCashflowCategory] = useState("");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
@@ -107,9 +110,9 @@ export function FundsPage() {
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();
   const [cashflowForm] = Form.useForm();
-  const cashflowFundNature = Form.useWatch("fund_nature", cashflowForm) as string | undefined;
+  const cashflowFormNature = Form.useWatch("fund_nature", cashflowForm) as string | undefined;
   const cashflowAttributeOptions = (
-    ALLOWED_ATTRIBUTES_BY_FUND_NATURE[cashflowFundNature ?? "BUSINESS"]
+    ALLOWED_ATTRIBUTES_BY_FUND_NATURE[cashflowFormNature ?? "BUSINESS"]
     ?? Object.keys(ACCOUNTING_ATTRIBUTE_LABEL)
   ).map((value) => ({ value, label: ACCOUNTING_ATTRIBUTE_LABEL[value] ?? value }));
   const [transferForm] = Form.useForm();
@@ -121,17 +124,36 @@ export function FundsPage() {
   const [repairForm] = Form.useForm();
   const [periodLockForm] = Form.useForm();
 
-  // 用 ref 持有最新日期筛选值，使全局 load()（含写操作后刷新）也能套用当前日期区间。
+  // 用 ref 持有最新筛选值，使全局 load()（含写操作后刷新）也能套用当前筛选条件。
   const cashflowFromRef = useRef(cashflowFrom);
   cashflowFromRef.current = cashflowFrom;
   const cashflowToRef = useRef(cashflowTo);
   cashflowToRef.current = cashflowTo;
+  const cashflowPoolIdRef = useRef(cashflowPoolId);
+  cashflowPoolIdRef.current = cashflowPoolId;
+  const cashflowDirectionRef = useRef(cashflowDirection);
+  cashflowDirectionRef.current = cashflowDirection;
+  const cashflowStatusRef = useRef(cashflowStatus);
+  cashflowStatusRef.current = cashflowStatus;
+  const cashflowFundNatureRef = useRef(cashflowFundNature);
+  cashflowFundNatureRef.current = cashflowFundNature;
+  const cashflowAttributeRef = useRef(cashflowAttribute);
+  cashflowAttributeRef.current = cashflowAttribute;
+  const cashflowCategoryRef = useRef(cashflowCategory);
+  cashflowCategoryRef.current = cashflowCategory;
 
-  // 资金流水：日期区间改为服务端过滤（移除 500 硬截断），total 为服务端命中总数。
+  // 资金流水：筛选全部走服务端（对齐 finance/router.py list_cashflows 的 11 个参数），
+  // 避免 2000 条上限把池/方向/状态之外的结果挡在客户端之外。
   const fetchCashflows = useCallback(async () => {
     const result = await cashflowsApi.list({
       occurred_from: cashflowFromRef.current || undefined,
       occurred_to: cashflowToRef.current || undefined,
+      pool_id: cashflowPoolIdRef.current ?? undefined,
+      direction: cashflowDirectionRef.current || undefined,
+      status: cashflowStatusRef.current || undefined,
+      fund_nature: cashflowFundNatureRef.current || undefined,
+      accounting_attribute: cashflowAttributeRef.current || undefined,
+      category: cashflowCategoryRef.current.trim() || undefined,
       limit: 2000,
       offset: 0,
     });
@@ -495,6 +517,11 @@ export function FundsPage() {
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
     },
     {
+      title: "流向",
+      dataIndex: "nature",
+      render: (v: string | null | undefined) => NATURE_LABEL[v ?? ""] ?? v ?? "—",
+    },
+    {
       title: "金额",
       dataIndex: "amount",
       align: "right",
@@ -650,10 +677,16 @@ export function FundsPage() {
                   <Select aria-label="流水资金池" allowClear value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
                   <Select aria-label="流水方向" allowClear value={cashflowDirection} placeholder="全部收支" options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} onChange={setCashflowDirection} />
                   <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={[{ value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已审核" }, { value: "REJECTED", label: "已拒绝" }]} onChange={setCashflowStatus} />
+                  <Select aria-label="流水资金性质" allowClear value={cashflowFundNature || undefined} placeholder="全部资金性质" options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowFundNature(value ?? "")} />
+                  <Select aria-label="流水核算属性" allowClear value={cashflowAttribute || undefined} placeholder="全部核算属性" options={Object.entries(ACCOUNTING_ATTRIBUTE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowAttribute(value ?? "")} />
+                  <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
                   <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
                   <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
                   <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
                 </div>
+                <Typography.Paragraph type="secondary" className="ui-drawer-hint">
+                  状态口径：订单事件过账生成的流水直接为「已审核」；本页手工登记的独立流水需审核通过后才计入系统余额。
+                </Typography.Paragraph>
                 {cashflowTotal > cashflows.length ? (
                   <Typography.Text type="warning">
                     共匹配 {cashflowTotal} 笔，已加载 {cashflows.length} 笔（单次上限 2000 条，请用日期区间缩小范围）。
@@ -853,7 +886,7 @@ export function FundsPage() {
           <Form.Item name="account_label" label="对账账户" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></Form.Item>
           <Form.Item name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></Form.Item>
-          <Form.Item name="reason" label="差异原因"><Input.TextArea rows={2} /></Form.Item>
+          <Form.Item name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已审核流水）"><Input.TextArea rows={2} /></Form.Item>
           <Form.Item name="note" label="说明"><Input.TextArea rows={2} /></Form.Item>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交对账</PermissionButton>
         </Form>

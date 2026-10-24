@@ -858,6 +858,12 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
+    status?: string;
+    nature?: string;
+    fund_nature?: string;
+    accounting_attribute?: string;
+    category?: string;
+    created_by?: string;
     limit?: number;
     offset?: number;
   }) =>
@@ -1065,7 +1071,16 @@ export interface AuditLogRow {
 }
 
 export const auditApi = {
-  list: (params?: { entity_type?: string; entity_id?: string; limit?: number; offset?: number }) =>
+  list: (params?: {
+    entity_type?: string;
+    entity_id?: string;
+    action?: string;
+    actor?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
     api.get<{ items: AuditLogRow[]; total: number }>("/audit-logs", { params }).then((r) => r.data),
   actions: () => api.get<{ items: string[] }>("/audit-logs/actions").then((r) => r.data.items),
 };
@@ -1284,6 +1299,8 @@ export const qualityApi = {
   summary: () => api.get<QualitySummary>("/quality/exceptions").then(r => r.data),
   list: () => api.get<{ items: QualityIssue[] }>("/quality/issues").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<QualityIssue>("/quality/issues", data).then(r => r.data),
+  update: (id: number, data: { status: string }) => api.patch<QualityIssue>(`/quality/issues/${id}`, data).then(r => r.data),
+  scan: () => api.post<QualityIssue[]>("/quality/scan").then(r => r.data),
   close: (id: number, data: { resolution: string; evidence: string }) => api.post<QualityIssue>(`/quality/issues/${id}/close`, data).then(r => r.data),
   batchClose: (data: { issue_ids: number[]; resolution: string; evidence: string }) => api.post<QualityIssue[]>("/quality/issues/batch-close", data).then(r => r.data),
 };

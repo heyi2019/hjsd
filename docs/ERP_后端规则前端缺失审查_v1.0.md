@@ -86,7 +86,7 @@ P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
 | #48 | 审计动作裸英文 | labels.ts 新增 AUDIT_ACTION_LABEL 全量 79 项（对齐 AuditAction 枚举），AuditPanel 动作列与筛选下拉均用中文 | audit |
 | #49 | 审计筛选仅 2 参 | 补动作（选项来自 /audit-logs/actions）、操作人、开始/结束日期；对象类型改 ENTITY_TYPE_LABEL | audit |
 
-**P1 剩余 14 条**（#26 已随 #25 相邻处理验证存在、#28 已在第三轮随 #11 修复、#30/#32/#35-#44/#47/#62），P2 13 条未动。
+**P1 剩余 14 条**（#26 已随 #25 相邻处理验证存在、#28 已在第三轮随 #11 修复、#30/#32/#35-#44/#47/#62），P2 13 条未动。〔本行及下文各「剩余」行均为当批处置后的时点快照，终态以 0.3 节末「P1 24 条全部清零」为准。〕
 
 ## 0.5 P1 第二批处置状态（2026-10-24 已实施）
 
@@ -105,7 +105,20 @@ P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
 
 配套修正：`catalog.ts` `policyApi.resolve` 补 scope_type/scope_id 可选参数（默认 GLOBAL，与后端 Query 一致）。
 
-**P1 剩余 6 条**（#30/#32/#40/#41/#47/#62，展示基建类），P2 13 条未动。
+### 0.3 P1 第三批处置记录（展示基建类，提交 7850f1f + 975a5ac）
+
+| # | 差异 | 修复 | 验证 |
+|---|---|---|---|
+| #30 | 系统余额口径不可见 | `FundsPage.tsx` 对账页补口径说明段（截至对账日「已审核」流水累计、待审核/已拒绝不计入、按池内账户对账时另含该账户期初余额、差异 = 账面余额 − 系统余额）；「系统余额」列表头加 Tooltip 同口径 | pools 48 |
+| #32 | 对账唯一约束后置报错 | 新增对账 Modal「对账账户」字段补唯一约束说明（同一资金池+对账账户+日期）；提交前按已加载记录做客户端预检，命中重复 warning 阻断并提示调整日期或账户，不再让用户直接吃后端校验错误 | pools 48（含重复预检守门） |
+| #40 | 孤儿单（ORPHAN）无筛选入口 | `catalog.ts` Order 补 `link_status`（移除后段重复声明）；`labels.ts` 补 `LINK_STATUS_LABEL` 四态；OrdersPage 筛选栏新增「关联状态」下拉（数量联动），台账加「关联」列（StatusTag 带 label），详情抽屉补关联状态行 | orders 37（含孤儿单筛选守门） |
+| #41 | capital_type 建单不可覆盖 | `CreateBusinessModal.tsx` 新增「资金性质」选择（默认跟随业务类型定义，allowClear 可显式覆盖 STOCK/ZERO/CREDIT），两个创建分支均随 payload 提交 `capital_type`；OrdersPage 详情补资金性质行 | quick 21（含 ZERO 覆盖守门） |
+| #47 | 编号序列不可见 | `catalog.ts` 补 `sequencesApi`（GET /foundation/sequences）与 `DocumentSequence`；新建 `SequencesPanel.tsx` 只读面板（12 编号域中文标签 + 序列键/前缀/补齐位数/当前值/下一编号，排查断号/跳号）；SettingsPage 新增「编号序列」Tab，`order-type.manage` 门控 | field-definitions 45（含展示+失败分支守门） |
+| #62 | 自有权益口径缺失 | `FundsPage.tsx` 统计卡新增第四项「自有权益合计」：按 PoolOwnership 口径仅累计 OWNED 归属池的现金头寸（CUSTODY/THIRD_PART 只计头寸不计权益），归属以资金池主数据为准；卡下补口径说明（押金占用仍是自有资金，权益不扣减占用） | pools 48（含权益合计守门） |
+
+配套修正：新增共享类 `.ui-filter-select` / `.ui-card-hint`（替代内联样式，`no-inline-style` 守卫）；权益合计以 `pools` 主数据为归属真来源，不依赖 balance 载荷是否带 `pool_id`。
+
+**P1 24 条全部清零**（口径 5 + 状态机/能力页 12 + 订单/入口/策略 8 + 展示基建 6... 分四批落地：3f078ea/3fdcc2d、9303fe3/bd86485/9a42913、3e2c44a/c883b27、62416da、96847b6/e2d3b98、7850f1f、975a5ac）。P2 13 条未动。
 
 ---
 

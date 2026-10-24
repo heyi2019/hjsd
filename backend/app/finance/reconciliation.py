@@ -149,8 +149,6 @@ def create_reconciliation(
         required=difference != 0,
         type_message="存在差异时必须填写差异原因",
     )
-    if difference != 0 and not text_reason:
-        raise Validation("存在差异时必须填写差异原因", details={"field": "reason"})
     item = Reconciliation(
         pool_id=pool.id,
         pool_account_id=pool_account_id,

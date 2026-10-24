@@ -278,3 +278,19 @@ def test_resolve_reconciliation_requires_open_and_reason(seeded_db):
     # 重复核销 → 已核销
     with pytest.raises(Validation, match="该对账记录已核销"):
         resolve_reconciliation(seeded_db, item.id, actor="pytest", reason="再次")
+
+
+def test_create_reconciliation_rejects_difference_without_reason(seeded_db):
+    pool, account = _seed_recon(seeded_db)
+    # system=70 而 statement=100 → difference=30（!=0），且不传 reason；
+    # 删除原 153 行冗余防御后，此行为改由 _text(required=difference!=0) 兜住。
+    with pytest.raises(Validation, match="存在差异时必须填写差异原因"):
+        create_reconciliation(
+            seeded_db,
+            pool_id=pool.id,
+            pool_account_id=account.id,
+            reconciled_on=date(2026, 10, 17),
+            account_label="差异无原因",
+            statement_balance=Decimal("100"),
+            actor="pytest",
+        )

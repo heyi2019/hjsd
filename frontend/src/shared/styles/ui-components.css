@@ -1003,6 +1003,12 @@
   font: var(--font-caption-2);
   color: var(--color-text-secondary);
 }
+/* 卡片内口径说明：位于统计卡组 / 表格上方，与上下文留出上下间距。 */
+.ui-card-hint {
+  margin: var(--space-3) 0;
+  font: var(--font-caption-2);
+  color: var(--color-text-secondary);
+}
 .ui-error-banner { margin-block-end: var(--space-3); }
 
 /* 减少动效偏好：玻璃模糊属于装饰，直接关闭。 */

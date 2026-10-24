@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Select, Tabs, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Tabs, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -326,6 +326,19 @@ export function FundsPage() {
   };
 
   const submitReconciliation = async (values: Record<string, unknown>) => {
+    const poolId = Number(values.pool_id);
+    const reconciledOn = values.reconciled_on as string;
+    const accountLabel = (values.account_label as string).trim();
+    // 唯一约束（domain/trade.py uq_reconciliations_scope：池+池内账户+日期+账户标签）客户端预检，
+    // 命中重复即阻断并提示调整，避免用户直接吃到后端校验错误。
+    if (
+      reconciliations.some(
+        (row) => row.pool_id === poolId && row.reconciled_on === reconciledOn && row.account_label === accountLabel,
+      )
+    ) {
+      message.warning("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户");
+      return;
+    }
     await write.run(async () => {
       const rawIds = String(values.unmatched_flow_ids ?? "").trim();
       await reconciliationsApi.create({
@@ -365,6 +378,12 @@ export function FundsPage() {
     .toFixed(2);
   const totalDeposit = Object.values(balances)
     .reduce((sum, balance) => sum + Number(balance.deposit_held), 0)
+    .toFixed(2);
+  // 自有权益口径（domain/enums.py PoolOwnership：OWNED 计入权益，CUSTODY/THIRD_PART 只计现金头寸）。
+  // 归属以资金池主数据为准；权益按现金头寸计、不扣押金占用——押金占用仍是自有资金，只是暂时不可用。
+  const totalOwned = pools
+    .filter((pool) => pool.ownership === "OWNED")
+    .reduce((sum, pool) => sum + Number(balances[pool.id]?.cash_balance ?? 0), 0)
     .toFixed(2);
 
   const visibleCashflows = useMemo(() => {
@@ -582,7 +601,7 @@ export function FundsPage() {
     { title: "资金池", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
     { title: "账户", dataIndex: "account_label" },
-    { title: "系统余额", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
+    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已审核流水，剔除待审核/已拒绝">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
     { title: "账面余额", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
     { title: "差异", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
@@ -652,8 +671,12 @@ export function FundsPage() {
                     { label: "现金头寸合计", amount: totalCash },
                     { label: "可用余额合计", amount: totalAvailable },
                     { label: "押金占用", amount: totalDeposit },
+                    { label: "自有权益合计", amount: totalOwned },
                   ]}
                 />
+                <Typography.Paragraph type="secondary" className="ui-card-hint">
+                  口径：现金头寸含全部资金池；自有权益仅计归属为「{POOL_OWNERSHIP_LABEL.OWNED}」的池，「{POOL_OWNERSHIP_LABEL.CUSTODY}/{POOL_OWNERSHIP_LABEL.THIRD_PART}」只计头寸、不计权益；押金占用仍为自有资金，故权益不扣减占用。
+                </Typography.Paragraph>
                 <DataTable<Pool>
                   columns={poolColumns}
                   rows={pools}
@@ -749,6 +772,9 @@ export function FundsPage() {
             label: "对账",
             children: (
               <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
+                <Typography.Paragraph type="secondary" className="ui-card-hint">
+                  系统余额口径：截至对账日期「已审核」流水的累计（待审核/已拒绝不计入）；按池内账户对账时另含该账户期初余额。差异 = 账面余额 − 系统余额。
+                </Typography.Paragraph>
                 <DataTable<Reconciliation>
                   columns={reconciliationColumns}
                   rows={reconciliations}
@@ -883,7 +909,7 @@ export function FundsPage() {
           <Form form={reconciliationForm} layout="vertical" onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <Form.Item name="reconciled_on" label="对账日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
-          <Form.Item name="account_label" label="对账账户" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></Form.Item>
           <Form.Item name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></Form.Item>
           <Form.Item name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></Form.Item>
           <Form.Item name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已审核流水）"><Input.TextArea rows={2} /></Form.Item>

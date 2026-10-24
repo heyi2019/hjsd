@@ -1,3 +1,4 @@
+import { message } from "antd";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -221,6 +222,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.click(await screen.findByRole("button", { name: /新增对账/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
+    await ui.clear(modal.querySelector("#reconciled_on") ?? modal);
     await ui.type(modal.querySelector("#reconciled_on") ?? modal, "2026-10-18");
     await ui.type(modal.querySelector("#account_label") ?? modal, "经营账户");
     await ui.type(modal.querySelector("#statement_balance") ?? modal, "900.00");
@@ -230,6 +232,52 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await waitFor(() => expect(vi.mocked(catalog.reconciliationsApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(catalog.reconciliationsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.unmatched_flow_ids).toEqual([1, 2]);
+  });
+
+  it("新增对账预检：命中唯一约束（池+账户+日期）时阻断提交并提示调整", async () => {
+    const warningSpy = vi.spyOn(message, "warning").mockReturnValue(undefined as never);
+    // 初始加载即带入一条「同池+同日期+同账户」记录，模拟重复对账场景。
+    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValueOnce([
+      { id: 30, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
+    ]);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    await ui.click(await screen.findByRole("button", { name: /新增对账/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    await ui.clear(modal.querySelector("#reconciled_on") ?? modal);
+    await ui.type(modal.querySelector("#reconciled_on") ?? modal, "2026-10-18");
+    await ui.type(modal.querySelector("#account_label") ?? modal, "经营账户");
+    await ui.type(modal.querySelector("#statement_balance") ?? modal, "900.00");
+    await ui.click(screen.getByRole("button", { name: /提交对账/ }));
+    await waitFor(() =>
+      expect(warningSpy).toHaveBeenCalledWith("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户"),
+    );
+    expect(vi.mocked(catalog.reconciliationsApi.create)).not.toHaveBeenCalled();
+    warningSpy.mockRestore();
+  });
+
+  it("对账页展示系统余额口径说明", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    expect(await screen.findByText(/系统余额口径：截至对账日期「已审核」流水的累计/)).toBeInTheDocument();
+  });
+
+  it("总览统计卡展示自有权益合计（仅 OWNED 归属池计入）", async () => {
+    // 注意用 mockResolvedValue 而非 Once：Tabs 不卸载非激活面板，池列表会被多个面板消费。
+    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "OWNED", status: "ACTIVE" },
+      { id: 2, code: "POOL-B", name: "托管池", pool_type: "DEPOSIT", ownership: "CUSTODY", status: "ACTIVE" },
+    ]);
+    renderLight(<FundsPage />, { user: "admin" });
+    expect(await screen.findByText("自有权益合计")).toBeInTheDocument();
+    // balance mock 两池现金头寸均为 800.00，仅 POOL-A（OWNED）计入权益 → 800.00。
+    const card = screen.getByText("自有权益合计").closest(".ui-stat");
+    expect(within(card as HTMLElement).getByText("800.00")).toBeInTheDocument();
+    // 口径说明：CUSTODY/THIRD_PART 只计头寸不计权益。
+    expect(screen.getByText(/自有权益仅计归属为「自有」的池/)).toBeInTheDocument();
   });
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {

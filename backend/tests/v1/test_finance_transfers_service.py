@@ -180,20 +180,25 @@ def test_repair_transfer_rejects_invalid_direction(seeded_db):
     invest, profit = _pools(seeded_db)
     bad_tid = "TRF-BAD-DIR"
     seeded_db.execute(text("PRAGMA ignore_check_constraints=ON"))
-    bad = Cashflow(
-        flow_no=f"{bad_tid}-BAD",
-        pool_id=invest.id,
-        occurred_on=date(2026, 10, 17),
-        nature=Nature.INTERNAL.value,
-        accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
-        fund_nature=FundNature.INTERNAL.value,
-        category="TRANSFER",
-        direction="ZZ",
-        amount=to_money("10"),
-        transfer_id=bad_tid,
-    )
-    seeded_db.add(bad)
-    seeded_db.flush()
+    try:
+        bad = Cashflow(
+            flow_no=f"{bad_tid}-BAD",
+            pool_id=invest.id,
+            occurred_on=date(2026, 10, 17),
+            nature=Nature.INTERNAL.value,
+            accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
+            fund_nature=FundNature.INTERNAL.value,
+            category="TRANSFER",
+            direction="ZZ",
+            amount=to_money("10"),
+            transfer_id=bad_tid,
+        )
+        seeded_db.add(bad)
+        seeded_db.flush()
+    finally:
+        # 关键：复位 PRAGMA。ignore_check_constraints 是连接级状态，经 SQLAlchemy 连接池
+        # 泄漏给后续测试后，会使其数据库约束 contract 测试因 CHECK 不再生效而误通过。
+        seeded_db.execute(text("PRAGMA ignore_check_constraints=OFF"))
     with pytest.raises(Validation, match="单边划转方向无效"):
         transfers.repair_transfer(
             seeded_db,

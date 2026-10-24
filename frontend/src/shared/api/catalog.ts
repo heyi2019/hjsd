@@ -1337,7 +1337,7 @@ export interface DocumentSequence {
   next_number: string;
 }
 export const sequencesApi = {
-  list: () => api.get<DocumentSequence[]>("/foundation/sequences").then(r => r.data),
+  list: () => api.get<DocumentSequence[]>("/sequences").then(r => r.data),
 };
 export const attachmentsApi = {
   list: (entity_type: string, entity_id: string) => api.get<{ items: AttachmentItem[] }>("/attachments", { params: { entity_type, entity_id } }).then(r => r.data),

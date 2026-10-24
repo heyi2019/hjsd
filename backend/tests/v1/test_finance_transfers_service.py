@@ -2,9 +2,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import text
 
 from app.core.errors import NotFound, Validation
+from app.core.money import to_money
 from app.core.security import CurrentUser
+from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.trade import Cashflow
 from app.finance import transfers
 
 
@@ -103,4 +107,98 @@ def test_repair_transfer_rejects_pool_not_visible_to_user(seeded_db):
             actor="pytest",
             reason="r",
             user=restricted,
+        )
+
+
+def test_repair_transfer_completes_in_direction_single_side(seeded_db):
+    """单边剩余行为 IN 方向时，补齐的边应为 OUT 方向（覆盖 elif 分支）。"""
+    invest, profit = _pools(seeded_db)
+    result = transfers.create_transfer(
+        seeded_db,
+        source_pool_id=invest.id,
+        target_pool_id=profit.id,
+        amount=Decimal("10"),
+        occurred_on=date(2026, 10, 17),
+        actor="pytest",
+    )
+    # 删除 OUT 边，只留下 IN 方向的单边记录
+    seeded_db.delete(result["cashflows"][0])
+    seeded_db.flush()
+    repaired = transfers.repair_transfer(
+        seeded_db,
+        result["transfer_id"],
+        counterpart_pool_id=invest.id,
+        actor="pytest",
+        reason="补回缺失的 OUT 边",
+    )
+    assert repaired["transfer_id"] == result["transfer_id"]
+    assert len(repaired["cashflows"]) == 2
+    repaired_flow = repaired["cashflows"][1]
+    assert repaired_flow.direction == Direction.OUT.value
+    assert repaired_flow.pool_id == invest.id
+
+
+def test_repair_transfer_rejects_multiple_rows_same_transfer(seeded_db):
+    """同一 transfer_id 出现第三行（非 0/1/2 行）应命中 len(rows) != 1 防御分支。"""
+    invest, profit = _pools(seeded_db)
+    result = transfers.create_transfer(
+        seeded_db,
+        source_pool_id=invest.id,
+        target_pool_id=profit.id,
+        amount=Decimal("10"),
+        occurred_on=date(2026, 10, 17),
+        actor="pytest",
+    )
+    tid = result["transfer_id"]
+    third = Cashflow(
+        flow_no=f"{tid}-THIRD",
+        pool_id=profit.id,
+        occurred_on=date(2026, 10, 17),
+        nature=Nature.INTERNAL.value,
+        direction=Direction.OUT.value,
+        amount=to_money("10"),
+        transfer_id=tid,
+    )
+    seeded_db.add(third)
+    seeded_db.flush()
+    with pytest.raises(Validation, match="不是单边记录"):
+        transfers.repair_transfer(
+            seeded_db,
+            tid,
+            counterpart_pool_id=profit.id,
+            actor="pytest",
+            reason="r",
+        )
+
+
+def test_repair_transfer_rejects_invalid_direction(seeded_db):
+    """单边记录方向既非 IN 也非 OUT（脏数据）应命中 else 防御分支。
+
+    用 PRAGMA ignore_check_constraints 绕过 direction 列的 CHECK 约束直插脏行，
+    证明该防御分支真实可达、无需删除。
+    """
+    invest, profit = _pools(seeded_db)
+    bad_tid = "TRF-BAD-DIR"
+    seeded_db.execute(text("PRAGMA ignore_check_constraints=ON"))
+    bad = Cashflow(
+        flow_no=f"{bad_tid}-BAD",
+        pool_id=invest.id,
+        occurred_on=date(2026, 10, 17),
+        nature=Nature.INTERNAL.value,
+        accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
+        fund_nature=FundNature.INTERNAL.value,
+        category="TRANSFER",
+        direction="ZZ",
+        amount=to_money("10"),
+        transfer_id=bad_tid,
+    )
+    seeded_db.add(bad)
+    seeded_db.flush()
+    with pytest.raises(Validation, match="单边划转方向无效"):
+        transfers.repair_transfer(
+            seeded_db,
+            bad_tid,
+            counterpart_pool_id=profit.id,
+            actor="pytest",
+            reason="r",
         )

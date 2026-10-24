@@ -8,6 +8,7 @@ NON_JSON_ROUTES = frozenset(
     {
         ("DELETE", "/api/v1/pools/{pool_id}"),
         ("DELETE", "/api/v1/field-definitions/{definition_id}"),
+        ("DELETE", "/api/v1/orders/{order_id}/links/{link_id}"),
         ("GET", "/api/v1/reports/{report_name}/export.csv"),
         ("GET", "/api/v1/attachments/{attachment_id}/download"),
     }
@@ -33,4 +34,4 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    assert public_routes == 158
+    assert public_routes == 159

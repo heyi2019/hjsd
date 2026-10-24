@@ -54,6 +54,21 @@
 
 **遗留（未在范围）**：分期违约登记的业务必要性（DEFAULTED 全链路）建议业务侧确认后启用；`OrderLink` 无删除入口（后端亦未提供）。
 
+## 0.3 第三轮处置状态（2026-10-24 已实施）
+
+剩余 5 条 P0 全部清除（提交 `3e2c44a`）：
+
+| 原编号 | 修复内容 | 改动 | 验证 |
+|---|---|---|---|
+| #11 | 资金性质 × 核算属性白名单 | `FundsPage.tsx`：核算属性选项按资金性质联动（镜像 `backend/app/finance/attributes.py`：BUSINESS 10 项 / EXTERNAL 3 项 / INTERNAL 1 项），切换自动改选合法项 | pools+field-definitions 40 |
+| #28 | 核算属性标签缺 REFUND | `ACCOUNTING_ATTRIBUTE_LABEL` 补 REFUND=退款（原 12/13） | 同上 |
+| #23 | AllocationRole 写死 OWNER | `OrdersPage.tsx`：分配四行 role 由隐藏 Input 改 Select（主责/采买/销售/服务），对齐 `policy/service.py:571-576` 校验 | orders 54 |
+| #22 | EntityType 仅 customer | `labels.ts` 补全 8 域（与后端 `_ENTITY_LABELS` 用词一致）；`FieldsPanel.tsx` 实体 Select 解除 disabled（新建可选、编辑锁定）；列表映射同步生效 | field-definitions 26 |
+| #14 | 冲销规则不可见 | `FundsPage.tsx` 冲销 Modal 补四条口径：继承原资金性质、核算属性固定冲销、直接已审核不经审核、不可重复冲销 | pools |
+| #17 | 订单详情缺区块 | `OrdersPage.tsx` Drawer 新增资金流水/返点/分期合约（含期次）/审计记录/附件五个区块，数据来自 `GET /orders/{id}` 的 `OrderDetailOut`；`catalog.ts` 补 6 个详情类型 | orders 54 |
+
+**至此 P0 24 条全部有处置**（#1-#24 中 #12 按勘误降为 P1 #62）。剩余：P1 24 条、P2 13 条，见正文。
+
 ---
 
 ## 1. P0 — 规则已在后端生效，但前端完全不可见 / 不可达

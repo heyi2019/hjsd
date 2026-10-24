@@ -172,7 +172,7 @@ export function FieldsPanel() {
           initialValues={{ entity_type: "customer", field_type: "TEXT", sort_order: 0 }}
         >
           <Form.Item name="entity_type" label="实体">
-            <Select options={ENTITY_TYPE_OPTIONS} className="ui-control-width-120" disabled />
+            <Select options={ENTITY_TYPE_OPTIONS} className="ui-control-width-120" disabled={editingId !== null} />
           </Form.Item>
           <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
             <Input placeholder="小写下划线，如 credit_level" disabled={editingId !== null} />

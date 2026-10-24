@@ -22,6 +22,7 @@ import {
   DataTable,
   ErrorBanner,
   MoneyInput,
+  MoneyText,
   PermissionButton,
   PermissionGate,
   StatusTag,
@@ -93,6 +94,23 @@ const ALLOCATION_LABEL: Record<"BUY" | "SELL" | "OPERATION" | "COMPANY", string>
   SELL: "售出",
   OPERATION: "运营",
   COMPANY: "公司归属",
+};
+
+// 与 backend/app/domain/enums.py AllocationRole 一致（policy/service.py 校验四值）
+const ALLOCATION_ROLE_LABEL: Record<string, string> = {
+  OWNER: "主责",
+  BUYER: "采买",
+  SALES: "销售",
+  SERVICE: "服务",
+};
+
+// 与 backend/app/domain/enums.py ScheduleStatus 一致（StatusTag 未内置 PARTIAL/WAIVED）
+const SCHEDULE_STATUS_LABEL: Record<string, string> = {
+  PENDING: "待收",
+  PARTIAL: "部分收取",
+  PAID: "已付清",
+  OVERDUE: "逾期",
+  WAIVED: "已减免",
 };
 
 function formatOrderAmount(order: Order): string {
@@ -196,7 +214,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         allocations: ["BUY", "SELL", "OPERATION", "COMPANY"].map((allocation_type) => ({
           allocation_type,
           user_id: byType[allocation_type]?.user_id ?? undefined,
-          role: byType[allocation_type]?.role ?? (allocation_type === "COMPANY" ? "OWNER" : "OWNER"),
+          role: byType[allocation_type]?.role ?? "OWNER",
           allocation_rate: byType[allocation_type]?.allocation_rate ?? "0",
         })),
       });
@@ -555,6 +573,81 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             )}
           </div>
         ) : null}
+        {selectedOrder?.cashflows?.length ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>资金流水</Typography.Text>
+            {selectedOrder.cashflows.map((flow) => (
+              <div key={flow.flow_no} className="orders-event-row">
+                <span>{flow.occurred_on}</span>
+                <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
+                <span><MoneyText value={flow.amount} /></span>
+                <span><StatusTag status={flow.status} /></span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {selectedOrder?.rebates?.length ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>返点</Typography.Text>
+            {selectedOrder.rebates.map((rebate) => (
+              <div key={rebate.id} className="orders-event-row">
+                <span>{rebate.rebate_no}</span>
+                <span>{rebate.rate}% · <MoneyText value={rebate.base_amount} /></span>
+                <span>{rebate.expected_on ? `预计 ${rebate.expected_on}` : rebate.collected_on}</span>
+                <span><StatusTag status={rebate.status} /></span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {selectedOrder?.installment ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>分期合约 · {selectedOrder.installment.inst_no}</Typography.Text>
+            <Typography.Text type="secondary">
+              本金 ¥{money(selectedOrder.installment.principal)} · 已收 ¥{money(selectedOrder.installment.paid_amount)}
+              {Number(selectedOrder.installment.waived_amount) > 0 ? ` · 减免 ¥${money(selectedOrder.installment.waived_amount)}` : ""}
+              {Number(selectedOrder.installment.bad_debt_amount) > 0 ? ` · 坏账 ¥${money(selectedOrder.installment.bad_debt_amount)}` : ""}
+              {" · "}{selectedOrder.installment.periods} 期
+            </Typography.Text>
+            <div className="orders-event-row">
+              <span><StatusTag status={selectedOrder.installment.status} /></span>
+              <span>{selectedOrder.installment.delivered_on ? `交付于 ${selectedOrder.installment.delivered_on}` : "未交付"}</span>
+              <span>{selectedOrder.installment.first_due_on ? `首期 ${selectedOrder.installment.first_due_on}` : ""}</span>
+            </div>
+            {(selectedOrder.installment_schedule ?? []).map((row) => (
+              <div key={row.id} className="orders-event-row">
+                <span>第 {row.period_no} 期</span>
+                <span>{row.due_on}</span>
+                <span>应收 ¥{money(row.due_amount)}</span>
+                <span>已收 ¥{money(row.received_amount)}</span>
+                <span><StatusTag status={row.status} label={SCHEDULE_STATUS_LABEL[row.status] ?? row.status} /></span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {selectedOrder?.audit?.length ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>审计记录</Typography.Text>
+            {selectedOrder.audit.map((entry) => (
+              <div key={entry.id} className="orders-event-row">
+                <span>{entry.action}</span>
+                <span>{entry.actor}</span>
+                <span>{entry.occurred_at ? new Date(entry.occurred_at).toLocaleString("zh-CN") : "-"}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {selectedOrder?.attachments?.length ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>附件</Typography.Text>
+            {selectedOrder.attachments.map((file) => (
+              <div key={file.id} className="orders-event-row">
+                <span>{file.file_name}</span>
+                <span>{(file.size_bytes / 1024).toFixed(1)} KB</span>
+                <span>{file.created_at ? file.created_at.slice(0, 10) : "-"}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {selectedOrder ? (
           <Space className="ui-form-spaced" wrap>
             <Dropdown
@@ -723,7 +816,11 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     />
                   )}
                 </Form.Item>
-                <Form.Item {...field} name={[field.name, "role"]} hidden><Input /></Form.Item>
+                <Form.Item {...field} name={[field.name, "role"]} label="角色">
+                  <AntSelect
+                    options={Object.entries(ALLOCATION_ROLE_LABEL).map(([value, label]) => ({ value, label }))}
+                  />
+                </Form.Item>
                 <Form.Item {...field} name={[field.name, "allocation_rate"]} label="比例" rules={[{ required: true, message: "请输入比例" }, ...percentRules("比例")]}><Input suffix="%" inputMode="decimal" /></Form.Item>
               </Space>
             ))}

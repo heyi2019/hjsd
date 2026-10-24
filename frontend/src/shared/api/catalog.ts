@@ -168,6 +168,105 @@ export interface Order {
   installment_periods?: number | null;
   installment_status?: string | null;
   events?: OrderEvent[];
+  links?: OrderLink[];
+  cashflows?: OrderCashflow[];
+  rebates?: OrderRebate[];
+  installment?: OrderInstallment | null;
+  installment_schedule?: OrderScheduleRow[];
+  audit?: OrderAuditEntry[];
+  attachments?: OrderAttachment[];
+}
+
+/** GET /orders/{id}（OrderDetailOut）返回的关联资金流水。 */
+export interface OrderCashflow {
+  flow_no: string;
+  pool_id: number;
+  occurred_on: string;
+  nature: string;
+  category: string;
+  direction: string;
+  amount: string;
+  status: string;
+  order_event_id?: number | null;
+  note?: string | null;
+  operator: string;
+}
+
+/** GET /orders/{id}（OrderDetailOut）返回的关联返点。 */
+export interface OrderRebate {
+  id: number;
+  rebate_no: string;
+  rebate_type: string;
+  channel?: string | null;
+  rate: string;
+  base_amount: string;
+  link_status: string;
+  status: string;
+  collected_on: string;
+  expected_on?: string | null;
+  note?: string | null;
+  created_at?: string;
+  operator: string;
+}
+
+/** GET /orders/{id}（OrderDetailOut）返回的分期合约摘要。 */
+export interface OrderInstallment {
+  id: number;
+  inst_no: string;
+  order_id: number;
+  contract_type: string;
+  principal: string;
+  down_payment: string;
+  service_fee: string;
+  periods: number;
+  per_period_service_fee: string;
+  per_period: string;
+  paid_amount: string;
+  waived_amount: string;
+  bad_debt_amount: string;
+  status: string;
+  delivery_mode?: string | null;
+  delivered_on?: string | null;
+  first_due_on?: string | null;
+  note?: string | null;
+}
+
+/** GET /orders/{id}（OrderDetailOut）返回的分期期次。 */
+export interface OrderScheduleRow {
+  id: number;
+  installment_id: number;
+  period_no: number;
+  due_on: string;
+  due_amount: string;
+  received_amount: string;
+  waived_amount: string;
+  status: string;
+}
+
+/** GET /orders/{id}（OrderDetailOut）返回的审计摘要。 */
+export interface OrderAuditEntry {
+  id: number;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  actor: string;
+  reason?: string | null;
+  request_id?: string | null;
+  occurred_at: string;
+}
+
+/** GET /orders/{id}（OrderDetailOut）返回的附件。 */
+export interface OrderAttachment {
+  id: number;
+  attachment_no: string;
+  entity_type: string;
+  entity_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  sha256: string;
+  deleted_at?: string | null;
+  created_at: string;
 }
 
 export interface OrderEvent {

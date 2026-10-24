@@ -52,6 +52,26 @@ const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   EXTERNAL_FUNDING: "外部资金",
   INTERNAL_TRANSFER: "内部调拨",
   REVERSAL: "冲销",
+  REFUND: "退款",
+};
+
+// 与 backend/app/finance/attributes.py 的 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE 保持一致：
+// 资金性质决定可用核算属性，非法组合后端直接 422，此处事前收窄避免误选。
+const ALLOWED_ATTRIBUTES_BY_FUND_NATURE: Record<string, string[]> = {
+  BUSINESS: [
+    "SELF_REVENUE",
+    "SELF_DIRECT_COST",
+    "TH_DIRECT_COST",
+    "TH_REVENUE",
+    "DFQ_PRINCIPAL",
+    "SERVICE_REVENUE",
+    "REBATE_INCOME",
+    "OPERATING_EXPENSE",
+    "REVERSAL",
+    "REFUND",
+  ],
+  EXTERNAL: ["DEPOSIT", "EXTERNAL_FUNDING", "REVERSAL"],
+  INTERNAL: ["INTERNAL_TRANSFER"],
 };
 
 export function FundsPage() {
@@ -87,6 +107,11 @@ export function FundsPage() {
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();
   const [cashflowForm] = Form.useForm();
+  const cashflowFundNature = Form.useWatch("fund_nature", cashflowForm) as string | undefined;
+  const cashflowAttributeOptions = (
+    ALLOWED_ATTRIBUTES_BY_FUND_NATURE[cashflowFundNature ?? "BUSINESS"]
+    ?? Object.keys(ACCOUNTING_ATTRIBUTE_LABEL)
+  ).map((value) => ({ value, label: ACCOUNTING_ATTRIBUTE_LABEL[value] ?? value }));
   const [transferForm] = Form.useForm();
   const [reconciliationForm] = Form.useForm();
   const [resolveForm] = Form.useForm();
@@ -785,8 +810,22 @@ export function FundsPage() {
           <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <Form.Item name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
           <Form.Item name="direction" label="收支方向" rules={[{ required: true }]}><Select options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} /></Form.Item>
-          <Form.Item name="fund_nature" label="资金性质" rules={[{ required: true }]}><Select options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>
-          <Form.Item name="accounting_attribute" label="核算属性" rules={[{ required: true }]}><Select options={Object.entries(ACCOUNTING_ATTRIBUTE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>
+          <Form.Item name="fund_nature" label="资金性质" rules={[{ required: true }]}>
+            <Select
+              options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))}
+              onChange={(value: string) => {
+                // 资金性质切换后，原核算属性可能不在白名单内，自动改选首个合法项
+                const allowed = ALLOWED_ATTRIBUTES_BY_FUND_NATURE[value] ?? [];
+                const current = cashflowForm.getFieldValue("accounting_attribute") as string | undefined;
+                if (current && !allowed.includes(current)) {
+                  cashflowForm.setFieldsValue({ accounting_attribute: allowed[0] });
+                }
+              }}
+            />
+          </Form.Item>
+          <Form.Item name="accounting_attribute" label="核算属性" rules={[{ required: true }]} help="可选范围由资金性质决定（与后端白名单一致）">
+            <Select options={cashflowAttributeOptions} />
+          </Form.Item>
           <Form.Item name="category" label="类别" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></Form.Item>
           <Form.Item name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></Form.Item>
@@ -839,6 +878,10 @@ export function FundsPage() {
       <Modal title="冲销资金流水" open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)} footer={null}>
         <InlineError error={write.error} />
           <Form form={reverseForm} layout="vertical" onFinish={reverseCashflow}>
+          <Typography.Paragraph type="secondary" className="ui-drawer-hint">
+            冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，
+            状态直接为「已审核」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
+          </Typography.Paragraph>
           <Form.Item name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>

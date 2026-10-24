@@ -67,7 +67,14 @@ export const OWNER_SCOPE_LABEL: Record<string, string> = {
 };
 
 export const ENTITY_TYPE_LABEL: Record<string, string> = {
+  order: "订单",
+  account: "账号",
   customer: "客户",
+  installment: "分期合约",
+  pool: "资金池",
+  cashflow: "资金流水",
+  lead: "需求",
+  counterparty: "合作方",
 };
 
 export const FIELD_TYPE_LABEL: Record<string, string> = {

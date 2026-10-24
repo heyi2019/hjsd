@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { today } from "../shared/lib/format";
+import { money, today } from "../shared/lib/format";
 import {
   DataTable,
   ErrorBanner,
@@ -56,6 +56,8 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [savingAccount, setSavingAccount] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
+  const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
+  const [voiding, setVoiding] = useState(false);
   const [installmentCancelTarget, setInstallmentCancelTarget] = useState<{ account: Account; installmentId: number; contractType: string } | null>(null);
   const [cancelAmount, setCancelAmount] = useState("");
   const [cancelReason, setCancelReason] = useState("");
@@ -122,6 +124,79 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
       }
     }
     return null;
+  }
+
+  /** 下架（VOID）走后端「全额冲销买入事件」路径：CANCEL offset=BUY 且全额消耗时账号转入 VOID
+   * （core/state_machine.py ACCOUNT_TRANSITIONS；orders/events.py _apply_account_effect）。 */
+  function findCancelableBuy(detail: AccountExecutionDetail) {
+    for (const order of [...detail.orders].reverse()) {
+      for (const event of [...order.events].reverse()) {
+        if (event.event_type !== "BUY") continue;
+        const cancelledAmount = order.events
+          .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
+          .reduce((sum, item) => sum + Number(item.amount), 0);
+        const remaining = Number(event.amount) - cancelledAmount;
+        if (remaining > 0) {
+          return {
+            orderId: order.order_id,
+            eventId: event.id,
+            amount: remaining.toFixed(2),
+            portion: event.portion,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function openVoid(account: Account) {
+    try {
+      const detail = executionDetails[account.id] ?? await accountsApi.executionDetail(account.id);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const buy = findCancelableBuy(detail);
+      if (!buy) {
+        message.warning("未找到可冲销的买入流水，无法下架");
+        return;
+      }
+      setVoidTarget({ account, ...buy });
+      setCancelReason("");
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
+  async function submitVoid() {
+    if (!voidTarget) return;
+    if (!cancelReason.trim()) {
+      message.error("请填写下架原因");
+      return;
+    }
+    setVoiding(true);
+    try {
+      await ordersApi.postEvent(voidTarget.orderId, {
+        event_type: "CANCEL",
+        amount: voidTarget.amount,
+        occurred_on: today(),
+        portion: voidTarget.portion,
+        offset_event_id: voidTarget.eventId,
+        reason: cancelReason.trim(),
+        note: "账号下架，冲销买入",
+      });
+      message.success("账号已下架");
+      const accountId = voidTarget.account.id;
+      setVoidTarget(null);
+      setCancelReason("");
+      setExecutionDetails((current) => {
+        const next = { ...current };
+        delete next[accountId];
+        return next;
+      });
+      await load();
+    } catch (cause) {
+      setError(normalizeError(cause));
+    } finally {
+      setVoiding(false);
+    }
   }
 
   async function openCancellation(account: Account) {
@@ -234,7 +309,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
 
   function handleMoreAction(key: string, row: Account) {
     if (key === "remove") {
-      message.info("下架请按来源订单执行下架流程");
+      void openVoid(row);
       return;
     }
     if (key === "cancel") {
@@ -342,10 +417,10 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
             type="link"
             size="small"
             aria-label="下架"
-            disabled={row.status === "SOLD"}
+            disabled={row.status === "SOLD" || row.status === "VOID"}
             onClick={(event) => {
               event.stopPropagation();
-              message.info("下架请按来源订单执行下架流程");
+              void openVoid(row);
             }}
           >
             下架
@@ -381,7 +456,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
               placement="bottomRight"
               menu={{
                 items: [
-                  { key: "remove", label: "下架", disabled: row.status === "SOLD" },
+                  { key: "remove", label: "下架", disabled: row.status === "SOLD" || row.status === "VOID" },
                   { key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true, disabled: !["SOLD", "INSTALLMENT"].includes(row.status) },
                   { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
                   { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
@@ -622,6 +697,27 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           <label>
             <span>退款原因</span>
             <Input.TextArea aria-label="取消原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入退款原因" />
+          </label>
+        </div> : null}
+      </Modal>
+      <Modal
+        title="下架登记"
+        open={Boolean(voidTarget)}
+        okText="确认下架"
+        cancelText="返回"
+        confirmLoading={voiding}
+        okButtonProps={{ danger: true }}
+        onOk={() => void submitVoid()}
+        onCancel={() => { if (!voiding) setVoidTarget(null); }}
+      >
+        {voidTarget ? <div className="ui-stack">
+          <p className="muted">
+            将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
+            下架不可撤销，历史轨迹保留。
+          </p>
+          <label>
+            <span>下架原因</span>
+            <Input.TextArea aria-label="下架原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入下架原因" />
           </label>
         </div> : null}
       </Modal>

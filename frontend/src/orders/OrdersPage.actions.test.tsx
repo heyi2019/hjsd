@@ -18,6 +18,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "orderSnapshot",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -228,6 +229,42 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(await screen.findByText("订单详情 · HS-2026-0001")).toBeInTheDocument();
   });
 
+  it("编辑订单：抽屉内打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
+    vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
+    await openLedger();
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
+    await screen.findByText("订单详情 · HS-2026-0001");
+    await ui.click(screen.getByRole("button", { name: /编辑订单/ }));
+    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
+    await ui.clear(within(modal).getByLabelText("成交日期"));
+    await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
+    await ui.type(within(modal).getByLabelText("备注"), "补登记");
+    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
+    await waitFor(() => expect(catalog.ordersApi.patch).toHaveBeenCalledWith(1, expect.objectContaining({
+      trade_date: "2026-10-05",
+      note: "补登记",
+    })));
+  });
+
+  it("订单详情：规则快照 found 时展示版本号与固化参数", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
+    vi.mocked(catalog.policyApi.orderSnapshot).mockResolvedValue({
+      found: true,
+      snapshot: {
+        policy_version_id: 7,
+        policy_snapshot: { REBATE: { policy_code: "REBATE", version: 2, config: { rate: "5" } } },
+      },
+    });
+    await openLedger();
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
+    await screen.findByText("订单详情 · HS-2026-0001");
+    expect(await screen.findByText("规则快照")).toBeInTheDocument();
+    expect(screen.getByText("#7")).toBeInTheDocument();
+    expect(screen.getByText("返点规则")).toBeInTheDocument();
+    expect(screen.getByText(/config=\{"rate":"5"\}/)).toBeInTheDocument();
+  });
+
   it("抽屉展示动作记录", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
@@ -237,7 +274,10 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
     await screen.findByText("订单详情 · HS-2026-0001");
     expect(screen.getByText("动作记录")).toBeInTheDocument();
-    expect(screen.getByText("张三")).toBeInTheDocument();
+    // 事件行展示编号、金额、日期+操作人（#36：明细字段不再只有动作/操作人/日期）。
+    expect(screen.getByText("EV-101")).toBeInTheDocument();
+    expect(screen.getByText("1,000.00")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-01 · 张三")).toBeInTheDocument();
   });
 
   it("抽屉点击去库存中心切换到库存 Tab 并关闭抽屉", async () => {
@@ -353,6 +393,36 @@ describe("OrdersPage：操作与筛选分支", () => {
       expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ event_type: "CANCEL", offset_event_id: 101 }),
+      )
+    );
+  });
+
+  it("取消交易：可改选被冲销动作并按剩余可做部分冲销", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...order1,
+      events: [
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "500.00", occurred_on: "2026-10-02", is_posted: true },
+      ],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "取消交易");
+    const modal = await modalOf(/取消交易 · HS-2026-0001/);
+    // 默认冲销最后一笔可冲销动作（SELL EV-102，剩余 500）
+    expect(within(modal).getByText("售出 · EV-102 · ¥500.00（剩余可冲 ¥500.00）")).toBeInTheDocument();
+    // 改选 BUY 动作后，冲销金额自动重置为该动作剩余可冲金额
+    fireEvent.mouseDown(within(modal).getByLabelText("被冲销动作"));
+    await ui.click(await within(document.body).findByText(/EV-101/, { selector: ".ant-select-item-option-content" }));
+    expect(within(modal).getByLabelText("冲销金额")).toHaveValue("1000.00");
+    // 部分冲销：300 < 剩余 1000
+    await ui.clear(within(modal).getByLabelText("冲销金额"));
+    await ui.type(within(modal).getByLabelText("冲销金额"), "300");
+    await ui.type(screen.getByLabelText("取消原因"), "部分冲销");
+    fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
+    await waitFor(() =>
+      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ event_type: "CANCEL", offset_event_id: 101, amount: "300" }),
       )
     );
   });

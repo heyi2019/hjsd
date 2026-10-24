@@ -122,10 +122,39 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     expect((await screen.findAllByText("账号图片")).length).toBeGreaterThan(0);
   });
 
-  it("更多菜单 → 下架：提示按来源订单执行", async () => {
+  it("更多菜单 → 下架：找到可冲销买入流水时打开下架登记弹窗", async () => {
+    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(noSaleDetail);
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "下架");
-    await waitFor(() => expect(message.info).toHaveBeenCalledWith("下架请按来源订单执行下架流程"));
+    await screen.findByText("下架登记");
+    expect(screen.getByLabelText("下架原因")).toBeInTheDocument();
+  });
+
+  it("更多菜单 → 下架：填原因后按买入流水发起全额 CANCEL 冲销", async () => {
+    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(noSaleDetail);
+    await openPanel([inStockRow]);
+    await clickMore(rowOf(1), "下架");
+    await screen.findByText("下架登记");
+    await ui.type(screen.getByLabelText("下架原因"), "账号被封");
+    await ui.click(screen.getByRole("button", { name: /确认下架/ }));
+    await waitFor(() =>
+      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+        55,
+        expect.objectContaining({
+          event_type: "CANCEL",
+          amount: "500.00",
+          offset_event_id: 900,
+          portion: "PRINCIPAL",
+          reason: "账号被封",
+        }),
+      ),
+    );
+  });
+
+  it("更多菜单 → 下架：没有可冲销买入流水时提示无法下架", async () => {
+    await openPanel([inStockRow]);
+    await clickMore(rowOf(1), "下架");
+    await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到可冲销的买入流水，无法下架"));
   });
 
   it("取消交易（SOLD 行）：无金额时拒绝提交", async () => {

@@ -66,6 +66,7 @@ function ContractTable({
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
+  const [resaleTarget, setResaleTarget] = useState<Installment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
   const [settleTarget, setSettleTarget] = useState<Installment | null>(null);
   const [defaultTarget, setDefaultTarget] = useState<Installment | null>(null);
@@ -78,6 +79,7 @@ function ContractTable({
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
+  const [resaleForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
   const [settleForm] = Form.useForm();
   const [defaultForm] = Form.useForm();
@@ -154,6 +156,21 @@ function ContractTable({
         message.success("逾期账号已登记回收");
         setRecoverTarget(null);
         recoverForm.resetFields();
+        await load();
+    });
+  };
+
+  const submitResale = async (values: Record<string, unknown>) => {
+    if (!resaleTarget) return;
+    await write.run(async () => {
+        await installmentsApi.resale(resaleTarget.id, {
+          resale_order_id: Number(values.resale_order_id),
+          occurred_on: values.occurred_on as string,
+          note: values.note as string,
+        });
+        message.success("已登记出售，原分期与出售订单的利润关联保留");
+        setResaleTarget(null);
+        resaleForm.resetFields();
         await load();
     });
   };
@@ -395,11 +412,21 @@ function ContractTable({
           >
             登记违约
           </PermissionButton>
-          {row.status === "CLOSED"
-            && (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
-            && !(dispositions[row.id] ?? []).some((item) => item.action === "RESELL") ? (
-              <Typography.Text type="secondary">请到库存中心售出，系统自动关联</Typography.Text>
-            ) : null}
+      {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)
+        && (dispositions[row.id] ?? []).some((item) => item.action === "RECOVER")
+        && !(dispositions[row.id] ?? []).some((item) => item.action === "RESELL") ? (
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            onClick={() => {
+              resaleForm.resetFields();
+              setResaleTarget(row);
+              resaleForm.setFieldsValue({ occurred_on: today() });
+            }}
+          >
+            登记出售
+          </PermissionButton>
+        ) : null}
         </Space>
       ),
     },
@@ -564,6 +591,43 @@ function ContractTable({
           </Form.Item>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
+          </PermissionButton>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={resaleTarget ? `登记出售 · ${resaleTarget.inst_no}` : "登记出售"}
+        open={Boolean(resaleTarget)}
+        onCancel={() => setResaleTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+          <Form form={resaleForm} layout="vertical" onFinish={submitResale}>
+          <Typography.Paragraph type="secondary">
+            回收账号转售登记：请先在库存中心售出该账号生成售出订单，再在此关联。
+            出售订单必须已登记 SELL 事件且关联同一账号，每个合约只能登记一次。
+          </Typography.Paragraph>
+          <Form.Item name="resale_order_id" label="出售订单" rules={[{ required: true, message: "请选择出售订单" }]}>
+            <Select
+              showSearch
+              placeholder="请选择售出订单"
+              optionFilterProp="label"
+              options={orders
+                .filter((item) => item.id !== resaleTarget?.order_id)
+                .map((item) => ({
+                  value: item.id,
+                  label: `${item.order_no}${item.party_name ? ` · ${item.party_name}` : ""}`,
+                }))}
+            />
+          </Form.Item>
+          <Form.Item name="occurred_on" label="出售日期" rules={[{ required: true }]}>
+            <Input placeholder="YYYY-MM-DD" />
+          </Form.Item>
+          <Form.Item name="note" label="出售说明" rules={[{ required: true }]}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+            确认登记
           </PermissionButton>
         </Form>
       </Modal>

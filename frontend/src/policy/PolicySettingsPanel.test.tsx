@@ -117,3 +117,33 @@ it("auditor 有 policy.approve 且（与后端一致）有 policy.manage：发�
   // 后端 ROLE_PERMISSIONS.auditor 含 policy.manage（core/security.py），前端对齐后端口径
   expect(screen.getByRole("button", { name: /新建版本/ })).toBeInTheDocument();
 });
+
+it("生效期自查：选编码与日期后调用 resolve 并展示命中版本", async () => {
+  vi.mocked(catalog.policyApi.resolve).mockResolvedValue({
+    found: true,
+    version: { id: 7, policy_definition_id: 1, version: 3, effective_from: "2026-01-01", effective_to: null, config: { rate: "5" }, status: "ACTIVE", approved_by: "admin", approved_at: null, note: null },
+  } as unknown as { found: boolean; version: import("../shared/api/catalog").PolicyVersion | null });
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("REBATE_RATE");
+  await ui.click(screen.getByRole("button", { name: /生效期自查/ }));
+  fireEvent.mouseDown(screen.getByLabelText("规则编码"));
+  await ui.click(await screen.findByText("REBATE 返点"));
+  await ui.click(screen.getByRole("button", { name: /解析/ }));
+  await waitFor(() => expect(vi.mocked(catalog.policyApi.resolve)).toHaveBeenCalledWith(
+    "REBATE",
+    expect.any(String),
+    { scope_type: "GLOBAL", scope_id: undefined },
+  ));
+  expect(await screen.findByText(/命中版本/)).toBeInTheDocument();
+  expect(screen.getByText("v3")).toBeInTheDocument();
+  expect(screen.getByText(/rate=5/)).toBeInTheDocument();
+});
+
+it("生效期自查：未命中时提示该日该作用域无生效版本", async () => {
+  vi.mocked(catalog.policyApi.resolve).mockResolvedValue({ found: false, version: null });
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("REBATE_RATE");
+  await ui.click(screen.getByRole("button", { name: /生效期自查/ }));
+  await ui.click(screen.getByRole("button", { name: /解析/ }));
+  expect(await screen.findByText(/没有生效的规则版本/)).toBeInTheDocument();
+});

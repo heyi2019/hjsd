@@ -69,6 +69,10 @@ const IMPORT_TEMPLATES: Record<string, { filename: string; content: string }> = 
     filename: "分期导入模板.csv",
     content: "合同日期,合同类型,本金,首付,期数,每期金额,已收金额,状态,备注\n2026-01-31,ADVANCE_PURCHASE,0.00,0.00,1,0.00,0.00,PENDING,",
   },
+  STANDARD_LEAD: {
+    filename: "需求导入模板.csv",
+    content: "客户ID,需求类型,预算,需求内容,负责人ID,备注\n1,FIND_ACCOUNT,0.00,求购指定账号,,",
+  },
 };
 
 function downloadImportTemplate(sourceKind: string) {
@@ -561,6 +565,7 @@ export function ImportWorkbench({
               { value: "STANDARD_ACCOUNT", label: "账号" },
               { value: "STANDARD_CASHFLOW", label: "资金流水" },
               { value: "STANDARD_INSTALLMENT", label: "分期" },
+              { value: "STANDARD_LEAD", label: "需求" },
             ]} />
           </Form.Item>
           <PermissionButton

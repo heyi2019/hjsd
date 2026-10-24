@@ -253,6 +253,18 @@ describe("ImportWorkbench：操作分支补充", () => {
     expect(message.success).toHaveBeenCalledWith("已导入 1 行数据");
   });
 
+  it("新建导入：数据类型可选「需求」（STANDARD_LEAD）并随批次提交", async () => {
+    await openWorkbench();
+    const fileInput = await openImportModal();
+    await fillImportBase("2026年10月需求");
+    fireEvent.mouseDown(screen.getByLabelText("数据类型"));
+    await ui.click(await screen.findByText("需求"));
+    await attachFile(fileInput, makeFile(["客户ID,需求内容\n1,求购账号\n"], "leads.csv", { type: "text/csv" }));
+    await ui.click(screen.getByRole("button", { name: /开始导入/ }));
+    await waitFor(() => expect(catalog.importsApi.createBatch).toHaveBeenCalled());
+    expect(vi.mocked(catalog.importsApi.createBatch).mock.calls[0][0].source_kind).toBe("STANDARD_LEAD");
+  });
+
   it("新建导入：上传 JSON 数组走 JSON 解析分支", async () => {
     await openWorkbench();
     const fileInput = await openImportModal();

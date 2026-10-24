@@ -13,6 +13,7 @@ import {
   type PolicyVersion,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
+import { useSession } from "../shared/state/session";
 import {
   DataTable,
   ErrorBanner,
@@ -56,9 +57,20 @@ type VersionFormValues = {
   note?: string;
 };
 
+type ResolveFormValues = {
+  policy_code: string;
+  on: string;
+  scope_type: string;
+  scope_id?: string;
+};
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function PolicySettingsPanel() {
+  const { can } = useSession();
+  // 后端读取门控为 policy.manage / policy.approve 任一（policy/router.py policy_read_access）；
+  // PermissionButton 只接受单权限码，故按当前用户实际持有的那个码门控（同 InstallmentsPanel settlePermission 先例）。
+  const resolvePermission = can("policy.manage") ? "policy.manage" : "policy.approve";
   const [definitions, setDefinitions] = useState<PolicyDefinition[]>([]);
   const [definitionId, setDefinitionId] = useState<number | null>(null);
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
@@ -68,9 +80,14 @@ export function PolicySettingsPanel() {
   const [definitionModalOpen, setDefinitionModalOpen] = useState(false);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<PolicyVersion | null>(null);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [resolveResult, setResolveResult] = useState<{ found: boolean; version: PolicyVersion | null } | null>(null);
   const [definitionForm] = Form.useForm<DefinitionFormValues>();
   const [versionForm] = Form.useForm<VersionFormValues>();
+  const [resolveForm] = Form.useForm<ResolveFormValues>();
   const definitionScopeType = Form.useWatch("scope_type", definitionForm);
+  const resolveScopeType = Form.useWatch("scope_type", resolveForm);
 
   const current = definitions.find((d) => d.id === definitionId) ?? null;
 
@@ -144,6 +161,26 @@ export function PolicySettingsPanel() {
       note: version?.note ?? undefined,
     });
     setVersionModalOpen(true);
+  };
+
+  /** 生效期自查（BAS-06-04 依据）：解析某日某作用域实际命中的规则版本，配置错不错一查便知。 */
+  const submitResolve = async (values: ResolveFormValues) => {
+    setResolving(true);
+    setError(null);
+    try {
+      setResolveResult(await policyApi.resolve(
+        values.policy_code,
+        values.on,
+        {
+          scope_type: values.scope_type || "GLOBAL",
+          scope_id: values.scope_type && values.scope_type !== "GLOBAL" && values.scope_id ? Number(values.scope_id) : undefined,
+        },
+      ));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setResolving(false);
+    }
   };
 
   const submitDefinition = async (values: DefinitionFormValues) => {
@@ -284,6 +321,20 @@ export function PolicySettingsPanel() {
                 新建版本
               </PermissionButton>
             ) : null}
+            {can("policy.manage") || can("policy.approve") ? (
+              <PermissionButton
+                permission={resolvePermission}
+                loading={resolving}
+                onClick={() => {
+                  resolveForm.resetFields();
+                  resolveForm.setFieldsValue({ policy_code: current?.policy_code, on: today(), scope_type: "GLOBAL" });
+                  setResolveResult(null);
+                  setResolveOpen(true);
+                }}
+              >
+                生效期自查
+              </PermissionButton>
+            ) : null}
           </Space>
         }
       />
@@ -419,6 +470,47 @@ export function PolicySettingsPanel() {
             <Input.TextArea rows={2} placeholder="可选，说明本次版本变更" />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal
+        open={resolveOpen}
+        title="规则生效期自查"
+        okText="解析"
+        cancelText="取消"
+        confirmLoading={resolving}
+        onCancel={() => setResolveOpen(false)}
+        onOk={() => void resolveForm.submit()}
+      >
+        <Form form={resolveForm} layout="vertical" onFinish={submitResolve}>
+          <Typography.Paragraph type="secondary">
+            解析某个日期实际命中的规则版本——发布只影响生效日之后的新单，历史订单按建单时固化的快照计算，不随改版变化。
+          </Typography.Paragraph>
+          <Form.Item name="policy_code" label="规则编码" rules={[{ required: true, message: "请选择规则编码" }]}>
+            <Select options={POLICY_CODE_OPTIONS} placeholder="选择规则编码" />
+          </Form.Item>
+          <Form.Item name="on" label="生效日期" rules={[{ required: true, message: "请选择生效日期" }]}>
+            <Input type="date" />
+          </Form.Item>
+          <Form.Item name="scope_type" label="适用范围" initialValue="GLOBAL" rules={[{ required: true, message: "请选择适用范围" }]}>
+            <Select options={SCOPE_OPTIONS} />
+          </Form.Item>
+          <Form.Item
+            name="scope_id"
+            label="范围 ID"
+            rules={resolveScopeType && resolveScopeType !== "GLOBAL" ? [{ required: true, message: "请输入范围 ID" }] : []}
+          >
+            <Input type="number" min={1} placeholder="按人员、业务类型或资金池时填写" />
+          </Form.Item>
+        </Form>
+        {resolveResult ? (
+          resolveResult.found && resolveResult.version ? (
+            <Typography.Paragraph>
+              命中版本 <b>v{resolveResult.version.version}</b>（{resolveResult.version.effective_from} ~ {resolveResult.version.effective_to ?? "至今"}，
+              状态 {resolveResult.version.status}）：{Object.entries(resolveResult.version.config).map(([key, value]) => `${key}=${String(value)}`).join(" · ")}
+            </Typography.Paragraph>
+          ) : (
+            <Typography.Paragraph type="warning">该日该作用域没有生效的规则版本，新单不会套用此规则。</Typography.Paragraph>
+          )
+        ) : null}
       </Modal>
     </section>
   );

@@ -40,6 +40,9 @@ const order = {
   status: "ACTIVE",
 };
 
+/** 回收转售的出售订单：必须是新的售出订单（不能是分期来源单本身，后端强制）。 */
+const resaleOrder = { ...order, id: 20, order_no: "HS-2026-0020", party_name: "李四" };
+
 let ui: ReturnType<typeof userEvent.setup>;
 let successSpy: ReturnType<typeof vi.spyOn>;
 let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -228,7 +231,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     );
   });
 
-  it("CLOSED 且已有回收记录 → 行内提示到库存中心售出", async () => {
+  it("CLOSED 且已有回收记录 → 行内提供登记出售入口", async () => {
     vi.mocked(catalog.installmentsApi.list).mockResolvedValueOnce([
       { ...baseInstallment, status: "CLOSED" },
     ]);
@@ -237,7 +240,35 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     ]);
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
-    expect(await screen.findByText(/请到库存中心售出，系统自动关联/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /登记出售/ })).toBeInTheDocument();
+  });
+
+  it("登记出售：选择出售订单并填写后调用 resale 关联", async () => {
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValueOnce([
+      { ...baseInstallment, status: "CLOSED" },
+    ]);
+    vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValueOnce([
+      { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+    ]);
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([order, resaleOrder]);
+    vi.mocked(catalog.installmentsApi.resale).mockResolvedValue({
+      id: 2, installment_id: 1, account_id: 2, action: "RESELL", occurred_on: "2026-10-20", related_order_id: 20, note: "转售",
+    } as never);
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    await ui.click(await screen.findByRole("button", { name: /登记出售/ }));
+    const modal = openModal("登记出售");
+    await ui.click(within(modal).getByRole("combobox", { name: /出售订单/ }));
+    await ui.click(await within(document.body).findByText("HS-2026-0020 · 李四", { selector: ".ant-select-item-option-content" }));
+    await ui.clear(within(modal).getByLabelText("出售日期"));
+    await ui.type(within(modal).getByLabelText("出售日期"), "2026-10-20");
+    await ui.type(within(modal).getByLabelText("出售说明"), "转售给下家");
+    await ui.click(within(modal).getByRole("button", { name: /确认登记/ }));
+    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.resale)).toHaveBeenCalledWith(
+      1,
+      { resale_order_id: 20, occurred_on: "2026-10-20", note: "转售给下家" },
+    ));
+    expect(successSpy).toHaveBeenCalledWith("已登记出售，原分期与出售订单的利润关联保留");
   });
 
   it("收款提交失败 → Modal 内 InlineError 展示错误", async () => {

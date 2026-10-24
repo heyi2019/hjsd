@@ -175,6 +175,20 @@ export interface Order {
   installment_schedule?: OrderScheduleRow[];
   audit?: OrderAuditEntry[];
   attachments?: OrderAttachment[];
+  /** DFQ 建单时的账号文本快照（无 order.create 权限时 game_password 被后端置空）。 */
+  account_snapshot?: {
+    game_account: string;
+    game_type?: string | null;
+    game_password?: string | null;
+    channel_region?: string | null;
+    bound_phone?: string | null;
+    has_secondary?: boolean | null;
+    platform?: string | null;
+    purchase_price?: string | null;
+    note?: string | null;
+  } | null;
+  /** 关联完整性：NORMAL / ORPHAN / UNLINKED_TRANSFER（后端 orders/schemas.py）。 */
+  link_status?: string;
 }
 
 /** GET /orders/{id}（OrderDetailOut）返回的关联资金流水。 */
@@ -277,8 +291,13 @@ export interface OrderEvent {
   amount: string;
   occurred_on: string;
   pool_id?: number | null;
+  portion?: string;
   delivery_mode?: string | null;
+  offset_event_id?: number | null;
+  reason?: string | null;
+  refund_responsibility?: string | null;
   is_posted: boolean;
+  posted_at?: string | null;
   operator?: string;
 }
 
@@ -777,6 +796,25 @@ export const ordersApi = {
       note?: string;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
+  /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
+  patch: (
+    orderId: number,
+    payload: {
+      trade_date?: string;
+      note?: string | null;
+      account_snapshot?: {
+        game_account: string;
+        game_type?: string | null;
+        game_password?: string | null;
+        channel_region?: string | null;
+        bound_phone?: string | null;
+        has_secondary?: boolean | null;
+        platform?: string | null;
+        purchase_price?: string | null;
+        note?: string | null;
+      } | null;
+    },
+  ) => api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
 };
 
 export interface EmployeeOption { id: number; username: string; display_name: string; is_active: boolean }
@@ -802,7 +840,7 @@ export const accountsApi = {
 export const installmentsApi = {
   dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),
   recover: (id: number, data: {occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
-  sale: (id: number, data: {sale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, {resale_order_id: data.sale_order_id, occurred_on: data.occurred_on, note: data.note}).then(r => r.data),
+  /** 回收转售登记：把已回收账号的新售出订单关联回分期合约（后端只认 resale_order_id）。 */
   resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
@@ -1240,10 +1278,10 @@ export const policyApi = {
     api.patch<PolicyVersion>(`/policy-versions/${versionId}`, { config }).then((r) => r.data),
   approve: (versionId: number, payload: { approver?: string; note?: string }) =>
     api.post<PolicyVersion>(`/policy-versions/${versionId}/approve`, payload).then((r) => r.data),
-  resolve: (policyCode: string, on: string) =>
+  resolve: (policyCode: string, on: string, scope?: { scope_type?: string; scope_id?: number }) =>
     api
       .get<{ found: boolean; version: PolicyVersion | null }>("/policy-versions/resolve", {
-        params: { policy_code: policyCode, on },
+        params: { policy_code: policyCode, on, scope_type: scope?.scope_type, scope_id: scope?.scope_id },
       })
       .then((r) => r.data),
   allocations: (orderId: number) =>

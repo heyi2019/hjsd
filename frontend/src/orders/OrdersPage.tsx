@@ -113,6 +113,26 @@ const SCHEDULE_STATUS_LABEL: Record<string, string> = {
   WAIVED: "已减免",
 };
 
+// 与 backend/app/domain/enums.py Portion / DeliveryMode 一致
+const EVENT_PORTION_LABEL: Record<string, string> = {
+  PRINCIPAL: "本金",
+  PROFIT: "利润",
+  GROSS: "总额",
+};
+
+const DELIVERY_MODE_LABEL: Record<string, string> = {
+  PLATFORM_OPERATOR: "平台/本方操作换绑",
+  CUSTOMER_SELF: "客户自行换绑",
+};
+
+const REFUND_RESPONSIBILITY_LABEL: Record<string, string> = {
+  COMPANY: "公司",
+  CUSTOMER: "客户",
+  CONSIGNOR: "寄售方",
+  PLATFORM: "平台",
+  OTHER: "其他",
+};
+
 function formatOrderAmount(order: Order): string {
   if (order.installment_principal) {
     return `¥${order.installment_paid ?? "0.00"}/${order.installment_principal} · ${order.installment_periods ?? 0}期`;
@@ -184,6 +204,11 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [linkForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editForm] = Form.useForm();
+  const [orderSnapshot, setOrderSnapshot] = useState<{ found: boolean; snapshot: { policy_version_id?: number | null; policy_snapshot?: Record<string, unknown> | null } | null } | null>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -241,9 +266,36 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       setSelectedOrder(await ordersApi.get(order.id));
       // 关联单失败不阻断详情展示。
       setLinks(await ordersApi.links(order.id).catch(() => []));
+      // 规则快照（BAS-06-04）：无权查看时静默降级为 null，不阻断详情展示。
+      setSnapshotLoading(true);
+      try {
+        setOrderSnapshot(await policyApi.orderSnapshot(order.id));
+      } catch {
+        setOrderSnapshot(null);
+      } finally {
+        setSnapshotLoading(false);
+      }
     } catch (error) {
       message.error(normalizeError(error).message);
     }
+  };
+
+  /** 可冲销动作：已过账的 BUY/COST/SELL，按剩余可冲金额过滤（后端支持部分冲销）。 */
+  const reversibleEvents = (order: Order | null) => {
+    const posted = (order?.events ?? []).filter((event) => event.is_posted);
+    const cancelled = new Map<number, number>();
+    for (const event of posted) {
+      if (event.event_type !== "CANCEL" || event.offset_event_id == null) continue;
+      cancelled.set(event.offset_event_id, (cancelled.get(event.offset_event_id) ?? 0) + Number(event.amount || 0));
+    }
+    return posted
+      .filter((event) => ["BUY", "COST", "SELL"].includes(event.event_type))
+      .map((event) => {
+        const remaining = Number(event.amount || 0) - (cancelled.get(event.id) ?? 0);
+        return { event, remaining };
+      })
+      .filter((item) => item.remaining > 0)
+      .reverse();
   };
 
   const submitLink = async (values: Record<string, unknown>) => {
@@ -284,6 +336,13 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       } else {
         setCancelOrderTarget(order);
         setCancelInstallmentTarget(null);
+        // 默认冲销最后一笔可冲销动作（与历史行为一致），用户可在弹窗内改选其他动作或部分冲销。
+        const reversible = reversibleEvents(order);
+        const first = reversible[0];
+        cancelForm.setFieldsValue({
+          offset_event_id: first?.event.id,
+          cancel_amount: first ? first.remaining.toFixed(2) : undefined,
+        });
       }
       cancelForm.setFieldsValue({ cancelled_on: today() });
     } catch (error) {
@@ -297,7 +356,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     cancelForm.resetFields();
   };
 
-  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string }) => {
+  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; cancel_amount?: string }) => {
     const installment = cancelInstallmentTarget;
     const order = cancelOrderTarget;
     if (!installment && !order) return;
@@ -316,16 +375,23 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         if (result.order_status === "CANCELLED") await load();
       } else {
         if (!order) return;
-        const postedEvents = (order.events ?? []).filter((event) => event.is_posted);
-        const reversible = [...postedEvents]
-          .reverse()
-          .find((event) => ["BUY", "COST", "SELL"].includes(event.event_type));
-        if (reversible) {
+        const reversible = reversibleEvents(order);
+        const selected = reversible.find((item) => item.event.id === Number(values.offset_event_id)) ?? reversible[0];
+        if (selected) {
+          const amount = (values.cancel_amount ?? "").trim() || selected.remaining.toFixed(2);
+          if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+            message.error("请输入有效的冲销金额");
+            return;
+          }
+          if (Number(amount) > selected.remaining + 1e-9) {
+            message.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining.toFixed(2)}`);
+            return;
+          }
           const result = await ordersApi.postEvent(order.id, {
             event_type: "CANCEL",
-            amount: reversible.amount,
+            amount,
             occurred_on: values.cancelled_on,
-            offset_event_id: reversible.id,
+            offset_event_id: selected.event.id,
             reason: values.reason,
             note: "取消交易原路退款",
           });
@@ -345,12 +411,69 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     }
   };
 
+  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅 DFQ 可维护，
+   *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
+  const openEditOrder = () => {
+    if (!selectedOrder) return;
+    const snapshot = selectedOrder.account_snapshot;
+    editForm.setFieldsValue({
+      trade_date: selectedOrder.trade_date,
+      note: selectedOrder.note ?? undefined,
+      snap_game_account: snapshot?.game_account,
+      snap_game_type: snapshot?.game_type ?? undefined,
+      snap_game_password: snapshot?.game_password ?? undefined,
+      snap_channel_region: snapshot?.channel_region ?? undefined,
+      snap_bound_phone: snapshot?.bound_phone ?? undefined,
+      snap_platform: snapshot?.platform ?? undefined,
+      snap_purchase_price: snapshot?.purchase_price ?? undefined,
+      snap_note: snapshot?.note ?? undefined,
+    });
+    setEditOpen(true);
+  };
+
+  const submitEditOrder = async (values: Record<string, unknown>) => {
+    if (!selectedOrder) return;
+    // 后端规则：已有登记事件的订单只能改备注（核算字段必须走冲销/更正）。
+    const orderHasPosted = (selectedOrder.events ?? []).some((event) => event.is_posted);
+    setEditSubmitting(true);
+    try {
+      const payload: Parameters<typeof ordersApi.patch>[1] = {};
+      if (!orderHasPosted) payload.trade_date = values.trade_date as string;
+      payload.note = (values.note as string | undefined)?.trim() ? (values.note as string).trim() : null;
+      const snapshot = selectedOrder.account_snapshot;
+      // 仅当快照密码可见（持有 order.create）时才允许整体回写，防止把隐藏密码覆盖为空。
+      if (!orderHasPosted && snapshot && snapshot.game_password) {
+        payload.account_snapshot = {
+          game_account: (values.snap_game_account as string) ?? snapshot.game_account,
+          game_type: (values.snap_game_type as string) || null,
+          game_password: (values.snap_game_password as string) || null,
+          channel_region: (values.snap_channel_region as string) || null,
+          bound_phone: (values.snap_bound_phone as string) || null,
+          platform: (values.snap_platform as string) || null,
+          purchase_price: (values.snap_purchase_price as string) || null,
+          note: (values.snap_note as string) || null,
+        };
+      }
+      await ordersApi.patch(selectedOrder.id, payload);
+      message.success("订单已更新");
+      setEditOpen(false);
+      setSelectedOrder(await ordersApi.get(selectedOrder.id));
+      await load();
+    } catch (error) {
+      message.error(normalizeError(error).message);
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     void load();
   }, [load]);
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword);
+  // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
+  const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
     initialTab === "inventory" ? "inventory" : DEFAULT_BUSINESS_CENTER_TAB,
   );
@@ -532,9 +655,26 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             <Typography.Text strong>动作记录</Typography.Text>
             {selectedOrder.events.map((event) => (
               <div key={event.id} className="orders-event-row">
-                <span>{executionActionLabel(event.event_type, selectedOrder.order_type)}</span>
-                <span>{event.operator || "-"}</span>
-                <span>{event.occurred_on}</span>
+                <span>
+                  <b>{executionActionLabel(event.event_type, selectedOrder.order_type)}</b>
+                  {` ${event.event_no}`}
+                  {event.offset_event_id ? ` · 冲销 #${event.offset_event_id}` : ""}
+                </span>
+                <span>
+                  <MoneyText value={event.amount} />
+                  {" · "}{EVENT_PORTION_LABEL[event.portion ?? ""] ?? event.portion ?? "本金"}
+                  {event.is_posted ? "" : " · 未过账"}
+                </span>
+                <span>{event.occurred_on} · {event.operator || "-"}</span>
+                {event.reason || event.refund_responsibility || event.delivery_mode ? (
+                  <span className="muted">
+                    {[
+                      event.delivery_mode ? `交付 ${DELIVERY_MODE_LABEL[event.delivery_mode] ?? event.delivery_mode}` : "",
+                      event.refund_responsibility ? `责任方 ${REFUND_RESPONSIBILITY_LABEL[event.refund_responsibility] ?? event.refund_responsibility}` : "",
+                      event.reason,
+                    ].filter(Boolean).join(" · ")}
+                  </span>
+                ) : null}
               </div>
             ))}
           </div>
@@ -570,6 +710,37 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               ))
             ) : (
               <Typography.Text type="secondary">暂无关联订单</Typography.Text>
+            )}
+          </div>
+        ) : null}
+        {selectedOrder ? (
+          <div className="ui-form-spaced">
+            <Typography.Text strong>规则快照</Typography.Text>
+            {snapshotLoading ? (
+              <Typography.Text type="secondary">读取中…</Typography.Text>
+            ) : orderSnapshot?.found && orderSnapshot.snapshot ? (
+              <>
+                <div className="orders-event-row">
+                  <span>规则版本</span>
+                  <span>#{orderSnapshot.snapshot.policy_version_id ?? "-"}</span>
+                </div>
+                {Object.entries(orderSnapshot.snapshot.policy_snapshot ?? {}).map(([code, snap]) => (
+                  <div key={code} className="orders-event-row">
+                    <span>{code === "REBATE" ? "返点规则" : code === "COMMISSION" ? "提成规则" : code}</span>
+                    <span className="muted">
+                      {typeof snap === "object" && snap !== null
+                        ? Object.entries(snap as Record<string, unknown>)
+                            .filter(([key]) => key !== "captured_at")
+                            .map(([key, value]) => `${key}=${typeof value === "object" && value !== null ? JSON.stringify(value) : String(value)}`)
+                            .join(" · ")
+                        : String(snap)}
+                    </span>
+                  </div>
+                ))}
+                <Typography.Text type="secondary">快照按成交日固化，规则改版不会回写历史订单。</Typography.Text>
+              </>
+            ) : (
+              <Typography.Text type="secondary">建单时无生效的返点/提成规则，未固化规则快照。</Typography.Text>
             )}
           </div>
         ) : null}
@@ -650,6 +821,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         ) : null}
         {selectedOrder ? (
           <Space className="ui-form-spaced" wrap>
+            <PermissionButton permission="order.update" onClick={openEditOrder}>编辑订单</PermissionButton>
             <Dropdown
               trigger={["click"]}
               menu={{
@@ -698,14 +870,79 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 : cancelInstallmentTarget.contract_type === "ADVANCE_PURCHASE"
                   ? "按已收款原资金池退款，取消后终止代分期交易。"
                   : "按已收款原资金池退款，取消后账号回到库存。"
-              : "有已登记动作时冲销最后一笔可冲销动作并按原资金池退款；没有登记款项时仅取消交易。"}
+              : "默认冲销最后一笔可冲销动作并按原资金池退款；也可指定其他动作，或填写小于剩余可冲金额做部分冲销。没有登记款项时仅取消交易。"}
           </Typography.Paragraph>
+          {cancelOrderTarget && reversibleEvents(cancelOrderTarget).length > 0 ? (
+            <>
+              <Form.Item name="offset_event_id" label="被冲销动作" rules={[{ required: true, message: "请选择被冲销动作" }]}>
+                <AntSelect
+                  placeholder="请选择被冲销动作"
+                  options={reversibleEvents(cancelOrderTarget).map(({ event, remaining }) => ({
+                    value: event.id,
+                    label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining.toFixed(2))}）`,
+                  }))}
+                  onChange={(value: number) => {
+                    const target = reversibleEvents(cancelOrderTarget).find((item) => item.event.id === value);
+                    if (target) cancelForm.setFieldsValue({ cancel_amount: target.remaining.toFixed(2) });
+                  }}
+                />
+              </Form.Item>
+              <Form.Item name="cancel_amount" label="冲销金额" rules={requiredMoneyRules("冲销金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
+                <MoneyInput placeholder="请输入冲销金额" />
+              </Form.Item>
+            </>
+          ) : null}
           <Form.Item name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={selectedOrder ? `编辑订单 · ${selectedOrder.order_no}` : "编辑订单"}
+        open={editOpen}
+        confirmLoading={editSubmitting}
+        onCancel={() => { if (!editSubmitting) setEditOpen(false); }}
+        okText="保存修改"
+        onOk={() => void editForm.submit()}
+      >
+        <Form form={editForm} layout="vertical" onFinish={submitEditOrder}>
+          <Typography.Paragraph type="secondary">
+            订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
+          </Typography.Paragraph>
+          <Form.Item
+            name="trade_date"
+            label="成交日期"
+            rules={orderHasPostedEvents ? [] : [{ required: true, message: "请输入成交日期" }]}
+            extra={orderHasPostedEvents ? "已有登记事件，成交日期不可修改" : undefined}
+          >
+            <Input placeholder="YYYY-MM-DD" disabled={orderHasPostedEvents} />
+          </Form.Item>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea rows={2} placeholder="订单备注（选填）" />
+          </Form.Item>
+          {selectedOrder?.account_snapshot && selectedOrder.order_type === "DFQ" && !orderHasPostedEvents ? (
+            selectedOrder.account_snapshot.game_password ? (
+              <>
+                <Typography.Paragraph type="secondary">账号快照（代分期建单时填写的文本信息）：</Typography.Paragraph>
+                <Form.Item name="snap_game_account" label="账号标识" rules={[{ required: true, message: "请输入账号标识" }]}>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="snap_game_type" label="产品"><Input /></Form.Item>
+                <Form.Item name="snap_game_password" label="账号密码"><Input placeholder="留空表示清除密码" /></Form.Item>
+                <Form.Item name="snap_channel_region" label="区服"><Input /></Form.Item>
+                <Form.Item name="snap_bound_phone" label="绑定手机"><Input /></Form.Item>
+                <Form.Item name="snap_platform" label="平台"><Input /></Form.Item>
+                <Form.Item name="snap_purchase_price" label="号价"><Input inputMode="decimal" placeholder="例如 1000.00" /></Form.Item>
+                <Form.Item name="snap_note" label="快照备注"><Input.TextArea rows={2} /></Form.Item>
+              </>
+            ) : (
+              <Typography.Paragraph type="secondary">账号快照密码字段无权查看，为避免覆盖隐藏信息，快照暂不可编辑；如需修改请联系有订单创建权限的人员。</Typography.Paragraph>
+            )
+          ) : null}
         </Form>
       </Modal>
 

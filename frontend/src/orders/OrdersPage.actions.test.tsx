@@ -204,6 +204,18 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(screen.getAllByText("DG-2026-0002").length).toBeGreaterThan(0);
   });
 
+  it("关联筛选：选择孤儿单后仅保留 link_status=ORPHAN 的订单", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      { ...order1, link_status: "ORPHAN" },
+      { ...order2, link_status: "LINKED" },
+    ]);
+    await openLedger();
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "关联状态筛选" }));
+    await ui.click(await screen.findByText("孤儿单", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(screen.queryByText("DG-2026-0002")).toBeNull());
+    expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThan(0);
+  });
+
   it("切换 Tab 到分期与回款/库存中心", async () => {
     await openLedger();
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));

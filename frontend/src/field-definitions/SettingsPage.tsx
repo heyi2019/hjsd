@@ -12,6 +12,7 @@ import { FieldsPanel } from "./panels/FieldsPanel";
 import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
 import { OrderTypesPanel } from "./panels/OrderTypesPanel";
 import { PoolsPanel } from "./panels/PoolsPanel";
+import { SequencesPanel } from "./panels/SequencesPanel";
 
 export function SettingsPage() {
   const { can } = useSession();
@@ -32,6 +33,8 @@ export function SettingsPage() {
   const items = [
     { key: "business-dictionary", label: "业务字典", render: () => <BusinessDictionaryPanel /> },
     { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
+    // 编号序列与业务类型同源（sequence_prefix），读取门控与后端 manage_order_types 一致。
+    ...(can("order-type.manage") ? [{ key: "sequences", label: "编号序列", render: () => <SequencesPanel /> }] : []),
     { key: "pools", label: "资金池", render: () => <PoolsPanel /> },
     { key: "fields", label: "活字段", render: () => <FieldsPanel /> },
     { key: "game-types", label: "游戏类型", render: () => <GameTypeSettingsPanel /> },

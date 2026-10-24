@@ -13,7 +13,7 @@ import {
   type OrderType,
 } from "../shared/api/catalog";
 import { api, normalizeError } from "../shared/api/client";
-import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, CAPITAL_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { requiredMoneyRules, percentRules } from "../shared/lib/validators";
 import { InventoryPanel } from "../accounts/InventoryPanel";
@@ -161,18 +161,22 @@ function filterBusinessOrders(
   type: BusinessFilterKey,
   mode: BusinessModeFilterKey,
   keyword: string,
+  link: string,
 ): Order[] {
   const normalizedKeyword = keyword.trim().toLowerCase();
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
+    && (link === "all" || (order.link_status ?? "LINKED") === link)
     && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
   ));
 }
 
-function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey): number {
+function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey, link: string): number {
   return orders.filter((order) => (
-    (type === "all" || order.order_type === type) && orderMatchesBusinessMode(order, mode)
+    (type === "all" || order.order_type === type)
+    && orderMatchesBusinessMode(order, mode)
+    && (link === "all" || (order.link_status ?? "LINKED") === link)
   )).length;
 }
 
@@ -185,6 +189,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [pageSize, setPageSize] = useState(10);
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
+  const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -471,7 +476,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   }, [load]);
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword);
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter);
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
   const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
@@ -489,6 +494,13 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     { title: "库存状态", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    {
+      title: "关联",
+      dataIndex: "link_status",
+      render: (v: string | undefined) => (
+        <StatusTag status={v ?? "LINKED"} label={LINK_STATUS_LABEL[v ?? "LINKED"] ?? v} />
+      ),
+    },
     { title: "日期", dataIndex: "trade_date" },
     {
       title: "操作",
@@ -572,8 +584,8 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     options={BUSINESS_FILTERS.map((item) => ({
                       value: item.key,
                       label: `${item.label} ${item.key === "all"
-                        ? countBusinessOrders(orders, "all", businessModeFilter)
-                        : countBusinessOrders(orders, item.key, businessModeFilter)}`,
+                        ? countBusinessOrders(orders, "all", businessModeFilter, linkStatusFilter)
+                        : countBusinessOrders(orders, item.key, businessModeFilter, linkStatusFilter)}`,
                     }))}
                     onChange={(value) => {
                       setOrderTypeFilter(value as BusinessFilterKey);
@@ -589,6 +601,20 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     }))}
                     onChange={(value) => {
                       setBusinessModeFilter(value as BusinessModeFilterKey);
+                      setPage(1);
+                    }}
+                  />
+                  <Typography.Text strong>关联筛选</Typography.Text>
+                  <AntSelect
+                    aria-label="关联状态筛选"
+                    className="ui-filter-select"
+                    value={linkStatusFilter}
+                    options={[
+                      { value: "all", label: "全部关联状态" },
+                      ...Object.entries(LINK_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+                    ]}
+                    onChange={(value) => {
+                      setLinkStatusFilter(value);
                       setPage(1);
                     }}
                   />
@@ -646,6 +672,8 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             <Descriptions.Item label="金额/进度">{selectedOrder.installment_principal ? `¥${selectedOrder.installment_paid ?? "0.00"}/${selectedOrder.installment_principal} · ${selectedOrder.installment_periods ?? 0}期` : selectedOrder.event_total ? `¥${selectedOrder.event_total}` : "-"}</Descriptions.Item>
             <Descriptions.Item label="最新动作">{selectedOrder.last_event_type ? `${executionActionLabel(selectedOrder.last_event_type, selectedOrder.order_type)}${selectedOrder.last_event_amount ? ` · ¥${selectedOrder.last_event_amount}` : ""}` : "-"}</Descriptions.Item>
             <Descriptions.Item label="状态"><StatusTag status={selectedOrder.status} /></Descriptions.Item>
+            <Descriptions.Item label="资金性质">{CAPITAL_TYPE_LABEL[selectedOrder.capital_type] || selectedOrder.capital_type || "-"}</Descriptions.Item>
+            <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={LINK_STATUS_LABEL[selectedOrder.link_status ?? "LINKED"] ?? selectedOrder.link_status} /></Descriptions.Item>
             <Descriptions.Item label="成交日">{selectedOrder.trade_date || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>
           </Descriptions>

@@ -1,5 +1,5 @@
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
-import { Form, Modal, Space, message } from "antd";
+import { Form, Modal, Select as AntSelect, Space, message } from "antd";
 import { useEffect, useState } from "react";
 import {
   counterpartiesApi,
@@ -14,6 +14,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
+import { CAPITAL_TYPE_LABEL } from "../shared/lib/labels";
 import { ErrorBanner, PermissionButton, ResizableModal } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
@@ -155,6 +156,7 @@ export function CreateBusinessModal(props: {
         const order = await ordersApi.create({
           order_type: "DFQ",
           trade_date: today(),
+          capital_type: values.capital_type as string | undefined,
           note: values.dfq_note as string,
           account_snapshot: {
             game_type: values.dfq_game_type as string,
@@ -274,6 +276,7 @@ export function CreateBusinessModal(props: {
       await ordersApi.create({
         order_type: props.initialOrderType,
         trade_date: today(),
+        capital_type: values.capital_type as string | undefined,
         account_snapshot: undefined,
         account_id: undefined,
         note,
@@ -393,6 +396,17 @@ export function CreateBusinessModal(props: {
             <span>产品：业务单内联登记</span>
           </Space>
         ) : null}
+        <Form.Item
+          name="capital_type"
+          label="资金性质"
+          extra="默认跟随业务类型定义；仅特殊单需要按单覆盖时选择（V34）"
+        >
+          <AntSelect
+            allowClear
+            placeholder="跟随业务定义"
+            options={Object.entries(CAPITAL_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+          />
+        </Form.Item>
         {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
           <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
         </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}

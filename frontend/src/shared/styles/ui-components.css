@@ -1081,6 +1081,9 @@
   gap: var(--space-2);
 }
 
+/* 筛选栏内的枚举下拉：按语义宽度收敛，避免被 flex 拉满或缩成选项宽度。 */
+.ui-filter-select { width: var(--col-w-160); }
+
 /* 资金流水筛选项较多：桌面端按语义宽度收敛，避免每个字段被 flex 拉满；窄屏再自然堆叠。 */
 .funds-cashflow-filters {
   display: flex;

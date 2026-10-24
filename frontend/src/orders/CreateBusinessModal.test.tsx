@@ -101,6 +101,28 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
   });
 
+it("资金性质按单覆盖：显式选择后随创建 payload 提交（#41）", async () => {
+    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 9, order_no: "HS-2026-0009", status: "ACTIVE" });
+    await openModal();
+    await ui.click(screen.getByLabelText("资金性质").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+    await ui.click(await screen.findByText("零本金型", { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
+    await ui.type(screen.getByLabelText("客户昵称"), "张三");
+    await ui.click(screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+    await ui.click(await screen.findByText("闲鱼", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByLabelText("付款资金账户").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.order_type).toBe("HS");
+    expect(payload.capital_type).toBe("ZERO");
+  });
+
 it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 PermissionGate 决定）", async () => {
     await openModal("viewer");
     expect(screen.queryByRole("button", { name: /创建订单/ })).toBeNull();

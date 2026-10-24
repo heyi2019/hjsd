@@ -1321,6 +1321,16 @@ export const reconciliationsApi = {
   create: (data: Record<string, unknown>) => api.post<Reconciliation>("/reconciliations", data).then(r => r.data),
   resolve: (id: number, reason: string) => api.post<Reconciliation>(`/reconciliations/${id}/resolve`, { reason }).then(r => r.data),
 };
+export interface DocumentSequence {
+  sequence_key: string;
+  prefix: string;
+  padding: number;
+  current_value: number;
+  next_number: string;
+}
+export const sequencesApi = {
+  list: () => api.get<DocumentSequence[]>("/foundation/sequences").then(r => r.data),
+};
 export const attachmentsApi = {
   list: (entity_type: string, entity_id: string) => api.get<{ items: AttachmentItem[] }>("/attachments", { params: { entity_type, entity_id } }).then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<AttachmentItem>("/attachments", data).then(r => r.data),

@@ -291,6 +291,31 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(vi.mocked(message.success).mock.calls.map((call) => call[0])).toContain("订单关联已删除");
   });
 
+  it("订单详情：关联行按 direction 展示方向文案与对应单号（防 incoming 误判回归）", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
+    vi.mocked(catalog.ordersApi.links).mockResolvedValue([
+      link1,
+      {
+        ...link1,
+        id: 78,
+        source_order_id: 1,
+        source_order_no: "HS-2026-0001",
+        target_order_id: 3,
+        target_order_no: "DG-2026-0003",
+        direction: "FOLLOW_UP",
+      },
+    ]);
+    await openLedger();
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
+    await screen.findByText("订单详情 · HS-2026-0001");
+    await screen.findByText("关联订单");
+    // direction=SOURCE → 本单是后续单，关联来源单（文案「来源单」；DG-2026-0002 与列表表格撞名，不单独断言）
+    await screen.findByText("来源单");
+    // direction=FOLLOW_UP → 本单是来源单，关联后续单「DG-2026-0003」（该单号不出现在列表，唯一）
+    await screen.findByText("后续单");
+    expect(screen.getByText("DG-2026-0003")).toBeInTheDocument();
+  });
+
   it("订单详情：规则快照 found 时展示版本号与固化参数", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
     vi.mocked(catalog.policyApi.orderSnapshot).mockResolvedValue({

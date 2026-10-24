@@ -731,9 +731,9 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             {links.length ? (
               links.map((link) => (
                 <div key={link.id} className="orders-event-row">
-                  <span>{link.direction === "incoming" ? "来源单" : "后续单"}</span>
+                  <span>{link.direction === "SOURCE" ? "来源单" : "后续单"}</span>
                   <span>
-                    {link.direction === "incoming" ? link.source_order_no : link.target_order_no}
+                    {link.direction === "SOURCE" ? link.source_order_no : link.target_order_no}
                   </span>
                   <span>
                     {link.split_ratio

@@ -26,6 +26,7 @@ import {
   PermissionButton,
   PermissionGate,
   StatusTag,
+  ConfirmButton,
 } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import {
@@ -323,6 +324,13 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     } finally {
       setLinkSubmitting(false);
     }
+  };
+
+  const removeLink = async (link: OrderLink) => {
+    if (!selectedOrder) return;
+    await ordersApi.deleteLink(selectedOrder.id, link.id);
+    message.success("订单关联已删除");
+    setLinks(await ordersApi.links(selectedOrder.id));
   };
 
   const openCancelTransaction = async (sourceOrder?: Order) => {
@@ -734,6 +742,17 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                         ? `¥${money(link.split_amount)}`
                         : "-"}
                   </span>
+                  <ConfirmButton
+                    permission="order.update"
+                    size="small"
+                    type="link"
+                    danger
+                    title="删除订单关联"
+                    description="删除后该上下游关系即刻解除；如误删，可重新建立同一关联。"
+                    onConfirm={() => removeLink(link)}
+                  >
+                    删除
+                  </ConfirmButton>
                 </div>
               ))
             ) : (

@@ -7,7 +7,7 @@ import { OrdersPage } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
 import * as client from "../shared/api/client";
-import type { Installment, InstallmentCancelResult, Order, ProfitAllocation } from "../shared/api/catalog";
+import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "../shared/api/catalog";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -18,7 +18,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
-    "orderSnapshot",
+    "orderSnapshot", "links", "createLink", "deleteLink",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -104,6 +104,19 @@ const order3: Order = {
   installment_periods: 6,
 };
 const orders = [order1, order2];
+const link1: OrderLink = {
+  id: 77,
+  source_order_id: 2,
+  source_order_no: "DG-2026-0002",
+  target_order_id: 1,
+  target_order_no: "HS-2026-0001",
+  relation_type: "SOURCE",
+  direction: "SOURCE",
+  split_ratio: "50",
+  split_amount: null,
+  note: "来源单",
+  created_at: "2026-10-01T10:00:00",
+};
 const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
 
 const installment: Installment = {
@@ -137,6 +150,8 @@ beforeEach(() => {
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.ordersApi.get).mockResolvedValue(order1);
+  vi.mocked(catalog.ordersApi.links).mockResolvedValue([link1]);
+  vi.mocked(catalog.ordersApi.deleteLink).mockResolvedValue(undefined);
   vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
   vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({
     event: { id: 2, event_no: "EV-2", order_id: 1, event_type: "CANCEL", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true },
@@ -257,6 +272,23 @@ describe("OrdersPage：操作与筛选分支", () => {
       trade_date: "2026-10-05",
       note: "补登记",
     })));
+  });
+
+  it("订单详情：删除关联经二次确认后调用 deleteLink 并刷新列表", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
+    await openLedger();
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
+    await screen.findByText("订单详情 · HS-2026-0001");
+    await screen.findByText("关联订单");
+    // 关联行随 links 异步加载：删除触发按钮出现即关联行已挂载。
+    // antd Button 的 accessible name 会被加空格导致精确串失配，按 skill 约定用正则子串（同 UsersPanel 范式）。
+    await ui.click(await screen.findByRole("button", { name: /删除/ }, { timeout: 8000 }));
+    // 二次确认弹层打开：确认按钮（默认文案「确认」）出现，与触发按钮「删除」区分（套 UsersPanel 范式）
+    await ui.click(await screen.findByRole("button", { name: /确认/ }));
+    await waitFor(() => expect(catalog.ordersApi.deleteLink).toHaveBeenCalledWith(1, 77));
+    // 删除成功后重新拉取关联列表（首次为开抽屉、二次为删后刷新）
+    await waitFor(() => expect(catalog.ordersApi.links).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(message.success).mock.calls.map((call) => call[0])).toContain("订单关联已删除");
   });
 
   it("订单详情：规则快照 found 时展示版本号与固化参数", async () => {

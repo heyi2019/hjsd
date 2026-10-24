@@ -728,6 +728,8 @@ export const ordersApi = {
       note?: string;
     },
   ) => api.post<OrderLink>(`/orders/${orderId}/links`, payload).then((r) => r.data),
+  deleteLink: (orderId: number, linkId: number) =>
+    api.delete<void>(`/orders/${orderId}/links/${linkId}`).then((r) => r.data),
   cancel: (orderId: number, payload: { reason: string }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
   create: (payload: {

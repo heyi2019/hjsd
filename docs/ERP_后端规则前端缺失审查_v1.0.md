@@ -234,7 +234,7 @@ P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
 
 - **#53 已不成立**：event_no（#36 修复）、flow_no（FundsPage 流水号列）、rebate_no（RebatesPanel + 订单抽屉）均已展示。
 - **#51 不成立**：押金功能（占用/释放/损失登记）完整落在 FundsPage，仅为目录结构说明，无需处理。
-- **#52 升级为跨端缺口**：Order 表有 commission_mode/commission_payer 字段与 CHECK 约束，但 `orders/schemas.py` 的创建/更新契约**根本没有暴露这两个字段**——不是前端展示问题，需后端先在 OrderCreate/OrderUpdate 补契约，前端再录入。本批不动，列为后续项。
+- **#52 升级为跨端缺口**：Order 表有 commission_mode/commission_payer 字段与 CHECK 约束，但 `orders/schemas.py` 的创建/更新契约**根本没有暴露这两个字段**——不是前端展示问题，需后端先在 OrderCreate/OrderUpdate 补契约，前端再录入。本批不动，列为后续项（后在 3.2 复核结案）。
 
 已修复 9 条：
 
@@ -250,9 +250,24 @@ P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
 | #55 | 游戏类型新建表单补「默认类型」复选框，create payload 带 is_default（编辑态隐藏，后端 update 不支持） | react 守门 |
 | #57 | notificationsApi.list 补 unread_only；面板加「仅看未读」勾选，统计卡筛选态改显「未读列表」，空文案随切换 | react 守门 |
 
-**P2 状态：12 条中 9 条已修复、2 条复核不成立（#51/#53）、1 条升级跨端缺口待后端（#52）。**
+**P2 状态：12 条中 9 条已修复、2 条复核不成立（#51/#53）、1 条升级跨端缺口待后端（#52，已在 3.2 复核结案）。**
 
 > 备注：#57 的 offset 分页参数本次只补了 unread_only——流水/通知列表的分页 UI 本身未接线（DataTable onPageChange 为空实现），offset 留待分页重做时一并处理，避免留一个「能传但无入口」的半成品参数。
+
+### 3.2 P2 第二批处置记录（2026-10-24，#52 跨端缺口复核结案）
+
+对 #52 重新取证（git 历史 / 守门用例 / 数据库三线核对），初表与第一批的「跨端缺口」判断**前提失效**：
+
+- **该功能已于 2026-10-18 被产品裁决裁撤**：提交 `16581fb`「fix: 删除已取消的代挂与返点遗留逻辑」把 DG 代挂结算条款整体从 service 契约删除——`create_order` / `update_order` 的 `commission_mode` / `commission_payer`（及同批的 `listing_price` / `service_fee` / `expected_settlement_date`）参数、校验、落库全部移除，并新增守门用例 `test_dg_service_rejects_removed_commission_terms` 锁定「service 不再接受这些参数」（传参即 TypeError）。审计初表只看到 `domain/trade.py:144-159` 的 DB CHECK 约束仍在，误判为「契约未暴露」。
+- **DB 列与 CHECK 约束仍在，但已无任何业务读取方**：全仓 grep 确认除 ORM 定义外没有代码读 `Order.commission_mode / commission_payer`（R3 提成对账走 `OrderProfitAllocation`，与这两个字段无关）；dev 库 153 笔订单 **0 笔**有提成数据，属纯孤儿列。
+- **前端零引用**：建单 / 编辑 / 详情均无提成控件——初表「无控件」属实，但根因是功能已裁撤，不是漏接。
+
+**结论：#52 复核不成立（按既定产品裁决维持关闭）**，与 #51/#53 同样结案，不再排期。2026-10-24 用户裁决：维持关闭，以下两条后续事项均不排期：
+
+1. **重开提成登记**：不重开。若未来业务上确需恢复，属「重开已裁撤功能」——需先撤守门用例 `test_dg_service_rejects_removed_commission_terms`、重开 service 契约（成对 / 仅 DG / 枚举校验）与前端录入，按先报后改流程单独实施；
+2. **孤儿列清理**：暂不删列。`commission_mode` / `commission_payer`（及同批裁撤的 `listing_price` / `service_fee` / `expected_settlement_date`）已确认无历史数据，保留原位不影响任何读写；如未来清理，删列会动 orders 表结构与 CHECK 约束，需单独评估迁移风险。
+
+**P2 整体状态（2026-10-24 收口）：12 条全部闭环——9 条已修复（提交 2e946bd）、3 条复核不成立（#51/#53/#52），无遗留待办项。**
 
 ---
 

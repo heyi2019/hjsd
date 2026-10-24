@@ -69,6 +69,25 @@
 
 **至此 P0 24 条全部有处置**（#1-#24 中 #12 按勘误降为 P1 #62）。剩余：P1 24 条、P2 13 条，见正文。
 
+## 0.4 P1 第一批处置状态（2026-10-24 已实施）
+
+P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
+
+| 原编号 | 修复内容 | 改动 | 验证 |
+|---|---|---|---|
+| #31 | 对账差异原因口径 | `FundsPage.tsx` 补「账面与系统余额不一致时必填（系统余额=期初+已审核流水）」说明，与后端强制条件一致 | pools |
+| #33 | 流水筛选下沉服务端 | `catalog.ts` `cashflowsApi.list` 补全 status/nature/fund_nature/accounting_attribute/category/created_by 六参；筛选栏新增资金性质/核算属性/类别三控件；池/方向/状态改服务端过滤，消除 2000 条上限盲区 | pools |
+| #34 | 流水状态口径 | 筛选栏下补「事件过账流水直接已审核、独立流水需审核后才计入余额」 | pools |
+| #29 | 资金流向四值 | 流水表新增「流向」列（labels.ts 新增 NATURE_LABEL） | pools |
+| #25 | 期次表缺列 | 补「服务费率」列（后端 ScheduleOut.service_fee_rate 原本未展示） | installments |
+| #27 | 取消分期文案错误 | 代分期（ADVANCE_PURCHASE）取消走后端 CANCEL_STOCK→IN_STOCK 账号回库，原写「代分期已结束」误导；Modal 提示与成功文案同步修正，测试断言随正 | installments |
+| #45 | 质量中间态 | `qualityApi.update`（PATCH）接入，工单新增「开始处理」（OPEN→IN_PROGRESS）入口与三态中文标签 | quality |
+| #46 | 质量主动扫描 | 新增「主动扫描」按钮（POST /quality/scan） | quality |
+| #48 | 审计动作裸英文 | labels.ts 新增 AUDIT_ACTION_LABEL 全量 79 项（对齐 AuditAction 枚举），AuditPanel 动作列与筛选下拉均用中文 | audit |
+| #49 | 审计筛选仅 2 参 | 补动作（选项来自 /audit-logs/actions）、操作人、开始/结束日期；对象类型改 ENTITY_TYPE_LABEL | audit |
+
+**P1 剩余 14 条**（#26 已随 #25 相邻处理验证存在、#28 已在第三轮随 #11 修复、#30/#32/#35-#44/#47/#62），P2 13 条未动。
+
 ---
 
 ## 1. P0 — 规则已在后端生效，但前端完全不可见 / 不可达

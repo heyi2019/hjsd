@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping, Sequence
+from datetime import date
 from typing import Any
 
 from sqlalchemy import func, inspect, select

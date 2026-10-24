@@ -507,6 +507,16 @@ def create_order_link(
     return schemas.OrderLinkOut.model_validate(item)
 
 
+@router.delete("/orders/{order_id}/links/{link_id}", status_code=204)
+def delete_order_link(
+    order_id: int,
+    link_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> None:
+    service.delete_order_link(db, order_id, link_id, actor=_actor(user), user=user)
+
+
 @router.patch("/orders/{order_id}", response_model=schemas.OrderOut)
 def update_order(
     order_id: int,

@@ -31,6 +31,7 @@ from app.accounts import service as accounts_service
 from app.installments import service as installments_service
 from app.finance import service as finance_service
 from app.parties import service as parties_service
+from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
@@ -278,6 +279,72 @@ class TestCreateOrderValidation:
                 relation_type="UNKNOWN",
                 actor="pytest",
             )
+
+    def test_order_link_delete_removes_link_and_writes_audit(self, seeded_db):
+        source = _order(seeded_db, order_type="DFQ")
+        follow_up = _order(seeded_db, order_type="HS")
+        link = order_service.create_order_link(
+            seeded_db,
+            follow_up.id,
+            related_order_id=source.id,
+            relation_type="SOURCE",
+            split_ratio=Decimal("50"),
+            split_amount=Decimal("400"),
+            note="来源订单",
+            actor="pytest",
+        )
+
+        order_service.delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
+
+        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is None
+        assert order_service.list_order_links(seeded_db, follow_up.id) == []
+        assert order_service.list_order_links(seeded_db, source.id) == []
+        audit = seeded_db.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == AuditAction.ORDER_LINK_DELETE.value,
+                AuditLog.entity_id == str(link.id),
+            )
+            .order_by(AuditLog.id.desc())
+        )
+        assert audit is not None
+        assert audit.before_json["relation_type"] == "SOURCE"
+        assert audit.before_json["split_amount"] == "400.00"
+        # 删除后同一对订单可重新建立关联（唯一约束不阻挡重建）。
+        # 注意：SQLite rowid 是 max+1 复用语义（AUTOINCREMENT 关键字未生成），
+        # 删掉最大行后重建可能拿回同一 id —— 这是 DB 固有语义，不是缺陷。
+        again = order_service.create_order_link(
+            seeded_db,
+            follow_up.id,
+            related_order_id=source.id,
+            relation_type="SOURCE",
+            actor="pytest",
+        )
+        assert again.id is not None
+        relisted = order_service.list_order_links(seeded_db, follow_up.id)
+        assert [item["id"] for item in relisted] == [again.id]
+
+    def test_order_link_delete_rejects_foreign_and_missing(self, seeded_db):
+        source = _order(seeded_db, order_type="DFQ")
+        follow_up = _order(seeded_db, order_type="HS")
+        bystander = _order(seeded_db, order_type="HS")
+        link = order_service.create_order_link(
+            seeded_db,
+            follow_up.id,
+            related_order_id=source.id,
+            relation_type="SOURCE",
+            actor="pytest",
+        )
+        # 无关订单视角删除 → 404（不泄露关联存在性）
+        with pytest.raises(NotFound, match="不存在"):
+            order_service.delete_order_link(seeded_db, bystander.id, link.id, actor="pytest")
+        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is not None
+        # 对端（source 方）视角允许删除
+        order_service.delete_order_link(seeded_db, source.id, link.id, actor="pytest")
+        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is None
+        # 重复删除 → 404
+        with pytest.raises(NotFound, match="不存在"):
+            order_service.delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
 
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
@@ -1978,6 +2045,54 @@ class TestOrdersApi:
         detail = seeded_client.get(f"/api/v1/orders/{target.id}", headers=headers)
         assert detail.status_code == 200, detail.text
         assert detail.json()["links"][0]["id"] == created.json()["id"]
+
+    def test_order_link_delete_endpoint(self, seeded_client, seeded_db, headers):
+        source = _order(seeded_db, order_type="DFQ")
+        target = _order(seeded_db, order_type="HS")
+        created = seeded_client.post(
+            f"/api/v1/orders/{target.id}/links",
+            json={
+                "related_order_id": source.id,
+                "relation_type": "SOURCE",
+                "note": "来源单",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        link_id = created.json()["id"]
+
+        deleted = seeded_client.delete(
+            f"/api/v1/orders/{target.id}/links/{link_id}", headers=headers
+        )
+        assert deleted.status_code == 204, deleted.text
+        listed = seeded_client.get(
+            f"/api/v1/orders/{target.id}/links", headers=headers
+        )
+        assert listed.status_code == 200, listed.text
+        assert listed.json() == []
+        detail = seeded_client.get(f"/api/v1/orders/{target.id}", headers=headers)
+        assert detail.json()["links"] == []
+
+        # 重复删除 → 404
+        again = seeded_client.delete(
+            f"/api/v1/orders/{target.id}/links/{link_id}", headers=headers
+        )
+        assert again.status_code == 404, again.text
+
+    def test_order_link_delete_requires_update_permission(self, seeded_client, seeded_db, headers, viewer_headers):
+        source = _order(seeded_db, order_type="DFQ")
+        target = _order(seeded_db, order_type="HS")
+        created = seeded_client.post(
+            f"/api/v1/orders/{target.id}/links",
+            json={"related_order_id": source.id, "relation_type": "SOURCE"},
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        response = seeded_client.delete(
+            f"/api/v1/orders/{target.id}/links/{created.json()['id']}",
+            headers=viewer_headers,
+        )
+        assert response.status_code == 403, response.text
 
     def test_pool_balance_endpoint_scope_forbidden(self, seeded_client, viewer_headers):
         # viewer 有 finance.read 但无池授权 → 越权池返回 404（不泄露存在性）

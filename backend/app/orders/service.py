@@ -493,6 +493,41 @@ def create_order_link(
     return link
 
 
+def delete_order_link(
+    session: Session,
+    order_id: int,
+    link_id: int,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> None:
+    """删除上下游订单关系；只允许删挂在当前订单上的关联，删后可重新建立。"""
+    order = get_order(session, order_id, user)
+    link = session.get(OrderLink, link_id)
+    if (
+        link is None
+        or (link.source_order_id != order.id and link.target_order_id != order.id)
+    ):
+        raise NotFound(f"订单关联 {link_id} 不存在", details={"link_id": link_id})
+    before = {
+        "source_order_id": link.source_order_id,
+        "target_order_id": link.target_order_id,
+        "relation_type": link.relation_type,
+        "split_ratio": str(link.split_ratio) if link.split_ratio is not None else None,
+        "split_amount": str(link.split_amount) if link.split_amount is not None else None,
+    }
+    session.delete(link)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.ORDER_LINK_DELETE,
+        entity_type="order_link",
+        entity_id=link_id,
+        actor=actor,
+        before=before,
+    )
+
+
 def list_order_links(
     session: Session, order_id: int, user: CurrentUser | None = None
 ) -> list[dict[str, Any]]:

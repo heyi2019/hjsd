@@ -411,6 +411,40 @@ class TestRollbackAndCorrectionGuards:
             service.rollback_batch(seeded_db, batch["id"], reason="再次回滚", actor="pytest")
 
 
+# ------------------------------------------------------------------ service 内部守卫（MIG-01 守门分支，提升 imports/service.py 覆盖）
+class TestImportServiceInternalGuards:
+    def test_assert_batch_editable_rejects_missing_batch(self, seeded_db):
+        # service.py:52 的 NotFound 守卫：所有公开调用方虽都前置拦截 batch
+        # 存在性，但该函数自身仍应独立守卫；直接调用传入不存在的 batch_id
+        # 验证其抛 NotFound（保留防御、零源码改动）。
+        with pytest.raises(NotFound):
+            service._assert_batch_editable(seeded_db, 999999)
+
+    def test_skip_row_rejects_rolled_back_row(self, seeded_db):
+        batch = _batch(seeded_db)
+        rows = service.list_rows(seeded_db, batch["id"])
+        row_id = rows[0]["id"]
+        item = seeded_db.get(ImportRow, row_id)
+        assert item is not None
+        item.status = ImportRowStatus.ROLLED_BACK.value
+        seeded_db.flush()
+
+        with pytest.raises(Validation, match="已回滚的导入行不可跳过"):
+            service.skip_row(seeded_db, row_id, reason="口径不明", actor="pytest")
+
+    def test_create_correction_rejects_non_object_rows(self, seeded_db):
+        batch = _batch(seeded_db)
+        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        with pytest.raises(Validation, match="每行必须为对象"):
+            service.create_correction_batch(
+                seeded_db,
+                batch["id"],
+                rows=[{"日期": "2026/07/14", "交易金额": 1}, "NOT_A_DICT"],
+                reason="少导一行",
+                actor="pytest",
+            )
+
+
 # ------------------------------------------------------------------ 路由层
 class TestImportApi:
     def test_import_requests_reject_unknown_fields(self, seeded_client, headers):

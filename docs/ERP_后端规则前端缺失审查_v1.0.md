@@ -88,6 +88,25 @@ P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
 
 **P1 剩余 14 条**（#26 已随 #25 相邻处理验证存在、#28 已在第三轮随 #11 修复、#30/#32/#35-#44/#47/#62），P2 13 条未动。
 
+## 0.5 P1 第二批处置状态（2026-10-24 已实施）
+
+订单/入口/策略域 8 条批量落地：
+
+| 原编号 | 修复内容 | 改动 | 验证 |
+|---|---|---|---|
+| #35 | 订单编辑 PATCH | `catalog.ts` 补 `ordersApi.patch`（PATCH /orders/{id}）与 `Order.account_snapshot`/`link_status` 类型；`OrdersPage.tsx` 抽屉新增「编辑订单」入口与 Modal：成交日期/备注常改，DFQ 账号快照仅在密码可见（持 order.create）时整体回写，防止覆盖被后端隐去的密码；已有登记事件的订单按后端规则禁用核算字段只留备注 | orders 36 |
+| #36 | 事件明细字段 | `OrderEvent` 类型补 portion/offset_event_id/reason/refund_responsibility/posted_at；抽屉「动作记录」行展示 动作+event_no、金额+份额（本金/利润/总额）、日期+操作人、冲销来源 #id、责任方、交付方式、未过账标记；labels 三张映射表随后端枚举 | orders 36 |
+| #37 | 指定被冲销事件 | 取消交易 Modal 新增「被冲销动作」下拉（已过账 BUY/COST/SELL 按剩余可冲过滤，默认沿用最后一笔）+「冲销金额」（默认该动作剩余可冲，改选自动重置）；提交带 offset_event_id + amount，前端校验不超剩余；支持部分冲销 | orders 36（含部分冲销守门用例） |
+| #38 | 账号下架 VOID | `InventoryPanel.tsx`「下架」按钮/菜单项由 `message.info` 占位改为真实流程：加载执行明细找剩余可冲 BUY 事件 → 「下架登记」Modal（原因必填）→ postEvent CANCEL（offset=BUY、全额）→ 账号 VOID；找不到可冲买入流水时 warning 提示，不再静默无操作 | accounts 13（3 条新守门） |
+| #39 | 回收转售 RESELL | `InstallmentsPanel.tsx`：CLOSED/OVERDUE/DEFAULTED 且已回收未出售的合约新增「登记出售」按钮 + Modal（选出售订单/日期/说明）调 `installmentsApi.resale`；删除 catalog 中重复且改名的 `sale` 方法；原「请到库存中心售出，系统自动关联」误导文案（后端并无自动关联）随按钮替换 | installments 24（含登记出售守门） |
+| #42 | 导入来源补 LEAD | `ImportWorkbench.tsx` source_kind 选项补「需求」（STANDARD_LEAD，对齐 `ImportSourceKind`），IMPORT_TEMPLATES 补需求 CSV 模板（客户ID/需求类型/预算/需求内容/负责人ID/备注） | imports 22（含 LEAD 守门） |
+| #43 | 订单规则快照 | `OrdersPage.tsx` 抽屉新增「规则快照」区块：`policyApi.orderSnapshot` 读取，found 时展示 policy_version_id 与 REBATE/COMMISSION 固化参数（对象值 JSON 化），未固化时说明「建单时无生效的返点/提成规则」；无权查看时静默降级不阻断详情 | orders 36（含快照守门） |
+| #44 | 规则生效期 resolve | `PolicySettingsPanel.tsx` 新增「生效期自查」按钮 + Modal：规则编码（受控枚举）/日期/适用范围（GLOBAL 或按人员·类型·池 + 范围 ID）→ `policyApi.resolve`，展示命中版本（v号/生效期/状态/参数）或「该日该作用域没有生效的规则版本」；门控按后端 policy.manage/policy.approve 任一（同 settlePermission 先例取用户实际持有的码） | policy 9（含命中/未命中守门） |
+
+配套修正：`catalog.ts` `policyApi.resolve` 补 scope_type/scope_id 可选参数（默认 GLOBAL，与后端 Query 一致）。
+
+**P1 剩余 6 条**（#30/#32/#40/#41/#47/#62，展示基建类），P2 13 条未动。
+
 ---
 
 ## 1. P0 — 规则已在后端生效，但前端完全不可见 / 不可达

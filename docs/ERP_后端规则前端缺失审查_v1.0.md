@@ -228,6 +228,32 @@ P1 小项批量清理第一批，共 10 条（提交 `62416da`）：
 | 60 | 报表 | 资金属性分析显示裸码 | 上游 13 值 | `ReportsPage.tsx:387-388` 无 label 映射 |
 | 61 | 资金 | 审核人 / 审核时间 / reversal_of_id 不展示 | `cashflows.py:225-226,322` | 前端零命中，无法追溯 |
 
+### 3.1 P2 第一批处置记录（2026-10-24 已实施，提交 2e946bd）
+
+前置逐条复核结论（对当前代码重新取证，非照搬初表）：
+
+- **#53 已不成立**：event_no（#36 修复）、flow_no（FundsPage 流水号列）、rebate_no（RebatesPanel + 订单抽屉）均已展示。
+- **#51 不成立**：押金功能（占用/释放/损失登记）完整落在 FundsPage，仅为目录结构说明，无需处理。
+- **#52 升级为跨端缺口**：Order 表有 commission_mode/commission_payer 字段与 CHECK 约束，但 `orders/schemas.py` 的创建/更新契约**根本没有暴露这两个字段**——不是前端展示问题，需后端先在 OrderCreate/OrderUpdate 补契约，前端再录入。本批不动，列为后续项。
+
+已修复 9 条：
+
+| # | 修复 | 验证 |
+|---|---|---|
+| #50 | StatusTag 补 `CONVERTED`（已转化）；顺手补通知已读态 `READ/UNREAD`（前端本地码，原先也裸英文） | ui_guards |
+| #58 | StatusTag 补 `UNLINKED_TRANSFER`（单边划转未关联）；两码均为独有码无跨域冲突 | ui_guards |
+| #59 | 对账表状态列调用点显式传 label（OPEN→未核销、RESOLVED→已核销），不动全局 map（OPEN/RESOLVED 与质量域共用） | pools 深覆盖守门 |
+| #60 | `FUND_NATURE_LABEL`/`ACCOUNTING_ATTRIBUTE_LABEL` 上移至 `labels.ts` 共享，ReportsPage 资金性质/核算属性列改用映射 | reporting 守门 |
+| #56 | DailyFunds 加日期选择（默认今天）→ `dailyFunds({ on })`，日期变更 reload | reporting 守门 |
+| #61 | Cashflow 类型补 reviewed_by/reviewed_at/reversal_of_id 等 6 字段；流水表新增「审核追溯」列（审核人 · 审核时间 · 冲销来源） | pools 深覆盖守门 |
+| #54 | AdditionalFeeFields 新增「设计费」金额行；initialCosts 增 `flow_category: "DESIGN"` 分支，不再塞进 OTHER | quick 守门 |
+| #55 | 游戏类型新建表单补「默认类型」复选框，create payload 带 is_default（编辑态隐藏，后端 update 不支持） | react 守门 |
+| #57 | notificationsApi.list 补 unread_only；面板加「仅看未读」勾选，统计卡筛选态改显「未读列表」，空文案随切换 | react 守门 |
+
+**P2 状态：12 条中 9 条已修复、2 条复核不成立（#51/#53）、1 条升级跨端缺口待后端（#52）。**
+
+> 备注：#57 的 offset 分页参数本次只补了 unread_only——流水/通知列表的分页 UI 本身未接线（DataTable onPageChange 为空实现），offset 留待分页重做时一并处理，避免留一个「能传但无入口」的半成品参数。
+
 ---
 
 ## 4. 处置建议（按投入产出排序）

@@ -1,15 +1,15 @@
 /** 建单表单字段配置面板：按业务类型（回收/提号/代挂/代分期）配置字段的
  *  新增、删除、必填/选填（行内开关）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
-import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tabs, Tooltip, Typography, message } from "antd";
+import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { FIELD_TYPE_LABEL, ORDER_TYPE_LABEL } from "../../shared/lib/labels";
+import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
+import { FORM_SCOPE_GROUPED_OPTIONS, FORM_SCOPE_LABEL } from "../formScopes";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
-const ORDER_TYPES = ["HS", "TH", "DG", "DFQ"] as const;
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
 
@@ -191,19 +191,28 @@ export function OrderFormFieldsPanel() {
     <Card className="glass" title="表单字段配置">
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
       <Typography.Paragraph type="secondary">
-        按业务类型（回收 / 提号 / 代挂 / 代分期）配置建单表单字段：可新增自定义字段、删除自定义字段（仅自定义字段可删）、
-        停用/启用。「必填」列提供行内开关，点击即可在必填/选填之间切换（编辑态可直接配置）；
-        必填态与启用态的改动会即时反映到对应业务类型的建单表单。
+        选择上方「表单」可配置任意业务表单的字段：建单（回收/提号/代挂/代分期）、库存（售出/寄售/返点）、
+        客户需求池、分期（收款/回收/出售/换绑/取消/结清/违约/减免/展期）、返点（新建/结算/冲销）、
+        资金（占用/流水/划转/对账/核销/拒绝/冲销/释放/损失/修复/月结）。
+        可新增自定义字段、删除自定义字段（仅自定义字段可删）、停用/启用；
+        「必填」列提供行内开关，点击即在必填/选填间切换。改动即时反映到对应表单。
+        当前：{FORM_SCOPE_LABEL[activeType] ?? activeType}
       </Typography.Paragraph>
-      <Tabs
-        activeKey={activeType}
-        onChange={(key) => {
-          setActiveType(key);
-          setEditingId(null);
-          form.resetFields();
-        }}
-        items={ORDER_TYPES.map((code) => ({ key: code, label: ORDER_TYPE_LABEL[code] }))}
-      />
+      <Space style={{ marginBottom: 16 }} align="center">
+        <Typography.Text strong>表单</Typography.Text>
+        <Select
+          style={{ width: 260 }}
+          value={activeType}
+          onChange={(value: string) => {
+            setActiveType(value);
+            setEditingId(null);
+            form.resetFields();
+          }}
+          options={FORM_SCOPE_GROUPED_OPTIONS}
+          optionFilterProp="label"
+          showSearch
+        />
+      </Space>
       <DataTable<OrderFormField>
         columns={columns}
         rows={rows}

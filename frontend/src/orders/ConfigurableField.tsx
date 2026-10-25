@@ -55,6 +55,18 @@ export function useFieldConfig(): FieldConfigMap {
   return useContext(FieldConfigContext);
 }
 
+/** 按「表单作用域」按需拉取配置并注入上下文。
+ *  仅在 active 为 true 时请求，避免多弹窗面板挂载时一次性拉取全部作用域配置；
+ *  无配置或请求失败时降级为空配置，各字段保持原硬编码标签/必填态。 */
+export function FieldConfigScope(props: {
+  scope: string;
+  active: boolean;
+  children: ReactNode;
+}): ReactElement {
+  const { config } = useOrderFormConfig(props.active ? props.scope : undefined);
+  return <FieldConfigContext.Provider value={config}>{props.children}</FieldConfigContext.Provider>;
+}
+
 export function isFieldActive(config: FieldConfigMap, key: string): boolean {
   const def = config[key];
   return def ? def.is_active : true;
@@ -90,6 +102,10 @@ export function CfgItem(props: {
   rules?: Rule[];
   valuePropName?: string;
   tooltip?: ReactNode;
+  /** 字段下方的补充说明文案（antd Form.Item.extra）。 */
+  extra?: ReactNode;
+  /** 字段下方的校验/提示信息（antd Form.Item.help）。 */
+  help?: ReactNode;
   className?: string;
   initialValue?: unknown;
   children: ReactNode;
@@ -103,6 +119,8 @@ export function CfgItem(props: {
       rules={resolveRules(cfg, props.name, props.rules)}
       valuePropName={props.valuePropName}
       tooltip={props.tooltip}
+      extra={props.extra}
+      help={props.help}
       className={props.className}
       initialValue={props.initialValue}
     >

@@ -10,6 +10,7 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ErrorBanner, PermissionButton } from "../shared/ui";
+import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 export function InventoryConsignmentModal(props: {
   account: Account | null;
@@ -21,6 +22,7 @@ export function InventoryConsignmentModal(props: {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
+  const { config } = useOrderFormConfig(open ? "CONSIGN" : undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -79,24 +81,26 @@ export function InventoryConsignmentModal(props: {
     >
       <ErrorBanner error={error} />
       <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
-      <Form form={form} layout="vertical" onFinish={submit}>
-        <Form.Item
-          name="platform_ids"
-          label="寄售平台"
-          rules={[{ required: true, type: "array", min: 1, message: "请至少勾选一个寄售平台" }]}
-        >
-          {platforms.length ? (
-            <Checkbox.Group
-              options={platforms.map((platform) => ({
-                value: platform.id,
-                label: platform.display_name,
-              }))}
-            />
-          ) : (
-            <span className="muted">暂无可用寄售平台，请先在合作方中维护平台</span>
-          )}
-        </Form.Item>
-      </Form>
+      <FieldConfigContext.Provider value={config}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <CfgItem
+            name="platform_ids"
+            label="寄售平台"
+            rules={[{ required: true, type: "array", min: 1, message: "请至少勾选一个寄售平台" }]}
+          >
+            {platforms.length ? (
+              <Checkbox.Group
+                options={platforms.map((platform) => ({
+                  value: platform.id,
+                  label: platform.display_name,
+                }))}
+              />
+            ) : (
+              <span className="muted">暂无可用寄售平台，请先在合作方中维护平台</span>
+            )}
+          </CfgItem>
+        </Form>
+      </FieldConfigContext.Provider>
     </Modal>
   );
 }

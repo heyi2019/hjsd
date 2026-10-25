@@ -14,6 +14,7 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
+import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 /** 库存账号售出：按货源类型映射回收 / 代挂订单类型。 */
 const SALE_ORDER_TYPE: Record<string, string> = {
@@ -35,6 +36,7 @@ export function InventorySaleModal(props: {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
+  const { config } = useOrderFormConfig(open ? "SALE" : undefined);
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
   const saleAmount = Form.useWatch("amount", form);
   const downPayment = Form.useWatch("down_payment", form);
@@ -171,72 +173,74 @@ export function InventorySaleModal(props: {
     >
       <ErrorBanner error={error} />
       <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
-      <Form form={form} layout="vertical" onFinish={submit}>
-        <Form.Item name="customer_id" label="买家" rules={[{ required: true, message: "请选择买家" }]}>
-          <Select
-            showSearch
-            optionFilterProp="label"
-            placeholder="请选择买家"
-            options={customers.map((customer) => ({ value: customer.id, label: customer.display_name }))}
-            notFoundContent="暂无可用客户"
-          />
-        </Form.Item>
-        <Form.Item name="amount" label="售出金额" rules={[{ required: true, message: "请输入售出金额" }, { validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}>
-          <MoneyInput placeholder="请输入金额" />
-        </Form.Item>
-        <Form.Item name="payment_method" label="付款方式" initialValue="FULL">
-          <Radio.Group
-            options={[
-              { value: "FULL", label: "全款" },
-              { value: "INSTALLMENT", label: "分期付款" },
-            ]}
-            optionType="button"
-            buttonStyle="solid"
-          />
-        </Form.Item>
-        {paymentMethod === "FULL" ? (
-          <Form.Item name="pool_id" label="收款资金账户" rules={[{ required: true, message: "请选择收款资金账户" }]}>
+      <FieldConfigContext.Provider value={config}>
+        <Form form={form} layout="vertical" onFinish={submit}>
+          <CfgItem name="customer_id" label="买家" rules={[{ required: true, message: "请选择买家" }]}>
             <Select
-              placeholder="请选择收款资金账户"
-              options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
-              notFoundContent="暂无可用资金账户"
+              showSearch
+              optionFilterProp="label"
+              placeholder="请选择买家"
+              options={customers.map((customer) => ({ value: customer.id, label: customer.display_name }))}
+              notFoundContent="暂无可用客户"
             />
-          </Form.Item>
-        ) : (
-          <div className="inventory-sale-installment-fields">
-            <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
-            <Form.Item name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}>
-              <MoneyInput placeholder="没有首付填 0" />
-            </Form.Item>
-            <Form.Item name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}>
-              <MoneyInput placeholder="可选填" />
-            </Form.Item>
-            <Form.Item name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}>
-              <Input inputMode="numeric" placeholder="请输入期数" />
-            </Form.Item>
-            <Form.Item name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}>
-              <MoneyInput placeholder="按服务费总额/期数计算" />
-            </Form.Item>
-            <Form.Item
-              name="per_period"
-              label="每期金额"
-              rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => {
-                const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value);
-                if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配");
-              } }]}
-              extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}
-            >
-              <MoneyInput placeholder="请输入每期应收" />
-            </Form.Item>
-            <Form.Item name="first_due_on" label="首期日期" initialValue={dayjs()} rules={[{ required: true, message: "请选择首期日期" }]}>
-              <DatePicker className="ui-control-full" placeholder="请选择日期" />
-            </Form.Item>
-          </div>
-        )}
-        <Form.Item name="note" label="备注">
-          <Input.TextArea rows={2} placeholder="可选" />
-        </Form.Item>
-      </Form>
+          </CfgItem>
+          <CfgItem name="amount" label="售出金额" rules={[{ required: true, message: "请输入售出金额" }, { validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}>
+            <MoneyInput placeholder="请输入金额" />
+          </CfgItem>
+          <CfgItem name="payment_method" label="付款方式" initialValue="FULL">
+            <Radio.Group
+              options={[
+                { value: "FULL", label: "全款" },
+                { value: "INSTALLMENT", label: "分期付款" },
+              ]}
+              optionType="button"
+              buttonStyle="solid"
+            />
+          </CfgItem>
+          {paymentMethod === "FULL" ? (
+            <CfgItem name="pool_id" label="收款资金账户" rules={[{ required: true, message: "请选择收款资金账户" }]}>
+              <Select
+                placeholder="请选择收款资金账户"
+                options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
+                notFoundContent="暂无可用资金账户"
+              />
+            </CfgItem>
+          ) : (
+            <div className="inventory-sale-installment-fields">
+              <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
+              <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}>
+                <MoneyInput placeholder="没有首付填 0" />
+              </CfgItem>
+              <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}>
+                <MoneyInput placeholder="可选填" />
+              </CfgItem>
+              <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}>
+                <Input inputMode="numeric" placeholder="请输入期数" />
+              </CfgItem>
+              <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}>
+                <MoneyInput placeholder="按服务费总额/期数计算" />
+              </CfgItem>
+              <CfgItem
+                name="per_period"
+                label="每期金额"
+                rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => {
+                  const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value);
+                  if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配");
+                } }]}
+                extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}
+              >
+                <MoneyInput placeholder="请输入每期应收" />
+              </CfgItem>
+              <CfgItem name="first_due_on" label="首期日期" initialValue={dayjs()} rules={[{ required: true, message: "请选择首期日期" }]}>
+                <DatePicker className="ui-control-full" placeholder="请选择日期" />
+              </CfgItem>
+            </div>
+          )}
+          <CfgItem name="note" label="备注">
+            <Input.TextArea rows={2} placeholder="可选" />
+          </CfgItem>
+        </Form>
+      </FieldConfigContext.Provider>
     </Modal>
   );
 }

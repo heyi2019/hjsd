@@ -34,6 +34,7 @@ import {
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
+import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 // 与 backend/app/finance/attributes.py 的 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE 保持一致：
 // 资金性质决定可用核算属性，非法组合后端直接 422，此处事前收窄避免误选。
@@ -827,41 +828,44 @@ export function FundsPage() {
 
       <Modal title="新增押金占用" open={depositOpen} onCancel={() => setDepositOpen(false)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDDEPOSIT" active={depositOpen}>
           <Form form={depositForm} layout="vertical" onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
-          <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}>
+          <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
             <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
-          </Form.Item>
-          <Form.Item name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
+          </CfgItem>
+          <CfgItem name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
             <Input inputMode="numeric" />
-          </Form.Item>
-          <Form.Item name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">
+          </CfgItem>
+          <CfgItem name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">
             <Input inputMode="numeric" />
-          </Form.Item>
-          <Form.Item name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
+          </CfgItem>
+          <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="paid_on" label="占用日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="paid_on" label="占用日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="expected_release_on" label="预计释放日期">
+          </CfgItem>
+          <CfgItem name="expected_release_on" label="预计释放日期">
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="note" label="说明">
+          </CfgItem>
+          <CfgItem name="note" label="说明">
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             提交
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="新增独立资金流水" open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDFLOW" active={cashflowOpen}>
           <Form form={cashflowForm} layout="vertical" onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
-          <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <Form.Item name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
-          <Form.Item name="direction" label="收支方向" rules={[{ required: true }]}><Select options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} /></Form.Item>
-          <Form.Item name="fund_nature" label="资金性质" rules={[{ required: true }]}>
+          <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
+          <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} /></CfgItem>
+          <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
             <Select
               options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))}
               onChange={(value: string) => {
@@ -873,76 +877,87 @@ export function FundsPage() {
                 }
               }}
             />
-          </Form.Item>
-          <Form.Item name="accounting_attribute" label="核算属性" rules={[{ required: true }]} help="可选范围由资金性质决定（与后端白名单一致）">
+          </CfgItem>
+          <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]} help="可选范围由资金性质决定（与后端白名单一致）">
             <Select options={cashflowAttributeOptions} />
-          </Form.Item>
-          <Form.Item name="category" label="类别" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></Form.Item>
-          <Form.Item name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></Form.Item>
+          </CfgItem>
+          <CfgItem name="category" label="类别" rules={[{ required: true }]}><Input /></CfgItem>
+          <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></CfgItem>
+          <CfgItem name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交审核</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="资金池划转" open={transferOpen} onCancel={() => setTransferOpen(false)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDTRANSFER" active={transferOpen}>
           <Form form={transferForm} layout="vertical" onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
-          <Form.Item name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <Form.Item name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <Form.Item name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></Form.Item>
-          <Form.Item name="occurred_on" label="划转日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
-          <Form.Item name="note" label="说明"><Input.TextArea rows={2} /></Form.Item>
+          <CfgItem name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
+          <CfgItem name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
+          <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></CfgItem>
+          <CfgItem name="occurred_on" label="划转日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认划转</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="新增资金对账" open={reconciliationOpen} onCancel={() => setReconciliationOpen(false)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDRECON" active={reconciliationOpen}>
           <Form form={reconciliationForm} layout="vertical" onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
-          <Form.Item name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <Form.Item name="reconciled_on" label="对账日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
-          <Form.Item name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></Form.Item>
-          <Form.Item name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></Form.Item>
-          <Form.Item name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></Form.Item>
-          <Form.Item name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已审核流水）"><Input.TextArea rows={2} /></Form.Item>
-          <Form.Item name="note" label="说明"><Input.TextArea rows={2} /></Form.Item>
+          <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
+          <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
+          <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>
+          <CfgItem name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></CfgItem>
+          <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已审核流水）"><Input.TextArea rows={2} /></CfgItem>
+          <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交对账</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="核销对账差异" open={Boolean(resolveTarget)} onCancel={() => setResolveTarget(null)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDCLEAR" active={Boolean(resolveTarget)}>
           <Form form={resolveForm} layout="vertical" onFinish={resolveReconciliation}>
-          <Form.Item name="reason" label="处理说明" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <CfgItem name="reason" label="处理说明" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认核销</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="拒绝资金流水" open={Boolean(rejectTarget)} onCancel={() => setRejectTarget(null)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDREJECT" active={Boolean(rejectTarget)}>
           <Form form={rejectForm} layout="vertical" onFinish={(values) => rejectTarget && void reviewCashflow("reject", rejectTarget, values.reason as string)}>
-          <Form.Item name="reason" label="拒绝原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <CfgItem name="reason" label="拒绝原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认拒绝</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="冲销资金流水" open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDREVERSE" active={Boolean(reverseTarget)}>
           <Form form={reverseForm} layout="vertical" onFinish={reverseCashflow}>
           <Typography.Paragraph type="secondary" className="ui-drawer-hint">
             冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，
             状态直接为「已审核」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
           </Typography.Paragraph>
-          <Form.Item name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
+          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="冲销原因" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="冲销原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认冲销
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -960,8 +975,9 @@ export function FundsPage() {
         <Typography.Paragraph type="warning">
           释放后相应减少押金占用，操作不可撤销；释放金额不得超过剩余可释放额。
         </Typography.Paragraph>
+        <FieldConfigScope scope="FUNDRELEASE" active={Boolean(returnTarget)}>
           <Form form={returnForm} layout="vertical" onFinish={submitReturn}>
-          <Form.Item
+          <CfgItem
             name="amount"
             label="释放金额"
             rules={[
@@ -979,14 +995,15 @@ export function FundsPage() {
             ]}
           >
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="released_on" label="释放日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="released_on" label="释放日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认释放
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="登记押金损失" open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)} footer={null}>
@@ -994,13 +1011,15 @@ export function FundsPage() {
         <Typography.Paragraph type="warning">
           登记损失后该押金占用相应扣减，操作不可撤销，请核对金额与费用分类。
         </Typography.Paragraph>
+        <FieldConfigScope scope="FUNDLOSS" active={Boolean(lossTarget)}>
           <Form form={lossForm} layout="vertical" onFinish={submitLoss}>
-          <Form.Item name="amount" label="损失金额" rules={requiredMoneyRules("损失金额")}><MoneyInput /></Form.Item>
-          <Form.Item name="lost_on" label="损失日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></Form.Item>
-          <Form.Item name="category" label="费用分类" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="reason" label="损失原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <CfgItem name="amount" label="损失金额" rules={requiredMoneyRules("损失金额")}><MoneyInput /></CfgItem>
+          <CfgItem name="lost_on" label="损失日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="category" label="费用分类" rules={[{ required: true }]}><Input /></CfgItem>
+          <CfgItem name="reason" label="损失原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认损失</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="修复单边划转" open={Boolean(repairTarget)} onCancel={() => setRepairTarget(null)} footer={null}>
@@ -1008,22 +1027,26 @@ export function FundsPage() {
           划转号：{repairTarget?.transfer_id}；现有流水：{repairTarget?.flow_no}
         </Typography.Paragraph>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDREPAIR" active={Boolean(repairTarget)}>
           <Form form={repairForm} layout="vertical" onFinish={submitRepair}>
-          <Form.Item name="counterpart_pool_id" label="缺失对端资金池" rules={[{ required: true }]}>
+          <CfgItem name="counterpart_pool_id" label="缺失对端资金池" rules={[{ required: true }]}>
             <Select options={pools.filter((pool) => pool.id !== repairTarget?.pool_id).map((pool) => ({ value: pool.id, title: `${pool.name}（${pool.code}）`, label: `${pool.name}（${pool.code}）` }))} />
-          </Form.Item>
-          <Form.Item name="reason" label="修复原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
+          </CfgItem>
+          <CfgItem name="reason" label="修复原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认修复</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="锁定账期" open={periodLockOpen} onCancel={() => setPeriodLockOpen(false)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="FUNDLOCK" active={periodLockOpen}>
           <Form form={periodLockForm} layout="vertical" onFinish={submitPeriodLock}>
-          <Form.Item name="period" label="会计账期" rules={[{ required: true }, { pattern: /^\d{4}-\d{2}$/, message: "请输入 YYYY-MM" }]}><Input placeholder="YYYY-MM" /></Form.Item>
-          <Form.Item name="note" label="说明"><Input.TextArea rows={3} /></Form.Item>
+          <CfgItem name="period" label="会计账期" rules={[{ required: true }, { pattern: /^\d{4}-\d{2}$/, message: "请输入 YYYY-MM" }]}><Input placeholder="YYYY-MM" /></CfgItem>
+          <CfgItem name="note" label="说明"><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认锁定</PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>

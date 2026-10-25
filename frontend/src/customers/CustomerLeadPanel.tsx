@@ -6,6 +6,7 @@ import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/
 import { normalizeError } from "../shared/api/client";
 import { DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
+import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -13,6 +14,7 @@ export function CustomerLeadPanel() {
   const [rows, setRows] = useState<Lead[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const { config } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -78,14 +80,16 @@ export function CustomerLeadPanel() {
       <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" onPageChange={() => undefined} />
     </Card>
     <Modal title="新增客户需求" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
-      <Form form={createForm} layout="vertical" onFinish={createLead}>
-        <Form.Item name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></Form.Item>
-        <Form.Item name="request_type" label="需求类型" rules={[{ required: true }]}><Select options={Object.entries(REQUEST_TYPE_LABEL).map(([value, label]) => ({ value, label }))} /></Form.Item>
-        <Form.Item name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></Form.Item>
-        <Form.Item name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-        <Form.Item name="note" label="备注"><Input.TextArea rows={2} /></Form.Item>
-        <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>创建需求</PermissionButton>
-      </Form>
+      <FieldConfigContext.Provider value={config}>
+        <Form form={createForm} layout="vertical" onFinish={createLead}>
+          <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
+          <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select options={Object.entries(REQUEST_TYPE_LABEL).map(([value, label]) => ({ value, label }))} /></CfgItem>
+          <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
+          <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
+          <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>创建需求</PermissionButton>
+        </Form>
+      </FieldConfigContext.Provider>
     </Modal>
     <Modal title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
       <Form form={closeForm} layout="vertical" onFinish={closeLead}><Form.Item name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item><PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton></Form>

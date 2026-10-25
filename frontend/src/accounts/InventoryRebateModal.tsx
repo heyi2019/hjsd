@@ -11,6 +11,7 @@ import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
 import { ErrorBanner, MoneyInput, PermissionButton } from "../shared/ui";
+import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 type RebateKind = "BUY" | "SELL";
 
@@ -45,6 +46,7 @@ export function InventoryRebateModal(props: {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
+  const { config } = useOrderFormConfig(open ? "INVREBATE" : undefined);
 
   useEffect(() => {
     if (!open || !props.account) return;
@@ -120,43 +122,45 @@ export function InventoryRebateModal(props: {
       <ErrorBanner error={error} />
       <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
       {loading ? <Spin size="small" /> : (
-        <Form form={form} layout="vertical" onFinish={submit}>
-          <Form.Item
-            name="rebate_type"
-            label="返点类型"
-            rules={[{ required: true, type: "array", min: 1, max: 1, message: "请选择一种返点类型" }]}
-          >
-            <Checkbox.Group
-              onChange={(values) => {
-                const kind = values.slice(-1)[0] as RebateKind | undefined;
-                form.setFieldsValue({
-                  rebate_type: kind ? [kind] : [],
-                  base_amount: kind ? defaultBaseAmount(detail, kind) : "0",
-                });
-              }}
-              options={(["BUY", "SELL"] as RebateKind[]).map((kind) => ({
-                value: kind,
-                label: REBATE_KIND_LABEL[kind],
-                disabled: !availableKinds.includes(kind),
-              }))}
-            />
-          </Form.Item>
-          {!availableKinds.length ? <p className="muted">当前账号没有可关联的回收或分销来源订单</p> : null}
-          <Form.Item
-            name="base_amount"
-            label="返点金额"
-            extra="按此金额 × 返点比例计算预计返点"
-            rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
-          >
-            <MoneyInput placeholder="请输入返点金额" />
-          </Form.Item>
-          <Form.Item name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
-            <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
-          </Form.Item>
-          <Form.Item name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-        </Form>
+        <FieldConfigContext.Provider value={config}>
+          <Form form={form} layout="vertical" onFinish={submit}>
+            <CfgItem
+              name="rebate_type"
+              label="返点类型"
+              rules={[{ required: true, type: "array", min: 1, max: 1, message: "请选择一种返点类型" }]}
+            >
+              <Checkbox.Group
+                onChange={(values) => {
+                  const kind = values.slice(-1)[0] as RebateKind | undefined;
+                  form.setFieldsValue({
+                    rebate_type: kind ? [kind] : [],
+                    base_amount: kind ? defaultBaseAmount(detail, kind) : "0",
+                  });
+                }}
+                options={(["BUY", "SELL"] as RebateKind[]).map((kind) => ({
+                  value: kind,
+                  label: REBATE_KIND_LABEL[kind],
+                  disabled: !availableKinds.includes(kind),
+                }))}
+              />
+            </CfgItem>
+            {!availableKinds.length ? <p className="muted">当前账号没有可关联的回收或分销来源订单</p> : null}
+            <CfgItem
+              name="base_amount"
+              label="返点金额"
+              extra="按此金额 × 返点比例计算预计返点"
+              rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
+            >
+              <MoneyInput placeholder="请输入返点金额" />
+            </CfgItem>
+            <CfgItem name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
+              <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
+            </CfgItem>
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>
+              <Input placeholder="YYYY-MM-DD" />
+            </CfgItem>
+          </Form>
+        </FieldConfigContext.Provider>
       )}
     </Modal>
   );

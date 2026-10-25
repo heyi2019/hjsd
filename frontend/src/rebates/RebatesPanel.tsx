@@ -26,6 +26,7 @@ import {
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
+import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -321,34 +322,35 @@ export function RebatesPanel() {
 
       <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={write.error} />
+        <FieldConfigScope scope="REBATE" active={createOpen}>
         <Form form={form} layout="vertical"
           onFinish={submitCreate}
           initialValues={{ collected_on: today(), rebate_type: "BUY" }}
         >
-          <Form.Item name="source_order_id" label="来源订单" rules={[{ required: true }]}>
+          <CfgItem name="source_order_id" label="来源订单" rules={[{ required: true }]}>
             <Select
               options={orders
                 .filter((order) => ["ACTIVE", "COMPLETED"].includes(order.status))
                 .map((order) => ({ value: order.id, label: order.order_no }))}
             />
-          </Form.Item>
-          <Form.Item name="rebate_type" label="返点类型" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="rebate_type" label="返点类型" rules={[{ required: true }]}>
             <Select
               options={[
                 { value: "BUY", label: "买号返点" },
                 { value: "SELL", label: "卖号返点" },
               ]}
             />
-          </Form.Item>
-          <Form.Item name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}>
+          </CfgItem>
+          <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="rate" label="返点比例" rules={percentRules("返点比例")}>
+          </CfgItem>
+          <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}>
             <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
-          </Form.Item>
-          <Form.Item name="collected_on" label="返点日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
+          </CfgItem>
           <Typography.Paragraph type="secondary">
             新返点必须关联来源订单；返点不能独立创建为订单（REB-01-02）。
           </Typography.Paragraph>
@@ -356,6 +358,7 @@ export function RebatesPanel() {
             创建
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -365,23 +368,25 @@ export function RebatesPanel() {
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="REBSETTLE" active={Boolean(settleTarget)}>
         <Form form={settleForm} layout="vertical" onFinish={submitSettle}>
-          <Form.Item name="gross_amount" label="到账金额" rules={requiredMoneyRules("到账金额")}>
+          <CfgItem name="gross_amount" label="到账金额" rules={requiredMoneyRules("到账金额")}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="platform_fee" label="平台手续费（自动生成费用流水）" rules={requiredMoneyRules("平台手续费").slice(1)}>
+          </CfgItem>
+          <CfgItem name="platform_fee" label="平台手续费（自动生成费用流水）" rules={requiredMoneyRules("平台手续费").slice(1)}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="pool_id" label="回款池" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="pool_id" label="回款池" rules={[{ required: true }]}>
             <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
-          </Form.Item>
-          <Form.Item name="settled_on" label="到账日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="settled_on" label="到账日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认结算
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -391,16 +396,17 @@ export function RebatesPanel() {
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="REBREVERSE" active={Boolean(reverseTarget)}>
         <Form form={reverseForm} layout="vertical" onFinish={submitReverse}>
           <Typography.Paragraph type="secondary">
             冲销会生成反向结算与反向流水，原结算标记为已冲销；冲销不可撤销、不可重复。
           </Typography.Paragraph>
-          <Form.Item name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
+          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
             <Input.TextArea rows={3} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton
             permission="order.event.post"
             type="primary"
@@ -411,6 +417,7 @@ export function RebatesPanel() {
             确认冲销
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
     </section>
   );

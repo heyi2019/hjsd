@@ -27,6 +27,7 @@ import {
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { useSession } from "../shared/state/session";
+import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 /** 期次状态与合约状态取值不同（PENDING/PARTIAL/PAID/OVERDUE/WAIVED），单独映射，避免复用合约标签出现裸英文。 */
 const SCHEDULE_STATUS_LABEL: Record<string, string> = {
@@ -553,8 +554,9 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTPAY" active={Boolean(payTarget)}>
           <Form form={payForm} layout="vertical" onFinish={submitPay}>
-          <Form.Item name="period_no" label="期次（0=首付，留空按到期顺序）">
+          <CfgItem name="period_no" label="期次（0=首付，留空按到期顺序）">
             <Select
               allowClear
               options={(schedules[payTarget?.id ?? 0] ?? []).map((schedule) => ({
@@ -562,17 +564,18 @@ function ContractTable({
                 label: schedule.period_no === 0 ? "首付" : `第 ${schedule.period_no} 期`,
               }))}
             />
-          </Form.Item>
-          <Form.Item name="amount" label="本次实收" rules={requiredMoneyRules("本次实收")}>
+          </CfgItem>
+          <CfgItem name="amount" label="本次实收" rules={requiredMoneyRules("本次实收")}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="paid_on" label="收款日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="paid_on" label="收款日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认收款
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -582,17 +585,19 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTRECOVER" active={Boolean(recoverTarget)}>
           <Form form={recoverForm} layout="vertical" onFinish={submitRecover}>
-          <Form.Item name="occurred_on" label="回收日期" rules={[{ required: true }]}>
+          <CfgItem name="occurred_on" label="回收日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="note" label="回收说明" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="note" label="回收说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -602,12 +607,13 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTRESALE" active={Boolean(resaleTarget)}>
           <Form form={resaleForm} layout="vertical" onFinish={submitResale}>
           <Typography.Paragraph type="secondary">
             回收账号转售登记：请先在库存中心售出该账号生成售出订单，再在此关联。
             出售订单必须已登记 SELL 事件且关联同一账号，每个合约只能登记一次。
           </Typography.Paragraph>
-          <Form.Item name="resale_order_id" label="出售订单" rules={[{ required: true, message: "请选择出售订单" }]}>
+          <CfgItem name="resale_order_id" label="出售订单" rules={[{ required: true, message: "请选择出售订单" }]}>
             <Select
               showSearch
               placeholder="请选择售出订单"
@@ -619,17 +625,18 @@ function ContractTable({
                   label: `${item.order_no}${item.party_name ? ` · ${item.party_name}` : ""}`,
                 }))}
             />
-          </Form.Item>
-          <Form.Item name="occurred_on" label="出售日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="occurred_on" label="出售日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="note" label="出售说明" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="note" label="出售说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认登记
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -639,21 +646,22 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTDELIVER" active={Boolean(deliverTarget)}>
           <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
-          <Form.Item name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
+          <CfgItem name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
             <Select
               options={[
                 { value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" },
                 { value: "CUSTOMER_SELF", label: "客户自行换绑" },
               ]}
             />
-          </Form.Item>
-          <Form.Item name="delivered_on" label="换绑日期" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="delivered_on" label="换绑日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="note" label="换绑凭证" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="note" label="换绑凭证" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
           <Typography.Paragraph type="secondary">
             仅已结清合约可交付；DELIVER 无金额、不生成现金流，不再确认收入。
           </Typography.Paragraph>
@@ -661,6 +669,7 @@ function ContractTable({
             确认交付
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -670,22 +679,24 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTCANCEL" active={Boolean(cancelTarget)}>
           <Form form={cancelForm} layout="vertical" onFinish={submitCancel}>
           <Typography.Paragraph type="secondary">
             {cancelTarget?.contract_type === "PICKUP_SALE"
               ? "按已收款原资金池退款，提号取消后账号直接结束。"
               : "按已收款原资金池退款，取消后账号回到库存。"}
           </Typography.Paragraph>
-          <Form.Item name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
+          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="取消原因" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="取消原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit" loading={write.pending}>
             确认退款并终止分期
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -695,20 +706,22 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTSETTLE" active={Boolean(settleTarget)}>
         <Form form={settleForm} layout="vertical" onFinish={submitSettleEarly}>
           <Typography.Paragraph type="secondary">
             一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金池时按原收款资金池入账。
           </Typography.Paragraph>
-          <Form.Item name="paid_on" label="结清日期" rules={[{ required: true, message: "请选择结清日期" }]}>
+          <CfgItem name="paid_on" label="结清日期" rules={[{ required: true, message: "请选择结清日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="note" label="备注">
+          </CfgItem>
+          <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="可选" />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission={settlePermission} type="primary" htmlType="submit" loading={write.pending}>
             确认提前结清
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -718,17 +731,19 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTDEFAULT" active={Boolean(defaultTarget)}>
         <Form form={defaultForm} layout="vertical" onFinish={submitDefault}>
           <Typography.Paragraph type="secondary">
             登记后合约进入 DEFAULTED，仅可继续收款或关闭，不可再交付。
           </Typography.Paragraph>
-          <Form.Item name="reason" label="违约原因" rules={[{ required: true, message: "请填写违约原因" }]}>
+          <CfgItem name="reason" label="违约原因" rules={[{ required: true, message: "请填写违约原因" }]}>
             <Input.TextArea rows={3} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.exception.approve" type="primary" danger htmlType="submit" loading={write.pending}>
             确认登记违约
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -738,23 +753,25 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTWAIVE" active={Boolean(waiveTarget)}>
         <Form form={waiveForm} layout="vertical" onFinish={submitWaive}>
           <Typography.Paragraph type="secondary">
             已收款部分不可减免，减免额不得超过该期未收金额；减免后该期不再计入催收。
           </Typography.Paragraph>
-          <Form.Item name="amount" label="减免金额" rules={requiredMoneyRules("减免金额")}>
+          <CfgItem name="amount" label="减免金额" rules={requiredMoneyRules("减免金额")}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="waived_on" label="减免日期" rules={[{ required: true, message: "请选择减免日期" }]}>
+          </CfgItem>
+          <CfgItem name="waived_on" label="减免日期" rules={[{ required: true, message: "请选择减免日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="减免原因" rules={[{ required: true, message: "请填写减免原因" }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="减免原因" rules={[{ required: true, message: "请填写减免原因" }]}>
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认减免
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -764,20 +781,22 @@ function ContractTable({
         footer={null}
       >
         <InlineError error={write.error} />
+        <FieldConfigScope scope="INSTEXTEND" active={Boolean(extendTarget)}>
         <Form form={extendForm} layout="vertical" onFinish={submitExtend}>
           <Typography.Paragraph type="secondary">
             新到期日必须晚于原到期日；逾期期次展期后回到 PENDING。
           </Typography.Paragraph>
-          <Form.Item name="new_due_on" label="新到期日" rules={[{ required: true, message: "请选择新到期日" }]}>
+          <CfgItem name="new_due_on" label="新到期日" rules={[{ required: true, message: "请选择新到期日" }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="展期原因" rules={[{ required: true, message: "请填写展期原因" }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="展期原因" rules={[{ required: true, message: "请填写展期原因" }]}>
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认展期
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
     </section>
   );

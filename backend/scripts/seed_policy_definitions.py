@@ -57,11 +57,13 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
     ("DG_MIXED", "DG 混合单默认策略", "DG 混合单默认处理策略"),
 ]
 
-# 每个规则预置 1 条已发布默认版本，使配置直接就位（占位口径，业务方可在页面「设置配置」调整）。
+# 每个规则预置 1 条已发布默认版本，使配置直接就位。
+# REBATE/INSTALLMENT 的默认值由库内真实业务数据反推（rebate_records.rate 区间 3~10、
+# installments.periods 众数 3）；COMMISSION/WRITE_DOWN/REFUND 库内无对应历史，保留占位待业务方在页面「设置配置」调整。
 DEFAULT_VERSION_CONFIG: dict[str, dict[str, object]] = {
-    "REBATE": {"rate": "0"},
+    "REBATE": {"rate": "5"},
     "COMMISSION": {"rate": "0"},
-    "INSTALLMENT": {"periods": "1", "cycle": "monthly"},
+    "INSTALLMENT": {"periods": "3", "cycle": "monthly"},
     "WRITE_DOWN": {"rate": "0"},
     "REFUND": {"rate": "0"},
     "DG_MIXED": {"mode": "standard"},
@@ -92,6 +94,7 @@ def main() -> int:
     created_defs: list[str] = []
     skipped_defs: list[str] = []
     created_versions: list[str] = []
+    updated_versions: list[str] = []
     skipped_versions: list[str] = []
     try:
         for code, name, description in POLICY_SEEDS:
@@ -117,23 +120,22 @@ def main() -> int:
             else:
                 skipped_defs.append(f"{code}(id={definition_id})")
 
-            # 2) 版本：每个定义预置 1 条已发布版本（幂等）
+            # 2) 版本：每个定义预置 1 条已发布版本；已存在则摆正 config（upsert，幂等）。
             if definition_id is not None:
-                version_count = session.scalar(
-                    select(func.count(PolicyVersion.id)).where(
-                        PolicyVersion.policy_definition_id == definition_id
-                    )
+                latest = session.scalar(
+                    select(PolicyVersion)
+                    .where(PolicyVersion.policy_definition_id == definition_id)
+                    .order_by(PolicyVersion.version.desc())
                 )
-                if version_count:
-                    skipped_versions.append(f"{code}(已有 {version_count} 个版本)")
-                else:
+                target_config = DEFAULT_VERSION_CONFIG.get(code, {"placeholder": True})
+                if latest is None:
                     created_versions.append(code)
                     if args.apply:
                         version = policy_service.create_version(
                             session,
                             definition_id,
                             effective_from=date.today(),
-                            config=DEFAULT_VERSION_CONFIG.get(code, {"placeholder": True}),
+                            config=target_config,
                             note="系统预置默认版本",
                             actor="system:seed_policy_definitions",
                         )
@@ -143,6 +145,13 @@ def main() -> int:
                             approver="system:seed_policy_definitions",
                             note="系统预置默认版本",
                         )
+                elif latest.config != target_config:
+                    updated_versions.append(f"{code}(v{latest.version})")
+                    if args.apply:
+                        latest.config = target_config
+                        session.add(latest)
+                else:
+                    skipped_versions.append(f"{code}(v{latest.version} config 一致)")
         if args.apply:
             session.commit()
     finally:
@@ -153,6 +162,7 @@ def main() -> int:
     print(f"[{mode}] 定义 将创建/已创建 {len(created_defs)} 条：{created_defs or '（无）'}")
     print(f"[{mode}] 定义 已存在跳过 {len(skipped_defs)} 条：{skipped_defs or '（无）'}")
     print(f"[{mode}] 版本 将创建/已创建 {len(created_versions)} 条：{created_versions or '（无）'}")
+    print(f"[{mode}] 版本 将更新/已更新 {len(updated_versions)} 条：{updated_versions or '（无）'}")
     print(f"[{mode}] 版本 已存在跳过 {len(skipped_versions)} 条：{skipped_versions or '（无）'}")
     if not args.apply:
         print("[DRY-RUN] 未写入任何数据；确认无误后加 --apply 执行。")

@@ -517,7 +517,6 @@ def set_allocations(
 
     normalized_items = [_normalize_allocation_item(item) for item in items]
     total = Decimal("0")
-    seen: set[tuple[str | None, int | None, str]] = set()
     user_ids: set[int] = set()
     allocation_types: set[str] = set()
     if len(normalized_items) != 4 or any(not item.get("allocation_type") for item in normalized_items):
@@ -559,15 +558,7 @@ def set_allocations(
                 if creator_id is not None:
                     action_actor_ids[action_type] = creator_id
     for item in normalized_items:
-        try:
-            rate = to_money(item.get("allocation_rate"))
-        except (ValueError, ArithmeticError) as exc:
-            raise Validation(
-                "分配比例必须是数值",
-                details={"field": "allocation_rate", "value": item.get("allocation_rate")},
-            ) from exc
-        if rate < 0:
-            raise Validation("分配比例不得为负", details={"allocation_rate": str(rate)})
+        rate = to_money(item.get("allocation_rate"))
         role = str(item.get("role") or "").upper()
         if role not in AllocationRole.values():
             raise Validation(
@@ -599,13 +590,6 @@ def set_allocations(
         if item.get("user_id") is not None:
             user_ids.add(int(item["user_id"]))
         total += rate
-        key = (allocation_type, int(item["user_id"]) if item.get("user_id") is not None else None, role)
-        if key in seen:
-            raise Validation(
-                "同一人员同一角色不可重复分配",
-                details={"user_id": key[0], "role": key[1]},
-            )
-        seen.add(key)
 
     existing_user_ids = {
         user_id
@@ -618,8 +602,6 @@ def set_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
-    if has_typed_items and allocation_types != {"BUY", "SELL", "OPERATION", "COMPANY"}:
-        raise Validation("分配项必须完整包含 BUY、SELL、OPERATION、COMPANY；COMPANY 表示公司归属", details={"allocation_types": sorted(allocation_types)})
     if total != Decimal("100.00"):
         raise Validation(
             "有效分配比例合计必须为 100%",

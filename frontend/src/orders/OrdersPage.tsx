@@ -514,7 +514,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       title: "操作",
       key: "actions",
       render: (_, order) => (
-        <Space size="small">
+        <Space size={2}>
           <PermissionButton permission="order.event.post" type="link" onClick={() => void openOrder(order)}>查看详情</PermissionButton>
           <PermissionGate permission="order.event.post">
             <Dropdown

@@ -117,7 +117,7 @@ export function QualityPanel() {
     {
       title: "操作",
       render: (_v, row) => row.status === "OPEN" ? (
-        <Space>
+        <Space size={2}>
           <PermissionButton permission="order.exception.approve" size="small" loading={updating} onClick={() => void updateIssueStatus(row, "IN_PROGRESS")}>开始处理</PermissionButton>
           <PermissionButton permission="order.exception.approve" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
         </Space>

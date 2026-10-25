@@ -53,7 +53,7 @@ export function UsersPanel() {
         { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" },
         { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
         { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" },
-        { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><ConfirmButton
+        { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space size={2}><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><ConfirmButton
               permission="user.manage"
               size="small"
               title={user.is_active ? "停用该用户" : "启用该用户"}

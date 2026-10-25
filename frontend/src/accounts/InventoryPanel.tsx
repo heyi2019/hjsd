@@ -345,7 +345,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
       title: "操作",
       key: "actions",
       render: (_value, row) => (
-        <Space size="small">
+        <Space size={2}>
           <PermissionButton
             permission="order.create"
             type="link"
@@ -541,15 +541,6 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         title="账号台账"
         extra={
           <Space wrap>
-            <PermissionButton
-              permission="report.read"
-              aria-label="导出"
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              onClick={() => void handleExport()}
-            >
-              导出
-            </PermissionButton>
             <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={status} options={STATUS_OPTIONS} onChange={(value) => { setStatus(value); setPage(1); }} />
             <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={BUSINESS_OPTIONS} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
             <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={INVENTORY_TYPE_OPTIONS} onChange={(value) => { setInventoryType(value); setPage(1); }} />
@@ -561,6 +552,15 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
               className="ui-control-width-inventory"
               onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
             />
+            <PermissionButton
+              permission="report.read"
+              aria-label="导出"
+              icon={<DownloadOutlined />}
+              loading={exporting}
+              onClick={() => void handleExport()}
+            >
+              导出
+            </PermissionButton>
           </Space>
         }
       >

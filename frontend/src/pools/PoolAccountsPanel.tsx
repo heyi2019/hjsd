@@ -1,5 +1,5 @@
 /** 资金池内账户（银行/现金/第三方渠道）主数据维护：归属决定计入权益还是仅计头寸（V30）。 */
-import { Card, Form, Input, Modal, Select, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { normalizeError } from "../shared/api/client";
@@ -141,7 +141,7 @@ export function PoolAccountsPanel() {
       title: "操作",
       key: "actions",
       render: (_v, row) => (
-        <>
+        <Space size={2}>
           <PermissionButton
             permission="pool.manage"
             size="small"
@@ -168,7 +168,7 @@ export function PoolAccountsPanel() {
           >
             {row.status === "ACTIVE" ? "停用" : "启用"}
           </ConfirmButton>
-        </>
+        </Space>
       ),
     },
   ];

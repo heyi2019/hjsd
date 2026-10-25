@@ -1,4 +1,4 @@
-import { Card, Form, Input, Modal, Select, Typography, message, InputNumber } from "antd";
+import { Button, Card, Form, Input, Modal, Select, Space, Typography, message, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { orderTypesApi, type OrderType, type OrderTypeRoute } from "../../shared/api/catalog";
@@ -122,7 +122,7 @@ export function OrderTypesPanel() {
         <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
       ),
     },
-    { title: "操作", render: (_v, row) => <PermissionGate permission="order-type.manage"><button type="button" className="ui-button ui-button--small" onClick={() => { setEditTarget(row); editForm.setFieldsValue(row); }}>编辑</button><button type="button" className="ui-button ui-button--small" onClick={() => void openRoutes(row)}>路由</button><ConfirmButton
+    { title: "操作", render: (_v, row) => <PermissionGate permission="order-type.manage"><Space size={2}><Button size="small" onClick={() => { setEditTarget(row); editForm.setFieldsValue(row); }}>编辑</Button><Button size="small" onClick={() => void openRoutes(row)}>路由</Button><ConfirmButton
               permission="order-type.manage"
               size="small"
               title={row.is_active ? `停用业务类型「${row.name}」` : `启用业务类型「${row.name}」`}
@@ -133,7 +133,7 @@ export function OrderTypesPanel() {
               onConfirm={() => toggleActive(row)}
             >
               {row.is_active ? "停用" : "启用"}
-            </ConfirmButton><button type="button" className="ui-button ui-button--small" onClick={() => { setPreviewTarget(row); setPreview(null); }}>影响预览</button></PermissionGate> },
+            </ConfirmButton><Button size="small" onClick={() => { setPreviewTarget(row); setPreview(null); }}>影响预览</Button></Space></PermissionGate> },
   ];
 
   return (

@@ -1,5 +1,5 @@
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
-import { Card, Form, Input, Modal, Select, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/catalog";
@@ -68,7 +68,7 @@ export function CustomerLeadPanel() {
     { title: "预算", dataIndex: "budget", align: "right", render: (v: string | null) => v ? <MoneyText value={v} /> : "-" },
     { title: "目标", dataIndex: "target" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
-    { title: "操作", render: (_v, row) => row.status === "OPEN" ? <><PermissionButton permission="customer.create" size="small" onClick={() => setConvertTarget(row)}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton></> : null },
+    { title: "操作", render: (_v, row) => row.status === "OPEN" ? <Space size={2}><PermissionButton permission="customer.create" size="small" onClick={() => setConvertTarget(row)}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton></Space> : null },
   ];
 
   return <section className="ui-stack">

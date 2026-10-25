@@ -330,7 +330,7 @@ function CustomerPanel() {
     {
       title: "操作",
       render: (_v, row) => (
-        <Space>
+        <Space size={2}>
           <PermissionButton permission="customer.read" size="small" onClick={() => void openDetail(row)}>
             详情
           </PermissionButton>
@@ -786,7 +786,7 @@ function CounterpartyPanel() {
     {
       title: "操作",
       render: (_v, row) => (
-        <Space>
+        <Space size={2}>
           <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row)}>
             详情
           </PermissionButton>

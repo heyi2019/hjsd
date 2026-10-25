@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Select, Tabs, Tooltip, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tabs, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -467,7 +467,7 @@ export function FundsPage() {
       title: "操作",
       width: 190,
       render: (_v, row) => (
-        <>
+        <Space size={2}>
           <PermissionButton
             permission="deposit.post"
             size="small"
@@ -490,7 +490,7 @@ export function FundsPage() {
           >
             登记损失
           </PermissionButton>
-        </>
+        </Space>
       ),
     },
   ];
@@ -545,7 +545,7 @@ export function FundsPage() {
       title: "操作",
       width: 170,
       render: (_v, row) => (
-        <>
+        <Space size={2}>
           {row.status === "PENDING" && (
             <ConfirmButton
               permission="deposit.post"
@@ -575,7 +575,7 @@ export function FundsPage() {
               冲销
             </PermissionButton>
           )}
-        </>
+        </Space>
       ),
     },
   ];
@@ -600,14 +600,14 @@ export function FundsPage() {
     {
       title: "操作",
       render: (_v, row) => (
-        <>
+        <Space size={2}>
           {row.status === "OPEN" ? (
             <PermissionButton permission="finance.read" size="small" onClick={() => setUnmatchedTarget(row)}>查看未达流水</PermissionButton>
           ) : null}
           {row.status === "OPEN" ? (
-            <PermissionButton permission="deposit.post" size="small" onClick={() => setResolveTarget(row)}>核销</PermissionButton>
+              <PermissionButton permission="deposit.post" size="small" onClick={() => setResolveTarget(row)}>核销</PermissionButton>
           ) : null}
-        </>
+        </Space>
       ),
     },
   ];

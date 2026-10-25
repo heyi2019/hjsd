@@ -223,7 +223,7 @@ export function ImportWorkbench({
       title: "操作",
       width: 220,
       render: (_v, row) => (
-        <Space size="small" wrap>
+        <Space size={2} wrap>
           <PermissionButton
             permission="import.manage"
             size="small"

@@ -1,4 +1,4 @@
-import { Card, Form, Input, InputNumber, Popconfirm, Select, Switch, Typography, message } from "antd";
+import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { fieldsApi, type FieldDefinition } from "../../shared/api/catalog";
@@ -103,7 +103,7 @@ export function FieldsPanel() {
       title: "操作",
       render: (_v, row) => (
         <PermissionGate permission="field-definition.manage">
-          <span className="ui-inline-actions">
+          <Space size={2}>
             <PermissionButton
               permission="field-definition.manage"
               size="small"
@@ -127,7 +127,7 @@ export function FieldsPanel() {
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
-          </span>
+          </Space>
           <Popconfirm
             title={`删除字段「${row.label}」`}
             description="无历史值才可删除；已有历史值只能停用（历史值保留）"

@@ -1,4 +1,4 @@
-import { Card, Checkbox, Form, Input, InputNumber, Table, Typography, message } from "antd";
+import { Card, Checkbox, Form, Input, InputNumber, Space, Table, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
@@ -86,7 +86,7 @@ export function GameTypeSettingsPanel() {
       title: "操作",
       render: (_value, row) => (
         <PermissionGate permission="order-type.manage">
-          <span className="ui-inline-actions">
+          <Space size={2}>
             <PermissionButton
               permission="order-type.manage"
               size="small"
@@ -108,7 +108,7 @@ export function GameTypeSettingsPanel() {
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
-          </span>
+          </Space>
         </PermissionGate>
       ),
     },

@@ -332,7 +332,7 @@ function ContractTable({
     {
       title: "操作",
       render: (_v, row) => (
-        <Space>
+        <Space size={2}>
           <PermissionButton
             permission="order.event.post"
             size="small"
@@ -463,7 +463,7 @@ function ContractTable({
     {
       title: "操作",
       render: (_v, schedule) => (
-        <Space>
+        <Space size={2}>
           <PermissionButton
             permission="order.exception.approve"
             size="small"

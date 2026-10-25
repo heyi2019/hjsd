@@ -13,7 +13,7 @@ import {
   type OrderType,
 } from "../shared/api/catalog";
 import { api, normalizeError } from "../shared/api/client";
-import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, CAPITAL_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { requiredMoneyRules, percentRules } from "../shared/lib/validators";
 import { InventoryPanel } from "../accounts/InventoryPanel";
@@ -680,7 +680,6 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             <Descriptions.Item label="金额/进度">{selectedOrder.installment_principal ? `¥${selectedOrder.installment_paid ?? "0.00"}/${selectedOrder.installment_principal} · ${selectedOrder.installment_periods ?? 0}期` : selectedOrder.event_total ? `¥${selectedOrder.event_total}` : "-"}</Descriptions.Item>
             <Descriptions.Item label="最新动作">{selectedOrder.last_event_type ? `${executionActionLabel(selectedOrder.last_event_type, selectedOrder.order_type)}${selectedOrder.last_event_amount ? ` · ¥${selectedOrder.last_event_amount}` : ""}` : "-"}</Descriptions.Item>
             <Descriptions.Item label="状态"><StatusTag status={selectedOrder.status} /></Descriptions.Item>
-            <Descriptions.Item label="资金性质">{CAPITAL_TYPE_LABEL[selectedOrder.capital_type] || selectedOrder.capital_type || "-"}</Descriptions.Item>
             <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={LINK_STATUS_LABEL[selectedOrder.link_status ?? "LINKED"] ?? selectedOrder.link_status} /></Descriptions.Item>
             <Descriptions.Item label="成交日">{selectedOrder.trade_date || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>

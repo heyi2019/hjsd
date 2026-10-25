@@ -510,7 +510,7 @@ def create_order_link(
     return schemas.OrderLinkOut.model_validate(item)
 
 
-@router.delete("/orders/{order_id}/links/{link_id}", status_code=204)
+@router.delete("/orders/{order_id}/links/{link_id}", status_code=204, response_model=None)
 def delete_order_link(
     order_id: int,
     link_id: int,
@@ -711,6 +711,7 @@ def set_order_form_field_active(
 @router.delete(
     "/order-form-fields/{field_id}",
     status_code=204,
+    response_model=None,
 )
 def delete_order_form_field(
     field_id: int,

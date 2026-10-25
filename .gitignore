@@ -47,5 +47,8 @@ htmlcov/
 # 数据库备份运行产物，不纳入代码版本库
 /backend/data/backups/*
 
+# 迁移前的临时库备份（带时间戳后缀，*.db 规则匹配不到）
+/backend/data/*.bak*
+
 # WorkBuddy 记忆目录，与项目代码无关
 .workbuddy/

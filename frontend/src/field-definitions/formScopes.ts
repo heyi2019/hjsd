@@ -1,14 +1,14 @@
 /** 表单作用域注册表：可配置字段的「表单」清单（单一事实源）。
  *
- * 后端 OrderFormField.order_type_code 是 2-10 位大写字母数字的自由字符串，
- * 这里把它泛化为「表单作用域码」：建单表单 4 个 + 其余业务表单 27 个。
+ * 后端 OrderFormField.order_type_code 是长度 2-16 的大写字母数字自由字符串，
+ * 这里把它泛化为「表单作用域码」：建单表单 4 个 + 其余业务表单 29 个。
  * 设置面板与业务表单都从此处取码，避免两处各写一份清单而漂移。
  */
 
 export type FormScopeCode =
   | "HS" | "TH" | "DG" | "DFQ"
   | "SALE" | "CONSIGN" | "INVREBATE"
-  | "LEAD"
+  | "LEAD" | "LEADCLOSE" | "LEADCONVERT"
   | "INSTPAY" | "INSTRECOVER" | "INSTRESALE" | "INSTDELIVER" | "INSTCANCEL"
   | "INSTSETTLE" | "INSTDEFAULT" | "INSTWAIVE" | "INSTEXTEND"
   | "REBATE" | "REBSETTLE" | "REBREVERSE"
@@ -38,6 +38,8 @@ export const FORM_SCOPES: { code: FormScopeCode; label: string; group: string }[
   { code: "INVREBATE", label: "库存返点", group: "INVENTORY" },
 
   { code: "LEAD", label: "客户需求池", group: "CUSTOMER" },
+  { code: "LEADCLOSE", label: "关闭需求", group: "CUSTOMER" },
+  { code: "LEADCONVERT", label: "需求转单", group: "CUSTOMER" },
 
   { code: "INSTPAY", label: "分期收款", group: "INSTALLMENT" },
   { code: "INSTRECOVER", label: "分期回收", group: "INSTALLMENT" },

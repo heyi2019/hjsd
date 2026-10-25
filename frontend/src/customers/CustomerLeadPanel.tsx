@@ -6,7 +6,7 @@ import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/
 import { normalizeError } from "../shared/api/client";
 import { DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
-import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -92,10 +92,20 @@ export function CustomerLeadPanel() {
       </FieldConfigContext.Provider>
     </Modal>
     <Modal title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
-      <Form form={closeForm} layout="vertical" onFinish={closeLead}><Form.Item name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item><PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton></Form>
+      <FieldConfigScope scope="LEADCLOSE" active={Boolean(closeTarget)}>
+        <Form form={closeForm} layout="vertical" onFinish={closeLead}>
+          <CfgItem name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
+          <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
+        </Form>
+      </FieldConfigScope>
     </Modal>
     <Modal title="需求转单" open={Boolean(convertTarget)} onCancel={() => setConvertTarget(null)} footer={null}>
-      <Form form={convertForm} layout="vertical" onFinish={convertLead}><Form.Item name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></Form.Item><PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton></Form>
+      <FieldConfigScope scope="LEADCONVERT" active={Boolean(convertTarget)}>
+        <Form form={convertForm} layout="vertical" onFinish={convertLead}>
+          <CfgItem name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></CfgItem>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>
+        </Form>
+      </FieldConfigScope>
     </Modal>
   </section>;
 }

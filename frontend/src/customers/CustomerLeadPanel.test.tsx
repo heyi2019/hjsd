@@ -106,6 +106,30 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await waitFor(() => expect(catalog.leadsApi.convert).toHaveBeenCalledWith(1, 99));
   });
 
+  it("配置停用后关闭弹窗不渲染「关闭原因」字段", async () => {
+    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+      { id: 1, order_type_code: "LEADCLOSE", field_key: "reason", label: "关闭原因", field_type: "TEXT", options: null, required: true, is_active: false, sort_order: 10, locked: false, is_custom: false, note: null },
+    ] as never);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: /关闭/ }));
+    const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
+    await waitFor(() => expect(within(modal).queryByLabelText("关闭原因")).toBeNull());
+    await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
+    await waitFor(() => expect(catalog.leadsApi.close).toHaveBeenCalledWith(1, undefined));
+  });
+
+  it("转单弹窗「订单 ID」标签取配置值", async () => {
+    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+      { id: 2, order_type_code: "LEADCONVERT", field_key: "order_id", label: "关联订单号", field_type: "TEXT", options: null, required: true, is_active: true, sort_order: 10, locked: false, is_custom: false, note: null },
+    ] as never);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: /转单/ }));
+    const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
+    await waitFor(() => expect(within(modal).getByLabelText("关联订单号")).toBeInTheDocument());
+  });
+
   it("已关闭需求不渲染行内操作按钮", async () => {
     vi.mocked(catalog.leadsApi.list).mockResolvedValue([
       { id: 2, lead_no: "LD-2", customer_id: 1, request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" },

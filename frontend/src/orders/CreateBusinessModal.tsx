@@ -1,5 +1,5 @@
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
-import { Form, Modal, Select as AntSelect, Space, message } from "antd";
+import { Form, Modal, message } from "antd";
 import { useEffect, useState } from "react";
 import {
   counterpartiesApi,
@@ -14,7 +14,6 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { CAPITAL_TYPE_LABEL } from "../shared/lib/labels";
 import { ErrorBanner, PermissionButton, ResizableModal } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
@@ -32,13 +31,6 @@ const MODAL_TITLES: Record<string, string> = {
   TH: "新建提号订单",
   DG: "新建代挂订单",
   DFQ: "新建代分期订单",
-};
-
-const BUSINESS_CONTEXT: Partial<Record<BusinessOrderType, { business: string; type: string }>> = {
-  HS: { business: "自营", type: "回收" },
-  TH: { business: "分销", type: "提号" },
-  DG: { business: "分销", type: "代挂" },
-  DFQ: { business: "增值服务（独立分销服务）", type: "代分期" },
 };
 
 function toDateString(value: unknown) {
@@ -63,7 +55,6 @@ export function CreateBusinessModal(props: {
   const isTh = orderType === "TH";
   const isDg = orderType === "DG";
   const isDfq = orderType === "DFQ";
-  const businessContext = BUSINESS_CONTEXT[orderType];
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
@@ -156,7 +147,6 @@ export function CreateBusinessModal(props: {
         const order = await ordersApi.create({
           order_type: "DFQ",
           trade_date: today(),
-          capital_type: values.capital_type as string | undefined,
           note: values.dfq_note as string,
           account_snapshot: {
             game_type: values.dfq_game_type as string,
@@ -281,7 +271,6 @@ export function CreateBusinessModal(props: {
       await ordersApi.create({
         order_type: props.initialOrderType,
         trade_date: today(),
-        capital_type: values.capital_type as string | undefined,
         account_snapshot: undefined,
         account_id: undefined,
         note,
@@ -394,24 +383,6 @@ export function CreateBusinessModal(props: {
               : {}),
         }}
       >
-        {businessContext ? (
-          <Space className="muted" size="large">
-            <span>业务：{businessContext.business}</span>
-            <span>类型：{businessContext.type}</span>
-            <span>产品：业务单内联登记</span>
-          </Space>
-        ) : null}
-        <Form.Item
-          name="capital_type"
-          label="资金性质"
-          extra="默认跟随业务类型定义；仅特殊单需要按单覆盖时选择（V34）"
-        >
-          <AntSelect
-            allowClear
-            placeholder="跟随业务定义"
-            options={Object.entries(CAPITAL_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
-          />
-        </Form.Item>
         {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
           <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
         </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}

@@ -1,8 +1,9 @@
-import { Form, Input } from "antd";
+import { Input } from "antd";
 import type { ReactNode } from "react";
 import { Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
 import { HAS_SECONDARY_OPTIONS } from "./recoveryConfig";
+import { CfgItem } from "../ConfigurableField";
 import "./RecoveryAccountSection.css";
 
 /** 新建业务（回收/提号/代挂/代分期）的游戏账号资料区。只负责字段，不处理提交和接口。
@@ -35,7 +36,7 @@ export function RecoveryAccountSection(props: {
       <div id="game-account-info-title" className="recovery-entry-fields__title">
         游戏账号信息
       </div>
-      <Form.Item name={fieldNames.gameType} label="游戏类型" rules={[{ required: true, message: "游戏类型必填" }]}>
+      <CfgItem name={fieldNames.gameType} label="游戏类型" rules={[{ required: true, message: "游戏类型必填" }]}>
         {props.gameTypes?.length ? (
           <Select
             showSearch
@@ -47,25 +48,25 @@ export function RecoveryAccountSection(props: {
         ) : (
           <Input placeholder="例如：王者荣耀" />
         )}
-      </Form.Item>
-      <Form.Item name={fieldNames.gameAccount} label="游戏账号" rules={[{ required: true, message: "游戏账号必填" }]}>
+      </CfgItem>
+      <CfgItem name={fieldNames.gameAccount} label="游戏账号" rules={[{ required: true, message: "游戏账号必填" }]}>
         <Input placeholder="请输入游戏账号" />
-      </Form.Item>
-      <Form.Item name={fieldNames.gamePassword} label="账号密码" rules={[{ required: true, message: "账号密码必填" }]}>
+      </CfgItem>
+      <CfgItem name={fieldNames.gamePassword} label="账号密码" rules={[{ required: true, message: "账号密码必填" }]}>
         <Input placeholder="请输入账号密码" />
-      </Form.Item>
-      <Form.Item name={fieldNames.channelRegion} label="渠道／区服" rules={[{ required: true, message: "渠道／区服必填" }]}>
+      </CfgItem>
+      <CfgItem name={fieldNames.channelRegion} label="渠道／区服" rules={[{ required: true, message: "渠道／区服必填" }]}>
         <Input placeholder="例如：安卓一区／微信" />
-      </Form.Item>
-      <Form.Item name={fieldNames.boundPhone} label="绑定手机号">
+      </CfgItem>
+      <CfgItem name={fieldNames.boundPhone} label="绑定手机号">
         <Input placeholder="可选填" />
-      </Form.Item>
-      <Form.Item name={fieldNames.hasSecondary} label="有无二次">
+      </CfgItem>
+      <CfgItem name={fieldNames.hasSecondary} label="有无二次">
         <Select options={HAS_SECONDARY_OPTIONS} />
-      </Form.Item>
-      <Form.Item className="recovery-entry-fields__account-note" name={fieldNames.accountNote} label="账号备注">
+      </CfgItem>
+      <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">
         <Input placeholder="可选填" />
-      </Form.Item>
+      </CfgItem>
       {props.children}
     </section>
   );

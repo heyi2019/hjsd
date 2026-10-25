@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.core.errors import PermissionDenied, Validation
 from app.core.security import (
     PERM_AUDIT_READ,
+    PERM_FIELD_DEFINITION_MANAGE,
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
@@ -36,6 +37,7 @@ from app.domain.trade import (
 from app.installments import service as installments_service
 from app.parties import service as parties_service
 from app.orders import schemas, service
+from app.orders import form_fields as form_fields_service
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
 
@@ -411,6 +413,7 @@ def create_order(
             if role.counterparty_id is not None
         ],
         extra_values=payload.extra_values,
+        form_extra=payload.form_extra,
         user=user,
     )
     if payload.installment is not None:
@@ -603,6 +606,121 @@ def pool_balance(
     return schemas.PoolBalanceOut.model_validate(
         service.pool_balance(db, pool_id, user=_user)
     )
+
+
+manage_form_fields = require_permissions(PERM_FIELD_DEFINITION_MANAGE)
+
+
+@router.get(
+    "/order-form-fields",
+    response_model=list[schemas.OrderFormFieldOut],
+)
+def list_order_form_fields(
+    order_type_code: str,
+    include_inactive: bool = True,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> list[schemas.OrderFormFieldOut]:
+    """按业务类型 code 列出建单表单字段配置（含停用项）。"""
+    from app.orders import form_fields as ff
+
+    return [
+        schemas.OrderFormFieldOut.model_validate(f)
+        for f in ff.list_order_form_fields(
+            db, order_type_code=order_type_code, include_inactive=include_inactive
+        )
+    ]
+
+
+@router.post(
+    "/order-form-fields",
+    response_model=schemas.OrderFormFieldOut,
+    status_code=201,
+)
+def create_order_form_field(
+    payload: schemas.OrderFormFieldCreate,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> schemas.OrderFormFieldOut:
+    """新增自定义建单表单字段。"""
+    from app.orders import form_fields as ff
+
+    return schemas.OrderFormFieldOut.model_validate(
+        ff.create_order_form_field(
+            db,
+            order_type_code=payload.order_type_code,
+            field_key=payload.field_key,
+            label=payload.label,
+            actor=_user.username,
+            field_type=payload.field_type,
+            options=payload.options,
+            required=payload.required,
+            is_active=payload.is_active,
+            sort_order=payload.sort_order,
+            note=payload.note,
+        )
+    )
+
+
+@router.patch(
+    "/order-form-fields/{field_id}",
+    response_model=schemas.OrderFormFieldOut,
+)
+def update_order_form_field(
+    field_id: int,
+    payload: schemas.OrderFormFieldUpdate,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> schemas.OrderFormFieldOut:
+    """编辑建单表单字段（label/类型/选项/必填/排序/备注）。"""
+    from app.orders import form_fields as ff
+
+    return schemas.OrderFormFieldOut.model_validate(
+        ff.update_order_form_field(
+            db,
+            field_id,
+            actor=_user.username,
+            label=payload.label,
+            field_type=payload.field_type,
+            options=payload.options,
+            required=payload.required,
+            sort_order=payload.sort_order,
+            note=payload.note,
+        )
+    )
+
+
+@router.patch(
+    "/order-form-fields/{field_id}/active",
+    response_model=schemas.OrderFormFieldOut,
+)
+def set_order_form_field_active(
+    field_id: int,
+    active: bool,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> schemas.OrderFormFieldOut:
+    """启用/停用建单表单字段（核心字段亦允许，由前端提示风险）。"""
+    from app.orders import form_fields as ff
+
+    return schemas.OrderFormFieldOut.model_validate(
+        ff.set_order_form_field_active(db, field_id, active, actor=_user.username)
+    )
+
+
+@router.delete(
+    "/order-form-fields/{field_id}",
+    status_code=204,
+)
+def delete_order_form_field(
+    field_id: int,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> None:
+    """删除建单表单字段：核心字段(locked)禁止删除。"""
+    from app.orders import form_fields as ff
+
+    ff.delete_order_form_field(db, field_id, actor=_user.username)
 
 
 __all__ = ["router"]

@@ -101,6 +101,8 @@ class OrderCreate(BaseModel):
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
+    # 建单表单自定义字段值（由 OrderFormField 配置驱动），独立存储于订单 form_extra。
+    form_extra: dict[str, object] | None = None
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
     counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
     initial_buy: InitialBuyCreate | None = None
@@ -365,5 +367,58 @@ __all__ = [
     "OrderListOut",
     "OrderLinkOut",
     "OrderUpdate",
+    "OrderFormFieldOut",
+    "OrderFormFieldCreate",
+    "OrderFormFieldUpdate",
     "PoolBalanceOut",
 ]
+
+
+class OrderFormFieldOut(BaseModel):
+    """建单表单字段配置响应。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    order_type_code: str
+    field_key: str
+    label: str
+    field_type: str
+    options: list[str] | None = None
+    required: bool
+    is_active: bool
+    sort_order: int
+    locked: bool
+    is_custom: bool
+    note: str | None = None
+
+
+class OrderFormFieldCreate(BaseModel):
+    """新增建单表单字段（自定义字段）。核心字段由种子锁定，不可经此创建覆盖。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    order_type_code: str = Field(min_length=2, max_length=16)
+    field_key: str = Field(min_length=1, max_length=64)
+    label: str = Field(min_length=1, max_length=128)
+    field_type: str = "TEXT"
+    options: list[str] | None = None
+    required: bool = False
+    is_active: bool = True
+    sort_order: int = 0
+    is_custom: bool = True
+    note: str | None = None
+
+
+class OrderFormFieldUpdate(BaseModel):
+    """编辑建单表单字段：label/类型/选项/必填/排序/停用均可改；field_key 与 code 固定。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str | None = None
+    field_type: str | None = None
+    options: list[str] | None = None
+    required: bool | None = None
+    sort_order: int | None = None
+    note: str | None = None
+

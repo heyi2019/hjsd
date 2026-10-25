@@ -232,6 +232,7 @@ def create_order(
     customer_roles: Sequence[tuple[int, str]] = (),
     counterparty_roles: Sequence[tuple[int, str]] = (),
     extra_values: Mapping[str, Any] | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     definition = foundation_service.get_order_type_by_code(session, order_type)
@@ -359,6 +360,7 @@ def create_order(
         policy_snapshot=snapshot or None,
         owner_id=owner_id,
         note=note,
+        form_extra=dict(form_extra) if form_extra else None,
         created_by=actor,
         updated_by=actor,
     )

@@ -1,6 +1,7 @@
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form, Modal, message } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useOrderFormConfig, CustomFormField, FieldConfigContext } from "./ConfigurableField";
 import {
   counterpartiesApi,
   customersApi,
@@ -64,6 +65,14 @@ export function CreateBusinessModal(props: {
   const [form] = Form.useForm();
   const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
+  const { config } = useOrderFormConfig(props.open ? orderType : undefined);
+  const customFields = useMemo(
+    () =>
+      Object.values(config)
+        .filter((field) => field.is_custom && field.is_active)
+        .sort((a, b) => a.sort_order - b.sort_order),
+    [config],
+  );
 
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
@@ -148,6 +157,7 @@ export function CreateBusinessModal(props: {
           order_type: "DFQ",
           trade_date: today(),
           note: values.dfq_note as string,
+          form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
           account_snapshot: {
             game_type: values.dfq_game_type as string,
             game_account: values.dfq_game_account as string,
@@ -298,6 +308,7 @@ export function CreateBusinessModal(props: {
             : `提号｜付${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
         } : undefined,
         initial_costs: initialCosts,
+        form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
       message.success(isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建");
       props.onClose();
@@ -383,10 +394,19 @@ export function CreateBusinessModal(props: {
               : {}),
         }}
       >
-        {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
-          <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
-        </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
-        {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
+        <FieldConfigContext.Provider value={config}>
+          {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
+            <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
+          </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
+          {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
+          {customFields.length > 0 && (
+            <section className="ui-stack" data-testid="custom-fields">
+              {customFields.map((def) => (
+                <CustomFormField key={def.id} def={def} />
+              ))}
+            </section>
+          )}
+        </FieldConfigContext.Provider>
       </Form>
     </Modal>
   );

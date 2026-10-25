@@ -1,4 +1,4 @@
-import { Form } from "antd";
+import { CfgItem } from "../ConfigurableField";
 import type { Pool } from "../../shared/api/catalog";
 import { MoneyInput } from "../../shared/ui";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
@@ -21,9 +21,9 @@ export function RecoveryFeeSection(props: {
       <div className="primary-amount-section recovery-fee-card recovery-fee-card--primary">
         <div className="recovery-fee-card__label">账号号价</div>
         <div className="recovery-fee-card__desc">实际支付给卖家的账号基础价格，不含附加费用</div>
-        <Form.Item name="recovery_price" rules={[{ required: true, message: "回收价必填" }]}>
+        <CfgItem name="recovery_price" hideLabel rules={[{ required: true, message: "回收价必填" }]}>
           <MoneyInput placeholder="请输入金额" />
-        </Form.Item>
+        </CfgItem>
       </div>
       <AdditionalFeeFields />
       <RecoveryPaymentSection pools={props.pools} />

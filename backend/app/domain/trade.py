@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+import sqlalchemy as sa
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -204,6 +205,9 @@ class Order(Base, AuditMixin):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 建单表单「自定义字段」值存放处（与 parties 活字段解耦，不违反治理约束）。
+    # key 为 OrderFormField.field_key，value 为按 field_type 归一化后的值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class OrderLink(Base, TimestampMixin):
@@ -753,7 +757,59 @@ class RebateSettlement(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class OrderFormField(Base, AuditMixin):
+    """建单表单字段配置：按业务类型 code（HS/TH/DG/DFQ）维度描述「建单表单」的字段构成。
+
+    与 parties 活字段(FieldDefinition)解耦：活字段用于存储实体附加属性值且治理上
+    排除订单字段；本表专门描述表单字段的展示/必填/停用/排序，并可覆盖核心核算字段
+    的必填态。核心核算字段（建单/过账强依赖）以 locked=True 保护，禁止删除，
+    但仍可改必填/选填与停用（停用需业务侧自行承担过账风险，由前端提示）。
+
+    field_key 与建单表单既有字段 name / 自定义字段键一一对应；自定义字段值落在
+    Order.form_extra（JSON）。
+    """
+
+    __tablename__ = "order_form_fields"
+    __table_args__ = (
+        Index("ix_order_form_fields_code_sort", "order_type_code", "sort_order"),
+        CheckConstraint(
+            "field_type IN ('TEXT','NUMBER','DATE','BOOLEAN','SELECT','MULTI_SELECT')",
+            name="order_form_field_type_valid",
+        ),
+        UniqueConstraint(
+            "order_type_code", "field_key", name="uq_order_form_fields_code_key"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_type_code: Mapped[str] = mapped_column(String(16), nullable=False)
+    field_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    field_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="TEXT"
+    )
+    options: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("0")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("1")
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=sa.text("0")
+    )
+    locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("0")
+    )
+    is_custom: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("0")
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 __all__ = [
+    "Order",
+    "OrderFormField",
     "Account",
     "Cashflow",
     "Deposit",

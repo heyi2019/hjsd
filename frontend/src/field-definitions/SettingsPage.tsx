@@ -11,6 +11,7 @@ import { BusinessDictionaryPanel } from "./panels/BusinessDictionaryPanel";
 import { FieldsPanel } from "./panels/FieldsPanel";
 import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
 import { OrderTypesPanel } from "./panels/OrderTypesPanel";
+import { OrderFormFieldsPanel } from "./panels/OrderFormFieldsPanel";
 import { PoolsPanel } from "./panels/PoolsPanel";
 import { SequencesPanel } from "./panels/SequencesPanel";
 
@@ -36,6 +37,7 @@ export function SettingsPage() {
     // 编号序列与业务类型同源（sequence_prefix），读取门控与后端 manage_order_types 一致。
     ...(can("order-type.manage") ? [{ key: "sequences", label: "编号序列", render: () => <SequencesPanel /> }] : []),
     { key: "pools", label: "资金池", render: () => <PoolsPanel /> },
+    { key: "form-fields", label: "表单字段", render: () => <OrderFormFieldsPanel /> },
     { key: "fields", label: "活字段", render: () => <FieldsPanel /> },
     { key: "game-types", label: "游戏类型", render: () => <GameTypeSettingsPanel /> },
     { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },

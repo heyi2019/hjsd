@@ -756,6 +756,7 @@ export const ordersApi = {
     has_secondary?: boolean;
     account_note?: string;
     note?: string;
+    form_extra?: Record<string, unknown>;
     customer_roles?: { customer_id: number; role: string }[];
     counterparty_roles?: { counterparty_id: number; role: string }[];
     initial_buy?: {
@@ -965,6 +966,42 @@ export const fieldsApi = {
     api.patch<FieldDefinition>(`/field-definitions/${id}/active?active=${active}`).then((r) => r.data),
   /** 删除字段定义：有历史值返回 409，只能停用（BAS-04-03） */
   remove: (id: number) => api.delete(`/field-definitions/${id}`),
+};
+
+export interface OrderFormField {
+  id: number;
+  order_type_code: string;
+  field_key: string;
+  label: string;
+  field_type: string;
+  options?: string[] | null;
+  required: boolean;
+  is_active: boolean;
+  sort_order: number;
+  /** 核心核算字段锁定：禁止删除，但仍可改必填/停用 */
+  locked: boolean;
+  /** 用户自定义字段（区别于种子预置的系统字段）；自定义字段可增删停 */
+  is_custom: boolean;
+  note?: string | null;
+}
+
+/** 建单表单字段配置（按业务类型 code 维度），与 parties 活字段解耦。 */
+export const orderFormFieldsApi = {
+  list: (orderTypeCode: string, includeInactive = true) =>
+    api
+      .get<OrderFormField[]>("/order-form-fields", {
+        params: { order_type_code: orderTypeCode, include_inactive: includeInactive },
+      })
+      .then((r) => r.data),
+  create: (payload: Partial<OrderFormField>) =>
+    api.post<OrderFormField>("/order-form-fields", payload).then((r) => r.data),
+  update: (id: number, payload: Partial<OrderFormField>) =>
+    api.patch<OrderFormField>(`/order-form-fields/${id}`, payload).then((r) => r.data),
+  setActive: (id: number, active: boolean) =>
+    api
+      .patch<OrderFormField>(`/order-form-fields/${id}/active?active=${active}`)
+      .then((r) => r.data),
+  remove: (id: number) => api.delete(`/order-form-fields/${id}`),
 };
 
 /* ── M4：报表 / 审计 ─────────────────────────────── */

@@ -1,6 +1,7 @@
 import { Form } from "antd";
 import type { Pool } from "../../shared/api/catalog";
 import { MoneyInput } from "../../shared/ui";
+import { CfgItem } from "../ConfigurableField";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
 import { PaymentInfoSection } from "../PaymentInfoSection";
 import "../recovery/RecoveryFeeSection.css";
@@ -25,13 +26,13 @@ export function ThFeeSection(props: { pools: Pool[] }) {
       </div>
       <div className="recovery-fee-card recovery-fee-card--primary th-fee-primary">
         <div className="recovery-fee-card__label">账号号价</div>
-        <Form.Item className="th-fee-primary__purchase" name="th_purchase_amount" rules={[{ required: true, message: "账号号价必填" }]}>
+        <CfgItem className="th-fee-primary__purchase" name="th_purchase_amount" hideLabel rules={[{ required: true, message: "账号号价必填" }]}>
           <MoneyInput placeholder="请输入金额" />
-        </Form.Item>
+        </CfgItem>
         <div className="recovery-fee-card__label">预计收买家</div>
-        <Form.Item className="th-fee-primary__expected" name="th_receive_amount" rules={[{ required: true, message: "请输入预计收买家金额" }]}>
+        <CfgItem className="th-fee-primary__expected" name="th_receive_amount" hideLabel rules={[{ required: true, message: "请输入预计收买家金额" }]}>
           <MoneyInput placeholder="请输入金额" />
-        </Form.Item>
+        </CfgItem>
         <div className="recovery-fee-card__desc">实际支付给供货方的账号基础价格，不含附加费用</div>
       </div>
       <AdditionalFeeFields />

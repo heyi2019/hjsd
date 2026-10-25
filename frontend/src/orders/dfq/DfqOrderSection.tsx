@@ -4,6 +4,7 @@ import type { GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CUSTOMER_SOURCE_OPTIONS } from "../recovery/recoveryConfig";
+import { CfgItem, CfgNestedItem } from "../ConfigurableField";
 import "./DfqOrderSection.css";
 
 function DfqInstallmentInfo() {
@@ -114,25 +115,25 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
         </NestedFormSection>
         <NestedFormSection className="nested-form-section--card dfq-section" title="付款信息">
           <AdaptiveFormGrid>
-            <NestedFormField label="付款资金账户"><Form.Item noStyle name="dfq_payment_pool_id" rules={[{ required: true, message: "请选择资金账户" }]}><Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item></NestedFormField>
-            <NestedFormField label="付款对象"><Form.Item noStyle name="dfq_payment_recipient" initialValue="供货方"><Input /></Form.Item></NestedFormField>
-            <NestedFormField label="资金流水备注"><Form.Item noStyle name="dfq_payment_note"><Input placeholder="可选填" /></Form.Item></NestedFormField>
+            <CfgNestedItem name="dfq_payment_pool_id" label="付款资金账户" rules={[{ required: true, message: "请选择资金账户" }]}><Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
+            <CfgNestedItem name="dfq_payment_recipient" label="付款对象" initialValue="供货方"><Input /></CfgNestedItem>
+            <CfgNestedItem name="dfq_payment_note" label="资金流水备注"><Input placeholder="可选填" /></CfgNestedItem>
           </AdaptiveFormGrid>
         </NestedFormSection>
       </RecoveryAccountSection>
 
       <section className="dfq-customer-section recovery-customer-fields" aria-labelledby="dfq-customer-info-title">
         <div id="dfq-customer-info-title" className="recovery-customer-fields__title">分期客户</div>
-        <Form.Item className="recovery-order-modal__party-field" name="dfq_customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></Form.Item>
-        <Form.Item className="recovery-order-modal__party-field" name="dfq_customer_source" label="客户来源" rules={[{ required: true, message: "请选择客户来源" }]}><Select placeholder="请选择客户来源" options={CUSTOMER_SOURCE_OPTIONS} /></Form.Item>
+        <CfgItem className="recovery-order-modal__party-field" name="dfq_customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
+        <CfgItem className="recovery-order-modal__party-field" name="dfq_customer_source" label="客户来源" rules={[{ required: true, message: "请选择客户来源" }]}><Select placeholder="请选择客户来源" options={CUSTOMER_SOURCE_OPTIONS} /></CfgItem>
         <div className="recovery-customer-contacts">
           <div className="recovery-customer-contacts__title">联系方式</div>
-          <NestedFormField className="recovery-fee-field" label="姓名"><Form.Item noStyle name="dfq_customer_contact"><Input className="recovery-fee-control" placeholder="可选填" /></Form.Item></NestedFormField>
-          <NestedFormField className="recovery-fee-field" label="手机号"><Form.Item noStyle name="dfq_customer_phone"><Input className="recovery-fee-control" placeholder="可选填" /></Form.Item></NestedFormField>
-          <NestedFormField className="recovery-fee-field" label="微信号"><Form.Item noStyle name="dfq_customer_wechat"><Input className="recovery-fee-control" placeholder="可选填" /></Form.Item></NestedFormField>
-          <NestedFormField className="recovery-fee-field" label="QQ"><Form.Item noStyle name="dfq_customer_qq"><Input className="recovery-fee-control" placeholder="可选填" /></Form.Item></NestedFormField>
+          <CfgNestedItem className="recovery-fee-field" name="dfq_customer_contact" label="姓名"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
+          <CfgNestedItem className="recovery-fee-field" name="dfq_customer_phone" label="手机号"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
+          <CfgNestedItem className="recovery-fee-field" name="dfq_customer_wechat" label="微信号"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
+          <CfgNestedItem className="recovery-fee-field" name="dfq_customer_qq" label="QQ"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
         </div>
-        <Form.Item className="recovery-order-modal__note-field" name="dfq_note" label="分期备注"><Input.TextArea rows={2} placeholder="可选填" /></Form.Item>
+        <CfgItem className="recovery-order-modal__note-field" name="dfq_note" label="分期备注"><Input.TextArea rows={2} placeholder="可选填" /></CfgItem>
       </section>
     </>
   );

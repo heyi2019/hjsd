@@ -46,7 +46,6 @@ EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
     EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
     EventType.REFUND.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "REFUND"),
 }
-MONEY_EVENTS = tuple(EVENT_FLOW_MAP.keys())
 
 
 def _auto_link_recovered_installment_sale(
@@ -198,11 +197,6 @@ def post_event(
             delivery_mode=delivery_mode,
             note=note,
             allow_installment_delivery=allow_installment_delivery,
-        )
-
-    if event_type not in MONEY_EVENTS:
-        raise Validation(
-            f"{event_type} 不是可登记的金额事件", details={"event_type": event_type}
         )
 
     if event_type == EventType.SELL.value:

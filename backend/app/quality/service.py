@@ -164,18 +164,6 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
         if flow.order_event_id not in event_ids:
             continue
         event = session.get(OrderEvent, flow.order_event_id)
-        if event is None:
-            issues.append(
-                _issue(
-                    code="ORPHAN_CASHFLOW",
-                    severity="CRITICAL",
-                    title="孤儿现金流",
-                    entity_type="cashflow",
-                    entity_id=flow.flow_no,
-                    message="现金流引用的业务事件不存在。",
-                )
-            )
-            continue
         mismatches: dict[str, str] = {}
         if flow.order_id != event.order_id:
             mismatches["order_id"] = f"{flow.order_id}!={event.order_id}"

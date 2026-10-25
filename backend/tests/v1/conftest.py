@@ -16,8 +16,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # tests/v1 -> backend
+# 正常环境：把 backend 根置顶，保证 `import app` 走原始代码。
+# mutmut 会在 sys.path 注入 mutants/ 并移除 backend 根；此时若仍 insert(0, backend)，
+# `import app` 会命中原始 backend/app，导致所有变异失效。故检测到 mutants 已在 sys.path
+# （即 mutmut 运行环境）时不再抢占 [0]，让变异后的 mutants/app 优先。
+# 对正常 pytest 零行为变化：正常环境 sys.path 中不含 mutants，逻辑与原先一致。
 if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
+    _mutant_env = any("mutants" in p for p in sys.path)
+    if not _mutant_env:
+        sys.path.insert(0, str(BACKEND_DIR))
 
 os.environ.setdefault("APP_ENV", "development")
 

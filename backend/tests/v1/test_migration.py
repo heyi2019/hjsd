@@ -9,7 +9,17 @@ from pathlib import Path
 import pytest
 from sqlalchemy import create_engine, inspect, text
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
+def _backend_root() -> Path:
+    # mutmut 会把测试复制到 mutants/ 嵌套下，导致 parents[2] 错位到 mutants 根；
+    # 向上找含 alembic.ini 的目录作为真正的 backend 根（正常环境下第一轮即命中，行为不变）。
+    p = Path(__file__).resolve()
+    for cand in (p, *p.parents):
+        if (cand / "alembic.ini").exists():
+            return cand
+    return p.parents[2]
+
+
+BACKEND_DIR = _backend_root()
 
 EXPECTED_TABLES = {
     "pools",

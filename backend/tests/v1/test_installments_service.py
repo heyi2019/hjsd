@@ -4,22 +4,30 @@
 合约类型与计划校验、waive/extend/settle_early 的守卫、recover_account 的
 处置守卫、以及 record_sale 整段（L1128-1190）从未被直接调用。本文件补齐。
 
-注：以下 6 行为「不可达防御」，保留源码不删、不强行覆盖：
-- L315 / L676 / L739 / L1061 / L1068：数据库外键保证不可达（orders.account_id
-  → accounts.id SET NULL、installments.order_id → orders.id RESTRICT，测试库
-  FK 开启，物理删父行只会置 NULL，不会留下悬空引用）。
+末尾一组用例专门覆盖「外键 / 精度保证不可达」的 6 行防御分支：
+- L315 / L676 / L739 / L1061 / L1068：依赖外键（orders.account_id → accounts.id
+  SET NULL、installments.order_id → orders.id RESTRICT）。正常 ORM 路径删父行只
+  会置 NULL，不留悬空引用，故常规测试到不了。
 - L975（settle_early 循环内 `outstanding <= 0: continue`）：rows 已按
-  `received + waived < due` 过滤，且 pay() 只改指定期次、不顺延，故该 continue
-  恒不触发；保留以防御未来 pay 改为跨期顺延。
+  `received + waived < due` 过滤，正常数据下 outstanding 恒 > 0。
+
+覆盖手段：**用原生 `sqlite3.connect()` 建独立连接绕过约束造脏数据**。
+database.py 的 `@event.listens_for(Engine, "connect")` 只对 SQLAlchemy Engine
+创建的连接生效；原生连接不受影响、默认 `foreign_keys=OFF`，可真实复现
+「约束未生效时遗留的脏行」（生产上 DBA 直连改数据同样会产生）。
+关键：执行前 `session.commit()` 释放 SQLite 写锁，执行后 `expire_all()`
+让主会话重新加载；独立连接用完即关，**不会污染 Session 连接池**
+（区别于 `PRAGMA ignore_check_constraints` 那种连接级状态泄漏）。
 """
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import (
@@ -642,6 +650,134 @@ def test_record_sale_success(seeded_db):
     assert disposition.account_id == order.account_id
     assert disposition.related_order_id == sale.id
     assert disposition.note == "出售给新客户"  # _required_text 去空白
+
+
+# ------------------------------------------------- 外键 / 精度保证的不可达防御
+def _raw_sql(seeded_db, sql: str, params=()):
+    """用独立 sqlite3 连接执行 DML，绕过外键约束造脏数据。
+
+    database.py 的 `@event.listens_for(Engine, "connect")` 只对 SQLAlchemy
+    Engine 创建的连接生效；原生 `sqlite3.connect()` 不受影响、默认
+    `foreign_keys=OFF`，可真实复现「约束未生效时遗留的悬空引用 / 分以下零头」
+    ——生产上 DBA 直连改数据同样会产生这类脏行。
+
+    纪律：执行前 `commit()` 释放 SQLite 写锁，执行后 `expire_all()` 让主会话
+    重新加载；独立连接用完即关，不触碰主连接状态，杜绝连接池污染（与
+    `PRAGMA ignore_check_constraints` 那种连接级泄漏相反）。
+    """
+    db_path = seeded_db.get_bind().engine.url.database
+    seeded_db.commit()
+    raw = sqlite3.connect(db_path)
+    try:
+        raw.execute("PRAGMA foreign_keys=OFF")
+        raw.execute(sql, tuple(params))
+        raw.commit()
+    finally:
+        raw.close()
+    seeded_db.expire_all()
+
+
+def test_create_advance_purchase_rejects_dangling_account(seeded_db):
+    """orders.account_id 悬空 → ADVANCE_PURCHASE 建单拒绝（L315）。
+
+    FK `orders.account_id → accounts.id ON DELETE SET NULL` 保证正常路径不会留下
+    悬空引用；这里用独立连接绕过外键，复现直连脏数据场景。
+    """
+    account = _account(seeded_db, "ACC-315")
+    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+    seeded_db.flush()
+    _raw_sql(seeded_db, "UPDATE orders SET account_id = 999315 WHERE id = ?", (order.id,))
+    with pytest.raises(Validation, match="ADVANCE_PURCHASE 关联的库存账号不存在"):
+        _contract(
+            seeded_db,
+            order.id,
+            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+        )
+
+
+def test_cancel_rejects_dangling_order(seeded_db):
+    """installments.order_id 悬空 → 取消分期报「所属订单不存在」（L676）。"""
+    _, contract = _dfq_overdue(seeded_db, "ACC-676")
+    _raw_sql(
+        seeded_db,
+        "UPDATE installments SET order_id = 999676 WHERE id = ?",
+        (contract.id,),
+    )
+    with pytest.raises(NotFound, match="分期合约所属订单不存在"):
+        installment_service.cancel_installment(
+            seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
+        )
+
+
+def test_cancel_rejects_dangling_account(seeded_db):
+    """orders.account_id 悬空 → 取消分期报「关联账号不存在」（L739）。"""
+    account = _account(seeded_db, "ACC-739")
+    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+    contract = _contract(seeded_db, order.id)
+    seeded_db.flush()
+    _raw_sql(seeded_db, "UPDATE orders SET account_id = 999739 WHERE id = ?", (order.id,))
+    with pytest.raises(NotFound, match="分期合约关联账号不存在"):
+        installment_service.cancel_installment(
+            seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
+        )
+
+
+def test_settle_early_skips_sub_cent_residual(seeded_db):
+    """期次残留「分以下零头」脏数据 → SQL 判有余额、量化到分后为 0 → continue（L975）。
+
+    正常数据下 `received + waived < due` 与 `outstanding > 0` 等价，故该分支恒不
+    触发；仅当 DB 存在超过 2 位小数的脏值时才会走到，此处用独立连接直写复现。
+    """
+    _, contract = _dfq_overdue(seeded_db, "ACC-975")
+    _raw_sql(
+        seeded_db,
+        "UPDATE installment_schedules SET due_amount = '1.00', "
+        "received_amount = '0.996', waived_amount = '0' WHERE installment_id = ?",
+        (contract.id,),
+    )
+    before = seeded_db.scalar(
+        select(func.count())
+        .select_from(OrderEvent)
+        .where(OrderEvent.event_type == EventType.PAYMENT.value)
+    )
+    result = installment_service.settle_early(
+        seeded_db, contract.id, paid_on=TODAY, actor="pytest", pool_id=1
+    )
+    after = seeded_db.scalar(
+        select(func.count())
+        .select_from(OrderEvent)
+        .where(OrderEvent.event_type == EventType.PAYMENT.value)
+    )
+    assert result.id == contract.id
+    assert after == before  # continue 生效：零头不足 1 分，未生成 PAYMENT
+
+
+def test_recover_rejects_dangling_order(seeded_db):
+    """installments.order_id 悬空 → 回收账号报「没有所属订单」（L1061）。"""
+    _, contract = _dfq_overdue(seeded_db, "ACC-1061")
+    _raw_sql(
+        seeded_db,
+        "UPDATE installments SET order_id = 999161 WHERE id = ?",
+        (contract.id,),
+    )
+    with pytest.raises(Validation, match="分期合约没有所属订单"):
+        installment_service.recover_account(
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
+        )
+
+
+def test_recover_rejects_dangling_account(seeded_db):
+    """orders.account_id 悬空 → 回收账号报「关联账号不存在」（L1068）。"""
+    account = _account(seeded_db, "ACC-1068")
+    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+    contract = _contract(seeded_db, order.id)
+    contract.status = InstallmentStatus.OVERDUE.value
+    seeded_db.flush()
+    _raw_sql(seeded_db, "UPDATE orders SET account_id = 999168 WHERE id = ?", (order.id,))
+    with pytest.raises(NotFound, match="分期合约关联账号不存在"):
+        installment_service.recover_account(
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
+        )
 
 
 def test_record_resale_delegates_to_record_sale(seeded_db):

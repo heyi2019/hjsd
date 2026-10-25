@@ -59,13 +59,15 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
 
 # 每个规则预置 1 条已发布默认版本，使配置直接就位。
 # REBATE/INSTALLMENT 的默认值由库内真实业务数据反推（rebate_records.rate 区间 3~10、
-# installments.periods 众数 3）；COMMISSION/WRITE_DOWN/REFUND 库内无对应历史，保留占位待业务方在页面「设置配置」调整。
+# installments.periods 众数 3）。
+# COMMISSION/WRITE_DOWN/REFUND 库内无对应历史流水；按 ERP_页面原型_v1.0.md:139 纪律
+# 「未配置提成规则显示待配置，不猜值」，config 置空（{}）表示待配置，而非填假值 0。
 DEFAULT_VERSION_CONFIG: dict[str, dict[str, object]] = {
     "REBATE": {"rate": "5"},
-    "COMMISSION": {"rate": "0"},
+    "COMMISSION": {},
     "INSTALLMENT": {"periods": "3", "cycle": "monthly"},
-    "WRITE_DOWN": {"rate": "0"},
-    "REFUND": {"rate": "0"},
+    "WRITE_DOWN": {},
+    "REFUND": {},
     "DG_MIXED": {"mode": "standard"},
 }
 

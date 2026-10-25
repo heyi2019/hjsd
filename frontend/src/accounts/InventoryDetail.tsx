@@ -2,7 +2,7 @@ import { Descriptions, Image, Input, Select, Space, Spin, Typography } from "ant
 import type { ColumnsType } from "antd/es/table";
 import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
 import { executionActionLabel } from "../shared/lib/format";
-import { DataTable, MoneyText, StatusTag } from "../shared/ui";
+import { DataTable, MoneyInput, MoneyText, StatusTag } from "../shared/ui";
 import {
   PROFILE_ACCOUNT_TYPES,
   accountFinancialFlows,
@@ -160,7 +160,7 @@ export function InventoryDetail({
     { title: "动作", dataIndex: "action", key: "action" },
     { title: "动作时间", dataIndex: "occurredAt", key: "occurredAt" },
     { title: "操作人", dataIndex: "operator", key: "operator", render: (value: string, item) => editing ? <Select className="inventory-edit-operator" mode="multiple" aria-label={`编辑执行操作人 ${item.action}`} placeholder={value} value={eventDrafts?.[item.event.id]?.operator_user_ids ?? item.event.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => onEventEdit?.(item.event, { operator_user_ids: ids })} /> : value },
-    { title: "金额", dataIndex: "amount", key: "amount", align: "right", render: (value: string, item) => editing && item.event.cashflow && ["BUY", "SELL", "COST"].includes(item.event.event_type) ? <Input aria-label={`编辑执行金额 ${item.action}`} inputMode="decimal" value={eventDrafts?.[item.event.id]?.amount ?? value} onChange={(e) => onEventEdit?.(item.event, { amount: e.target.value })} /> : <MoneyText value={value} /> },
+    { title: "金额", dataIndex: "amount", key: "amount", align: "right", render: (value: string, item) => editing && item.event.cashflow && ["BUY", "SELL", "COST"].includes(item.event.event_type) ? <MoneyInput aria-label={`编辑执行金额 ${item.action}`} value={eventDrafts?.[item.event.id]?.amount ?? value} status={/^\d*(\.\d{0,2})?$/.test(eventDrafts?.[item.event.id]?.amount ?? "") ? undefined : "error"} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*(\.\d{0,2})?$/.test(v)) onEventEdit?.(item.event, { amount: v }); }} /> : <MoneyText value={value} /> },
     { title: "备注", dataIndex: "note", key: "note", render: (value: string, item) => editing && item.event.cashflow && ["BUY", "SELL", "COST"].includes(item.event.event_type) ? <Input aria-label={`编辑执行备注 ${item.action}`} value={eventDrafts?.[item.event.id]?.note ?? item.event.note ?? ""} onChange={(e) => onEventEdit?.(item.event, { note: e.target.value })} /> : value },
   ];
 

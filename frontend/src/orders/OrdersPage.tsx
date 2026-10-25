@@ -15,7 +15,7 @@ import {
 import { api, normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
-import { requiredMoneyRules, percentRules } from "../shared/lib/validators";
+import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import {
@@ -982,7 +982,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 <Form.Item name="snap_channel_region" label="区服"><Input /></Form.Item>
                 <Form.Item name="snap_bound_phone" label="绑定手机"><Input /></Form.Item>
                 <Form.Item name="snap_platform" label="平台"><Input /></Form.Item>
-                <Form.Item name="snap_purchase_price" label="号价"><Input inputMode="decimal" placeholder="例如 1000.00" /></Form.Item>
+                <Form.Item name="snap_purchase_price" label="号价" rules={moneyRules("号价")}><MoneyInput placeholder="例如 1000.00" /></Form.Item>
                 <Form.Item name="snap_note" label="快照备注"><Input.TextArea rows={2} /></Form.Item>
               </>
             ) : (

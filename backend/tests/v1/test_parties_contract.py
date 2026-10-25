@@ -1132,3 +1132,37 @@ class TestPartiesApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["is_active"] is False
+
+
+def test_customer_detail_reveal_records_contact_read_audit(seeded_client, seeded_db, headers):
+    customer = _customer(seeded_db, "脱敏审计客户")
+    response = seeded_client.get(
+        f"/api/v1/customers/{customer.id}/detail",
+        params={"reveal": "true"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    audits = seeded_db.scalars(
+        select(AuditLog).where(
+            AuditLog.action == AuditAction.CONTACT_READ.value,
+            AuditLog.entity_id == customer.customer_no,
+        )
+    ).all()
+    assert audits
+
+
+def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
+    from app.parties._common import _validate_owner_id
+    from app.domain.users import User
+    from app.core.errors import Validation
+
+    with pytest.raises(Validation):
+        _validate_owner_id(seeded_db, 0)
+    inactive = User(
+        username="inactive-owner", display_name="停用负责人", password_hash="x",
+        role="VIEWER", owner_scope="SELF", is_active=False,
+    )
+    seeded_db.add(inactive)
+    seeded_db.flush()
+    with pytest.raises(Validation, match="启用"):
+        _validate_owner_id(seeded_db, inactive.id)

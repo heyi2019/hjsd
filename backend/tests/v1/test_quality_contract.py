@@ -280,3 +280,9 @@ def test_quality_batch_close_endpoint(seeded_client, seeded_db):
     )
     assert response.status_code == 200, response.text
     assert {item["status"] for item in response.json()} == {"CLOSED"}
+
+
+def test_scan_quality_endpoint_runs_and_returns_list(seeded_client, headers):
+    response = seeded_client.post("/api/v1/quality/scan", headers=headers)
+    assert response.status_code == 200, response.text
+    assert isinstance(response.json(), list)

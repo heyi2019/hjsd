@@ -1613,3 +1613,94 @@ def test_final_period_absorbs_rounding_difference(seeded_db):
         installment_service.pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
     assert contract.status == InstallmentStatus.SETTLED.value
     assert contract.paid_amount == Decimal("1000.00")
+
+
+def test_cancel_endpoint_cancels_installment(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "cancel-endpoint-account")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, amount="800")
+    contract = _contract(
+        seeded_db, order.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000", down_payment="100", periods=1,
+        per_period="900", first_due_on=TODAY,
+    )
+    response = seeded_client.post(
+        f"/api/v1/installments/{contract.id}/cancel",
+        json={"cancelled_on": TODAY.isoformat(), "reason": "测试取消"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "list-dispo-account")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, amount="800")
+    contract = _contract(
+        seeded_db, order.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000", down_payment="100", periods=1,
+        per_period="900", first_due_on=PAST,
+    )
+    seeded_client.post(
+        "/api/v1/installments/mark-overdue",
+        params={"as_of": TODAY.isoformat()}, headers=headers,
+    )
+    seeded_client.post(
+        f"/api/v1/installments/{contract.id}/recover",
+        json={"occurred_on": TODAY.isoformat(), "note": "逾期回收"},
+        headers=headers,
+    )
+    response = seeded_client.get(
+        f"/api/v1/installments/{contract.id}/dispositions", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    assert any(item["action"] == "RECOVER" for item in response.json())
+
+
+def test_resale_endpoint_records_sale(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "resale-endpoint-account")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, amount="800")
+    contract = _contract(
+        seeded_db, order.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000", down_payment="100", periods=1,
+        per_period="900", first_due_on=PAST,
+    )
+    seeded_client.post(
+        "/api/v1/installments/mark-overdue",
+        params={"as_of": TODAY.isoformat()}, headers=headers,
+    )
+    seeded_client.post(
+        f"/api/v1/installments/{contract.id}/recover",
+        json={"occurred_on": TODAY.isoformat(), "note": "逾期回收"},
+        headers=headers,
+    )
+    resale_order = _order(seeded_db, order_type="HS", account_id=account.id)
+    orders_service.post_event(
+        seeded_db, resale_order.id, event_type="SELL", amount=Decimal("800"),
+        occurred_on=TODAY, actor="pytest",
+    )
+    from sqlalchemy import delete as _sa_delete
+    from app.domain.trade import InstallmentDisposition
+    # 防御：SQLite rowid 复用 + 用例间截断偶发残留，确保本合约无旧 RESELL 记录
+    seeded_db.execute(
+        _sa_delete(InstallmentDisposition).where(
+            InstallmentDisposition.installment_id == contract.id,
+            InstallmentDisposition.action == "RESELL",
+        )
+    )
+    seeded_db.flush()
+    response = seeded_client.post(
+        f"/api/v1/installments/{contract.id}/resale",
+        json={
+            "resale_order_id": resale_order.id,
+            "occurred_on": TODAY.isoformat(),
+            "note": "转售",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["action"] == "RESELL"

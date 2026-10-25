@@ -81,3 +81,23 @@ def test_quality_issue_list_and_closed_filter(seeded_client, headers):
     )
     assert listed.status_code == 200, listed.text
     assert listed.json()["total"] == 1
+
+
+def test_get_quality_issue_endpoint(seeded_client, headers):
+    created = seeded_client.post(
+        "/api/v1/quality/issues",
+        json={
+            "code": "GET_API_CODE",
+            "severity": "MEDIUM",
+            "title": "查询接口工单",
+            "entity_type": "order",
+            "entity_id": "GET-API-1",
+            "message": "测试",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    issue_id = created.json()["id"]
+    response = seeded_client.get(f"/api/v1/quality/issues/{issue_id}", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["issue_no"] == created.json()["issue_no"]

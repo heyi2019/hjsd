@@ -80,3 +80,42 @@ def test_lead_close_does_not_create_order_or_cashflow(seeded_client, seeded_db, 
     assert closed.status_code == 200, closed.text
     assert closed.json()["status"] == "CLOSED"
     assert closed.json()["converted_order_id"] is None
+
+
+def test_get_lead_endpoint_returns_lead(seeded_client, seeded_db, headers):
+    customer = parties_service.create_customer(
+        seeded_db, display_name="查询需求客户", owner_id=9, actor="pytest"
+    )
+    created = seeded_client.post(
+        "/api/v1/leads",
+        json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["id"]
+    response = seeded_client.get(f"/api/v1/leads/{lead_id}", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["lead_no"] == created.json()["lead_no"]
+
+
+def test_update_lead_rejects_owner_transfer_for_scoped_user(seeded_client, seeded_db, headers):
+    from app.core.security import CurrentUser, build_access_token
+
+    customer = parties_service.create_customer(
+        seeded_db, display_name="转交需求客户", owner_id=9, actor="pytest"
+    )
+    created = seeded_client.post(
+        "/api/v1/leads",
+        json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["id"]
+    operator = CurrentUser.build(
+        id=9, username="op", roles=["OPERATOR"], owner_scope="SELF"
+    )
+    op_headers = {"Authorization": f"Bearer {build_access_token(operator)}"}
+    response = seeded_client.patch(
+        f"/api/v1/leads/{lead_id}", json={"owner_id": 9}, headers=op_headers
+    )
+    assert response.status_code == 403, response.text

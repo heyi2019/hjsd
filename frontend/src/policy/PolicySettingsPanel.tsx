@@ -1,7 +1,7 @@
 /** 经营规则配置（T19 / BAS-06-01~02）：定义 → 版本 → 审批 → 生效期。
  *
- * 页面必须持续强调的两条红线：
- * - **已发布版本不可改**，只能新建版本；
+ * 页面红线：
+ * - **已发布版本不可改**，点「设置配置」会生成新版本并立即发布；
  * - **新版本生效期不得与已有版本重叠**。
  */
 import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
@@ -18,7 +18,6 @@ import {
   DataTable,
   ErrorBanner,
   PageHeader,
-  ConfirmButton,
   PermissionButton,
   StatRow,
   StatusTag,
@@ -41,14 +40,6 @@ const POLICY_CODE_OPTIONS = [
   { value: "REFUND", label: "REFUND 退款" },
   { value: "DG_MIXED", label: "DG_MIXED DG 混合单默认策略" },
 ];
-
-type DefinitionFormValues = {
-  policy_code: string;
-  name: string;
-  scope_type: string;
-  scope_id?: string;
-  description?: string;
-};
 
 type VersionFormValues = {
   effective_from: string;
@@ -77,16 +68,13 @@ export function PolicySettingsPanel() {
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [definitionModalOpen, setDefinitionModalOpen] = useState(false);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<PolicyVersion | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveResult, setResolveResult] = useState<{ found: boolean; version: PolicyVersion | null } | null>(null);
-  const [definitionForm] = Form.useForm<DefinitionFormValues>();
   const [versionForm] = Form.useForm<VersionFormValues>();
   const [resolveForm] = Form.useForm<ResolveFormValues>();
-  const definitionScopeType = Form.useWatch("scope_type", definitionForm);
   const resolveScopeType = Form.useWatch("scope_type", resolveForm);
 
   const current = definitions.find((d) => d.id === definitionId) ?? null;
@@ -146,12 +134,6 @@ export function PolicySettingsPanel() {
     [loadDefinitions, loadVersions],
   );
 
-  const openDefinitionModal = () => {
-    definitionForm.resetFields();
-    definitionForm.setFieldValue("scope_type", "GLOBAL");
-    setDefinitionModalOpen(true);
-  };
-
   const openVersionModal = (version?: PolicyVersion) => {
     setEditingVersion(version ?? null);
     versionForm.setFieldsValue({
@@ -183,29 +165,6 @@ export function PolicySettingsPanel() {
     }
   };
 
-  const submitDefinition = async (values: DefinitionFormValues) => {
-    setActing(true);
-    setError(null);
-    try {
-      const created = await policyApi.create({
-        policy_code: values.policy_code,
-        name: values.name,
-        scope_type: values.scope_type,
-        scope_id: values.scope_type === "GLOBAL" || !values.scope_id ? undefined : Number(values.scope_id),
-        description: values.description || undefined,
-      });
-      const data = await policyApi.list();
-      setDefinitions(data.items);
-      setDefinitionId(created.id);
-      setDefinitionModalOpen(false);
-      definitionForm.resetFields();
-    } catch (err) {
-      setError(normalizeError(err));
-    } finally {
-      setActing(false);
-    }
-  };
-
   const submitVersion = async (values: VersionFormValues) => {
     if (!current) return;
     let config: Record<string, unknown>;
@@ -220,14 +179,22 @@ export function PolicySettingsPanel() {
       return;
     }
 
-    const succeeded = await act(() => editingVersion
-      ? policyApi.updateDraft(editingVersion.id, config)
-      : policyApi.createVersion(current.id, {
-          effective_from: values.effective_from,
-          effective_to: values.effective_to || undefined,
-          config,
-          note: values.note || undefined,
-        }));
+    // 保存即发布：版本不再停留草稿态（草稿若忘了发布，建单时解析不到规则，等于规则没配）。
+    // 编辑同样是「改完即发布」，因此要求当前账号同时持有 policy.manage 与 policy.approve。
+    const succeeded = await act(async () => {
+      if (editingVersion) {
+        await policyApi.updateDraft(editingVersion.id, config);
+        await policyApi.approve(editingVersion.id, {});
+        return;
+      }
+      const created = await policyApi.createVersion(current.id, {
+        effective_from: values.effective_from,
+        effective_to: values.effective_to || undefined,
+        config,
+        note: values.note || undefined,
+      });
+      await policyApi.approve(created.id, {});
+    });
     if (!succeeded) return;
     setVersionModalOpen(false);
     setEditingVersion(null);
@@ -262,30 +229,9 @@ export function PolicySettingsPanel() {
       title: "操作",
       width: 160,
       render: (_v, row) => (
-        <Space size="small">
-          <PermissionButton
-            permission="policy.manage"
-            size="small"
-            loading={acting}
-            disabled={row.status !== "DRAFT"}
-            onClick={() => openVersionModal(row)}
-          >
-            编辑
-          </PermissionButton>
-          <ConfirmButton
-            permission="policy.approve"
-            size="small"
-            type="primary"
-            disabled={row.status !== "DRAFT"}
-            title="发布该规则版本"
-            description="发布后对生效日之后的新单生效；已发布版本不可修改，只能新建版本。"
-            onConfirm={async () => {
-              await act(() => policyApi.approve(row.id, {}));
-            }}
-          >
-            发布
-          </ConfirmButton>
-        </Space>
+        <span className="muted">
+          {row.status === "ACTIVE" ? "已发布 · 可查" : row.status}
+        </span>
       ),
     },
   ];
@@ -294,7 +240,7 @@ export function PolicySettingsPanel() {
     <section className="ui-stack">
       <PageHeader
         title="经营规则"
-        description="规则按版本与生效期管理；已发布版本不可修改，只能新建版本。"
+        description="规则配置由系统预置并直接生效；点「设置配置」即生成新版本并发布，历史版本保留可查。"
         actions={
           <Space className="ui-filter-bar">
             <Select
@@ -304,21 +250,13 @@ export function PolicySettingsPanel() {
               options={definitions.map((d) => ({ value: d.id, label: `${d.name}（${d.policy_code}）` }))}
               onChange={setDefinitionId}
             />
-            <PermissionButton
-              permission="policy.manage"
-              type="primary"
-              loading={acting}
-              onClick={openDefinitionModal}
-            >
-              新建规则
-            </PermissionButton>
             {current ? (
               <PermissionButton
                 permission="policy.manage"
                 loading={acting}
                 onClick={() => openVersionModal()}
               >
-                新建版本
+                设置配置
               </PermissionButton>
             ) : null}
             {can("policy.manage") || can("policy.approve") ? (
@@ -385,10 +323,10 @@ export function PolicySettingsPanel() {
       </Card>
 
       {current ? (
-        <Card className="glass" title={`版本历史 · ${current.name}`}>
+          <Card className="glass" title={`版本历史 · ${current.name}`}>
           <Typography.Paragraph type="secondary">
             生效期采用左闭右开区间，相邻版本（前版本失效日 = 后版本生效日）不算重叠。
-            发布只影响生效日之后的新建业务，不会回算历史。
+            每次「设置配置」会生成一条新版本并立即发布，生效日之后的新单套用；历史订单按建单时固化的快照计算，不随改版变化。
           </Typography.Paragraph>
           <DataTable<PolicyVersion>
             columns={versionColumns}
@@ -403,42 +341,11 @@ export function PolicySettingsPanel() {
         </Card>
       ) : null}
 
-      <Modal
-        open={definitionModalOpen}
-        title="新建经营规则"
-        okText="创建规则"
-        cancelText="取消"
-        confirmLoading={acting}
-        onCancel={() => setDefinitionModalOpen(false)}
-        onOk={() => void definitionForm.submit()}
-      >
-        <Form form={definitionForm} layout="vertical" onFinish={submitDefinition}>
-          <Form.Item name="policy_code" label="规则编码" rules={[{ required: true, message: "请选择规则编码" }]}>
-            <Select options={POLICY_CODE_OPTIONS} placeholder="选择规则编码（与后端 PolicyType 一致）" />
-          </Form.Item>
-          <Form.Item name="name" label="规则名称" rules={[{ required: true, message: "请输入规则名称" }]}>
-            <Input placeholder="例如 返点比例" />
-          </Form.Item>
-          <Form.Item name="scope_type" label="适用范围" rules={[{ required: true, message: "请选择适用范围" }]}>
-            <Select options={SCOPE_OPTIONS} />
-          </Form.Item>
-          <Form.Item
-            name="scope_id"
-            label="范围 ID"
-            rules={definitionScopeType && definitionScopeType !== "GLOBAL" ? [{ required: true, message: "请输入范围 ID" }] : []}
-          >
-            <Input type="number" min={1} placeholder="按人员、业务类型或资金池时填写" />
-          </Form.Item>
-          <Form.Item name="description" label="说明">
-            <Input.TextArea rows={2} placeholder="可选，说明规则用途" />
-          </Form.Item>
-        </Form>
-      </Modal>
 
       <Modal
         open={versionModalOpen}
-        title={editingVersion ? `编辑草稿 v${editingVersion.version}` : "新建规则版本"}
-        okText="保存版本"
+        title={editingVersion ? `编辑草稿 v${editingVersion.version}` : "设置配置"}
+        okText="保存并发布"
         cancelText="取消"
         confirmLoading={acting}
         onCancel={() => setVersionModalOpen(false)}

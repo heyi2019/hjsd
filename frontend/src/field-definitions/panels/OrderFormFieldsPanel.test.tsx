@@ -1,4 +1,4 @@
-/** OrderFormFieldsPanel 交互测试：挂载拉取、新增、停用、删除、核心字段禁用。 */
+/** OrderFormFieldsPanel 交互测试：挂载拉取、新增、行内必填开关、停用、删除、预置字段禁用。 */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,7 +75,7 @@ describe("OrderFormFieldsPanel", () => {
     expect(payload.order_type_code).toBe("HS");
   });
 
-  it("停用非核心字段调用 setActive(false)", async () => {
+  it("停用字段调用 setActive(false)", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 20, field_key: "tag", label: "可停用字段", locked: false, is_custom: true, is_active: true }),
     ]);
@@ -90,22 +90,46 @@ describe("OrderFormFieldsPanel", () => {
     );
   });
 
-  it("核心字段删除按钮禁用", async () => {
+  it("预置字段（非自定义）删除按钮禁用", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
-      makeField({ id: 30, field_key: "core", label: "核心字段X", locked: true, is_custom: false }),
+      makeField({ id: 30, field_key: "core", label: "预置字段X", locked: true, is_custom: false }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("核心字段X");
+    await screen.findByText("预置字段X");
     expect(screen.getByRole("button", { name: /删除/ })).toBeDisabled();
   });
 
-  it("核心字段编辑按钮禁用", async () => {
+  it("行内必填开关切换调用 update 并刷新", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
-      makeField({ id: 31, field_key: "core", label: "核心字段Y", locked: true }),
+      makeField({ id: 50, field_key: "vip", label: "VIP字段", required: false, is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("核心字段Y");
-    expect(screen.getByRole("button", { name: /编辑核心字段Y/ })).toBeDisabled();
+    await screen.findByText("VIP字段");
+
+    const toggle = screen.getByLabelText("必填_vip");
+    expect(toggle).not.toBeChecked();
+    await ui.click(toggle);
+
+    await waitFor(() =>
+      expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(50, { required: true }),
+    );
+    expect(vi.mocked(catalog.orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+  });
+
+  it("已必填字段再次点击行内开关改为选填", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 51, field_key: "note", label: "备注字段", required: true, is_custom: true }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("备注字段");
+
+    const toggle = screen.getByLabelText("必填_note");
+    expect(toggle).toBeChecked();
+    await ui.click(toggle);
+
+    await waitFor(() =>
+      expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(51, { required: false }),
+    );
   });
 
   it("删除自定义字段调用 remove", async () => {

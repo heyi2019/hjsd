@@ -1,5 +1,6 @@
 /** 建单表单字段配置面板：按业务类型（回收/提号/代挂/代分期）配置字段的
- *  新增、删除、必填/选填、停用/启用。核心核算字段 locked，禁止删除与停用。 */
+ *  新增、删除、必填/选填（行内开关）、停用/启用。字段可配置必填态与启用态；
+ *  仅自定义字段可删除（预置字段受保护）。 */
 import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tabs, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -23,6 +24,7 @@ export function OrderFormFieldsPanel() {
   const [rows, setRows] = useState<OrderFormField[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const fieldType = Form.useWatch("field_type", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
@@ -94,16 +96,40 @@ export function OrderFormFieldsPanel() {
     { title: "字段键", dataIndex: "field_key" },
     { title: "标签", dataIndex: "label" },
     { title: "类型", dataIndex: "field_type", render: (v: string) => FIELD_TYPE_LABEL[v] ?? v },
-    { title: "必填", dataIndex: "required", render: (value: boolean) => (value ? "是" : "否") },
+    {
+      title: "必填",
+      dataIndex: "required",
+      render: (value: boolean, row: OrderFormField) => (
+        <PermissionGate
+          permission="field-definition.manage"
+          fallback={<Typography.Text type="secondary">{value ? "必填" : "选填"}</Typography.Text>}
+        >
+          <Switch
+            checked={value}
+            loading={togglingId === row.id}
+            aria-label={`必填_${row.field_key}`}
+            onChange={async (checked: boolean) => {
+              try {
+                setTogglingId(row.id);
+                await orderFormFieldsApi.update(row.id, { required: checked });
+                message.success(checked ? "已设为必填" : "已设为选填");
+                await load(activeType);
+              } catch (err) {
+                setError(normalizeError(err));
+              } finally {
+                setTogglingId(null);
+              }
+            }}
+          />
+        </PermissionGate>
+      ),
+    },
     { title: "选项", dataIndex: "options", render: (value: string[] | null | undefined) => (value?.length ? value.join("、") : "-") },
     {
       title: "启用",
       dataIndex: "is_active",
-      render: (value: boolean, row) => (
-        <Space size={4}>
-          <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
-          {row.locked ? <Typography.Text type="secondary" style={{ fontSize: 12 }}>(核心)</Typography.Text> : (!row.is_custom ? <Typography.Text type="secondary" style={{ fontSize: 12 }}>(系统)</Typography.Text> : null)}
-        </Space>
+      render: (value: boolean) => (
+        <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
       ),
     },
     {
@@ -111,40 +137,30 @@ export function OrderFormFieldsPanel() {
       render: (_v, row) => (
         <PermissionGate permission="field-definition.manage">
           <Space size={2}>
-            <Tooltip title={row.locked ? "核心字段不可编辑" : undefined}>
-              <span>
-                <PermissionButton
-                  permission="field-definition.manage"
-                  size="small"
-                  aria-label={`编辑${row.label}`}
-                  disabled={row.locked}
-                  onClick={() => startEditing(row)}
-                >
-                  编辑
-                </PermissionButton>
-              </span>
-            </Tooltip>
-            <Tooltip title={row.locked ? "核心字段不可停用" : undefined}>
-              <span>
-                <ConfirmButton
-                  permission="field-definition.manage"
-                  size="small"
-                  disabled={row.locked}
-                  title={row.is_active ? `停用字段「${row.label}」` : `启用字段「${row.label}」`}
-                  description={row.is_active
-                    ? "停用后该字段从建单表单消失（自定义字段值保留在订单数据中）。"
-                    : "启用后该字段重新出现在建单表单中。"}
-                  danger={row.is_active}
-                  onConfirm={async () => {
-                    await orderFormFieldsApi.setActive(row.id, !row.is_active);
-                    await load(activeType);
-                  }}
-                >
-                  {row.is_active ? "停用" : "启用"}
-                </ConfirmButton>
-              </span>
-            </Tooltip>
-            <Tooltip title={row.locked ? "核心字段不可删除" : (!row.is_custom ? "系统预置字段不可删除（仅自定义字段可删）" : undefined)}>
+            <PermissionButton
+              permission="field-definition.manage"
+              size="small"
+              aria-label={`编辑${row.label}`}
+              onClick={() => startEditing(row)}
+            >
+              编辑
+            </PermissionButton>
+            <ConfirmButton
+              permission="field-definition.manage"
+              size="small"
+              title={row.is_active ? `停用字段「${row.label}」` : `启用字段「${row.label}」`}
+              description={row.is_active
+                ? "停用后该字段从建单表单消失（自定义字段值保留在订单数据中）。"
+                : "启用后该字段重新出现在建单表单中。"}
+              danger={row.is_active}
+              onConfirm={async () => {
+                await orderFormFieldsApi.setActive(row.id, !row.is_active);
+                await load(activeType);
+              }}
+            >
+              {row.is_active ? "停用" : "启用"}
+            </ConfirmButton>
+            <Tooltip title={!row.is_custom ? "预置字段不可删除（仅自定义字段可删）" : undefined}>
               <span>
                 <Popconfirm
                   title={`删除字段「${row.label}」`}
@@ -159,7 +175,7 @@ export function OrderFormFieldsPanel() {
                     }
                   }}
                 >
-                  <PermissionButton permission="field-definition.manage" size="small" danger disabled={row.locked || !row.is_custom}>
+                  <PermissionButton permission="field-definition.manage" size="small" danger disabled={!row.is_custom}>
                     删除
                   </PermissionButton>
                 </Popconfirm>
@@ -176,8 +192,8 @@ export function OrderFormFieldsPanel() {
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
       <Typography.Paragraph type="secondary">
         按业务类型（回收 / 提号 / 代挂 / 代分期）配置建单表单字段：可新增自定义字段、删除自定义字段（仅自定义字段可删）、
-        切换必填/选填、停用/启用。核心核算字段标记为「核心」，锁定不可删除、不可停用（仅可调整必填）。
-        系统预置字段（标记「系统」）的必填/停用配置需在建单表单接入门控后生效。
+        停用/启用。「必填」列提供行内开关，点击即可在必填/选填之间切换（编辑态可直接配置）；
+        必填态与启用态的改动会即时反映到对应业务类型的建单表单。
       </Typography.Paragraph>
       <Tabs
         activeKey={activeType}

@@ -37,7 +37,7 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
   expect(body.events.some((event: { event_type: string; amount: string }) => event.event_type === "REFUND" && Number(event.amount) === 30)).toBe(true);
 });
 
-test("分润页面保存四项比例并允许同一人承担多个动作", async ({ page, request }) => {
+test("分润页面按人模型保存四项比例", async ({ page, request }) => {
   const created = await request.post(`${base}/orders`, { headers, data: { order_type: "DFQ", trade_date: "2026-10-17" } });
   expect(created.status()).toBe(201);
   const order = await created.json();
@@ -45,6 +45,16 @@ test("分润页面保存四项比例并允许同一人承担多个动作", async
   expect(contract.status()).toBe(201);
   const buy = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
   expect(buy.status()).toBe(201);
+
+  // 分润弹窗已重构为「按人」模型（OrdersPage.openAllocations）：顶部「姓名（可多选，勾选后自动加行）」
+  // 勾选分润对象→自动加行，不再有 BUY/SELL/OPERATION/COMPANY 四个动作位，后端按人存
+  // allocation_type=None 且禁止同一人重复分润。这里拉取在职用户，勾选 4 人凑满四项比例。
+  const users = (await (await request.get(`${base}/users`, { headers })).json()) as Array<{ id: number; username: string; is_active: boolean }>;
+  const pick = users.filter((u) => u.is_active).slice(0, 4);
+  const pickIds = pick.map((u) => u.id);
+  const pickUsernames = pick.map((u) => u.username);
+  expect(pickIds.length).toBe(4);
+
   await page.goto("/");
   await navItem(page, "业务中心").click();
   // 业务中心默认落 URL 指定的 Tab（导航进来是 #/business/inventory 库存中心），
@@ -52,24 +62,42 @@ test("分润页面保存四项比例并允许同一人承担多个动作", async
   await page.getByRole("tab", { name: "业务台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
   await page.getByRole("row").filter({ hasText: order.order_no }).getByText("查看详情").click();
-  // 「分润」同样收在 Drawer 的「更多⌄」下拉菜单内。
+  // 「分润」收在 Drawer 的「更多⌄」下拉菜单内。
   await page.locator(".ant-drawer-content").getByRole("button", { name: /更多/ }).click();
   await page.getByRole("menuitem", { name: "分润" }).click();
   const modal = page.locator(".ant-modal-content");
+  // Fix #4 改名验证：弹窗标题已为「分润 ·」。
   await expect(modal.getByText("分润 ·", { exact: false })).toBeVisible();
+
+  // 顶部「姓名（可多选，勾选后自动加行）」勾选 4 人 → 自动生成 4 行（默认空行被替换）。
+  const multiSelect = modal.locator('.ant-form-item:has(.ant-form-item-label:has-text("勾选后自动加行")) .ant-select-selector');
+  await multiSelect.click();
+  const dropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").last();
+  for (const username of pickUsernames) {
+    await dropdown.locator(".ant-select-item-option", { hasText: username }).first().click();
+  }
+  await page.keyboard.press("Escape");
+
   const rows = modal.locator(".orders-allocation-row");
   await expect(rows).toHaveCount(4);
-  for (const row of await rows.all()) await row.locator('input[inputmode="decimal"]').fill("25");
-  await rows.nth(2).locator(".ant-select-selector").click();
-  await page.locator(".ant-select-dropdown:visible .ant-select-item-option").first().click();
-  const response = page.waitForResponse(r => r.url().endsWith(`/orders/${order.id}/profit-allocations`) && r.request().method() === "PUT");
+  // 每行填「比例」25%，合计 100%（纯比例分润要求合计 100%）。
+  for (const row of await rows.all()) {
+    await row.locator('.ant-form-item:has(.ant-form-item-label:has-text("比例")) input').fill("25");
+  }
+
+  const response = page.waitForResponse(
+    (r) => r.url().endsWith(`/orders/${order.id}/profit-allocations`) && r.request().method() === "PUT",
+  );
   await modal.getByRole("button", { name: /确\s*定/ }).click();
   expect((await response).status()).toBe(200);
   const saved = await (await request.get(`${base}/orders/${order.id}/profit-allocations`, { headers })).json();
   expect(saved.items).toHaveLength(4);
-  expect(saved.items.find((x: { allocation_type: string }) => x.allocation_type === "BUY").user_id).toBeTruthy();
-  expect(saved.items.find((x: { allocation_type: string }) => x.allocation_type === "OPERATION").user_id).toBe(saved.items.find((x: { allocation_type: string }) => x.allocation_type === "BUY").user_id);
-  expect(saved.items.find((x: { allocation_type: string }) => x.allocation_type === "COMPANY").user_id).toBeNull();
+  // 按人模型：4 行均为真实 user_id（无 COMPANY 空归属），顺序不保证，按 id 集合断言。
+  const savedUserIds = saved.items
+    .map((x: { user_id: number | null }) => x.user_id)
+    .filter((id: number | null): id is number => id !== null)
+    .sort((a: number, b: number) => a - b);
+  expect(savedUserIds).toEqual([...pickIds].sort((a: number, b: number) => a - b));
 });
 
 // 重写入用例：串行隔离（describe.serial），避免与文件内其他写用例及 E2E 库写竞争
@@ -137,7 +165,11 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     await page.getByRole("row").filter({ hasText: rebate.rebate_no }).getByRole("button", { name: "登记结算" }).click();
     const settle = page.getByRole("dialog", { name: `返点到账 · ${rebate.rebate_no}` });
     await settle.getByLabel("到账金额").fill("100");
-    await settle.getByLabel("平台手续费（自动生成费用流水）").fill("10");
+    // 「平台手续费（自动生成费用流水）」为可选字段（REBSETTLE 配置可能不渲染），存在可编辑输入框才填。
+    const feeInput = settle.locator('.ant-form-item:has(.ant-form-item-label:has-text("平台手续费")) input').first();
+    if (await feeInput.count() > 0) {
+      await feeInput.fill("10");
+    }
     await settle.locator(".ant-select-selector").click();
     await page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option").first().click();
     const settlement = page.waitForResponse(r => r.url().endsWith(`/rebates/${rebate.id}/settlements`) && r.request().method() === "POST");

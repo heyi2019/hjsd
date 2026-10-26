@@ -127,7 +127,10 @@ async function readSettingsTabs(page: Page): Promise<string[]> {
     if (text) names.push(text);
   }
   const more = page.locator(".settings-tabs .ant-tabs-nav-more");
-  if (await more.count() > 0) {
+  // 桌面端设置页为竖向（tabPosition=left）Tabs，溢出收纳的「更多 ⌄」按钮在 DOM 中存在
+  // 但被隐藏（display:none），count() 恒 > 0 却不可点击——必须先用 isVisible() 判定，
+  // 否则会误点到隐藏按钮导致 timeout。竖向布局下所有 Tab 本就全部可见，无需走「更多」路径。
+  if ((await more.first().isVisible().catch(() => false))) {
     await more.first().click();
     const items = page.locator(".ant-tabs-dropdown .ant-tabs-dropdown-menu-item");
     const ic = await items.count();

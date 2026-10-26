@@ -19,9 +19,9 @@ from app.policy import schemas, service
 
 router = APIRouter(tags=["policy"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
-approve_access = require_permissions(PERM_POLICY_APPROVE)
 # 注意：require_permissions 返回的已是 Depends 对象，直接作默认值，不要再包一层。
-# 规则配置只对规则管理员/审核人开放；审核人必须能先读取规则再执行审批。
+# 规则配置只对规则管理员开放（2026-10-26 起取消独立的「审核」权限：保存即发布，
+# 发布人取当前登录用户，无单独审批环节）。
 policy_read_access = require_permissions(
     PERM_POLICY_MANAGE, PERM_POLICY_APPROVE, require_all=False
 )
@@ -130,9 +130,10 @@ def approve_version(
     version_id: int,
     payload: schemas.PolicyVersionApprove,
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = approve_access,
+    user: CurrentUser = manage_access,
 ) -> schemas.PolicyVersionOut:
-    """发布规则版本。发布后只影响生效日后的新计算，不重算历史。"""
+    """发布规则版本。发布后只影响生效日后的新计算，不重算历史。
+    2026-10-26 起取消独立「审核」权限：保存即发布，发布人取当前登录用户。"""
     approver = payload.approver or user.username
     return schemas.PolicyVersionOut.model_validate(
         service.approve_version(db, version_id, approver=approver, note=payload.note)

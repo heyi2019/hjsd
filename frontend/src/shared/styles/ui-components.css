@@ -1134,5 +1134,11 @@
 .policy-version-date-row { width: 100%; }
 .policy-version-date-row__item { flex: 1; }
 
+/* 经营规则主从双表：左栏规则清单选中态（antd List，非内联样式）。 */
+.policy-master .ant-list-item { cursor: pointer; transition: background-color 0.15s; }
+.policy-master .ant-list-item:hover { background: rgba(0, 0, 0, 0.03); }
+.policy-master .ant-list-item.is-active { background: #e6f4ff; }
+.policy-split { align-items: flex-start; }
+
 /* 容器内错误提示（Modal / Drawer 内部）下边距：原用内联 style 控制，迁移到此处（ui_guards 规则 11）。 */
 .inline-error { margin-block-end: var(--space-3); }

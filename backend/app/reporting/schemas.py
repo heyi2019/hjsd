@@ -60,8 +60,10 @@ class CommissionOrderOut(ReportModel):
     user_id: int | None = None
     order_no: str
     order_id: int
+    allocation_type: str | None = None
     profit_base: Decimal
     rate: Decimal
+    amount: Decimal = Decimal("0")
     payable: Decimal
     paid: Decimal
     difference: Decimal

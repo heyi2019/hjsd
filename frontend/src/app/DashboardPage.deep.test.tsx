@@ -44,6 +44,19 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     expect(within(doneCard).getByText("2")).toBeInTheDocument();
   });
 
+  it("汇总接口失败时「今日关注」显示占位「-」而非 0", async () => {
+    // 经营场景里「0」有确定业务含义；接口失败若渲染成 0，用户会误判为「今天没有业务」。
+    vi.mocked(catalog.ordersApi.list).mockRejectedValue(new Error("orders down"));
+    renderLight(<DashboardPage />, { user: "admin" });
+    const activeCard = (await screen.findByText("进行中业务")).closest(".ui-stat") as HTMLElement;
+    const doneCard = (await screen.findByText("已完成业务")).closest(".ui-stat") as HTMLElement;
+    expect(within(activeCard).getByText("-")).toBeInTheDocument();
+    expect(within(doneCard).getByText("-")).toBeInTheDocument();
+    // 反证：失败态绝不允许回落到 0 计数（改回 String(...length) 本例会红）
+    expect(within(activeCard).queryByText("0")).toBeNull();
+    expect(within(doneCard).queryByText("0")).toBeNull();
+  });
+
   it("点「代挂」卡打开代挂登记弹窗", async () => {
     renderLight(<DashboardPage />, { user: "admin" });
     await screen.findByRole("button", { name: "代挂" });

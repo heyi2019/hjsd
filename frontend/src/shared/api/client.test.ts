@@ -62,6 +62,19 @@ describe("normalizeError：只认 v1 统一错误结构", () => {
     expect(normalizeError(err).message).toContain("后端");
   });
 
+  it("结构化 5xx 的英文原文不上屏，统一降级为中文兜底", () => {
+    const err = axiosError({ status: 500, responseData: { code: "INTERNAL", message: "boom" } });
+    expect(normalizeError(err)).toEqual({
+      message: "后端接口返回异常，请查看后端日志。",
+      code: "BACKEND_ERROR",
+    });
+  });
+
+  it("4xx 业务中文文案原样透出，不被 5xx 兜底误伤", () => {
+    const err = axiosError({ status: 422, responseData: { code: "PERIOD_LOCKED", message: "期间已锁定" } });
+    expect(normalizeError(err)).toEqual({ message: "期间已锁定", code: "PERIOD_LOCKED" });
+  });
+
   it("非 axios 错误也能安全转文案（不抛错即为达标）", () => {
     expect(normalizeError("boom")).toEqual({ message: "boom" });
     // 现状：实现走 String(error)，Error 会带 "Error: " 前缀。

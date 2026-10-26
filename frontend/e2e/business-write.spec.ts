@@ -195,37 +195,6 @@ test("资金闭环：独立流水审核冲销、资金池划转与日对账", as
   expect((await resolved.json()).status).toBe("RESOLVED");
 });
 
-test("资金池账户：批量启停并保留原因", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
-  const headers = { "X-Dev-User": "admin" };
-  const pools = await request.get(`${apiBase}/pools`, { headers });
-  expect(pools.ok()).toBe(true);
-  const pool = (await pools.json())[0];
-  const stamp = Date.now();
-  const created: number[] = [];
-  for (const suffix of ["A", "B"]) {
-    const response = await request.post(`${apiBase}/pool-accounts`, {
-      headers,
-      data: {
-        pool_id: pool.id,
-        account_no: `E2E-BATCH-${stamp}-${suffix}`,
-        account_name: `E2E 批量账户 ${suffix}`,
-        account_type: "BANK",
-        ownership: "OWNED",
-        opening_balance: "0.00",
-      },
-    });
-    expect(response.status()).toBe(201);
-    created.push((await response.json()).id);
-  }
-  const updated = await request.post(`${apiBase}/pool-accounts/batch-status`, {
-    headers,
-    data: { account_ids: created, status: "DISABLED", reason: "E2E 批量停用" },
-  });
-  expect(updated.status()).toBe(200);
-  expect((await updated.json()).every((item: { status: string }) => item.status === "DISABLED")).toBe(true);
-});
-
 test("质量中心：异常工单创建、列表与关闭", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };

@@ -94,23 +94,23 @@ export function normalizeError(error: unknown): NormalizedError {
       | { code?: string; message?: string }
       | undefined;
 
+    // 5xx 一律降级为中文兜底：后端业务异常（AppError）全部落在 4xx，其 message 为中文且带可执行
+    // 业务语义，必须原样透出；而 5xx 只可能来自未捕获异常或网关故障，其 message 对终端用户无操作
+    // 价值且可能携带堆栈/英文技术串。此处先行拦截，避免英文原文直接上屏。
+    if (error.response && error.response.status >= 500) {
+      return error.response.status === 503
+        ? {
+            message: "后端服务未连接或启动异常，请检查后端服务和端口。",
+            code: "BACKEND_UNAVAILABLE",
+          }
+        : {
+            message: "后端接口返回异常，请查看后端日志。",
+            code: "BACKEND_ERROR",
+          };
+    }
+
     // v1 唯一错误结构：{ code, message, details }
     if (data?.message) return { message: data.message, code: data.code };
-
-    // 数据库未就绪时后端明确返回 503；500 则表示接口执行异常，不能误报成连接失败。
-    if (error.response?.status === 503) {
-      return {
-        message: "后端服务未连接或启动异常，请检查后端服务和端口。",
-        code: "BACKEND_UNAVAILABLE",
-      };
-    }
-
-    if (error.response?.status === 500 && (data === undefined || typeof data !== "object")) {
-      return {
-        message: "后端接口返回异常，请查看后端日志。",
-        code: "BACKEND_ERROR",
-      };
-    }
 
     // 无响应体：后端不可达 / 超时 / 被 CORS 拒绝
     if (!error.response) {

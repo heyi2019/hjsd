@@ -28,14 +28,20 @@ const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api/v1";
 const ADMIN = { "X-Dev-User": "admin" };
 
 /**
- * 打开 antd Select：定位含 label 文本的表单项的可见选择区并点击。
- * 用 `.ant-form-item` 的 `hasText` 子串定位（label 形如「资金池」「转出资金池」）。
+ * 按表单项的**标签**精确定位（而非 hasText 整项匹配），避免 help 文案含同名子串时
+ * 误命中相邻字段。典型坑：资金性质 与 核算属性（help="可选范围由资金性质决定..."）——
+ * 若用整项 hasText 会同时命中两项触发 strict violation；按 label 匹配只命中「资金性质」本身。
  */
+function formItemByLabel(dialog: Locator, label: string): Locator {
+  // 按表单项的**标签**精确定位（而非整项 hasText），避免 help 文案含同名子串时误命中相邻字段。
+  // 例：资金性质 与 核算属性（help="可选范围由资金性质决定..."）整项 hasText 会同时命中两项；
+  // 仅匹配「label 文本」只命中「资金性质」本身。用 CSS :has() 单次选择器（廉价、点击稳定），
+  // 不取 .filter({has})（嵌套 JS 查询在重载下反复求值，导致 .ant-select-selector 迟迟不 actionable）。
+  return dialog.locator(`.ant-form-item:has(.ant-form-item-label:has-text(${JSON.stringify(label)}))`);
+}
+
 async function openSelect(dialog: Locator, label: string): Promise<void> {
-  await dialog
-    .locator(".ant-form-item", { hasText: label })
-    .locator(".ant-select-selector")
-    .click();
+  await formItemByLabel(dialog, label).locator(".ant-select-selector").click();
 }
 
 /**
@@ -59,10 +65,7 @@ async function pickSelect(
   label: string,
   option: RegExp | string,
 ): Promise<void> {
-  await dialog
-    .locator(".ant-form-item", { hasText: label })
-    .locator(".ant-select-selector")
-    .click();
+  await formItemByLabel(dialog, label).locator(".ant-select-selector").click();
 
   const open = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)");
   await expect(open).toHaveCount(1, { timeout: 5000 });

@@ -298,7 +298,7 @@
   --font-nav-primary: 600 0.8824rem/1.4 var(--font-sans); /* Subheadline · 15，一级导航 */
   --font-nav-secondary: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13，二级导航 */
   --font-nav-tertiary: 500 0.7059rem/1.4 var(--font-sans); /* Caption 1 · 12，三级及以下导航 */
-  --font-nav-caption: 700 0.6471rem/1.4 var(--font-sans); /* Caption 2 · 11，导航分组说明 */
+  --font-nav-caption: 700 0.7059rem/1.4 var(--font-sans); /* Caption 2 · 12，导航分组说明 */
   --font-body-m: 400 1rem/1.6 var(--font-sans); /* Body · 17 */
   --font-body-s: 400 0.8824rem/1.5 var(--font-sans); /* Subheadline · 15 */
   --font-caption: 400 0.7647rem/1.5 var(--font-sans); /* Footnote · 13 */
@@ -307,7 +307,7 @@
      不存在的自定义属性时整条 font 简写作废、静默回落浏览器默认（实测 13px，
      恰与父级继承值撞车而看不出异常），真正的 Caption 2 11px 从未生效。
      注意别与 --font-nav-caption（导航专用，同为 11px 但 700 字重）混用。 */
-  --font-caption-2: 400 0.6471rem/1.4 var(--font-sans); /* Caption 2 · 11 */
+  --font-caption-2: 400 0.7059rem/1.4 var(--font-sans); /* Caption 2 · 12 */
   --font-table-header: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13 */
   /* 长度型字号：专供 fontSize/font-size 场景。--font-body-s/--font-caption 等是 font 简写
      （含 weight/line-height），放进 font-size 属非法值 → 静默 unset 回继承（2026-09-07 实测踩坑）。 */
@@ -326,7 +326,7 @@
   --fs-subheadline: 0.8824rem; /* 15 · Subheadline（导航/表格/控件） */
   --fs-footnote: 0.7647rem; /* 13 · Footnote（正文基线，2026-09-03 裁定：正文小于导航） */
   --fs-caption-1: 0.7059rem; /* 12 · Caption 1（说明/badge/三级导航） */
-  --fs-caption-2: 0.6471rem; /* 11 · Caption 2（最小注脚） */
+  --fs-caption-2: 0.7059rem; /* 12 · Caption 2（最小注脚） */
   --fs-14: 0.8235rem; /* 14 · 非 iOS 阶梯（图标对齐/特殊文本），长度型 */
   /* 字距光学收紧（亚像素，负值；2026-09-18 二维孤儿清理） */
   --ls-tight: -0.5px;

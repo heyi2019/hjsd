@@ -97,8 +97,12 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (key: string, tab?:
         <h2 id="dashboard-summary-title" className="dashboard-summary__title">今日关注</h2>
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
         <StatRow items={[
-          { label: "进行中业务", kind: "count", amount: String(orders.filter((order) => order.status === "ACTIVE").length) },
-          { label: "已完成业务", kind: "count", amount: String(orders.filter((order) => order.status !== "ACTIVE").length) },
+          /* summaryError 非空表示汇总接口失败：此时 orders 仍是初始 []，
+             若照常取 .length 会把「加载失败」显示成「0 笔业务」，用户在经营场景会误判
+             （「0」有确定的业务含义）。StatRow 契约规定 amount 为 null 时显示 "-"，
+             这里直接复用该失败态占位。 */
+          { label: "进行中业务", kind: "count", amount: summaryError ? null : String(orders.filter((order) => order.status === "ACTIVE").length) },
+          { label: "已完成业务", kind: "count", amount: summaryError ? null : String(orders.filter((order) => order.status !== "ACTIVE").length) },
         ]} />
       </section>
 

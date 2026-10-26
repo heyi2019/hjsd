@@ -13,12 +13,12 @@ import { navItem } from "./support/api-stub";
  * business-write / finance-write-ui 等写路径 spec 负责，本 spec 只守
  * 「每个叶子都能开」这条主干。
  *
- * 维护提示：Tab 文案来自各页面源码（OrdersPage/CustomersPage/FundsPage/
- * ReportsPage/SettingsPage 的 Tab 定义数组）。页面增删 Tab 时同步改这里，
- * 新增叶子当天就能被走查覆盖。
+ * 维护提示：业务/客户/资金/经营中心的 Tab 文案来自各页面源码；「设置」中心不硬编码，
+ * 改由 readSettingsTabs 从 SettingsPage 真实渲染动态读取（含权限门控与溢出收纳的 Tab），
+ * 设置页增删 Tab 当天即自动覆盖，无需手动同步。
  */
 
-const CENTERS = [
+const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
   {
     nav: "业务中心",
     tabs: ["库存中心", "业务台账", "分期与回款"],
@@ -50,21 +50,12 @@ const CENTERS = [
     ],
   },
   {
+    // 设置页 Tab 不硬编码：从 SettingsPage 真实渲染的 Tab（含溢出收纳到「更多」的）
+    // 动态读取，单一事实源，增删 Tab 当天即被走查覆盖。
     nav: "设置",
-    tabs: [
-      "业务字典",
-      "业务类型",
-      "资金池",
-      "活字段",
-      "游戏类型",
-      "经营规则",
-      "标准导入",
-      "人员与权限",
-      "团队管理",
-      "外观",
-    ],
+    dynamic: true,
   },
-] as const;
+];
 
 /**
  * antd 会给中文 Tab 文案插入空格（与「退 出」按钮同源），故 accessible name
@@ -119,8 +110,38 @@ async function enterApp(page: Page) {
   await expect(navItem(page, "工作台")).toBeVisible();
 }
 
+/**
+ * 动态读取「设置」页真实渲染的 Tab 清单：可见 Tab + 溢出收纳到「更多 ⌄」下拉的 Tab，
+ * 一并返回。避免硬编码 10 Tab 过时（如「表单字段/导入」曾错写成「活字段/标准导入」，
+ * 且漏掉权限门控的 编号序列/月结账期锁/改动追溯）。
+ *
+ * 选标签用 textContent 并压平空白——antd 会给中文 Tab 插空格（与「退 出」同源）；
+ * textContent 不受滚动/可见性影响，竖向（tabPosition=left）或横向溢出都读到全量。
+ */
+async function readSettingsTabs(page: Page): Promise<string[]> {
+  const names: string[] = [];
+  const visible = page.locator(".settings-tabs .ant-tabs-tab");
+  const count = await visible.count();
+  for (let i = 0; i < count; i += 1) {
+    const text = (await visible.nth(i).textContent())?.replace(/\s+/g, "") ?? "";
+    if (text) names.push(text);
+  }
+  const more = page.locator(".settings-tabs .ant-tabs-nav-more");
+  if (await more.count() > 0) {
+    await more.first().click();
+    const items = page.locator(".ant-tabs-dropdown .ant-tabs-dropdown-menu-item");
+    const ic = await items.count();
+    for (let i = 0; i < ic; i += 1) {
+      const text = (await items.nth(i).textContent())?.replace(/\s+/g, "") ?? "";
+      if (text) names.push(text);
+    }
+    await page.keyboard.press("Escape");
+  }
+  return names;
+}
+
 for (const center of CENTERS) {
-  test(`全叶子走查：${center.nav}（${center.tabs.length} 个 Tab）`, async ({ page }) => {
+  test(`全叶子走查：${center.nav}（${center.dynamic ? "动态读取" : `${center.tabs!.length} 个`} Tab）`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
@@ -128,7 +149,8 @@ for (const center of CENTERS) {
     await navItem(page, center.nav).click();
     await expect(page.locator(".topbar__page")).toHaveText(center.nav);
 
-    for (const label of center.tabs) {
+    const labels = center.dynamic ? await readSettingsTabs(page) : center.tabs!;
+    for (const label of labels) {
       await clickTab(page, label);
       const tab = tabByName(page, label);
       await expect(tab).toHaveAttribute("aria-selected", "true");

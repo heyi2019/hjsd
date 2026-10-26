@@ -41,9 +41,10 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     renderLight(<ConfigAuditPanel />, { user: "admin" });
 
     expect(await screen.findByText("配置改动追溯")).toBeInTheDocument();
-    // 配置项名来自 configCatalog 的 ENTITY_TYPE_TO_ITEM；对象类型列来自 ENTITY_TYPE 词典。
-    // 两者对 OrderTypePool 的中文名都是「资金路由」，故页面至少两处命中（配置列 + 对象类型列）。
-    expect(screen.getAllByText("资金路由").length).toBeGreaterThanOrEqual(2);
+    // 配置项名来自 configCatalog 的 ENTITY_TYPE_TO_ITEM（4cd136c 后 OrderTypePool 归「资金池」项）；
+    // 对象类型列来自 ENTITY_TYPE 词典（「资金路由」）。两列各命中一次。
+    expect(screen.getAllByText("资金池").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("资金路由").length).toBeGreaterThanOrEqual(1);
     // 对象类型已翻成中文，不再显示裸码
     expect(screen.queryByText("OrderTypePool")).not.toBeInTheDocument();
     // 动作中文名来自 AUDIT_ACTION_LABEL

@@ -125,6 +125,7 @@ def update_account_profile(
     account_images: list[str] | None | object = _UNSET,
     note: str | None | object = _UNSET,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
+    form_extra: Mapping[str, Any] | None | object = _UNSET,
     user: CurrentUser | None = None,
 ) -> Account:
     account = get_account(session, account_id, user)
@@ -183,6 +184,9 @@ def update_account_profile(
             entity_id=account.id,
             values=(extra_values or {}).items(),
         )
+    if form_extra is not _UNSET and form_extra:
+        # INVEDIT 作用域自定义字段值合并进账号 form_extra。
+        account.form_extra = {**(account.form_extra or {}), **dict(form_extra)}
     record_audit(
         session,
         action=AuditAction.ACCOUNT_UPDATE,

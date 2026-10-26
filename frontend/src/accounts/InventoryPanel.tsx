@@ -1,6 +1,6 @@
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Dropdown, Input, Modal, Select, Space, message } from "antd";
+import { Card, Dropdown, Form, Input, Modal, Select, Space, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
@@ -29,6 +29,8 @@ import {
 } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
+import { requiredMoneyRules } from "../shared/lib/validators";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
 export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [rows, setRows] = useState<Account[]>([]);
@@ -53,8 +55,10 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [installmentCancelTarget, setInstallmentCancelTarget] = useState<{ account: Account; installmentId: number; contractType: string } | null>(null);
-  const [cancelAmount, setCancelAmount] = useState("");
-  const [cancelReason, setCancelReason] = useState("");
+  const [refundForm] = Form.useForm();
+  const [voidForm] = Form.useForm();
+  const [instCancelForm] = Form.useForm();
+  const [invEditExtraForm] = Form.useForm();
   const [cancelling, setCancelling] = useState(false);
   const [cancellingInstallment, setCancellingInstallment] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
@@ -157,18 +161,14 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         return;
       }
       setVoidTarget({ account, ...buy });
-      setCancelReason("");
+      voidForm.setFieldsValue({ reason: undefined });
     } catch (cause) {
       setError(normalizeError(cause));
     }
   }
 
-  async function submitVoid() {
+  async function submitVoid(values: { reason: string; form_extra?: Record<string, unknown> }) {
     if (!voidTarget) return;
-    if (!cancelReason.trim()) {
-      message.error("请填写下架原因");
-      return;
-    }
     setVoiding(true);
     try {
       await ordersApi.postEvent(voidTarget.orderId, {
@@ -177,13 +177,14 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         occurred_on: today(),
         portion: voidTarget.portion,
         offset_event_id: voidTarget.eventId,
-        reason: cancelReason.trim(),
+        reason: values.reason.trim(),
+        form_extra: values.form_extra,
         note: "账号下架，冲销买入",
       });
       message.success("账号已下架");
       const accountId = voidTarget.account.id;
       setVoidTarget(null);
-      setCancelReason("");
+      voidForm.resetFields();
       setExecutionDetails((current) => {
         const next = { ...current };
         delete next[accountId];
@@ -207,8 +208,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         return;
       }
       setCancelTarget({ account, ...sale });
-      setCancelAmount(sale.amount);
-      setCancelReason("");
+      refundForm.setFieldsValue({ refund_amount: sale.amount, reason: undefined });
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -230,31 +230,28 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         return;
       }
       setInstallmentCancelTarget({ account, installmentId: contract.id, contractType: contract.contract_type });
-      setCancelReason("");
+      instCancelForm.setFieldsValue({ reason: undefined });
     } catch (cause) {
       setError(normalizeError(cause));
     }
   }
 
-  async function submitCancellation() {
+  async function submitCancellation(values: { refund_amount: string; reason: string; form_extra?: Record<string, unknown> }) {
     if (!cancelTarget) return;
-    if (!cancelAmount.trim() || Number.isNaN(Number(cancelAmount)) || Number(cancelAmount) <= 0) {
+    if (!values.refund_amount?.trim() || Number.isNaN(Number(values.refund_amount)) || Number(values.refund_amount) <= 0) {
       message.error("请输入有效的退款金额");
-      return;
-    }
-    if (!cancelReason.trim()) {
-      message.error("请填写退款原因");
       return;
     }
     setCancelling(true);
     try {
       await ordersApi.postEvent(cancelTarget.orderId, {
         event_type: "CANCEL",
-        amount: cancelAmount.trim(),
+        amount: values.refund_amount.trim(),
         occurred_on: new Date().toISOString().slice(0, 10),
         portion: cancelTarget.portion,
         offset_event_id: cancelTarget.eventId,
-        reason: cancelReason.trim(),
+        reason: values.reason.trim(),
+        form_extra: values.form_extra,
         note: "取消交易，原路退款",
       });
       message.success(cancelTarget.account.inventory_type === "PICKUP"
@@ -262,8 +259,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         : "退款已登记，账号已回到在库");
       const accountId = cancelTarget.account.id;
       setCancelTarget(null);
-      setCancelAmount("");
-      setCancelReason("");
+      refundForm.resetFields();
       setExecutionDetails((current) => {
         const next = { ...current };
         delete next[accountId];
@@ -277,8 +273,8 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
     }
   }
 
-  async function submitInstallmentCancellation() {
-    if (!installmentCancelTarget || !cancelReason.trim()) {
+  async function submitInstallmentCancellation(values: { reason: string; form_extra?: Record<string, unknown> }) {
+    if (!installmentCancelTarget || !values.reason?.trim()) {
       message.error("请填写退款原因");
       return;
     }
@@ -286,12 +282,13 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
     try {
       await installmentsApi.cancel(installmentCancelTarget.installmentId, {
         cancelled_on: new Date().toISOString().slice(0, 10),
-        reason: cancelReason.trim(),
+        reason: values.reason.trim(),
+        form_extra: values.form_extra,
       });
       message.success(installmentCancelTarget.contractType === "PICKUP_SALE" ? "退款已登记，提号交易已结束" : "退款已登记，账号已回到库存");
       const accountId = installmentCancelTarget.account.id;
       setInstallmentCancelTarget(null);
-      setCancelReason("");
+      instCancelForm.resetFields();
       setExecutionDetails((current) => {
         const next = { ...current };
         delete next[accountId];
@@ -447,7 +444,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
     setSavingAccount(true);
     try {
       const { id, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note } = editingAccount;
-      const profile = { game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note };
+      const profile = { game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note, form_extra: invEditExtraForm.getFieldsValue()?.form_extra };
       const events = Object.values(eventDrafts).filter((draft) => {
         const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
@@ -471,6 +468,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
       }
       setEditingAccount(null);
       setEventDrafts({});
+      invEditExtraForm.resetFields();
       message.success("修改已保存");
     } catch (err) {
       setError(normalizeError(err));
@@ -620,23 +618,24 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         okText="确认退款并取消交易"
         cancelText="返回"
         confirmLoading={cancelling}
-        onOk={() => void submitCancellation()}
-        onCancel={() => { if (!cancelling) setCancelTarget(null); }}
+        onOk={() => refundForm.submit()}
+        onCancel={() => { if (!cancelling) { setCancelTarget(null); refundForm.resetFields(); } }}
       >
-        {cancelTarget ? <div className="ui-stack">
+        {cancelTarget ? <Form form={refundForm} layout="vertical" onFinish={(values) => void submitCancellation(values as { refund_amount: string; reason: string; form_extra?: Record<string, unknown> })}>
           <p className="muted">
             交易 {cancelTarget.account.source_order_no || "-"} 将按原售出流水和原资金池原路退款。
             {cancelTarget.account.inventory_type === "PICKUP" ? "提号取消后直接结束，不回库存。" : "取消后账号回到库存。"}
           </p>
-          <label>
-            <span>退款金额</span>
-            <MoneyInput aria-label="退款金额" inputMode="decimal" value={cancelAmount} onChange={(event) => setCancelAmount(event.target.value)} />
-          </label>
-          <label>
-            <span>退款原因</span>
-            <Input.TextArea aria-label="取消原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入退款原因" />
-          </label>
-        </div> : null}
+          <FieldConfigScope scope="INVREFUND" active={Boolean(cancelTarget)}>
+          <CfgItem name="refund_amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
+            <MoneyInput aria-label="退款金额" inputMode="decimal" />
+          </CfgItem>
+          <CfgItem name="reason" label="退款原因" rules={[{ required: true, message: "请填写退款原因" }]}>
+            <Input.TextArea aria-label="取消原因" rows={3} placeholder="请输入退款原因" />
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="inv-refund" />
+          </FieldConfigScope>
+        </Form> : null}
       </Modal>
       <Modal
         title="下架登记"
@@ -645,19 +644,21 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         cancelText="返回"
         confirmLoading={voiding}
         okButtonProps={{ danger: true }}
-        onOk={() => void submitVoid()}
-        onCancel={() => { if (!voiding) setVoidTarget(null); }}
+        onOk={() => voidForm.submit()}
+        onCancel={() => { if (!voiding) { setVoidTarget(null); voidForm.resetFields(); } }}
       >
-        {voidTarget ? <div className="ui-stack">
+        {voidTarget ? <Form form={voidForm} layout="vertical" onFinish={(values) => void submitVoid(values as { reason: string; form_extra?: Record<string, unknown> })}>
           <p className="muted">
             将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
             下架不可撤销，历史轨迹保留。
           </p>
-          <label>
-            <span>下架原因</span>
-            <Input.TextArea aria-label="下架原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入下架原因" />
-          </label>
-        </div> : null}
+          <FieldConfigScope scope="INVOID" active={Boolean(voidTarget)}>
+          <CfgItem name="reason" label="下架原因" rules={[{ required: true, message: "请填写下架原因" }]}>
+            <Input.TextArea aria-label="下架原因" rows={3} placeholder="请输入下架原因" />
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="inv-void" />
+          </FieldConfigScope>
+        </Form> : null}
       </Modal>
       <Modal
         title="退款登记"
@@ -665,21 +666,23 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         okText="确认退款并终止分期"
         cancelText="返回"
         confirmLoading={cancellingInstallment}
-        onOk={() => void submitInstallmentCancellation()}
-        onCancel={() => { if (!cancellingInstallment) setInstallmentCancelTarget(null); }}
+        onOk={() => instCancelForm.submit()}
+        onCancel={() => { if (!cancellingInstallment) { setInstallmentCancelTarget(null); instCancelForm.resetFields(); } }}
       >
-        {installmentCancelTarget ? <div className="ui-stack">
+        {installmentCancelTarget ? <Form form={instCancelForm} layout="vertical" onFinish={(values) => void submitInstallmentCancellation(values as { reason: string; form_extra?: Record<string, unknown> })}>
           <p className="muted">
             分期收款将按原资金池原路退款。
             {installmentCancelTarget.contractType === "PICKUP_SALE" ? "提号取消后账号直接结束。" : installmentCancelTarget.contractType === "ADVANCE_PURCHASE" ? "取消后终止分期合约。" : "取消后账号回到库存。"}
           </p>
-          <label>
-            <span>取消原因</span>
-            <Input.TextArea aria-label="分期取消原因" rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="请输入退款及取消原因" />
-          </label>
-        </div> : null}
+          <FieldConfigScope scope="INVCANCEL" active={Boolean(installmentCancelTarget)}>
+          <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请填写退款原因" }]}>
+            <Input.TextArea aria-label="分期取消原因" rows={3} placeholder="请输入退款及取消原因" />
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="inv-cancel" />
+          </FieldConfigScope>
+        </Form> : null}
       </Modal>
-      <Modal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); } }}>
+      <Modal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); invEditExtraForm.resetFields(); } }}>
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">
             <label>
@@ -695,6 +698,11 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
               <Input aria-label="编辑平台" value={editingAccount.platform ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, platform: e.target.value })} />
             </label>
           </div>
+          <Form form={invEditExtraForm} layout="vertical">
+            <FieldConfigScope scope="INVEDIT" active={Boolean(editingAccount)}>
+              <CustomFieldSection testIdSuffix="inv-edit" />
+            </FieldConfigScope>
+          </Form>
           <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} />
         </> : null}
       </Modal>

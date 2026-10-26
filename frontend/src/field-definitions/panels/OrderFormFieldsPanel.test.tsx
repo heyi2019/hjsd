@@ -8,7 +8,7 @@ vi.mock("../../shared/api/catalog");
 import * as client from "../../shared/api/client";
 import { renderLight } from "../../test/render";
 import { OrderFormFieldsPanel } from "./OrderFormFieldsPanel";
-import { FORM_SCOPES } from "../formScopes";
+import { FORM_SCOPES_FALLBACK } from "../formScopes";
 
 vi.mock("../../shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/client")>()),
@@ -46,12 +46,13 @@ beforeEach(() => {
   vi.spyOn(message, "success").mockImplementation(() => ({}) as never);
   vi.spyOn(message, "error").mockImplementation(() => ({}) as never);
   vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
+  vi.mocked(catalog.orderFormFieldsApi).scopes = vi.fn().mockResolvedValue([]);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
 });
 
 describe("OrderFormFieldsPanel", () => {
   it("不再提供已删除的资金池账户表单入口", () => {
-    expect(FORM_SCOPES.map((scope) => scope.code)).not.toContain("POOLACCOUNT");
+    expect(FORM_SCOPES_FALLBACK.map((scope) => scope.code)).not.toContain("POOLACCOUNT");
   });
 
   it("挂载时按当前业务类型拉取字段列表", async () => {

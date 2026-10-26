@@ -224,6 +224,23 @@ export function CfgNestedItem(props: {
   );
 }
 
+/** 渲染当前作用域（FieldConfigContext）下的自定义字段区块；无自定义字段时不渲染。
+ *  值通过 CustomFormField 归集到 form_extra.<field_key>，随表单提交上报。 */
+export function CustomFieldSection(props: { testIdSuffix?: string } = {}): ReactElement | null {
+  const cfg = useFieldConfig();
+  const defs = Object.values(cfg)
+    .filter((field) => field.is_custom && field.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  if (defs.length === 0) return null;
+  return (
+    <section className="ui-stack" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
+      {defs.map((def) => (
+        <CustomFormField key={def.id} def={def} />
+      ))}
+    </section>
+  );
+}
+
 /** 解析配置选项：兼容纯字符串数组（value=label）与 {value,label} 对象数组。 */
 export function resolveOptionItems(
   options: Array<string | { value: string; label: string }> | null | undefined,

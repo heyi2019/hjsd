@@ -89,6 +89,8 @@ class AccountProfileUpdate(RequestModel):
     account_images: list[str] | None = Field(default=None, max_length=9)
     note: str | None = None
     extra_values: dict[str, object] | None = None
+    # 表单字段配置体系（INVEDIT 作用域）：合并进账号 form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class ExecutionEditItem(RequestModel):

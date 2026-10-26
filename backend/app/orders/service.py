@@ -481,6 +481,7 @@ def create_order_link(
     split_ratio: Any = None,
     split_amount: Any = None,
     note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     actor: str,
     user: CurrentUser | None = None,
 ) -> OrderLink:
@@ -522,6 +523,7 @@ def create_order_link(
         split_ratio=ratio,
         split_amount=amount,
         note=note.strip() if isinstance(note, str) and note.strip() else None,
+        form_extra=dict(form_extra) if form_extra else None,
         created_by=actor,
         updated_by=actor,
     )
@@ -622,6 +624,7 @@ def list_order_links(
                 "split_ratio": row.split_ratio,
                 "split_amount": row.split_amount,
                 "note": row.note,
+                "form_extra": row.form_extra,
                 "created_at": row.created_at,
             }
         )
@@ -689,6 +692,7 @@ def update_order(
     account_snapshot: dict[str, Any] | None | object = _UNSET,
     note: str | None | object = _UNSET,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
+    form_extra: Mapping[str, Any] | None | object = _UNSET,
     user: CurrentUser | None = None,
 ) -> Order:
     """受控编辑订单主字段。
@@ -738,6 +742,9 @@ def update_order(
             entity_id=order.id,
             values=(extra_values or {}).items(),
         )
+    if form_extra is not _UNSET and form_extra:
+        # ORDEREDIT 作用域自定义字段值合并进订单 form_extra。
+        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
     record_audit(
         session,
         action=AuditAction.ORDER_UPDATE,
@@ -760,6 +767,7 @@ def cancel_order(
     *,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     """作废尚未登记事件的订单；已产生业务事实的订单必须走事件冲销。"""
@@ -774,6 +782,9 @@ def cancel_order(
     if posted is not None:
         raise Validation("订单已有登记事件，不能直接作废，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+    if form_extra:
+        # ORDERCANC 作用域自定义字段值合并进订单 form_extra。
+        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
     order.updated_by = actor
     session.flush()
     record_audit(

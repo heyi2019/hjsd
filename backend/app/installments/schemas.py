@@ -112,6 +112,8 @@ class DefaultIn(RequestModel):
 class CancelIn(RequestModel):
     cancelled_on: date
     reason: str = Field(min_length=1)
+    # 表单字段配置体系（INVCANCEL 作用域）：自定义字段值落分期 form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class DispositionIn(RequestModel):

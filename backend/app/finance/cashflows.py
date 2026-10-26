@@ -103,6 +103,7 @@ def create_cashflow(
     order_id: int | None = None,
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
@@ -169,6 +170,7 @@ def create_cashflow(
         order_id=order_id,
         status=CashflowStatus.PENDING.value,
         note=note,
+        form_extra=dict(form_extra) if form_extra else None,
         created_by=actor,
         updated_by=actor,
     )
@@ -234,6 +236,7 @@ def reject_cashflow(
     *,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     text_reason = _text(
@@ -253,6 +256,9 @@ def reject_cashflow(
     flow.reviewed_by = actor
     flow.reviewed_at = datetime.now()
     flow.reversal_reason = text_reason
+    if form_extra:
+        # STUDIOREJ 作用域自定义字段值合并进流水 form_extra。
+        flow.form_extra = {**(flow.form_extra or {}), **dict(form_extra)}
     flow.updated_by = actor
     session.flush()
     record_audit(
@@ -273,6 +279,7 @@ def reverse_cashflow(
     reversed_on: date,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     text_reason = _text(
@@ -313,6 +320,7 @@ def reverse_cashflow(
         reversal_of_id=flow.id,
         reversal_reason=text_reason,
         note=f"冲销 {flow.flow_no}",
+        form_extra=dict(form_extra) if form_extra else None,
         reviewed_by=actor,
         reviewed_at=datetime.now(),
         created_by=actor,

@@ -702,6 +702,7 @@ def cancel_installment(
     cancelled_on: date,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """终止交付前分期并登记原路退款。
@@ -733,6 +734,9 @@ def cancel_installment(
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"order_no": order.order_no, "status": order.status},
         )
+    if form_extra:
+        # INVCANCEL 作用域自定义字段值落分期合约 form_extra。
+        installment.form_extra = {**(installment.form_extra or {}), **dict(form_extra)}
 
     event_ids: list[int] = []
     refund_amount = Decimal("0")

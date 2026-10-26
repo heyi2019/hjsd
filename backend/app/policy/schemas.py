@@ -45,6 +45,8 @@ class ProfitAllocationItem(RequestModel):
 
 class ProfitAllocationSet(RequestModel):
     items: list[ProfitAllocationItem] = Field(default_factory=list)
+    # 表单字段配置体系（ALLOCATION 作用域）：自定义字段值合并进订单 form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class PolicyDefinitionOut(BaseModel):

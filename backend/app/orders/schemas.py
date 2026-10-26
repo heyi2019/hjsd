@@ -126,6 +126,8 @@ class OrderUpdate(BaseModel):
     account_snapshot: OrderAccountSnapshot | None = None
     note: str | None = None
     extra_values: dict[str, object] | None = None
+    # 表单字段配置体系（ORDEREDIT 作用域）：合并进订单 form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class OrderLinkCreate(BaseModel):
@@ -136,12 +138,16 @@ class OrderLinkCreate(BaseModel):
     split_ratio: Decimal | None = Field(default=None, gt=0, le=100)
     split_amount: Decimal | None = Field(default=None, gt=0)
     note: str | None = None
+    # 表单字段配置体系（ORDERLINK 作用域）：自定义字段值落 OrderLink.form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class OrderCancelIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reason: str = Field(min_length=1, max_length=500)
+    # 表单字段配置体系（ORDERCANC 作用域）：合并进订单 form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class OrderOut(BaseModel):
@@ -207,6 +213,8 @@ class EventCreate(BaseModel):
         default=None, description="COST 时可填 FEE / DESIGN / OTHER"
     )
     note: str | None = None
+    # 表单字段配置体系：操作类作用域自定义字段值，落 OrderEvent.form_extra。
+    form_extra: dict[str, object] | None = None
 
 
 class EventOut(BaseModel):
@@ -227,6 +235,7 @@ class EventOut(BaseModel):
     reason: str | None = None
     refund_responsibility: str | None = None
     note: str | None = None
+    form_extra: dict[str, object] | None = None
     created_at: datetime
     operator: str
 
@@ -338,6 +347,7 @@ class OrderLinkOut(BaseModel):
     split_ratio: Decimal | None = None
     split_amount: Decimal | None = None
     note: str | None = None
+    form_extra: dict[str, object] | None = None
     created_at: datetime
 
 
@@ -422,6 +432,14 @@ class OrderFormFieldOut(BaseModel):
     locked: bool
     is_custom: bool
     note: str | None = None
+
+
+class FormScopeOut(BaseModel):
+    """表单作用域（设置页「表单」下拉清单，来自 form_scopes 注册表）。"""
+
+    code: str
+    label: str
+    group: str
 
 
 class OrderFormFieldCreate(BaseModel):

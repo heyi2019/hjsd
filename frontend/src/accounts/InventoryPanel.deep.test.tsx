@@ -165,22 +165,25 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await screen.findByText("退款登记");
     await ui.clear(screen.getByLabelText("退款金额"));
     await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith("请输入有效的退款金额"));
+    // 表单必填校验拦截：不发请求
+    await waitFor(() => expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled());
   });
 
   it("取消交易（SOLD 行）：未填原因时拒绝提交", async () => {
     await openPanel([soldRow]);
     await clickMore(rowOf(2), "取消交易");
     await screen.findByText("退款登记");
+    await ui.clear(screen.getByLabelText("退款金额"));
     await ui.type(screen.getByLabelText("退款金额"), "500");
     await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith("请填写退款原因"));
+    await waitFor(() => expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled());
   });
 
   it("取消交易（SOLD 行）：填全后按原售出流水发起 CANCEL 冲销", async () => {
     await openPanel([soldRow]);
     await clickMore(rowOf(2), "取消交易");
     await screen.findByText("退款登记");
+    await ui.clear(screen.getByLabelText("退款金额"));
     await ui.type(screen.getByLabelText("退款金额"), "500");
     await ui.type(screen.getByLabelText("取消原因"), "客户反悔");
     await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));

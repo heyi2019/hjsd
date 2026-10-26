@@ -1,7 +1,7 @@
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
 import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   installmentsApi,
   ordersApi,
@@ -30,6 +30,7 @@ import {
   ConfirmButton,
 } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
 import {
   DEFAULT_BUSINESS_CENTER_TAB,
   type BusinessCenterEntryTab,
@@ -363,6 +364,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         split_ratio: values.split_ratio ? String(values.split_ratio) : undefined,
         split_amount: values.split_amount ? String(values.split_amount) : undefined,
         note: values.note as string | undefined,
+        form_extra: values.form_extra as Record<string, unknown> | undefined,
       });
       message.success("订单关联已建立");
       setLinkOpen(false);
@@ -418,7 +420,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     cancelForm.resetFields();
   };
 
-  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; cancel_amount?: string }) => {
+  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; cancel_amount?: string; form_extra?: Record<string, unknown> }) => {
     const installment = cancelInstallmentTarget;
     const order = cancelOrderTarget;
     if (!installment && !order) return;
@@ -456,10 +458,11 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             offset_event_id: selected.event.id,
             reason: values.reason,
             note: "取消交易原路退款",
+          form_extra: values.form_extra,
           });
           message.success(`取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退款`);
         } else {
-          await ordersApi.cancel(order.id, { reason: values.reason });
+          await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
           message.success("交易已取消，无已登记款项需要退款");
         }
         await load();
@@ -502,6 +505,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       const payload: Parameters<typeof ordersApi.patch>[1] = {};
       if (!orderHasPosted) payload.trade_date = values.trade_date as string;
       payload.note = (values.note as string | undefined)?.trim() ? (values.note as string).trim() : null;
+      payload.form_extra = (values.form_extra as Record<string, unknown> | undefined) ?? undefined;
       const snapshot = selectedOrder.account_snapshot;
       // 仅当快照密码可见（持有 order.create）时才允许整体回写，防止把隐藏密码覆盖为空。
       if (!orderHasPosted && snapshot && snapshot.game_password) {
@@ -959,6 +963,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         onOk={() => void cancelForm.submit()}
       >
         <Form form={cancelForm} layout="vertical" onFinish={submitCancelTransaction}>
+          <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : "ORDERCANC"} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
               ? cancelInstallmentTarget.contract_type === "PICKUP_SALE"
@@ -970,7 +975,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           </Typography.Paragraph>
           {cancelOrderTarget && reversibleEvents(cancelOrderTarget).length > 0 ? (
             <>
-              <Form.Item name="offset_event_id" label="被冲销动作" rules={[{ required: true, message: "请选择被冲销动作" }]}>
+              <CfgItem name="offset_event_id" label="被冲销动作" rules={[{ required: true, message: "请选择被冲销动作" }]}>
                 <AntSelect
                   placeholder="请选择被冲销动作"
                   options={reversibleEvents(cancelOrderTarget).map(({ event, remaining }) => ({
@@ -982,18 +987,20 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     if (target) cancelForm.setFieldsValue({ cancel_amount: target.remaining.toFixed(2) });
                   }}
                 />
-              </Form.Item>
-              <Form.Item name="cancel_amount" label="冲销金额" rules={requiredMoneyRules("冲销金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
+              </CfgItem>
+              <CfgItem name="cancel_amount" label="冲销金额" rules={requiredMoneyRules("冲销金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
                 <MoneyInput placeholder="请输入冲销金额" />
-              </Form.Item>
+              </CfgItem>
             </>
           ) : null}
-          <Form.Item name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
+          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
-          </Form.Item>
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="order-cancel" />
+          </FieldConfigScope>
         </Form>
       </Modal>
 
@@ -1006,39 +1013,42 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         onOk={() => void editForm.submit()}
       >
         <Form form={editForm} layout="vertical" onFinish={submitEditOrder}>
+          <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
             订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
           </Typography.Paragraph>
-          <Form.Item
+          <CfgItem
             name="trade_date"
             label="成交日期"
             rules={orderHasPostedEvents ? [] : [{ required: true, message: "请输入成交日期" }]}
             extra={orderHasPostedEvents ? "已有登记事件，成交日期不可修改" : undefined}
           >
             <Input placeholder="YYYY-MM-DD" disabled={orderHasPostedEvents} />
-          </Form.Item>
-          <Form.Item name="note" label="备注">
+          </CfgItem>
+          <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="订单备注（选填）" />
-          </Form.Item>
+          </CfgItem>
           {selectedOrder?.account_snapshot && selectedOrder.order_type === "DFQ" && !orderHasPostedEvents ? (
             selectedOrder.account_snapshot.game_password ? (
               <>
                 <Typography.Paragraph type="secondary">账号快照（代分期建单时填写的文本信息）：</Typography.Paragraph>
-                <Form.Item name="snap_game_account" label="账号标识" rules={[{ required: true, message: "请输入账号标识" }]}>
+                <CfgItem name="snap_game_account" label="账号标识" rules={[{ required: true, message: "请输入账号标识" }]}>
                   <Input />
-                </Form.Item>
-                <Form.Item name="snap_game_type" label="产品"><Input /></Form.Item>
-                <Form.Item name="snap_game_password" label="账号密码"><Input placeholder="留空表示清除密码" /></Form.Item>
-                <Form.Item name="snap_channel_region" label="区服"><Input /></Form.Item>
-                <Form.Item name="snap_bound_phone" label="绑定手机"><Input /></Form.Item>
-                <Form.Item name="snap_platform" label="平台"><Input /></Form.Item>
-                <Form.Item name="snap_purchase_price" label="号价" rules={moneyRules("号价")}><MoneyInput placeholder="例如 1000.00" /></Form.Item>
-                <Form.Item name="snap_note" label="快照备注"><Input.TextArea rows={2} /></Form.Item>
+                </CfgItem>
+                <CfgItem name="snap_game_type" label="产品"><Input /></CfgItem>
+                <CfgItem name="snap_game_password" label="账号密码"><Input placeholder="留空表示清除密码" /></CfgItem>
+                <CfgItem name="snap_channel_region" label="区服"><Input /></CfgItem>
+                <CfgItem name="snap_bound_phone" label="绑定手机"><Input /></CfgItem>
+                <CfgItem name="snap_platform" label="平台"><Input /></CfgItem>
+                <CfgItem name="snap_purchase_price" label="号价" rules={moneyRules("号价")}><MoneyInput placeholder="例如 1000.00" /></CfgItem>
+                <CfgItem name="snap_note" label="快照备注"><Input.TextArea rows={2} /></CfgItem>
               </>
             ) : (
               <Typography.Paragraph type="secondary">账号快照密码字段无权查看，为避免覆盖隐藏信息，快照暂不可编辑；如需修改请联系有订单创建权限的人员。</Typography.Paragraph>
             )
           ) : null}
+          <CustomFieldSection testIdSuffix="order-edit" />
+          </FieldConfigScope>
         </Form>
       </Modal>
 
@@ -1051,10 +1061,11 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         onOk={() => void linkForm.submit()}
       >
         <Form form={linkForm} layout="vertical" onFinish={submitLink}>
+          <FieldConfigScope scope="ORDERLINK" active={linkOpen}>
           <Typography.Paragraph type="secondary">
             关联单用于把同一真实交易拆分的上下游订单串起来；分成口径作为关系快照保存，不会改写订单自身金额。
           </Typography.Paragraph>
-          <Form.Item
+          <CfgItem
             name="related_order_id"
             label="关联订单"
             rules={[{ required: true, message: "请选择关联订单" }]}
@@ -1070,19 +1081,21 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   label: `${item.order_no}${item.party_name ? ` · ${item.party_name}` : ""}`,
                 }))}
             />
-          </Form.Item>
-          <Form.Item name="relation_type" label="关系" rules={[{ required: true, message: "请选择关系" }]}>
+          </CfgItem>
+          <CfgItem name="relation_type" label="关系" rules={[{ required: true, message: "请选择关系" }]}>
             <AntSelect placeholder="请选择关系" options={relationTypeOptions} />
-          </Form.Item>
-          <Form.Item name="split_ratio" label="分成比例（%）" tooltip="与分成金额二选一，按交易拆分口径填写">
+          </CfgItem>
+          <CfgItem name="split_ratio" label="分成比例（%）" tooltip="与分成金额二选一，按交易拆分口径填写">
             <Input placeholder="例如 60" />
-          </Form.Item>
-          <Form.Item name="split_amount" label="分成金额（元）" tooltip="与分成比例二选一">
+          </CfgItem>
+          <CfgItem name="split_amount" label="分成金额（元）" tooltip="与分成比例二选一">
             <Input placeholder="例如 1000.00" />
-          </Form.Item>
-          <Form.Item name="note" label="备注">
+          </CfgItem>
+          <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="关联说明（选填）" />
-          </Form.Item>
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="order-link" />
+          </FieldConfigScope>
         </Form>
       </Modal>
 
@@ -1097,7 +1110,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         <Form
           form={allocationForm}
           layout="vertical"
-          onFinish={async (values: { allocations: AllocationFormRow[] }) => {
+          onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             const rows = (values.allocations ?? []).filter(
               (row) => row.employee !== undefined && row.employee !== null,
@@ -1158,7 +1171,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             }
             setAllocationSubmitting(true);
             try {
-              await policyApi.setAllocations(actionOrder.id, items);
+              await policyApi.setAllocations(actionOrder.id, items, values.form_extra);
               message.success("分润已保存");
               setAllocationOpen(false);
               setActionOrder(null);
@@ -1249,6 +1262,9 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               </>
             )}
           </Form.List>
+          <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>
+            <CustomFieldSection testIdSuffix="order-allocation" />
+          </FieldConfigScope>
         </Form>
       </Modal>
 
@@ -1262,7 +1278,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         <Form
           form={refundForm}
           layout="vertical"
-          onFinish={async (values: { amount: string; reason: string; refund_responsibility: string }) => {
+          onFinish={async (values: { amount: string; reason: string; refund_responsibility: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
@@ -1272,6 +1288,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 occurred_on: new Date().toISOString().slice(0, 10),
                 reason: values.reason,
                 refund_responsibility: values.refund_responsibility as "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER",
+                form_extra: values.form_extra,
               });
               message.success("退款已登记");
               setRefundOpen(false);
@@ -1284,15 +1301,18 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             }
           }}
         >
-          <Form.Item name="amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
+          <FieldConfigScope scope="REFUND" active={refundOpen}>
+          <CfgItem name="amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
             <MoneyInput placeholder="请输入退款金额" />
-          </Form.Item>
-          <Form.Item name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
+          </CfgItem>
+          <CfgItem name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
             <AntSelect options={refundResponsibilityOptions} />
-          </Form.Item>
-          <Form.Item name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款原因" />
-          </Form.Item>
+          </CfgItem>
+            <CustomFieldSection testIdSuffix="order-refund" />
+          </FieldConfigScope>
         </Form>
       </Modal>
 

@@ -193,6 +193,7 @@ def cancel_installment(
         cancelled_on=payload.cancelled_on,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.InstallmentCancelResult(

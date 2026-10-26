@@ -3,12 +3,12 @@
  *  仅自定义字段可删除（预置字段受保护）。 */
 import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { gameTypesApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { FORM_SCOPE_GROUPED_OPTIONS, FORM_SCOPE_LABEL } from "../formScopes";
+import { FORM_SCOPE_LABEL, buildGroupedScopeOptions, useFormScopes } from "../formScopes";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
@@ -44,6 +44,9 @@ export interface OrderFormFieldsPanelProps {
 export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: OrderFormFieldsPanelProps = {}) {
   // 词典未加载时回落模块常量，保证与改造前完全一致。
   const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
+  // 作用域清单以后端注册表为单一事实源；接口不可用时回落本地兜底。
+  const { scopes } = useFormScopes();
+  const groupedScopeOptions = useMemo(() => buildGroupedScopeOptions(scopes), [scopes]);
   const [activeType, setActiveType] = useState<string>(
     initialScope && FORM_SCOPE_LABEL[initialScope] ? initialScope : "HS",
   );
@@ -380,7 +383,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
             setEditingId(null);
             form.resetFields();
           }}
-          options={FORM_SCOPE_GROUPED_OPTIONS}
+          options={groupedScopeOptions}
           optionFilterProp="label"
           showSearch
         />

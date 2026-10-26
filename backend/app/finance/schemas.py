@@ -94,6 +94,7 @@ class CashflowOut(BaseModel):
     transfer_id: str | None = None
     source: str
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
     operator: str
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
@@ -117,15 +118,21 @@ class CashflowCreate(RequestModel):
     order_id: int | None = None
     note: str | None = None
     extra_values: dict[str, Any] | None = None
+    # 表单字段配置体系（STUDIOEXP 作用域）：自定义字段值落 Cashflow.form_extra。
+    form_extra: dict[str, Any] | None = None
 
 
 class CashflowReject(RequestModel):
     reason: str
+    # 表单字段配置体系（STUDIOREJ 作用域）：合并进流水 form_extra。
+    form_extra: dict[str, Any] | None = None
 
 
 class CashflowReverse(RequestModel):
     reversed_on: date
     reason: str
+    # 表单字段配置体系（STUDIOREV 作用域）：落冲销流水 form_extra。
+    form_extra: dict[str, Any] | None = None
 
 
 class ReconciliationCreate(RequestModel):

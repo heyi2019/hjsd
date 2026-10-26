@@ -10,6 +10,7 @@
  */
 import { Card, Form, Input, Modal, Select, Space, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   cashflowsApi,
@@ -166,10 +167,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     void load();
   }, [load]);
 
-  const review = async (row: Cashflow, action: "approve" | "reject", reason?: string) => {
+  const review = async (row: Cashflow, action: "approve" | "reject", reason?: string, formExtra?: Record<string, unknown>) => {
     await write.run(async () => {
       if (action === "approve") await cashflowsApi.approve(row.id);
-      else await cashflowsApi.reject(row.id, reason ?? "");
+      else await cashflowsApi.reject(row.id, reason ?? "", formExtra);
       message.success(action === "approve" ? "支出已审核" : "支出已拒绝");
       setRejectTarget(null);
       rejectForm.resetFields();
@@ -190,6 +191,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         category: values.category as string,
         amount: values.amount as string,
         note: (values.note as string) || null,
+        form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
       // 关闭审核态：提交即入账，紧接自动补审核；失败不吞——提示去流水页手动审核。
       const flowId = (flow as { id?: number } | undefined)?.id;
@@ -214,6 +216,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       await cashflowsApi.reverse(targetId, {
         reversed_on: values.reversed_on as string,
         reason: values.reason as string,
+        form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
       message.success("支出已冲销");
       setReverseTarget(null);
@@ -430,16 +433,17 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       >
         <InlineError error={write.error} />
         <Form form={registerForm} layout="vertical" onFinish={submitRegister}>
-          <Form.Item name="pool_id" label="资金池" rules={[{ required: true, message: "请选择资金池" }]}>
+          <FieldConfigScope scope="STUDIOEXP" active={registerOpen}>
+          <CfgItem name="pool_id" label="资金池" rules={[{ required: true, message: "请选择资金池" }]}>
             <Select
               options={selectedPools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
               placeholder={selectedPools.length ? "选择资金池" : "请先在「配置承载池」勾选资金池"}
             />
-          </Form.Item>
-          <Form.Item name="occurred_on" label="日期" rules={[{ required: true, message: "请输入日期" }]}>
+          </CfgItem>
+          <CfgItem name="occurred_on" label="日期" rules={[{ required: true, message: "请输入日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="direction" label="收支" rules={[{ required: true, message: "请选择收支" }]}>
+          </CfgItem>
+          <CfgItem name="direction" label="收支" rules={[{ required: true, message: "请选择收支" }]}>
             <Select
               options={[
                 { value: "OUT", label: "支出" },
@@ -450,19 +454,21 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
                 registerForm.setFieldValue("category", undefined);
               }}
             />
-          </Form.Item>
-          <Form.Item name="category" label="科目" rules={[{ required: true, message: "请选择科目" }]}>
+          </CfgItem>
+          <CfgItem name="category" label="科目" rules={[{ required: true, message: "请选择科目" }]}>
             <Select options={registerDirection === "OUT" ? expenseItems : INCOME_ITEMS} />
-          </Form.Item>
-          <Form.Item name="amount" label="金额" rules={requiredMoneyRules("金额")}>
+          </CfgItem>
+          <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
             <MoneyInput />
-          </Form.Item>
-          <Form.Item name="note" label="备注">
+          </CfgItem>
+          <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} />
-          </Form.Item>
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="studio-expense" />
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             登记入账
           </PermissionButton>
+          </FieldConfigScope>
         </Form>
       </Modal>
 
@@ -502,13 +508,16 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         footer={null}
       >
         <InlineError error={write.error} />
-        <Form form={rejectForm} layout="vertical" onFinish={(values) => review(rejectTarget!, "reject", values.reason as string)}>
-          <Form.Item name="reason" label="拒绝原因" rules={[{ required: true, message: "请填写拒绝原因" }]}>
+        <Form form={rejectForm} layout="vertical" onFinish={(values) => review(rejectTarget!, "reject", values.reason as string, values.form_extra as Record<string, unknown> | undefined)}>
+          <FieldConfigScope scope="STUDIOREJ" active={Boolean(rejectTarget)}>
+          <CfgItem name="reason" label="拒绝原因" rules={[{ required: true, message: "请填写拒绝原因" }]}>
             <Input.TextArea rows={3} />
-          </Form.Item>
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="studio-reject" />
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认拒绝
           </PermissionButton>
+          </FieldConfigScope>
         </Form>
       </Modal>
 
@@ -520,15 +529,18 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       >
         <InlineError error={write.error} />
         <Form form={reverseForm} layout="vertical" onFinish={submitReverse}>
-          <Form.Item name="reversed_on" label="冲销日期" rules={[{ required: true, message: "请输入冲销日期" }]}>
+          <FieldConfigScope scope="STUDIOREV" active={Boolean(reverseTarget)}>
+          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true, message: "请输入冲销日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
+          </CfgItem>
+          <CfgItem name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
             <Input.TextArea rows={3} />
-          </Form.Item>
+          </CfgItem>
+          <CustomFieldSection testIdSuffix="studio-reverse" />
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认冲销
           </PermissionButton>
+          </FieldConfigScope>
         </Form>
       </Modal>
     </section>

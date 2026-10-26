@@ -36,7 +36,6 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    # public_routes = 160（实测）。自 2026-10 基线 159 起，本期全量移除「资金池账户」板块 5 个端点
-    # （GET/POST /pool-accounts、PATCH /{id}/status、PATCH /{id}、POST /batch-status）；
-    # 并行重构（经营规则/审核面板）另移除若干端点。以当前应用实际路由数为准。
-    assert public_routes == 160
+    # public_routes = 161（实测）。自 160 基线起新增 GET /order-form-fields/scopes
+    # （表单作用域注册表下发端点）。以当前应用实际路由数为准。
+    assert public_routes == 161

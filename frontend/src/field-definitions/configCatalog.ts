@@ -18,7 +18,7 @@ import {
   poolsApi,
   sequencesApi,
 } from "../shared/api/catalog";
-import { FORM_SCOPES } from "./formScopes";
+import { FORM_SCOPES_FALLBACK } from "./formScopes";
 
 export type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
 
@@ -53,12 +53,12 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "form-fields",
     label: "表单字段",
-    summary: `${FORM_SCOPES.length} 个业务表单的字段：选填/必填、停用/启用、增删自定义字段`,
+    summary: `${FORM_SCOPES_FALLBACK.length} 个业务表单的字段：选填/必填、停用/启用、增删自定义字段`,
     group: "FIELD",
     permission: "field-definition.manage",
     entityTypes: ["order_form_field"],
     // 表单数是注册表静态已知量；逐作用域的明细由总览面板按需展开时再拉。
-    count: async () => FORM_SCOPES.length,
+    count: async () => FORM_SCOPES_FALLBACK.length,
   },
   {
     key: "order-types",

@@ -678,11 +678,12 @@ export const ordersApi = {
       split_ratio?: string;
       split_amount?: string;
       note?: string;
+      form_extra?: Record<string, unknown>;
     },
   ) => api.post<OrderLink>(`/orders/${orderId}/links`, payload).then((r) => r.data),
   deleteLink: (orderId: number, linkId: number) =>
     api.delete<void>(`/orders/${orderId}/links/${linkId}`).then((r) => r.data),
-  cancel: (orderId: number, payload: { reason: string }) =>
+  cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown> }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
   create: (payload: {
     order_type: string;
@@ -758,6 +759,7 @@ export const ordersApi = {
       refund_responsibility?: "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER";
       flow_category?: string;
       note?: string;
+      form_extra?: Record<string, unknown>;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
@@ -765,6 +767,7 @@ export const ordersApi = {
     orderId: number,
     payload: {
       trade_date?: string;
+      form_extra?: Record<string, unknown>;
       note?: string | null;
       account_snapshot?: {
         game_account: string;
@@ -789,7 +792,7 @@ export const employeesApi = {
 export const accountsApi = {
   list: (params?: { status?: string }) =>
     api.get<Account[]>("/accounts", { params }).then((r) => r.data),
-  updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "platform" | "note" | "account_description" | "account_images">>) =>
+  updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
     api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api
@@ -822,7 +825,7 @@ export const installmentsApi = {
         payload,
       )
       .then((r) => r.data),
-  cancel: (id: number, payload: { cancelled_on: string; reason: string }) =>
+  cancel: (id: number, payload: { cancelled_on: string; reason: string; form_extra?: Record<string, unknown> }) =>
     api.post<InstallmentCancelResult>(`/installments/${id}/cancel`, payload).then((r) => r.data),
   settleEarly: (id: number, payload: { paid_on: string; pool_id?: number; note?: string }) =>
     api.post<Installment>(`/installments/${id}/settle-early`, payload).then((r) => r.data),
@@ -852,8 +855,8 @@ export const depositsApi = {
 export const cashflowsApi = {
   create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),
   approve: (id: number) => api.post<Cashflow>(`/cashflows/${id}/approve`).then(r => r.data),
-  reject: (id: number, reason: string) => api.post<Cashflow>(`/cashflows/${id}/reject`, {reason}).then(r => r.data),
-  reverse: (id: number, data: {reversed_on: string; reason: string}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
+  reject: (id: number, reason: string, formExtra?: Record<string, unknown>) => api.post<Cashflow>(`/cashflows/${id}/reject`, { reason, form_extra: formExtra }).then(r => r.data),
+  reverse: (id: number, data: {reversed_on: string; reason: string; form_extra?: Record<string, unknown>}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
   list: (params?: {
     pool_id?: number;
     order_id?: number;
@@ -919,6 +922,12 @@ export interface RequiredWhen {
   values?: string[] | null;
 }
 
+export interface FormScope {
+  code: string;
+  label: string;
+  group: string;
+}
+
 export interface OrderFormField {
   id: number;
   order_type_code: string;
@@ -940,6 +949,8 @@ export interface OrderFormField {
 
 /** 表单字段配置（按表单作用域码维度）；自定义字段即客户/订单的扩展字段定义。 */
 export const orderFormFieldsApi = {
+  /** 表单作用域注册表（后端单一事实源；前端仅作降级兜底）。 */
+  scopes: () => api.get<FormScope[]>("/order-form-fields/scopes").then((r) => r.data),
   list: (orderTypeCode: string, includeInactive = true) =>
     api
       .get<OrderFormField[]>("/order-form-fields", {
@@ -1338,8 +1349,8 @@ export const policyApi = {
       .then((r) => r.data),
   allocations: (orderId: number) =>
     api.get<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
-  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null; allocation_rate: string; allocation_amount?: string }[]) =>
-    api.put<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`, { items }).then((r) => r.data),
+  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null; allocation_rate: string; allocation_amount?: string }[], formExtra?: Record<string, unknown>) =>
+    api.put<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`, { items, form_extra: formExtra }).then((r) => r.data),
   orderSnapshot: (orderId: number) =>
     api
       .get<{ found: boolean; snapshot: { policy_version_id?: number | null; policy_snapshot?: Record<string, unknown> | null } | null }>(

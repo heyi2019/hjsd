@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -524,6 +525,7 @@ def set_allocations(
     *,
     items: list[dict[str, Any]],
     actor: str = "system",
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
     """整单重设分润。
@@ -542,12 +544,19 @@ def set_allocations(
     if typed and len(typed) != len(normalized_items):
         raise Validation("按动作分润与按人分润不能混用，请统一为其中一种")
     if typed:
-        return _set_action_allocations(
+        result = _set_action_allocations(
             session, order_id, items=items, actor=actor, user=user
         )
-    return _set_person_allocations(
-        session, order_id, items=normalized_items, actor=actor, user=user
-    )
+    else:
+        result = _set_person_allocations(
+            session, order_id, items=normalized_items, actor=actor, user=user
+        )
+    if form_extra:
+        # ALLOCATION 作用域自定义字段值合并进订单 form_extra。
+        order = _scoped_order(session, order_id, user)
+        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
+        session.flush()
+    return result
 
 
 def _set_person_allocations(

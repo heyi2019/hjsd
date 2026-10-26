@@ -1,6 +1,7 @@
 """orders 事件登记服务（ORD-02）。"""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -84,6 +85,7 @@ def post_event(
     refund_responsibility: str | None = None,
     flow_category: str | None = None,
     note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
     allow_installment_payment: bool = False,
     allow_installment_delivery: bool = False,
@@ -310,6 +312,7 @@ def post_event(
         reason=reason,
         refund_responsibility=refund_responsibility,
         note=note,
+        form_extra=dict(form_extra) if form_extra else None,
         is_posted=True,
         posted_at=datetime.now(),
         created_by=actor,

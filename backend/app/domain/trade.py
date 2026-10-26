@@ -108,6 +108,8 @@ class Account(Base, AuditMixin):
     account_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     account_images: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 表单字段配置体系：INVEDIT 等作用域自定义字段值（与 Order.form_extra 同构）。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Order(Base, AuditMixin):
@@ -244,6 +246,8 @@ class OrderLink(Base, TimestampMixin):
     split_ratio: Mapped[object | None] = mapped_column(Amount, nullable=True)
     split_amount: Mapped[object | None] = mapped_column(Amount, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 表单字段配置体系：ORDERLINK 作用域自定义字段值（与 Order.form_extra 同构）。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
     updated_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
 
@@ -297,6 +301,9 @@ class OrderEvent(Base, AuditMixin):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     refund_responsibility: Mapped[str | None] = mapped_column(String(32), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 表单字段配置体系：订单操作类作用域（ORDERCANC/REFUND/INVREFUND/INVOID 等）
+    # 的自定义字段值（与 Order.form_extra 同构）。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Cashflow(Base, AuditMixin):
@@ -390,6 +397,8 @@ class Cashflow(Base, AuditMixin):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reversal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 表单字段配置体系：工作室（STUDIOEXP/STUDIOREJ/STUDIOREV）等自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Reconciliation(Base, AuditMixin):
@@ -536,6 +545,8 @@ class Installment(Base, AuditMixin):
     delivered_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     first_due_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 表单字段配置体系：INVCANCEL 等作用域自定义字段值（与 Order.form_extra 同构）。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class InstallmentSchedule(Base, TimestampMixin):

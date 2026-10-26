@@ -115,6 +115,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         transfer_id=transfer_id,
         source=source,
         note=value("note"),
+        form_extra=value("form_extra"),
         operator=(value("operator") or value("created_by"))
         if isinstance(flow, dict)
         else flow.created_by,
@@ -260,6 +261,7 @@ def create_cashflow(
         order_id=payload.order_id,
         note=payload.note,
         extra_values=payload.extra_values,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -284,7 +286,8 @@ def reject_cashflow(
     user: CurrentUser = post_deposit,
 ) -> schemas.CashflowOut:
     flow = service.reject_cashflow(
-        db, cashflow_id, actor=_actor(user), reason=payload.reason, user=user
+        db, cashflow_id, actor=_actor(user), reason=payload.reason,
+        form_extra=payload.form_extra, user=user,
     )
     return _cashflow_out(db, flow)
 
@@ -302,6 +305,7 @@ def reverse_cashflow(
         reversed_on=payload.reversed_on,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _cashflow_out(db, flow)

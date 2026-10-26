@@ -501,6 +501,7 @@ def create_order_link(
         split_ratio=payload.split_ratio,
         split_amount=payload.split_amount,
         note=payload.note,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -551,6 +552,7 @@ def cancel_order(
         order_id,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _order_output(db, order, user)
@@ -586,6 +588,7 @@ def post_event(
         refund_responsibility=payload.refund_responsibility,
         flow_category=payload.flow_category,
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.EventPostResult(
@@ -609,6 +612,19 @@ def pool_balance(
 
 
 manage_form_fields = require_permissions(PERM_FIELD_DEFINITION_MANAGE)
+
+
+@router.get(
+    "/order-form-fields/scopes",
+    response_model=list[schemas.FormScopeOut],
+)
+def list_form_scopes(
+    _user: CurrentUser = manage_form_fields,
+) -> list[schemas.FormScopeOut]:
+    """表单作用域注册表：设置页「表单」下拉的单一事实源。"""
+    from app.orders.form_scopes import list_scopes
+
+    return [schemas.FormScopeOut.model_validate(item) for item in list_scopes()]
 
 
 @router.get(

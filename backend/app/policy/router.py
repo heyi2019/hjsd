@@ -201,6 +201,7 @@ def set_allocations(
         order_id,
         items=[item.model_dump() for item in payload.items],
         actor=user.username,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.ProfitAllocationListOut(

@@ -13,6 +13,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { requiredMoneyRules } from "../shared/lib/validators";
+import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 const OWNERSHIP_LABEL: Record<string, string> = {
   OWNED: "自有（计入权益）",
@@ -216,6 +217,7 @@ export function PoolAccountsPanel() {
         okText="创建"
         onOk={() => void createForm.submit()}
       >
+        <FieldConfigScope scope="POOLACCOUNT" active={createOpen}>
         <Form form={createForm} layout="vertical" onFinish={submitCreate} initialValues={{ opening_balance: "0", account_type: "BANK", ownership: "OWNED" }}>
           <Form.Item name="pool_id" label="所属资金池" rules={[{ required: true, message: "请选择资金池" }]}>
             <Select placeholder="请选择资金池" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
@@ -226,12 +228,12 @@ export function PoolAccountsPanel() {
           <Form.Item name="account_name" label="账户名称" rules={[{ required: true, message: "请输入账户名称" }]}>
             <Input placeholder="例如 农行卡 8678" maxLength={128} />
           </Form.Item>
-          <Form.Item name="account_type" label="账户类型" rules={[{ required: true }]}>
-            <Select options={[{ value: "BANK", label: "银行账户" }, { value: "CASH", label: "现金" }, { value: "THIRD_PARTY", label: "第三方渠道" }]} />
-          </Form.Item>
-          <Form.Item name="ownership" label="归属" rules={[{ required: true }]} extra="OWNED 计入权益；CUSTODY / THIRD_PART 只计现金头寸">
-            <Select options={[{ value: "OWNED", label: "自有（计入权益）" }, { value: "CUSTODY", label: "代管（只计头寸）" }, { value: "THIRD_PART", label: "第三方（只计头寸）" }]} />
-          </Form.Item>
+          <CfgItem name="account_type" label="账户类型" rules={[{ required: true }]}>
+            <Select />
+          </CfgItem>
+          <CfgItem name="ownership" label="归属" rules={[{ required: true }]} extra="OWNED 计入权益；CUSTODY / THIRD_PART 只计现金头寸">
+            <Select />
+          </CfgItem>
           <Form.Item name="opening_balance" label="期初余额" rules={requiredMoneyRules("期初余额")}>
             <MoneyInput />
           </Form.Item>
@@ -239,6 +241,7 @@ export function PoolAccountsPanel() {
             <Input.TextArea rows={2} placeholder="选填" />
           </Form.Item>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -249,17 +252,18 @@ export function PoolAccountsPanel() {
         okText="保存"
         onOk={() => void editForm.submit()}
       >
+        <FieldConfigScope scope="POOLACCOUNT" active={Boolean(editTarget)}>
         <Form form={editForm} layout="vertical" onFinish={submitEdit}>
           <Form.Item label="账号编号"><Input value={editTarget?.account_no} disabled /></Form.Item>
           <Form.Item name="account_name" label="账户名称" rules={[{ required: true, message: "请输入账户名称" }]}>
             <Input maxLength={128} />
           </Form.Item>
-          <Form.Item name="account_type" label="账户类型" rules={[{ required: true }]}>
-            <Select options={[{ value: "BANK", label: "银行账户" }, { value: "CASH", label: "现金" }, { value: "THIRD_PARTY", label: "第三方渠道" }]} />
-          </Form.Item>
-          <Form.Item name="ownership" label="归属" rules={[{ required: true }]}>
-            <Select options={[{ value: "OWNED", label: "自有（计入权益）" }, { value: "CUSTODY", label: "代管（只计头寸）" }, { value: "THIRD_PART", label: "第三方（只计头寸）" }]} />
-          </Form.Item>
+          <CfgItem name="account_type" label="账户类型" rules={[{ required: true }]}>
+            <Select />
+          </CfgItem>
+          <CfgItem name="ownership" label="归属" rules={[{ required: true }]}>
+            <Select />
+          </CfgItem>
           <Form.Item name="opening_balance" label="期初余额" rules={requiredMoneyRules("期初余额")}>
             <MoneyInput />
           </Form.Item>
@@ -267,6 +271,7 @@ export function PoolAccountsPanel() {
             <Input.TextArea rows={2} placeholder="选填" />
           </Form.Item>
         </Form>
+        </FieldConfigScope>
       </Modal>
     </Card>
   );

@@ -171,7 +171,11 @@ def duplicate_candidates(
     if not conditions:
         return []
 
-    stmt = select(Customer).where(or_(*conditions))
+    # 已合并客户不作为重复候选：其资料已并入目标客户，列为候选只会制造噪音
+    # （合并目标侧另有「必须 ACTIVE」拦截，但候选列表应从源头排除）。
+    stmt = select(Customer).where(
+        or_(*conditions), Customer.status != CustomerStatus.MERGED.value
+    )
     if user is not None:
         scope = owner_scope_filter(Customer.owner_id, user, session)
         if scope is not None:

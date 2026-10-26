@@ -205,7 +205,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "SELF", label: "自营" }, { value: "DISTRIBUTION", label: "分销" },
   ] },
   { code: "ORDER_RELATION_TYPE", label: "订单关联关系", group: "ORDER", editable: false, options: [
-    { value: "SOURCE", label: "来源单" }, { value: "FOLLOW_UP", label: "后续单" },
+    { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" }, { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
   ] },
   { code: "INSTALLMENT_CONTRACT_TYPE", label: "分期合约类型", group: "INSTALLMENT", editable: false, options: [
     { value: "STOCK_SALE", label: "分期出售" }, { value: "ADVANCE_PURCHASE", label: "代分期" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
@@ -254,6 +254,46 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   ] },
   { code: "OWNER_SCOPE", label: "数据可见范围", group: "SYSTEM", editable: false, options: [
     { value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" },
+  ] },
+  /* ── 0009 补种：资金池主数据 / 资金路由 / 佣金 / 订单角色 / 违约处置 / 导入行 / 字段元数据 ── */
+  { code: "POOL_TYPE", label: "资金池用途类型", group: "FUND", editable: false, options: [
+    { value: "INVEST", label: "投资款" }, { value: "PROFIT", label: "利润" }, { value: "OTHER", label: "其他" },
+  ] },
+  { code: "POOL_OWNERSHIP", label: "资金池归属", group: "FUND", editable: false, options: [
+    { value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" },
+  ] },
+  { code: "CAPITAL_TYPE", label: "资金性质", group: "ORDER", editable: false, options: [
+    { value: "STOCK", label: "库存型" }, { value: "ZERO", label: "零本金型" }, { value: "CREDIT", label: "分期业务" },
+  ] },
+  { code: "ROUTE_PORTION", label: "资金份额", group: "ORDER", editable: false, options: [
+    { value: "PRINCIPAL", label: "本金" }, { value: "PROFIT", label: "利润" }, { value: "GROSS", label: "总额" },
+  ] },
+  { code: "ROUTE_FUND_NATURE", label: "路由资金性质", group: "ORDER", editable: false, options: [
+    { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
+  ] },
+  { code: "COMMISSION_PAYER", label: "佣金承担方", group: "ORDER", editable: false, options: [
+    { value: "BUYER", label: "买方" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" },
+  ] },
+  { code: "COMMISSION_MODE", label: "佣金支付方式", group: "ORDER", editable: false, options: [
+    { value: "DEDUCT_FROM_SETTLEMENT", label: "结算扣减" }, { value: "SEPARATE_PAYMENT", label: "单独支付" },
+  ] },
+  { code: "ORDER_CUSTOMER_ROLE", label: "订单客户角色", group: "ORDER", editable: false, options: [
+    { value: "SELLER", label: "卖方" }, { value: "BUYER", label: "买方" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "INSTALLMENT_CUSTOMER", label: "分期客户" },
+  ] },
+  { code: "PROFIT_ROLE", label: "利润分配角色", group: "ORDER", editable: false, options: [
+    { value: "OWNER", label: "业绩归属人" }, { value: "BUYER", label: "买方" }, { value: "SALES", label: "销售" }, { value: "SERVICE", label: "服务" },
+  ] },
+  { code: "INSTALLMENT_DISPOSITION", label: "违约处置方式", group: "INSTALLMENT", editable: false, options: [
+    { value: "RECOVER", label: "回收" }, { value: "RESELL", label: "出售" },
+  ] },
+  { code: "IMPORT_ROW_STATUS", label: "导入行状态", group: "IMPORT", editable: false, options: [
+    { value: "PENDING", label: "待映射" }, { value: "MAPPED", label: "已映射" }, { value: "UNMAPPED", label: "未映射" }, { value: "IMPORTED", label: "已导入" }, { value: "SKIPPED", label: "已跳过" }, { value: "ROLLED_BACK", label: "已回滚" },
+  ] },
+  { code: "ENTITY_TYPE", label: "实体类型", group: "SYSTEM", editable: false, options: [
+    { value: "order", label: "订单" }, { value: "account", label: "账号" }, { value: "customer", label: "客户" }, { value: "installment", label: "分期合约" }, { value: "pool", label: "资金池" }, { value: "cashflow", label: "资金流水" }, { value: "lead", label: "需求" }, { value: "counterparty", label: "合作方" },
+  ] },
+  { code: "FIELD_TYPE", label: "字段类型", group: "FIELD", editable: false, options: [
+    { value: "TEXT", label: "文本" }, { value: "NUMBER", label: "数字" }, { value: "DATE", label: "日期" }, { value: "BOOLEAN", label: "是/否" }, { value: "SELECT", label: "单选" }, { value: "MULTI_SELECT", label: "多选" },
   ] },
 ];
 

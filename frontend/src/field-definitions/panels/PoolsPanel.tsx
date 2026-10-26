@@ -4,9 +4,24 @@ import { useCallback, useEffect, useState } from "react";
 import { poolsApi, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
+import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
+
+/** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
+const POOL_TYPE_FALLBACK = [
+  { value: "INVEST", label: "投资款" },
+  { value: "PROFIT", label: "利润" },
+  { value: "OTHER", label: "其他" },
+];
+const POOL_OWNERSHIP_FALLBACK = [
+  { value: "OWNED", label: "自有" },
+  { value: "CUSTODY", label: "代管" },
+  { value: "THIRD_PART", label: "第三方" },
+];
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function PoolsPanel() {
+  const poolTypeOptions = useOptionSet("POOL_TYPE") ?? POOL_TYPE_FALLBACK;
+  const ownershipOptions = useOptionSet("POOL_OWNERSHIP") ?? POOL_OWNERSHIP_FALLBACK;
   const [rows, setRows] = useState<Pool[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
@@ -66,8 +81,8 @@ export function PoolsPanel() {
   const columns: ColumnsType<Pool> = [
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
-    { title: "类型", dataIndex: "pool_type", render: (v: string) => POOL_TYPE_LABEL[v] ?? v },
-    { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
+    { title: "类型", dataIndex: "pool_type", render: (v: string) => configurableLabel("POOL_TYPE", v, POOL_TYPE_LABEL) },
+    { title: "归属", dataIndex: "ownership", render: (v: string) => configurableLabel("POOL_OWNERSHIP", v, POOL_OWNERSHIP_LABEL) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
     { title: "操作", render: (_v, row) => <Space size={2}><PermissionButton permission="pool.manage" size="small" onClick={() => { setEditing(row); editForm.setFieldsValue(row); }}>{"编辑"}</PermissionButton><ConfirmButton
               permission="pool.manage"
@@ -116,8 +131,8 @@ export function PoolsPanel() {
         <Form layout="vertical" form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editing?.code} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={[{ value: "INVEST", label: "投资款" }, { value: "PROFIT", label: "利润" }, { value: "OTHER", label: "其他" }]} /></Form.Item>
-          <Form.Item name="ownership" label="资金归属" rules={[{ required: true }]}><Select options={[{ value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" }]} /></Form.Item>
+          <Form.Item name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={poolTypeOptions} /></Form.Item>
+          <Form.Item name="ownership" label="资金归属" rules={[{ required: true }]}><Select options={ownershipOptions} /></Form.Item>
           <Form.Item name="note" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Modal>

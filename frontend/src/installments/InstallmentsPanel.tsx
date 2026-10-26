@@ -30,6 +30,18 @@ import { requiredMoneyRules } from "../shared/lib/validators";
 import { useSession } from "../shared/state/session";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
+/** 合约类型页签与违约处置文案的回落值；词典加载后由选项词典接管（改造前即为这些文案）。 */
+const CONTRACT_TYPE_LABEL: Record<string, string> = {
+  STOCK_SALE: "分期出售",
+  ADVANCE_PURCHASE: "代分期",
+  PICKUP_SALE: "提号分期",
+  CONSIGNMENT_SALE: "代挂分期",
+};
+const DISPOSITION_LABEL: Record<string, string> = {
+  RECOVER: "回收",
+  RESELL: "出售",
+};
+
 /** 期次状态与合约状态取值不同（PENDING/PARTIAL/PAID/OVERDUE/WAIVED），单独映射，避免复用合约标签出现裸英文。 */
 const SCHEDULE_STATUS_LABEL: Record<string, string> = {
   PENDING: "待收",
@@ -538,7 +550,7 @@ function ContractTable({
                 {(dispositions[row.id] ?? []).length > 0 && (
                   <Typography.Paragraph>
                     处置记录：{(dispositions[row.id] ?? []).map((item) =>
-                      `${item.action === "RECOVER" ? "回收" : "出售"}（${item.occurred_on}）`,
+                      `${configurableLabel("INSTALLMENT_DISPOSITION", item.action, DISPOSITION_LABEL)}（${item.occurred_on}）`,
                     ).join("、")}
                   </Typography.Paragraph>
                 )}
@@ -827,22 +839,22 @@ export function InstallmentsPanel() {
       items={[
         {
           key: "stock",
-          label: "分期出售",
+          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "STOCK_SALE", CONTRACT_TYPE_LABEL),
           children: <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey} />,
         },
         {
           key: "advance",
-          label: "代分期",
+          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "ADVANCE_PURCHASE", CONTRACT_TYPE_LABEL),
           children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey} />,
         },
         {
           key: "pickup",
-          label: "提号分期",
+          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "PICKUP_SALE", CONTRACT_TYPE_LABEL),
           children: <ContractTable contractType="PICKUP_SALE" reloadKey={reloadKey} />,
         },
         {
           key: "consignment",
-          label: "代挂分期",
+          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "CONSIGNMENT_SALE", CONTRACT_TYPE_LABEL),
           children: <ContractTable contractType="CONSIGNMENT_SALE" reloadKey={reloadKey} />,
         },
       ]}

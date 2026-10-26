@@ -69,7 +69,9 @@ it("渲染经营规则标题、统计卡与规则定义表格，并默认加载�
   expect(await screen.findByText("经营规则")).toBeInTheDocument();
   // StatRow：规则总数 / 已发布 / 草稿版本（kind=count 满足 ui_guard）
   expect(screen.getByText("规则总数")).toBeInTheDocument();
-  expect(screen.getByText("已发布")).toBeInTheDocument();
+  // 统计卡与版本表格都会出现「已发布」：版本状态改由 POLICY_STATUS 词典承载后，
+  // 表格 StatusTag 从全局映射的「进行中」变为词典文案「已发布」，与统计卡口径一致。
+  expect(screen.getAllByText("已发布").length).toBeGreaterThan(0);
   // 规则定义表格
   expect((await screen.findAllByText("REBATE_RATE")).length).toBeGreaterThan(0);
   // 默认选中首个定义 → vi.mocked(catalog.policyApi.versions) 被调用

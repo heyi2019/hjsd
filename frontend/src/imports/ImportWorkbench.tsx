@@ -213,7 +213,7 @@ export function ImportWorkbench({
         </span>
       ),
     },
-    { title: "状态", dataIndex: "status", width: 130, render: (v: string) => <StatusTag status={v} optionSet="IMPORT_BATCH_STATUS" /> },
+    { title: "行状态", dataIndex: "status", width: 130, render: (v: string) => <StatusTag status={v} optionSet="IMPORT_ROW_STATUS" /> },
     {
       title: "单边划转",
       dataIndex: "unlinked_transfer",

@@ -226,7 +226,7 @@ export function PolicySettingsPanel() {
         </span>
       ),
     },
-    { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="POLICY_STATUS" /> },
     { title: "审批人", dataIndex: "approved_by", width: 100 },
     {
       title: "操作",
@@ -314,7 +314,7 @@ export function PolicySettingsPanel() {
               render: (v: string) => scopeOptions.find((o) => o.value === v)?.label ?? v,
             },
             { title: "范围 ID", dataIndex: "scope_id", width: 100, render: (v?: number | null) => v ?? "-" },
-            { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} /> },
+            { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="POLICY_STATUS" /> },
           ]}
           rows={definitions}
           page={1}

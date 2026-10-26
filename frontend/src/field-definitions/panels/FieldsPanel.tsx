@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fieldsApi, type FieldDefinition } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { ENTITY_TYPE_LABEL, FIELD_TYPE_LABEL } from "../../shared/lib/labels";
+import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
@@ -17,6 +18,9 @@ const parseOptions = (raw: unknown): string[] | undefined => {
 };
 
 export function FieldsPanel() {
+  // 词典未加载时回落模块常量，保证与改造前完全一致。
+  const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
+  const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_OPTIONS;
   const [rows, setRows] = useState<FieldDefinition[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -88,10 +92,10 @@ export function FieldsPanel() {
   };
 
   const columns: ColumnsType<FieldDefinition> = [
-    { title: "实体", dataIndex: "entity_type", render: (v: string) => ENTITY_TYPE_LABEL[v] ?? v },
+    { title: "实体", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL) },
     { title: "字段键", dataIndex: "field_key" },
     { title: "标签", dataIndex: "label" },
-    { title: "类型", dataIndex: "field_type", render: (v: string) => FIELD_TYPE_LABEL[v] ?? v },
+    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
     { title: "必填", dataIndex: "required", render: (value: boolean) => (value ? "是" : "否") },
     { title: "选项", dataIndex: "options", render: (value: string[] | null | undefined) => (value?.length ? value.join("、") : "-") },
     {
@@ -172,7 +176,7 @@ export function FieldsPanel() {
           initialValues={{ entity_type: "customer", field_type: "TEXT", sort_order: 0 }}
         >
           <Form.Item name="entity_type" label="实体">
-            <Select options={ENTITY_TYPE_OPTIONS} className="ui-control-width-120" disabled={editingId !== null} />
+            <Select options={entityTypeOptions} className="ui-control-width-120" disabled={editingId !== null} />
           </Form.Item>
           <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
             <Input placeholder="小写下划线，如 credit_level" disabled={editingId !== null} />
@@ -181,7 +185,7 @@ export function FieldsPanel() {
             <Input placeholder="页面显示名" />
           </Form.Item>
           <Form.Item name="field_type" label="类型">
-            <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" disabled={editingId !== null} />
+            <Select options={fieldTypeOptions} className="ui-control-width-110" disabled={editingId !== null} />
           </Form.Item>
           {needsOptions && (
             <Form.Item name="options" label="选项">

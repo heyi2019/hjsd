@@ -70,6 +70,12 @@ function MobileOrderList(props: {
 type BusinessFilterKey = "all" | "HS" | "TH" | "DG" | "DFQ";
 type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
 
+/** 建关联时关系下拉的回落值；措辞比词典 label 长，用于说明方向，词典加载后由词典接管。 */
+const RELATION_TYPE_FALLBACK: Array<{ value: string; label: string }> = [
+  { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" },
+  { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
+];
+
 const BUSINESS_FILTERS: Array<{ key: BusinessFilterKey; label: string }> = [
   { key: "all", label: "全部" },
   { key: "HS", label: "回收" },
@@ -204,6 +210,9 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const orderBusinessModeOptions: Opt[] =
     useOptionSet("ORDER_BUSINESS_MODE") ??
     BUSINESS_MODE_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
+  const relationTypeOptions: Opt[] =
+    useOptionSet("ORDER_RELATION_TYPE") ?? RELATION_TYPE_FALLBACK;
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -685,7 +694,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="业务">{BUSINESS_MODE_LABEL[selectedOrder.business_mode ?? ""] || "-"}</Descriptions.Item>
             <Descriptions.Item label="类型">{BUSINESS_TYPE_LABEL[selectedOrder.business_type ?? ""] || orderTypeLabel(selectedOrder.order_type, typeNames)}</Descriptions.Item>
-            <Descriptions.Item label="增值服务">{VALUE_ADDED_SERVICE_LABEL[selectedOrder.value_added_service ?? ""] || "-"}</Descriptions.Item>
+            <Descriptions.Item label="增值服务">{configurableLabel("INSTALLMENT_CONTRACT_TYPE", selectedOrder.value_added_service, VALUE_ADDED_SERVICE_LABEL)}</Descriptions.Item>
             <Descriptions.Item label="产品">{[selectedOrder.account_game_type, selectedOrder.account_game_account, selectedOrder.account_channel_region].filter(Boolean).join(" / ") || "-"}</Descriptions.Item>
             <Descriptions.Item label="对方">{selectedOrder.party_name || "-"}</Descriptions.Item>
             <Descriptions.Item label="获客来源">{selectedOrder.party_source || "-"}</Descriptions.Item>
@@ -1036,13 +1045,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             />
           </Form.Item>
           <Form.Item name="relation_type" label="关系" rules={[{ required: true, message: "请选择关系" }]}>
-            <AntSelect
-              placeholder="请选择关系"
-              options={[
-                { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" },
-                { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
-              ]}
-            />
+            <AntSelect placeholder="请选择关系" options={relationTypeOptions} />
           </Form.Item>
           <Form.Item name="split_ratio" label="分成比例（%）" tooltip="与分成金额二选一，按交易拆分口径填写">
             <Input placeholder="例如 60" />

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
+import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { FORM_SCOPE_GROUPED_OPTIONS, FORM_SCOPE_LABEL } from "../formScopes";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
@@ -27,6 +28,8 @@ export interface OrderFormFieldsPanelProps {
 }
 
 export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps = {}) {
+  // 词典未加载时回落模块常量，保证与改造前完全一致。
+  const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
   const [activeType, setActiveType] = useState<string>(
     initialScope && FORM_SCOPE_LABEL[initialScope] ? initialScope : "HS",
   );
@@ -104,7 +107,7 @@ export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps
   const columns: ColumnsType<OrderFormField> = [
     { title: "字段键", dataIndex: "field_key" },
     { title: "标签", dataIndex: "label" },
-    { title: "类型", dataIndex: "field_type", render: (v: string) => FIELD_TYPE_LABEL[v] ?? v },
+    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
     {
       title: "必填",
       dataIndex: "required",
@@ -253,7 +256,7 @@ export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps
             <Input placeholder="页面显示名" />
           </Form.Item>
           <Form.Item name="field_type" label="类型">
-            <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" disabled={editingId !== null} />
+            <Select options={fieldTypeOptions} className="ui-control-width-110" disabled={editingId !== null} />
           </Form.Item>
           {needsOptions && (
             <Form.Item label="选项（值 / 展示名）">

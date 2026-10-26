@@ -5,9 +5,14 @@ import { useCallback, useEffect, useState } from "react";
 import { auditApi, type AuditLogRow } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+
+/** 词典未加载时的回落值，与改造前硬编码一致。 */
+const ENTITY_TYPE_FALLBACK = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 import { DataTable, ErrorBanner } from "../shared/ui";
 
 export function AuditPanel() {
+  const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_FALLBACK;
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [entityType, setEntityType] = useState("");
   const [entityId, setEntityId] = useState("");
@@ -42,7 +47,7 @@ export function AuditPanel() {
     { title: "时间", dataIndex: "occurred_at" },
     { title: "操作人", dataIndex: "actor" },
     { title: "动作", dataIndex: "action", render: (v: string) => AUDIT_ACTION_LABEL[v] ?? v },
-    { title: "对象类型", dataIndex: "entity_type", render: (v: string) => ENTITY_TYPE_LABEL[v] ?? v },
+    { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL) },
     { title: "对象编号", dataIndex: "entity_id" },
     { title: "原因", dataIndex: "reason", render: (v: string | null) => v || "-" },
   ];
@@ -57,7 +62,7 @@ export function AuditPanel() {
             placeholder="对象类型"
             value={entityType || undefined}
             onChange={(value) => setEntityType(value ?? "")}
-            options={Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+            options={entityTypeOptions}
           />
           <Input placeholder="对象编号" value={entityId} onChange={(event) => setEntityId(event.target.value)} onPressEnter={() => void load()} />
           <Select

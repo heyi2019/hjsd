@@ -5,6 +5,7 @@ import { orderTypesApi, type OrderType, type OrderTypeRoute } from "../../shared
 import { poolsApi, type Pool, type RouteImpactPreview } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
+import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
@@ -13,7 +14,33 @@ const FUND_NATURE_LABEL: Record<string, string> = {
   INTERNAL: "内部调拨",
 };
 
+const PORTION_LABEL: Record<string, string> = {
+  PRINCIPAL: "本金",
+  PROFIT: "利润",
+  GROSS: "总额",
+};
+
+/** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
+const CAPITAL_TYPE_FALLBACK = [
+  { value: "STOCK", label: CAPITAL_TYPE_LABEL.STOCK },
+  { value: "ZERO", label: CAPITAL_TYPE_LABEL.ZERO },
+  { value: "CREDIT", label: CAPITAL_TYPE_LABEL.CREDIT },
+];
+const PORTION_FALLBACK = [
+  { value: "PRINCIPAL", label: "本金" },
+  { value: "PROFIT", label: "利润" },
+  { value: "GROSS", label: "总额" },
+];
+const FUND_NATURE_FALLBACK = [
+  { value: "BUSINESS", label: FUND_NATURE_LABEL.BUSINESS },
+  { value: "EXTERNAL", label: FUND_NATURE_LABEL.EXTERNAL },
+  { value: "INTERNAL", label: FUND_NATURE_LABEL.INTERNAL },
+];
+
 export function OrderTypesPanel() {
+  const capitalTypeOptions = useOptionSet("CAPITAL_TYPE") ?? CAPITAL_TYPE_FALLBACK;
+  const portionOptions = useOptionSet("ROUTE_PORTION") ?? PORTION_FALLBACK;
+  const fundNatureOptions = useOptionSet("ROUTE_FUND_NATURE") ?? FUND_NATURE_FALLBACK;
   const [rows, setRows] = useState<OrderType[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [pools, setPools] = useState<Pool[]>([]);
@@ -114,7 +141,7 @@ export function OrderTypesPanel() {
   const columns: ColumnsType<OrderType> = [
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
-    { title: "资金性质", dataIndex: "capital_type", render: (v: string) => CAPITAL_TYPE_LABEL[v] ?? v },
+    { title: "资金性质", dataIndex: "capital_type", render: (v: string) => configurableLabel("CAPITAL_TYPE", v, CAPITAL_TYPE_LABEL) },
     {
       title: "启用",
       dataIndex: "is_active",
@@ -185,11 +212,7 @@ export function OrderTypesPanel() {
             <Input placeholder="例如 新业务" maxLength={64} />
           </Form.Item>
           <Form.Item name="capital_type" label="资金性质" rules={[{ required: true }]}>
-            <Select options={[
-              { value: "STOCK", label: CAPITAL_TYPE_LABEL.STOCK },
-              { value: "ZERO", label: CAPITAL_TYPE_LABEL.ZERO },
-              { value: "CREDIT", label: CAPITAL_TYPE_LABEL.CREDIT },
-            ]} />
+            <Select options={capitalTypeOptions} />
           </Form.Item>
           <Form.Item name="sequence_prefix" label="编号前缀" extra="选填，默认等于代码；订单编号 = 前缀 + 日期 + 序号">
             <Input placeholder="默认同代码" maxLength={16} />
@@ -204,7 +227,7 @@ export function OrderTypesPanel() {
       </Modal>
       <Modal title={previewTarget ? `${previewTarget.code} 路由影响预览` : "路由影响预览"} open={Boolean(previewTarget)} onCancel={() => setPreviewTarget(null)} footer={null}>
         <Form form={previewForm} layout="vertical" onFinish={runPreview}>
-          <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}><Select options={[{ value: "PRINCIPAL", label: "本金" }, { value: "PROFIT", label: "利润" }, { value: "GROSS", label: "总额" }]} /></Form.Item>
+          <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}><Select options={portionOptions} /></Form.Item>
           <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">生成预览</PermissionButton>
         </Form>
@@ -231,8 +254,8 @@ export function OrderTypesPanel() {
         </Typography.Paragraph>
         <DataTable<OrderTypeRoute>
           columns={[
-            { title: "份额", dataIndex: "portion", render: (v: string) => ({ PRINCIPAL: "本金", PROFIT: "利润", GROSS: "总额" }[v] ?? v) },
-            { title: "资金性质", dataIndex: "fund_nature", render: (v: string | null) => v ? FUND_NATURE_LABEL[v] ?? v : "不限" },
+            { title: "份额", dataIndex: "portion", render: (v: string) => configurableLabel("ROUTE_PORTION", v, PORTION_LABEL) },
+            { title: "资金性质", dataIndex: "fund_nature", render: (v: string | null) => (v ? configurableLabel("ROUTE_FUND_NATURE", v, FUND_NATURE_LABEL) : "不限") },
             { title: "目标资金池", render: (_v, row) => `${row.pool_name}（${row.pool_code}）` },
             { title: "优先级", dataIndex: "priority" },
             { title: "启用", dataIndex: "is_active", render: (v: boolean) => <StatusTag status={v ? "ACTIVE" : "DISABLED"} label={v ? "是" : "否"} /> },
@@ -247,14 +270,10 @@ export function OrderTypesPanel() {
         <Typography.Paragraph strong className="ui-form-spaced">新增 / 覆盖路由</Typography.Paragraph>
         <Form form={routeForm} layout="vertical" onFinish={submitRoute} initialValues={{ portion: "PRINCIPAL", priority: 0 }}>
           <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}>
-            <Select options={[{ value: "PRINCIPAL", label: "本金" }, { value: "PROFIT", label: "利润" }, { value: "GROSS", label: "总额" }]} />
+            <Select options={portionOptions} />
           </Form.Item>
           <Form.Item name="fund_nature" label="资金性质" extra="选填；不填表示不限性质">
-            <Select allowClear placeholder="不限" options={[
-              { value: "BUSINESS", label: FUND_NATURE_LABEL.BUSINESS },
-              { value: "EXTERNAL", label: FUND_NATURE_LABEL.EXTERNAL },
-              { value: "INTERNAL", label: FUND_NATURE_LABEL.INTERNAL },
-            ]} />
+            <Select allowClear placeholder="不限" options={fundNatureOptions} />
           </Form.Item>
           <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true, message: "请选择目标资金池" }]}>
             <Select placeholder="请选择资金池" options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))} />

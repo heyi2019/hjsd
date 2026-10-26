@@ -7,6 +7,7 @@ import { normalizeError } from "../shared/api/client";
 import { DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
 import { CfgItem, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
+import { configurableLabel } from "../shared/lib/optionSets";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -66,7 +67,7 @@ export function CustomerLeadPanel() {
   const columns: ColumnsType<Lead> = [
     { title: "需求编号", dataIndex: "lead_no" },
     { title: "客户", render: (_v, row) => customers.find((customer) => customer.id === row.customer_id)?.display_name ?? row.customer_id },
-    { title: "需求类型", dataIndex: "request_type", render: (v: string) => REQUEST_TYPE_LABEL[v] ?? v },
+    { title: "需求类型", dataIndex: "request_type", render: (v: string) => configurableLabel("LEAD_TYPE", v, REQUEST_TYPE_LABEL) },
     { title: "预算", dataIndex: "budget", align: "right", render: (v: string | null) => v ? <MoneyText value={v} /> : "-" },
     { title: "目标", dataIndex: "target" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="LEAD_STATUS" /> },

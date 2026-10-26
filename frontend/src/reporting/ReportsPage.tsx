@@ -28,6 +28,7 @@ import {
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ACCOUNTING_ATTRIBUTE_LABEL, BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, FUND_NATURE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
+import { useOptionSet } from "../shared/lib/optionSets";
 import {
   DataTable,
   ErrorBanner,
@@ -57,10 +58,14 @@ const REPORT_LABEL: Record<string, string> = {
   "order-profit": "订单利润",
 };
 
+/** 词典未加载时的回落值：顺序与 REPORT_NAMES 一致，保证与改造前零行为变化。 */
+const REPORT_FALLBACK = REPORT_NAMES.map((name) => ({ value: name, label: REPORT_LABEL[name] }));
+
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
 type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
 
 export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void }) {
+  const reportOptions = useOptionSet("REPORT_NAME") ?? REPORT_FALLBACK;
   const [activeTab, setActiveTab] = useState("r1");
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState("");
@@ -138,7 +143,7 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
             placeholder="选择导出报表"
             value={selectedReports}
             onChange={setSelectedReports}
-            options={REPORT_NAMES.map((name) => ({ value: name, label: REPORT_LABEL[name] }))}
+            options={reportOptions}
             className="ui-control-width-import"
             maxTagCount="responsive"
           />

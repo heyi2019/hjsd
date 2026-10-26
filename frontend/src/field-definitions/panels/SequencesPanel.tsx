@@ -1,5 +1,6 @@
 /** 编号序列（foundation/sequences）：12 个编号域的当前值与下一编号，只读。
  *  用于断号 / 跳号 / 重号排查——编号由后端统一发放，本面板不提供任何写入口。 */
+import { configurableLabel } from "../../shared/lib/optionSets";
 import { Card, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -44,7 +45,7 @@ export function SequencesPanel() {
   }, [load]);
 
   const columns: ColumnsType<DocumentSequence> = [
-    { title: "编号域", dataIndex: "sequence_key", render: (v: string) => SEQUENCE_KEY_LABEL[v] ?? v },
+    { title: "编号域", dataIndex: "sequence_key", render: (v: string) => configurableLabel("SEQUENCE_KEY", v, SEQUENCE_KEY_LABEL) },
     { title: "序列键", dataIndex: "sequence_key" },
     { title: "前缀", dataIndex: "prefix", render: (v: string) => v || "—" },
     { title: "补齐位数", dataIndex: "padding", align: "right" },

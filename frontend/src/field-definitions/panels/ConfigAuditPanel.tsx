@@ -107,7 +107,7 @@ export function ConfigAuditPanel() {
       title: "动作",
       dataIndex: "action",
       width: 160,
-      render: (v: string | null) => (v ? AUDIT_ACTION_LABEL[v] ?? v : "—"),
+      render: (v: string | null) => (v ? configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) : "—"),
     },
     { title: "对象", dataIndex: "entity_id", width: 120, render: (v: string | null) => v ?? "—" },
     { title: "备注", dataIndex: "reason", render: (v: string | null) => v || "—", ellipsis: true },
@@ -140,7 +140,7 @@ export function ConfigAuditPanel() {
             onChange={(value) => patch({ action: value ?? "" })}
             options={actions.map((action) => ({
               value: action,
-              label: AUDIT_ACTION_LABEL[action] ?? action,
+              label: configurableLabel("AUDIT_ACTION", action, AUDIT_ACTION_LABEL),
             }))}
           />
           <Input

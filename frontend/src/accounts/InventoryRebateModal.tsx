@@ -1,4 +1,5 @@
 /** 库存账号返点：买号返点关联买入订单，卖号返点关联实际售出订单。 */
+import { configurableLabel } from "../shared/lib/optionSets";
 import { Checkbox, Form, Input, Modal, Spin, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -139,7 +140,7 @@ export function InventoryRebateModal(props: {
                 }}
                 options={(["BUY", "SELL"] as RebateKind[]).map((kind) => ({
                   value: kind,
-                  label: REBATE_KIND_LABEL[kind],
+                  label: configurableLabel("REBATE_TYPE", kind, REBATE_KIND_LABEL),
                   disabled: !availableKinds.includes(kind),
                 }))}
               />

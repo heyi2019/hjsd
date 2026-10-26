@@ -207,6 +207,13 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const orderBusinessOptions: Opt[] =
     useOptionSet("ORDER_BUSINESS") ??
     BUSINESS_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
+  const refundResponsibilityOptions: Opt[] =
+    useOptionSet("REFUND_RESPONSIBILITY") ??
+    Object.entries(REFUND_RESPONSIBILITY_LABEL).map(([value, label]) => ({ value, label }));
+  const allocationRoleOptions: Opt[] =
+    useOptionSet("PROFIT_ROLE") ??
+    Object.entries(ALLOCATION_ROLE_LABEL).map(([value, label]) => ({ value, label }));
   const orderBusinessModeOptions: Opt[] =
     useOptionSet("ORDER_BUSINESS_MODE") ??
     BUSINESS_MODE_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
@@ -727,8 +734,8 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 {event.reason || event.refund_responsibility || event.delivery_mode ? (
                   <span className="muted">
                     {[
-                      event.delivery_mode ? `交付 ${DELIVERY_MODE_LABEL[event.delivery_mode] ?? event.delivery_mode}` : "",
-                      event.refund_responsibility ? `责任方 ${REFUND_RESPONSIBILITY_LABEL[event.refund_responsibility] ?? event.refund_responsibility}` : "",
+                      event.delivery_mode ? `交付 ${configurableLabel("DELIVERY_MODE", event.delivery_mode, DELIVERY_MODE_LABEL)}` : "",
+                      event.refund_responsibility ? `责任方 ${configurableLabel("REFUND_RESPONSIBILITY", event.refund_responsibility, REFUND_RESPONSIBILITY_LABEL)}` : "",
                       event.reason,
                     ].filter(Boolean).join(" · ")}
                   </span>
@@ -1099,7 +1106,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             {(fields) => fields.map((field) => (
               <Space key={field.key} align="baseline" className="orders-allocation-row">
                 <Form.Item {...field} name={[field.name, "allocation_type"]} hidden><Input /></Form.Item>
-                <Form.Item label="动作/归属"><Typography.Text>{ALLOCATION_LABEL[["BUY", "SELL", "OPERATION", "COMPANY"][field.name] as keyof typeof ALLOCATION_LABEL]}</Typography.Text></Form.Item>
+                <Form.Item label="动作/归属"><Typography.Text>{configurableLabel("ALLOCATION_TYPE", ["BUY", "SELL", "OPERATION", "COMPANY"][field.name], ALLOCATION_LABEL)}</Typography.Text></Form.Item>
                 <Form.Item {...field} name={[field.name, "user_id"]} label="收益人">
                   {field.name === 2 ? (
                     <AntSelect
@@ -1118,7 +1125,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 </Form.Item>
                 <Form.Item {...field} name={[field.name, "role"]} label="角色">
                   <AntSelect
-                    options={Object.entries(ALLOCATION_ROLE_LABEL).map(([value, label]) => ({ value, label }))}
+                    options={allocationRoleOptions}
                   />
                 </Form.Item>
                 <Form.Item {...field} name={[field.name, "allocation_rate"]} label="比例" rules={[{ required: true, message: "请输入比例" }, ...percentRules("比例")]}><Input suffix="%" inputMode="decimal" /></Form.Item>
@@ -1164,7 +1171,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             <MoneyInput placeholder="请输入退款金额" />
           </Form.Item>
           <Form.Item name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
-            <AntSelect options={["COMPANY", "CUSTOMER", "CONSIGNOR", "PLATFORM", "OTHER"].map((value) => ({ value, label: { COMPANY: "公司", CUSTOMER: "客户", CONSIGNOR: "寄售方", PLATFORM: "平台", OTHER: "其他" }[value] }))} />
+            <AntSelect options={refundResponsibilityOptions} />
           </Form.Item>
           <Form.Item name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款原因" />

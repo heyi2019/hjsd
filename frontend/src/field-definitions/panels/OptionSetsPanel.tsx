@@ -12,6 +12,8 @@ import { optionSetsApi, type OptionItem, type OptionSet } from "../../shared/api
 import { clearOptionSetsCache } from "../../shared/lib/optionSets";
 
 const GROUP_LABEL: Record<string, string> = {
+  AUDIT: "审计",
+  REPORT: "报表",
   INVENTORY: "库存",
   FUND: "资金",
   ORDER: "业务",

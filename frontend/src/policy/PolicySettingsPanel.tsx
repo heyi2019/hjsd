@@ -59,6 +59,8 @@ type ResolveFormValues = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function PolicySettingsPanel() {
+  // POLICY_TYPE 是死枚举（值决定规则引擎分支），只放开文案；词典未加载时回落模块常量。
+  const policyTypeOptions = useOptionSet("POLICY_TYPE") ?? POLICY_CODE_OPTIONS;
   const { can } = useSession();
   // 后端读取门控为 policy.manage / policy.approve 任一（policy/router.py policy_read_access）；
   // PermissionButton 只接受单权限码，故按当前用户实际持有的那个码门控（同 InstallmentsPanel settlePermission 先例）。
@@ -395,7 +397,7 @@ export function PolicySettingsPanel() {
             解析某个日期实际命中的规则版本——发布只影响生效日之后的新单，历史订单按建单时固化的快照计算，不随改版变化。
           </Typography.Paragraph>
           <Form.Item name="policy_code" label="规则编码" rules={[{ required: true, message: "请选择规则编码" }]}>
-            <Select options={POLICY_CODE_OPTIONS} placeholder="选择规则编码" />
+            <Select options={policyTypeOptions} placeholder="选择规则编码" />
           </Form.Item>
           <Form.Item name="on" label="生效日期" rules={[{ required: true, message: "请选择生效日期" }]}>
             <Input type="date" />

@@ -46,7 +46,7 @@ export function AuditPanel() {
   const columns: ColumnsType<AuditLogRow> = [
     { title: "时间", dataIndex: "occurred_at" },
     { title: "操作人", dataIndex: "actor" },
-    { title: "动作", dataIndex: "action", render: (v: string) => AUDIT_ACTION_LABEL[v] ?? v },
+    { title: "动作", dataIndex: "action", render: (v: string) => configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) },
     { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL) },
     { title: "对象编号", dataIndex: "entity_id" },
     { title: "原因", dataIndex: "reason", render: (v: string | null) => v || "-" },
@@ -71,7 +71,7 @@ export function AuditPanel() {
             placeholder="动作"
             value={action || undefined}
             onChange={(value) => setAction(value ?? "")}
-            options={actionOptions.map((value) => ({ value, label: AUDIT_ACTION_LABEL[value] ?? value }))}
+            options={actionOptions.map((value) => ({ value, label: configurableLabel("AUDIT_ACTION", value, AUDIT_ACTION_LABEL) }))}
           />
           <Input placeholder="操作人" value={actor} onChange={(event) => setActor(event.target.value)} onPressEnter={() => void load()} />
           <Input aria-label="审计开始日期" placeholder="开始日期" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />

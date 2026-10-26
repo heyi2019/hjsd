@@ -124,7 +124,7 @@ export function PoolAccountsPanel() {
     { title: "所属资金池", key: "pool", render: (_v, row) => poolName(row.pool_id) },
     { title: "账号编号", dataIndex: "account_no" },
     { title: "账户名称", dataIndex: "account_name" },
-    { title: "类型", dataIndex: "account_type", render: (v: string) => ACCOUNT_TYPE_LABEL[v] ?? v },
+    { title: "类型", dataIndex: "account_type", render: (v: string) => configurableLabel("POOL_ACCOUNT_TYPE", v, ACCOUNT_TYPE_LABEL) },
     {
       title: "归属",
       dataIndex: "ownership",

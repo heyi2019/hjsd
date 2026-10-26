@@ -1,4 +1,5 @@
 /** 金额与日期展示：后端以字符串传金额（DECIMAL），前端不做浮点运算。 */
+import { configurableLabel } from "./optionSets";
 
 export function money(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "-";
@@ -81,7 +82,8 @@ export function executionActionLabel(
   if (eventType === "BUY" && orderType === "DFQ") return "付款";
   if (eventType === "PAYMENT" && orderType === "DFQ") return "还款（分期）";
   if (eventType === "DELIVER") return orderType === "DFQ" ? "售出交付" : "买入交付";
-  return EXECUTION_ACTION_LABEL[eventType] ?? eventType;
+  // 词典未加载时回落模块常量，保证零行为变化；DFQ 的上下文特判仍在前面优先命中。
+  return configurableLabel("ORDER_EVENT_TYPE", eventType, EXECUTION_ACTION_LABEL);
 }
 
 /** 状态 → antd Tag 颜色；不使用颜色单独承载紧急程度。 */

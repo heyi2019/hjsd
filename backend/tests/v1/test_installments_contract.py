@@ -378,7 +378,7 @@ class TestCreateInstallmentValidation:
     def test_advance_purchase_does_not_require_account(self, seeded_db):
         # DFQ 是独立分销代分期，不关联库存账号。
         order = _order(seeded_db, order_type="DFQ", account_id=None)
-        installment = _contract(seeded_db, order.id)
+        _contract(seeded_db, order.id)
         assert order.account_id is None
 
     def test_duplicate_contract_conflicts(self, seeded_db):

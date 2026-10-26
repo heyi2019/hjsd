@@ -1,8 +1,6 @@
 """账号域共享校验与可见范围。"""
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 

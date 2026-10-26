@@ -1046,8 +1046,6 @@ class TestPostEventValidation:
             )
 
     def test_refund_event_records_responsibility_and_limits_amount(self, seeded_db):
-        from app.domain.trade import Cashflow
-
         order = _order(seeded_db, order_type="TH")
         order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="60.00",

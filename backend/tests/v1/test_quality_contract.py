@@ -5,7 +5,6 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
 
 from app.core.security import CurrentUser, build_access_token
 from app.domain.trade import Account, Cashflow, OrderEvent, RebateRecord

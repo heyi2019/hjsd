@@ -11,7 +11,6 @@ from __future__ import annotations
 import random
 from decimal import Decimal
 
-import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, create_engine, func, insert, select
 from sqlalchemy.orm import Session
 

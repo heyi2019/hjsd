@@ -31,7 +31,6 @@ from app.domain.parties import (
     OrderCustomerRole,
 )
 from app.domain.trade import InstallmentSchedule, OrderFormField
-from app.accounts import service as accounts_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
 from app.parties import service

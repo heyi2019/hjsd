@@ -14,7 +14,6 @@ import sqlalchemy as sa
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.money import Amount
 from app.domain.trade import OrderFormField
 
 

@@ -211,7 +211,7 @@ def main() -> None:
             "DFQ01-分期进行中",
             snapshot={"game_account": "BATCH-DFQ01-20261018", "game_type": "王者荣耀", "purchase_price": "800"},
         )
-        f1_inst = contract(session, f1, InstallmentContractType.ADVANCE_PURCHASE.value, first_due_on=TODAY)
+        contract(session, f1, InstallmentContractType.ADVANCE_PURCHASE.value, first_due_on=TODAY)
         event(session, f1, EventType.BUY.value, "800")
         created.append(f1)
 

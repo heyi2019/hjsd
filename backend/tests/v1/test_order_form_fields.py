@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.trade import OrderFormField

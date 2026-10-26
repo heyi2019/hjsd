@@ -13,10 +13,9 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy import select
 
-from app.accounts import service as accounts_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.enums import Direction, OrderStatus
+from app.domain.enums import Direction
 from app.domain.trade import Account, Installment, Order, OrderEvent
 from app.installments import service as installment_service
 from app.orders import events, service

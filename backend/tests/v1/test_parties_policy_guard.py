@@ -14,9 +14,7 @@ from sqlalchemy import select
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.parties import (
-    Customer,
     CustomerLead,
-    EntityType,
     OrderCustomerRole,
 )
 from app.domain.trade import Order, OrderEvent

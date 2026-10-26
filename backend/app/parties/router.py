@@ -428,4 +428,4 @@ def update_counterparty_status(
     return _counterparty_output(db, item)
 
 
-__all__ = ["router", "get_current_user"]
+__all__ = ["router"]

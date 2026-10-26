@@ -2,12 +2,20 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PYTHON = ROOT / ".venv" / "bin" / "python"
+
+# pyflakes 扫描范围：业务代码 + 测试 + 迁移 + 脚本（与历史「pyflakes 干净」口径一致）
+LINT_TARGETS = ["app", "tests/v1", "alembic/versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
+# 基线只记「文件 + 消息」，不含行列号——行号漂移不应判定为新增告警
+LINT_BASELINE = ROOT / "lint_baseline.txt"
+LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
 
 GROUPS = {
     "smoke": [
@@ -177,11 +185,89 @@ def groups_for_changes(paths: list[str]) -> list[str]:
     return [name for name in GROUPS if name in selected]
 
 
+def lint_findings(runner: str) -> list[str]:
+    """跑 pyflakes 并把结果归一化为「路径 :: 消息」（去掉行列号）。"""
+    result = subprocess.run(
+        [runner, "-m", "pyflakes", *LINT_TARGETS],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    findings: list[str] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        matched = LINT_LINE_RE.match(line)
+        findings.append(f"{matched['path']} :: {matched['msg']}" if matched else line)
+    return findings
+
+
+def run_lint(runner: str, *, update_baseline: bool) -> int:
+    """静态检查入口：与基线比对，只对新增告警失败。
+
+    存量以 lint_baseline.txt 登记（当前几乎全是 `import app.domain.*` 这类
+    为注册 ORM 模型而保留的副作用导入，pyflakes 不认 noqa，故只能白名单）。
+    清理存量后用 `lint --update-baseline` 收紧基线。
+    """
+    try:
+        subprocess.run(
+            [runner, "-m", "pyflakes", "--version"],
+            cwd=ROOT,
+            capture_output=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("缺少 pyflakes：请先执行 .venv/bin/python -m pip install -r requirements.txt")
+        return 1
+
+    findings = lint_findings(runner)
+    if update_baseline:
+        LINT_BASELINE.write_text(
+            "".join(f"{item}\n" for item in sorted(findings)), encoding="utf-8"
+        )
+        print(f"已更新 lint 基线：{len(findings)} 条存量告警")
+        return 0
+
+    baseline: Counter[str] = Counter()
+    if LINT_BASELINE.exists():
+        baseline = Counter(
+            line.strip()
+            for line in LINT_BASELINE.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+    current = Counter(findings)
+    added = current - baseline
+    fixed = baseline - current
+
+    if fixed:
+        print(f"存量已减少 {sum(fixed.values())} 条，可执行 lint --update-baseline 收紧基线")
+    if not added:
+        print(f"pyflakes 通过：存量 {sum(current.values())} 条（均在基线内），无新增告警")
+        return 0
+
+    print(f"新增 pyflakes 告警 {sum(added.values())} 条：")
+    for item, count in sorted(added.items()):
+        print(f"  {item}" + (f"  x{count}" if count > 1 else ""))
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="执行按业务域拆分的后端回归")
-    parser.add_argument("group", choices=[*GROUPS, "changed", "all"], help="回归分组")
+    parser.add_argument(
+        "group", choices=[*GROUPS, "changed", "all", "lint"], help="回归分组（lint=静态检查）"
+    )
     parser.add_argument("--list", action="store_true", help="仅展示将执行的测试文件")
+    parser.add_argument(
+        "--update-baseline", action="store_true", help="仅用于 lint：把当前存量告警写入基线"
+    )
     args = parser.parse_args()
+    if args.group == "lint":
+        return run_lint(
+            str(PYTHON) if PYTHON.exists() else sys.executable,
+            update_baseline=args.update_baseline,
+        )
     if args.group == "changed":
         paths_changed = changed_paths()
         selected = groups_for_changes(paths_changed)

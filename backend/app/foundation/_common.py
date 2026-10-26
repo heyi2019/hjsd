@@ -4,25 +4,11 @@
 """
 from __future__ import annotations
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
-from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
-from app.core.audit import record_audit
-from app.core.errors import ErrorCode, NotFound, Validation
-from app.core.security import CurrentUser
-from app.core.numbering import allocate_number, ensure_sequence, peek_number
-from app.domain.enums import (
-    AuditAction,
-    CapitalType,
-    PoolOwnership,
-    PoolStatus,
-    PoolType,
-    Portion,
-)
-from app.domain.foundation import DocumentSequence, OrderTypeDef, OrderTypePool, Pool
-from app.domain.trade import Cashflow, Order, OrderEvent
-from app.parties import service as parties_service
+from app.core.errors import NotFound, Validation
+from app.domain.foundation import OrderTypeDef, Pool
 # 池代码允许下划线（HJ_INVEST / HJ_PROFIT）；业务代码为紧凑大写字母数字（HS / TB2）
 POOL_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")

@@ -9,8 +9,7 @@ from sqlalchemy import select
 
 from app.accounts import service as accounts_service
 from app.core.errors import ErrorCode, NotFound, Validation
-from app.core.numbering import allocate_number
-from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus, SequenceKey
+from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.installments import service as installment_service

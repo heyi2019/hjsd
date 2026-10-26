@@ -28,7 +28,6 @@ from app.domain.trade import Account, Cashflow, RebateRecord
 from app.finance import service as finance_service
 from app.orders import service as order_service
 from app.policy import service as policy_service
-from app.parties import service as parties_service
 from app.reporting import service as reporting_service
 
 

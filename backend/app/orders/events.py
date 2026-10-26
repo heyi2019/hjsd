@@ -734,7 +734,6 @@ def _apply_account_effect(
     if account is None:
         return
     stock_type = order.order_type == "HS" or order.capital_type == CapitalType.STOCK.value
-    credit_type = order.capital_type == CapitalType.CREDIT.value
 
     if event_type == EventType.BUY.value:
         account.cost_amount = to_money(account.cost_amount) + amount

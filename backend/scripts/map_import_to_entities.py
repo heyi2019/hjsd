@@ -69,10 +69,8 @@ from app.domain.foundation import OrderTypeDef, Pool  # noqa: E402
 from app.domain.enums import (  # noqa: E402
     ImportRowStatus,
     LinkStatus,
-    OrderStatus,
     Portion,
 )
-from app.imports import service as import_service  # noqa: E402
 from app.orders import service as order_service  # noqa: E402
 
 # 源「订单类型」→ v1 order_type_defs.code

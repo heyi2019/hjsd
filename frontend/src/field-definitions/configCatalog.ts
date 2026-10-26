@@ -77,10 +77,24 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "order-types",
     label: "业务类型",
-    summary: "回收/提号/代挂/代分期等定义，含资金路由与投放比例",
+    summary: "回收/提号/代挂/代分期等定义，含资金性质与编号前缀",
     group: "MASTER",
-    entityTypes: ["OrderTypeDef", "OrderTypePool"],
+    // 只收 OrderTypeDef：路由另立「资金路由」项（OrderTypePool），
+    // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool / pool_account 的处理口径一致）。
+    entityTypes: ["OrderTypeDef"],
     count: async () => (await orderTypesApi.list()).length,
+  },
+  {
+    key: "order-type-routes",
+    label: "资金路由",
+    summary: "各业务类型的过账去向：按份额与资金性质匹配目标资金池",
+    group: "MASTER",
+    entityTypes: ["OrderTypePool"],
+    count: async () => {
+      const types = await orderTypesApi.list();
+      const lists = await Promise.all(types.map((type) => orderTypesApi.routes(type.id).catch(() => [])));
+      return lists.reduce((sum, rows) => sum + rows.length, 0);
+    },
   },
   {
     key: "pools",
@@ -188,6 +202,16 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     permission: "option-set.manage",
     entityTypes: ["option_set"],
     count: async () => (await optionSetsApi.list()).items.length,
+  },
+  {
+    key: "config-audit",
+    label: "改动追溯",
+    summary: "配置改动流水：按配置项 / 动作 / 操作人 / 时间筛选，只读",
+    group: "GOV",
+    permission: "audit.read",
+    readOnly: true,
+    entityTypes: [],
+    count: noCount,
   },
   {
     key: "appearance",

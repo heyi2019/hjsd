@@ -10,10 +10,12 @@ import { TeamsPanel } from "../users/TeamsPanel";
 import { UsersPanel } from "../users/UsersPanel";
 import { useSession } from "../shared/state/session";
 import { BusinessDictionaryPanel } from "./panels/BusinessDictionaryPanel";
+import { ConfigAuditPanel } from "./panels/ConfigAuditPanel";
 import { ConfigOverviewPanel } from "./panels/ConfigOverviewPanel";
 import { FieldsPanel } from "./panels/FieldsPanel";
 import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
 import { OptionSetsPanel } from "./panels/OptionSetsPanel";
+import { OrderTypeRoutesPanel } from "./panels/OrderTypeRoutesPanel";
 import { OrderTypesPanel } from "./panels/OrderTypesPanel";
 import { OrderFormFieldsPanel } from "./panels/OrderFormFieldsPanel";
 import { PeriodLocksPanel } from "./panels/PeriodLocksPanel";
@@ -62,6 +64,7 @@ export function SettingsPage() {
     { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
     // 编号序列与业务类型同源（sequence_prefix），读取门控与后端 manage_order_types 一致。
     ...(can("order-type.manage") ? [{ key: "sequences", label: "编号序列", render: () => <SequencesPanel /> }] : []),
+    { key: "order-type-routes", label: "资金路由", render: () => <OrderTypeRoutesPanel /> },
     { key: "pools", label: "资金池", render: () => <PoolsPanel /> },
     ...(can("pool.manage")
       ? [{ key: "pool-accounts", label: "资金池账户", render: () => <PoolAccountsPanel /> }]
@@ -85,6 +88,9 @@ export function SettingsPage() {
           { key: "users", label: "人员与权限", render: () => <UsersPanel /> },
           { key: "teams", label: "团队管理", render: () => <TeamsPanel /> },
         ]
+      : []),
+    ...(can("audit.read")
+      ? [{ key: "config-audit", label: "改动追溯", render: () => <ConfigAuditPanel /> }]
       : []),
     { key: "appearance", label: "外观", render: () => <AppearancePanel /> },
   ];

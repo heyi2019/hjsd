@@ -24,27 +24,41 @@ ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 
 
 def _normalize_field_options(
-    field_type: str, options: Sequence[str] | None
-) -> list[str]:
+    field_type: str,
+    options: Sequence[Any] | None,
+) -> list[dict[str, str]]:
+    """归一化为 [{value,label}] 对象数组；兼容纯字符串数组（value=label）。"""
     if options is None:
         raw: list[Any] = []
     elif isinstance(options, (str, bytes)):
-        raise Validation("字段选项必须为字符串数组", details={"field": "options"})
+        raise Validation("字段选项必须为数组", details={"field": "options"})
     else:
         raw = list(options)
     if field_type not in ("SELECT", "MULTI_SELECT"):
         if raw:
             raise Validation("非选择型字段不能配置选项", details={"field": "options"})
         return []
-    normalized: list[str] = []
+    normalized: list[dict[str, str]] = []
+    seen: set[str] = set()
     for option in raw:
-        if not isinstance(option, str) or not option.strip():
-            raise Validation("字段选项必须为非空字符串", details={"field": "options"})
-        normalized.append(option.strip())
+        if isinstance(option, str):
+            item = {"value": option.strip(), "label": option.strip()}
+        elif isinstance(option, dict) and "value" in option:
+            v = str(option.get("value", "")).strip()
+            l = str(option.get("label", v)).strip() or v
+            if not v:
+                raise Validation("字段选项 value 不能为空", details={"field": "options"})
+            item = {"value": v, "label": l}
+        else:
+            raise Validation("字段选项须为字符串或 {value,label}", details={"field": "options"})
+        if not item["value"]:
+            raise Validation("字段选项不能为空", details={"field": "options"})
+        if item["value"] in seen:
+            raise Validation("字段选项不能重复", details={"field": "options"})
+        seen.add(item["value"])
+        normalized.append(item)
     if not normalized:
         raise Validation("选择型字段至少需要一个选项", details={"field": "options"})
-    if len(set(normalized)) != len(normalized):
-        raise Validation("字段选项不能重复", details={"field": "options"})
     return normalized
 
 

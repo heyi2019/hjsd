@@ -374,6 +374,11 @@ __all__ = [
 ]
 
 
+class FieldOption(BaseModel):
+    value: str
+    label: str
+
+
 class OrderFormFieldOut(BaseModel):
     """建单表单字段配置响应。"""
 
@@ -384,7 +389,7 @@ class OrderFormFieldOut(BaseModel):
     field_key: str
     label: str
     field_type: str
-    options: list[str] | None = None
+    options: list[FieldOption] | None = None
     required: bool
     is_active: bool
     sort_order: int
@@ -402,7 +407,7 @@ class OrderFormFieldCreate(BaseModel):
     field_key: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=128)
     field_type: str = "TEXT"
-    options: list[str] | None = None
+    options: list[FieldOption] | None = None
     required: bool = False
     is_active: bool = True
     sort_order: int = 0
@@ -417,7 +422,7 @@ class OrderFormFieldUpdate(BaseModel):
 
     label: str | None = None
     field_type: str | None = None
-    options: list[str] | None = None
+    options: list[FieldOption] | None = None
     required: bool | None = None
     sort_order: int | None = None
     note: str | None = None

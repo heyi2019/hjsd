@@ -101,8 +101,11 @@ def test_update_field_label_required_options(seeded_db):
     seeded_db.commit()
     assert updated.label == "来源渠道"
     assert updated.required is True
-    # 选项保持不变
-    assert updated.options == ["微信", "支付宝"]
+    # 选项保持不变（归一化为 {value,label} 对象数组）
+    assert updated.options == [
+        {"value": "微信", "label": "微信"},
+        {"value": "支付宝", "label": "支付宝"},
+    ]
 
 
 def test_set_active_toggle(seeded_db):

@@ -788,7 +788,7 @@ class OrderFormField(Base, AuditMixin):
     field_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="TEXT"
     )
-    options: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    options: Mapped[list | None] = mapped_column(JSON, nullable=True)
     required: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("0")
     )

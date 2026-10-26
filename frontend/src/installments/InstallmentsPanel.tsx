@@ -14,6 +14,7 @@ import {
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { INSTALLMENT_STATUS_LABEL, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
+import { configurableLabel } from "../shared/lib/optionSets";
 import {
   DataTable,
   ErrorBanner,
@@ -329,7 +330,7 @@ function ContractTable({
         />
       ),
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={INSTALLMENT_STATUS_LABEL[v] ?? v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("INSTALLMENT_STATUS", v, INSTALLMENT_STATUS_LABEL)} /> },
     {
       title: "操作",
       render: (_v, row) => (
@@ -460,7 +461,7 @@ function ContractTable({
       align: "right",
       render: (v: string | undefined) => (v == null || v === "" ? "—" : `${v}%`),
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={SCHEDULE_STATUS_LABEL[v] ?? v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("SCHEDULE_STATUS", v, SCHEDULE_STATUS_LABEL)} /> },
     {
       title: "操作",
       render: (_v, schedule) => (

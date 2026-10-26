@@ -13,6 +13,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { requiredMoneyRules } from "../shared/lib/validators";
+import { configurableLabel } from "../shared/lib/optionSets";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 const OWNERSHIP_LABEL: Record<string, string> = {
@@ -136,7 +137,7 @@ export function PoolAccountsPanel() {
     },
     { title: "期初余额", dataIndex: "opening_balance", align: "right", render: (v: string) => `¥${v}` },
     { title: "当前余额", dataIndex: "current_balance", align: "right", render: (v: string) => `¥${v}` },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={v === "ACTIVE" ? "启用" : "停用"} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("POOL_ACCOUNT_STATUS", v, { ACTIVE: "启用", DISABLED: "停用" })} /> },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "-" },
     {
       title: "操作",

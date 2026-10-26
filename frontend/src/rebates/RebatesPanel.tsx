@@ -190,7 +190,7 @@ export function RebatesPanel() {
         return v;
       },
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="REBATE_STATUS" /> },
     {
       title: "操作",
       render: (_v, row) => (

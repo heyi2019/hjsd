@@ -15,6 +15,7 @@ import {
 import { api, normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -47,7 +48,7 @@ function MobileOrderList(props: {
         <article className="orders-mobile-card" key={order.id}>
           <div className="orders-mobile-card__topline">
             <strong>{order.order_no}</strong>
-            <StatusTag status={order.status} />
+            <StatusTag status={order.status} optionSet="ORDER_STATUS" />
           </div>
           <dl className="orders-mobile-card__meta">
             <div><dt>对方 / 来源</dt><dd>{[order.party_name, order.party_source].filter(Boolean).join(" · ") || "-"}</dd></div>
@@ -191,6 +192,18 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
+  // 关联状态 / 业务类型 / 业务模式：优先读选项词典（设置页可改 label），
+  // 未加载完时回落原硬编码常量，避免主筛选条出现空白（零行为变化）。
+  type Opt = { value: string; label: string };
+  const linkStatusOptions: Opt[] =
+    useOptionSet("ORDER_LINK_STATUS") ??
+    Object.entries(LINK_STATUS_LABEL).map(([value, label]) => ({ value, label }));
+  const orderBusinessOptions: Opt[] =
+    useOptionSet("ORDER_BUSINESS") ??
+    BUSINESS_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  const orderBusinessModeOptions: Opt[] =
+    useOptionSet("ORDER_BUSINESS_MODE") ??
+    BUSINESS_MODE_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -499,14 +512,14 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     { title: "账号", dataIndex: "account_game_account", render: (v: string | null) => v || "-" },
     { title: "平台", dataIndex: "account_platform", render: (v: string | null) => v || "-" },
     { title: "金额", dataIndex: "event_total", render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "库存状态", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} /> : "-" },
+    { title: "库存状态", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} optionSet="INVENTORY_STATUS" /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
     {
       title: "关联",
       dataIndex: "link_status",
       render: (v: string | undefined) => (
-        <StatusTag status={v ?? "LINKED"} label={LINK_STATUS_LABEL[v ?? "LINKED"] ?? v} />
+        <StatusTag status={v ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", v ?? "LINKED", LINK_STATUS_LABEL)} />
       ),
     },
     { title: "日期", dataIndex: "trade_date" },
@@ -589,12 +602,13 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   <Typography.Text strong>类型筛选</Typography.Text>
                   <Segmented
                     value={orderTypeFilter}
-                    options={BUSINESS_FILTERS.map((item) => ({
-                      value: item.key,
-                      label: `${item.label} ${item.key === "all"
-                        ? countBusinessOrders(orders, "all", businessModeFilter, linkStatusFilter)
-                        : countBusinessOrders(orders, item.key, businessModeFilter, linkStatusFilter)}`,
-                    }))}
+                    options={[
+                      { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter, linkStatusFilter)}` },
+                      ...orderBusinessOptions.map((item) => ({
+                        value: item.value,
+                        label: `${item.label} ${countBusinessOrders(orders, item.value as BusinessFilterKey, businessModeFilter, linkStatusFilter)}`,
+                      })),
+                    ]}
                     onChange={(value) => {
                       setOrderTypeFilter(value as BusinessFilterKey);
                       setPage(1);
@@ -603,10 +617,10 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   <Typography.Text strong>业务筛选</Typography.Text>
                   <Segmented
                     value={businessModeFilter}
-                    options={BUSINESS_MODE_FILTERS.map((item) => ({
-                      value: item.key,
-                      label: item.label,
-                    }))}
+                    options={[
+                      { value: "all", label: "全部业务" },
+                      ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label })),
+                    ]}
                     onChange={(value) => {
                       setBusinessModeFilter(value as BusinessModeFilterKey);
                       setPage(1);
@@ -619,7 +633,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     value={linkStatusFilter}
                     options={[
                       { value: "all", label: "全部关联状态" },
-                      ...Object.entries(LINK_STATUS_LABEL).map(([value, label]) => ({ value, label })),
+                      ...linkStatusOptions.map(({ value, label }) => ({ value, label })),
                     ]}
                     onChange={(value) => {
                       setLinkStatusFilter(value);
@@ -679,8 +693,8 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             <Descriptions.Item label="获客时间">{selectedOrder.party_created_at ? new Date(selectedOrder.party_created_at).toLocaleString("zh-CN") : "-"}</Descriptions.Item>
             <Descriptions.Item label="金额/进度">{selectedOrder.installment_principal ? `¥${selectedOrder.installment_paid ?? "0.00"}/${selectedOrder.installment_principal} · ${selectedOrder.installment_periods ?? 0}期` : selectedOrder.event_total ? `¥${selectedOrder.event_total}` : "-"}</Descriptions.Item>
             <Descriptions.Item label="最新动作">{selectedOrder.last_event_type ? `${executionActionLabel(selectedOrder.last_event_type, selectedOrder.order_type)}${selectedOrder.last_event_amount ? ` · ¥${selectedOrder.last_event_amount}` : ""}` : "-"}</Descriptions.Item>
-            <Descriptions.Item label="状态"><StatusTag status={selectedOrder.status} /></Descriptions.Item>
-            <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={LINK_STATUS_LABEL[selectedOrder.link_status ?? "LINKED"] ?? selectedOrder.link_status} /></Descriptions.Item>
+            <Descriptions.Item label="状态"><StatusTag status={selectedOrder.status} optionSet="ORDER_STATUS" /></Descriptions.Item>
+            <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", selectedOrder.link_status ?? "LINKED", LINK_STATUS_LABEL)} /></Descriptions.Item>
             <Descriptions.Item label="成交日">{selectedOrder.trade_date || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>
           </Descriptions>
@@ -798,7 +812,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 <span>{flow.occurred_on}</span>
                 <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
                 <span><MoneyText value={flow.amount} /></span>
-                <span><StatusTag status={flow.status} /></span>
+                <span><StatusTag status={flow.status} optionSet="FUND_FLOW_STATUS" /></span>
               </div>
             ))}
           </div>
@@ -811,7 +825,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 <span>{rebate.rebate_no}</span>
                 <span>{rebate.rate}% · <MoneyText value={rebate.base_amount} /></span>
                 <span>{rebate.expected_on ? `预计 ${rebate.expected_on}` : rebate.collected_on}</span>
-                <span><StatusTag status={rebate.status} /></span>
+                <span><StatusTag status={rebate.status} optionSet="REBATE_STATUS" /></span>
               </div>
             ))}
           </div>
@@ -826,7 +840,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               {" · "}{selectedOrder.installment.periods} 期
             </Typography.Text>
             <div className="orders-event-row">
-              <span><StatusTag status={selectedOrder.installment.status} /></span>
+              <span><StatusTag status={selectedOrder.installment.status} optionSet="INSTALLMENT_STATUS" /></span>
               <span>{selectedOrder.installment.delivered_on ? `交付于 ${selectedOrder.installment.delivered_on}` : "未交付"}</span>
               <span>{selectedOrder.installment.first_due_on ? `首期 ${selectedOrder.installment.first_due_on}` : ""}</span>
             </div>
@@ -836,7 +850,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 <span>{row.due_on}</span>
                 <span>应收 ¥{money(row.due_amount)}</span>
                 <span>已收 ¥{money(row.received_amount)}</span>
-                <span><StatusTag status={row.status} label={SCHEDULE_STATUS_LABEL[row.status] ?? row.status} /></span>
+                <span><StatusTag status={row.status} label={configurableLabel("SCHEDULE_STATUS", row.status, SCHEDULE_STATUS_LABEL)} /></span>
               </div>
             ))}
           </div>

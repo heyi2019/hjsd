@@ -30,6 +30,7 @@ import {
   StatRow,
   StatusTag,
 } from "../shared/ui";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 
 /** 嵌入模式：作为「设置」页内的 Tab 渲染时，不再重复输出 PageHeader 大标题，
  *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
@@ -97,6 +98,8 @@ export function ImportWorkbench({
   onBatchIdChange?: (id: number | null) => void;
 }) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const sourceKindOptions = useOptionSet("IMPORT_SOURCE_KIND") ?? [];
+  const batchStatusOptions = useOptionSet("IMPORT_BATCH_STATUS") ?? [];
   const isBatchControlled = batchIdProp !== undefined;
   const [internalBatchId, setInternalBatchId] = useState<number | null>(null);
   const batchId = isBatchControlled ? (batchIdProp as number | null) : internalBatchId;
@@ -210,7 +213,7 @@ export function ImportWorkbench({
         </span>
       ),
     },
-    { title: "状态", dataIndex: "status", width: 130, render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", width: 130, render: (v: string) => <StatusTag status={v} optionSet="IMPORT_BATCH_STATUS" /> },
     {
       title: "单边划转",
       dataIndex: "unlinked_transfer",
@@ -269,7 +272,7 @@ export function ImportWorkbench({
         placeholder="选择导入批次"
         options={batches.map((b) => ({
           value: b.id,
-          label: `${b.source_name}（${b.batch_no} · ${b.status === "DRAFT" ? "草稿" : b.status === "MAPPED" ? "已映射" : b.status === "COMMITTED" ? "已确认" : b.status}）`,
+          label: `${b.source_name}（${b.batch_no} · ${batchStatusOptions.find((o) => o.value === b.status)?.label ?? b.status}）`,
         }))}
         onChange={setBatchId}
       />
@@ -560,13 +563,7 @@ export function ImportWorkbench({
             <Input placeholder="例如：2026年10月订单导入" />
           </Form.Item>
           <Form.Item name="source_kind" label="数据类型" initialValue="STANDARD_ORDER" rules={[{ required: true }]}>
-            <Select options={[
-              { value: "STANDARD_ORDER", label: "订单" },
-              { value: "STANDARD_ACCOUNT", label: "账号" },
-              { value: "STANDARD_CASHFLOW", label: "资金流水" },
-              { value: "STANDARD_INSTALLMENT", label: "分期" },
-              { value: "STANDARD_LEAD", label: "需求" },
-            ]} />
+            <Select options={sourceKindOptions} />
           </Form.Item>
           <PermissionButton
             permission="import.manage"

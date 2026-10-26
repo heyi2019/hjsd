@@ -22,6 +22,7 @@ import {
   StatRow,
   StatusTag,
 } from "../shared/ui";
+import { useOptionSet } from "../shared/lib/optionSets";
 
 const SCOPE_OPTIONS = [
   { value: "GLOBAL", label: "全局" },
@@ -62,6 +63,8 @@ export function PolicySettingsPanel() {
   // 后端读取门控为 policy.manage / policy.approve 任一（policy/router.py policy_read_access）；
   // PermissionButton 只接受单权限码，故按当前用户实际持有的那个码门控（同 InstallmentsPanel settlePermission 先例）。
   const resolvePermission = can("policy.manage") ? "policy.manage" : "policy.approve";
+  // 适用范围：优先读选项词典（设置页可改 label），加载中回落原硬编码，保证零空白。
+  const scopeOptions = useOptionSet("POLICY_SCOPE_TYPE") ?? SCOPE_OPTIONS;
   const [definitions, setDefinitions] = useState<PolicyDefinition[]>([]);
   const [definitionId, setDefinitionId] = useState<number | null>(null);
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
@@ -308,7 +311,7 @@ export function PolicySettingsPanel() {
               title: "适用范围",
               dataIndex: "scope_type",
               width: 160,
-              render: (v: string) => SCOPE_OPTIONS.find((o) => o.value === v)?.label ?? v,
+              render: (v: string) => scopeOptions.find((o) => o.value === v)?.label ?? v,
             },
             { title: "范围 ID", dataIndex: "scope_id", width: 100, render: (v?: number | null) => v ?? "-" },
             { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} /> },
@@ -398,7 +401,7 @@ export function PolicySettingsPanel() {
             <Input type="date" />
           </Form.Item>
           <Form.Item name="scope_type" label="适用范围" initialValue="GLOBAL" rules={[{ required: true, message: "请选择适用范围" }]}>
-            <Select options={SCOPE_OPTIONS} />
+            <Select options={scopeOptions} />
           </Form.Item>
           <Form.Item
             name="scope_id"

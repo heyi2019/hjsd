@@ -4,13 +4,14 @@ import { api, errorMessage } from "../shared/api/client";
 import { poolsApi, type Pool } from "../shared/api/catalog";
 import { ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
+import { useOptionSet } from "../shared/lib/optionSets";
 
 type User = { id: number; username: string; display_name: string; role: string; owner_scope: string; pool_ids: number[]; team_ids: number[]; is_active: boolean; must_change_password: boolean };
 type Team = { id: number; code: string; name: string; is_active: boolean };
-const roles = [{ value: "ADMIN", label: "系统管理员" }, { value: "OPERATOR", label: "业务经办人" }, { value: "FINANCE", label: "财务" }, { value: "AUDITOR", label: "审核人" }, { value: "VIEWER", label: "查看人" }];
-const scopes = [{ value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" }];
 
 export function UsersPanel() {
+  const roleOptions = useOptionSet("USER_ROLE") ?? [];
+  const scopeOptions = useOptionSet("OWNER_SCOPE") ?? [];
   const [rows, setRows] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
@@ -71,8 +72,8 @@ export function UsersPanel() {
       <Form.Item name="username" rules={[{ required: true }]}><Input placeholder="用户名" /></Form.Item>
       <Form.Item name="display_name" rules={[{ required: true }]}><Input placeholder="姓名" /></Form.Item>
       <Form.Item name="password" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
-      <Form.Item name="role" initialValue="VIEWER"><Select options={roles} className="ui-control-width-140" /></Form.Item>
-      <Form.Item name="owner_scope" initialValue="SELF"><Select options={[{ value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" }]} className="ui-control-width-100" /></Form.Item>
+      <Form.Item name="role" initialValue="VIEWER"><Select options={roleOptions} className="ui-control-width-140" /></Form.Item>
+      <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} className="ui-control-width-100" /></Form.Item>
       <Form.Item name="team_ids"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
       <Form.Item name="pool_ids"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金池" className="ui-control-min-180" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit">新增用户</PermissionButton>
@@ -80,8 +81,8 @@ export function UsersPanel() {
     <Modal title={`编辑用户：${editing?.username ?? ""}`} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
       <Form form={editForm} layout="vertical" onFinish={updateUser}>
         <Form.Item name="display_name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
-        <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roles} /></Form.Item>
-        <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopes} /></Form.Item>
+        <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} /></Form.Item>
+        <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopeOptions} /></Form.Item>
         <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} /></Form.Item>
         <Form.Item name="pool_ids" label="可见资金池"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
       </Form>

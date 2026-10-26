@@ -32,7 +32,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { useOptionSet } from "../shared/lib/optionSets";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
@@ -407,7 +407,7 @@ export function FundsPage() {
   const poolColumns: ColumnsType<Pool> = [
     { title: "资金池", dataIndex: "name", render: (_v, row) => `${row.name}（${row.code}）` },
     { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
-    { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
     {
       title: "收入",
       align: "right",
@@ -469,7 +469,7 @@ export function FundsPage() {
         <MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)} />
       ),
     },
-    { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} /> },
+    { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",
       width: 190,
@@ -534,7 +534,7 @@ export function FundsPage() {
       render: (v: string) => <MoneyText value={v} />,
     },
     { title: "来源", dataIndex: "source" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={({ PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" } as Record<string, string>)[v]} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" })} /> },
     {
       title: "审核追溯",
       width: 190,
@@ -603,7 +603,7 @@ export function FundsPage() {
     { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已审核流水，剔除待审核/已拒绝">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
     { title: "账面余额", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
     { title: "差异", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={RECONCILIATION_STATUS_LABEL[v] ?? v} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
     {
       title: "操作",
       render: (_v, row) => (

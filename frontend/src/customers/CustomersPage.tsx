@@ -17,6 +17,7 @@ import {
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
 import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import "./CustomersPage.css";
 import {
@@ -61,7 +62,7 @@ function MobileCustomerList(props: {
     <div className="customers-mobile-list" aria-label="客户列表">
       {props.rows.map((row) => (
         <article className="customers-mobile-card" key={row.id}>
-          <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} label={customerStatusLabel(row.status)} /></div>
+          <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} optionSet="CUSTOMER_STATUS" /></div>
           <dl><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div><div><dt>手机</dt><dd>{row.phone || "-"}</dd></div></dl>
           <Space size="small">
             <PermissionButton permission="customer.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
@@ -85,7 +86,7 @@ function MobileCounterpartyList(props: {
     <div className="customers-mobile-list" aria-label="合作方列表">
       {props.rows.map((row) => (
         <article className="customers-mobile-card" key={row.id}>
-          <div className="customers-mobile-card__topline"><strong>{row.counterparty_no} · {row.display_name}</strong><StatusTag status={row.status} label={row.status === "DISABLED" ? "已拉黑" : undefined} /></div>
+          <div className="customers-mobile-card__topline"><strong>{row.counterparty_no} · {row.display_name}</strong><StatusTag status={row.status} optionSet="COUNTERPARTY_STATUS" /></div>
           <dl><div><dt>类型</dt><dd>{COUNTERPARTY_TYPE_LABEL[row.type] ?? row.type}</dd></div><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div></dl>
           <Space size="small">
             <PermissionButton permission="counterparty.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
@@ -188,6 +189,7 @@ function CustomerPanel() {
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [mergeForm] = Form.useForm();
@@ -308,7 +310,7 @@ function CustomerPanel() {
     { title: "手机", dataIndex: "phone" },
     { title: "微信", dataIndex: "wechat" },
     { title: "QQ", dataIndex: "qq" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={customerStatusLabel(v)} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
     {
       title: "活字段",
       key: "extra_values",
@@ -411,11 +413,7 @@ function CustomerPanel() {
           allowClear
           placeholder="全部状态"
           value={statusFilter}
-          options={[
-            { value: "ACTIVE", label: "启用中" },
-            { value: "DISABLED", label: "已拉黑" },
-            { value: "MERGED", label: "已合并" },
-          ]}
+          options={customerStatusOptions ?? []}
           onChange={(value) => {
             setStatusFilter(value);
             setPage(1);
@@ -595,7 +593,7 @@ function CustomerPanel() {
               <Descriptions.Item label="微信">{detailTarget.wechat || "-"}</Descriptions.Item>
               <Descriptions.Item label="QQ">{detailTarget.qq || "-"}</Descriptions.Item>
               <Descriptions.Item label="状态">
-                <StatusTag status={detailTarget.status} />
+                <StatusTag status={detailTarget.status} optionSet="CUSTOMER_STATUS" />
               </Descriptions.Item>
               <Descriptions.Item label="备注">{detailTarget.note || "-"}</Descriptions.Item>
             </Descriptions>
@@ -641,7 +639,7 @@ function CustomerPanel() {
                     { title: "订单", dataIndex: "order_no" },
                     { title: "业务", render: (_value, row) => orderTypeLabel(row.order_type) },
                     { title: "角色", render: (_value, row) => row.roles.join("、") || "-" },
-                    { title: "状态", render: (_value, row) => <StatusTag status={row.status} /> },
+                    { title: "状态", render: (_value, row) => <StatusTag status={row.status} optionSet="ORDER_STATUS" /> },
                     { title: "日期", dataIndex: "trade_date" },
                   ]}
                   rows={detailData.business}
@@ -657,7 +655,7 @@ function CustomerPanel() {
                   columns={[
                     { title: "合约", dataIndex: "inst_no" },
                     { title: "订单", dataIndex: "order_no" },
-                    { title: "状态", render: (_value, row) => <StatusTag status={row.status} /> },
+                    { title: "状态", render: (_value, row) => <StatusTag status={row.status} optionSet="INSTALLMENT_STATUS" /> },
                     { title: "已收", render: (_value, row) => `¥${money(row.paid_amount)}` },
                     { title: "剩余", render: (_value, row) => `¥${money(row.remaining_amount)}` },
                     { title: "逾期", render: (_value, row) => row.overdue_periods > 0 ? `逾期 ${row.overdue_periods} 期` : "-" },
@@ -704,6 +702,8 @@ function CustomerPanel() {
 
 function CounterpartyPanel() {
   const compact = useCompactLayout();
+  const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
+  const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [rows, setRows] = useState<Counterparty[]>([]);
   const [open, setOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Counterparty | null>(null);
@@ -782,7 +782,7 @@ function CounterpartyPanel() {
     { title: "编号", dataIndex: "counterparty_no" },
     { title: "名称", dataIndex: "display_name" },
     { title: "类型", dataIndex: "type", render: (v: string) => COUNTERPARTY_TYPE_LABEL[v] ?? v },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={v === "DISABLED" ? "已拉黑" : undefined} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="COUNTERPARTY_STATUS" /> },
     {
       title: "操作",
       render: (_v, row) => (
@@ -852,13 +852,7 @@ function CounterpartyPanel() {
             <Input />
           </Form.Item>
           <Form.Item name="type" label="类型" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: "PEER", label: "同行" },
-                { value: "SUPPLIER", label: "供货方" },
-                { value: "PLATFORM", label: "平台" },
-              ]}
-            />
+            <Select options={counterpartyTypeOptions ?? []} />
           </Form.Item>
           <Form.Item name="contact_name" label="联系人">
             <Input />
@@ -965,7 +959,7 @@ function CounterpartyPanel() {
             <Descriptions.Item label="手机">{detailData.phone || "-"}</Descriptions.Item>
             <Descriptions.Item label="微信">{detailData.wechat || "-"}</Descriptions.Item>
             <Descriptions.Item label="QQ">{detailData.qq || "-"}</Descriptions.Item>
-            <Descriptions.Item label="状态"><StatusTag status={detailData.status} label={detailData.status === "DISABLED" ? "已拉黑" : undefined} /></Descriptions.Item>
+            <Descriptions.Item label="状态"><StatusTag status={detailData.status} optionSet="COUNTERPARTY_STATUS" /></Descriptions.Item>
             <Descriptions.Item label="备注">{detailData.note || "-"}</Descriptions.Item>
           </Descriptions>
         ) : null}

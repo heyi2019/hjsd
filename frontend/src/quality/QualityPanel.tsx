@@ -5,8 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { DataTable, ErrorBanner, InlineError, PermissionButton, StatRow, StatusTag } from "../shared/ui";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+
+const QUALITY_STATUS_LABEL: Record<string, string> = { OPEN: "待处理", IN_PROGRESS: "处理中", CLOSED: "已关闭" };
 
 export function QualityPanel() {
+  const severityOptions = useOptionSet("QUALITY_SEVERITY") ?? [];
+  const qualityStatusOptions = useOptionSet("QUALITY_STATUS") ?? [];
   const [summary, setSummary] = useState<QualitySummary | null>(null);
   const [rows, setRows] = useState<QualityIssue[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -109,10 +114,10 @@ export function QualityPanel() {
 
   const columns: ColumnsType<QualityIssue> = [
     { title: "工单号", dataIndex: "issue_no" },
-    { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} /> },
+    { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} optionSet="QUALITY_SEVERITY" /> },
     { title: "标题", dataIndex: "title" },
     { title: "对象", render: (_v, row) => `${row.entity_type}:${row.entity_id}` },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={({ OPEN: "待处理", IN_PROGRESS: "处理中", CLOSED: "已关闭" } as Record<string, string>)[v]} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("QUALITY_STATUS", v, QUALITY_STATUS_LABEL)} /> },
     { title: "问题", dataIndex: "message" },
     {
       title: "操作",
@@ -139,7 +144,7 @@ export function QualityPanel() {
         <InlineError error={createOpen ? error : null} />
         <Form form={createForm} layout="vertical" onFinish={createIssue}>
           <Form.Item name="code" label="异常编码" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={[{ value: "LOW", label: "低" }, { value: "MEDIUM", label: "中" }, { value: "HIGH", label: "高" }, { value: "CRITICAL", label: "严重" }]} /></Form.Item>
+          <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={severityOptions} /></Form.Item>
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="entity_type" label="对象类型" rules={[{ required: true }]}><Input placeholder="order / account / customer" /></Form.Item>
           <Form.Item name="entity_id" label="对象编号" rules={[{ required: true }]}><Input /></Form.Item>

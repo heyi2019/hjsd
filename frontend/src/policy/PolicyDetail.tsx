@@ -2,6 +2,7 @@ import { Card, Descriptions, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { PolicyDefinition, PolicyVersion } from "../shared/api/catalog";
 import { DataTable, PermissionButton, StatusTag } from "../shared/ui";
+import { describeConfig } from "./policyConfigSchema";
 
 interface PolicyDetailProps {
   definition: PolicyDefinition;
@@ -40,11 +41,7 @@ export function PolicyDetail({
       title: "规则参数",
       dataIndex: "config",
       render: (config: Record<string, unknown>) => (
-        <span className="muted">
-          {Object.entries(config)
-            .map(([key, value]) => `${key}=${String(value)}`)
-            .join(" · ") || "（无参数）"}
-        </span>
+        <span className="muted">{describeConfig(config, definition.policy_code)}</span>
       ),
     },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="POLICY_STATUS" /> },
@@ -55,7 +52,6 @@ export function PolicyDetail({
     <section className="ui-stack">
       <Card className="glass" title={`规则详情 · ${definition.name}`}>
         <Descriptions column={2} size="small" className="policy-detail-desc">
-          <Descriptions.Item label="编码">{definition.policy_code}</Descriptions.Item>
           <Descriptions.Item label="适用范围">{scopeLabel}</Descriptions.Item>
           <Descriptions.Item label="状态">
             <StatusTag status={definition.status} optionSet="POLICY_STATUS" />

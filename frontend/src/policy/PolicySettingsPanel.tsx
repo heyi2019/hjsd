@@ -153,7 +153,7 @@ export function PolicySettingsPanel() {
           { label: "规则总数", kind: "count", amount: String(definitions.length) },
           { label: "已发布", kind: "count", amount: String(versions.filter((v) => v.status === "ACTIVE").length) },
           { label: "草稿版本", kind: "count", amount: String(versions.filter((v) => v.status === "DRAFT").length) },
-          { label: "当前规则", kind: "count", amount: current ? current.policy_code : "-" },
+          { label: "当前规则", kind: "count", amount: current ? current.name : "-" },
         ]}
       />
 

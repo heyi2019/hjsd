@@ -26,7 +26,7 @@ export function PolicyMasterList({ definitions, selectedId, onSelect, scopeOptio
           >
             <List.Item.Meta
               title={d.name}
-              description={`${d.policy_code} · ${scopeOptions.find((o) => o.value === d.scope_type)?.label ?? d.scope_type}`}
+              description={scopeOptions.find((o) => o.value === d.scope_type)?.label ?? d.scope_type}
             />
             <StatusTag status={d.status} optionSet="POLICY_STATUS" />
           </List.Item>

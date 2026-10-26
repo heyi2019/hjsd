@@ -145,6 +145,32 @@ it("设计费走 DESIGN 资金分类（不再落到 OTHER）", async () => {
     expect(costs).toEqual([expect.objectContaining({ amount: "50", flow_category: "DESIGN", note: "设计费" })]);
   });
 
+it("代挂单的佣金口径随建单提交（支付方式与承担方成对落到顶层字段）", async () => {
+  resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 21, order_no: "DG-2026-0021", status: "ACTIVE" });
+  // 代挂建单会先按昵称建档（昵称必填），这里补上建档返回，避免走到 catch 分支。
+  vi.mocked(catalog.customersApi.create).mockResolvedValue({
+    customer: { id: 3, customer_no: "CUS-0003", display_name: "李四", status: "ACTIVE" },
+    duplicate_candidates: [],
+  });
+  await openTypedModal("DG");
+  await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+  await ui.type(screen.getByLabelText("游戏账号"), "consignment-account");
+  await ui.type(screen.getByLabelText("账号密码"), "secret");
+  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await ui.type(screen.getByLabelText("客户昵称"), "李四");
+  await ui.click(screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+  await ui.click(await screen.findByText("闲鱼", { selector: ".ant-select-item-option-content" }));
+  await ui.click(screen.getByLabelText("佣金支付方式").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+  await ui.click(await screen.findByText("结算扣减", { selector: ".ant-select-item-option-content" }));
+  await ui.click(screen.getByLabelText("佣金承担方").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+  await ui.click(await screen.findByText("寄售方", { selector: ".ant-select-item-option-content" }));
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+  const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
+  expect(payload.commission_mode).toBe("DEDUCT_FROM_SETTLEMENT");
+  expect(payload.commission_payer).toBe("CONSIGNOR");
+});
+
 it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 PermissionGate 决定）", async () => {
     await openModal("viewer");
     expect(screen.queryByRole("button", { name: /创建订单/ })).toBeNull();

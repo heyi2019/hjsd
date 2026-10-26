@@ -402,6 +402,8 @@ def create_order(
         owner_id=owner_id,
         capital_type=payload.capital_type,
         note=payload.note,
+        commission_mode=payload.commission_mode,
+        commission_payer=payload.commission_payer,
         customer_roles=[
             (role.customer_id, role.role)
             for role in payload.customer_roles

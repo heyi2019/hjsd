@@ -706,15 +706,54 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="订单负责人不存在"):
             _order(seeded_db, owner_id=999999)
 
-    def test_dg_service_rejects_removed_commission_terms(self, seeded_db):
-        with pytest.raises(TypeError, match="commission_mode"):
+    def test_dg_service_accepts_commission_terms(self, seeded_db):
+        """佣金口径只属于 DG 代挂单：支付方式与承担方成对落库（DB CHECK 同口径）。
+
+        入参小写也要归一成大写，否则会被 `order_commission_mode_valid` 拒绝。
+        """
+        order = order_service.create_order(
+            seeded_db,
+            order_type="DG",
+            trade_date=D,
+            actor="pytest",
+            commission_mode="deduct_from_settlement",
+            commission_payer="consignor",
+        )
+        assert (order.commission_mode, order.commission_payer) == (
+            "DEDUCT_FROM_SETTLEMENT",
+            "CONSIGNOR",
+        )
+
+    def test_commission_terms_reject_incomplete_pair(self, seeded_db):
+        with pytest.raises(Validation, match="同时填写或同时留空"):
             order_service.create_order(
                 seeded_db,
                 order_type="DG",
                 trade_date=D,
                 actor="pytest",
-                commission_mode="DEDUCT_FROM_SETTLEMENT",
-                commission_payer="CONSIGNOR",
+                commission_mode="SEPARATE_PAYMENT",
+            )
+
+    def test_commission_terms_reject_unknown_value(self, seeded_db):
+        with pytest.raises(Validation, match="commission_mode"):
+            order_service.create_order(
+                seeded_db,
+                order_type="DG",
+                trade_date=D,
+                actor="pytest",
+                commission_mode="WHATEVER",
+                commission_payer="BUYER",
+            )
+
+    def test_commission_terms_reject_non_dg_order_type(self, seeded_db):
+        with pytest.raises(Validation, match="只有 DG 代挂订单"):
+            order_service.create_order(
+                seeded_db,
+                order_type="HS",
+                trade_date=D,
+                actor="pytest",
+                commission_mode="SEPARATE_PAYMENT",
+                commission_payer="BUYER",
             )
 
     def test_dfq_account_snapshot_does_not_create_inventory_account(self, seeded_db):
@@ -1761,6 +1800,7 @@ class TestOrdersApi:
     def test_dg_creation_rejects_legacy_settlement_terms(
         self, seeded_client, seeded_db, headers
     ):
+        # 佣金口径已在建单接口打通，这里只保留「旧结算字段被拒」的断言。
         response = seeded_client.post(
             "/api/v1/orders",
             json={
@@ -1768,8 +1808,6 @@ class TestOrdersApi:
                 "trade_date": D.isoformat(),
                 "listing_price": "1200.00",
                 "service_fee": "120.00",
-                "commission_mode": "DEDUCT_FROM_SETTLEMENT",
-                "commission_payer": "CONSIGNOR",
                 "expected_settlement_date": "2026-10-20",
             },
             headers=headers,
@@ -1777,6 +1815,24 @@ class TestOrdersApi:
 
         assert response.status_code == 422, response.text
         assert "Extra inputs are not permitted" in response.text
+
+    def test_dg_creation_persists_commission_terms(
+        self, seeded_client, seeded_db, headers
+    ):
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "DG",
+                "trade_date": D.isoformat(),
+                "commission_mode": "DEDUCT_FROM_SETTLEMENT",
+                "commission_payer": "CONSIGNOR",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["commission_mode"] == "DEDUCT_FROM_SETTLEMENT"
+        assert body["commission_payer"] == "CONSIGNOR"
 
     def test_dfq_composite_create_persists_buy_and_installment(
         self, seeded_client, seeded_db, headers

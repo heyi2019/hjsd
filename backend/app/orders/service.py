@@ -30,6 +30,8 @@ from app.domain.enums import (
     AuditAction,
     CapitalType,
     CashflowStatus,
+    CommissionMode,
+    CommissionPayer,
     CounterpartyRole,
     CustomerRole,
     Direction,
@@ -211,6 +213,22 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
     )
 
 
+def _normalize_commission_value(value: str | None, field: str) -> str | None:
+    """佣金口径入参归一：空串 / 非字符串一律视作「未填」，其余去空格并大写。
+
+    大写是硬要求——`orders` 上有 CHECK 约束 `order_commission_mode_valid` /
+    `order_commission_payer_valid`，小写会被数据库直接拒绝。
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise Validation(
+            f"{field} 必须为字符串", details={"field": field, "value": value}
+        )
+    cleaned = value.strip().upper()
+    return cleaned or None
+
+
 def create_order(
     session: Session,
     *,
@@ -229,6 +247,8 @@ def create_order(
     owner_id: int | None = None,
     capital_type: str | None = None,
     note: str | None = None,
+    commission_mode: str | None = None,
+    commission_payer: str | None = None,
     customer_roles: Sequence[tuple[int, str]] = (),
     counterparty_roles: Sequence[tuple[int, str]] = (),
     extra_values: Mapping[str, Any] | None = None,
@@ -271,6 +291,33 @@ def create_order(
             f"capital_type 必须为 {CapitalType.values()}",
             details={"field": "capital_type", "value": selected_capital_type},
         )
+    # 佣金口径：仅 DG 代挂单可用，且支付方式与承担方必须成对出现（DB CHECK 同口径）。
+    normalized_commission_mode = _normalize_commission_value(commission_mode, "commission_mode")
+    normalized_commission_payer = _normalize_commission_value(commission_payer, "commission_payer")
+    if (normalized_commission_mode is None) != (normalized_commission_payer is None):
+        raise Validation(
+            "佣金支付方式与佣金承担方必须同时填写或同时留空",
+            details={
+                "commission_mode": normalized_commission_mode,
+                "commission_payer": normalized_commission_payer,
+            },
+        )
+    if normalized_commission_mode is not None:
+        if definition.code != "DG":
+            raise Validation(
+                "只有 DG 代挂订单可以填写佣金口径",
+                details={"order_type": definition.code},
+            )
+        if normalized_commission_mode not in CommissionMode.values():
+            raise Validation(
+                f"commission_mode 必须为 {CommissionMode.values()}",
+                details={"field": "commission_mode", "value": normalized_commission_mode},
+            )
+        if normalized_commission_payer not in CommissionPayer.values():
+            raise Validation(
+                f"commission_payer 必须为 {CommissionPayer.values()}",
+                details={"field": "commission_payer", "value": normalized_commission_payer},
+            )
     if account_id is not None:
         account = accounts_service.get_account(session, account_id, user)
         _validate_existing_account_context(definition.code, account)
@@ -360,6 +407,8 @@ def create_order(
         policy_snapshot=snapshot or None,
         owner_id=owner_id,
         note=note,
+        commission_mode=normalized_commission_mode,
+        commission_payer=normalized_commission_payer,
         form_extra=dict(form_extra) if form_extra else None,
         created_by=actor,
         updated_by=actor,

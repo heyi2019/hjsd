@@ -100,6 +100,13 @@ class OrderCreate(BaseModel):
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
+    # 佣金口径（BAS：仅 DG 代挂单可用；两者必须同时填写或同时留空）
+    commission_mode: str | None = Field(
+        default=None, max_length=32, description="DEDUCT_FROM_SETTLEMENT / SEPARATE_PAYMENT"
+    )
+    commission_payer: str | None = Field(
+        default=None, max_length=16, description="BUYER / CONSIGNOR / PLATFORM"
+    )
     extra_values: dict[str, object] = Field(default_factory=dict)
     # 建单表单自定义字段值（由 OrderFormField 配置驱动），独立存储于订单 form_extra。
     form_extra: dict[str, object] | None = None
@@ -154,6 +161,8 @@ class OrderOut(BaseModel):
     link_status: str
     owner_id: int | None = None
     note: str | None = None
+    commission_mode: str | None = None
+    commission_payer: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
     created_at: datetime
 

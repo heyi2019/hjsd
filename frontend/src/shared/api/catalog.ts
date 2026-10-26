@@ -708,6 +708,9 @@ export const ordersApi = {
     has_secondary?: boolean;
     account_note?: string;
     note?: string;
+    /** 佣金口径：仅 DG 代挂单可用，两者必须同时填写或同时留空。 */
+    commission_mode?: string;
+    commission_payer?: string;
     form_extra?: Record<string, unknown>;
     customer_roles?: { customer_id: number; role: string }[];
     counterparty_roles?: { counterparty_id: number; role: string }[];

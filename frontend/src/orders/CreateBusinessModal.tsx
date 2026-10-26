@@ -291,6 +291,9 @@ export function CreateBusinessModal(props: {
         bound_phone: values.bound_phone as string | undefined,
         has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
         account_note: values.game_account_note as string | undefined,
+        // 佣金口径仅 DG 生效，其余业务类型一律不带这两个字段。
+        commission_mode: isDg ? (values.commission_mode as string | undefined) : undefined,
+        commission_payer: isDg ? (values.commission_payer as string | undefined) : undefined,
         customer_roles: customerRoles,
         counterparty_roles: counterpartyId
           ? [

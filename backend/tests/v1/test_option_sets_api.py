@@ -77,6 +77,71 @@ def test_dead_enum_rejects_option_change(client, headers):
     assert bad.json()["code"] in ("VALIDATION_ERROR",)
 
 
+def test_dead_enum_allows_label_only_change(client, headers):
+    """2026-10-26 裁决：死枚举的值集合锁死，但展示文案可在设置页维护。
+
+    不放开的话 47 项词典里只有 2 项纯字典能改文案，「改文案 → 全站表格同步」形同虚设。
+    """
+    client.post(
+        OPTION_SETS,
+        json={
+            "code": "INVENTORY_STATUS",
+            "label": "库存状态",
+            "editable": False,
+            "options": [{"value": "IN_STOCK", "label": "在库"}, {"value": "SOLD", "label": "已售"}],
+        },
+        headers=headers,
+    )
+    ok = client.put(
+        f"{OPTION_SETS}/INVENTORY_STATUS",
+        json={"options": [{"value": "IN_STOCK", "label": "在库中"}, {"value": "SOLD", "label": "已售出"}]},
+        headers=headers,
+    )
+    assert ok.status_code == 200, ok.text
+    body = ok.json()
+    assert [o["value"] for o in body["options"]] == ["IN_STOCK", "SOLD"]
+    assert [o["label"] for o in body["options"]] == ["在库中", "已售出"]
+
+
+def test_dead_enum_rejects_reorder(client, headers):
+    """值集合相同但顺序变化也要拒绝：顺序承载展示优先级，改动同样属语义漂移。"""
+    client.post(
+        OPTION_SETS,
+        json={
+            "code": "ORDER_STATUS",
+            "label": "订单状态",
+            "editable": False,
+            "options": [{"value": "ACTIVE", "label": "进行中"}, {"value": "DONE", "label": "已完成"}],
+        },
+        headers=headers,
+    )
+    bad = client.put(
+        f"{OPTION_SETS}/ORDER_STATUS",
+        json={"options": [{"value": "DONE", "label": "已完成"}, {"value": "ACTIVE", "label": "进行中"}]},
+        headers=headers,
+    )
+    assert bad.status_code == 422, bad.text
+
+
+def test_dead_enum_rejects_blank_label(client, headers):
+    client.post(
+        OPTION_SETS,
+        json={
+            "code": "LEAD_STATUS",
+            "label": "需求状态",
+            "editable": False,
+            "options": [{"value": "OPEN", "label": "未结算"}],
+        },
+        headers=headers,
+    )
+    bad = client.put(
+        f"{OPTION_SETS}/LEAD_STATUS",
+        json={"options": [{"value": "OPEN", "label": "   "}]},
+        headers=headers,
+    )
+    assert bad.status_code == 422, bad.text
+
+
 def test_get_missing_returns_404(client, headers):
     assert client.get(f"{OPTION_SETS}/NOPE").status_code == 404
 

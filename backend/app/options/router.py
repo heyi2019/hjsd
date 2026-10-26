@@ -117,14 +117,30 @@ def update_option_set(
     if payload.editable is not None:
         row.editable = payload.editable
     if payload.options is not None:
-        # 死枚举（editable=False）不允许改值集合；仅纯字典可改
-        if not row.editable:
-            raise AppError(
-                "该选项词典为后端死枚举，禁止修改选项值",
-                code=ErrorCode.VALIDATION_ERROR,
-                details={"code": code},
-            )
-        row.options = [item.model_dump() for item in payload.options]
+        incoming = [item.model_dump() for item in payload.options]
+        if row.editable:
+            # 纯字典：值与文案都可自由增删。
+            row.options = incoming
+        else:
+            # 死枚举（editable=False）：值集合受 DB CHECK / domain/enums.py 约束，
+            # 增删或改顺序会让业务语义漂移，故值序列必须逐项全等；
+            # 但**展示文案允许维护**——这正是全站表格展示同步（T25）的意义所在，
+            # 否则 47 项词典里只有 2 项纯字典能改文案，机制形同虚设（2026-10-26 裁决）。
+            current = [{"value": opt["value"], "label": opt["label"]} for opt in (row.options or [])]
+            if [opt["value"] for opt in incoming] != [opt["value"] for opt in current]:
+                raise AppError(
+                    "该选项词典为后端死枚举：不能增删选项或调整顺序，只能修改展示文案",
+                    code=ErrorCode.VALIDATION_ERROR,
+                    details={"code": code},
+                )
+            blank = [opt["value"] for opt in incoming if not opt["label"].strip()]
+            if blank:
+                raise AppError(
+                    "展示文案不能为空",
+                    code=ErrorCode.VALIDATION_ERROR,
+                    details={"code": code, "values": blank},
+                )
+            row.options = incoming
     if payload.description is not None:
         row.description = payload.description
     record_audit(

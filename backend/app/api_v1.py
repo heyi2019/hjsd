@@ -34,6 +34,7 @@ from app.parties.router import router as parties_router
 from app.search.router import router as search_router
 from app.auth.router import router as auth_router, admin_router as users_router, teams_router
 from app.attachments.router import router as attachments_router
+from app.options.router import router as options_router
 
 
 def install_exception_handlers(app: FastAPI) -> None:
@@ -149,6 +150,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(users_router, prefix=settings.api_prefix)
     app.include_router(teams_router, prefix=settings.api_prefix)
     app.include_router(attachments_router, prefix=settings.api_prefix)
+    app.include_router(options_router, prefix=settings.api_prefix)
 
     @app.get("/", response_model=EngineInfoOut, tags=["health"])
     def root() -> EngineInfoOut:

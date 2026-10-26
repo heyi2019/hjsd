@@ -1,0 +1,166 @@
+"""options.router：选项词典的只读查询 + 管理端点（D 类筛选器 / 业务字典）。
+
+- 读取（GET）仅要求已登录：筛选器被库存/资金等页面广泛使用，不能仅限管理员。
+- 写入（POST/PUT/DELETE）要求 `option-set.manage`，并写审计（entity_type=option_set）。
+"""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.errors import AppError, ErrorCode
+from app.core.security import (
+    PERM_OPTION_SET_MANAGE,
+    CurrentUser,
+    get_current_user,
+    require_permissions,
+)
+from app.core.audit import record_audit
+from app.domain.options import OptionSet
+from app.options import schemas
+
+router = APIRouter(tags=["option-sets"])
+
+_read_access = get_current_user
+_write_access = require_permissions(PERM_OPTION_SET_MANAGE)
+
+
+@router.get("/option-sets", response_model=schemas.OptionSetListOut)
+def list_option_sets(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _read_access,
+    group: str | None = Query(default=None),
+    editable: bool | None = Query(default=None),
+) -> schemas.OptionSetListOut:
+    """列出全部选项词典；可按分组 / 是否可编辑过滤。前端缓存后按 code 取用。"""
+    del user
+    stmt = select(OptionSet).order_by(OptionSet.group, OptionSet.code)
+    if group is not None:
+        stmt = stmt.where(OptionSet.group == group)
+    if editable is not None:
+        stmt = stmt.where(OptionSet.editable == editable)
+    rows = db.scalars(stmt).all()
+    return schemas.OptionSetListOut(
+        items=[schemas.OptionSetOut.model_validate(row) for row in rows]
+    )
+
+
+@router.get("/option-sets/{code}", response_model=schemas.OptionSetOut)
+def get_option_set(
+    code: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _read_access,
+) -> schemas.OptionSetOut:
+    del user
+    row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="选项词典不存在")
+    return schemas.OptionSetOut.model_validate(row)
+
+
+@router.post("/option-sets", response_model=schemas.OptionSetOut, status_code=status.HTTP_201_CREATED)
+def create_option_set(
+    payload: schemas.OptionSetCreate,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _write_access,
+) -> schemas.OptionSetOut:
+    if db.scalars(select(OptionSet).where(OptionSet.code == payload.code)).first():
+        raise AppError(ErrorCode.VALIDATION_ERROR, "选项词典 code 已存在", details={"code": payload.code})
+    row = OptionSet(
+        code=payload.code,
+        label=payload.label,
+        group=payload.group,
+        editable=payload.editable,
+        options=[item.model_dump() for item in payload.options],
+        description=payload.description,
+    )
+    db.add(row)
+    db.flush()
+    record_audit(
+        db,
+        action="OPTION_SET_CREATE",
+        entity_type="option_set",
+        entity_id=row.code,
+        actor=getattr(user, "username", "system"),
+        after={"label": row.label, "group": row.group, "editable": row.editable, "options": row.options},
+    )
+    db.commit()
+    db.refresh(row)
+    return schemas.OptionSetOut.model_validate(row)
+
+
+@router.put("/option-sets/{code}", response_model=schemas.OptionSetOut)
+def update_option_set(
+    code: str,
+    payload: schemas.OptionSetUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _write_access,
+) -> schemas.OptionSetOut:
+    row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="选项词典不存在")
+    before = {
+        "label": row.label,
+        "group": row.group,
+        "editable": row.editable,
+        "options": row.options,
+    }
+    if payload.label is not None:
+        row.label = payload.label
+    if payload.group is not None:
+        row.group = payload.group
+    if payload.editable is not None:
+        row.editable = payload.editable
+    if payload.options is not None:
+        # 死枚举（editable=False）不允许改值集合；仅纯字典可改
+        if not row.editable:
+            raise AppError(
+                "该选项词典为后端死枚举，禁止修改选项值",
+                code=ErrorCode.VALIDATION_ERROR,
+                details={"code": code},
+            )
+        row.options = [item.model_dump() for item in payload.options]
+    if payload.description is not None:
+        row.description = payload.description
+    record_audit(
+        db,
+        action="OPTION_SET_UPDATE",
+        entity_type="option_set",
+        entity_id=row.code,
+        actor=getattr(user, "username", "system"),
+        before=before,
+        after={"label": row.label, "group": row.group, "editable": row.editable, "options": row.options},
+    )
+    db.commit()
+    db.refresh(row)
+    return schemas.OptionSetOut.model_validate(row)
+
+
+@router.delete("/option-sets/{code}")
+def delete_option_set(
+    code: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _write_access,
+) -> Response:
+    row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="选项词典不存在")
+    record_audit(
+        db,
+        action="OPTION_SET_DELETE",
+        entity_type="option_set",
+        entity_id=row.code,
+        actor=getattr(user, "username", "system"),
+        before={"label": row.label, "group": row.group, "options": row.options},
+    )
+    db.delete(row)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+__all__ = ["router"]

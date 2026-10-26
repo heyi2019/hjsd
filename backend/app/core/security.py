@@ -65,6 +65,7 @@ PERM_REPORT_EXPORT = "report.export"
 PERM_IMPORT_MANAGE = "import.manage"
 PERM_USER_MANAGE = "user.manage"
 PERM_PERIOD_LOCK = "finance.period.lock"
+PERM_OPTION_SET_MANAGE = "option-set.manage"
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(
     {
@@ -95,6 +96,7 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_IMPORT_MANAGE,
         PERM_USER_MANAGE,
         PERM_PERIOD_LOCK,
+        PERM_OPTION_SET_MANAGE,
     }
 )
 

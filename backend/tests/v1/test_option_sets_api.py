@@ -1,0 +1,93 @@
+"""T20 / 选项词典（option_sets）API：只读查询 + 管理端点 + 死枚举防改。"""
+from __future__ import annotations
+
+OPTION_SETS = "/api/v1/option-sets"
+
+
+def test_list_empty_initially(client):
+    body = client.get(OPTION_SETS).json()
+    assert body["items"] == []
+
+
+def test_create_and_list_editable_set(client, headers):
+    created = client.post(
+        OPTION_SETS,
+        json={
+            "code": "GAME_TAG",
+            "label": "游戏标签",
+            "group": "INVENTORY",
+            "editable": True,
+            "options": [
+                {"value": "HOT", "label": "热门"},
+                {"value": "NEW", "label": "新游"},
+            ],
+            "description": "可自由增删的标签字典",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["code"] == "GAME_TAG"
+    assert body["editable"] is True
+    assert [o["value"] for o in body["options"]] == ["HOT", "NEW"]
+
+    listed = client.get(OPTION_SETS).json()
+    codes = {item["code"] for item in listed["items"]}
+    assert "GAME_TAG" in codes
+
+
+def test_filter_by_group_and_editable(client, headers):
+    client.post(OPTION_SETS, json={"code": "A1", "label": "A1", "group": "G1", "editable": True}, headers=headers)
+    client.post(OPTION_SETS, json={"code": "B1", "label": "B1", "group": "G2", "editable": False}, headers=headers)
+
+    only_editable = client.get(f"{OPTION_SETS}?editable=true").json()
+    assert {i["code"] for i in only_editable["items"]} == {"A1"}
+
+    only_g2 = client.get(f"{OPTION_SETS}?group=G2").json()
+    assert {i["code"] for i in only_g2["items"]} == {"B1"}
+
+
+def test_update_options_on_editable_set(client, headers):
+    client.post(
+        OPTION_SETS,
+        json={"code": "GAME_TAG", "label": "游戏标签", "editable": True, "options": [{"value": "HOT", "label": "热门"}]},
+        headers=headers,
+    )
+    updated = client.put(
+        f"{OPTION_SETS}/GAME_TAG",
+        json={"options": [{"value": "HOT", "label": "热门"}, {"value": "CLASSIC", "label": "经典"}]},
+        headers=headers,
+    )
+    assert updated.status_code == 200, updated.text
+    assert [o["value"] for o in updated.json()["options"]] == ["HOT", "CLASSIC"]
+
+
+def test_dead_enum_rejects_option_change(client, headers):
+    client.post(
+        OPTION_SETS,
+        json={"code": "INVENTORY_STATUS", "label": "库存状态", "editable": False, "options": [{"value": "IN_STOCK", "label": "在库"}]},
+        headers=headers,
+    )
+    bad = client.put(
+        f"{OPTION_SETS}/INVENTORY_STATUS",
+        json={"options": [{"value": "X", "label": "越权值"}]},
+        headers=headers,
+    )
+    assert bad.status_code == 422, bad.text
+    assert bad.json()["code"] in ("VALIDATION_ERROR",)
+
+
+def test_get_missing_returns_404(client, headers):
+    assert client.get(f"{OPTION_SETS}/NOPE").status_code == 404
+
+
+def test_delete_set(client, headers):
+    client.post(OPTION_SETS, json={"code": "TMP", "label": "临时"}, headers=headers)
+    deleted = client.delete(f"{OPTION_SETS}/TMP", headers=headers)
+    assert deleted.status_code == 204
+    assert client.get(f"{OPTION_SETS}/TMP").status_code == 404
+
+
+def test_viewer_cannot_create(client, viewer_headers):
+    resp = client.post(OPTION_SETS, json={"code": "X", "label": "X"}, headers=viewer_headers)
+    assert resp.status_code == 403

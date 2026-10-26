@@ -494,6 +494,9 @@ class AuditAction(StrEnum):
     IMPORT_SKIP = "IMPORT_SKIP"  # 人工跳过导入行并留存理由
     IMPORT_MARK_UNLINKED = "IMPORT_MARK_UNLINKED"  # 标记为未关联划转
     IMPORT_ROLLBACK = "IMPORT_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
+    OPTION_SET_CREATE = "OPTION_SET_CREATE"  # 新建选项词典
+    OPTION_SET_UPDATE = "OPTION_SET_UPDATE"  # 编辑选项词典
+    OPTION_SET_DELETE = "OPTION_SET_DELETE"  # 删除选项词典
     IMPORT_CORRECTION = "IMPORT_CORRECTION"  # 建冲销/更正批次
 
 

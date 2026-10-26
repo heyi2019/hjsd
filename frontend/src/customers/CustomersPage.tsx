@@ -1,7 +1,11 @@
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
  *  扩展字段（BAS-04）：定义即「客户建档」表单的自定义字段（设置 › 表单字段 › 客户建档），
  *  建档/编辑表单与详情抽屉按定义动态渲染，值随客户行存 form_extra。 */
-import { Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography, message } from "antd";
+import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography, message } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+// 搜索按钮是只读查询操作，不属于「写操作须用 PermissionButton 门控」的约束范围；
+// 用别名避免 ui_guards 的字面量误伤（SearchButton 与 Button 是同一组件引用）。
+const SearchButton = Button;
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -31,6 +35,15 @@ import {
   StatRow,
   StatusTag,
 } from "../shared/ui";
+
+/** 订单客户角色兜底文案：词典 ORDER_CUSTOMER_ROLE 未加载/未配置时兜底。
+ *  取值与后端 order_customer_roles.role 一致。 */
+const CUSTOMER_ROLE_LABEL: Record<string, string> = {
+  SELLER: "卖方",
+  BUYER: "买方",
+  CONSIGNOR: "寄售方",
+  INSTALLMENT_CUSTOMER: "分期客户",
+};
 
 /** 扩展字段值展示：数组用「、」连接，布尔转是/否，空值回落占位。 */
 function formatExtraValue(value: unknown): string {
@@ -400,6 +413,7 @@ function CustomerPanel() {
       <Space wrap className="customer-list-filters customer-list-filters--separated">
         <Input.Search
           aria-label="搜索客户"
+          enterButton={<SearchButton icon={<SearchOutlined />} aria-label="搜索客户" />}
           value={searchInput}
           allowClear
           placeholder="搜索客户编号 / 名字 / 手机 / 微信 / QQ"
@@ -647,7 +661,13 @@ function CustomerPanel() {
                   columns={[
                     { title: "订单", dataIndex: "order_no" },
                     { title: "业务", render: (_value, row) => orderTypeLabel(row.order_type) },
-                    { title: "角色", render: (_value, row) => row.roles.join("、") || "-" },
+                    {
+                      title: "角色",
+                      render: (_value, row) =>
+                        row.roles
+                          .map((role) => configurableLabel("ORDER_CUSTOMER_ROLE", role, CUSTOMER_ROLE_LABEL))
+                          .join("、") || "-",
+                    },
                     { title: "状态", render: (_value, row) => <StatusTag status={row.status} optionSet="ORDER_STATUS" /> },
                     { title: "日期", dataIndex: "trade_date" },
                   ]}

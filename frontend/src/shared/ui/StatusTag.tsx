@@ -1,6 +1,7 @@
 /** 状态标签：颜色只做辅助，语义由文案与图标承载（a11y 要求）。 */
 import { Tag } from "antd";
 import { statusColor } from "../lib/format";
+import { useOptionSet } from "../lib/optionSets";
 
 const LABELS: Record<string, string> = {
   DRAFT: "草稿",
@@ -55,10 +56,18 @@ const LABELS: Record<string, string> = {
   UNREAD: "未读",
 };
 
-export function StatusTag(props: { status: string; label?: string; color?: string }) {
+/**
+ * @param optionSet 该状态所属的选项词典 code（如 "INSTALLMENT_STATUS"）。传入后优先用
+ *   词典里的 label，实现「设置页改文案 → 表格同步变化」；未传或词典未命中则回落全局
+ *   LABELS 映射（T25 前的行为，零回归）。
+ */
+export function StatusTag(props: { status: string; label?: string; color?: string; optionSet?: string }) {
+  // 始终调用 hook（空 code 返回 null），避免条件调用违反 Hooks 规则。
+  const options = useOptionSet(props.optionSet ?? "");
+  const cfgLabel = options?.find((item) => item.value === props.status)?.label;
   return (
     <Tag color={props.color ?? statusColor(props.status)} bordered={false}>
-      {props.label ?? LABELS[props.status] ?? props.status}
+      {props.label ?? cfgLabel ?? LABELS[props.status] ?? props.status}
     </Tag>
   );
 }

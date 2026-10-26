@@ -14,6 +14,12 @@ const GROUP_LABEL: Record<string, string> = {
   INVENTORY: "库存",
   FUND: "资金",
   ORDER: "业务",
+  CUSTOMER: "客户与合作方",
+  INSTALLMENT: "分期与押金",
+  IMPORT: "数据导入",
+  POLICY: "经营规则",
+  QUALITY: "质量",
+  SYSTEM: "系统与人员",
   GENERAL: "通用",
 };
 

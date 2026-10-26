@@ -15,11 +15,11 @@ let inflight: Promise<OptionSetMap> | null = null;
 export function loadOptionSets(): Promise<OptionSetMap> {
   if (cache) return Promise.resolve(cache);
   if (inflight) return inflight;
-  inflight = optionSetsApi
-    .list()
+  inflight = Promise.resolve(optionSetsApi.list())
     .then((res) => {
       const map: OptionSetMap = {};
-      for (const set of res.items) {
+      // 防御：接口返回空/未打桩（如单测未 mock）时按空词典处理，避免整页白屏。
+      for (const set of (res as { items?: Array<{ code: string; options?: OptionItem[] }> } | undefined)?.items ?? []) {
         map[set.code] = set.options ?? [];
       }
       cache = map;
@@ -61,4 +61,40 @@ export function useOptionSet(code: string): OptionItem[] | null {
   const map = useOptionSets();
   if (map === null) return null;
   return map[code] ?? null;
+}
+
+/**
+ * 同步查询：从已缓存的词典里取某个值的展示文案。
+ * 未加载完成或未命中返回 null，调用方回落原硬编码映射（保证零行为变化）。
+ * 用于表格 render 这类非 hook 上下文（`labels.ts` 的展示映射、StatusTag 等）。
+ */
+export function optionLabelSync(code: string, value: string | null | undefined): string | null {
+  if (!value || !cache) return null;
+  const found = (cache[code] ?? []).find((item) => item.value === value);
+  return found?.label ?? null;
+}
+
+/**
+ * 组件用：按 code + value 取展示文案，未命中回落 fallback，再回落原值。
+ * 词典加载完成后会触发重渲染，因此设置页改 label 后表格展示同步变化。
+ */
+export function useOptionLabel(code: string, value: string | null | undefined, fallback?: string): string {
+  const options = useOptionSet(code);
+  const found = options?.find((item) => item.value === value);
+  if (found?.label) return found.label;
+  if (fallback) return fallback;
+  return value ?? "-";
+}
+
+/**
+ * 展示映射的统一入口（T25）：优先读选项词典，回落传入的硬编码映射，再回落原值。
+ * 让 `labels.ts` 的各 `*_LABEL` 与 StatusTag 全局映射具备配置感知能力。
+ */
+export function configurableLabel(
+  code: string,
+  value: string | null | undefined,
+  fallbackLabels?: Record<string, string>,
+): string {
+  if (!value) return "-";
+  return optionLabelSync(code, value) ?? fallbackLabels?.[value] ?? value;
 }

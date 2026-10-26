@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
+import { loadOptionSets } from "../shared/lib/optionSets";
 import { DashboardPage } from "./DashboardPage";
 import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
@@ -54,6 +55,11 @@ const PAGES: Record<string, ComponentType<PageProps>> = {
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  // 选项词典预加载：让表格展示（StatusTag / labels.ts 映射）在首屏就能读到配置文案，
+  // 而不是等某个筛选器组件首次 useOptionSet 时才拉取。
+  useEffect(() => {
+    void loadOptionSets().catch(() => undefined);
+  }, []);
   // 路由化：落点由 URL 唯一决定（深链 / 刷新 / 前进后退可用），不再用 useState 记忆。
   const segments = location.pathname.split("/").filter(Boolean);
   const rawActive = segments[0] ?? "dashboard";

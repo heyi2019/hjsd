@@ -26,17 +26,19 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     ...actual,
     customersApi: mk(actual.customersApi),
     counterpartiesApi: mk(actual.counterpartiesApi),
-    fieldsApi: mk(actual.fieldsApi),
+    orderFormFieldsApi: mk(actual.orderFormFieldsApi),
     leadsApi: mk(actual.leadsApi),
     optionSetsApi: mk(actual.optionSetsApi),
   };
 });
 
-/** 活字段定义：SELECT / MULTI_SELECT / 停用字段各一，覆盖动态渲染与历史值展示 */
+/** 扩展字段定义：客户建档表单的自定义字段，SELECT / MULTI_SELECT / 停用字段各一 */
 const fieldDefs = [
   {
     id: 1,
-    entity_type: "customer",
+    order_type_code: "CUSTOMER",
+    is_custom: true,
+    locked: false,
     field_key: "game_category",
     label: "常玩品类",
     field_type: "MULTI_SELECT",
@@ -47,7 +49,9 @@ const fieldDefs = [
   },
   {
     id: 2,
-    entity_type: "customer",
+    order_type_code: "CUSTOMER",
+    is_custom: true,
+    locked: false,
     field_key: "credit_level",
     label: "信用评级",
     field_type: "SELECT",
@@ -58,7 +62,9 @@ const fieldDefs = [
   },
   {
     id: 3,
-    entity_type: "customer",
+    order_type_code: "CUSTOMER",
+    is_custom: true,
+    locked: false,
     field_key: "referrer",
     label: "转介绍人",
     field_type: "TEXT",
@@ -69,7 +75,9 @@ const fieldDefs = [
   },
   {
     id: 4,
-    entity_type: "customer",
+    order_type_code: "CUSTOMER",
+    is_custom: true,
+    locked: false,
     field_key: "legacy_note",
     label: "历史备注",
     field_type: "TEXT",
@@ -78,7 +86,7 @@ const fieldDefs = [
     sort_order: 40,
     is_active: false,
   },
-] as unknown as import("../shared/api/catalog").FieldDefinition[];
+] as unknown as import("../shared/api/catalog").OrderFormField[];
 
 const customers = [
   {
@@ -109,7 +117,7 @@ beforeEach(() => {
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.leadsApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
+  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
   vi.mocked(catalog.customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: {
@@ -149,15 +157,15 @@ beforeEach(() => {
     audit: [],
   });
 });
-describe("CustomersPage：活字段（BAS-04）", () => {
-  it("列表按字段定义渲染活字段摘要列", async () => {
+describe("CustomersPage：扩展字段（BAS-04）", () => {
+  it("列表按字段定义渲染扩展字段摘要列", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     expect(await screen.findByText(/信用评级：优质/)).toBeInTheDocument();
-    await waitFor(() => expect(vi.mocked(catalog.fieldsApi.list)).toHaveBeenCalledWith({ entity_type: "customer" }));
+    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi.list)).toHaveBeenCalledWith("CUSTOMER", true));
   });
 
-  it("新建弹窗动态渲染活字段控件，提交时回传 extra_values", async () => {
+  it("新建弹窗动态渲染扩展字段控件，提交时回传 extra_values", async () => {
     resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 3 }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
@@ -169,7 +177,7 @@ describe("CustomersPage：活字段（BAS-04）", () => {
     expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
   });
 
-  it("详情抽屉展示活字段值，停用字段标注保留历史值", async () => {
+  it("详情抽屉展示扩展字段值，停用字段标注保留历史值", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getAllByRole("button", { name: /详\s*情/ })[0]);
@@ -180,8 +188,8 @@ describe("CustomersPage：活字段（BAS-04）", () => {
     expect(within(drawer).getByText("早期客户")).toBeInTheDocument();
   });
 
-  it("活字段定义接口失败不阻断客户页渲染", async () => {
-    vi.mocked(catalog.fieldsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+  it("扩展字段定义接口失败不阻断客户页渲染", async () => {
+    vi.mocked(catalog.orderFormFieldsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />, { user: "admin" });
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
   });

@@ -17,10 +17,6 @@ const pools = [
   { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
 ] as unknown as import("../shared/api/catalog").Pool[];
 
-const fields = [
-  { id: 1, entity_type: "ORDER", field_key: "region", label: "区域", field_type: "TEXT", is_active: true },
-] as unknown as import("../shared/api/catalog").FieldDefinition[];
-
 // 复用现有 SettingsPage.test 的 client 桩，避免挂载面板时真实网络请求。
 vi.mock("../shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../shared/api/client")>()),
@@ -37,7 +33,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(orderTypes);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fields);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
@@ -101,23 +96,17 @@ describe("SettingsPage.deep", () => {
     expect(container.querySelector(".ant-tabs-top")).toBeNull();
   });
 
-  it("月结账期锁与质量异常议题 Tab 在设置页可见且能挂载对应面板", async () => {
+  it("月结账期锁可在设置页打开，质量异常议题不再作为设置页入口", async () => {
     vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([
       { id: 1, period: "2026-09", locked_at: "2026-10-01T09:30:00", locked_by: "heyi", note: "9月封账" },
     ] as never);
-    vi.mocked(catalog.qualityApi.summary).mockResolvedValue({ total: 1, by_severity: { HIGH: 1 } } as never);
-    vi.mocked(catalog.qualityApi.list).mockResolvedValue({
-      items: [{ id: 1, issue_no: "QI-001", severity: "HIGH", title: "现金流水缺失", entity_type: "order", entity_id: "12", status: "OPEN", message: "x" }],
-    } as never);
-
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "月结账期锁" });
 
     await ui.click(screen.getByRole("tab", { name: "月结账期锁" }));
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
 
-    await ui.click(screen.getByRole("tab", { name: "质量异常议题" }));
-    expect(await screen.findByText("现金流水缺失")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "质量异常议题" })).toBeNull();
   });
 
   it("切换 Tab 仅挂载激活面板：点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
@@ -131,16 +120,13 @@ describe("SettingsPage.deep", () => {
     expect(await screen.findByText("托管池")).toBeInTheDocument();
   });
 
-  it("遍历基础 Tab 均挂载对应面板（业务类型/活字段/游戏类型/经营规则/外观）", async () => {
+  it("遍历基础 Tab 均挂载对应面板（业务类型/游戏类型/经营规则/外观）", async () => {
     // AppearancePanel 依赖 GlassProvider，需走 renderApp（含 AllProviders）。
     renderApp(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
 
     await ui.click(screen.getByRole("tab", { name: "业务类型" }));
     expect(await screen.findByText("HS")).toBeInTheDocument();
-
-    await ui.click(screen.getByRole("tab", { name: "活字段" }));
-    expect(await screen.findByText("区域")).toBeInTheDocument();
 
     await ui.click(screen.getByRole("tab", { name: "游戏类型" }));
     await waitFor(() => expect(vi.mocked(catalog.gameTypesApi.list)).toHaveBeenCalled());

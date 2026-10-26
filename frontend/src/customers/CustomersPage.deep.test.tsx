@@ -16,11 +16,11 @@ vi.mock("../shared/api/catalog");
 vi.mock("./CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 const fieldDefs = [
-  { id: 1, entity_type: "customer", field_key: "game_category", label: "常玩品类", field_type: "MULTI_SELECT", options: ["王者荣耀", "和平精英"], required: false, sort_order: 10, is_active: true },
-  { id: 2, entity_type: "customer", field_key: "credit_level", label: "信用评级", field_type: "SELECT", options: ["优质", "一般", "观察", "黑名单"], required: false, sort_order: 20, is_active: true },
-  { id: 3, entity_type: "customer", field_key: "referrer", label: "转介绍人", field_type: "TEXT", options: null, required: false, sort_order: 30, is_active: true },
-  { id: 4, entity_type: "customer", field_key: "legacy_note", label: "历史备注", field_type: "TEXT", options: null, required: false, sort_order: 40, is_active: false },
-] as unknown as import("../shared/api/catalog").FieldDefinition[];
+  { id: 1, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "game_category", label: "常玩品类", field_type: "MULTI_SELECT", options: ["王者荣耀", "和平精英"], required: false, sort_order: 10, is_active: true },
+  { id: 2, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "credit_level", label: "信用评级", field_type: "SELECT", options: ["优质", "一般", "观察", "黑名单"], required: false, sort_order: 20, is_active: true },
+  { id: 3, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "referrer", label: "转介绍人", field_type: "TEXT", options: null, required: false, sort_order: 30, is_active: true },
+  { id: 4, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "legacy_note", label: "历史备注", field_type: "TEXT", options: null, required: false, sort_order: 40, is_active: false },
+] as unknown as import("../shared/api/catalog").OrderFormField[];
 
 const customers = [
   { id: 1, customer_no: "CUS-0001", display_name: "张三", contact_name: "张", phone: "138", wechat: "z", qq: "1", status: "ACTIVE", note: "老客户", extra_values: { credit_level: "优质" } },
@@ -43,7 +43,7 @@ beforeEach(() => {
   seedOptionSets(catalog);
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers as unknown as never);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
-  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);
+  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);
   vi.mocked(catalog.customersApi.detail).mockResolvedValue(detail as unknown as never);
   vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0] as unknown as never);
 });

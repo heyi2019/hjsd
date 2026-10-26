@@ -1,6 +1,7 @@
 import { Form, Input, Modal, Select, Typography } from "antd";
 import { useEffect } from "react";
 import { SCOPE_OPTIONS, today } from "./policyConstants";
+import { describeConfig } from "./policyConfigSchema";
 
 export interface PolicyResolveValues {
   policy_code: string;
@@ -85,9 +86,7 @@ export function PolicyResolveModal({
             <Typography.Paragraph>
               命中版本 <b>v{result.version.version}</b>（{result.version.effective_from} ~ {result.version.effective_to ?? "至今"}，状态{" "}
               {result.version.status}）：
-              {Object.entries(result.version.config)
-                .map(([key, value]) => `${key}=${String(value)}`)
-                .join(" · ")}
+              {describeConfig(result.version.config)}
             </Typography.Paragraph>
           ) : (
             <Typography.Paragraph type="warning">

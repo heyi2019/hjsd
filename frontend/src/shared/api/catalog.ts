@@ -585,21 +585,6 @@ export interface Settlement {
   note?: string | null;
 }
 
-export interface FieldDefinition {
-  id: number;
-  entity_type: string;
-  field_key: string;
-  label: string;
-  field_type: string;
-  required: boolean;
-  sort_order: number;
-  is_active: boolean;
-  /** SELECT / MULTI_SELECT 的选项集：纯字符串数组或 {value,label} 对象数组 */
-  options?: Array<string | { value: string; label: string }> | null;
-  /** 选择型字段可复用的选项词典编码。 */
-  option_set_code?: string | null;
-}
-
 export interface GameTypeOption {
   id: number;
   name: string;
@@ -922,19 +907,6 @@ export const rebatesApi = {
       .then((r) => r.data),
 };
 
-export const fieldsApi = {
-  list: (params?: { entity_type?: string }) =>
-    api.get<FieldDefinition[]>("/field-definitions", { params }).then((r) => r.data),
-  create: (payload: Partial<FieldDefinition>) =>
-    api.post<FieldDefinition>("/field-definitions", payload).then((r) => r.data),
-  update: (id: number, payload: Partial<FieldDefinition>) =>
-    api.patch<FieldDefinition>(`/field-definitions/${id}`, payload).then((r) => r.data),
-  setActive: (id: number, active: boolean) =>
-    api.patch<FieldDefinition>(`/field-definitions/${id}/active?active=${active}`).then((r) => r.data),
-  /** 删除字段定义：有历史值返回 409，只能停用（BAS-04-03） */
-  remove: (id: number) => api.delete(`/field-definitions/${id}`),
-};
-
 export interface RequiredWhen {
   /** 依赖字段键（同作用域内其它字段） */
   field: string;
@@ -963,7 +935,7 @@ export interface OrderFormField {
   note?: string | null;
 }
 
-/** 建单表单字段配置（按业务类型 code 维度），与 parties 活字段解耦。 */
+/** 表单字段配置（按表单作用域码维度）；自定义字段即客户/订单的扩展字段定义。 */
 export const orderFormFieldsApi = {
   list: (orderTypeCode: string, includeInactive = true) =>
     api
@@ -1336,8 +1308,10 @@ export interface ProfitAllocation {
   role: string;
   allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null;
   allocation_rate: string;
+  allocation_amount?: string;
   policy_version_id?: number | null;
   total_rate?: string;
+  total_amount?: string;
 }
 
 export const policyApi = {
@@ -1360,9 +1334,9 @@ export const policyApi = {
       })
       .then((r) => r.data),
   allocations: (orderId: number) =>
-    api.get<{ items: ProfitAllocation[]; total: number }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
-  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type: "BUY" | "SELL" | "OPERATION" | "COMPANY"; allocation_rate: string }[]) =>
-    api.put<{ items: ProfitAllocation[]; total: number }>(`/orders/${orderId}/profit-allocations`, { items }).then((r) => r.data),
+    api.get<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
+  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null; allocation_rate: string; allocation_amount?: string }[]) =>
+    api.put<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`, { items }).then((r) => r.data),
   orderSnapshot: (orderId: number) =>
     api
       .get<{ found: boolean; snapshot: { policy_version_id?: number | null; policy_snapshot?: Record<string, unknown> | null } | null }>(

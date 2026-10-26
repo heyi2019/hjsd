@@ -1,5 +1,5 @@
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
+import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -97,19 +97,11 @@ const BUSINESS_CREATE_ITEMS = [
   { key: "DFQ", label: "新建代分期订单" },
 ];
 
-const ALLOCATION_LABEL: Record<"BUY" | "SELL" | "OPERATION" | "COMPANY", string> = {
-  BUY: "买号",
-  SELL: "售出",
-  OPERATION: "运营",
-  COMPANY: "公司归属",
-};
-
-// 与 backend/app/domain/enums.py AllocationRole 一致（policy/service.py 校验四值）
-const ALLOCATION_ROLE_LABEL: Record<string, string> = {
-  OWNER: "主责",
-  BUYER: "采买",
-  SALES: "销售",
-  SERVICE: "服务",
+/** 分润弹窗的一行：姓名（员工 id 或 COMPANY）+ 比例 + 金额（比例/金额都选填、互斥）。 */
+type AllocationFormRow = {
+  employee?: number | "COMPANY";
+  allocation_rate?: string;
+  allocation_amount?: string;
 };
 
 // 与 backend/app/domain/enums.py ScheduleStatus 一致（StatusTag 未内置 PARTIAL/WAIVED）
@@ -211,9 +203,6 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const refundResponsibilityOptions: Opt[] =
     useOptionSet("REFUND_RESPONSIBILITY") ??
     Object.entries(REFUND_RESPONSIBILITY_LABEL).map(([value, label]) => ({ value, label }));
-  const allocationRoleOptions: Opt[] =
-    useOptionSet("PROFIT_ROLE") ??
-    Object.entries(ALLOCATION_ROLE_LABEL).map(([value, label]) => ({ value, label }));
   const orderBusinessModeOptions: Opt[] =
     useOptionSet("ORDER_BUSINESS_MODE") ??
     BUSINESS_MODE_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
@@ -233,12 +222,41 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
+  /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
+  const [allocationProfit, setAllocationProfit] = useState<string>("0");
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [links, setLinks] = useState<OrderLink[]>([]);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [linkForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
+  const allocationRows = Form.useWatch("allocations", allocationForm) as
+    | AllocationFormRow[]
+    | undefined;
+  // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
+  const employeeOptions = [
+    ...users.map((item) => ({
+      value: item.id as number | "COMPANY",
+      label: `${item.display_name}（${item.username}）`,
+    })),
+    { value: "COMPANY" as number | "COMPANY", label: "公司（不绑定人员）" },
+  ];
+  const pickedEmployees = (allocationRows ?? [])
+    .map((row) => row?.employee)
+    .filter((value): value is number | "COMPANY" => value !== undefined && value !== null);
+  /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
+  const allocationIsLoss = Number(allocationProfit) < 0;
+  /** 顶部多选与行联动：勾选的人补成新行，取消勾选的人整行移除（已填的比例/金额随之丢弃）。 */
+  const syncPickedEmployees = (next: Array<number | "COMPANY">) => {
+    const current = allocationRows ?? [];
+    const kept = current.filter(
+      (row) => row?.employee !== undefined && next.includes(row.employee as number | "COMPANY"),
+    );
+    const added = next
+      .filter((value) => !kept.some((row) => row.employee === value))
+      .map((value) => ({ employee: value, allocation_rate: "", allocation_amount: "" }));
+    allocationForm.setFieldValue("allocations", [...kept, ...added]);
+  };
   const [editOpen, setEditOpen] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm();
@@ -269,14 +287,16 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       ]);
       setActionOrder(order);
       setUsers(userResult.data.filter((item) => item.is_active));
-      const byType = Object.fromEntries(result.items.map((item) => [item.allocation_type, item]));
+      setAllocationProfit(result.order_profit ?? "0");
+      // 分润按「姓名」录入：存量行直接映射成姓名（COMPANY / 无收益人 → 公司归属），
+      // 不再暴露 BUY/SELL/OPERATION/COMPANY 四个动作位——那种结构只允许一人拿运营份额。
+      const rows = result.items.map((item) => ({
+        employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
+        allocation_rate: item.allocation_rate,
+        allocation_amount: item.allocation_amount ?? "",
+      }));
       allocationForm.setFieldsValue({
-        allocations: ["BUY", "SELL", "OPERATION", "COMPANY"].map((allocation_type) => ({
-          allocation_type,
-          user_id: byType[allocation_type]?.user_id ?? undefined,
-          role: byType[allocation_type]?.role ?? "OWNER",
-          allocation_rate: byType[allocation_type]?.allocation_rate ?? "0",
-        })),
+        allocations: rows.length > 0 ? rows : [{ employee: undefined, allocation_rate: "", allocation_amount: "" }],
       });
       setAllocationOpen(true);
     } catch (error) {
@@ -550,7 +570,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               trigger={["click"]}
               menu={{
                 items: [
-                  { key: "allocation", label: "利润分配" },
+                  { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
                   { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
@@ -902,7 +922,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               trigger={["click"]}
               menu={{
                 items: [
-                  { key: "allocation", label: "利润分配" },
+                  { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                   { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                   { key: "cancel", label: "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                 ],
@@ -1067,8 +1087,9 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       </Modal>
 
       <Modal
-        title={actionOrder ? `利润分配 · ${actionOrder.order_no}` : "利润分配"}
+        title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
         open={allocationOpen}
+        width={720}
         confirmLoading={allocationSubmitting}
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
@@ -1076,23 +1097,69 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
         <Form
           form={allocationForm}
           layout="vertical"
-          onFinish={async (values: { allocations: Array<{ allocation_type: "BUY" | "SELL" | "OPERATION" | "COMPANY"; user_id?: number; role: string; allocation_rate: string }> }) => {
+          onFinish={async (values: { allocations: AllocationFormRow[] }) => {
             if (!actionOrder) return;
-            const rows = values.allocations ?? [];
-            const total = rows.reduce((sum, row) => sum + Number(row.allocation_rate || 0), 0);
-            if (Math.abs(total - 100) > 0.001) {
-              message.error("四类收益比例合计必须为 100%");
+            const rows = (values.allocations ?? []).filter(
+              (row) => row.employee !== undefined && row.employee !== null,
+            );
+            if (rows.length === 0) {
+              message.error("请先在员工花名册里选择分润对象");
               return;
+            }
+            const items: Array<{
+              user_id: number | null;
+              role: string;
+              allocation_rate: string;
+              allocation_amount: string;
+            }> = [];
+            let rateTotal = 0;
+            let amountTotal = 0;
+            for (const row of rows) {
+              const rate = String(row.allocation_rate ?? "").trim();
+              const amount = String(row.allocation_amount ?? "").trim();
+              // 「已填」按数值 > 0 判定：后端回显的 0.00 不算填了比例/金额，
+              // 否则金额分润的行会被互斥校验误拦。
+              const hasRate = Number(rate) > 0;
+              const hasAmount = Number(amount) > 0;
+              if (!hasRate && !hasAmount) {
+                message.error("每行至少填比例或金额之一");
+                return;
+              }
+              if (hasRate && hasAmount) {
+                message.error("同一行不能同时填比例和金额");
+                return;
+              }
+              if (hasRate) rateTotal += Number(rate);
+              if (hasAmount) amountTotal += Number(amount);
+              items.push({
+                user_id: row.employee === "COMPANY" ? null : Number(row.employee),
+                role: "OWNER",
+                allocation_rate: hasRate ? rate : "0",
+                allocation_amount: hasAmount ? amount : "0",
+              });
+            }
+            // 纯比例分润沿用「合计 100%」；一旦有人填金额，改为金额口径（后端校验不超利润）。
+            if (amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
+              message.error("按比例分润时合计必须为 100%（也可改用金额）");
+              return;
+            }
+            // 金额口径的前置拦截，与后端 _set_person_allocations 保持一致：
+            // 亏损/无利润单不接受金额分润，且金额合计不得超过订单总利润。
+            if (amountTotal > 0) {
+              const profit = Number(allocationProfit);
+              if (profit <= 0) {
+                message.error("该单当前为亏损或无利润，不能按金额分润，请改用比例");
+                return;
+              }
+              if (amountTotal > profit) {
+                message.error(`分润金额合计不能超过订单总利润 ${money(allocationProfit)}`);
+                return;
+              }
             }
             setAllocationSubmitting(true);
             try {
-              await policyApi.setAllocations(actionOrder.id, rows.map((row) => ({
-                allocation_type: row.allocation_type,
-                user_id: row.allocation_type === "OPERATION" ? Number(row.user_id) : null,
-                role: row.role,
-                allocation_rate: String(row.allocation_rate),
-              })));
-              message.success("利润分配已保存");
+              await policyApi.setAllocations(actionOrder.id, items);
+              message.success("分润已保存");
               setAllocationOpen(false);
               setActionOrder(null);
             } catch (error) {
@@ -1102,35 +1169,85 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
             }
           }}
         >
+          <Alert
+            className="ui-form-spaced"
+            type={allocationIsLoss ? "warning" : "info"}
+            showIcon
+            message={
+              <span>
+                订单总利润：
+                <MoneyText value={allocationProfit} tone="auto" strong />
+                {allocationIsLoss ? "（亏损）金额分润不可用，请按比例或暂不分润" : null}
+              </span>
+            }
+          />
+          <Typography.Paragraph type="secondary">
+            每行一位员工：填<strong>比例</strong>按订单利润占比分，填<strong>金额</strong>按固定额分，
+            两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。
+          </Typography.Paragraph>
+          <Form.Item label="姓名（可多选，勾选后自动加行）">
+            <AntSelect
+              mode="multiple"
+              placeholder="从员工花名册选择"
+              value={pickedEmployees}
+              onChange={syncPickedEmployees}
+              options={employeeOptions}
+            />
+          </Form.Item>
           <Form.List name="allocations">
-            {(fields) => fields.map((field) => (
-              <Space key={field.key} align="baseline" className="orders-allocation-row">
-                <Form.Item {...field} name={[field.name, "allocation_type"]} hidden><Input /></Form.Item>
-                <Form.Item label="动作/归属"><Typography.Text>{configurableLabel("ALLOCATION_TYPE", ["BUY", "SELL", "OPERATION", "COMPANY"][field.name], ALLOCATION_LABEL)}</Typography.Text></Form.Item>
-                <Form.Item {...field} name={[field.name, "user_id"]} label="收益人">
-                  {field.name === 2 ? (
-                    <AntSelect
-                      placeholder="请选择运营人员"
-                      options={users.map((item) => ({
-                        value: item.id,
-                        label: item.display_name + "（" + item.username + "）",
-                      }))}
-                    />
-                  ) : (
-                    <Input
-                      disabled
-                      placeholder={field.name === 0 ? "自动绑定回收/提号/代挂操作人" : field.name === 1 ? "自动绑定售出操作人" : "公司归属"}
-                    />
-                  )}
-                </Form.Item>
-                <Form.Item {...field} name={[field.name, "role"]} label="角色">
-                  <AntSelect
-                    options={allocationRoleOptions}
-                  />
-                </Form.Item>
-                <Form.Item {...field} name={[field.name, "allocation_rate"]} label="比例" rules={[{ required: true, message: "请输入比例" }, ...percentRules("比例")]}><Input suffix="%" inputMode="decimal" /></Form.Item>
-              </Space>
-            ))}
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((field) => (
+                  <Space key={field.key} align="baseline" className="orders-allocation-row" wrap>
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "employee"]}
+                      label="姓名"
+                      rules={[{ required: true, message: "请选择姓名" }]}
+                    >
+                      <AntSelect
+                        placeholder="选择员工"
+                        options={employeeOptions}
+                        className="ui-control-width-200"
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "allocation_rate"]}
+                      label="比例"
+                      rules={percentRules("比例")}
+                    >
+                      <Input suffix="%" inputMode="decimal" className="ui-control-width-120" />
+                    </Form.Item>
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "allocation_amount"]}
+                      label="金额"
+                      rules={moneyRules("金额")}
+                    >
+                      <Input prefix="¥" inputMode="decimal" className="ui-control-width-140" />
+                    </Form.Item>
+                    <PermissionButton
+                      permission="policy.manage"
+                      type="link"
+                      danger
+                      disabled={fields.length <= 1}
+                      onClick={() => remove(field.name)}
+                    >
+                      删除
+                    </PermissionButton>
+                  </Space>
+                ))}
+                <PermissionButton
+                  permission="policy.manage"
+                  type="dashed"
+                  block
+                  onClick={() => add({ allocation_rate: "", allocation_amount: "" })}
+                >
+                  + 增加一行
+                </PermissionButton>
+              </>
+            )}
           </Form.List>
         </Form>
       </Modal>

@@ -10,15 +10,12 @@
 
 import { api } from "../shared/api/client";
 import {
-  fieldsApi,
   gameTypesApi,
   importsApi,
-  optionSetsApi,
   orderTypesApi,
   periodLocksApi,
   policyApi,
   poolsApi,
-  qualityApi,
   sequencesApi,
 } from "../shared/api/catalog";
 import { FORM_SCOPES } from "./formScopes";
@@ -64,15 +61,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     count: async () => FORM_SCOPES.length,
   },
   {
-    key: "fields",
-    label: "活字段",
-    summary: "客户/账号等实体的自定义字段，独立于表单字段体系",
-    group: "FIELD",
-    permission: "field-definition.manage",
-    entityTypes: ["field_definition"],
-    count: async () => (await fieldsApi.list()).length,
-  },
-  {
     key: "order-types",
     label: "业务类型",
     summary: "回收/提号/代挂/代分期等定义，含资金性质与编号前缀",
@@ -110,15 +98,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "POLICY",
     entityTypes: ["policy_definition", "policy_version"],
     count: async () => (await policyApi.list()).total,
-  },
-  {
-    key: "quality-issues",
-    label: "质量异常议题",
-    summary: "数据一致性异常工单：生成、分派、关闭留痕",
-    group: "GOV",
-    permission: "report.read",
-    entityTypes: ["quality_issue"],
-    count: async () => (await qualityApi.list()).items.length,
   },
   {
     key: "users",
@@ -174,15 +153,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     readOnly: true,
     entityTypes: [],
     count: noCount,
-  },
-  {
-    key: "option-sets",
-    label: "选项词典",
-    summary: "库存/资金等筛选项的单一来源：纯字典可编辑，后端死枚举只读",
-    group: "OPS",
-    permission: "option-set.manage",
-    entityTypes: ["option_set"],
-    count: async () => (await optionSetsApi.list()).items.length,
   },
   {
     key: "config-audit",

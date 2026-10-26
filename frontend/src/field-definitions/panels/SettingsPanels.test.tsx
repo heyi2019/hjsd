@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as catalog from "../../shared/api/catalog";
 vi.mock("../../shared/api/catalog");
 import { renderLight } from "../../test/render";
-import { FieldsPanel } from "./FieldsPanel";
 import { PoolsPanel } from "./PoolsPanel";
 import { resolveMock } from "../../test/mock-api";
 
@@ -21,14 +20,9 @@ beforeEach(() => {
 const pools = [
   { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
 ];
-const fields = [
-  { id: 1, entity_type: "ORDER", field_key: "region", label: "区域", field_type: "TEXT", is_active: true },
-];
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.poolsApi).list.mockResolvedValue(pools);
-  resolveMock(vi.mocked(catalog.fieldsApi).list, fields);
   vi.mocked(catalog.policyApi).list.mockResolvedValue({ items: [], total: 0 });
   vi.mocked(catalog.policyApi).versions.mockResolvedValue({ items: [], total: 0 });
   vi.mocked(catalog.gameTypesApi).list.mockResolvedValue([
@@ -64,62 +58,6 @@ describe("设置面板：资金池", () => {
     await waitFor(() => expect(vi.mocked(catalog.poolsApi).update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
   });
 
-});
-
-describe("设置面板：活字段", () => {
-  it("viewer 无管理权限时隐藏字段操作", async () => {
-    renderLight(<FieldsPanel />, { user: "viewer" });
-    expect(await screen.findByText("区域")).toBeInTheDocument();
-    const labels = screen.queryAllByRole("button").map((button) => button.textContent ?? "");
-    expect(labels.some((text) => text.includes("启用") || text.includes("停用"))).toBe(false);
-    expect(screen.queryByRole("button", { name: /删\s*除/ })).toBeNull();
-  });
-
-  it("admin 可删除字段并刷新列表", async () => {
-    renderLight(<FieldsPanel />, { user: "admin" });
-    expect(await screen.findByText("区域")).toBeInTheDocument();
-    await ui.click(screen.getByRole("button", { name: /删\s*除/ }));
-    await ui.click(await screen.findByRole("button", { name: /确\s*定|OK/ }));
-    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).remove).toHaveBeenCalledWith(1));
-    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).list).toHaveBeenCalledTimes(2));
-  });
-
-  it("TEXT 类型不展开选项输入，提交回传定义字段", async () => {
-    renderLight(<FieldsPanel />, { user: "admin" });
-    expect(await screen.findByText("区域")).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText(/逗号分隔/)).toBeNull();
-    await ui.type(screen.getByPlaceholderText("小写下划线，如 credit_level"), "credit_level");
-    await ui.type(screen.getByPlaceholderText("页面显示名"), "信用评级");
-    await ui.click(screen.getByRole("button", { name: /新增字段/ }));
-    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).create).toHaveBeenCalled());
-    expect(vi.mocked(catalog.fieldsApi).create.mock.calls[0][0]).toMatchObject({
-      entity_type: "customer",
-      field_key: "credit_level",
-      label: "信用评级",
-      field_type: "TEXT",
-      required: false,
-      sort_order: 0,
-    });
-  });
-
-  it("管理员可编辑活字段标签和排序", async () => {
-    const field = { ...fields[0], required: false, sort_order: 3 };
-    vi.mocked(catalog.fieldsApi).list.mockResolvedValue([field]);
-    const { FieldsPanel } = await import("./FieldsPanel");
-    renderLight(<FieldsPanel />, { user: "admin" });
-
-    await screen.findByText("区域");
-    await ui.click(screen.getByRole("button", { name: "编辑区域" }));
-    await ui.clear(screen.getByPlaceholderText("页面显示名"));
-    await ui.type(screen.getByPlaceholderText("页面显示名"), "客户区域");
-    await ui.click(screen.getByRole("button", { name: /保存字段/ }));
-
-    await waitFor(() => expect(vi.mocked(catalog.fieldsApi).update).toHaveBeenCalledWith(1, {
-      label: "客户区域",
-      required: false,
-      sort_order: 3,
-    }));
-  });
 });
 
 describe("设置面板：游戏类型", () => {

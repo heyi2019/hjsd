@@ -4,15 +4,12 @@ import { useEffect, useState, type ReactElement } from "react";
 import { AppearancePanel } from "../app/AppearancePanel";
 import { ImportWorkbench } from "../imports/ImportWorkbench";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
-import { QualityPanel } from "../quality/QualityPanel";
 import { TeamsPanel } from "../users/TeamsPanel";
 import { UsersPanel } from "../users/UsersPanel";
 import { useSession } from "../shared/state/session";
 import { BusinessDictionaryPanel } from "./panels/BusinessDictionaryPanel";
 import { ConfigAuditPanel } from "./panels/ConfigAuditPanel";
-import { FieldsPanel } from "./panels/FieldsPanel";
 import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
-import { OptionSetsPanel } from "./panels/OptionSetsPanel";
 import { OrderTypesPanel } from "./panels/OrderTypesPanel";
 import { OrderFormFieldsPanel } from "./panels/OrderFormFieldsPanel";
 import { PeriodLocksPanel } from "./panels/PeriodLocksPanel";
@@ -58,10 +55,6 @@ export function SettingsPage() {
   const items: TabItem[] = [
     { key: "business-dictionary", label: "业务字典", render: () => <BusinessDictionaryPanel /> },
     { key: "form-fields", label: "表单字段", render: (nav) => <OrderFormFieldsPanel initialScope={pendingScope ?? undefined} onConfigureGameTypes={() => nav("game-types")} /> },
-    ...(can("option-set.manage")
-      ? [{ key: "option-sets", label: "选项词典", render: () => <OptionSetsPanel /> }]
-      : []),
-    { key: "fields", label: "扩展字段", render: (nav) => <FieldsPanel onNavigate={nav} /> },
     { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
     // 编号序列与业务类型同源（sequence_prefix），读取门控与后端 manage_order_types 一致。
     ...(can("order-type.manage") ? [{ key: "sequences", label: "编号序列", render: () => <SequencesPanel /> }] : []),
@@ -69,9 +62,6 @@ export function SettingsPage() {
     { key: "pools", label: "资金池", render: () => <PoolsAndRoutesPanel /> },
     { key: "game-types", label: "游戏类型", render: () => <GameTypeSettingsPanel /> },
     { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
-    ...(can("report.read")
-      ? [{ key: "quality-issues", label: "质量异常议题", render: () => <QualityPanel /> }]
-      : []),
     ...(can("finance.period.lock")
       ? [{ key: "period-locks", label: "月结账期锁", render: () => <PeriodLocksPanel /> }]
       : []),

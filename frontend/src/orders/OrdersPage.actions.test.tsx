@@ -161,8 +161,16 @@ beforeEach(() => {
     cash_flows: [],
     warnings: [],
   } as never);
-  vi.mocked(catalog.policyApi.allocations).mockResolvedValue({ items: allocationRows, total: allocationRows.length });
-  vi.mocked(catalog.policyApi.setAllocations).mockResolvedValue({ items: allocationRows, total: allocationRows.length });
+  vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    items: allocationRows,
+    total: allocationRows.length,
+    order_profit: "5000.00",
+  });
+  vi.mocked(catalog.policyApi.setAllocations).mockResolvedValue({
+    items: allocationRows,
+    total: allocationRows.length,
+    order_profit: "5000.00",
+  });
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([installment]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
   vi.mocked(client.api).get.mockResolvedValue({
@@ -370,58 +378,113 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(screen.getByRole("tab", { name: "分期与回款" })).toHaveAttribute("aria-selected", "true"));
   });
 
-  it("利润分配：打开弹窗并预填已有比例与收益人", async () => {
+  it("分润：打开弹窗按姓名预填已有比例", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "利润分配");
-    const modal = await modalOf(/利润分配 · HS-2026-0001/);
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(catalog.policyApi.allocations).toHaveBeenCalledWith(1);
-    expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
+    // 一行 = 一位员工（李四 40%），不再固定四个动作位
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(1);
     expect(within(modal).getByDisplayValue("40")).toBeInTheDocument();
+    // 姓名下拉（顶部多选 + 行内单选）都显示李四
+    expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThan(0);
   });
 
-  it("利润分配：合计非 100% 时拒绝提交", async () => {
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({ items: [], total: 0 });
+  it("分润：纯比例合计非 100% 时拒绝提交", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "利润分配");
-    const modal = await modalOf(/利润分配 · HS-2026-0001/);
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
     await clickModalOk(modal);
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith("四类收益比例合计必须为 100%"));
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith("按比例分润时合计必须为 100%（也可改用金额）"),
+    );
     expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
   });
 
-  it("利润分配：合计 100% 提交成功并只保留运营收益人", async () => {
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({ items: [], total: 0 });
+  it("分润：比例合计 100% 提交成功并绑定员工", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "利润分配");
-    const modal = await modalOf(/利润分配 · HS-2026-0001/);
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
     const rates = within(modal).getAllByLabelText("比例");
-    for (const rate of rates) {
-      await ui.clear(rate);
-      await ui.type(rate, "25");
-    }
+    await ui.clear(rates[0]);
+    await ui.type(rates[0], "100");
     await clickModalOk(modal);
     await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
     const [orderId, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
     expect(orderId).toBe(1);
-    expect(payload).toHaveLength(4);
-    expect(payload).toEqual(expect.arrayContaining([
-      expect.objectContaining({ allocation_type: "OPERATION", user_id: expect.any(Number) }),
-      expect.objectContaining({ allocation_type: "BUY", user_id: null }),
-    ]));
-    expect(message.success).toHaveBeenCalledWith("利润分配已保存");
+    expect(payload).toHaveLength(1);
+    expect(payload[0]).toMatchObject({
+      user_id: 9,
+      role: "OWNER",
+      allocation_rate: "100",
+      allocation_amount: "0",
+    });
+    expect(message.success).toHaveBeenCalledWith("分润已保存");
   });
 
-  it("利润分配：保存失败提示错误", async () => {
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({ items: [], total: 0 });
+  it("分润：改成按金额分润时提交 allocation_amount", async () => {
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const rates = within(modal).getAllByLabelText("比例");
+    await ui.clear(rates[0]);
+    await ui.type(within(modal).getByLabelText("金额"), "200");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    expect(payload[0]).toMatchObject({
+      user_id: 9,
+      allocation_rate: "0",
+      allocation_amount: "200",
+    });
+  });
+
+  it("分润：弹窗展示订单总利润", async () => {
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getByText(/订单总利润/)).toBeInTheDocument();
+    expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
+  });
+
+  it("分润：亏损单展示亏损提示并拒绝按金额分润", async () => {
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: allocationRows,
+      total: allocationRows.length,
+      order_profit: "-800.00",
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getByText(/金额分润不可用/)).toBeInTheDocument();
+    expect(within(modal).getByText("-800.00")).toBeInTheDocument();
+    await ui.clear(within(modal).getByLabelText("比例"));
+    await ui.type(within(modal).getByLabelText("金额"), "200");
+    await clickModalOk(modal);
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith("该单当前为亏损或无利润，不能按金额分润，请改用比例"),
+    );
+    expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
+  });
+
+  it("分润：同一行同时填比例与金额时拦截", async () => {
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("金额"), "200");
+    await clickModalOk(modal);
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith("同一行不能同时填比例和金额"));
+    expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
+  });
+
+  it("分润：保存失败提示错误", async () => {
     vi.mocked(catalog.policyApi.setAllocations).mockRejectedValue(new Error("alloc fail"));
     await openLedger();
-    await openRowMenu("HS-2026-0001", "利润分配");
-    const modal = await modalOf(/利润分配 · HS-2026-0001/);
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
     const rates = within(modal).getAllByLabelText("比例");
-    for (const rate of rates) {
-      await ui.clear(rate);
-      await ui.type(rate, "25");
-    }
+    await ui.clear(rates[0]);
+    await ui.type(rates[0], "100");
     await clickModalOk(modal);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("alloc fail")));
   });

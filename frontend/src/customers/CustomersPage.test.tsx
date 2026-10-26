@@ -9,54 +9,6 @@ import { seedOptionSets } from "../test/formFieldsSeed";
 vi.mock("../shared/api/catalog")
 vi.mock("./CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
-/** 活字段定义：SELECT / MULTI_SELECT / 停用字段各一，覆盖动态渲染与历史值展示 */
-const fieldDefs = [
-  {
-    id: 1,
-    entity_type: "customer",
-    field_key: "game_category",
-    label: "常玩品类",
-    field_type: "MULTI_SELECT",
-    options: ["王者荣耀", "和平精英"],
-    required: false,
-    sort_order: 10,
-    is_active: true,
-  },
-  {
-    id: 2,
-    entity_type: "customer",
-    field_key: "credit_level",
-    label: "信用评级",
-    field_type: "SELECT",
-    options: ["优质", "一般", "观察", "黑名单"],
-    required: false,
-    sort_order: 20,
-    is_active: true,
-  },
-  {
-    id: 3,
-    entity_type: "customer",
-    field_key: "referrer",
-    label: "转介绍人",
-    field_type: "TEXT",
-    options: null,
-    required: false,
-    sort_order: 30,
-    is_active: true,
-  },
-  {
-    id: 4,
-    entity_type: "customer",
-    field_key: "legacy_note",
-    label: "历史备注",
-    field_type: "TEXT",
-    options: null,
-    required: false,
-    sort_order: 40,
-    is_active: false,
-  },
-] as unknown as import("../shared/api/catalog").FieldDefinition[];
-
 const customers = [
   {
     id: 1,
@@ -101,7 +53,6 @@ beforeEach(() => {
   seedOptionSets(catalog);
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
   vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.customersApi.detail).mockResolvedValue({
     customer: customers[0],

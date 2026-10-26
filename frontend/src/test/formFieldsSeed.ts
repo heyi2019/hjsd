@@ -308,7 +308,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "option_set", label: "选项词典" },
     { value: "GameTypeOption", label: "游戏类型" },
     { value: "Pool", label: "资金池" },
-    { value: "field_definition", label: "活字段定义" },
     { value: "Seed", label: "种子数据" },
     { value: "deposit", label: "押金" },
     { value: "pool", label: "资金池" },

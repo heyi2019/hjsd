@@ -1,18 +1,19 @@
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
- *  活字段（BAS-04）：字段定义来自设置页，建档/编辑表单与详情抽屉按定义动态渲染。 */
+ *  扩展字段（BAS-04）：定义即「客户建档」表单的自定义字段（设置 › 表单字段 › 客户建档），
+ *  建档/编辑表单与详情抽屉按定义动态渲染，值随客户行存 form_extra。 */
 import { Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
   counterpartiesApi,
   customersApi,
-  fieldsApi,
+  orderFormFieldsApi,
   type Counterparty,
   type Customer,
   type CustomerBusiness,
   type CustomerDetail,
   type CustomerInstallment,
-  type FieldDefinition,
+  type OrderFormField,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
@@ -31,7 +32,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 
-/** 活字段值展示：数组用「、」连接，布尔转是/否，空值回落占位。 */
+/** 扩展字段值展示：数组用「、」连接，布尔转是/否，空值回落占位。 */
 function formatExtraValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
   if (Array.isArray(value)) return value.map((item) => String(item)).join("、");
@@ -122,10 +123,10 @@ function toDateText(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** 从表单值里收集活字段：跳过空值，日期统一转 YYYY-MM-DD 字符串。 */
+/** 从表单值里收集扩展字段：跳过空值，日期统一转 YYYY-MM-DD 字符串。 */
 function collectExtras(
   values: Record<string, unknown>,
-  defs: FieldDefinition[],
+  defs: OrderFormField[],
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const def of defs) {
@@ -140,8 +141,13 @@ function collectExtras(
 /** 按字段类型渲染表单控件（BAS-04：类型由字段定义决定）。
  *  必须透传 Form.Item 注入的 id / value / onChange：包装组件若吞掉这些 props，
  *  标签的 htmlFor 会指向不存在的 id（a11y 断链），且表单值收集为空。 */
-function ExtraFieldControl({ def, ...controlProps }: { def: FieldDefinition; [key: string]: unknown }) {
-  const options = (def.options ?? []).map((option) => ({ value: option, label: option }));
+function ExtraFieldControl({ def, ...controlProps }: { def: OrderFormField; [key: string]: unknown }) {
+  // 选项兼容纯字符串数组与 {value,label} 对象数组
+  const options = (def.options ?? []).map((option) =>
+    typeof option === "string"
+      ? { value: option, label: option }
+      : { value: option.value, label: option.label || option.value },
+  );
   switch (def.field_type) {
     case "NUMBER":
       return <InputNumber {...controlProps} className="ui-control-full" />;
@@ -176,7 +182,7 @@ export function CustomersPage() {
 function CustomerPanel() {
   const compact = useCompactLayout();
   const [rows, setRows] = useState<Customer[]>([]);
-  const [fieldDefs, setFieldDefs] = useState<FieldDefinition[]>([]);
+  const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
@@ -221,10 +227,10 @@ function CustomerPanel() {
   }, [load]);
 
   useEffect(() => {
-    // 活字段定义加载失败不阻断客户页：字段是辅助信息，静默降级为空
-    fieldsApi
-      .list({ entity_type: "customer" })
-      .then(setFieldDefs)
+    // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页
+    orderFormFieldsApi
+      .list("CUSTOMER", true)
+      .then((rows) => setFieldDefs((rows ?? []).filter((row) => row.is_custom)))
       .catch(() => setFieldDefs([]));
   }, []);
 
@@ -313,7 +319,7 @@ function CustomerPanel() {
     { title: "QQ", dataIndex: "qq" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
     {
-      title: "活字段",
+      title: "扩展字段",
       key: "extra_values",
       render: (_v, row) => {
         const entries = Object.entries(row.extra_values ?? {}).filter(
@@ -482,7 +488,7 @@ function CustomerPanel() {
             </Form.Item>
           ))}
           <Typography.Paragraph type="secondary">
-            联系方式允许重复；重复只提示候选，不拦截建档。活字段在设置页维护，可随时增删。
+            联系方式允许重复；重复只提示候选，不拦截建档。扩展字段在「设置 › 表单字段 › 客户建档」维护，可随时增删。
           </Typography.Paragraph>
           <PermissionButton permission="customer.create" type="primary" htmlType="submit">
             建档
@@ -601,11 +607,11 @@ function CustomerPanel() {
               <Descriptions.Item label="备注">{detailTarget.note || "-"}</Descriptions.Item>
             </Descriptions>
             <Typography.Title level={5} className="ui-title-spaced">
-              活字段
+              扩展字段
             </Typography.Title>
             {fieldDefs.length === 0 ? (
               <Typography.Paragraph type="secondary">
-                未配置活字段；在设置页「活字段」新增后，建档与详情会自动带出。
+                未配置扩展字段；在「设置 › 表单字段 › 客户建档」新增自定义字段后，建档与详情会自动带出。
               </Typography.Paragraph>
             ) : (
               <Descriptions column={1} bordered size="small">

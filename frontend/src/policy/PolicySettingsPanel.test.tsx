@@ -48,12 +48,23 @@ it("规则定义为系统预置闭集：页面不提供「新建规则」入口"
   expect(vi.mocked(catalog.policyApi.create)).not.toHaveBeenCalled();
 });
 
+it("配置项标注生效状态：返点费率标「参与计算」，计算基数标「仅留痕」", async () => {
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("返点比例");
+  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+
+  // 分方向费率 + 统一费率：后端 rebates.py:167 真读，标 calc
+  expect(await screen.findAllByText("参与计算")).toHaveLength(2);
+  // 计算基数后端由调用方传参，不读规则，标 snapshot
+  expect(screen.getAllByText("仅留痕")).toHaveLength(1);
+});
+
 it("设置配置：填写生效期和结构化字段后提交，生成新版本并立即发布", async () => {
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
   await ui.click(screen.getByRole("button", { name: /设置配置/ }));
-  // 原裸 JSON 文本框已改为按规则编码的结构化字段（REBATE → 返点比例）
-  const rate = screen.getByLabelText("返点比例");
+  // 结构化字段由 schema 驱动：REBATE → 统一返点比例（percent 控件）
+  const rate = screen.getByLabelText("统一返点比例");
   fireEvent.change(rate, { target: { value: "5" } });
   await ui.click(screen.getByRole("button", { name: /保存/ }));
 
@@ -65,6 +76,40 @@ it("设置配置：填写生效期和结构化字段后提交，生成新版本�
   }));
   // 保存即发布：不再有独立审核环节，创建版本后立即发布（发布人取当前登录用户）
   await waitFor(() => expect(vi.mocked(catalog.policyApi.approve)).toHaveBeenCalledWith(1, {}));
+});
+
+it("设置配置：按返点方向分别填写时提交 rates 子对象（引擎真实支持的形状）", async () => {
+  // 无历史版本 → 表单不回填，断言只反映本次填写。
+  vi.mocked(catalog.policyApi.versions).mockResolvedValue({ items: [], total: 0 });
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("返点比例");
+  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+
+  fireEvent.change(screen.getByLabelText("买入返点"), { target: { value: "5" } });
+  fireEvent.change(screen.getByLabelText("卖出返点"), { target: { value: "3" } });
+  await ui.click(screen.getByRole("button", { name: /保存/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.policyApi.createVersion)).toHaveBeenCalledWith(1, {
+    effective_from: expect.any(String),
+    effective_to: undefined,
+    config: { rates: { BUY: "5", SELL: "3" } },
+    note: undefined,
+  }));
+});
+
+it("未定义字段的规则：保存按钮禁用并说明不可配置（避免提交空 config 被后端拒绝）", async () => {
+  const custom = [
+    { id: 9, policy_code: "CUSTOM_X", name: "自定义规则", scope_type: "GLOBAL", scope_id: null, status: "ACTIVE" },
+  ] as unknown as import("../shared/api/catalog").PolicyDefinition[];
+  vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: custom, total: 1 });
+  vi.mocked(catalog.policyApi.versions).mockResolvedValue({ items: [], total: 0 });
+
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("自定义规则");
+  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+
+  expect(await screen.findByText(/暂无可配置参数/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /保存/ })).toBeDisabled();
 });
 
 it("渲染经营规则标题、统计卡与左侧规则清单，并默认加载首个规则的版本", async () => {

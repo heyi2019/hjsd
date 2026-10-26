@@ -9,35 +9,16 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 // 轻量纯逻辑测试可以安全并行；涉及大量 antd/jsdom 交互的页面测试共用
 // 一个 worker，避免多个大型 DOM 树同时争抢机器资源导致超时和重试。
-const fastTests = [
-  "src/test/fixtures.test.ts",
-  "src/accounts/inventory-export.test.ts",
-  "src/accounts/inventory-logic.test.ts",
-  "src/shared/api/*.test.ts",
-  "src/shared/lib/*.test.ts",
-  "src/vite.config.test.ts",
-];
-
-// 日常反馈层：覆盖登录、权限、主工作台、订单写路径、报表和设置等关键面，
-// 不包含库存/客户/资金等长链路全量页面回归。
-const quickTests = [
-  "src/app/DashboardPage.test.tsx",
-  "src/app/DashboardPage.interactions.test.tsx",
-  "src/auth/LoginPage.test.tsx",
-  "src/auth/UserCenterPage.test.tsx",
-  "src/field-definitions/SettingsPage.test.tsx",
-  "src/orders/CreateBusinessModal.test.tsx",
-  "src/orders/CreateBusinessModal.distribution.test.tsx",
-  "src/policy/PolicySettingsPanel.test.tsx",
-  "src/reporting/ReportsPage.test.tsx",
-  "src/shared/state/session.test.tsx",
-];
+// 清单本体见 scripts/test-layers.mjs（此处仅解构引入）。
 
 // Antd v5 + jsdom reliable test config.
 // Three settings are mandatory (see SKILL.md):
 //   1. resolve.mainFields forces antd ESM build (antd/es) instead of CJS (antd/lib)
 //   2. resolve.alias stubs rc-motion / rc-resize-observer with zero-motion stand-ins
 //   3. test.server.deps.inline true -> Vite handles CJS->ESM interop (stubs not dropped)
+// fast/quick 清单与 scripts/test-full-sharded.mjs 共用单一事实源（scripts/test-layers.mjs），
+// 严禁在本文件另写一份（2026-10-27 实锤：两处漂移致分片脚本 exit 1、test:full 长期不可用）。
+import { fastTests, quickTests } from "./scripts/test-layers.mjs";
 export default defineConfig({
   plugins: [react()],
   // Never inherit a developer machine's .env.local API address in jsdom.

@@ -19,6 +19,7 @@ import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
+import { StudioExpensePanel } from "./StudioExpensePanel";
 import {
   ConfirmButton,
   DataTable,
@@ -825,6 +826,11 @@ export function FundsPage() {
             key: "rebates",
             label: "返点",
             children: <RebatesPanel />,
+          },
+          {
+            key: "studio-expenses",
+            label: "工作室支出",
+            children: <StudioExpensePanel pools={pools} />,
           },
         ]}
       />

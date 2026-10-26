@@ -6,6 +6,7 @@ import { renderLight } from "../test/render";
 import { OrdersPage } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 import * as client from "../shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "../shared/api/catalog";
 
@@ -146,6 +147,7 @@ const allocationRows: ProfitAllocation[] = [
 ];
 
 beforeEach(() => {
+  seedOptionSets(catalog);
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);

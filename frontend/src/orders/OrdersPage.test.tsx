@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import { OrdersPage } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -59,6 +60,7 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.accountsApi.list).mockResolvedValue([]);

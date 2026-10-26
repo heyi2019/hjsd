@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import { CustomersPage } from "./CustomersPage";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -39,6 +40,7 @@ const detail = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers as unknown as never);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
   vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);

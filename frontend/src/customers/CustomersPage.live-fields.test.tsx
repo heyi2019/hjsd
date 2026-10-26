@@ -6,6 +6,7 @@ import { CustomersPage } from "./CustomersPage";
 import { resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -27,6 +28,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     counterpartiesApi: mk(actual.counterpartiesApi),
     fieldsApi: mk(actual.fieldsApi),
     leadsApi: mk(actual.leadsApi),
+    optionSetsApi: mk(actual.optionSetsApi),
   };
 });
 
@@ -103,6 +105,7 @@ const customers = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.leadsApi.list).mockResolvedValue([]);

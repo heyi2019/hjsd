@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { QualityPanel } from "./QualityPanel";
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 import type { QualityIssue, QualitySummary } from "../shared/api/catalog";
 
 vi.mock("../shared/api/catalog");
@@ -18,6 +19,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.qualityApi.summary).mockResolvedValue(summary);
   vi.mocked(catalog.qualityApi.list).mockResolvedValue({ items: rows });
   vi.mocked(catalog.qualityApi.create).mockResolvedValue({ id: 3 } as QualityIssue);

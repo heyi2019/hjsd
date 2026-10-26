@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import { CustomersPage } from "./CustomersPage";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 vi.mock("../shared/api/catalog")
 vi.mock("./CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
@@ -97,6 +98,7 @@ const counterparties = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
@@ -144,7 +146,8 @@ describe("CustomersPage：客户档案", () => {
     renderLight(<CustomersPage />);
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
     expect(screen.getByText("CUS-0002")).toBeInTheDocument();
-    expect(screen.getByText("进行中")).toBeInTheDocument(); // ACTIVE
+    // ACTIVE 文案现由 CUSTOMER_STATUS 选项词典提供（设置页可改）
+    expect(screen.getByText("启用中")).toBeInTheDocument(); // ACTIVE
     expect(screen.getAllByText("已拉黑").length).toBeGreaterThanOrEqual(1); // DISABLED
   });
 

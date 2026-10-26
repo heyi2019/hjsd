@@ -5,10 +5,12 @@ import { renderLight } from "../test/render";
 import { PolicySettingsPanel } from "./PolicySettingsPanel";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 

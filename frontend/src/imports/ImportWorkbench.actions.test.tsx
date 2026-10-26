@@ -7,6 +7,7 @@ import { ImportWorkbench } from "./ImportWorkbench";
 import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "../shared/api/catalog";
 
 let ui: ReturnType<typeof userEvent.setup>;
@@ -84,6 +85,7 @@ function setDefaults() {
 }
 
 beforeEach(() => {
+  seedOptionSets(catalog);
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
   URL.revokeObjectURL = vi.fn();

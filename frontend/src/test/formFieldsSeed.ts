@@ -173,6 +173,88 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "FUND_FLOW_ACCOUNTING_ATTRIBUTE", label: "流水核算属性", group: "FUND", editable: false, options: [
     { value: "SELF_REVENUE", label: "自营收入" }, { value: "SELF_DIRECT_COST", label: "自营直接成本" }, { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" }, { value: "TH_REVENUE", label: "提号/代挂收入" }, { value: "DFQ_PRINCIPAL", label: "代分期借款本金" }, { value: "SERVICE_REVENUE", label: "增值服务收入" }, { value: "REBATE_INCOME", label: "返点收入" }, { value: "OPERATING_EXPENSE", label: "运营费用" }, { value: "DEPOSIT", label: "押金/保证金" }, { value: "EXTERNAL_FUNDING", label: "外部资金" }, { value: "INTERNAL_TRANSFER", label: "内部调拨" }, { value: "REVERSAL", label: "冲销" }, { value: "REFUND", label: "退款" },
   ] },
+  /* ── 0008 补种：客户 / 订单 / 分期 / 导入 / 规则 / 质量 / 资金 / 系统 ── */
+  { code: "CUSTOMER_STATUS", label: "客户状态", group: "CUSTOMER", editable: false, options: [
+    { value: "ACTIVE", label: "启用中" }, { value: "DISABLED", label: "已拉黑" }, { value: "MERGED", label: "已合并" },
+  ] },
+  { code: "COUNTERPARTY_STATUS", label: "合作方状态", group: "CUSTOMER", editable: false, options: [
+    { value: "ACTIVE", label: "进行中" }, { value: "DISABLED", label: "已拉黑" },
+  ] },
+  { code: "COUNTERPARTY_TYPE", label: "合作方类型", group: "CUSTOMER", editable: false, options: [
+    { value: "PEER", label: "同行" }, { value: "SUPPLIER", label: "供货方" }, { value: "PLATFORM", label: "平台" },
+  ] },
+  { code: "LEAD_STATUS", label: "需求状态", group: "CUSTOMER", editable: false, options: [
+    { value: "OPEN", label: "未结算" }, { value: "CONVERTED", label: "已转化" }, { value: "CLOSED", label: "已关闭" },
+  ] },
+  { code: "LEAD_TYPE", label: "需求类型", group: "CUSTOMER", editable: false, options: [
+    { value: "FIND_ACCOUNT", label: "找号" }, { value: "SELL_ACCOUNT", label: "卖号" }, { value: "SPECIFIC_SEARCH", label: "指定搜索" },
+  ] },
+  { code: "ORDER_STATUS", label: "订单状态", group: "ORDER", editable: false, options: [
+    { value: "ACTIVE", label: "进行中" }, { value: "COMPLETED", label: "已完成" }, { value: "CANCELLED", label: "已取消" },
+  ] },
+  { code: "ORDER_LINK_STATUS", label: "订单关联状态", group: "ORDER", editable: false, options: [
+    { value: "LINKED", label: "已关联" }, { value: "UNLINKED", label: "未关联" }, { value: "ORPHAN", label: "孤儿单" }, { value: "UNLINKED_TRANSFER", label: "单边划转未关联" },
+  ] },
+  { code: "REFUND_RESPONSIBILITY", label: "退款责任方", group: "ORDER", editable: true, options: [
+    { value: "COMPANY", label: "公司" }, { value: "CUSTOMER", label: "客户" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" }, { value: "OTHER", label: "其他" },
+  ] },
+  { code: "ORDER_BUSINESS", label: "订单业务类型", group: "ORDER", editable: false, options: [
+    { value: "HS", label: "回收" }, { value: "TH", label: "提号" }, { value: "DG", label: "代挂" }, { value: "DFQ", label: "代分期" },
+  ] },
+  { code: "ORDER_BUSINESS_MODE", label: "订单业务模式", group: "ORDER", editable: false, options: [
+    { value: "SELF", label: "自营" }, { value: "DISTRIBUTION", label: "分销" },
+  ] },
+  { code: "ORDER_RELATION_TYPE", label: "订单关联关系", group: "ORDER", editable: false, options: [
+    { value: "SOURCE", label: "来源单" }, { value: "FOLLOW_UP", label: "后续单" },
+  ] },
+  { code: "INSTALLMENT_CONTRACT_TYPE", label: "分期合约类型", group: "INSTALLMENT", editable: false, options: [
+    { value: "STOCK_SALE", label: "分期出售" }, { value: "ADVANCE_PURCHASE", label: "代分期" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
+  ] },
+  { code: "INSTALLMENT_STATUS", label: "分期状态", group: "INSTALLMENT", editable: false, options: [
+    { value: "PENDING", label: "待首付" }, { value: "ACTIVE", label: "收款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },
+  ] },
+  { code: "SCHEDULE_STATUS", label: "期次状态", group: "INSTALLMENT", editable: false, options: [
+    { value: "PENDING", label: "待收" }, { value: "PARTIAL", label: "部分收款" }, { value: "PAID", label: "已收" }, { value: "OVERDUE", label: "逾期" }, { value: "WAIVED", label: "已减免" },
+  ] },
+  { code: "DEPOSIT_STATUS", label: "押金状态", group: "INSTALLMENT", editable: false, options: [
+    { value: "PAID", label: "已付" }, { value: "PARTIALLY_RETURNED", label: "部分退还" }, { value: "RETURNED", label: "已退" }, { value: "LOST", label: "已损失" }, { value: "CANCELLED", label: "已取消" },
+  ] },
+  { code: "IMPORT_BATCH_STATUS", label: "导入批次状态", group: "IMPORT", editable: false, options: [
+    { value: "DRAFT", label: "草稿" }, { value: "MAPPED", label: "已映射" }, { value: "COMMITTED", label: "已确认" }, { value: "REJECTED", label: "已拒绝" }, { value: "ROLLED_BACK", label: "已回滚" }, { value: "CORRECTED", label: "已更正" },
+  ] },
+  { code: "IMPORT_SOURCE_KIND", label: "导入数据类型", group: "IMPORT", editable: false, options: [
+    { value: "STANDARD_ORDER", label: "订单" }, { value: "STANDARD_ACCOUNT", label: "账号" }, { value: "STANDARD_CASHFLOW", label: "资金流水" }, { value: "STANDARD_INSTALLMENT", label: "分期" }, { value: "STANDARD_LEAD", label: "需求" },
+  ] },
+  { code: "POLICY_STATUS", label: "规则版本状态", group: "POLICY", editable: false, options: [
+    { value: "DRAFT", label: "草稿" }, { value: "ACTIVE", label: "已发布" }, { value: "EXPIRED", label: "已失效" }, { value: "SUPERSEDED", label: "已被取代" },
+  ] },
+  { code: "POLICY_SCOPE_TYPE", label: "规则适用范围", group: "POLICY", editable: false, options: [
+    { value: "GLOBAL", label: "全局" }, { value: "ORDER_TYPE", label: "按业务类型" }, { value: "USER", label: "按人员" }, { value: "POOL", label: "按资金池" },
+  ] },
+  { code: "QUALITY_STATUS", label: "质量问题状态", group: "QUALITY", editable: false, options: [
+    { value: "OPEN", label: "待处理" }, { value: "IN_PROGRESS", label: "处理中" }, { value: "CLOSED", label: "已关闭" },
+  ] },
+  { code: "QUALITY_SEVERITY", label: "质量问题严重程度", group: "QUALITY", editable: true, options: [
+    { value: "LOW", label: "低" }, { value: "MEDIUM", label: "中" }, { value: "HIGH", label: "高" }, { value: "CRITICAL", label: "严重" },
+  ] },
+  { code: "RECONCILIATION_STATUS", label: "日对账状态", group: "FUND", editable: false, options: [
+    { value: "OPEN", label: "未核销" }, { value: "RESOLVED", label: "已核销" },
+  ] },
+  { code: "REBATE_STATUS", label: "返点状态", group: "FUND", editable: false, options: [
+    { value: "OPEN", label: "未结算" }, { value: "PARTIALLY_SETTLED", label: "部分结算" }, { value: "SETTLED", label: "已结清" }, { value: "VOID", label: "失效" },
+  ] },
+  { code: "POOL_STATUS", label: "资金池状态", group: "FUND", editable: false, options: [
+    { value: "ACTIVE", label: "进行中" }, { value: "DISABLED", label: "已停用" },
+  ] },
+  { code: "POOL_ACCOUNT_STATUS", label: "资金池账户状态", group: "FUND", editable: false, options: [
+    { value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" },
+  ] },
+  { code: "USER_ROLE", label: "用户角色", group: "SYSTEM", editable: false, options: [
+    { value: "ADMIN", label: "系统管理员" }, { value: "OPERATOR", label: "业务经办人" }, { value: "FINANCE", label: "财务" }, { value: "AUDITOR", label: "审核人" }, { value: "VIEWER", label: "查看人" },
+  ] },
+  { code: "OWNER_SCOPE", label: "数据可见范围", group: "SYSTEM", editable: false, options: [
+    { value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" },
+  ] },
 ];
 
 /** 桩 optionSetsApi.list 返回完整种子，供库存/资金筛选器测试拿到筛选项。 */

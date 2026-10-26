@@ -6,6 +6,7 @@ import { ImportWorkbench } from "./ImportWorkbench";
 import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -54,6 +55,7 @@ const recon = {
 } as unknown as import("../shared/api/catalog").ReconciliationReport;
 
 beforeEach(() => {
+  seedOptionSets(catalog);
   resolveMock(vi.mocked(catalog.importsApi.batches), { items: [batch], total: 1 });
   resolveMock(vi.mocked(catalog.importsApi.rows), { items: importRows, total: importRows.length });
   resolveMock(vi.mocked(catalog.importsApi.preview), mappingPreview);

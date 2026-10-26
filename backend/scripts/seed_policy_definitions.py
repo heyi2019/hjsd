@@ -62,9 +62,12 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
 # installments.periods 众数 3）。
 # COMMISSION/WRITE_DOWN/REFUND 库内无对应历史流水；按 ERP_页面原型_v1.0.md:139 纪律
 # 「未配置提成规则显示待配置，不猜值」，config 置空（{}）表示待配置，而非填假值 0。
+# 例外：COMMISSION 的分润比例是业务既定口径（买入动作 30 / 卖出动作 30 / 运营动作 0 /
+# 公司 40，合计 100），不是猜值，故直接预置；且 create_version 拒绝空 config，
+# 预置 {} 会在 --apply 时直接抛「规则参数不能为空」。
 DEFAULT_VERSION_CONFIG: dict[str, dict[str, object]] = {
     "REBATE": {"rate": "5"},
-    "COMMISSION": {},
+    "COMMISSION": {"split": {"BUY": "30", "SELL": "30", "OPERATION": "0", "COMPANY": "40"}},
     "INSTALLMENT": {"periods": "3", "cycle": "monthly"},
     "WRITE_DOWN": {},
     "REFUND": {},
@@ -122,7 +125,7 @@ def main() -> int:
             else:
                 skipped_defs.append(f"{code}(id={definition_id})")
 
-            # 2) 版本：每个定义预置 1 条已发布版本；已存在则摆正 config（upsert，幂等）。
+            # 2) 版本：每个定义预置 1 条已发布版本；已发布版本不改写（只报告差异）。
             if definition_id is not None:
                 latest = session.scalar(
                     select(PolicyVersion)
@@ -130,7 +133,11 @@ def main() -> int:
                     .order_by(PolicyVersion.version.desc())
                 )
                 target_config = DEFAULT_VERSION_CONFIG.get(code, {"placeholder": True})
-                if latest is None:
+                if not target_config:
+                    # 待配置规则（WRITE_DOWN / REFUND）：create_version 拒绝空 config，
+                    # 这里跳过而不是塞假值（ERP_页面原型_v1.0.md:139 不猜值纪律）。
+                    skipped_versions.append(f"{code}(待配置，不预置版本)")
+                elif latest is None:
                     created_versions.append(code)
                     if args.apply:
                         version = policy_service.create_version(
@@ -148,10 +155,10 @@ def main() -> int:
                             note="系统预置默认版本",
                         )
                 elif latest.config != target_config:
-                    updated_versions.append(f"{code}(v{latest.version})")
-                    if args.apply:
-                        latest.config = target_config
-                        session.add(latest)
+                    # 已发布版本不可改写（只能新建版本）；脚本不越权覆盖线上口径。
+                    skipped_versions.append(
+                        f"{code}(v{latest.version} 已发布且 config 不同：{latest.config})"
+                    )
                 else:
                     skipped_versions.append(f"{code}(v{latest.version} config 一致)")
         if args.apply:

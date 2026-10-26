@@ -189,7 +189,8 @@ class TransferOut(BaseModel):
 class RebateCreate(RequestModel):
     source_order_id: int
     rebate_type: str = Field(description="BUY 买号返点 / SELL 卖号返点")
-    base_amount: Decimal
+    # 省略时按 REBATE 规则的 config.base 从订单事件派生；显式传入始终优先。
+    base_amount: Decimal | None = None
     collected_on: date
     expected_on: date | None = None
     rate: Decimal | None = None

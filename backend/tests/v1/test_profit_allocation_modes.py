@@ -1,0 +1,181 @@
+"""分润两种录入口径的契约测试。
+
+口径（2026-10-26 用户裁决「不止可以填比例，也可以填金额，两个都选填」）：
+
+- **按人模式**（items 不带 allocation_type）：每行一个姓名（user_id，空=公司归属），
+  比例与金额都选填、同一行只能填一个。
+  - 纯比例：合计必须 100%（沿用 BAS-06-03）。
+  - 出现金额：金额合计不得超过订单利润，比例合计不得超过 100%。
+- **按动作模式**（items 都带 allocation_type）：原四项结构不变，用于兼容旧数据/旧前端。
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from decimal import Decimal
+
+import pytest
+
+from app.accounts import service as account_service
+from app.core.errors import Validation
+from app.orders import service as order_service
+from app.policy import service as policy_service
+from app.reporting import service as reporting_service
+
+D = date(2026, 10, 17)
+
+
+def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> int:
+    """造一单有已过账 BUY/SELL 的订单，利润 = sell - buy。"""
+    account = account_service.create_account(
+        seeded_db,
+        game_account=f"alloc-{buy}-{sell}",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
+    )
+    order = order_service.create_order(
+        seeded_db,
+        order_type="HS",
+        owner_id=1,
+        trade_date=D,
+        actor="pytest",
+        account_id=account.id,
+    )
+    order_service.post_event(
+        seeded_db, order.id, event_type="BUY", amount=Decimal(buy),
+        occurred_on=D, actor="pytest", pool_id=1,
+    )
+    order_service.post_event(
+        seeded_db, order.id, event_type="SELL", amount=Decimal(sell),
+        occurred_on=D, actor="pytest", pool_id=1,
+    )
+    return order.id
+
+
+def test_person_mode_accepts_one_name_with_full_rate(seeded_db):
+    """按人模式不再强制四项：一个人拿 100% 是合法的。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["allocation_rate"] == "100.00"
+    assert rows[0]["allocation_amount"] == "0.00"
+    assert rows[0]["total_rate"] == "100.00"
+
+
+def test_person_mode_rate_must_total_one_hundred_without_amount(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "60"},
+                {"user_id": 2, "role": "OWNER", "allocation_rate": "30"},
+            ],
+        )
+
+
+def test_person_mode_accepts_amount_only(seeded_db):
+    """按金额分润：金额落库，比例保持 0，合计校验改为金额口径。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"user_id": 1, "role": "OWNER", "allocation_amount": "300"},
+            {"user_id": 2, "role": "OWNER", "allocation_amount": "200"},
+        ],
+    )
+
+    assert [row["allocation_amount"] for row in rows] == ["300.00", "200.00"]
+    assert all(row["allocation_rate"] == "0.00" for row in rows)
+    assert rows[0]["total_amount"] == "500.00"
+
+
+def test_person_mode_rejects_rate_and_amount_on_the_same_row(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "10", "allocation_amount": "100"}],
+        )
+
+
+def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
+    """利润 500，填 600 必须拒绝——金额模式不能凭空超出可分利润。"""
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "600"}],
+        )
+
+
+def test_person_mode_amount_requires_positive_profit(seeded_db):
+    """没有过账事件的订单没有利润，按金额分润应显式报错而不是记账 0。"""
+    order = order_service.create_order(
+        seeded_db, order_type="HS", owner_id=1, trade_date=D, actor="pytest"
+    )
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "100"}]
+        )
+
+
+def test_person_mode_rejects_duplicate_people(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
+            ],
+        )
+
+
+def test_person_mode_company_row_has_no_user(seeded_db):
+    """姓名可为空表示公司归属，但最多一行。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"user_id": 1, "role": "OWNER", "allocation_rate": "60"},
+            {"user_id": None, "role": "OWNER", "allocation_rate": "40"},
+        ],
+    )
+
+    assert [row["user_id"] for row in rows] == [1, None]
+
+
+def test_commission_report_uses_amount_as_payable_base(seeded_db):
+    """报表口径：填金额时直接取金额作为应付基数，不再乘利润比例。"""
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
+    policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "120"}],
+    )
+
+    report = reporting_service.r3_commission_reconciliation(seeded_db)
+    rows = [row for group in report["groups"] for row in group.get("orders", [])]
+
+    assert [row["profit_base"] for row in rows] == [Decimal("120.00")]

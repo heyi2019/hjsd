@@ -51,6 +51,7 @@ from app.domain.users import User
 from app.accounts import service as accounts_service
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
+from app.orders.amounts import order_amounts
 from app.installments.schemas import ScheduleCreate
 from app.parties import service as parties_service
 
@@ -239,6 +240,51 @@ def total_receivable(installment: Installment) -> Decimal:
     )
 
 
+def _service_fee_from_snapshot(
+    session: Session,
+    snapshot: dict[str, Any] | None,
+    order: Any,
+    principal: Decimal,
+) -> Decimal:
+    """按 INSTALLMENT 规则补算服务费（仅在入参 service_fee 省略时调用）。
+
+    - 规则没有 service_fee_rate：返回 0，保持「不收服务费」的既有默认。
+    - 基数 config.base：PRINCIPAL（默认）取本金；GROSS 取订单卖出收入合计；
+      其它值直接报错，不静默回退——「配了却按别的基数算钱」比报错更危险。
+    """
+    if not snapshot:
+        return Decimal("0")
+    config = snapshot.get("config")
+    if not isinstance(config, dict):
+        return Decimal("0")
+    raw_rate = config.get("service_fee_rate")
+    if raw_rate is None:
+        return Decimal("0")
+    try:
+        rate = to_money(raw_rate)
+    except ValueError as exc:
+        raise Validation(
+            "分期规则中的服务费率必须是数值",
+            details={"field": "config.service_fee_rate", "value": str(raw_rate)},
+        ) from exc
+    if rate > Decimal("100.00"):
+        raise Validation(
+            "分期服务费率必须在 0% 到 100% 之间",
+            details={"field": "config.service_fee_rate", "value": str(rate)},
+        )
+    base_kind = str(config.get("base") or "PRINCIPAL").strip().upper()
+    if base_kind == "PRINCIPAL":
+        base = principal
+    elif base_kind == "GROSS":
+        base = order_amounts(session, order.id)["GROSS"]
+    else:
+        raise Validation(
+            f"分期服务费基数不支持 {base_kind}（仅 PRINCIPAL / GROSS）",
+            details={"field": "config.base", "value": base_kind},
+        )
+    return (base * rate / Decimal("100")).quantize(Decimal("0.01"))
+
+
 def create_installment(
     session: Session,
     *,
@@ -246,7 +292,7 @@ def create_installment(
     contract_type: str,
     principal: Any = 0,
     down_payment: Any = 0,
-    service_fee: Any = 0,
+    service_fee: Any = None,
     periods: int,
     per_period_service_fee: Any = 0,
     per_period: Any = 0,
@@ -365,10 +411,28 @@ def create_installment(
 
     principal_amount = _non_negative(principal, field="principal")
     down_payment_amount = _non_negative(down_payment, field="down_payment")
-    service_fee_amount = _non_negative(service_fee, field="service_fee")
     per_period_service_fee_amount = _non_negative(
         per_period_service_fee, field="per_period_service_fee"
     )
+    # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约。
+    # 提前到金额计算之前，服务费省略时才能按规则补算。
+    order_type_definition = foundation_service.get_order_type_by_code(
+        session, order.order_type
+    )
+    policy_version_id, policy_snapshot = policy_service.make_snapshot(
+        session,
+        policy_code=PolicyType.INSTALLMENT.value,
+        on=first_due_on,
+        scope_type="ORDER_TYPE",
+        scope_id=order_type_definition.id if order_type_definition else None,
+    )
+    # 显式传值优先（含显式 0 = 不收服务费）；省略（None）才按规则费率补算。
+    resolved_service_fee = service_fee
+    if resolved_service_fee is None:
+        resolved_service_fee = _service_fee_from_snapshot(
+            session, policy_snapshot, order, principal_amount
+        )
+    service_fee_amount = _non_negative(resolved_service_fee, field="service_fee")
     per_period_amount = _non_negative(per_period, field="per_period")
     total_schedule_amount = down_payment_amount + per_period_amount * periods
     if down_payment_amount > principal_amount:
@@ -394,17 +458,6 @@ def create_installment(
     if per_period_amount + adjustment < 0:
         raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
 
-    # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约
-    order_type_definition = foundation_service.get_order_type_by_code(
-        session, order.order_type
-    )
-    policy_version_id, policy_snapshot = policy_service.make_snapshot(
-        session,
-        policy_code=PolicyType.INSTALLMENT.value,
-        on=first_due_on,
-        scope_type="ORDER_TYPE",
-        scope_id=order_type_definition.id if order_type_definition else None,
-    )
     installment = Installment(
         inst_no=order_installment_no(order.order_no),
         order_id=order.id,

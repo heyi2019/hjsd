@@ -140,15 +140,33 @@ class TestPolicyVersion:
         assert v1["version"] == 1
         assert v2["version"] == 2
 
-    def test_two_open_ended_versions_rejected(self, seeded_db):
-        """两个都无失效日 = 有效期重叠到无穷，必须拒绝。"""
+    def test_new_version_supersedes_open_ended(self, seeded_db):
+        """新版本接续封口「开放至今」的旧版本（旧失效日 = 新生效日）。
+
+        否则开放版本一旦存在，任何新版本都会因重叠被拒，规则永远无法改版
+        （设置配置「保存即发布」将不可用）。旧版本 config 不被改写。
+        """
+        definition = _make_policy(seeded_db)
+        v1 = policy_service.create_version(
+            seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
+        )
+        v2 = policy_service.create_version(
+            seeded_db, definition["id"], effective_from=date(2026, 7, 1), config={"rate": "8"}, actor="pytest"
+        )
+        assert v2["version"] == 2
+        row1 = seeded_db.get(PolicyVersion, v1["id"])
+        assert row1.effective_to == date(2026, 7, 1)
+        assert row1.config == {"rate": "5"}
+
+    def test_backward_overlap_still_rejected(self, seeded_db):
+        """新版本起点早于开放版本的起点 = 真重叠，必须拒绝。"""
         definition = _make_policy(seeded_db)
         policy_service.create_version(
-            seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
+            seeded_db, definition["id"], effective_from=date(2026, 7, 1), config={"rate": "5"}, actor="pytest"
         )
         with pytest.raises(Exception):
             policy_service.create_version(
-                seeded_db, definition["id"], effective_from=date(2026, 7, 1), config={"rate": "8"}, actor="pytest"
+                seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "8"}, actor="pytest"
             )
 
     def test_overlapping_period_rejected(self, seeded_db):
@@ -362,11 +380,17 @@ class TestSnapshotRedline:
 
 
 class TestProfitAllocation:
-    def test_allocation_rejects_legacy_and_duplicate_categories(self, seeded_db):
+    def test_allocation_rejects_incomplete_and_duplicate_action_categories(self, seeded_db):
         from app.core.errors import Validation
         order = self._order(seeded_db)
+        # 按动作模式（items 带 allocation_type）仍要求四项齐全：
+        # 单给一个 BUY 行属于「动作模式缺项」，必须拒绝。
         with pytest.raises(Validation):
-            policy_service.set_allocations(seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_rate": 100}])
+            policy_service.set_allocations(
+                seeded_db,
+                order.id,
+                items=[{"allocation_type": "BUY", "role": "OWNER", "allocation_rate": 100}],
+            )
         items = [
             {"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 20}
             for kind in ("BUY", "SELL", "OPERATION", "COMPANY", "SELL")
@@ -695,7 +719,11 @@ class TestPolicyApi:
         assert found.json()["version"]["config"] == {"rate": "5"}
 
     def test_overlap_returns_422(self, seeded_client, json_headers):
-        """项目约定：Validation → 422（见 test_pools_api / test_order_types_api）。"""
+        """项目约定：Validation → 422（见 test_pools_api / test_order_types_api）。
+
+        注意：无失效日的版本会被新版本接续封口（见 TestPolicyVersion），因此真重叠
+        需要旧版本本身带失效日、新版本起点落在其区间内。
+        """
         created = seeded_client.post(
             "/api/v1/policies",
             headers=json_headers,
@@ -704,7 +732,7 @@ class TestPolicyApi:
         seeded_client.post(
             f"/api/v1/policies/{created['id']}/versions",
             headers=json_headers,
-            json={"effective_from": "2026-01-01", "config": {"rate": "5"}},
+            json={"effective_from": "2026-01-01", "effective_to": "2026-12-31", "config": {"rate": "5"}},
         )
         conflict = seeded_client.post(
             f"/api/v1/policies/{created['id']}/versions",

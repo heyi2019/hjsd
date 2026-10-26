@@ -12,6 +12,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 from app.accounts import service as account_service
 from app.core.errors import Validation
@@ -24,6 +25,7 @@ from app.domain.enums import (
     OrderStatus,
     RebateStatus,
 )
+from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, RebateRecord
 from app.finance import service as finance_service
 from app.orders import service as order_service
@@ -52,19 +54,10 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     seeded_db, seeded_client, headers
 ):
     from app.finance.cashflows import approve_cashflow, create_cashflow
-    from app.finance.pool_accounts import create_pool_account, get_pool
 
-    pool = get_pool(seeded_db, "HJ_INVEST")
-    account = create_pool_account(
-        seeded_db,
-        pool_id=pool.id,
-        account_no="RPT-DIM-001",
-        account_name="经营分析账户",
-        account_type="BANK",
-        ownership="OWNED",
-        opening_balance=Decimal("0"),
-        actor="pytest",
-    )
+    # 资金池账户已下线：直接在种子池上造流水（等价于原 get_pool + create_pool_account）
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    assert pool is not None, "种子池 HJ_INVEST 缺失"
     for direction, amount, attribute in (
         ("IN", "100.00", "SELF_REVENUE"),
         ("OUT", "40.00", "SELF_DIRECT_COST"),
@@ -72,7 +65,6 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
         flow = create_cashflow(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             occurred_on=date(2026, 10, 17),
             direction=direction,
             nature="BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
@@ -91,7 +83,7 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     assert len(report["items"]) == 2
     assert report["total_amount"] == Decimal("140.00")
     assert report["total_signed_amount"] == Decimal("60.00")
-    assert {item["account_no"] for item in report["items"]} == {"RPT-DIM-001"}
+    assert {item["pool_code"] for item in report["items"]} == {"HJ_INVEST"}
     assert {item["accounting_attribute"] for item in report["items"]} == {
         "SELF_REVENUE", "SELF_DIRECT_COST"
     }

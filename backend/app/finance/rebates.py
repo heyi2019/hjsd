@@ -32,6 +32,7 @@ from app.domain.trade import Cashflow, Order, OrderEvent, RebateRecord, RebateSe
 from app.foundation import service as foundation_service
 from app.notifications import service as notifications_service
 from app.orders import service as orders_service
+from app.orders.amounts import order_amounts
 from app.policy import service as policy_service
 
 from ._common import _non_negative, _positive, _text
@@ -41,7 +42,7 @@ def create_rebate(
     session: Session,
     *,
     source_order_id: int,
-    base_amount: Any,
+    base_amount: Any = None,
     collected_on: date,
     actor: str,
     expected_on: date | None = None,
@@ -51,7 +52,10 @@ def create_rebate(
     note: str | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
-    """返点记录：来源订单必填且必须已成单（REB-01-02）。"""
+    """返点记录：来源订单必填且必须已成单（REB-01-02）。
+
+    base_amount 省略时按 REBATE 规则的 config.base 从订单事件派生（与报表同口径）。
+    """
     assert_period_open(session, collected_on, operation="创建返点记录")
     try:
         order = orders_service.get_order(session, source_order_id, user)
@@ -105,7 +109,6 @@ def create_rebate(
             },
         )
 
-    base = _positive(base_amount, field="base_amount")
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
     order_type_definition = foundation_service.get_order_type_by_code(
@@ -118,6 +121,11 @@ def create_rebate(
         scope_type="ORDER_TYPE",
         scope_id=order_type_definition.id if order_type_definition else None,
     )
+    # 基数：显式传参优先；未传时按规则 config.base 从订单事件派生（与报表同口径）。
+    resolved_base = base_amount
+    if resolved_base is None:
+        resolved_base = _rebate_base_from_snapshot(session, snapshot, order)
+    base = _positive(resolved_base, field="base_amount")
     if rate is None:
         rate = _rebate_rate_from_snapshot(snapshot, rebate_type)
     rebate_rate = _non_negative(Decimal("0") if rate is None else rate, field="rate")
@@ -153,6 +161,29 @@ def create_rebate(
         after={"source_order": order.order_no, "base_amount": str(base)},
     )
     return record
+
+
+def _rebate_base_from_snapshot(
+    session: Session, snapshot: dict[str, Any] | None, order: Any
+) -> Decimal | None:
+    """按 REBATE 规则的 config.base 派生返点基数。
+
+    口径复用 app/orders/amounts.py（与报表同源）：
+    - GROSS：卖出收入合计（成交额）
+    - PRINCIPAL：买入成本合计（本金）
+    - PROFIT：收入 - 买入成本 - 直接费用
+
+    规则未声明 base 时返回 None，由调用方按「base_amount 必填」报错，不静默兜底。
+    """
+    if not snapshot:
+        return None
+    config = snapshot.get("config")
+    if not isinstance(config, dict):
+        return None
+    kind = config.get("base")
+    if not isinstance(kind, str) or not kind.strip():
+        return None
+    return order_amounts(session, order.id).get(kind.strip().upper())
 
 
 def _rebate_rate_from_snapshot(

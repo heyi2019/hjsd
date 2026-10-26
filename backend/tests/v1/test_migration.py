@@ -191,7 +191,7 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "15b7c8d9e0f1 (head)"
+    assert result.stdout.strip() == "16c8d9e0f1a2 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

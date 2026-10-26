@@ -26,7 +26,6 @@ from app.domain.enums import (
     AccountStatus,
     CashflowStatus,
     Direction,
-    EventType,
     InstallmentDispositionAction,
     Nature,
     OrderStatus,
@@ -47,6 +46,10 @@ from app.domain.trade import (
 )
 from app.parties import service as parties_service
 from app.foundation.classification import classification_for_order_type
+from app.orders.amounts import (
+    event_contribution as order_event_contribution,
+    event_totals as order_event_totals,
+)
 
 ZERO = Decimal("0")
 REPORT_NAMES = frozenset(
@@ -219,49 +222,19 @@ def _money(value: Any) -> Decimal:
 def _event_contribution(
     event: OrderEvent, event_types: dict[int, str]
 ) -> tuple[Decimal, Decimal, Decimal]:
-    """Return (income, buy_amount, direct_cost) for one posted event.
+    """单个事件的 (income, buy_amount, direct_cost)。
 
-    CANCEL is an accounting reversal only when it explicitly points at the
-    event it offsets.  A bare order cancellation changes workflow state, but
-    does not provide enough information to rewrite historical P&L.
+    实现已下沉到 app/orders/amounts.py：报表与规则派生（返点基数 / 分期服务费基数）
+    必须共用同一口径，避免复制后漂移。保留本名以兼容既有测试与内部调用。
     """
-    amount = _money(event.amount)
-    if event.event_type == EventType.SELL.value:
-        return amount, ZERO, ZERO
-    if event.event_type == EventType.BUY.value:
-        return ZERO, amount, ZERO
-    if event.event_type == EventType.COST.value:
-        return ZERO, ZERO, amount
-    if event.event_type == EventType.CANCEL.value and event.offset_event_id is not None:
-        offset_type = event_types.get(event.offset_event_id)
-        if offset_type == EventType.SELL.value:
-            return -amount, ZERO, ZERO
-        if offset_type == EventType.BUY.value:
-            return ZERO, -amount, ZERO
-        if offset_type == EventType.COST.value:
-            return ZERO, ZERO, -amount
-    return ZERO, ZERO, ZERO
+    return order_event_contribution(event, event_types)
 
 
 def _event_totals(
     events: list[OrderEvent], *, from_date: date | None = None, to_date: date | None = None
 ) -> tuple[Decimal, Decimal, Decimal]:
-    event_types = {event.id: event.event_type for event in events}
-    income = ZERO
-    buy_amount = ZERO
-    direct_cost = ZERO
-    for event in events:
-        if not event.is_posted:
-            continue
-        if from_date and event.occurred_on < from_date:
-            continue
-        if to_date and event.occurred_on > to_date:
-            continue
-        event_income, event_buy, event_cost = _event_contribution(event, event_types)
-        income += event_income
-        buy_amount += event_buy
-        direct_cost += event_cost
-    return income, buy_amount, direct_cost
+    """事件汇总；实现见 app/orders/amounts.py。"""
+    return order_event_totals(events, from_date=from_date, to_date=to_date)
 
 
 def _bad_debt_rows(
@@ -584,7 +557,14 @@ def r3_commission_reconciliation(
             continue
         profit = per_order_profit[order.id]
         rate = _money(allocation.allocation_rate)
-        base = (profit * rate / Decimal("100")).quantize(Decimal("0.01"))
+        amount = _money(allocation.allocation_amount)
+        # 分润支持「按比例」与「按金额」两种录入口径：填了金额就直接作为应付基数，
+        # 否则按 利润 × 比例 计算。二者由录入校验保证不会同时出现。
+        base = (
+            amount
+            if amount > 0
+            else (profit * rate / Decimal("100")).quantize(Decimal("0.01"))
+        )
         grouped[allocation.user_id].append(
             {
                 "user_id": allocation.user_id,
@@ -593,6 +573,7 @@ def r3_commission_reconciliation(
                 "allocation_type": allocation.allocation_type,
                 "profit_base": base,
                 "rate": allocation.allocation_rate,
+                "amount": allocation.allocation_amount,
                 "payable": ZERO,
                 "paid": ZERO,
                 "difference": ZERO,

@@ -15,6 +15,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
+from app.orders.amounts import order_amounts
 from app.policy import schemas, service
 
 router = APIRouter(tags=["policy"])
@@ -180,6 +181,7 @@ def list_allocations(
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
+        order_profit=order_amounts(db, order_id)["PROFIT"],
     )
 
 
@@ -204,6 +206,7 @@ def set_allocations(
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
+        order_profit=order_amounts(db, order_id)["PROFIT"],
     )
 
 

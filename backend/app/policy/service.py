@@ -266,14 +266,26 @@ def create_version(
 
     conflict = _overlaps(session, definition_id, effective_from, effective_to)
     if conflict is not None:
-        raise Validation(
-            "生效期与已有版本重叠",
-            details={
-                "conflict_version": conflict.version,
-                "conflict_from": conflict.effective_from.isoformat(),
-                "conflict_to": conflict.effective_to.isoformat() if conflict.effective_to else None,
-            },
-        )
+        if (
+            conflict.effective_to is None
+            and conflict.effective_from < effective_from
+            and (effective_to is None or conflict.effective_from < effective_to)
+        ):
+            # 「开放至今」的旧版本由新版本接续封口（旧失效日 = 新生效日）：
+            # 否则开放版本一旦存在，任何新版本都建不出来，规则永远无法改版。
+            # 只调整生效窗口，不改旧版本 config（口径仍不可变）。
+            conflict.effective_to = effective_from
+            session.add(conflict)
+            session.flush()
+        else:
+            raise Validation(
+                "生效期与已有版本重叠",
+                details={
+                    "conflict_version": conflict.version,
+                    "conflict_from": conflict.effective_from.isoformat(),
+                    "conflict_to": conflict.effective_to.isoformat() if conflict.effective_to else None,
+                },
+            )
 
     next_version = int(
         session.scalar(
@@ -496,13 +508,170 @@ def _normalize_allocation_item(value: Any) -> dict[str, Any]:
         return ProfitAllocationItem.model_validate(value).model_dump()
     except PydanticValidationError as exc:
         errors = exc.errors()
-        has_rate_error = any("allocation_rate" in error.get("loc", ()) for error in errors)
+        has_rate_error = any(
+            error.get("loc") and error["loc"][-1] in {"allocation_rate", "allocation_amount"}
+            for error in errors
+        )
         raise Validation(
-            "分配比例必须是数值" if has_rate_error else "利润分配字段校验失败",
+            "分配比例/金额必须是数值" if has_rate_error else "利润分配字段校验失败",
             details={"field": "items", "errors": errors},
         ) from exc
 
+
 def set_allocations(
+    session: Session,
+    order_id: int,
+    *,
+    items: list[dict[str, Any]],
+    actor: str = "system",
+    user: CurrentUser | None = None,
+) -> list[dict[str, Any]]:
+    """整单重设分润。
+
+    两种录入口径，整单只能选其一：
+
+    - **按动作**（items 都带 allocation_type）：沿用 BAS-06-03 的四项结构
+      （买号/售出/运营/公司归属），比例合计必须 100%，收益人绑定动作执行人。
+    - **按人**（items 都不带 allocation_type）：每行一个姓名（user_id；为空表示
+      公司归属），比例与金额都选填——填比例按利润占比分、填金额按固定额分。
+      纯比例时合计仍须 100%；一旦出现金额，改为校验金额合计不超过订单利润，
+      因为此时「剩余未分配」默认留在公司，强行凑 100% 会逼用户编数字。
+    """
+    normalized_items = [_normalize_allocation_item(item) for item in items]
+    typed = [item for item in normalized_items if item.get("allocation_type")]
+    if typed and len(typed) != len(normalized_items):
+        raise Validation("按动作分润与按人分润不能混用，请统一为其中一种")
+    if typed:
+        return _set_action_allocations(
+            session, order_id, items=items, actor=actor, user=user
+        )
+    return _set_person_allocations(
+        session, order_id, items=normalized_items, actor=actor, user=user
+    )
+
+
+def _set_person_allocations(
+    session: Session,
+    order_id: int,
+    *,
+    items: list[dict[str, Any]],
+    actor: str,
+    user: CurrentUser | None,
+) -> list[dict[str, Any]]:
+    """按人分润：姓名 + 比例或金额（二者都选填，同一行不可同时填）。"""
+    from app.orders.amounts import order_amounts
+
+    order = _scoped_order(session, order_id, user)
+    if not items:
+        raise Validation("分润不能为空", details={"field": "items"})
+
+    total_rate = Decimal("0")
+    total_amount = Decimal("0")
+    user_ids: set[int] = set()
+    company_rows = 0
+    for item in items:
+        rate = to_money(item.get("allocation_rate") or 0)
+        amount = to_money(item.get("allocation_amount") or 0)
+        role = str(item.get("role") or "OWNER").upper()
+        if role not in AllocationRole.values():
+            raise Validation(
+                f"分配角色必须为 {AllocationRole.values()}",
+                details={"field": "role", "value": item.get("role")},
+            )
+        if rate > 0 and amount > 0:
+            raise Validation(
+                "同一分润行不能同时填比例和金额，二者只能选一个",
+                details={"field": "items"},
+            )
+        user_id = item.get("user_id")
+        if user_id is None:
+            company_rows += 1
+            if company_rows > 1:
+                raise Validation("公司归属只能有一行", details={"field": "items"})
+        else:
+            if int(user_id) in user_ids:
+                raise Validation("同一人员不可重复分润", details={"field": "items.user_id"})
+            user_ids.add(int(user_id))
+        total_rate += rate
+        total_amount += amount
+
+    existing_user_ids = {
+        user_id
+        for user_id in session.scalars(select(User.id).where(User.id.in_(user_ids))).all()
+    }
+    missing_user_ids = sorted(user_ids - existing_user_ids)
+    if missing_user_ids:
+        raise Validation(
+            "分润人员不存在",
+            details={"field": "items.user_id", "missing": missing_user_ids},
+        )
+
+    if total_amount > 0:
+        profit = order_amounts(session, order_id)["PROFIT"]
+        if profit <= 0:
+            raise Validation(
+                "该单尚无正利润，不能按金额分润；请改用比例分润",
+                details={"profit": str(profit)},
+            )
+        if total_amount > profit:
+            raise Validation(
+                f"分润金额合计 {total_amount} 超过订单利润 {profit}",
+                details={"total_amount": str(total_amount), "profit": str(profit)},
+            )
+        if total_rate > Decimal("100"):
+            raise Validation(
+                "存在按金额分润时，比例合计不能超过 100%",
+                details={"total_rate": str(total_rate)},
+            )
+    elif total_rate != Decimal("100.00"):
+        raise Validation(
+            "有效分配比例合计必须为 100%",
+            details={"total": str(total_rate), "items": len(items)},
+        )
+
+    for old in session.scalars(
+        select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order_id)
+    ).all():
+        session.delete(old)
+    session.flush()
+
+    created = []
+    for item in items:
+        row = OrderProfitAllocation(
+            order_id=order_id,
+            user_id=int(item["user_id"]) if item.get("user_id") is not None else None,
+            role=str(item.get("role") or "OWNER").upper(),
+            allocation_type=None,
+            allocation_rate=to_money(item.get("allocation_rate") or 0),
+            allocation_amount=to_money(item.get("allocation_amount") or 0),
+            policy_version_id=order.policy_version_id,
+        )
+        session.add(row)
+        created.append(row)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.EXCEPTION_APPROVE,
+        entity_type="order",
+        entity_id=order_id,
+        actor=actor,
+        after={
+            "allocations": [
+                {
+                    "user_id": r.user_id,
+                    "role": r.role,
+                    "allocation_type": r.allocation_type,
+                    "rate": str(r.allocation_rate),
+                    "amount": str(r.allocation_amount),
+                }
+                for r in created
+            ]
+        },
+    )
+    return list_allocations(session, order_id, user=user)
+
+
+def _set_action_allocations(
     session: Session,
     order_id: int,
     *,
@@ -628,6 +797,7 @@ def set_allocations(
             role=str(item["role"]).upper(),
             allocation_type=allocation_type,
             allocation_rate=to_money(item.get("allocation_rate")),
+            allocation_amount=to_money(item.get("allocation_amount") or 0),
             policy_version_id=order.policy_version_id,
         )
         session.add(row)
@@ -659,9 +829,11 @@ def list_allocations(
         .order_by(OrderProfitAllocation.id)
     ).all()
     total = Decimal("0")
+    total_amount = Decimal("0")
     out = []
     for row in rows:
         total += to_money(row.allocation_rate)
+        total_amount += to_money(row.allocation_amount)
         out.append(
             {
                 "id": row.id,
@@ -670,10 +842,14 @@ def list_allocations(
                 "role": row.role,
                 "allocation_type": row.allocation_type,
                 "allocation_rate": str(to_money(row.allocation_rate)),
+                "allocation_amount": str(to_money(row.allocation_amount)),
                 "policy_version_id": row.policy_version_id,
             }
         )
-    return [{**item, "total_rate": str(total)} for item in out] if out else []
+    return [
+        {**item, "total_rate": str(total), "total_amount": str(total_amount)}
+        for item in out
+    ]
 
 
 __all__ = [

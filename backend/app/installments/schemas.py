@@ -24,7 +24,8 @@ class InstallmentCreate(RequestModel):
     )
     principal: Decimal = Decimal("0")
     down_payment: Decimal = Decimal("0")
-    service_fee: Decimal = Decimal("0")
+    # 省略（null）时按 INSTALLMENT 规则的 service_fee_rate × 基数补算；传 0 视为「不收服务费」。
+    service_fee: Decimal | None = None
     periods: int = Field(gt=0)
     per_period_service_fee: Decimal = Decimal("0")
     per_period: Decimal = Decimal("0")

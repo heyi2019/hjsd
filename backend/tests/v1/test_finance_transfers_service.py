@@ -2,23 +2,23 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.finance import transfers
 
 
 def _pools(seeded_db):
-    from app.finance import pool_accounts
-
-    return (
-        pool_accounts.get_pool(seeded_db, "HJ_INVEST"),
-        pool_accounts.get_pool(seeded_db, "HJ_PROFIT"),
-    )
+    """按 code 取 system 池（等价于原 pool_accounts.get_pool）。"""
+    invest = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+    assert invest is not None and profit is not None, "种子池缺失"
+    return invest, profit
 
 
 def _make_single_side(seeded_db, *, source, target):

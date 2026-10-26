@@ -7,6 +7,7 @@ snapshot_for 无快照、set_allocations 坏 rate，以及 6 个未测路由端�
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -408,11 +409,14 @@ class TestPolicyApi:
         )
         assert put.status_code == 200, put.text
         assert put.json()["total"] == 4
+        # 订单总利润随分润接口下发（弹窗展示 + 金额分润上限）。该单无过账事件 → 利润 0。
+        assert Decimal(str(put.json()["order_profit"])) == 0
 
         listed = seeded_client.get(
             f"/api/v1/orders/{order.id}/profit-allocations", headers=json_headers
         )
         assert listed.status_code == 200
+        assert Decimal(str(listed.json()["order_profit"])) == 0
         operation = next(
             item for item in listed.json()["items"] if item["allocation_type"] == "OPERATION"
         )

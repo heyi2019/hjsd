@@ -36,9 +36,11 @@ class PolicyVersionApprove(RequestModel):
 
 class ProfitAllocationItem(RequestModel):
     user_id: int | None = Field(default=None, gt=0)
-    role: str = Field(min_length=1, max_length=32)
-    allocation_type: str = Field(min_length=1, max_length=16)
-    allocation_rate: Decimal = Field(ge=0)
+    role: str = Field(default="OWNER", min_length=1, max_length=32)
+    allocation_type: str | None = Field(default=None, max_length=16)
+    # 比例与金额都是选填：填比例按利润占比分，填金额按固定额分，同一条不可同时填。
+    allocation_rate: Decimal = Field(default=Decimal("0"), ge=0)
+    allocation_amount: Decimal = Field(default=Decimal("0"), ge=0)
 
 
 class ProfitAllocationSet(RequestModel):
@@ -103,8 +105,10 @@ class ProfitAllocationOut(BaseModel):
     role: str
     allocation_type: str | None = None
     allocation_rate: Decimal
+    allocation_amount: Decimal = Decimal("0")
     policy_version_id: int | None = None
     total_rate: Decimal
+    total_amount: Decimal = Decimal("0")
 
 
 class ProfitAllocationListOut(BaseModel):
@@ -112,6 +116,9 @@ class ProfitAllocationListOut(BaseModel):
 
     items: list[ProfitAllocationOut]
     total: int
+    # 订单总利润（口径同 order_amounts：收入-买入成本-直接费用），负数即亏损单。
+    # 分润弹窗据此展示基数，金额分润的上限也由它决定。
+    order_profit: Decimal = Decimal("0")
 
 
 class PolicySnapshotOut(BaseModel):

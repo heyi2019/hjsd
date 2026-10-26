@@ -49,12 +49,18 @@ def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
 
 @event.listens_for(Engine, "connect")
 def _enable_sqlite_foreign_keys(dbapi_connection: Any, connection_record: Any) -> None:
-    """SQLite 默认不启用外键；不开启会导致 cascade 失效、脏行留存。"""
+    """SQLite 连接级 PRAGMA：外键 + WAL。
+
+    - 外键默认关闭，不开启会导致 cascade 失效、脏行留存；
+    - journal_mode 默认 delete（读写互斥），改 WAL 后读不阻塞写、写不阻塞读。
+      该设置持久化在库头，此处每次连接再声明一次，保证新建库/临时库同样生效。
+    """
     if dbapi_connection.__class__.__module__ not in {"sqlite3", "pysqlite2.dbapi2"}:
         return
     try:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
     except Exception:  # pragma: no cover - 非 SQLite 方言直接忽略
         pass

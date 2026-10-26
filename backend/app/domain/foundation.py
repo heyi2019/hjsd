@@ -194,6 +194,14 @@ class AuditLog(Base):
     """受控操作审计日志：只追加，禁止编辑与删除（BAS-05-03）。"""
 
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        # 审计页按「对象类型 + 对象 ID」查轨迹，并按动作 / 操作人 / 时间筛选。
+        # 该表只追加、增长最快，缺索引时每次查询都是全表扫描（2026-10-26 补齐）。
+        Index("ix_audit_logs_entity", "entity_type", "entity_id", "id"),
+        Index("ix_audit_logs_action", "action"),
+        Index("ix_audit_logs_actor", "actor"),
+        Index("ix_audit_logs_occurred_at", "occurred_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     occurred_at: Mapped[datetime] = mapped_column(

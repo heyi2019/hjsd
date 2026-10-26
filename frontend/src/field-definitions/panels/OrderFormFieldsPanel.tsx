@@ -1,4 +1,4 @@
-/** 建单表单字段配置面板：按业务类型（回收/提号/代挂/代分期）配置字段的
+/** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
  *  新增、删除、必填/选填（行内开关）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
 import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography, message } from "antd";
@@ -13,14 +13,23 @@ import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
 
-const parseOptions = (raw: unknown): string[] | undefined => {
-  const text = typeof raw === "string" ? raw : "";
-  const items = text.split(/[,，]/).map((item) => item.trim()).filter(Boolean);
-  return items.length ? items : undefined;
+/** 规范化表单里的 options 字段：过滤空 value，label 缺省取 value。 */
+const normalizeOptionItems = (raw: unknown): Array<{ value: string; label: string }> => {
+  if (!Array.isArray(raw)) return [];
+  return (raw as Array<{ value?: string; label?: string }>)
+    .map((o) => ({ value: (o?.value ?? "").trim(), label: (o?.label ?? "").trim() || (o?.value ?? "").trim() }))
+    .filter((o) => o.value);
 };
 
-export function OrderFormFieldsPanel() {
-  const [activeType, setActiveType] = useState<string>("HS");
+export interface OrderFormFieldsPanelProps {
+  /** 初始选中的表单作用域；由「配置总览」跳转过来时传入，缺省为 HS。 */
+  initialScope?: string;
+}
+
+export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps = {}) {
+  const [activeType, setActiveType] = useState<string>(
+    initialScope && FORM_SCOPE_LABEL[initialScope] ? initialScope : "HS",
+  );
   const [rows, setRows] = useState<OrderFormField[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -46,7 +55,7 @@ export function OrderFormFieldsPanel() {
     try {
       const sortOrder = Number(values.sort_order ?? 0);
       const required = Boolean(values.required);
-      const options = needsOptions ? (parseOptions(values.options) ?? []) : undefined;
+      const options = needsOptions ? normalizeOptionItems(values.options) : undefined;
       if (editingId === null) {
         await orderFormFieldsApi.create({
           order_type_code: activeType,
@@ -81,7 +90,7 @@ export function OrderFormFieldsPanel() {
       field_key: row.field_key,
       label: row.label,
       field_type: row.field_type,
-      options: row.options?.join("，") ?? "",
+      options: (row.options ?? []).map((o) => (typeof o === "string" ? { value: o, label: o } : o)),
       required: Boolean(row.required),
       sort_order: row.sort_order,
     });
@@ -124,7 +133,14 @@ export function OrderFormFieldsPanel() {
         </PermissionGate>
       ),
     },
-    { title: "选项", dataIndex: "options", render: (value: string[] | null | undefined) => (value?.length ? value.join("、") : "-") },
+    {
+      title: "选项",
+      dataIndex: "options",
+      render: (value: Array<string | { value: string; label: string }> | null | undefined) =>
+        value && value.length
+          ? value.map((o) => (typeof o === "string" ? o : o.label)).join("、")
+          : "-",
+    },
     {
       title: "启用",
       dataIndex: "is_active",
@@ -240,8 +256,29 @@ export function OrderFormFieldsPanel() {
             <Select options={FIELD_TYPE_OPTIONS} className="ui-control-width-110" disabled={editingId !== null} />
           </Form.Item>
           {needsOptions && (
-            <Form.Item name="options" label="选项">
-              <Input placeholder="逗号分隔，如 是,否" className="ui-control-width-200" />
+            <Form.Item label="选项（值 / 展示名）">
+              <Form.List name="options">
+                {(fields, { add, remove }) => (
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    {fields.map(({ key, name, ...restField }) => (
+                      <Space key={key} align="baseline">
+                        <Form.Item {...restField} name={[name, "value"]} rules={[{ required: true, message: "值必填" }]} noStyle>
+                          <Input placeholder="value（后端枚举码/字典键）" style={{ width: 200 }} />
+                        </Form.Item>
+                        <Form.Item {...restField} name={[name, "label"]} noStyle>
+                          <Input placeholder="展示名（可空，默认同值）" style={{ width: 200 }} />
+                        </Form.Item>
+                        <PermissionButton permission="field-definition.manage" danger size="small" onClick={() => remove(name)}>
+                          删
+                        </PermissionButton>
+                      </Space>
+                    ))}
+                    <PermissionButton permission="field-definition.manage" onClick={() => add({ value: "", label: "" })}>
+                      添加选项
+                    </PermissionButton>
+                  </Space>
+                )}
+              </Form.List>
             </Form.Item>
           )}
           <Form.Item name="required" label="必填" valuePropName="checked"><Switch /></Form.Item>

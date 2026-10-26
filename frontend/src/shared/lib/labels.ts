@@ -223,4 +223,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   IMPORT_MARK_UNLINKED: "标记单边划转",
   IMPORT_ROLLBACK: "回滚导入批次",
   IMPORT_CORRECTION: "更正导入批次",
+  OPTION_SET_CREATE: "新建选项词典",
+  OPTION_SET_UPDATE: "编辑选项词典",
+  OPTION_SET_DELETE: "删除选项词典",
 };

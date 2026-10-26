@@ -53,19 +53,22 @@ beforeEach(() => {
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
-it("渲染四个主数据 Tab，默认业务类型列表可见", async () => {
+it("渲染四个主数据 Tab，切到业务类型后列表可见", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
   expect(await screen.findByRole("tab", { name: "业务类型" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "资金池" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "活字段" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "经营规则" })).toBeInTheDocument();
-  expect(vi.mocked(client.api).get).not.toHaveBeenCalled();
+  // 默认进入「配置总览」，业务类型面板此时尚未挂载
+  expect(screen.queryByText("HS")).toBeNull();
   await ui.click(screen.getByRole("tab", { name: "业务类型" }));
   expect(await screen.findByText("HS")).toBeInTheDocument();
 });
 
 it("业务分类明确分期归自营、代分期归分销", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
+  // 默认 Tab 是配置总览，先切到业务字典（业务口径文案在该面板）
+  await ui.click(await screen.findByRole("tab", { name: "业务字典" }));
   expect(await screen.findByText(/分期：本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
   expect(screen.getByText(/代分期：客户向本方借款，按合约分期还款/)).toBeInTheDocument();
   expect(screen.getAllByText(/生成 DFQ 业务订单号/)).toHaveLength(2);

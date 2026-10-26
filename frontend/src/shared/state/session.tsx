@@ -28,6 +28,7 @@ export const ALL_PERMISSIONS = [
   "audit.read",
   "pool.manage",
   "order-type.manage",
+  "option-set.manage",
   "report.read",
   "report.export",
   "import.manage",

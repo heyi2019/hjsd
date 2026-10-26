@@ -22,15 +22,13 @@ import { InventoryDetail } from "./InventoryDetail";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
 import {
   BUSINESS_MODE_LABEL,
-  BUSINESS_OPTIONS,
   EDITABLE_ACCOUNT_TYPES,
   INVENTORY_TYPE_LABEL,
-  INVENTORY_TYPE_OPTIONS,
   PROFILE_ACCOUNT_TYPES,
-  STATUS_OPTIONS,
   inventoryAge,
 } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
+import { useOptionSet } from "../shared/lib/optionSets";
 
 export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [rows, setRows] = useState<Account[]>([]);
@@ -61,6 +59,10 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [cancellingInstallment, setCancellingInstallment] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型）。
+  const statusOptions = useOptionSet("INVENTORY_STATUS");
+  const businessOptions = useOptionSet("INVENTORY_BUSINESS");
+  const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
   const load = useCallback(async () => {
     try {
       const list = await accountsApi.list(status ? { status } : undefined);
@@ -541,9 +543,9 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         title="账号台账"
         extra={
           <Space wrap>
-            <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={status} options={STATUS_OPTIONS} onChange={(value) => { setStatus(value); setPage(1); }} />
-            <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={BUSINESS_OPTIONS} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
-            <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={INVENTORY_TYPE_OPTIONS} onChange={(value) => { setInventoryType(value); setPage(1); }} />
+            <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={status} options={statusOptions ?? []} onChange={(value) => { setStatus(value); setPage(1); }} />
+            <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
+            <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
             <Input
               allowClear
               value={keyword}

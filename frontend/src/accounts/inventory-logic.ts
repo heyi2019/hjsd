@@ -1,11 +1,13 @@
 import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
 
-export const STATUS_OPTIONS = [
-  { value: "IN_STOCK", label: "在库" },
-  { value: "INSTALLMENT", label: "分期中" },
-  { value: "SOLD", label: "已售" },
-  { value: "VOID", label: "下架" },
-];
+/** 状态 / 业务 / 类型的展示文案（用于表格、导出、报表渲染）。
+ * ⚠️ 这些是渲染用的静态文案；筛选项的「可选项是哪些」由设置页「选项词典」配置（INVENTORY_STATUS / INVENTORY_BUSINESS / INVENTORY_TYPE）。 */
+export const STATUS_LABEL: Record<string, string> = {
+  IN_STOCK: "在库",
+  INSTALLMENT: "分期中",
+  SOLD: "已售",
+  VOID: "下架",
+};
 
 export const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -18,15 +20,13 @@ export const INVENTORY_TYPE_LABEL: Record<string, string> = {
   CONSIGNMENT: "代挂",
 };
 
-export const BUSINESS_OPTIONS = Object.entries(BUSINESS_MODE_LABEL).map(([value, label]) => ({ value, label }));
-export const INVENTORY_TYPE_OPTIONS = Object.entries(INVENTORY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 export const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
 export const EDITABLE_ACCOUNT_TYPES = new Set(["RECOVERY", "PICKUP", "CONSIGNMENT"]);
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export function inventoryStatusLabel(value: string): string {
-  return STATUS_OPTIONS.find((option) => option.value === value)?.label ?? value;
+  return STATUS_LABEL[value] ?? value;
 }
 
 export function financeTypeLabel(eventType: string, direction: string): string {

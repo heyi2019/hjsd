@@ -32,6 +32,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
@@ -85,6 +86,11 @@ export function FundsPage() {
   const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  // T20：资金流水筛选项从「选项词典」配置读取（方向 / 状态 / 资金性质 / 核算属性）。
+  const flowDirectionOptions = useOptionSet("FUND_FLOW_DIRECTION");
+  const flowStatusOptions = useOptionSet("FUND_FLOW_STATUS");
+  const flowFundNatureOptions = useOptionSet("FUND_FLOW_FUND_NATURE");
+  const flowAttributeOptions = useOptionSet("FUND_FLOW_ACCOUNTING_ATTRIBUTE");
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [loading, setLoading] = useState(false);
@@ -691,10 +697,10 @@ export function FundsPage() {
                 <div className="ui-filter-bar funds-cashflow-filters">
                   <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
                   <Select aria-label="流水资金池" allowClear value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
-                  <Select aria-label="流水方向" allowClear value={cashflowDirection} placeholder="全部收支" options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} onChange={setCashflowDirection} />
-                  <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={[{ value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已审核" }, { value: "REJECTED", label: "已拒绝" }]} onChange={setCashflowStatus} />
-                  <Select aria-label="流水资金性质" allowClear value={cashflowFundNature || undefined} placeholder="全部资金性质" options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowFundNature(value ?? "")} />
-                  <Select aria-label="流水核算属性" allowClear value={cashflowAttribute || undefined} placeholder="全部核算属性" options={Object.entries(ACCOUNTING_ATTRIBUTE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowAttribute(value ?? "")} />
+                  <Select aria-label="流水方向" allowClear value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
+                  <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
+                  <Select aria-label="流水资金性质" allowClear value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
+                  <Select aria-label="流水核算属性" allowClear value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
                   <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
                   <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
                   <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
@@ -864,10 +870,9 @@ export function FundsPage() {
           <Form form={cashflowForm} layout="vertical" onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
-          <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]} /></CfgItem>
+          <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select /></CfgItem>
           <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
             <Select
-              options={Object.entries(FUND_NATURE_LABEL).map(([value, label]) => ({ value, label }))}
               onChange={(value: string) => {
                 // 资金性质切换后，原核算属性可能不在白名单内，自动改选首个合法项
                 const allowed = ALLOWED_ATTRIBUTES_BY_FUND_NATURE[value] ?? [];

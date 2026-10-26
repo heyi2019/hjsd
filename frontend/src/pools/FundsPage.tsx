@@ -91,6 +91,8 @@ export function FundsPage() {
   const flowStatusOptions = useOptionSet("FUND_FLOW_STATUS");
   const flowFundNatureOptions = useOptionSet("FUND_FLOW_FUND_NATURE");
   const flowAttributeOptions = useOptionSet("FUND_FLOW_ACCOUNTING_ATTRIBUTE");
+  // 资金流向（nature）从 CASHFLOW_NATURE 词典读取，设置页改文案可同步；词典未加载时回落 NATURE_LABEL。
+  const natureOptionSet = useOptionSet("CASHFLOW_NATURE");
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [loading, setLoading] = useState(false);
@@ -525,7 +527,8 @@ export function FundsPage() {
     {
       title: "流向",
       dataIndex: "nature",
-      render: (v: string | null | undefined) => NATURE_LABEL[v ?? ""] ?? v ?? "—",
+      render: (v: string | null | undefined) =>
+        natureOptionSet?.find((o) => o.value === (v ?? ""))?.label ?? NATURE_LABEL[v ?? ""] ?? v ?? "—",
     },
     {
       title: "金额",

@@ -20,7 +20,10 @@ const parseOptions = (raw: unknown): string[] | undefined => {
 export function FieldsPanel() {
   // 词典未加载时回落模块常量，保证与改造前完全一致。
   const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
-  const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_OPTIONS;
+  // 活字段实体仅支持 EntityType 枚举的 8 个值，不能暴露 ENTITY_TYPE 词典的 30 种审计裸码。
+  // 词典加载时只保留活字段支持的子集，未加载时回落 ENTITY_TYPE_OPTIONS（同源）。
+  const entityOptionSet = useOptionSet("ENTITY_TYPE");
+  const entityTypeOptions = entityOptionSet?.filter((o) => ENTITY_TYPE_LABEL[o.value]) ?? ENTITY_TYPE_OPTIONS;
   const [rows, setRows] = useState<FieldDefinition[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);

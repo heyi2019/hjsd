@@ -2,10 +2,11 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
-from app.finance import pool_accounts
+from app.domain.foundation import Pool
 from app.finance.cashflows import approve_cashflow, create_cashflow
 from app.finance.reconciliation import (
     _get_reconciliation,
@@ -27,40 +28,35 @@ def _restricted_user() -> CurrentUser:
 
 
 def _seed_recon(seeded_db):
-    pool = pool_accounts.get_pool(seeded_db, "HJ_INVEST")
-    account = pool_accounts.create_pool_account(
-        seeded_db,
-        pool_id=pool.id,
-        account_no="RECON-SVC-001",
-        account_name="对账svc",
-        account_type="BANK",
-        ownership="OWNED",
-        opening_balance=Decimal("50"),
-        actor="pytest",
-    )
-    flow = create_cashflow(
-        seeded_db,
-        pool_id=pool.id,
-        pool_account_id=account.id,
-        occurred_on=date(2026, 10, 17),
-        direction="IN",
-        nature="BUSINESS_IN",
-        fund_nature="BUSINESS",
-        accounting_attribute="OPERATING_EXPENSE",
-        category="OTHER",
-        amount=Decimal("20"),
-        actor="pytest",
-    )
-    approve_cashflow(seeded_db, flow.id, actor="finance")
-    return pool, account
+    """在 HJ_INVEST 池上造两笔已审核流水，建立系统余额基线 50+20=70。
+
+    资金池账户下线后系统余额即「池内已审核流水有符号和」，原本来自
+    PoolAccount.opening_balance 的 50 改为等额期初流水，基线保持不变。
+    """
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    assert pool is not None, "种子池 HJ_INVEST 缺失"
+    for amount in (Decimal("50"), Decimal("20")):
+        flow = create_cashflow(
+            seeded_db,
+            pool_id=pool.id,
+            occurred_on=date(2026, 10, 17),
+            direction="IN",
+            nature="BUSINESS_IN",
+            fund_nature="BUSINESS",
+            accounting_attribute="OPERATING_EXPENSE",
+            category="OTHER",
+            amount=amount,
+            actor="pytest",
+        )
+        approve_cashflow(seeded_db, flow.id, actor="finance")
+    return pool
 
 
 def test_create_reconciliation_rejects_duplicate(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     create_reconciliation(
         seeded_db,
         pool_id=pool.id,
-        pool_account_id=account.id,
         reconciled_on=date(2026, 10, 17),
         account_label="对账svc",
         statement_balance=Decimal("70"),
@@ -70,7 +66,6 @@ def test_create_reconciliation_rejects_duplicate(seeded_db):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="对账svc",
             statement_balance=Decimal("70"),
@@ -79,12 +74,11 @@ def test_create_reconciliation_rejects_duplicate(seeded_db):
 
 
 def test_create_reconciliation_rejects_non_iterable_unmatched(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     with pytest.raises(Validation, match="未达流水 ID 列表格式无效"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="对账svc",
             statement_balance=Decimal("70"),
@@ -94,12 +88,11 @@ def test_create_reconciliation_rejects_non_iterable_unmatched(seeded_db):
 
 
 def test_create_reconciliation_rejects_duplicate_flow_ids(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     with pytest.raises(Validation, match="未达流水不能重复"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="对账svc",
             statement_balance=Decimal("70"),
@@ -109,12 +102,11 @@ def test_create_reconciliation_rejects_duplicate_flow_ids(seeded_db):
 
 
 def test_create_reconciliation_rejects_missing_flow(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     with pytest.raises(Validation, match="未达流水不存在"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="对账svc",
             statement_balance=Decimal("70"),
@@ -124,22 +116,11 @@ def test_create_reconciliation_rejects_missing_flow(seeded_db):
 
 
 def test_create_reconciliation_rejects_flow_outside_pool(seeded_db):
-    pool, account = _seed_recon(seeded_db)
-    profit = pool_accounts.get_pool(seeded_db, "HJ_PROFIT")
-    acc2 = pool_accounts.create_pool_account(
-        seeded_db,
-        pool_id=profit.id,
-        account_no="RECON-SVC-002",
-        account_name="x",
-        account_type="BANK",
-        ownership="OWNED",
-        opening_balance=Decimal("0"),
-        actor="pytest",
-    )
+    pool = _seed_recon(seeded_db)
+    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
     flow2 = create_cashflow(
         seeded_db,
         pool_id=profit.id,
-        pool_account_id=acc2.id,
         occurred_on=date(2026, 10, 17),
         direction="IN",
         nature="BUSINESS_IN",
@@ -154,7 +135,6 @@ def test_create_reconciliation_rejects_flow_outside_pool(seeded_db):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="对账svc",
             statement_balance=Decimal("70"),
@@ -163,37 +143,11 @@ def test_create_reconciliation_rejects_flow_outside_pool(seeded_db):
         )
 
 
-def test_create_reconciliation_rejects_account_not_in_pool(seeded_db):
-    pool, account = _seed_recon(seeded_db)
-    profit = pool_accounts.get_pool(seeded_db, "HJ_PROFIT")
-    acc2 = pool_accounts.create_pool_account(
-        seeded_db,
-        pool_id=profit.id,
-        account_no="RECON-SVC-003",
-        account_name="x",
-        account_type="BANK",
-        ownership="OWNED",
-        opening_balance=Decimal("0"),
-        actor="pytest",
-    )
-    with pytest.raises(Validation, match="对账账户不属于当前资金池"):
-        create_reconciliation(
-            seeded_db,
-            pool_id=pool.id,
-            pool_account_id=acc2.id,
-            reconciled_on=date(2026, 10, 17),
-            account_label="对账svc",
-            statement_balance=Decimal("70"),
-            actor="pytest",
-        )
-
-
 def test_create_reconciliation_with_difference_and_reason(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     item = create_reconciliation(
         seeded_db,
         pool_id=pool.id,
-        pool_account_id=account.id,
         reconciled_on=date(2026, 10, 17),
         account_label="差异对账",
         statement_balance=Decimal("100"),
@@ -206,12 +160,11 @@ def test_create_reconciliation_with_difference_and_reason(seeded_db):
 
 
 def test_create_reconciliation_rejects_user_not_visible(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     with pytest.raises(NotFound, match="资金池不存在"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="x",
             statement_balance=Decimal("0"),
@@ -226,11 +179,10 @@ def test_get_reconciliation_rejects_unknown(seeded_db):
 
 
 def test_get_reconciliation_rejects_user_not_visible(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     item = create_reconciliation(
         seeded_db,
         pool_id=pool.id,
-        pool_account_id=account.id,
         reconciled_on=date(2026, 10, 17),
         account_label="可见测试",
         statement_balance=Decimal("70"),
@@ -241,11 +193,10 @@ def test_get_reconciliation_rejects_user_not_visible(seeded_db):
 
 
 def test_list_reconciliations_user_filter(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     item = create_reconciliation(
         seeded_db,
         pool_id=pool.id,
-        pool_account_id=account.id,
         reconciled_on=date(2026, 10, 17),
         account_label="list测试",
         statement_balance=Decimal("70"),
@@ -263,11 +214,10 @@ def test_list_reconciliations_user_filter(seeded_db):
 
 
 def test_resolve_reconciliation_requires_open_and_reason(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     item = create_reconciliation(
         seeded_db,
         pool_id=pool.id,
-        pool_account_id=account.id,
         reconciled_on=date(2026, 10, 17),
         account_label="核销测试",
         statement_balance=Decimal("70"),
@@ -281,14 +231,13 @@ def test_resolve_reconciliation_requires_open_and_reason(seeded_db):
 
 
 def test_create_reconciliation_rejects_difference_without_reason(seeded_db):
-    pool, account = _seed_recon(seeded_db)
+    pool = _seed_recon(seeded_db)
     # system=70 而 statement=100 → difference=30（!=0），且不传 reason；
     # 删除原 153 行冗余防御后，此行为改由 _text(required=difference!=0) 兜住。
     with pytest.raises(Validation, match="存在差异时必须填写差异原因"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
-            pool_account_id=account.id,
             reconciled_on=date(2026, 10, 17),
             account_label="差异无原因",
             statement_balance=Decimal("100"),

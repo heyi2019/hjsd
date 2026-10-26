@@ -14,7 +14,6 @@ from app.accounts import service as accounts_service
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
 from app.finance import cashflows
-from app.finance import pool_accounts
 from app.finance import rebates
 from app.finance import router as finance_router
 from app.finance import schemas
@@ -45,25 +44,10 @@ def _all_scope_user() -> CurrentUser:
     )
 
 
-def _account(seeded_db):
-    return pool_accounts.create_pool_account(
-        seeded_db,
-        pool_id=1,
-        account_no="RT-SVC-001",
-        account_name="rt",
-        account_type="BANK",
-        ownership="OWNED",
-        opening_balance=Decimal("0"),
-        actor="pytest",
-    )
-
-
 def _make_pending_flow(seeded_db):
-    account = _account(seeded_db)
     return cashflows.create_cashflow(
         seeded_db,
         pool_id=1,
-        pool_account_id=account.id,
         occurred_on=TODAY,
         direction="IN",
         nature="EXTERNAL_IN",
@@ -233,29 +217,4 @@ def test_router_settle_rebate_record_not_found(seeded_db):
             ),
             db=seeded_db,
             user=_all_scope_user(),
-        )
-
-
-# ----------------------------------------------------- update_pool_account 越权
-def test_router_update_pool_account_not_visible(seeded_db):
-    acc = _account(seeded_db)
-    with pytest.raises(NotFound):
-        finance_router.update_pool_account(
-            acc.id,
-            payload=schemas.PoolAccountUpdate(account_name="改名"),
-            db=seeded_db,
-            user=_restricted_user(),
-        )
-
-
-# ----------------------------------------------------- batch_set_pool_account_status 越权
-def test_router_batch_set_pool_account_not_visible(seeded_db):
-    acc = _account(seeded_db)
-    with pytest.raises(NotFound):
-        finance_router.batch_set_pool_account_status(
-            payload=schemas.PoolAccountBatchStatus(
-                account_ids=[acc.id], status="DISABLED", reason="x"
-            ),
-            db=seeded_db,
-            user=_restricted_user(),
         )

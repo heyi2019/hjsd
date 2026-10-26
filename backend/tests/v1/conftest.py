@@ -67,6 +67,19 @@ def v1_engine(tmp_path_factory: pytest.TempPathFactory):
         connect_args={"check_same_thread": False},
         future=True,
     )
+
+    # 测试库不需要崩溃安全：关 fsync + 内存 journal，消除并行跑时的 I/O 等待。
+    # 仅作用于本测试引擎，不影响生产 database.py。
+    from sqlalchemy import event as sa_event
+
+    @sa_event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_conn, _record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA synchronous=OFF")
+        cursor.execute("PRAGMA journal_mode=MEMORY")
+        cursor.execute("PRAGMA temp_store=MEMORY")
+        cursor.close()
+
     Base.metadata.create_all(bind=engine)
     yield engine
     engine.dispose()
@@ -97,15 +110,61 @@ def db(v1_engine):
         connection.close()
 
 
+@pytest.fixture(scope="session")
+def seed_template_path(tmp_path_factory: pytest.TempPathFactory):
+    """会话级种子模板库：只 seed 一次，之后每个用例用 ATTACH 回放（纯 SQL，无 ORM 开销）。
+
+    seed_foundation 单次 ~40-95ms × 978 个种子用例曾是全量运行的最大 CPU 项；
+    回放成本 ~几 ms，行为与逐次 seed 完全一致（同一批行、同样的主键与顺序）。
+    """
+    db_file = tmp_path_factory.mktemp("seed_tmpl") / "seed_template.db"
+    engine = create_engine(
+        f"sqlite:///{db_file}",
+        connect_args={"check_same_thread": False},
+        future=True,
+    )
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)()
+    seed_foundation(session, actor="pytest")
+    seed_default_users(session)
+    session.commit()
+    session.close()
+    engine.dispose()
+    return str(db_file)
+
+
+def _replay_seeds(db: Session, template_path: str) -> None:
+    """把模板库的全部行回放到 db 所在库（ATTACH + INSERT..SELECT，走 SQLite C 层）。
+
+    注意：DETACH 必须在 commit 之后——事务未提交时主库持有写锁，DETACH 会报 locked。
+    """
+    raw = db.connection().connection  # DBAPI 连接（SQLAlchemy 池代理）
+    cursor = raw.cursor()
+    cursor.execute("ATTACH DATABASE ? AS seed_template", (template_path,))
+    try:
+        for table in Base.metadata.sorted_tables:  # 依赖序，父表先插
+            cursor.execute(
+                f'INSERT INTO main."{table.name}" SELECT * FROM seed_template."{table.name}"'
+            )
+        db.commit()  # 先提交释放写锁
+        cursor.execute("DETACH DATABASE seed_template")
+    finally:
+        cursor.close()
+
+
 @pytest.fixture()
-def seeded_db(db: Session):
-    seed_foundation(db, actor="pytest")
-    seed_default_users(db)
+def seeded_db(db: Session, seed_template_path: str):
+    _replay_seeds(db, seed_template_path)
     db.commit()
     return db
 
 
-@pytest.fixture()
+# 会话级复用：create_app 单次 ~415ms（162 条路由的 pydantic schema 注册是纯 CPU 无状态），
+# 函数级重建曾占全量运行大头。共享 app 安全的前提：
+# - 全库无测试直接改 app.state / 依赖覆写（conftest 的 client/seeded_client 每用例 set/clear）；
+# - create_app 无 lifespan/on_event 钩子，TestClient 反复进出无状态残留；
+# - 需要自定义 settings 的用例（test_settings / test_main_contract）自行 create_app，不受影响。
+@pytest.fixture(scope="session")
 def app():
     return create_app()
 

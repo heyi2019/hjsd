@@ -61,7 +61,7 @@ export function PeriodLocksPanel() {
 
   return (
     <section className="ui-stack">
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+      <Typography.Paragraph type="secondary" className="ui-text-flush">
         锁定某个会计账期后，该账期内不再允许登记或修改现金流；用于月结封账。
       </Typography.Paragraph>
 

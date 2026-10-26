@@ -280,14 +280,14 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           <Form.Item label="选项（值 / 展示名）">
             <Form.List name="options">
               {(fields, { add, remove }) => (
-                <Space direction="vertical" style={{ width: "100%" }}>
+                <Space direction="vertical" className="ui-control-full">
                   {fields.map(({ key, name, ...restField }) => (
                     <Space key={key} align="baseline">
                       <Form.Item {...restField} name={[name, "value"]} rules={[{ required: true, message: "值必填" }]} noStyle>
-                        <Input placeholder="value（后端枚举码/字典键）" style={{ width: 200 }} />
+                        <Input placeholder="value（后端枚举码/字典键）" className="ui-control-width-200" />
                       </Form.Item>
                       <Form.Item {...restField} name={[name, "label"]} noStyle>
-                        <Input placeholder="展示名（可空，默认同值）" style={{ width: 200 }} />
+                        <Input placeholder="展示名（可空，默认同值）" className="ui-control-width-200" />
                       </Form.Item>
                       <PermissionButton permission="field-definition.manage" danger size="small" onClick={() => remove(name)}>
                         删
@@ -370,10 +370,10 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         「条件必填」（如客户来源等于「其他」时其他来源必填）。改动即时反映到对应表单。
         当前：{FORM_SCOPE_LABEL[activeType] ?? activeType}
       </Typography.Paragraph>
-      <Space style={{ marginBottom: 16 }} align="center">
+      <Space className="ui-toolbar-spaced" align="center">
         <Typography.Text strong>表单</Typography.Text>
         <Select
-          style={{ width: 260 }}
+          className="ui-control-width-260"
           value={activeType}
           onChange={(value: string) => {
             setActiveType(value);

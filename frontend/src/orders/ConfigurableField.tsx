@@ -247,13 +247,13 @@ export function CustomFormField({ def }: { def: OrderFormField }): ReactElement 
     case "NUMBER":
       return (
         <Form.Item name={name} label={def.label} rules={rules}>
-          <InputNumber style={{ width: "100%" }} />
+          <InputNumber className="ui-control-full" />
         </Form.Item>
       );
     case "DATE":
       return (
         <Form.Item name={name} label={def.label} rules={rules}>
-          <DatePicker style={{ width: "100%" }} />
+          <DatePicker className="ui-control-full" />
         </Form.Item>
       );
     case "BOOLEAN":

@@ -1129,8 +1129,11 @@
 .ui-control-width-140 { width: var(--col-w-140); }
 .ui-control-width-180 { width: var(--col-w-180); }
 .ui-control-width-200 { width: var(--col-w-200); }
+.ui-control-width-260 { width: var(--col-w-260); }
 .ui-control-min-180 { min-width: var(--col-w-180); }
 .ui-title-spaced { margin-block-start: var(--space-4); }
+.ui-toolbar-spaced { margin-block-end: var(--space-4); }
+.ui-text-flush { margin-block-end: 0; }
 .ui-drawer-actions { justify-content: flex-end; width: 100%; }
 .policy-version-date-row { width: 100%; }
 .policy-version-date-row__item { flex: 1; }

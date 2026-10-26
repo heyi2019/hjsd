@@ -49,17 +49,40 @@ beforeEach(() => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(orderTypes);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fields);
+  vi.mocked(catalog.optionSetsApi.list).mockResolvedValue({ items: [] });
+  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
-it("渲染四个主数据 Tab，切到业务类型后列表可见", async () => {
+it("业务字典仅说明业务口径，不展示配置跳转按钮", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
-  expect(await screen.findByRole("tab", { name: "业务类型" })).toBeInTheDocument();
+  const tabs = await screen.findAllByRole("tab");
+  expect(tabs.slice(0, 4).map((tab) => tab.textContent)).toEqual([
+    "业务字典",
+    "表单字段",
+    "选项词典",
+    "扩展字段",
+  ]);
+  expect(screen.getByText("业务分类口径")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /配置字段与表单/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /管理扩展字段/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /维护选项词典/ })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "配置总览" })).toBeNull();
+
+  await ui.click(screen.getByRole("tab", { name: "扩展字段" }));
+  expect(screen.getByRole("tab", { name: "扩展字段", selected: true })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /配置表单字段/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /维护选项词典/ })).toBeInTheDocument();
+  await ui.click(screen.getByRole("button", { name: /配置表单字段/ }));
+  expect(screen.getByRole("tab", { name: "表单字段", selected: true })).toBeInTheDocument();
+
+  expect(screen.getByRole("tab", { name: "业务类型" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "资金池" })).toBeInTheDocument();
-  expect(screen.getByRole("tab", { name: "活字段" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "扩展字段" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "经营规则" })).toBeInTheDocument();
-  // 默认进入「配置总览」，业务类型面板此时尚未挂载
+  // 业务字典作为入口时，业务类型面板尚未挂载。
   expect(screen.queryByText("HS")).toBeNull();
   await ui.click(screen.getByRole("tab", { name: "业务类型" }));
   expect(await screen.findByText("HS")).toBeInTheDocument();
@@ -67,8 +90,7 @@ it("渲染四个主数据 Tab，切到业务类型后列表可见", async () => 
 
 it("业务分类明确分期归自营、代分期归分销", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
-  // 默认 Tab 是配置总览，先切到业务字典（业务口径文案在该面板）
-  await ui.click(await screen.findByRole("tab", { name: "业务字典" }));
+  // 默认 Tab 是业务字典。
   expect(await screen.findByText(/分期：本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
   expect(screen.getByText(/代分期：客户向本方借款，按合约分期还款/)).toBeInTheDocument();
   expect(screen.getAllByText(/生成 DFQ 业务订单号/)).toHaveLength(2);

@@ -102,13 +102,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
   });
 
-  it("资金属性分析：渲染资金账户 / 方向 / 净方向金额", async () => {
+  it("资金属性分析：渲染资金池 / 方向 / 净方向金额", async () => {
     resolveMockOnce(vi.mocked(catalog.reportsApi.financeDimensions), {
       items: [
         {
           pool_name: "POOL-A",
-          account_name: "经营账户",
-          account_no: "A1",
           fund_nature: "BUSINESS",
           accounting_attribute: "SELF_REVENUE",
           direction: "IN",
@@ -122,7 +120,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     });
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("资金属性分析");
-    await screen.findByText("经营账户（A1）"); // account_name 拼接 account_no
+    await screen.findByText("POOL-A");
+    expect(screen.queryByText("资金账户")).toBeNull();
     expect(screen.getByText("收入")).toBeInTheDocument(); // direction === IN
     expect(screen.getByText("本方经营")).toBeInTheDocument(); // fund_nature 中文映射（#60）
     expect(screen.getByText("自营收入")).toBeInTheDocument(); // accounting_attribute 中文映射（#60）

@@ -92,7 +92,7 @@ SEED: dict[str, list[tuple[str, str, str, bool, bool, int]]] = {
         ("dfq_channel_region", "渠道／区服", "TEXT", True, True, 40),
         ("dfq_bound_phone", "绑定手机号", "TEXT", False, False, 50),
         ("dfq_has_secondary", "有无二次", "SELECT", False, False, 60),
-        ("dfq_game_account_note", "账号备注", "TEXT", False, False, 70),
+        ("dfq_account_note", "账号备注", "TEXT", False, False, 70),
         ("dfq_purchase_price", "账号号价", "NUMBER", True, True, 110),
         ("dfq_down_payment", "客户首付款", "NUMBER", False, False, 120),
         ("dfq_service_fee", "手续费总额", "NUMBER", False, False, 130),

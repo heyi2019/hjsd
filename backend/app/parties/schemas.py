@@ -252,6 +252,7 @@ class FieldDefinitionCreate(RequestModel):
     label: str = Field(min_length=1, max_length=128)
     field_type: str = "TEXT"
     options: list[str] | None = None
+    option_set_code: str | None = Field(default=None, max_length=64)
     default_value: Any = None
     applicable_order_types: list[str] | None = None
     validation_rule: dict[str, Any] | None = None
@@ -264,6 +265,7 @@ class FieldDefinitionUpdate(RequestModel):
 
     label: str | None = Field(default=None, min_length=1, max_length=128)
     options: list[str] | None = None
+    option_set_code: str | None = Field(default=None, max_length=64)
     default_value: Any = None
     applicable_order_types: list[str] | None = None
     validation_rule: dict[str, Any] | None = None
@@ -280,6 +282,7 @@ class FieldDefinitionOut(BaseModel):
     label: str
     field_type: str
     options: list[str] | None = None
+    option_set_code: str | None = None
     default_value: Any = None
     applicable_order_types: list[str] | None = None
     validation_rule: dict[str, Any] | None = None

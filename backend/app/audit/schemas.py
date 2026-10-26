@@ -35,4 +35,31 @@ class AuditActionListOut(BaseModel):
     items: list[str]
 
 
-__all__ = ["AuditActionListOut", "AuditLogListOut", "AuditLogOut"]
+class AuditEntityStatOut(BaseModel):
+    """单个 entity_type 的聚合结果。
+
+    注：`AuditLogListOut.total` 语义是「当前页行数」（= len(items)），不是总数，
+    拿它当累计次数会得到错误数字。需要真实累计数请用 /audit-logs/stats。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    entity_type: str
+    count: int
+    last_at: datetime | None = None
+    last_actor: str | None = None
+
+
+class AuditEntityStatsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AuditEntityStatOut]
+
+
+__all__ = [
+    "AuditActionListOut",
+    "AuditEntityStatOut",
+    "AuditEntityStatsOut",
+    "AuditLogListOut",
+    "AuditLogOut",
+]

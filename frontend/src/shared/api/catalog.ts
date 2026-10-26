@@ -596,6 +596,8 @@ export interface FieldDefinition {
   is_active: boolean;
   /** SELECT / MULTI_SELECT 的选项集：纯字符串数组或 {value,label} 对象数组 */
   options?: Array<string | { value: string; label: string }> | null;
+  /** 选择型字段可复用的选项词典编码。 */
+  option_set_code?: string | null;
 }
 
 export interface GameTypeOption {
@@ -629,41 +631,6 @@ export const orderTypesApi = {
     payload: { portion: string; pool_code: string; fund_nature?: string | null; priority?: number },
   ) =>
     api.post<OrderTypeRoute>(`/order-types/${code}/routes`, payload).then((r) => r.data),
-};
-
-/** 资金池内账户（银行/支付渠道）主数据：归属决定计入权益还是仅计头寸。 */
-export interface PoolAccount {
-  id: number;
-  pool_id: number;
-  account_no: string;
-  account_name: string;
-  account_type: string;
-  ownership: string;
-  opening_balance: string;
-  current_balance: string;
-  status: string;
-  note?: string | null;
-  created_at?: string;
-}
-
-export const poolAccountsApi = {
-  list: (poolId?: number) =>
-    api.get<PoolAccount[]>("/pool-accounts", { params: { pool_id: poolId } }).then((r) => r.data),
-  create: (payload: {
-    pool_id: number;
-    account_no: string;
-    account_name: string;
-    account_type: string;
-    ownership: string;
-    opening_balance: string;
-    note?: string;
-  }) => api.post<PoolAccount>("/pool-accounts", payload).then((r) => r.data),
-  update: (
-    id: number,
-    payload: { account_name?: string; account_type?: string; ownership?: string; opening_balance?: string; note?: string },
-  ) => api.patch<PoolAccount>(`/pool-accounts/${id}`, payload).then((r) => r.data),
-  setStatus: (id: number, status: string) =>
-    api.patch<PoolAccount>(`/pool-accounts/${id}/status`, undefined, { params: { status } }).then((r) => r.data),
 };
 
 export const gameTypesApi = {
@@ -1395,9 +1362,9 @@ export const policyApi = {
 
 export interface RouteImpactPreview { changed: boolean; historical_impact: Record<string, unknown>; future_effect: string }
 export interface InstallmentDisposition { id: number; installment_id: number; account_id: number; action: string; occurred_on: string; related_order_id?: number | null; note: string }
-export interface FinanceDimensionRow { pool_id: number; pool_code: string; pool_name: string; pool_account_id?: number | null; account_no?: string | null; account_name?: string | null; fund_nature: string; accounting_attribute: string; direction: string; flow_count: number; amount: string; signed_amount: string }
+export interface FinanceDimensionRow { pool_id: number; pool_code: string; pool_name: string; fund_nature: string; accounting_attribute: string; direction: string; flow_count: number; amount: string; signed_amount: string }
 export interface FinanceDimensionReport { items: FinanceDimensionRow[]; total_amount: string; total_signed_amount: string }
-export interface Reconciliation { id: number; pool_id: number; pool_account_id?: number | null; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; unmatched_flow_ids?: number[]; note?: string | null }
+export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; unmatched_flow_ids?: number[]; note?: string | null }
 export interface AttachmentItem { id: number; attachment_no: string; file_name: string; size_bytes: number; created_by: string }
 export interface Lead { id: number; lead_no: string; customer_id: number; request_type: string; budget?: string | null; target: string; status: string }
 export interface QualityIssue { id: number; issue_no: string; severity: string; title: string; entity_type: string; entity_id: string; status: string; message: string }

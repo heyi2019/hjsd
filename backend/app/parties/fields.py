@@ -13,6 +13,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction, EntityType, FieldType
 from app.domain.parties import EntityExtraValue, FieldDefinition
+from app.domain.options import OptionSet
 from app.domain.trade import Order
 
 from ._common import (
@@ -364,6 +365,7 @@ def create_field_definition(
     actor: str,
     field_type: str = "TEXT",
     options: Sequence[str] | None = None,
+    option_set_code: str | None = None,
     default_value: Any = None,
     applicable_order_types: Sequence[str] | None = None,
     validation_rule: Mapping[str, Any] | None = None,
@@ -393,7 +395,14 @@ def create_field_definition(
             "排序值不能为负数",
             details={"field": "sort_order", "value": sort_order},
         )
-    normalized_options = _normalize_field_options(field_type, options)
+    if option_set_code and field_type not in {"SELECT", "MULTI_SELECT"}:
+        raise Validation("仅选择型字段可引用选项词典")
+    normalized_option_set_code = option_set_code.strip().upper() if option_set_code else None
+    option_set = session.scalar(select(OptionSet).where(OptionSet.code == normalized_option_set_code)) if normalized_option_set_code else None
+    if normalized_option_set_code and option_set is None:
+        raise Validation("选项词典不存在", details={"option_set_code": normalized_option_set_code})
+    source_options = [item["value"] for item in (option_set.options or [])] if option_set and options is None else options
+    normalized_options = _normalize_field_options(field_type, source_options)
     normalized_applicable = _normalize_applicable_order_types(applicable_order_types)
     normalized_rule = _normalize_validation_rule(field_type, validation_rule)
     key = _required_text(
@@ -433,6 +442,7 @@ def create_field_definition(
         label=normalized_label,
         field_type=field_type,
         options=normalized_options,
+        option_set_code=normalized_option_set_code,
         default_value=default_value,
         applicable_order_types=normalized_applicable,
         validation_rule=normalized_rule,
@@ -464,6 +474,7 @@ def update_field_definition(
     actor: str,
     label: str | None = None,
     options: Sequence[str] | None | object = _UNSET,
+    option_set_code: str | None | object = _UNSET,
     default_value: Any = _UNSET,
     applicable_order_types: Sequence[str] | None | object = _UNSET,
     validation_rule: Mapping[str, Any] | None | object = _UNSET,
@@ -487,6 +498,11 @@ def update_field_definition(
         if options is not _UNSET
         else list(definition.options or [])
     )
+    next_option_set_code = definition.option_set_code if option_set_code is _UNSET else (option_set_code.strip().upper() if option_set_code else None)
+    if next_option_set_code and definition.field_type not in {"SELECT", "MULTI_SELECT"}:
+        raise Validation("仅选择型字段可引用选项词典")
+    if next_option_set_code and session.scalar(select(OptionSet.id).where(OptionSet.code == next_option_set_code)) is None:
+        raise Validation("选项词典不存在", details={"option_set_code": next_option_set_code})
     next_applicable = (
         _normalize_applicable_order_types(applicable_order_types)
         if applicable_order_types is not _UNSET
@@ -504,6 +520,7 @@ def update_field_definition(
         label=next_label,
         field_type=definition.field_type,
         options=next_options,
+        option_set_code=next_option_set_code,
         default_value=next_default,
         applicable_order_types=next_applicable,
         validation_rule=next_rule,
@@ -519,6 +536,7 @@ def update_field_definition(
     before = {
         "label": definition.label,
         "options": definition.options,
+        "option_set_code": definition.option_set_code,
         "default_value": definition.default_value,
         "applicable_order_types": definition.applicable_order_types,
         "validation_rule": definition.validation_rule,
@@ -527,6 +545,7 @@ def update_field_definition(
     }
     definition.label = candidate.label
     definition.options = candidate.options
+    definition.option_set_code = candidate.option_set_code
     definition.default_value = candidate.default_value
     definition.applicable_order_types = candidate.applicable_order_types
     definition.validation_rule = candidate.validation_rule

@@ -92,7 +92,6 @@ def create_cashflow(
     session: Session,
     *,
     pool_id: int,
-    pool_account_id: int | None = None,
     occurred_on: date,
     direction: str,
     nature: str,
@@ -154,20 +153,12 @@ def create_cashflow(
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
-    if pool_account_id is not None:
-        from app.domain.foundation import PoolAccount
-        account = session.get(PoolAccount, pool_account_id)
-        if account is None or account.pool_id != pool.id:
-            raise Validation("资金账户不属于所选资金池", details={"pool_account_id": pool_account_id})
-        if account.status != "ACTIVE":
-            raise Validation("停用资金账户不能新增流水", details={"pool_account_id": pool_account_id})
     if order_id is not None:
         orders_service.get_order(session, order_id, user)
     money = _positive(amount, field="amount")
     flow = Cashflow(
         flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
         pool_id=pool.id,
-        pool_account_id=pool_account_id,
         occurred_on=occurred_on,
         nature=nature,
         fund_nature=fund_nature,
@@ -697,7 +688,6 @@ def list_cashflows(
                 "id": flow.id,
                 "flow_no": flow.flow_no,
                 "pool_id": flow.pool_id,
-                "pool_account_id": flow.pool_account_id,
                 "occurred_on": flow.occurred_on,
                 "occurred_at": flow.created_at,
                 "nature": flow.nature,

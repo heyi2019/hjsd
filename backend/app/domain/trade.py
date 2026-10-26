@@ -340,7 +340,6 @@ class Cashflow(Base, AuditMixin):
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         UniqueConstraint("order_event_id", name="uq_cashflow_event"),
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
-        Index("ix_cashflow_pool_account", "pool_account_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_deposit", "deposit_id"),
         Index("ix_cashflow_nature", "nature"),
@@ -357,9 +356,6 @@ class Cashflow(Base, AuditMixin):
     flow_no: Mapped[str] = mapped_column(String(32), nullable=False)
     pool_id: Mapped[int] = mapped_column(
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
-    )
-    pool_account_id: Mapped[int | None] = mapped_column(
-        ForeignKey("pool_accounts.id", ondelete="SET NULL"), nullable=True
     )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
     nature: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -401,10 +397,8 @@ class Reconciliation(Base, AuditMixin):
 
     __tablename__ = "reconciliations"
     __table_args__ = (
-        Index("ix_reconciliations_pool_account_id", "pool_account_id"),
         UniqueConstraint(
             "pool_id",
-            "pool_account_id",
             "reconciled_on",
             "account_label",
             name="uq_reconciliations_scope",
@@ -426,9 +420,6 @@ class Reconciliation(Base, AuditMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     pool_id: Mapped[int] = mapped_column(
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
-    )
-    pool_account_id: Mapped[int | None] = mapped_column(
-        ForeignKey("pool_accounts.id", ondelete="SET NULL"), nullable=True
     )
     reconciled_on: Mapped[date] = mapped_column(Date, nullable=False)
     account_label: Mapped[str] = mapped_column(String(128), nullable=False)

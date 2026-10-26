@@ -22,6 +22,7 @@ from app.core.security import (
 )
 from app.core.audit import record_audit
 from app.domain.options import OptionSet
+from app.domain.parties import FieldDefinition
 from app.options import schemas
 
 router = APIRouter(tags=["option-sets"])
@@ -121,6 +122,10 @@ def update_option_set(
         if row.editable:
             # 纯字典：值与文案都可自由增删。
             row.options = incoming
+        # 引用本词典的扩展字段保存值快照，以兼容既有字段值校验。
+        values = [item["value"] for item in (row.options or [])]
+        for field in db.scalars(select(FieldDefinition).where(FieldDefinition.option_set_code == row.code)):
+            field.options = values
         else:
             # 死枚举（editable=False）：值集合受 DB CHECK / domain/enums.py 约束，
             # 增删或改顺序会让业务语义漂移，故值序列必须逐项全等；

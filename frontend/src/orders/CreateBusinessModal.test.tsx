@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CreateBusinessModal } from "./CreateBusinessModal";
+import { DfqOrderSection } from "./dfq/DfqOrderSection";
+import { FieldConfigContext } from "./ConfigurableField";
+import { Form } from "antd";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
@@ -54,6 +57,24 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
+it("代分期的金额字段与账号备注读取表单字段配置", async () => {
+  renderLight(
+    <Form>
+      <FieldConfigContext.Provider value={{
+        dfq_purchase_price: { id: 301, order_type_code: "DFQ", field_key: "dfq_purchase_price", label: "购号成本", field_type: "NUMBER", options: null, required: true, is_active: true, sort_order: 110, locked: true, is_custom: false, note: null },
+        dfq_account_note: { id: 302, order_type_code: "DFQ", field_key: "dfq_account_note", label: "账号补充说明", field_type: "TEXT", options: null, required: false, is_active: true, sort_order: 70, locked: false, is_custom: false, note: null },
+        dfq_period_amount: { id: 303, order_type_code: "DFQ", field_key: "dfq_period_amount", label: "每期金额", field_type: "NUMBER", options: null, required: false, is_active: false, sort_order: 160, locked: false, is_custom: false, note: null },
+      }}>
+        <DfqOrderSection pools={[]} />
+      </FieldConfigContext.Provider>
+    </Form>,
+  );
+
+  expect(screen.getByText(/购号成本/)).toBeInTheDocument();
+  expect(screen.getByLabelText("账号补充说明")).toBeInTheDocument();
+  expect(screen.queryByText(/每期金额/)).toBeNull();
+});
+
 it("回收入口内联填写游戏账号信息，不加载库存账号", async () => {
     const { container } = await openTypedModal("HS");
 

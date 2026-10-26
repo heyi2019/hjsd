@@ -139,6 +139,7 @@ def upgrade() -> None:
     sa.Column('label', sa.String(length=128), nullable=False),
     sa.Column('field_type', sa.String(length=16), nullable=False),
     sa.Column('options', sa.JSON(), nullable=True),
+    sa.Column('option_set_code', sa.String(length=64), nullable=True),
     sa.Column('default_value', sa.JSON(), nullable=True),
     sa.Column('applicable_order_types', sa.JSON(), nullable=True),
     sa.Column('validation_rule', sa.JSON(), nullable=True),

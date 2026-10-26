@@ -17,7 +17,6 @@ from app.core.security import (
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
     PERM_PERIOD_LOCK,
-    PERM_POOL_MANAGE,
     PERM_TRANSFER_POST,
     CurrentUser,
     require_permissions,
@@ -35,94 +34,10 @@ manage_period_locks = require_permissions(PERM_PERIOD_LOCK)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
 post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 post_transfer = require_permissions(PERM_TRANSFER_POST)
-manage_pool_accounts = require_permissions(PERM_POOL_MANAGE)
 
 
 def _actor(user: CurrentUser) -> str:
     return user.username
-
-
-def _pool_account_out(db: Session, row) -> schemas.PoolAccountOut:
-    output = schemas.PoolAccountOut.model_validate(row)
-    output.current_balance = service.pool_account_balance(db, row)
-    return output
-
-
-@router.get("/pool-accounts", response_model=list[schemas.PoolAccountOut])
-def list_pool_accounts(
-    pool_id: int | None = Query(default=None),
-    db: Session = Depends(get_db),
-    user: CurrentUser = read_access,
-) -> list[schemas.PoolAccountOut]:
-    rows = service.list_pool_accounts(db, pool_id=pool_id)
-    return [_pool_account_out(db, row) for row in rows if user.can_see_pool(row.pool_id)]
-
-
-@router.post("/pool-accounts", response_model=schemas.PoolAccountOut, status_code=201)
-def create_pool_account(
-    payload: schemas.PoolAccountCreate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_pool_accounts,
-) -> schemas.PoolAccountOut:
-    row = service.create_pool_account(
-        db,
-        pool_id=payload.pool_id,
-        account_no=payload.account_no,
-        account_name=payload.account_name,
-        account_type=payload.account_type.strip().upper(),
-        ownership=payload.ownership.strip().upper(),
-        opening_balance=payload.opening_balance,
-        note=payload.note,
-        actor=_actor(user),
-    )
-    return _pool_account_out(db, row)
-
-
-@router.patch("/pool-accounts/{account_id}/status", response_model=schemas.PoolAccountOut)
-def set_pool_account_status(
-    account_id: int,
-    status: str = Query(...),
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_pool_accounts,
-) -> schemas.PoolAccountOut:
-    row = service.set_pool_account_status(db, account_id, status=status.strip().upper(), actor=_actor(user))
-    return _pool_account_out(db, row)
-
-
-@router.patch("/pool-accounts/{account_id}", response_model=schemas.PoolAccountOut)
-def update_pool_account(
-    account_id: int,
-    payload: schemas.PoolAccountUpdate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_pool_accounts,
-) -> schemas.PoolAccountOut:
-    row = service.update_pool_account(
-        db,
-        account_id,
-        actor=_actor(user),
-        **payload.model_dump(exclude_unset=True),
-    )
-    if not user.can_see_pool(row.pool_id):
-        raise NotFound("资金账户不存在")
-    return _pool_account_out(db, row)
-
-
-@router.post("/pool-accounts/batch-status", response_model=list[schemas.PoolAccountOut])
-def batch_set_pool_account_status(
-    payload: schemas.PoolAccountBatchStatus,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_pool_accounts,
-) -> list[schemas.PoolAccountOut]:
-    rows = service.batch_set_pool_account_status(
-        db,
-        payload.account_ids,
-        status=payload.status.strip().upper(),
-        reason=payload.reason,
-        actor=_actor(user),
-    )
-    if any(not user.can_see_pool(row.pool_id) for row in rows):
-        raise NotFound("资金账户不存在")
-    return [_pool_account_out(db, row) for row in rows]
 
 
 @router.get("/period-locks", response_model=list[schemas.PeriodLockOut])
@@ -181,7 +96,6 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         id=value("id"),
         flow_no=value("flow_no"),
         pool_id=value("pool_id"),
-        pool_account_id=value("pool_account_id"),
         occurred_on=value("occurred_on"),
         occurred_at=value("occurred_at"),
         nature=nature,
@@ -332,7 +246,6 @@ def create_cashflow(
     flow = service.create_cashflow(
         db,
         pool_id=payload.pool_id,
-        pool_account_id=payload.pool_account_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
         nature=payload.nature.strip().upper(),
@@ -397,7 +310,6 @@ def reverse_cashflow(
 @router.get("/reconciliations", response_model=list[schemas.ReconciliationOut])
 def list_reconciliations(
     pool_id: int | None = Query(default=None),
-    pool_account_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> list[schemas.ReconciliationOut]:
@@ -406,7 +318,6 @@ def list_reconciliations(
     items = service.list_reconciliations(
         db,
         pool_id=pool_id,
-        pool_account_id=pool_account_id,
         pool_ids=None
         if pool_id is not None or user.is_admin or user.owner_scope == "ALL"
         else sorted(user.pool_ids),
@@ -426,7 +337,6 @@ def create_reconciliation(
     item = service.create_reconciliation(
         db,
         pool_id=payload.pool_id,
-        pool_account_id=payload.pool_account_id,
         reconciled_on=payload.reconciled_on,
         account_label=payload.account_label,
         statement_balance=payload.statement_balance,

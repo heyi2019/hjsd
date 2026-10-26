@@ -142,6 +142,7 @@ class FieldDefinition(Base, AuditMixin):
     label: Mapped[str] = mapped_column(String(128), nullable=False)
     field_type: Mapped[str] = mapped_column(String(16), nullable=False, default="TEXT")
     options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    option_set_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     default_value: Mapped[object | None] = mapped_column(JSON, nullable=True)
     applicable_order_types: Mapped[list | None] = mapped_column(JSON, nullable=True)
     validation_rule: Mapped[dict | None] = mapped_column(JSON, nullable=True)

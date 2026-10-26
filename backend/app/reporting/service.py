@@ -32,7 +32,7 @@ from app.domain.enums import (
     OrderStatus,
     RebateStatus,
 )
-from app.domain.foundation import Pool, PoolAccount
+from app.domain.foundation import Pool
 from app.domain.trade import (
     Account,
     Cashflow,
@@ -156,9 +156,6 @@ def finance_dimension_report(
             Pool.id.label("pool_id"),
             Pool.code.label("pool_code"),
             Pool.name.label("pool_name"),
-            PoolAccount.id.label("pool_account_id"),
-            PoolAccount.account_no.label("account_no"),
-            PoolAccount.account_name.label("account_name"),
             Cashflow.fund_nature,
             Cashflow.accounting_attribute,
             Cashflow.direction,
@@ -172,14 +169,13 @@ def finance_dimension_report(
             ).label("signed_amount"),
         )
         .join(Pool, Pool.id == Cashflow.pool_id)
-        .outerjoin(PoolAccount, PoolAccount.id == Cashflow.pool_account_id)
         .where(Cashflow.status == CashflowStatus.APPROVED.value)
         .group_by(
-            Pool.id, Pool.code, Pool.name, PoolAccount.id, PoolAccount.account_no,
-            PoolAccount.account_name, Cashflow.fund_nature,
+            Pool.id, Pool.code, Pool.name,
+            Cashflow.fund_nature,
             Cashflow.accounting_attribute, Cashflow.direction,
         )
-        .order_by(Pool.code, PoolAccount.account_no, Cashflow.fund_nature, Cashflow.accounting_attribute, Cashflow.direction)
+        .order_by(Pool.code, Cashflow.fund_nature, Cashflow.accounting_attribute, Cashflow.direction)
     )
     if from_date is not None:
         stmt = stmt.where(Cashflow.occurred_on >= from_date)
@@ -194,9 +190,6 @@ def finance_dimension_report(
             "pool_id": row["pool_id"],
             "pool_code": row["pool_code"],
             "pool_name": row["pool_name"],
-            "pool_account_id": row["pool_account_id"],
-            "account_no": row["account_no"],
-            "account_name": row["account_name"],
             "fund_nature": row["fund_nature"],
             "accounting_attribute": row["accounting_attribute"],
             "direction": row["direction"],

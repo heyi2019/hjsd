@@ -15,17 +15,18 @@ export type FormScopeCode =
   | "FUNDDEPOSIT" | "FUNDFLOW" | "FUNDTRANSFER" | "FUNDRECON" | "FUNDCLEAR"
   | "FUNDREJECT" | "FUNDREVERSE" | "FUNDRELEASE" | "FUNDLOSS" | "FUNDREPAIR"
   | "FUNDLOCK"
-  | "POOLACCOUNT";
+  | "CUSTOMER"
+  | "COUNTERPARTY";
 
 /** 作用域所属模块，设置面板按此分组展示。 */
 export const FORM_SCOPE_GROUP_LABEL: Record<string, string> = {
   ORDER: "建单表单",
   INVENTORY: "库存",
   CUSTOMER: "客户",
+  PARTY: "客户与合作方",
   INSTALLMENT: "分期",
   REBATE: "返点",
   FUND: "资金",
-  POOL: "资金池",
 };
 
 /** 作用域清单：code / 中文名 / 所属模块。与后端迁移种子一一对应。 */
@@ -42,6 +43,9 @@ export const FORM_SCOPES: { code: FormScopeCode; label: string; group: string }[
   { code: "LEAD", label: "客户需求池", group: "CUSTOMER" },
   { code: "LEADCLOSE", label: "关闭需求", group: "CUSTOMER" },
   { code: "LEADCONVERT", label: "需求转单", group: "CUSTOMER" },
+
+  { code: "CUSTOMER", label: "客户建档", group: "PARTY" },
+  { code: "COUNTERPARTY", label: "合作方建档", group: "PARTY" },
 
   { code: "INSTPAY", label: "分期收款", group: "INSTALLMENT" },
   { code: "INSTRECOVER", label: "分期回收", group: "INSTALLMENT" },
@@ -68,8 +72,6 @@ export const FORM_SCOPES: { code: FormScopeCode; label: string; group: string }[
   { code: "FUNDLOSS", label: "损失", group: "FUND" },
   { code: "FUNDREPAIR", label: "划转修复", group: "FUND" },
   { code: "FUNDLOCK", label: "月结锁定", group: "FUND" },
-
-  { code: "POOLACCOUNT", label: "资金池账户", group: "POOL" },
 ];
 
 export const FORM_SCOPE_LABEL: Record<string, string> = Object.fromEntries(

@@ -11,6 +11,7 @@ import pytest
 
 from app.core.errors import NotFound, Validation
 from app.domain.parties import FieldDefinition
+from app.domain.options import OptionSet
 from app.domain.trade import Installment
 from app.parties import fields
 from app.parties import service as parties_service
@@ -28,6 +29,23 @@ def test_field_module_creates_and_lists_definition(seeded_db):
     listed = fields.list_field_definitions(seeded_db, entity_type="customer")
 
     assert [item.field_key for item in listed] == [definition.field_key]
+
+
+def test_field_definition_can_reference_an_existing_option_set(seeded_db):
+    seeded_db.add(OptionSet(code="CUSTOMER_LEVEL", label="客户等级", group="CUSTOMER", options=[{"value": "VIP", "label": "VIP"}]))
+    seeded_db.flush()
+
+    definition = fields.create_field_definition(
+        seeded_db,
+        entity_type="customer",
+        field_key="customer_level",
+        label="客户等级",
+        field_type="SELECT",
+        option_set_code="CUSTOMER_LEVEL",
+        actor="pytest",
+    )
+
+    assert definition.option_set_code == "CUSTOMER_LEVEL"
 
 
 def test_field_module_writes_and_reads_entity_values(seeded_db):

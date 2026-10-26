@@ -4,7 +4,7 @@
 import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
+import { gameTypesApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
@@ -23,18 +23,21 @@ const normalizeOptionItems = (raw: unknown): Array<{ value: string; label: strin
 };
 
 export interface OrderFormFieldsPanelProps {
-  /** 初始选中的表单作用域；由「配置总览」跳转过来时传入，缺省为 HS。 */
+  /** 初始选中的表单作用域；缺省为 HS。 */
   initialScope?: string;
+  onConfigureGameTypes?: () => void;
 }
 
-export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps = {}) {
+export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: OrderFormFieldsPanelProps = {}) {
   // 词典未加载时回落模块常量，保证与改造前完全一致。
   const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
   const [activeType, setActiveType] = useState<string>(
     initialScope && FORM_SCOPE_LABEL[initialScope] ? initialScope : "HS",
   );
   const [rows, setRows] = useState<OrderFormField[]>([]);
+  const [gameTypeNames, setGameTypeNames] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const editingField = rows.find((row) => row.id === editingId) ?? null;
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form] = Form.useForm();
@@ -53,6 +56,7 @@ export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps
   useEffect(() => {
     void load(activeType);
   }, [activeType, load]);
+  useEffect(() => { void gameTypesApi.list({ include_inactive: false }).then((items) => setGameTypeNames(items.map((item) => item.name))).catch(() => undefined); }, []);
 
   const submit = async (values: Record<string, unknown>) => {
     try {
@@ -139,7 +143,8 @@ export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps
     {
       title: "选项",
       dataIndex: "options",
-      render: (value: Array<string | { value: string; label: string }> | null | undefined) =>
+      render: (value: Array<string | { value: string; label: string }> | null | undefined, row) =>
+        row.field_key === "game_type" ? `游戏类型主数据 · ${gameTypeNames.slice(0, 2).join("、") || "暂无"}等 ${gameTypeNames.length} 项` :
         value && value.length
           ? value.map((o) => (typeof o === "string" ? o : o.label)).join("、")
           : "-",
@@ -206,6 +211,71 @@ export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps
     },
   ];
 
+  const editorForm = (
+    <PermissionGate permission="field-definition.manage">
+      <Form
+        form={form}
+        layout="inline"
+        onFinish={submit}
+        className="ui-form-spaced"
+        initialValues={{ field_type: "TEXT", sort_order: 0 }}
+      >
+        <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
+          <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
+        </Form.Item>
+        <Form.Item name="label" label="标签" rules={[{ required: true }]}>
+          <Input placeholder="页面显示名" />
+        </Form.Item>
+        <Form.Item name="field_type" label="类型">
+          <Select options={fieldTypeOptions} className="ui-control-width-110" disabled={editingId !== null} />
+        </Form.Item>
+        {needsOptions && (
+          <Form.Item label="选项（值 / 展示名）">
+            <Form.List name="options">
+              {(fields, { add, remove }) => (
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {fields.map(({ key, name, ...restField }) => (
+                    <Space key={key} align="baseline">
+                      <Form.Item {...restField} name={[name, "value"]} rules={[{ required: true, message: "值必填" }]} noStyle>
+                        <Input placeholder="value（后端枚举码/字典键）" style={{ width: 200 }} />
+                      </Form.Item>
+                      <Form.Item {...restField} name={[name, "label"]} noStyle>
+                        <Input placeholder="展示名（可空，默认同值）" style={{ width: 200 }} />
+                      </Form.Item>
+                      <PermissionButton permission="field-definition.manage" danger size="small" onClick={() => remove(name)}>
+                        删
+                      </PermissionButton>
+                    </Space>
+                  ))}
+                  <PermissionButton permission="field-definition.manage" onClick={() => add({ value: "", label: "" })}>
+                    添加选项
+                  </PermissionButton>
+                </Space>
+              )}
+            </Form.List>
+          </Form.Item>
+        )}
+        {editingField?.field_key === "game_type" && onConfigureGameTypes ? (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={onConfigureGameTypes}>配置游戏类型</PermissionButton>
+          </Form.Item>
+        ) : null}
+        <Form.Item name="required" label="必填" valuePropName="checked"><Switch /></Form.Item>
+        <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
+        <Form.Item>
+          <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">
+            {editingId === null ? "新增字段" : "保存字段"}
+          </PermissionButton>
+        </Form.Item>
+        {editingId !== null && (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
+          </Form.Item>
+        )}
+      </Form>
+    </PermissionGate>
+  );
+
   return (
     <Card className="glass" title="表单字段配置">
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
@@ -240,64 +310,13 @@ export function OrderFormFieldsPanel({ initialScope }: OrderFormFieldsPanelProps
         total={rows.length}
         emptyText="该表单暂无字段配置"
         onPageChange={() => undefined}
+        expandable={{
+          expandedRowKeys: editingId === null ? [] : [String(editingId)],
+          showExpandColumn: false,
+          expandedRowRender: (row) => <div aria-label={`编辑区${row.label}`}>{editorForm}</div>,
+        }}
       />
-      <PermissionGate permission="field-definition.manage">
-        <Form
-          form={form}
-          layout="inline"
-          onFinish={submit}
-          className="ui-form-spaced"
-          initialValues={{ field_type: "TEXT", sort_order: 0 }}
-        >
-          <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
-            <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
-          </Form.Item>
-          <Form.Item name="label" label="标签" rules={[{ required: true }]}>
-            <Input placeholder="页面显示名" />
-          </Form.Item>
-          <Form.Item name="field_type" label="类型">
-            <Select options={fieldTypeOptions} className="ui-control-width-110" disabled={editingId !== null} />
-          </Form.Item>
-          {needsOptions && (
-            <Form.Item label="选项（值 / 展示名）">
-              <Form.List name="options">
-                {(fields, { add, remove }) => (
-                  <Space direction="vertical" style={{ width: "100%" }}>
-                    {fields.map(({ key, name, ...restField }) => (
-                      <Space key={key} align="baseline">
-                        <Form.Item {...restField} name={[name, "value"]} rules={[{ required: true, message: "值必填" }]} noStyle>
-                          <Input placeholder="value（后端枚举码/字典键）" style={{ width: 200 }} />
-                        </Form.Item>
-                        <Form.Item {...restField} name={[name, "label"]} noStyle>
-                          <Input placeholder="展示名（可空，默认同值）" style={{ width: 200 }} />
-                        </Form.Item>
-                        <PermissionButton permission="field-definition.manage" danger size="small" onClick={() => remove(name)}>
-                          删
-                        </PermissionButton>
-                      </Space>
-                    ))}
-                    <PermissionButton permission="field-definition.manage" onClick={() => add({ value: "", label: "" })}>
-                      添加选项
-                    </PermissionButton>
-                  </Space>
-                )}
-              </Form.List>
-            </Form.Item>
-          )}
-          <Form.Item name="required" label="必填" valuePropName="checked"><Switch /></Form.Item>
-          <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
-          <Form.Item>
-            <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">
-              {editingId === null ? "新增字段" : "保存字段"}
-            </PermissionButton>
-          </Form.Item>
-          {editingId !== null && (
-            <Form.Item>
-              <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
-            </Form.Item>
-          )}
-        </Form>
-      </PermissionGate>
+      {editingId === null ? editorForm : null}
     </Card>
   );
 }

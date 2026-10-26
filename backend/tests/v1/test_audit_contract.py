@@ -155,3 +155,88 @@ class TestAuditLogApi:
         )
         assert response.status_code == 200, response.text
         assert [row["actor"] for row in response.json()["items"]] == ["numbered-order"]
+
+
+class TestAuditStatsApi:
+    """/audit-logs/stats：按 entity_type 汇总真实累计数。
+
+    存在理由：既有 /audit-logs 的 total 是「当前页行数」，limit=1 时恒为 1，
+    不能用来表示累计改动次数。本端点直接 COUNT(*)。
+    """
+
+    def test_stats_routes_publish_typed_response_model(self, app):
+        paths = app.openapi()["paths"]
+        schema = paths["/api/v1/audit-logs/stats"]["get"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+
+        assert schema["$ref"].endswith("/AuditEntityStatsOut")
+
+    def test_count_is_real_total_not_page_size(self, seeded_client, seeded_db, headers):
+        for index in range(3):
+            _audit(
+                seeded_db,
+                action=AuditAction.ORDER_CREATE,
+                actor="stats-actor",
+                entity_id=98000 + index,
+                entity_type="cfg_probe_count",
+            )
+        seeded_db.flush()
+
+        # 对照组：list 端点的 total 是当前页行数，limit=1 时恒为 1
+        listed = seeded_client.get(
+            "/api/v1/audit-logs",
+            params={"entity_type": "cfg_probe_count", "limit": 1},
+            headers=headers,
+        )
+        assert listed.status_code == 200, listed.text
+        assert listed.json()["total"] == 1
+
+        response = seeded_client.get(
+            "/api/v1/audit-logs/stats",
+            params={"entity_types": "cfg_probe_count"},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        row = response.json()["items"][0]
+        assert row["entity_type"] == "cfg_probe_count"
+        assert row["count"] == 3
+        assert row["last_actor"] == "stats-actor"
+        assert row["last_at"] is not None
+
+    def test_unknown_type_returns_zero_with_null_last(self, seeded_client, headers):
+        response = seeded_client.get(
+            "/api/v1/audit-logs/stats",
+            params={"entity_types": "cfg_probe_missing"},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        row = response.json()["items"][0]
+        assert row["count"] == 0
+        assert row["last_actor"] is None
+        assert row["last_at"] is None
+
+    def test_whitespace_and_empty_input_are_tolerated(self, seeded_client, seeded_db, headers):
+        _audit(
+            seeded_db,
+            action=AuditAction.EVENT_POST,
+            actor="ws-actor",
+            entity_id=98010,
+            entity_type="cfg_probe_ws",
+        )
+        seeded_db.flush()
+
+        response = seeded_client.get(
+            "/api/v1/audit-logs/stats",
+            params={"entity_types": " cfg_probe_ws , , "},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        rows = response.json()["items"]
+        # 空白会被 trim，空段被丢弃，因此只剩一个有效类型
+        assert [row["entity_type"] for row in rows] == ["cfg_probe_ws"]
+        assert rows[0]["count"] == 1
+
+        empty = seeded_client.get("/api/v1/audit-logs/stats", headers=headers)
+        assert empty.status_code == 200, empty.text
+        assert empty.json()["items"] == []

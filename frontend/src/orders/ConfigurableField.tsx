@@ -161,6 +161,8 @@ export function CfgNestedItem(props: {
   rules?: Rule[];
   initialValue?: unknown;
   className?: string;
+  /** 保留校验提示时关闭 noStyle；嵌套的紧凑字段默认不额外占位。 */
+  noStyle?: boolean;
   children: ReactNode;
 }): ReactElement | null {
   const cfg = props.cfg ?? useFieldConfig();
@@ -168,7 +170,7 @@ export function CfgNestedItem(props: {
   return (
     <NestedFormField className={props.className} label={fieldLabel(cfg, props.name, props.label)}>
       <Form.Item
-        noStyle
+        noStyle={props.noStyle ?? true}
         name={props.name}
         rules={resolveRules(cfg, props.name, props.rules)}
         initialValue={props.initialValue}

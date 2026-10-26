@@ -8,6 +8,7 @@ vi.mock("../../shared/api/catalog");
 import * as client from "../../shared/api/client";
 import { renderLight } from "../../test/render";
 import { OrderFormFieldsPanel } from "./OrderFormFieldsPanel";
+import { FORM_SCOPES } from "../formScopes";
 
 vi.mock("../../shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/client")>()),
@@ -45,9 +46,14 @@ beforeEach(() => {
   vi.spyOn(message, "success").mockImplementation(() => ({}) as never);
   vi.spyOn(message, "error").mockImplementation(() => ({}) as never);
   vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
+  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
 });
 
 describe("OrderFormFieldsPanel", () => {
+  it("不再提供已删除的资金池账户表单入口", () => {
+    expect(FORM_SCOPES.map((scope) => scope.code)).not.toContain("POOLACCOUNT");
+  });
+
   it("挂载时按当前业务类型拉取字段列表", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 10, field_key: "tag", label: "自定义标签A", locked: false, is_custom: true }),
@@ -97,6 +103,35 @@ describe("OrderFormFieldsPanel", () => {
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("预置字段X");
     expect(screen.getByRole("button", { name: /删除/ })).toBeDisabled();
+  });
+
+  it("游戏类型字段显示数据源并可进入游戏类型配置", async () => {
+    const onConfigureGameTypes = vi.fn();
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ field_key: "game_type", label: "游戏类型", field_type: "SELECT", locked: true, is_custom: false }),
+    ]);
+    vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
+      { id: 1, name: "王者荣耀", sort_order: 1, is_active: true, is_default: false },
+      { id: 2, name: "原神", sort_order: 2, is_active: true, is_default: false },
+    ]);
+    renderLight(<OrderFormFieldsPanel onConfigureGameTypes={onConfigureGameTypes} />, { user: "admin" });
+    expect(await screen.findByText("游戏类型主数据 · 王者荣耀、原神等 2 项")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /配置游戏类型/ })).toBeNull();
+    await ui.click(screen.getByRole("button", { name: "编辑游戏类型" }));
+    await ui.click(screen.getByRole("button", { name: /配置游戏类型/ }));
+    expect(onConfigureGameTypes).toHaveBeenCalledOnce();
+  });
+
+  it("编辑字段时将编辑区展开在该字段行的下方", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 61, field_key: "tag", label: "行内编辑字段", is_custom: true }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("行内编辑字段");
+
+    await ui.click(screen.getByRole("button", { name: "编辑行内编辑字段" }));
+
+    expect(screen.getByLabelText("标签").closest(".ant-table-expanded-row")).not.toBeNull();
   });
 
   it("行内必填开关切换调用 update 并刷新", async () => {

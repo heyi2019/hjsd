@@ -99,10 +99,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   INSTDELIVER: [
     { key: "delivery_mode", label: "交付方式", type: "SELECT", options: [{ value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" }, { value: "CUSTOMER_SELF", label: "客户自行换绑" }] },
   ],
-  POOLACCOUNT: [
-    { key: "account_type", label: "账户类型", type: "SELECT", options: [{ value: "BANK", label: "银行账户" }, { value: "CASH", label: "现金" }, { value: "THIRD_PARTY", label: "第三方渠道" }] },
-    { key: "ownership", label: "归属", type: "SELECT", options: [{ value: "OWNED", label: "自有（计入权益）" }, { value: "CUSTODY", label: "代管（只计头寸）" }, { value: "THIRD_PART", label: "第三方（只计头寸）" }] },
-  ],
 };
 
 let _id = 1;
@@ -246,9 +242,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "POOL_STATUS", label: "资金池状态", group: "FUND", editable: false, options: [
     { value: "ACTIVE", label: "进行中" }, { value: "DISABLED", label: "已停用" },
   ] },
-  { code: "POOL_ACCOUNT_STATUS", label: "资金池账户状态", group: "FUND", editable: false, options: [
-    { value: "ACTIVE", label: "启用" }, { value: "DISABLED", label: "停用" },
-  ] },
   { code: "USER_ROLE", label: "用户角色", group: "SYSTEM", editable: false, options: [
     { value: "ADMIN", label: "系统管理员" }, { value: "OPERATOR", label: "业务经办人" }, { value: "FINANCE", label: "财务" }, { value: "AUDITOR", label: "审核人" }, { value: "VIEWER", label: "查看人" },
   ] },
@@ -300,7 +293,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "attachment", label: "附件" },
     { value: "reconciliation", label: "日对账" },
     { value: "quality_issue", label: "质量工单" },
-    { value: "pool_account", label: "资金池账户" },
     { value: "lead", label: "客户需求" },
     { value: "order_form_field", label: "订单表单字段" },
     { value: "OrderTypePool", label: "资金路由" },
@@ -432,11 +424,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "REBATE_TYPE", label: "返点类型", group: "FUND", editable: false, options: [
     { value: "BUY", label: "买号返点（对应回收）" },
     { value: "SELL", label: "卖号返点（对应售出）" },
-  ] },
-  { code: "POOL_ACCOUNT_TYPE", label: "资金池账户类型", group: "FUND", editable: false, options: [
-    { value: "BANK", label: "银行账户" },
-    { value: "CASH", label: "现金" },
-    { value: "THIRD_PARTY", label: "第三方渠道" },
   ] },
   { code: "SEQUENCE_KEY", label: "编号域", group: "SYSTEM", editable: false, options: [
     { value: "ORDER_HS", label: "回收订单" },

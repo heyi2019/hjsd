@@ -19,7 +19,6 @@ import { errorMessage, normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
-import { PoolAccountsPanel } from "./PoolAccountsPanel";
 import {
   ConfirmButton,
   DataTable,
@@ -821,11 +820,6 @@ export function FundsPage() {
                 </Card>
               </div>
             ),
-          },
-          {
-            key: "pool-accounts",
-            label: "池内账户",
-            children: <PoolAccountsPanel />,
           },
           {
             key: "rebates",

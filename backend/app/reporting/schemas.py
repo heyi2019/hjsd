@@ -121,9 +121,6 @@ class FinanceDimensionItemOut(ReportModel):
     pool_id: int
     pool_code: str
     pool_name: str
-    pool_account_id: int | None = None
-    account_no: str | None = None
-    account_name: str | None = None
     fund_nature: str
     accounting_attribute: str
     direction: str

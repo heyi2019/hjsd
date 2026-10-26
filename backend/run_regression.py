@@ -33,7 +33,6 @@ GROUPS = {
         "tests/v1/test_foundation_pools_service.py",
         "tests/v1/test_order_types_api.py",
         "tests/v1/test_pools_api.py",
-        "tests/v1/test_pool_accounts_contract.py",
         "tests/v1/test_field_definition_rules_contract.py",
         "tests/v1/test_live_fields_contract.py",
         "tests/v1/test_numbering.py",
@@ -161,7 +160,7 @@ def groups_for_changes(paths: list[str]) -> list[str]:
             selected.add("orders")
         if "installment" in path or path.endswith("/test_m2.py") or path.endswith("/test_m4.py"):
             selected.add("installments")
-        if path.startswith("backend/app/finance/") or "finance" in path or "pool_account" in path or "rebate" in path or "period_lock" in path:
+        if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path or "period_lock" in path:
             selected.add("finance")
         if any(token in path for token in ("parties", "leads")):
             selected.add("parties")

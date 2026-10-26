@@ -20,51 +20,6 @@ class DepositCreate(RequestModel):
     note: str | None = None
 
 
-class PoolAccountCreate(RequestModel):
-    pool_id: int
-    account_no: str = Field(min_length=1, max_length=64)
-    account_name: str = Field(min_length=1, max_length=128)
-    account_type: str = Field(min_length=1, max_length=16)
-    ownership: str = Field(min_length=1, max_length=16)
-    opening_balance: Decimal = Field(ge=0)
-    note: str | None = None
-
-
-class PoolAccountUpdate(RequestModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    account_name: str | None = Field(default=None, min_length=1, max_length=128)
-    account_type: str | None = Field(default=None, min_length=1, max_length=16)
-    ownership: str | None = Field(default=None, min_length=1, max_length=16)
-    opening_balance: Decimal | None = Field(default=None, ge=0)
-    note: str | None = None
-
-
-class PoolAccountBatchStatus(RequestModel):
-    account_ids: list[int] = Field(min_length=1, max_length=100)
-    status: str = Field(min_length=1, max_length=16)
-    reason: str = Field(min_length=1, max_length=500)
-
-
-class PoolAccountOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    pool_id: int
-    account_no: str
-    account_name: str
-    account_type: str
-    ownership: str
-    opening_balance: Decimal
-    current_balance: Decimal = Decimal("0")
-    status: str
-    note: str | None = None
-    created_at: datetime
-    updated_at: datetime
-    created_by: str
-    updated_by: str
-
-
 class PeriodLockCreate(RequestModel):
     period: str = Field(min_length=7, max_length=7)
     note: str | None = Field(default=None, max_length=500)
@@ -120,7 +75,6 @@ class CashflowOut(BaseModel):
     id: int
     flow_no: str
     pool_id: int
-    pool_account_id: int | None = None
     occurred_on: date
     occurred_at: datetime
     nature: str
@@ -153,7 +107,6 @@ class CashflowListOut(BaseModel):
 
 class CashflowCreate(RequestModel):
     pool_id: int
-    pool_account_id: int | None = None
     occurred_on: date
     direction: str
     nature: str
@@ -177,7 +130,6 @@ class CashflowReverse(RequestModel):
 
 class ReconciliationCreate(RequestModel):
     pool_id: int
-    pool_account_id: int | None = None
     reconciled_on: date
     account_label: str
     statement_balance: Decimal
@@ -195,7 +147,6 @@ class ReconciliationOut(BaseModel):
 
     id: int
     pool_id: int
-    pool_account_id: int | None = None
     reconciled_on: date
     account_label: str
     system_balance: Decimal

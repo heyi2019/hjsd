@@ -102,6 +102,7 @@ beforeEach(() => {
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.fieldsApi.list).mockResolvedValue(fieldDefs);
+  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: {
@@ -172,6 +173,27 @@ describe("CustomersPage：客户档案", () => {
     await screen.findByText("CUS-0001");
     expect(screen.getByRole("tab", { name: "客户档案" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /合作方/ })).toBeInTheDocument();
+  });
+
+  it("新建客户与合作方分别加载各自的表单字段配置", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.orderFormFieldsApi.list).mockImplementation(async (scope) => (
+      scope === "CUSTOMER"
+        ? [{ id: 101, order_type_code: "CUSTOMER", field_key: "display_name", label: "客户称呼", field_type: "TEXT", options: null, required: true, is_active: true, sort_order: 10, locked: false, is_custom: false, note: null }]
+        : [{ id: 102, order_type_code: "COUNTERPARTY", field_key: "type", label: "合作类型", field_type: "SELECT", options: null, required: true, is_active: true, sort_order: 10, locked: false, is_custom: false, note: null }]
+    ) as never);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+
+    await user.click(screen.getByRole("button", { name: /新建客户$/ }));
+    await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith("CUSTOMER", true));
+    expect(screen.getByLabelText("客户称呼")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await user.click((await screen.findByRole("button", { name: /新建合作方$/ })));
+    await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith("COUNTERPARTY", true));
+    expect(screen.getByLabelText("合作类型")).toBeInTheDocument();
   });
 
   it("统计卡片与筛选条之间保留清晰的分组间距", async () => {

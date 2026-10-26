@@ -4,7 +4,7 @@ export function BusinessDictionaryPanel() {
   return (
     <Card className="glass" title="业务分类口径">
       <Typography.Paragraph type="secondary">
-        活字段只承载客户辅助信息；库存和订单字段由固定业务模型管理，不允许通过活字段覆盖。
+        业务字典定义系统记录什么；字段与表单配置决定这些信息在哪里、以何种方式录入。核心业务字段受固定模型保护，扩展字段只补充业务信息，不覆盖资金、订单或库存事实。
       </Typography.Paragraph>
       <Descriptions bordered size="small" column={1}>
         <Descriptions.Item label="业务">

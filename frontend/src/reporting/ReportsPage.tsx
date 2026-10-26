@@ -394,7 +394,6 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
   );
   const columns: ColumnsType<FinanceDimensionRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 130 },
-    { title: "资金账户", dataIndex: "account_name", render: (v: string | null, row) => v ? `${v}（${row.account_no ?? "-"}）` : "未指定账户" },
     { title: "资金性质", dataIndex: "fund_nature", width: 120, render: (v: string) => FUND_NATURE_LABEL[v] ?? v },
     { title: "核算属性", dataIndex: "accounting_attribute", width: 160, render: (v: string) => ACCOUNTING_ATTRIBUTE_LABEL[v] ?? v },
     { title: "现金方向", dataIndex: "direction", width: 90, render: (v: string) => v === "IN" ? "收入" : "支出" },
@@ -406,7 +405,7 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
     <Card className="glass" title="资金属性分析">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
-      <Note>按已审核流水的资金性质、核算属性、现金方向和资金账户聚合；净方向金额按收入为正、支出为负计算。</Note>
+      <Note>按已审核流水的资金池、资金性质、核算属性和现金方向聚合；净方向金额按收入为正、支出为负计算。</Note>
       <StatRow
         items={[
           { label: "发生额合计", amount: data?.total_amount ?? "-" },

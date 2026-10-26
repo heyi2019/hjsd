@@ -68,32 +68,6 @@ class Pool(Base, AuditMixin):
     )
 
 
-class PoolAccount(Base, AuditMixin):
-    """资金池下的实际账户；停用只阻止新流水关联，不删除历史。"""
-
-    __tablename__ = "pool_accounts"
-    __table_args__ = (
-        CheckConstraint("account_type IN ('BANK', 'CASH', 'THIRD_PARTY')", name="pool_account_type_valid"),
-        CheckConstraint(
-            f"ownership IN {PoolOwnership.values()!r}".replace("[", "(").replace("]", ")"),
-            name="pool_account_ownership_valid",
-        ),
-        CheckConstraint("status IN ('ACTIVE', 'DISABLED')", name="pool_account_status_valid"),
-        CheckConstraint("opening_balance >= 0", name="pool_account_opening_balance_nonnegative"),
-        UniqueConstraint("account_no", name="uq_pool_accounts_account_no"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pool_id: Mapped[int] = mapped_column(ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False, index=True)
-    account_no: Mapped[str] = mapped_column(String(64), nullable=False)
-    account_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    account_type: Mapped[str] = mapped_column(String(16), nullable=False)
-    ownership: Mapped[str] = mapped_column(String(16), nullable=False, default=PoolOwnership.OWNED.value)
-    opening_balance: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-
 class OrderTypeDef(Base, AuditMixin):
     """业务类型主数据：首批 HS/TH/DG/DFQ，可自由新增（BAS-02-02）。"""
 
@@ -243,5 +217,4 @@ __all__ = [
     "PeriodLock",
     "OrderTypePool",
     "Pool",
-    "PoolAccount",
 ]

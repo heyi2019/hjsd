@@ -460,6 +460,7 @@ def create_field_definition(
         actor=_actor(user),
         field_type=payload.field_type,
         options=payload.options,
+        option_set_code=payload.option_set_code,
         default_value=payload.default_value,
         applicable_order_types=payload.applicable_order_types,
         validation_rule=payload.validation_rule,

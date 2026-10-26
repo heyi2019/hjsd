@@ -61,22 +61,22 @@ function DfqInstallmentInfo() {
 
   return (
     <AdaptiveFormGrid>
-      <NestedFormField label="账号号价"><Form.Item name="dfq_purchase_price" rules={[{ required: true, message: "请输入账号号价" }, { validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("请输入非负金额"); } }]}><MoneyInput placeholder="账号全款基础价格" /></Form.Item></NestedFormField>
+      <CfgNestedItem noStyle={false} name="dfq_purchase_price" label="账号号价" rules={[{ required: true, message: "请输入账号号价" }, { validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("请输入非负金额"); } }]}><MoneyInput placeholder="账号全款基础价格" /></CfgNestedItem>
       <NestedFormField label="借款本金"><Form.Item noStyle name="dfq_total_amount"><MoneyInput placeholder="客户借款的剩余号款" readOnly /></Form.Item></NestedFormField>
-      <NestedFormField label="客户首付款"><Form.Item name="dfq_down_payment" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > Number(form.getFieldValue("dfq_purchase_price")))) throw new Error("首付款不能为负数或超过账号号价"); } }]}><MoneyInput placeholder="客户已支付的部分号款" /></Form.Item></NestedFormField>
-      <NestedFormField label="手续费总额"><Form.Item name="dfq_service_fee" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("手续费必须为非负金额"); } }]}><MoneyInput placeholder="分期服务手续费" /></Form.Item></NestedFormField>
-      <NestedFormField label="分期期数"><Form.Item name="dfq_periods" initialValue={1} rules={[{ validator: async (_, value) => {
+      <CfgNestedItem noStyle={false} name="dfq_down_payment" label="客户首付款" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > Number(form.getFieldValue("dfq_purchase_price")))) throw new Error("首付款不能为负数或超过账号号价"); } }]}><MoneyInput placeholder="客户已支付的部分号款" /></CfgNestedItem>
+      <CfgNestedItem noStyle={false} name="dfq_service_fee" label="手续费总额" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("手续费必须为非负金额"); } }]}><MoneyInput placeholder="分期服务手续费" /></CfgNestedItem>
+      <CfgNestedItem noStyle={false} name="dfq_periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, value) => {
         const count = Number(value);
         if (!Number.isInteger(count) || count <= 0 || count > 120) throw new Error("期数必须为 1 至 120 的整数");
         if ((form.getFieldValue("dfq_schedule") ?? []).length !== count) throw new Error("分期计划数量须与期数一致");
-      } }]}><Input className="dfq-periods-control" inputMode="numeric" placeholder="请输入期数" /></Form.Item></NestedFormField>
-      <NestedFormField label="每期手续费"><Form.Item name="dfq_period_service_fee" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("每期手续费必须为非负金额"); } }]}><MoneyInput placeholder="按手续费总额/期数计算，可修改" /></Form.Item></NestedFormField>
-      <NestedFormField label="每期金额"><Form.Item name="dfq_period_amount" rules={[{ validator: async (_, value) => {
+      } }]}><Input className="dfq-periods-control" inputMode="numeric" placeholder="请输入期数" /></CfgNestedItem>
+      <CfgNestedItem noStyle={false} name="dfq_period_service_fee" label="每期手续费" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("每期手续费必须为非负金额"); } }]}><MoneyInput placeholder="按手续费总额/期数计算，可修改" /></CfgNestedItem>
+      <CfgNestedItem noStyle={false} name="dfq_period_amount" label="每期金额" rules={[{ validator: async (_, value) => {
         const count = Number(periods), total = Number(totalAmount) + Number(serviceFee || 0), amount = Number(value);
         if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(totalAmount) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配");
-      } }]}><MoneyInput placeholder="请输入金额" /></Form.Item>
+      } }]}><MoneyInput placeholder="请输入金额" />
         {totalAmount != null && Number(periods) > 0 && periodAmount != null && Number.isFinite(Number(periodAmount)) && <span>最后一期：{((Math.round((Number(totalAmount) + Number(serviceFee || 0)) * 100) - Math.round(Number(periodAmount) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元</span>}
-      </NestedFormField>
+      </CfgNestedItem>
     </AdaptiveFormGrid>
   );
 }

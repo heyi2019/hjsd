@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -69,6 +69,47 @@ def list_audit_logs(
         ],
         total=len(rows),
     )
+
+
+@router.get("/audit-logs/stats", response_model=schemas.AuditEntityStatsOut)
+def stats_audit_logs(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = read_access,
+    entity_types: str = Query(default="", description="逗号分隔的 entity_type 清单"),
+) -> schemas.AuditEntityStatsOut:
+    """按 entity_type 汇总**真实**累计条数与最近一条改动。
+
+    为什么单开一个端点：`AuditLogListOut.total` 的语义是「当前页行数」（= len(items)），
+    limit=1 时它恒等于 1，把它当累计数会得到错误数字。这里直接 COUNT(*)。
+    不改既有 /audit-logs 的 total —— 经营中心审计页的分页依赖现有行为，改它需另行裁决。
+
+    entity_types 走逗号分隔而非 FastAPI 重复参数：前端 axios 默认把数组序列化成
+    `key[]=v`，与重复参数约定不兼容，逗号串更简单稳定。
+    """
+    del user
+    wanted = [item.strip() for item in entity_types.split(",") if item.strip()]
+    items: list[schemas.AuditEntityStatOut] = []
+    for entity_type in wanted:
+        count = db.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.entity_type == entity_type)
+        )
+        last = db.scalars(
+            select(AuditLog)
+            .where(AuditLog.entity_type == entity_type)
+            .order_by(AuditLog.id.desc())
+            .limit(1)
+        ).first()
+        items.append(
+            schemas.AuditEntityStatOut(
+                entity_type=entity_type,
+                count=int(count or 0),
+                last_at=last.occurred_at if last else None,
+                last_actor=last.actor if last else None,
+            )
+        )
+    return schemas.AuditEntityStatsOut(items=items)
 
 
 @router.get("/audit-logs/actions", response_model=schemas.AuditActionListOut)

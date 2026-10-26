@@ -101,10 +101,7 @@ describe("SettingsPage.deep", () => {
     expect(container.querySelector(".ant-tabs-top")).toBeNull();
   });
 
-  it("新增三类主数据 Tab 在设置页可见且能挂载对应面板", async () => {
-    vi.mocked(catalog.poolAccountsApi.list).mockResolvedValue([
-      { id: 1, pool_id: 1, account_no: "ABC-8678", account_name: "农行卡 8678", account_type: "BANK", ownership: "OWNED", opening_balance: "0.00", current_balance: "0.00", status: "ACTIVE", note: null },
-    ] as never);
+  it("月结账期锁与质量异常议题 Tab 在设置页可见且能挂载对应面板", async () => {
     vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([
       { id: 1, period: "2026-09", locked_at: "2026-10-01T09:30:00", locked_by: "heyi", note: "9月封账" },
     ] as never);
@@ -114,10 +111,7 @@ describe("SettingsPage.deep", () => {
     } as never);
 
     renderLight(<SettingsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "资金池账户" });
-
-    await ui.click(screen.getByRole("tab", { name: "资金池账户" }));
-    expect(await screen.findByText("农行卡 8678")).toBeInTheDocument();
+    await screen.findByRole("tab", { name: "月结账期锁" });
 
     await ui.click(screen.getByRole("tab", { name: "月结账期锁" }));
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
@@ -129,8 +123,7 @@ describe("SettingsPage.deep", () => {
   it("切换 Tab 仅挂载激活面板：点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
-    // 惰性挂载的证据是「面板内容不在 DOM」而非「没发请求」：
-    // 默认 Tab 为配置总览，它会主动统计各资源条目数（含 poolsApi.list）。
+    // 惰性挂载的证据是「面板内容不在 DOM」。
     expect(screen.queryByText("托管池")).toBeNull();
     await ui.click(screen.getByRole("tab", { name: "资金池" }));
     await waitFor(() => expect(vi.mocked(catalog.poolsApi.list)).toHaveBeenCalled());

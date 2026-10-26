@@ -19,6 +19,7 @@ import { money, today } from "../shared/lib/format";
 import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
+import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import "./CustomersPage.css";
 import {
   DataTable,
@@ -446,28 +447,29 @@ function CustomerPanel() {
       />}
 
       <Modal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+        <FieldConfigScope scope="CUSTOMER" active={createOpen}>
         <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submitCreate}>
-          <Form.Item name="display_name" label="名字" rules={[{ required: true }]}>
+          <CfgItem name="display_name" label="名字" rules={[{ required: true }]}>
             <Input />
-          </Form.Item>
+          </CfgItem>
           {/* 短字段两列一行，压弹窗高度（称呼为必填主字段保持整行） */}
           <div className="form-cols-2">
-            <Form.Item name="contact_name" label="联系人姓名">
+            <CfgItem name="contact_name" label="联系人姓名">
               <Input />
-            </Form.Item>
-            <Form.Item name="phone" label="手机号">
+            </CfgItem>
+            <CfgItem name="phone" label="手机号">
               <Input />
-            </Form.Item>
-            <Form.Item name="wechat" label="微信号">
+            </CfgItem>
+            <CfgItem name="wechat" label="微信号">
               <Input />
-            </Form.Item>
-            <Form.Item name="qq" label="QQ">
+            </CfgItem>
+            <CfgItem name="qq" label="QQ">
               <Input />
-            </Form.Item>
+            </CfgItem>
           </div>
-          <Form.Item name="note" label="备注">
+          <CfgItem name="note" label="备注">
             <Input.TextArea rows={3} placeholder="选填：客户来源、偏好、注意事项等" />
-          </Form.Item>
+          </CfgItem>
           {activeDefs.map((def) => (
             <Form.Item
               key={def.field_key}
@@ -486,6 +488,7 @@ function CustomerPanel() {
             建档
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal
@@ -847,26 +850,28 @@ function CounterpartyPanel() {
         }}
       />}
       <Modal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
+        <FieldConfigScope scope="COUNTERPARTY" active={open}>
         <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
-          <Form.Item name="display_name" label="名称" rules={[{ required: true }]}>
+          <CfgItem name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
-          </Form.Item>
-          <Form.Item name="type" label="类型" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="type" label="类型" rules={[{ required: true }]}>
             <Select options={counterpartyTypeOptions ?? []} />
-          </Form.Item>
-          <Form.Item name="contact_name" label="联系人">
+          </CfgItem>
+          <CfgItem name="contact_name" label="联系人">
             <Input />
-          </Form.Item>
-          <Form.Item name="phone" label="手机号">
+          </CfgItem>
+          <CfgItem name="phone" label="手机号">
             <Input />
-          </Form.Item>
-          <Form.Item name="wechat" label="微信号">
+          </CfgItem>
+          <CfgItem name="wechat" label="微信号">
             <Input />
-          </Form.Item>
+          </CfgItem>
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             建档
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Modal

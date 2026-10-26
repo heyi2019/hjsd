@@ -1,7 +1,6 @@
-/** 设置页「配置总览」的配置项注册表 —— 单一事实源。
+/** 设置项与审计实体的映射注册表 —— 单一事实源。
  *
- * 存在理由：设置页此前只能一个一个 Tab 点进去，才知道「这台系统一共能配什么」。
- * 这里集中声明每项配置的元信息，供总览面板一次性呈现（清单 + 条目数 + 改动痕迹 + 跳转）。
+ * 配置审计面板依此将审计流水翻译为具体的设置项名称。
  *
  * entityTypes 取自后端 audit_logs.entity_type 的**实际写入值**（dev 库实证）。
  * ⚠️ 大小写不统一且无规律：`order_form_field`/`field_definition` 是下划线小写，
@@ -18,7 +17,6 @@ import {
   orderTypesApi,
   periodLocksApi,
   policyApi,
-  poolAccountsApi,
   poolsApi,
   qualityApi,
   sequencesApi,
@@ -79,40 +77,23 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     label: "业务类型",
     summary: "回收/提号/代挂/代分期等定义，含资金性质与编号前缀",
     group: "MASTER",
-    // 只收 OrderTypeDef：路由另立「资金路由」项（OrderTypePool），
+    // 只收 OrderTypeDef：路由（OrderTypePool）归「资金池」项，
     // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool / pool_account 的处理口径一致）。
     entityTypes: ["OrderTypeDef"],
     count: async () => (await orderTypesApi.list()).length,
   },
   {
-    key: "order-type-routes",
-    label: "资金路由",
-    summary: "各业务类型的过账去向：按份额与资金性质匹配目标资金池",
-    group: "MASTER",
-    entityTypes: ["OrderTypePool"],
-    count: async () => {
-      const types = await orderTypesApi.list();
-      const lists = await Promise.all(types.map((type) => orderTypesApi.routes(type.id).catch(() => [])));
-      return lists.reduce((sum, rows) => sum + rows.length, 0);
-    },
-  },
-  {
     key: "pools",
     label: "资金池",
-    summary: "资金归属池定义，决定计入权益还是仅计头寸",
+    // 池与路由同属设置页「资金池」页签（池为视图一、路由为视图二），此处合并计数。
+    summary: "资金归属池定义与过账路由：钱归谁、各业务类型按份额落到哪个池",
     group: "MASTER",
-    // 池账户单独成项：两者共用 pool_account 审计类型会重复计数，故此处只收 Pool。
-    entityTypes: ["Pool"],
-    count: async () => (await poolsApi.list()).length,
-  },
-  {
-    key: "pool-accounts",
-    label: "资金池账户",
-    summary: "池内银行账户/现金/第三方渠道，属性决定余额归属口径",
-    group: "MASTER",
-    permission: "pool.manage",
-    entityTypes: ["pool_account"],
-    count: async () => (await poolAccountsApi.list()).length,
+    entityTypes: ["Pool", "OrderTypePool"],
+    count: async () => {
+      const [poolRows, types] = await Promise.all([poolsApi.list(), orderTypesApi.list()]);
+      const lists = await Promise.all(types.map((type) => orderTypesApi.routes(type.id).catch(() => [])));
+      return poolRows.length + lists.reduce((sum, rows) => sum + rows.length, 0);
+    },
   },
   {
     key: "game-types",

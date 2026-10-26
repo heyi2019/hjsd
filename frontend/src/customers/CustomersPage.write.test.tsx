@@ -127,7 +127,9 @@ describe("CustomersPage：权限门控与写操作", () => {
   it("客户列表支持关键词搜索并把条件传给后端", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
-    await ui.type(screen.getByLabelText("搜索客户"), "张三");
+    // 输入框与 enterButton 图标按钮均可访问名同为「搜索客户」（F4 无障碍整改），
+    // Input.Search 的 input 是 type=search → role 为 searchbox，用它精确命中输入框避免双命中。
+    await ui.type(screen.getByRole("searchbox", { name: "搜索客户" }), "张三");
     await ui.keyboard("{Enter}");
     // 用 toHaveBeenCalledWith 而非 toHaveBeenLastCalledWith：搜索后页面可能再触发一次刷新调用，
     // 断言「关键词确实传给了后端」才是本用例的意图，避免与刷新调用竞争导致偶发红。

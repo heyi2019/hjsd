@@ -33,7 +33,7 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState("business-dictionary");
   /** 子面板跳转到表单字段时待消费的作用域。 */
   const [pendingScope, setPendingScope] = useState<string | null>(null);
-  // 标准导入的批次选择提升到父级：SettingsPage 的 Tab 非挂载，切换后回到导入页仍能保留上次所选批次。
+  // 导入的批次选择提升到父级：SettingsPage 的 Tab 非挂载，切换后回到导入页仍能保留上次所选批次。
   const [importBatchId, setImportBatchId] = useState<number | null>(null);
 
   const navigate: TabNavigate = (key, params) => {
@@ -75,7 +75,7 @@ export function SettingsPage() {
     ...(can("finance.period.lock")
       ? [{ key: "period-locks", label: "月结账期锁", render: () => <PeriodLocksPanel /> }]
       : []),
-    ...(can("import.manage") ? [{ key: "imports", label: "标准导入", render: () => <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} /> }] : []),
+    ...(can("import.manage") ? [{ key: "imports", label: "导入", render: () => <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} /> }] : []),
     ...(can("user.manage")
       ? [
           { key: "users", label: "人员与权限", render: () => <UsersPanel /> },

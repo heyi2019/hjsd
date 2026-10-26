@@ -140,7 +140,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   },
   {
     key: "imports",
-    label: "标准导入",
+    label: "导入",
     summary: "批量导入作业：映射、提交、回滚",
     group: "OPS",
     permission: "import.manage",

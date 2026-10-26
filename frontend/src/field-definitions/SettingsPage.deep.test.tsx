@@ -55,10 +55,10 @@ beforeEach(() => {
 });
 
 describe("SettingsPage.deep", () => {
-  it("管理员可见全部条件 Tab（标准导入/人员与权限/团队管理）", async () => {
+  it("管理员可见全部条件 Tab（导入/人员与权限/团队管理）", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
-    expect(screen.getByRole("tab", { name: "标准导入" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "人员与权限" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "团队管理" })).toBeInTheDocument();
     // 基础 Tab 始终存在
@@ -69,7 +69,7 @@ describe("SettingsPage.deep", () => {
   it("查看人(viewer)屏蔽 import.manage / user.manage 条件 Tab", async () => {
     renderLight(<SettingsPage />, { user: "viewer" });
     await screen.findByRole("tab", { name: "业务字典" });
-    expect(screen.queryByRole("tab", { name: "标准导入" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "团队管理" })).toBeNull();
     // 无权限不应引入未授权面板

@@ -9,4 +9,4 @@ LOG_DIR="/Users/aries/黑金时代/logs"
 mkdir -p "$LOG_DIR"
 
 cd "$FRONTEND_DIR"
-exec node "$VITE_BIN" --host --port 5188 --host 127.0.0.1
+exec node "$VITE_BIN" --host 0.0.0.0 --port 5188

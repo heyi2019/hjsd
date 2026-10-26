@@ -332,10 +332,51 @@ def list_order_form_fields(
     return list(session.scalars(stmt.order_by(OrderFormField.sort_order, OrderFormField.id)))
 
 
+def _dependent_field_labels(session: Session, definition: OrderFormField) -> list[str]:
+    """返回把该字段作为条件依赖的其它字段标签（同作用域；条件只允许同作用域引用）。
+
+    停用/删除被依赖的字段会让下游条件必填永久无法命中（依赖值恒空），
+    表现为「设置页显示条件必填、表单却永不转必填」的静默失效，故两处均需拦截。
+    """
+    rows = session.scalars(
+        select(OrderFormField).where(
+            OrderFormField.order_type_code == definition.order_type_code,
+            OrderFormField.id != definition.id,
+        )
+    )
+    labels: list[str] = []
+    for row in rows:
+        condition = row.required_when
+        if isinstance(condition, dict) and condition.get("field") == definition.field_key:
+            labels.append(row.label)
+    return sorted(labels)
+
+
+def _reject_if_dependent(
+    session: Session, definition: OrderFormField, *, action: str
+) -> None:
+    dependents = _dependent_field_labels(session, definition)
+    if not dependents:
+        return
+    joined = "、".join(f"「{label}」" for label in dependents)
+    raise Validation(
+        f"字段「{definition.label}」被 {len(dependents)} 个条件必填引用（{joined}），"
+        f"无法{action}；请先解除这些字段的条件必填",
+        details={
+            "field_key": definition.field_key,
+            "order_type_code": definition.order_type_code,
+            "dependents": dependents,
+        },
+    )
+
+
 def set_order_form_field_active(
     session: Session, definition_id: int, active: bool, *, actor: str
 ) -> OrderFormField:
-    """停用/启用字段：核心字段(locked)也允许切换 is_active，由前端提示风险。"""
+    """停用/启用字段：核心字段(locked)也允许切换 is_active，由前端提示风险。
+
+    停用前校验依赖：被其它字段的条件必填引用时拒绝，避免条件静默失效。
+    """
     if not isinstance(active, bool):
         raise Validation("active 必须为布尔值", details={"field": "active"})
     definition = session.get(OrderFormField, definition_id)
@@ -343,6 +384,8 @@ def set_order_form_field_active(
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
         )
+    if not active and definition.is_active:
+        _reject_if_dependent(session, definition, action="停用")
     before = definition.is_active
     definition.is_active = active
     definition.updated_by = actor
@@ -371,6 +414,7 @@ def delete_order_form_field(session: Session, definition_id: int, *, actor: str)
             f"核心字段 {definition.label} 已锁定，不可删除（仅可改必填/停用）",
             details={"field_key": definition.field_key},
         )
+    _reject_if_dependent(session, definition, action="删除")
     record_audit(
         session,
         action=AuditAction.ORDER_FORM_FIELD_CHANGE,

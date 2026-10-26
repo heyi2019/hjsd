@@ -220,7 +220,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
               size="small"
               title={row.is_active ? `停用字段「${row.label}」` : `启用字段「${row.label}」`}
               description={row.is_active
-                ? "停用后该字段从建单表单消失（自定义字段值保留在订单数据中）。"
+                ? "停用后该字段从建单表单消失（自定义字段值保留在订单数据中）。若被其它字段的条件必填引用，需先解除条件。"
                 : "启用后该字段重新出现在建单表单中。"}
               danger={row.is_active}
               onConfirm={async () => {
@@ -241,7 +241,8 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
                       message.success("字段已删除");
                       await load(activeType);
                     } catch (err) {
-                      setError(normalizeError(err));
+                      // 顶部 ErrorBanner 语义是「加载失败」，操作失败需即时可见
+                      message.error(normalizeError(err).message);
                     }
                   }}
                 >

@@ -484,3 +484,120 @@ def test_router_required_when_roundtrip(seeded_client, headers):
     )
     assert kept.status_code == 200
     assert kept.json()["required_when"] is None
+
+
+# --------------------------------------------------------------------------- #
+# 依赖防护：被条件必填引用的字段不可停用/删除
+# --------------------------------------------------------------------------- #
+def _seed_conditional_pair(seeded_db) -> tuple[OrderFormField, OrderFormField]:
+    """建依赖字段 + 条件字段（依赖前者等于「其他」）。"""
+    dep = ff.create_order_form_field(
+        seeded_db,
+        order_type_code="HS",
+        field_key="dep_src",
+        label="来源X",
+        actor="admin",
+        field_type="SELECT",
+        options=["其他", "微信"],
+    )
+    cond = ff.create_order_form_field(
+        seeded_db,
+        order_type_code="HS",
+        field_key="dep_other",
+        label="其他来源X",
+        actor="admin",
+        required_when={"field": "dep_src", "op": "eq", "values": ["其他"]},
+    )
+    seeded_db.commit()
+    return dep, cond
+
+
+def test_deactivate_rejected_when_dependent(seeded_db):
+    dep, _cond = _seed_conditional_pair(seeded_db)
+    with pytest.raises(Validation) as exc:
+        ff.set_order_form_field_active(seeded_db, dep.id, False, actor="admin")
+    assert "其他来源X" in str(exc.value)
+    assert exc.value.details["dependents"] == ["其他来源X"]
+    seeded_db.rollback()
+    # 状态未被改动
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderFormField, dep.id).is_active is True
+
+
+def test_deactivate_allowed_when_not_dependent(seeded_db):
+    _dep, cond = _seed_conditional_pair(seeded_db)
+    # 条件字段自身不被任何字段依赖 → 允许停用
+    updated = ff.set_order_form_field_active(seeded_db, cond.id, False, actor="admin")
+    seeded_db.commit()
+    assert updated.is_active is False
+
+
+def test_deactivate_is_idempotent_when_already_inactive(seeded_db):
+    """已停用的字段再次停用直接通过（幂等），不因依赖而报错。"""
+    dep, _cond = _seed_conditional_pair(seeded_db)
+    dep.is_active = False  # 模拟历史已停用（如依赖是后来才加的）
+    seeded_db.commit()
+    updated = ff.set_order_form_field_active(seeded_db, dep.id, False, actor="admin")
+    assert updated.is_active is False
+
+
+def test_delete_rejected_when_dependent(seeded_db):
+    dep, _cond = _seed_conditional_pair(seeded_db)
+    with pytest.raises(Validation) as exc:
+        ff.delete_order_form_field(seeded_db, dep.id, actor="admin")
+    assert "无法删除" in str(exc.value)
+    assert exc.value.details["field_key"] == "dep_src"
+
+
+def test_delete_allowed_when_not_dependent(seeded_db):
+    _dep, cond = _seed_conditional_pair(seeded_db)
+    ff.delete_order_form_field(seeded_db, cond.id, actor="admin")
+    seeded_db.commit()
+    assert seeded_db.get(OrderFormField, cond.id) is None
+
+
+def test_dependent_check_is_scoped_by_order_type(seeded_db):
+    """别的业务类型下同名 key 的条件不应干扰本作用域的停用。"""
+    _dep, _cond = _seed_conditional_pair(seeded_db)
+    # TH 作用域建一个自己的字段，key 相同但不引用 HS 的字段
+    other = ff.create_order_form_field(
+        seeded_db, order_type_code="TH", field_key="dep_src", label="来源Y", actor="admin"
+    )
+    seeded_db.commit()
+    updated = ff.set_order_form_field_active(seeded_db, other.id, False, actor="admin")
+    seeded_db.commit()
+    assert updated.is_active is False
+
+
+def test_router_rejects_deactivate_dependent(seeded_client, headers):
+    dep = seeded_client.post(
+        "/api/v1/order-form-fields",
+        headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS", field_key="rt_dep", label="路由依赖", field_type="TEXT"
+        ).model_dump(mode="json"),
+    ).json()
+    seeded_client.post(
+        "/api/v1/order-form-fields",
+        headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS",
+            field_key="rt_dep_child",
+            label="路由子字段",
+            required_when={"field": "rt_dep", "op": "filled"},
+        ).model_dump(mode="json"),
+    )
+    blocked = seeded_client.patch(
+        f"/api/v1/order-form-fields/{dep['id']}/active?active=false", headers=headers
+    )
+    assert blocked.status_code == 422, blocked.text
+    body = blocked.json()
+    # 422 必须来自依赖防护（而非 schema 拒收字段）
+    assert "路由子字段" in body["message"]
+    assert body["details"]["dependents"] == ["路由子字段"]
+
+    # 启用方向不受限
+    enabled = seeded_client.patch(
+        f"/api/v1/order-form-fields/{dep['id']}/active?active=true", headers=headers
+    )
+    assert enabled.status_code == 200, enabled.text

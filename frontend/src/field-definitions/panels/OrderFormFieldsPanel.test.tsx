@@ -225,3 +225,45 @@ describe("OrderFormFieldsPanel 条件必填", () => {
     expect(payload.required_when).toMatchObject({ field: "customer_source", op: "eq" });
   });
 });
+
+describe("OrderFormFieldsPanel 依赖防护", () => {
+  it("停用被条件引用的字段失败时即时提示原因，不重载列表", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 90, field_key: "src", label: "来源字段", is_active: true, locked: false, is_custom: true }),
+    ]);
+    vi.mocked(catalog.orderFormFieldsApi).setActive.mockRejectedValue(
+      new Error("字段「来源字段」被 1 个条件必填引用（「其他来源」），无法停用；请先解除这些字段的条件必填"),
+    );
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("来源字段");
+    const listCalls = vi.mocked(catalog.orderFormFieldsApi).list.mock.calls.length;
+
+    await ui.click(screen.getByText("停用"));
+    await ui.click(await screen.findByRole("button", { name: /确认/ }));
+
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith(expect.stringContaining("请先解除")),
+    );
+    // 操作失败不触发重新拉取
+    expect(vi.mocked(catalog.orderFormFieldsApi).list.mock.calls.length).toBe(listCalls);
+  });
+
+  it("删除被条件引用的字段失败时即时提示原因", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 91, field_key: "src2", label: "来源字段2", locked: false, is_custom: true }),
+    ]);
+    vi.mocked(catalog.orderFormFieldsApi).remove.mockRejectedValue(
+      new Error("字段「来源字段2」被 1 个条件必填引用（「其他来源2」），无法删除；请先解除这些字段的条件必填"),
+    );
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("来源字段2");
+
+    await ui.click(screen.getByText("删除"));
+    await ui.click(await screen.findByRole("button", { name: /OK/ }));
+
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith(expect.stringContaining("无法删除")),
+    );
+    expect(vi.mocked(catalog.orderFormFieldsApi).remove).toHaveBeenCalledWith(91);
+  });
+});

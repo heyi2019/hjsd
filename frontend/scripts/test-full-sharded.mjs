@@ -16,6 +16,9 @@ const extraArgs = process.argv.slice(2);
 // 片数过多会增加进程启动开销，过多过少都失衡，故给上下限。
 const SHARD_MIN = 6;
 const SHARD_MAX = 10;
+// [2026-10-27 实测定案] 并发 3 实验否决：RUN1 >6.5min（比并发 2 的 262.81s 更慢）
+// 且 shard-1 直接 exit 1（机制与 10-20 的 4 workers 超时同源：jsdom+antd 重型用例
+// 争抢资源触发重试放大）。2 是本机稳定边界，勿再上调；提速走「拆重型用例」路线。
 const CONCURRENCY = 2;
 
 const testFilePattern = /\.(test|spec)\.(ts|tsx)$/;

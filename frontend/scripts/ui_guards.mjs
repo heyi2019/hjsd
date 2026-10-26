@@ -248,11 +248,58 @@ if (mainSource.includes("responsive-overrides.css")) {
   fail("responsive-fallback", "main.tsx 仍加载开发服务器响应式兼容兜底，应归并到正式样式");
 }
 
+// 规则 13：录入表单必须接入「设置-表单字段」配置体系。
+// 背景（2026-10-27）：12 个业务弹窗（订单 5 / 库存 4 / 工作室 3）漏接表单字段配置，
+// 字段全部前端硬编码，用户无法在设置页配置——根因是新增表单时没有强制提醒动作。
+// 判定：文件含 antd Form + onFinish（录入表单特征），但未从 ConfigurableField
+// 体系消费任何配置能力。两条等价接线路径都认可：
+//   a) <FieldConfigScope scope=...> 包裹（含 CfgItem / CustomFieldSection）
+//   b) useOrderFormConfig(scope) 直取配置（CreateBusinessModal / SALE 等原范式）
+// 白名单 = 刻意不接的系统表单/配置管理界面，逐项带理由；新增录入表单
+// 要么接线、要么显式加入白名单并写明理由——不允许静默漏接。
+const CONFIG_MODULE_RE = /from\s+"[^"]*ConfigurableField"/;
+const WIRED_RE = /FieldConfigScope|useOrderFormConfig/;
+const FORM_SCOPE_WHITELIST = new Map([
+  ["src/quality/QualityPanel.tsx", "质量工单 2 弹窗未接入（2026-10-27 盘点明确暂缓，补接时移出本清单）"],
+  ["src/auth/LoginPage.tsx", "登录表单，非业务数据录入"],
+  ["src/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],
+  ["src/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],
+  ["src/field-definitions/panels/GameTypeSettingsPanel.tsx", "配置管理界面本身"],
+  ["src/field-definitions/panels/OrderFormFieldsPanel.tsx", "表单字段配置界面本身（即守卫所保护的设置页）"],
+  ["src/field-definitions/panels/OrderTypeRoutesPanel.tsx", "配置管理界面本身"],
+  ["src/field-definitions/panels/OrderTypesPanel.tsx", "配置管理界面本身"],
+  ["src/field-definitions/panels/PoolsPanel.tsx", "资金池配置界面本身"],
+  ["src/policy/PolicyResolveModal.tsx", "政策试算弹窗，非业务数据录入"],
+  ["src/policy/PolicyVersionEditorModal.tsx", "政策版本编辑，配置管理"],
+  ["src/search/SearchPanel.tsx", "查询表单，非数据录入"],
+  ["src/users/TeamsPanel.tsx", "团队管理，系统表单"],
+  ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
+]);
+let wiredCount = 0;
+for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+  const rel = relative(process.cwd(), file).replaceAll("\\", "/");
+  const text = readFileSync(file, "utf8");
+  if (!(/<Form[\s>]/.test(text) && /onFinish=/.test(text))) continue;
+  if (WIRED_RE.test(text) && CONFIG_MODULE_RE.test(text)) {
+    wiredCount++;
+    continue;
+  }
+  if (FORM_SCOPE_WHITELIST.has(rel)) continue;
+  fail(
+    "form-scope",
+    `${rel} → 录入表单未接入「设置-表单字段」配置体系（须 FieldConfigScope / useOrderFormConfig；确属系统表单则加入 ui_guards.mjs 白名单并写明理由）`,
+  );
+}
+// 规则 13 自检：全项目 0 个已接线表单 = 判定正则已失效（守卫假绿）。
+if (wiredCount === 0) {
+  fail("form-scope", "全项目未找到任何已接线表单，规则 13 的判定正则可能已失效");
+}
+
 if (failures.length) {
   console.error(`UI 守卫未通过（${failures.length} 项）：`);
   console.error(failures.join("\n"));
   process.exit(1);
 }
 console.log(
-  `UI 守卫通过：${pages().length} 个页面文件，12 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧 + 无内联样式/原生表格）。`,
+  `UI 守卫通过：${pages().length} 个页面文件，13 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧 + 无内联样式/原生表格 + 录入表单配置接线）。`,
 );

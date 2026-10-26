@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import { InstallmentsPanel } from "./InstallmentsPanel";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOrderFormFields } from "../test/formFieldsSeed";
 vi.mock("../shared/api/catalog")
 
 const installments = [
@@ -40,6 +41,7 @@ const installments = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOrderFormFields(catalog);
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue(installments);
   vi.mocked(catalog.installmentsApi.schedules).mockResolvedValue([
     { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },

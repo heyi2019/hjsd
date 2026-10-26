@@ -2,6 +2,7 @@ import { beforeEach, vi } from "vitest";
 import type { AccountExecutionDetail } from "../shared/api/catalog";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
+import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
 
 export const accounts = [
   { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
@@ -11,6 +12,9 @@ export const accounts = [
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  // T19/T20：建单表单字段与选项词典改为从配置读取，测试需默认种子，否则下拉无选项。
+  seedOrderFormFields(catalog);
+  seedOptionSets(catalog);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);

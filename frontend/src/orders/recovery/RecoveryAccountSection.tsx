@@ -2,7 +2,6 @@ import { Input } from "antd";
 import type { ReactNode } from "react";
 import { Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
-import { HAS_SECONDARY_OPTIONS } from "./recoveryConfig";
 import { CfgItem } from "../ConfigurableField";
 import "./RecoveryAccountSection.css";
 
@@ -62,7 +61,7 @@ export function RecoveryAccountSection(props: {
         <Input placeholder="可选填" />
       </CfgItem>
       <CfgItem name={fieldNames.hasSecondary} label="有无二次">
-        <Select options={HAS_SECONDARY_OPTIONS} />
+        <Select />
       </CfgItem>
       <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">
         <Input placeholder="可选填" />

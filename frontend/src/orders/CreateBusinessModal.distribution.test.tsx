@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import { CreateBusinessModal } from "./CreateBusinessModal";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
+import { seedOrderFormFields } from "../test/formFieldsSeed";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -20,6 +21,7 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOrderFormFields(catalog);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);

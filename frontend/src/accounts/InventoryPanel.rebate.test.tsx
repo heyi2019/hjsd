@@ -6,6 +6,7 @@ import { InventoryPanel } from "./InventoryPanel";
 
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
+import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -21,6 +22,7 @@ const accounts = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});

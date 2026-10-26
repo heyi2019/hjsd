@@ -6,6 +6,7 @@ import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
+import { seedOptionSets } from "../test/formFieldsSeed";
 import type { Account, AccountExecutionDetail, Installment } from "../shared/api/catalog";
 
 vi.mock("../shared/api/catalog", async (importOriginal) => {
@@ -98,6 +99,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
   URL.revokeObjectURL = vi.fn();
+  seedOptionSets(catalog);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([contract]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue({} as never);

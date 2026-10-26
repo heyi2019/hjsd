@@ -83,7 +83,7 @@ export function CustomerLeadPanel() {
       <FieldConfigContext.Provider value={config}>
         <Form form={createForm} layout="vertical" onFinish={createLead}>
           <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
-          <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select options={Object.entries(REQUEST_TYPE_LABEL).map(([value, label]) => ({ value, label }))} /></CfgItem>
+          <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select /></CfgItem>
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
           <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>

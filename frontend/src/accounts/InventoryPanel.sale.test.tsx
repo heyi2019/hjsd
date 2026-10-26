@@ -7,6 +7,7 @@ import { InventorySaleModal } from "./InventorySaleModal";
 
 import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
+import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
 vi.mock("../shared/api/catalog")
 
 const accounts = [
@@ -16,6 +17,8 @@ const accounts = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOrderFormFields(catalog);
+  seedOptionSets(catalog);
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});

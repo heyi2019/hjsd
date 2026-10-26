@@ -1,6 +1,5 @@
 import { Input } from "antd";
 import { Select } from "../../shared/ui";
-import { CUSTOMER_SOURCE_OPTIONS } from "./recoveryConfig";
 import { CfgItem, CfgNestedItem } from "../ConfigurableField";
 import "./RecoveryCustomerSection.css";
 
@@ -12,7 +11,7 @@ export function RecoveryCustomerSection(props: { customerSource?: string }) {
       <div id="customer-info-title" className="recovery-customer-fields__title">客户信息</div>
       <CfgItem className="recovery-order-modal__party-field" name="customer_nickname" label="客户昵称" rules={[{ required: true, message: "请输入客户昵称" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
       <CfgItem className="recovery-order-modal__party-field" name="customer_source" label="客户来源" rules={[{ required: true, message: "请选择客户来源" }]}>
-        <Select placeholder="请选择客户来源" options={CUSTOMER_SOURCE_OPTIONS} />
+        <Select placeholder="请选择客户来源" />
       </CfgItem>
       <CfgItem className="recovery-order-modal__party-field recovery-customer-source-other" name="customer_source_other" label="其他来源" rules={isOtherSource ? [{ required: true, message: "请输入客户来源" }] : []}>
         <Input disabled={!isOtherSource} placeholder={isOtherSource ? "请输入来源名称" : "选择其他后可填写"} />

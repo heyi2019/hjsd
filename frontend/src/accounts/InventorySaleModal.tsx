@@ -189,10 +189,6 @@ export function InventorySaleModal(props: {
           </CfgItem>
           <CfgItem name="payment_method" label="付款方式" initialValue="FULL">
             <Radio.Group
-              options={[
-                { value: "FULL", label: "全款" },
-                { value: "INSTALLMENT", label: "分期付款" },
-              ]}
               optionType="button"
               buttonStyle="solid"
             />

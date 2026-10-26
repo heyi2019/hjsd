@@ -6,6 +6,7 @@ import { renderLight } from "../test/render";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import * as catalog from "../shared/api/catalog";
 import type { Customer, Lead } from "../shared/api/catalog";
+import { seedOrderFormFields } from "../test/formFieldsSeed";
 
 vi.mock("../shared/api/catalog");
 
@@ -23,6 +24,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
+  seedOrderFormFields(catalog);
   vi.mocked(catalog.leadsApi.list).mockResolvedValue(leads);
   vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
   vi.mocked(catalog.leadsApi.create).mockResolvedValue(leads[0]);

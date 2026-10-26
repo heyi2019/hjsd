@@ -3,7 +3,6 @@ import { useEffect, useRef } from "react";
 import type { GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
-import { CUSTOMER_SOURCE_OPTIONS } from "../recovery/recoveryConfig";
 import { CfgItem, CfgNestedItem } from "../ConfigurableField";
 import "./DfqOrderSection.css";
 
@@ -125,7 +124,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
       <section className="dfq-customer-section recovery-customer-fields" aria-labelledby="dfq-customer-info-title">
         <div id="dfq-customer-info-title" className="recovery-customer-fields__title">分期客户</div>
         <CfgItem className="recovery-order-modal__party-field" name="dfq_customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
-        <CfgItem className="recovery-order-modal__party-field" name="dfq_customer_source" label="客户来源" rules={[{ required: true, message: "请选择客户来源" }]}><Select placeholder="请选择客户来源" options={CUSTOMER_SOURCE_OPTIONS} /></CfgItem>
+        <CfgItem className="recovery-order-modal__party-field" name="dfq_customer_source" label="客户来源" rules={[{ required: true, message: "请选择客户来源" }]}><Select placeholder="请选择客户来源" /></CfgItem>
         <div className="recovery-customer-contacts">
           <div className="recovery-customer-contacts__title">联系方式</div>
           <CfgNestedItem className="recovery-fee-field" name="dfq_customer_contact" label="姓名"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>

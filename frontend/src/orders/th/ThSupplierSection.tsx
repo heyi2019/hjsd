@@ -2,9 +2,6 @@ import { Form, Input } from "antd";
 import { Select } from "../../shared/ui";
 import { CfgItem, CfgNestedItem } from "../ConfigurableField";
 
-const SUPPLIER_SOURCE_OPTIONS = ["氪金联盟", "同行", "其他"]
-  .map((value) => ({ value, label: value }));
-
 /** 提号复用回收页客户信息的结构，只将业务主体替换为供货方。 */
 export function ThSupplierSection() {
   const supplierSource = Form.useWatch("supplier_source");
@@ -15,7 +12,7 @@ export function ThSupplierSection() {
         <Input placeholder="请输入供货方昵称" />
       </CfgItem>
       <CfgItem className="recovery-order-modal__party-field" name="supplier_source" label="供货方来源" rules={[{ required: true, message: "请选择供货方来源" }]}>
-        <Select placeholder="请选择供货方来源" options={SUPPLIER_SOURCE_OPTIONS} />
+        <Select placeholder="请选择供货方来源" />
       </CfgItem>
       <CfgItem className="recovery-order-modal__party-field recovery-customer-source-other" name="supplier_source_other" label="其他来源" rules={supplierSource === "其他" ? [{ required: true, whitespace: true, message: "请输入供货方来源" }] : []}>
         <Input disabled={supplierSource !== "其他"} placeholder={supplierSource === "其他" ? "请输入来源名称" : "选择其他后可填写"} />

@@ -6,10 +6,13 @@ import { FundsPage } from "./FundsPage";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
+  seedOrderFormFields(catalog);
+  seedOptionSets(catalog);
 });
 
 vi.mock("../shared/api/catalog", async (importOriginal) => {

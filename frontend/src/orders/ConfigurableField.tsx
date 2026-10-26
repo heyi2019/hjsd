@@ -6,9 +6,10 @@
  *  降级策略：配置未加载或某字段无配置时，视为「启用 + 使用原硬编码必填/标签」，
  *  保证既有表单在无配置或接口异常时与现状一致。
  */
-import { DatePicker, Form, Input, InputNumber, Select, Switch } from "antd";
+import { DatePicker, Form, Input, InputNumber, Radio, Select, Switch } from "antd";
+import { Select as UiSelect } from "../shared/ui";
 import type { ReactElement, ReactNode } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
 import type { Rule } from "antd/es/form";
 import { NestedFormField } from "../shared/ui";
 import { orderFormFieldsApi, type OrderFormField } from "../shared/api/catalog";
@@ -124,9 +125,32 @@ export function CfgItem(props: {
       className={props.className}
       initialValue={props.initialValue}
     >
-      {props.children}
+      {injectOptionsIfMissing(props.children, cfg[props.name])}
     </Form.Item>
   );
+}
+
+/** 若 children 内的 Select / Select 未显式传 options，且字段配置带有选项集，则注入。
+ *  动态数据源下拉（options 由 pools.map 等运行时计算）因显式传了 options 不会被覆盖。 */
+export function injectOptionsIfMissing(
+  children: ReactNode,
+  def?: OrderFormField,
+): ReactNode {
+  if (!def) return children;
+  const items = resolveOptionItems(def.options);
+  if (items.length === 0) return children;
+  return Children.map(children, (child) => {
+    if (!isValidElement(child)) return child;
+    const childProps = child.props as { options?: unknown };
+    // 同时兼容 antd Select、shared/ui 的 Select 封装（forwardRef 封装组件，类型与裸 antd Select 不同）、
+    // 以及 Radio.Group（三者均接受 options 数组）；动态数据源因显式传 options 不被覆盖。
+    const isOptionControl =
+      child.type === Select || child.type === UiSelect || child.type === Radio.Group;
+    if (isOptionControl && childProps.options === undefined) {
+      return cloneElement(child as ReactElement, { options: items } as never);
+    }
+    return child;
+  });
 }
 
 /** 受配置驱动的 NestedFormField 布局项（name 在内层 Form.Item，如「联系方式」网格内的子字段）。 */
@@ -149,9 +173,18 @@ export function CfgNestedItem(props: {
         rules={resolveRules(cfg, props.name, props.rules)}
         initialValue={props.initialValue}
       >
-        {props.children}
+        {injectOptionsIfMissing(props.children, cfg[props.name])}
       </Form.Item>
     </NestedFormField>
+  );
+}
+
+/** 解析配置选项：兼容纯字符串数组（value=label）与 {value,label} 对象数组。 */
+export function resolveOptionItems(
+  options: Array<string | { value: string; label: string }> | null | undefined,
+): Array<{ value: string; label: string }> {
+  return (options ?? []).map((item) =>
+    typeof item === "string" ? { value: item, label: item } : { value: item.value, label: item.label },
   );
 }
 
@@ -159,7 +192,7 @@ export function CfgNestedItem(props: {
 export function CustomFormField({ def }: { def: OrderFormField }): ReactElement {
   const name = ["form_extra", def.field_key] as [string, string];
   const rules = def.required ? [{ required: true, message: `${def.label}必填` }] : [];
-  const options = (def.options ?? []).map((value) => ({ value, label: value }));
+  const options = resolveOptionItems(def.options);
   switch (def.field_type) {
     case "NUMBER":
       return (

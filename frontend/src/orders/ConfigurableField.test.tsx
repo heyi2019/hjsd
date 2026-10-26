@@ -6,13 +6,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Form, Input } from "antd";
+import type { ReactElement } from "react";
+import { Form, Input, Radio, Select } from "antd";
 import type { OrderFormField } from "../shared/api/catalog";
 import { renderLight } from "../test/render";
 import {
   CfgItem,
   CustomFormField,
   FieldConfigContext,
+  injectOptionsIfMissing,
+  resolveOptionItems,
   resolveRules,
   type FieldConfigMap,
 } from "./ConfigurableField";
@@ -169,5 +172,60 @@ describe("CfgItem 配置门控", () => {
       </Form>,
     );
     expect(screen.getByText("账号(配置)")).toBeInTheDocument();
+  });
+});
+
+describe("resolveOptionItems：选项归一化", () => {
+  it("字符串数组 → {value,label} 同值", () => {
+    expect(resolveOptionItems(["微信", "支付宝"])).toEqual([
+      { value: "微信", label: "微信" },
+      { value: "支付宝", label: "支付宝" },
+    ]);
+  });
+  it("{value,label} 对象原样保留", () => {
+    expect(resolveOptionItems([{ value: "BUY", label: "买号返点" }])).toEqual([
+      { value: "BUY", label: "买号返点" },
+    ]);
+  });
+  it("null/undefined → 空数组", () => {
+    expect(resolveOptionItems(null)).toEqual([]);
+    expect(resolveOptionItems(undefined)).toEqual([]);
+  });
+});
+
+describe("injectOptionsIfMissing：未传 options 时从配置注入", () => {
+  const def = makeField({
+    field_key: "src",
+    field_type: "SELECT",
+    options: [{ value: "a", label: "A" }, { value: "b", label: "B" }],
+  });
+
+  // injectOptionsIfMissing 用 Children.map 包裹，返回可能是数组（注入时）或单元素（提前返回原 children 时）。
+  const firstProps = (out: unknown) => {
+    const el = (Array.isArray(out) ? out[0] : out) as ReactElement;
+    return (el.props as { options?: unknown }).options;
+  };
+
+  it("Select 未传 options 时注入配置选项", () => {
+    expect(firstProps(injectOptionsIfMissing(<Select />, def))).toEqual([
+      { value: "a", label: "A" },
+      { value: "b", label: "B" },
+    ]);
+  });
+
+  it("Radio.Group 未传 options 时注入配置选项", () => {
+    expect(firstProps(injectOptionsIfMissing(<Radio.Group />, def))).toEqual([
+      { value: "a", label: "A" },
+      { value: "b", label: "B" },
+    ]);
+  });
+
+  it("Select 已显式传 options 时不覆盖（动态数据源）", () => {
+    const explicit = [{ value: "x", label: "X" }];
+    expect(firstProps(injectOptionsIfMissing(<Select options={explicit} />, def))).toEqual(explicit);
+  });
+
+  it("配置无 options 时不注入", () => {
+    expect(firstProps(injectOptionsIfMissing(<Select />, makeField({ field_key: "x" })))).toBeUndefined();
   });
 });

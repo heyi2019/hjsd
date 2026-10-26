@@ -335,12 +335,7 @@ export function RebatesPanel() {
             />
           </CfgItem>
           <CfgItem name="rebate_type" label="返点类型" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: "BUY", label: "买号返点" },
-                { value: "SELL", label: "卖号返点" },
-              ]}
-            />
+            <Select />
           </CfgItem>
           <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}>
             <MoneyInput />

@@ -649,12 +649,7 @@ function ContractTable({
         <FieldConfigScope scope="INSTDELIVER" active={Boolean(deliverTarget)}>
           <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
           <CfgItem name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" },
-                { value: "CUSTOMER_SELF", label: "客户自行换绑" },
-              ]}
-            />
+            <Select />
           </CfgItem>
           <CfgItem name="delivered_on" label="换绑日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />

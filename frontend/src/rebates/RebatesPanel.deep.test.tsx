@@ -6,6 +6,7 @@ import { RebatesPanel } from "./RebatesPanel";
 import { resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
+import { seedOrderFormFields } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -32,6 +33,7 @@ const settlementsFor1 = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOrderFormFields(catalog);
   vi.mocked(catalog.rebatesApi.list).mockResolvedValue(rebates as unknown as never);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders as unknown as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools as unknown as never);

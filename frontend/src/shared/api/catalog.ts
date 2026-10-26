@@ -594,8 +594,8 @@ export interface FieldDefinition {
   required: boolean;
   sort_order: number;
   is_active: boolean;
-  /** SELECT / MULTI_SELECT 的选项集 */
-  options?: string[] | null;
+  /** SELECT / MULTI_SELECT 的选项集：纯字符串数组或 {value,label} 对象数组 */
+  options?: Array<string | { value: string; label: string }> | null;
 }
 
 export interface GameTypeOption {
@@ -974,7 +974,7 @@ export interface OrderFormField {
   field_key: string;
   label: string;
   field_type: string;
-  options?: string[] | null;
+  options?: Array<string | { value: string; label: string }> | null;
   required: boolean;
   is_active: boolean;
   sort_order: number;
@@ -1002,6 +1002,41 @@ export const orderFormFieldsApi = {
       .patch<OrderFormField>(`/order-form-fields/${id}/active?active=${active}`)
       .then((r) => r.data),
   remove: (id: number) => api.delete(`/order-form-fields/${id}`),
+};
+
+/* ── T20：选项词典（D 类筛选器 / 业务字典） ────────────── */
+
+export interface OptionItem {
+  value: string;
+  label: string;
+}
+
+export interface OptionSet {
+  id: number;
+  code: string;
+  label: string;
+  group: string;
+  /** true=纯字典可编辑；false=后端死枚举只读 */
+  editable: boolean;
+  options: OptionItem[] | null;
+  description?: string | null;
+}
+
+export interface OptionSetList {
+  items: OptionSet[];
+}
+
+/** 选项词典：读取（筛选器广泛使用，仅登录即可） + 管理（option-set.manage）。 */
+export const optionSetsApi = {
+  list: (params?: { group?: string; editable?: boolean }) =>
+    api.get<OptionSetList>("/option-sets", { params }).then((r) => r.data),
+  get: (code: string) =>
+    api.get<OptionSet>(`/option-sets/${code}`).then((r) => r.data),
+  create: (payload: Partial<OptionSet>) =>
+    api.post<OptionSet>("/option-sets", payload).then((r) => r.data),
+  update: (code: string, payload: Partial<OptionSet>) =>
+    api.put<OptionSet>(`/option-sets/${code}`, payload).then((r) => r.data),
+  remove: (code: string) => api.delete(`/option-sets/${code}`),
 };
 
 /* ── M4：报表 / 审计 ─────────────────────────────── */
@@ -1153,6 +1188,14 @@ export interface AuditLogRow {
   occurred_at?: string | null;
 }
 
+export interface AuditEntityStat {
+  entity_type: string;
+  /** 真实累计条数（COUNT(*)） */
+  count: number;
+  last_at?: string | null;
+  last_actor?: string | null;
+}
+
 export const auditApi = {
   list: (params?: {
     entity_type?: string;
@@ -1166,6 +1209,15 @@ export const auditApi = {
   }) =>
     api.get<{ items: AuditLogRow[]; total: number }>("/audit-logs", { params }).then((r) => r.data),
   actions: () => api.get<{ items: string[] }>("/audit-logs/actions").then((r) => r.data.items),
+  /** 按 entity_type 汇总真实累计数。
+   *  ⚠️ 不要用 list 的 `total` 当累计数——它的语义是「当前页行数」，
+   *  limit=1 时恒等于 1（见 backend/app/audit/router.py）。 */
+  stats: (entityTypes: string[]) =>
+    api
+      .get<{ items: AuditEntityStat[] }>("/audit-logs/stats", {
+        params: { entity_types: entityTypes.join(",") },
+      })
+      .then((r) => r.data.items),
 };
 
 /* ── M4 补齐：标准导入（MIG-01）──────────────────────────────

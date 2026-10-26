@@ -5,6 +5,7 @@ import { InventoryPanel } from "./InventoryPanel";
 
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
+import { seedOptionSets } from "../test/formFieldsSeed";
 vi.mock("../shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/api/catalog")>();
   const METHODS = [
@@ -37,6 +38,7 @@ const accounts = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  seedOptionSets(catalog);
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});

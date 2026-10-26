@@ -655,6 +655,9 @@ def create_order_form_field(
             field_type=payload.field_type,
             options=payload.options,
             required=payload.required,
+            required_when=(
+                payload.required_when.model_dump() if payload.required_when is not None else None
+            ),
             is_active=payload.is_active,
             sort_order=payload.sort_order,
             note=payload.note,
@@ -672,8 +675,15 @@ def update_order_form_field(
     db: Session = Depends(get_db),
     _user: CurrentUser = manage_form_fields,
 ) -> schemas.OrderFormFieldOut:
-    """编辑建单表单字段（label/类型/选项/必填/排序/备注）。"""
+    """编辑建单表单字段（label/类型/选项/必填态/排序/备注）。"""
     from app.orders import form_fields as ff
+
+    extra: dict[str, object] = {}
+    # required_when 三态：未传=保持不变；显式 null=清除条件；对象=设为条件必填。
+    if "required_when" in payload.model_fields_set:
+        extra["required_when"] = (
+            payload.required_when.model_dump() if payload.required_when is not None else None
+        )
 
     return schemas.OrderFormFieldOut.model_validate(
         ff.update_order_form_field(
@@ -686,6 +696,7 @@ def update_order_form_field(
             required=payload.required,
             sort_order=payload.sort_order,
             note=payload.note,
+            **extra,
         )
     )
 

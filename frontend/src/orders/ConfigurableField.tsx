@@ -12,7 +12,7 @@ import type { ReactElement, ReactNode } from "react";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
 import type { Rule } from "antd/es/form";
 import { NestedFormField } from "../shared/ui";
-import { orderFormFieldsApi, type OrderFormField } from "../shared/api/catalog";
+import { orderFormFieldsApi, type OrderFormField, type RequiredWhen } from "../shared/api/catalog";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
 
@@ -77,13 +77,40 @@ export function fieldLabel(config: FieldConfigMap, key: string, fallback: string
   return config[key]?.label ?? fallback;
 }
 
+/** 判断条件必填是否命中：values 为当前表单值（至少含依赖字段）。
+ *  - filled：依赖字段有值（数组非空 / 非空字符串 / 非 null）→ 命中；
+ *  - eq：依赖字段值属于触发值 → 命中；
+ *  - ne：依赖字段值不属于触发值 → 命中。
+ *  依赖值可能来自多选（数组），按任一值命中处理。
+ */
+export function isConditionActive(
+  cond: RequiredWhen | null | undefined,
+  values?: Record<string, unknown>,
+): boolean {
+  if (!cond) return false;
+  const raw = values?.[cond.field];
+  if (cond.op === "filled") {
+    if (Array.isArray(raw)) return raw.length > 0;
+    return raw !== undefined && raw !== null && String(raw).trim() !== "";
+  }
+  const triggers = cond.values ?? [];
+  const current = (Array.isArray(raw) ? raw : [raw]).map((item) => String(item ?? ""));
+  const hit = current.some((item) => triggers.includes(item));
+  return cond.op === "ne" ? !hit : hit;
+}
+
 /** 合并必填（配置为最终口径）：
+ *  - 配置条件必填（required_when 非空）→ 条件命中时必填，否则选填（剥离基础规则中的必填项）；
  *  - 配置 required=true → 强制必填（保留基础与条件校验规则，基础无必填时追加）；
- *  - 配置 required=false → 剥离基础规则中的必填项（保留金额格式等校验器，空值时校验器自行放行），
- *    即「设置里改成选填」对表单生效；条件必填（如「其他来源」）也随之解除——用户显式配置选填即最终口径；
+ *  - 配置 required=false 且无条件 → 剥离基础规则中的必填项（保留金额格式等校验器），即纯选填；
  *  - 无配置 → 原 rules（降级保持既有行为）。
  */
-export function resolveRules(config: FieldConfigMap, key: string, baseRules?: Rule[]): Rule[] {
+export function resolveRules(
+  config: FieldConfigMap,
+  key: string,
+  baseRules?: Rule[],
+  values?: Record<string, unknown>,
+): Rule[] {
   const def = config[key];
   const base = (baseRules ?? []).filter(Boolean) as Rule[];
   if (!def) return base;
@@ -91,7 +118,21 @@ export function resolveRules(config: FieldConfigMap, key: string, baseRules?: Ru
     const hasRequired = base.some((rule) => rule && (rule as { required?: boolean }).required);
     return hasRequired ? base : [...base, { required: true, message: `${def.label}必填` } as Rule];
   }
-  return base.filter((rule) => !(rule as { required?: boolean }).required);
+  const stripped = base.filter((rule) => !(rule as { required?: boolean }).required);
+  if (def.required_when) {
+    return isConditionActive(def.required_when, values)
+      ? [...stripped, { required: true, message: `${def.label}必填` } as Rule]
+      : stripped;
+  }
+  return stripped;
+}
+
+/** 订阅条件依赖字段的当前值；无条件时不订阅（用占位键，antd useWatch 对未知字段返回 undefined）。 */
+function useConditionValues(cfg: FieldConfigMap, key: string): Record<string, unknown> | undefined {
+  const form = Form.useFormInstance();
+  const condField = cfg[key]?.required_when?.field;
+  const depValue = Form.useWatch(condField ?? "__no_required_when__", form);
+  return condField ? { [condField]: depValue } : undefined;
 }
 
 export function CfgItem(props: {
@@ -112,12 +153,13 @@ export function CfgItem(props: {
   children: ReactNode;
 }): ReactElement | null {
   const cfg = props.cfg ?? useFieldConfig();
+  const condValues = useConditionValues(cfg, props.name);
   if (!isFieldActive(cfg, props.name)) return null;
   return (
     <Form.Item
       name={props.name}
       label={props.hideLabel ? undefined : fieldLabel(cfg, props.name, props.label ?? "")}
-      rules={resolveRules(cfg, props.name, props.rules)}
+      rules={resolveRules(cfg, props.name, props.rules, condValues)}
       valuePropName={props.valuePropName}
       tooltip={props.tooltip}
       extra={props.extra}
@@ -166,13 +208,14 @@ export function CfgNestedItem(props: {
   children: ReactNode;
 }): ReactElement | null {
   const cfg = props.cfg ?? useFieldConfig();
+  const condValues = useConditionValues(cfg, props.name);
   if (!isFieldActive(cfg, props.name)) return null;
   return (
     <NestedFormField className={props.className} label={fieldLabel(cfg, props.name, props.label)}>
       <Form.Item
         noStyle={props.noStyle ?? true}
         name={props.name}
-        rules={resolveRules(cfg, props.name, props.rules)}
+        rules={resolveRules(cfg, props.name, props.rules, condValues)}
         initialValue={props.initialValue}
       >
         {injectOptionsIfMissing(props.children, cfg[props.name])}
@@ -193,7 +236,12 @@ export function resolveOptionItems(
 /** 渲染用户自定义字段；值通过 name=['form_extra', field_key] 归集到 form_extra 对象。 */
 export function CustomFormField({ def }: { def: OrderFormField }): ReactElement {
   const name = ["form_extra", def.field_key] as [string, string];
-  const rules = def.required ? [{ required: true, message: `${def.label}必填` }] : [];
+  const condField = def.required_when?.field;
+  const depValue = Form.useWatch(condField ?? "__no_required_when__", Form.useFormInstance());
+  const required =
+    def.required ||
+    isConditionActive(def.required_when, condField ? { [condField]: depValue } : undefined);
+  const rules = required ? [{ required: true, message: `${def.label}必填` }] : [];
   const options = resolveOptionItems(def.options);
   switch (def.field_type) {
     case "NUMBER":

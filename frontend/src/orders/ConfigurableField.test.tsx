@@ -15,6 +15,7 @@ import {
   CustomFormField,
   FieldConfigContext,
   injectOptionsIfMissing,
+  isConditionActive,
   resolveOptionItems,
   resolveRules,
   type FieldConfigMap,
@@ -237,5 +238,124 @@ describe("injectOptionsIfMissing：未传 options 时从配置注入", () => {
 
   it("配置无 options 时不注入", () => {
     expect(firstProps(injectOptionsIfMissing(<Select />, makeField({ field_key: "x" })))).toBeUndefined();
+  });
+});
+
+describe("isConditionActive：条件命中判定", () => {
+  it("eq：依赖值属于触发值即命中（含多选任一命中）", () => {
+    const cond = { field: "customer_source", op: "eq" as const, values: ["其他"] };
+    expect(isConditionActive(cond, { customer_source: "其他" })).toBe(true);
+    expect(isConditionActive(cond, { customer_source: "微信" })).toBe(false);
+    expect(isConditionActive(cond, { customer_source: ["微信", "其他"] })).toBe(true);
+  });
+
+  it("ne：依赖值不属于触发值才算命中", () => {
+    const cond = { field: "customer_source", op: "ne" as const, values: ["其他"] };
+    expect(isConditionActive(cond, { customer_source: "微信" })).toBe(true);
+    expect(isConditionActive(cond, { customer_source: "其他" })).toBe(false);
+  });
+
+  it("filled：依赖字段有值即命中（空串/空数组/null 不算）", () => {
+    const cond = { field: "intermediary_fee", op: "filled" as const };
+    expect(isConditionActive(cond, { intermediary_fee: "100" })).toBe(true);
+    expect(isConditionActive(cond, { intermediary_fee: "" })).toBe(false);
+    expect(isConditionActive(cond, { intermediary_fee: null })).toBe(false);
+    expect(isConditionActive(cond, { intermediary_fee: [] })).toBe(false);
+    expect(isConditionActive(cond, {})).toBe(false);
+  });
+
+  it("无条件时恒为 false", () => {
+    expect(isConditionActive(null, { a: "1" })).toBe(false);
+    expect(isConditionActive(undefined, { a: "1" })).toBe(false);
+  });
+});
+
+describe("resolveRules 条件必填：条件命中决定必填", () => {
+  const cond = { field: "customer_source", op: "eq" as const, values: ["其他"] };
+  const cfg: FieldConfigMap = {
+    customer_source_other: makeField({
+      field_key: "customer_source_other",
+      label: "其他来源",
+      required: false,
+      required_when: cond,
+    }),
+  };
+  const base = [{ required: true, message: "请输入客户来源" }] as never;
+
+  it("条件命中 → 必填（剥离基础必填后追加配置文案）", () => {
+    const out = resolveRules(cfg, "customer_source_other", base, { customer_source: "其他" });
+    const requiredRules = out.filter((r) => (r as { required?: boolean }).required);
+    expect(requiredRules).toHaveLength(1);
+    expect((requiredRules[0] as { message?: string }).message).toBe("其他来源必填");
+  });
+
+  it("条件未命中 → 选填（基础必填被剥离）", () => {
+    const out = resolveRules(cfg, "customer_source_other", base, { customer_source: "微信" });
+    expect(out.filter((r) => (r as { required?: boolean }).required)).toHaveLength(0);
+  });
+
+  it("required=true 时忽略条件（必填与条件必填互斥）", () => {
+    const forceCfg: FieldConfigMap = {
+      customer_source_other: makeField({
+        field_key: "customer_source_other",
+        label: "其他来源",
+        required: true,
+        required_when: cond,
+      }),
+    };
+    const out = resolveRules(forceCfg, "customer_source_other", base, { customer_source: "微信" });
+    expect(out.filter((r) => (r as { required?: boolean }).required)).toHaveLength(1);
+  });
+});
+
+describe("CfgItem 条件必填：依赖值变化实时生效", () => {
+  const cfg: FieldConfigMap = {
+    customer_source: makeField({ field_key: "customer_source", label: "客户来源" }),
+    customer_source_other: makeField({
+      field_key: "customer_source_other",
+      label: "其他来源",
+      required: false,
+      required_when: { field: "customer_source", op: "eq", values: ["其他"] },
+    }),
+  };
+
+  const Harness = () => {
+    const [form] = Form.useForm();
+    return (
+      <Form form={form}>
+        <CfgItem name="customer_source" label="客户来源">
+          <Select
+            options={[
+              { value: "微信", label: "微信" },
+              { value: "其他", label: "其他" },
+            ]}
+          />
+        </CfgItem>
+        <CfgItem name="customer_source_other" label="其他来源" rules={[{ required: true, message: "请输入客户来源" }]}>
+          <Input aria-label="其他来源输入" />
+        </CfgItem>
+        <button type="button" onClick={() => form.setFieldsValue({ customer_source: "其他" })}>
+          选其他
+        </button>
+        <button type="button" onClick={() => form.submit()}>
+          提交
+        </button>
+      </Form>
+    );
+  };
+
+  it("依赖字段变为触发值后，条件字段转为必填并拦截提交", async () => {
+    renderLight(
+      <FieldConfigContext.Provider value={cfg}>
+        <Harness />
+      </FieldConfigContext.Provider>,
+    );
+    // 初始未命中：无必填星号（label 不带 required 标记）
+    expect(screen.queryByText("请输入客户来源")).toBeNull();
+
+    await ui.click(screen.getByRole("button", { name: "选其他" }));
+    await ui.click(screen.getByRole("button", { name: "提交" }));
+
+    expect(await screen.findByText("其他来源必填")).toBeInTheDocument();
   });
 });

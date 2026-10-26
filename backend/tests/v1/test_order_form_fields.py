@@ -318,3 +318,169 @@ def test_router_requires_auth(seeded_client):
         ).model_dump(mode="json"),
     )
     assert resp.status_code in (401, 403)
+
+
+# --------------------------------------------------------------------------- #
+# 条件必填（required_when）：必填 / 条件必填 / 选填 三态
+# --------------------------------------------------------------------------- #
+def _seed_dependency(seeded_db, *, code: str = "HS", key: str = "src_pick") -> OrderFormField:
+    row = ff.create_order_form_field(
+        seeded_db,
+        order_type_code=code,
+        field_key=key,
+        label="来源选择",
+        actor="admin",
+        field_type="SELECT",
+        options=["其他", "微信"],
+    )
+    seeded_db.commit()
+    return row
+
+
+def test_create_with_required_when(seeded_db):
+    _seed_dependency(seeded_db)
+    created = ff.create_order_form_field(
+        seeded_db,
+        order_type_code="HS",
+        field_key="src_pick_other",
+        label="其他来源",
+        actor="admin",
+        required=False,
+        required_when={"field": "src_pick", "op": "eq", "values": ["其他"]},
+    )
+    seeded_db.commit()
+    assert created.required is False
+    assert created.required_when == {"field": "src_pick", "op": "eq", "values": ["其他"]}
+
+
+def test_create_required_true_ignores_condition(seeded_db):
+    _seed_dependency(seeded_db)
+    created = ff.create_order_form_field(
+        seeded_db,
+        order_type_code="HS",
+        field_key="must_fill",
+        label="必填项",
+        actor="admin",
+        required=True,
+        required_when={"field": "src_pick", "op": "eq", "values": ["其他"]},
+    )
+    seeded_db.commit()
+    # 必填与条件必填互斥：required=True 时不落条件
+    assert created.required_when is None
+
+
+def test_update_sets_condition_then_required_clears_it(seeded_db):
+    _seed_dependency(seeded_db)
+    created = ff.create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="cond_note", label="条件备注", actor="admin"
+    )
+    seeded_db.commit()
+
+    updated = ff.update_order_form_field(
+        seeded_db,
+        created.id,
+        actor="admin",
+        required=False,
+        required_when={"field": "src_pick", "op": "filled"},
+    )
+    seeded_db.commit()
+    assert updated.required_when == {"field": "src_pick", "op": "filled", "values": None}
+
+    # 切回必填 → 条件被清除
+    back = ff.update_order_form_field(seeded_db, created.id, actor="admin", required=True)
+    seeded_db.commit()
+    assert back.required is True
+    assert back.required_when is None
+
+
+def test_update_condition_rejected_when_required(seeded_db):
+    _seed_dependency(seeded_db)
+    created = ff.create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="req_first", label="先必填", actor="admin",
+        required=True,
+    )
+    seeded_db.commit()
+    with pytest.raises(Validation):
+        ff.update_order_form_field(
+            seeded_db,
+            created.id,
+            actor="admin",
+            required_when={"field": "src_pick", "op": "filled"},
+        )
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        {"field": "cond_self", "op": "eq", "values": ["x"]},  # 依赖自身
+        {"field": "no_such_field", "op": "eq", "values": ["x"]},  # 依赖字段不存在
+        {"field": "src_pick", "op": "gt", "values": ["x"]},  # 运算符非法
+        {"field": "src_pick", "op": "eq", "values": []},  # 等于但无触发值
+        {"field": "src_pick", "op": "filled", "values": ["x"]},  # 有值却给了触发值
+        {"field": "", "op": "eq", "values": ["x"]},  # 空依赖字段
+    ],
+)
+def test_required_when_validation_rejects(seeded_db, condition):
+    _seed_dependency(seeded_db)
+    with pytest.raises(Validation):
+        ff.create_order_form_field(
+            seeded_db,
+            order_type_code="HS",
+            field_key="cond_self",
+            label="条件字段",
+            actor="admin",
+            required_when=condition,
+        )
+
+
+def test_required_when_non_mapping_rejected(seeded_db):
+    with pytest.raises(Validation):
+        ff.create_order_form_field(
+            seeded_db,
+            order_type_code="HS",
+            field_key="bad_cond",
+            label="坏条件",
+            actor="admin",
+            required_when="src_pick=其他",
+        )
+
+
+def test_router_required_when_roundtrip(seeded_client, headers):
+    dep = seeded_client.post(
+        "/api/v1/order-form-fields",
+        headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS", field_key="rt_src", label="路由来源", field_type="SELECT",
+            options=[{"value": "其他", "label": "其他"}, {"value": "微信", "label": "微信"}],
+        ).model_dump(mode="json"),
+    ).json()
+
+    created = seeded_client.post(
+        "/api/v1/order-form-fields",
+        headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS",
+            field_key="rt_other",
+            label="路由其他来源",
+            field_type="TEXT",
+            required_when={"field": "rt_src", "op": "eq", "values": ["其他"]},
+        ).model_dump(mode="json"),
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["required_when"] == {"field": "rt_src", "op": "eq", "values": ["其他"]}
+
+    # 显式 null → 清除条件（回退纯选填）
+    cleared = seeded_client.patch(
+        f"/api/v1/order-form-fields/{created.json()['id']}",
+        headers=headers,
+        json={"required_when": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["required_when"] is None
+
+    # 不传 → 保持现状
+    kept = seeded_client.patch(
+        f"/api/v1/order-form-fields/{dep['id']}", headers=headers, json={"label": "路由来源2"}
+    )
+    assert kept.status_code == 200
+    assert kept.json()["required_when"] is None

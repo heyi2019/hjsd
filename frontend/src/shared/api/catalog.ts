@@ -935,6 +935,15 @@ export const fieldsApi = {
   remove: (id: number) => api.delete(`/field-definitions/${id}`),
 };
 
+export interface RequiredWhen {
+  /** 依赖字段键（同作用域内其它字段） */
+  field: string;
+  /** eq=等于任一触发值；ne=不等于任一触发值；filled=依赖字段有值 */
+  op: "eq" | "ne" | "filled";
+  /** 触发值（op=filled 时必须为空） */
+  values?: string[] | null;
+}
+
 export interface OrderFormField {
   id: number;
   order_type_code: string;
@@ -943,6 +952,8 @@ export interface OrderFormField {
   field_type: string;
   options?: Array<string | { value: string; label: string }> | null;
   required: boolean;
+  /** 条件必填：与 required 互斥；为空即纯选填 */
+  required_when?: RequiredWhen | null;
   is_active: boolean;
   sort_order: number;
   /** 核心核算字段锁定：禁止删除，但仍可改必填/停用 */

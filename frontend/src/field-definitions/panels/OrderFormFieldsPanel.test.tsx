@@ -182,3 +182,46 @@ describe("OrderFormFieldsPanel", () => {
     );
   });
 });
+
+describe("OrderFormFieldsPanel 条件必填", () => {
+  it("列表展示条件必填描述", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 70, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: ["其他", "微信"] }),
+      makeField({
+        id: 71,
+        field_key: "customer_source_other",
+        label: "其他来源",
+        required: false,
+        required_when: { field: "customer_source", op: "eq", values: ["其他"] },
+      }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("其他来源");
+    expect(screen.getByLabelText("条件_customer_source_other")).toHaveTextContent(
+      "条件必填：客户来源 等于 其他",
+    );
+  });
+
+  it("保存条件必填时提交 required_when 并把 required 置为 false", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 80, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: ["其他", "微信"] }),
+      makeField({ id: 81, field_key: "other_source", label: "其他来源", required: true }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("其他来源");
+
+    await ui.click(screen.getByRole("button", { name: "编辑其他来源" }));
+    // 选择依赖字段「客户来源（customer_source）」
+    const depSelect = screen.getByLabelText("条件必填·依赖字段");
+    await ui.click(depSelect);
+    await ui.click(await screen.findByTitle("客户来源（customer_source）"));
+
+    await ui.click(screen.getByRole("button", { name: /保存字段/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(catalog.orderFormFieldsApi).update.mock.calls[0];
+    expect(id).toBe(81);
+    expect(payload.required).toBe(false);
+    expect(payload.required_when).toMatchObject({ field: "customer_source", op: "eq" });
+  });
+});

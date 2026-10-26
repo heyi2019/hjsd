@@ -462,6 +462,10 @@ class OrderProfitAllocation(Base, TimestampMixin):
     )
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     allocation_rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    # 按金额分润：与 allocation_rate 互斥（二者都为选填，填哪个用哪个）。
+    # 报表取数口径：allocation_amount > 0 时直接作为该人的应付基数，
+    # 否则回退 利润 × allocation_rate / 100。
+    allocation_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     policy_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
     )
@@ -783,6 +787,9 @@ class OrderFormField(Base, AuditMixin):
     required: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("0")
     )
+    # 条件必填：{"field": 依赖字段键, "op": "eq|ne|filled", "values": [触发值]}
+    # 与 required 互斥（required=True 时忽略并清空）；为空即纯选填。
+    required_when: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("1")
     )

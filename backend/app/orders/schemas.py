@@ -370,6 +370,7 @@ __all__ = [
     "OrderFormFieldOut",
     "OrderFormFieldCreate",
     "OrderFormFieldUpdate",
+    "RequiredWhen",
     "PoolBalanceOut",
 ]
 
@@ -377,6 +378,21 @@ __all__ = [
 class FieldOption(BaseModel):
     value: str
     label: str
+
+
+class RequiredWhen(BaseModel):
+    """条件必填条件：依赖同作用域内某个字段的取值。
+
+    - op=eq：依赖字段值属于 values 任一 → 必填；
+    - op=ne：依赖字段值不属于 values → 必填；
+    - op=filled：依赖字段有值（非空字符串/非 null）→ 必填，此时 values 必须为空。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    field: str = Field(min_length=1, max_length=64)
+    op: str = Field(default="eq", pattern="^(eq|ne|filled)$")
+    values: list[str] | None = None
 
 
 class OrderFormFieldOut(BaseModel):
@@ -391,6 +407,7 @@ class OrderFormFieldOut(BaseModel):
     field_type: str
     options: list[FieldOption] | None = None
     required: bool
+    required_when: RequiredWhen | None = None
     is_active: bool
     sort_order: int
     locked: bool
@@ -409,6 +426,7 @@ class OrderFormFieldCreate(BaseModel):
     field_type: str = "TEXT"
     options: list[FieldOption] | None = None
     required: bool = False
+    required_when: RequiredWhen | None = None
     is_active: bool = True
     sort_order: int = 0
     is_custom: bool = True
@@ -416,7 +434,10 @@ class OrderFormFieldCreate(BaseModel):
 
 
 class OrderFormFieldUpdate(BaseModel):
-    """编辑建单表单字段：label/类型/选项/必填/排序/停用均可改；field_key 与 code 固定。"""
+    """编辑建单表单字段：label/类型/选项/必填态（含条件必填）/排序/备注均可改；field_key 与 code 固定。
+
+    required_when 语义：不传=保持不变；传 null=清除条件（回退纯选填）；传对象=设为条件必填。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -424,6 +445,8 @@ class OrderFormFieldUpdate(BaseModel):
     field_type: str | None = None
     options: list[FieldOption] | None = None
     required: bool | None = None
+    required_when: RequiredWhen | None = None
     sort_order: int | None = None
     note: str | None = None
+
 

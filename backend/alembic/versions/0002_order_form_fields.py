@@ -123,6 +123,9 @@ def upgrade() -> None:
         sa.Column('field_type', sa.String(length=16), nullable=False, server_default='TEXT'),
         sa.Column('options', sa.JSON(), nullable=True),
         sa.Column('required', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+        # 条件必填（0015 引入）：建表即带列，保证回放本迁移后 ORM 元数据与库一致；
+        # 既有库由 0015 幂等补列。
+        sa.Column('required_when', sa.JSON(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
         sa.Column('sort_order', sa.Integer(), nullable=False, server_default=sa.text('0')),
         sa.Column('locked', sa.Boolean(), nullable=False, server_default=sa.text('0')),

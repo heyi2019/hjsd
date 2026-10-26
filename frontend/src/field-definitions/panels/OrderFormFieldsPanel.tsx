@@ -1,5 +1,5 @@
 /** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
- *  新增、删除、必填/选填（行内开关）、停用/启用。字段可配置必填态与启用态；
+ *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
 import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -13,6 +13,19 @@ import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
+const CONDITION_OP_OPTIONS = [
+  { value: "eq", label: "等于" },
+  { value: "ne", label: "不等于" },
+  { value: "filled", label: "有值" },
+];
+const OP_TEXT: Record<string, string> = { eq: "等于", ne: "不等于", filled: "有值" };
+
+/** 条件描述文案：如「客户来源 等于 其他」。 */
+const describeCondition = (fieldLabel: string, cond: { op: string; values?: string[] | null }): string => {
+  const opText = OP_TEXT[cond.op] ?? cond.op;
+  if (cond.op === "filled") return `${fieldLabel} ${opText}即可`;
+  return `${fieldLabel} ${opText} ${(cond.values ?? []).join(" / ")}`;
+};
 
 /** 规范化表单里的 options 字段：过滤空 value，label 缺省取 value。 */
 const normalizeOptionItems = (raw: unknown): Array<{ value: string; label: string }> => {
@@ -43,6 +56,18 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   const [form] = Form.useForm();
   const fieldType = Form.useWatch("field_type", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
+  const condFieldKey = Form.useWatch("cond_field", form) as string | undefined;
+  const condOp = (Form.useWatch("cond_op", form) as string | undefined) ?? "eq";
+  // 依赖字段候选：同作用域内、启用中、且不是自身。
+  const dependencyOptions = rows
+    .filter((row) => row.is_active && row.field_key !== editingField?.field_key)
+    .map((row) => ({ value: row.field_key, label: `${row.label}（${row.field_key}）` }));
+  // 触发值候选取自依赖字段自身的选项；无选项时允许手输（tags 模式）。
+  const dependencyRow = rows.find((row) => row.field_key === condFieldKey);
+  const triggerOptions = normalizeOptionItems(dependencyRow?.options).map((item) => ({
+    value: item.value,
+    label: item.label,
+  }));
 
   const load = useCallback(async (code: string) => {
     try {
@@ -61,7 +86,13 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   const submit = async (values: Record<string, unknown>) => {
     try {
       const sortOrder = Number(values.sort_order ?? 0);
-      const required = Boolean(values.required);
+      const condField = (values.cond_field as string | undefined) ?? undefined;
+      const op = ((values.cond_op as string | undefined) ?? "eq") as "eq" | "ne" | "filled";
+      const requiredWhen = condField
+        ? { field: condField, op, values: op === "filled" ? null : ((values.cond_values as string[] | undefined) ?? []) }
+        : null;
+      // 必填与条件必填互斥：配置了条件即按条件必填处理（基础态为选填）。
+      const required = condField ? false : Boolean(values.required);
       const options = needsOptions ? normalizeOptionItems(values.options) : undefined;
       if (editingId === null) {
         await orderFormFieldsApi.create({
@@ -71,6 +102,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           field_type: (values.field_type as string) ?? "TEXT",
           options,
           required,
+          required_when: requiredWhen,
           sort_order: sortOrder,
         });
         message.success("字段已创建");
@@ -79,6 +111,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           label: values.label as string,
           options,
           required,
+          required_when: requiredWhen,
           sort_order: sortOrder,
         });
         message.success("字段已更新");
@@ -99,6 +132,9 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
       field_type: row.field_type,
       options: (row.options ?? []).map((o) => (typeof o === "string" ? { value: o, label: o } : o)),
       required: Boolean(row.required),
+      cond_field: row.required_when?.field,
+      cond_op: row.required_when?.op ?? "eq",
+      cond_values: row.required_when?.values ?? [],
       sort_order: row.sort_order,
     });
   };
@@ -116,28 +152,38 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
       title: "必填",
       dataIndex: "required",
       render: (value: boolean, row: OrderFormField) => (
-        <PermissionGate
-          permission="field-definition.manage"
-          fallback={<Typography.Text type="secondary">{value ? "必填" : "选填"}</Typography.Text>}
-        >
-          <Switch
-            checked={value}
-            loading={togglingId === row.id}
-            aria-label={`必填_${row.field_key}`}
-            onChange={async (checked: boolean) => {
-              try {
-                setTogglingId(row.id);
-                await orderFormFieldsApi.update(row.id, { required: checked });
-                message.success(checked ? "已设为必填" : "已设为选填");
-                await load(activeType);
-              } catch (err) {
-                setError(normalizeError(err));
-              } finally {
-                setTogglingId(null);
-              }
-            }}
-          />
-        </PermissionGate>
+        <Space direction="vertical" size={0}>
+          <PermissionGate
+            permission="field-definition.manage"
+            fallback={<Typography.Text type="secondary">{value ? "必填" : row.required_when ? "条件必填" : "选填"}</Typography.Text>}
+          >
+            <Switch
+              checked={value}
+              loading={togglingId === row.id}
+              aria-label={`必填_${row.field_key}`}
+              onChange={async (checked: boolean) => {
+                try {
+                  setTogglingId(row.id);
+                  await orderFormFieldsApi.update(row.id, { required: checked });
+                  message.success(checked ? "已设为必填" : row.required_when ? "已设为条件必填" : "已设为选填");
+                  await load(activeType);
+                } catch (err) {
+                  setError(normalizeError(err));
+                } finally {
+                  setTogglingId(null);
+                }
+              }}
+            />
+          </PermissionGate>
+          {row.required_when ? (
+            <Typography.Text type="secondary" aria-label={`条件_${row.field_key}`}>
+              条件必填：{describeCondition(
+                rows.find((item) => item.field_key === row.required_when?.field)?.label ?? row.required_when.field,
+                row.required_when,
+              )}
+            </Typography.Text>
+          ) : null}
+        </Space>
       ),
     },
     {
@@ -260,7 +306,42 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
             <PermissionButton permission="field-definition.manage" onClick={onConfigureGameTypes}>配置游戏类型</PermissionButton>
           </Form.Item>
         ) : null}
-        <Form.Item name="required" label="必填" valuePropName="checked"><Switch /></Form.Item>
+        <Form.Item
+          name="required"
+          label="必填"
+          valuePropName="checked"
+          tooltip={condFieldKey ? "已配置条件必填，二者互斥；清空依赖字段即可改回必填" : undefined}
+        >
+          <Switch disabled={Boolean(condFieldKey)} />
+        </Form.Item>
+        <Form.Item name="cond_field" label="条件必填·依赖字段">
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="不启用"
+            options={dependencyOptions}
+            className="ui-control-width-180"
+            onChange={(value: string | undefined) => {
+              if (value) form.setFieldsValue({ required: false, cond_op: form.getFieldValue("cond_op") ?? "eq" });
+            }}
+          />
+        </Form.Item>
+        {condFieldKey ? (
+          <Form.Item name="cond_op" label="条件" initialValue="eq">
+            <Select options={CONDITION_OP_OPTIONS} className="ui-control-width-110" />
+          </Form.Item>
+        ) : null}
+        {condFieldKey && condOp !== "filled" ? (
+          <Form.Item name="cond_values" label="触发值">
+            <Select
+              mode="tags"
+              options={triggerOptions}
+              placeholder="选值或输入后回车"
+              className="ui-control-width-200"
+            />
+          </Form.Item>
+        ) : null}
         <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
         <Form.Item>
           <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">
@@ -284,7 +365,8 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         客户需求池、分期（收款/回收/出售/换绑/取消/结清/违约/减免/展期）、返点（新建/结算/冲销）、
         资金（占用/流水/划转/对账/核销/拒绝/冲销/释放/损失/修复/月结）。
         可新增自定义字段、删除自定义字段（仅自定义字段可删）、停用/启用；
-        「必填」列提供行内开关，点击即在必填/选填间切换。改动即时反映到对应表单。
+        「必填」列提供行内开关（必填/选填），需要「仅在某字段取某值时必填」时在编辑区设置
+        「条件必填」（如客户来源等于「其他」时其他来源必填）。改动即时反映到对应表单。
         当前：{FORM_SCOPE_LABEL[activeType] ?? activeType}
       </Typography.Paragraph>
       <Space style={{ marginBottom: 16 }} align="center">

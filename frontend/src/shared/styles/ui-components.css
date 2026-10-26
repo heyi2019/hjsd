@@ -1127,6 +1127,7 @@
 .ui-control-width-110 { width: var(--col-w-110); }
 .ui-control-width-120 { width: var(--col-w-120); }
 .ui-control-width-140 { width: var(--col-w-140); }
+.ui-control-width-180 { width: var(--col-w-180); }
 .ui-control-width-200 { width: var(--col-w-200); }
 .ui-control-min-180 { min-width: var(--col-w-180); }
 .ui-title-spaced { margin-block-start: var(--space-4); }

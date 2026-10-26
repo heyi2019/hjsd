@@ -4,9 +4,15 @@ from __future__ import annotations
 OPTION_SETS = "/api/v1/option-sets"
 
 
-def test_list_empty_initially(client):
-    body = client.get(OPTION_SETS).json()
+def test_list_empty_initially(client, headers):
+    body = client.get(OPTION_SETS, headers=headers).json()
     assert body["items"] == []
+
+
+def test_read_requires_login(client):
+    """2026-10-27 鉴权缺口回归守卫：读端点此前误用裸函数默认值，匿名可读（200）。"""
+    assert client.get(OPTION_SETS).status_code == 401
+    assert client.get(f"{OPTION_SETS}/QUALITY_SEVERITY").status_code == 401
 
 
 def test_create_and_list_editable_set(client, headers):
@@ -31,7 +37,7 @@ def test_create_and_list_editable_set(client, headers):
     assert body["editable"] is True
     assert [o["value"] for o in body["options"]] == ["HOT", "NEW"]
 
-    listed = client.get(OPTION_SETS).json()
+    listed = client.get(OPTION_SETS, headers=headers).json()
     codes = {item["code"] for item in listed["items"]}
     assert "GAME_TAG" in codes
 
@@ -40,10 +46,10 @@ def test_filter_by_group_and_editable(client, headers):
     client.post(OPTION_SETS, json={"code": "A1", "label": "A1", "group": "G1", "editable": True}, headers=headers)
     client.post(OPTION_SETS, json={"code": "B1", "label": "B1", "group": "G2", "editable": False}, headers=headers)
 
-    only_editable = client.get(f"{OPTION_SETS}?editable=true").json()
+    only_editable = client.get(f"{OPTION_SETS}?editable=true", headers=headers).json()
     assert {i["code"] for i in only_editable["items"]} == {"A1"}
 
-    only_g2 = client.get(f"{OPTION_SETS}?group=G2").json()
+    only_g2 = client.get(f"{OPTION_SETS}?group=G2", headers=headers).json()
     assert {i["code"] for i in only_g2["items"]} == {"B1"}
 
 
@@ -144,14 +150,14 @@ def test_dead_enum_rejects_blank_label(client, headers):
 
 
 def test_get_missing_returns_404(client, headers):
-    assert client.get(f"{OPTION_SETS}/NOPE").status_code == 404
+    assert client.get(f"{OPTION_SETS}/NOPE", headers=headers).status_code == 404
 
 
 def test_delete_set(client, headers):
     client.post(OPTION_SETS, json={"code": "TMP", "label": "临时"}, headers=headers)
     deleted = client.delete(f"{OPTION_SETS}/TMP", headers=headers)
     assert deleted.status_code == 204
-    assert client.get(f"{OPTION_SETS}/TMP").status_code == 404
+    assert client.get(f"{OPTION_SETS}/TMP", headers=headers).status_code == 404
 
 
 def test_viewer_cannot_create(client, viewer_headers):

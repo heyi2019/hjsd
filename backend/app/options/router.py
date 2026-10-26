@@ -26,7 +26,9 @@ from app.options import schemas
 
 router = APIRouter(tags=["option-sets"])
 
-_read_access = get_current_user
+# 读端点也要走真实依赖：裸函数默认值不会被 FastAPI 解析为依赖，
+# 会导致鉴权被静默跳过（user 收到函数对象本身）。
+_read_access = Depends(get_current_user)
 _write_access = require_permissions(PERM_OPTION_SET_MANAGE)
 
 

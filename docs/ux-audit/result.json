@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-10-26T16:08:38.734Z",
+  "generatedAt": "2026-10-26T17:00:37.979Z",
   "base": "http://localhost:5180/",
   "devAutoLogin": true,
-  "bootMs": 4547,
+  "bootMs": 3899,
   "bootCls": 0,
   "bootShifts": [],
   "pages": [
     {
       "key": "dashboard",
       "name": "工作台",
-      "navMs": 1973,
+      "navMs": 1914,
       "title": "工作台",
       "url": "http://localhost:5180/#/dashboard",
       "tabs": [],
@@ -28,20 +28,7 @@
         "imgNoAlt": 0,
         "headingCount": 7,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          },
-          {
-            "text": "主推入口",
-            "fontSize": 11.0007
-          },
-          {
-            "text": "高频业务",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
       "tabSeqCount": 19,
       "invisibleFocus": 0,
@@ -51,43 +38,55 @@
           "tag": "button",
           "text": "业务中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "客户中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "资金中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "经营中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "设置",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "系统",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -104,17 +103,18 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
       "consoleErrors": [],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 0
     },
     {
       "key": "business-default",
       "name": "业务中心（默认落点）",
-      "navMs": 1882,
+      "navMs": 1864,
       "title": "业务中心",
       "url": "http://localhost:5180/#/business/inventory",
       "tabs": [
@@ -123,12 +123,12 @@
         "分期与回款"
       ],
       "activeTab": "库存中心",
-      "bodyTextLen": 991,
-      "emptyState": false,
+      "bodyTextLen": 311,
+      "emptyState": true,
       "clsNav": 0,
       "clsShifts": [],
       "contrast": {
-        "scanned": 179,
+        "scanned": 48,
         "fails": []
       },
       "a11y": {
@@ -156,58 +156,65 @@
         "imgNoAlt": 0,
         "headingCount": 1,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
-      "tabSeqCount": 20,
+      "tabSeqCount": 17,
       "invisibleFocus": 0,
-      "noFocusRing": 4,
+      "noFocusRing": 0,
       "tabSample": [
         {
           "tag": "button",
           "text": "客户中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "资金中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "经营中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "设置",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "系统",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "浅色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -224,19 +231,21 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
       "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
         "Warning: findDOMNode is deprecated and will be removed in the next major release. Instead, add a ref directly to the element you want to reference. Learn more about using refs safely here: https://rea"
       ],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 1
     },
     {
       "key": "business-ledger",
       "name": "业务中心·业务台账",
-      "navMs": 3563,
+      "navMs": 3966,
       "title": "业务中心",
       "url": "http://localhost:5180/#/business/inventory",
       "tabs": [
@@ -245,12 +254,15 @@
         "分期与回款"
       ],
       "activeTab": "业务台账",
-      "bodyTextLen": 1108,
-      "emptyState": false,
-      "clsNav": 0,
-      "clsShifts": [],
+      "bodyTextLen": 349,
+      "emptyState": true,
+      "clsNav": 0.0273,
+      "clsShifts": [
+        0.0271,
+        0.0002
+      ],
       "contrast": {
-        "scanned": 161,
+        "scanned": 50,
         "fails": []
       },
       "a11y": {
@@ -268,58 +280,65 @@
         "imgNoAlt": 0,
         "headingCount": 1,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
-      "tabSeqCount": 20,
-      "invisibleFocus": 2,
-      "noFocusRing": 2,
+      "tabSeqCount": 16,
+      "invisibleFocus": 0,
+      "noFocusRing": 0,
       "tabSample": [
         {
           "tag": "button",
           "text": "新建订单⌄",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         },
         {
           "tag": "div",
-          "text": "类型筛选全部 100回收 23提号 14代挂 1",
+          "text": "类型筛选全部 0回收 0提号 0代挂 0代分期 ",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "input",
           "text": "搜索订单号 / 游戏账号 / 对方 / 备注",
           "visible": true,
+          "opacity": "1",
           "outline": "none",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "div",
-          "text": "全部 100回收 23提号 14代挂 14代分期",
+          "text": "全部 0回收 0提号 0代挂 0代分期 0",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
-        },
-        {
-          "tag": "input",
-          "text": "",
-          "visible": false,
-          "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "div",
           "text": "全部业务自营分销",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
+        },
+        {
+          "tag": "div",
+          "text": "订单号对方 / 来源产品账号平台金额库存状态最新",
+          "visible": true,
+          "opacity": "1",
+          "outline": "solid",
+          "boxShadow": false,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -336,19 +355,21 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
       "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
         "Warning: findDOMNode is deprecated and will be removed in the next major release. Instead, add a ref directly to the element you want to reference. Learn more about using refs safely here: https://rea"
       ],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 1
     },
     {
       "key": "customers",
       "name": "客户中心",
-      "navMs": 1871,
+      "navMs": 1869,
       "title": "客户中心",
       "url": "http://localhost:5180/#/customers",
       "tabs": [
@@ -385,64 +406,70 @@
           }
         ],
         "missingName": [
-          "button.ant-btn css-dev-only-do-not-override-1w8",
           "span.ant-btn-icon"
         ],
         "imgNoAlt": 0,
         "headingCount": 1,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
-      "tabSeqCount": 20,
+      "tabSeqCount": 19,
       "invisibleFocus": 0,
-      "noFocusRing": 2,
+      "noFocusRing": 0,
       "tabSample": [
         {
           "tag": "button",
           "text": "资金中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "经营中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "设置",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "系统",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "浅色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "深色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -459,17 +486,20 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
-      "consoleErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 0
     },
     {
       "key": "funds",
       "name": "资金中心",
-      "navMs": 1872,
+      "navMs": 1914,
       "title": "资金中心",
       "url": "http://localhost:5180/#/funds",
       "tabs": [
@@ -478,15 +508,16 @@
         "押金",
         "对账",
         "异常与月结",
-        "返点"
+        "返点",
+        "工作室支出"
       ],
       "activeTab": "总览",
-      "bodyTextLen": 435,
+      "bodyTextLen": 466,
       "emptyState": false,
       "clsNav": 0,
       "clsShifts": [],
       "contrast": {
-        "scanned": 62,
+        "scanned": 65,
         "fails": []
       },
       "a11y": {
@@ -495,62 +526,65 @@
         "imgNoAlt": 0,
         "headingCount": 1,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          },
-          {
-            "text": "口径：现金头寸含全部资金池；自有权益仅计归属为「",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
-      "tabSeqCount": 19,
+      "tabSeqCount": 18,
       "invisibleFocus": 0,
-      "noFocusRing": 1,
+      "noFocusRing": 0,
       "tabSample": [
         {
           "tag": "button",
           "text": "经营中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "设置",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "系统",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "浅色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "深色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "用户中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -567,17 +601,20 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
-      "consoleErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 0
     },
     {
       "key": "operations",
       "name": "经营中心",
-      "navMs": 1887,
+      "navMs": 1865,
       "title": "经营中心",
       "url": "http://localhost:5180/#/operations",
       "tabs": [
@@ -596,12 +633,12 @@
         "附件中心"
       ],
       "activeTab": "库存 R1",
-      "bodyTextLen": 602,
-      "emptyState": false,
+      "bodyTextLen": 305,
+      "emptyState": true,
       "clsNav": 0,
       "clsShifts": [],
       "contrast": {
-        "scanned": 84,
+        "scanned": 51,
         "fails": []
       },
       "a11y": {
@@ -612,58 +649,65 @@
         "imgNoAlt": 0,
         "headingCount": 1,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
-      "tabSeqCount": 20,
+      "tabSeqCount": 19,
       "invisibleFocus": 0,
-      "noFocusRing": 1,
+      "noFocusRing": 0,
       "tabSample": [
         {
           "tag": "button",
           "text": "设置",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "系统",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "浅色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "深色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "用户中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "退出登录",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -680,17 +724,20 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
-      "consoleErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 0
     },
     {
       "key": "settings",
       "name": "设置",
-      "navMs": 1871,
+      "navMs": 1866,
       "title": "设置",
       "url": "http://localhost:5180/#/settings",
       "tabs": [
@@ -723,12 +770,7 @@
         "imgNoAlt": 0,
         "headingCount": 1,
         "h1": 1,
-        "tiny": [
-          {
-            "text": "宜游轩 · 经营工作台",
-            "fontSize": 11.0007
-          }
-        ]
+        "tiny": []
       },
       "tabSeqCount": 19,
       "invisibleFocus": 0,
@@ -738,43 +780,55 @@
           "tag": "button",
           "text": "系统",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": true
+          "boxShadow": true,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "浅色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "深色",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "用户中心",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "button",
           "text": "退出登录",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         },
         {
           "tag": "div",
           "text": "Tab 1 of 13业务字典",
           "visible": true,
+          "opacity": "1",
           "outline": "solid",
-          "boxShadow": false
+          "boxShadow": false,
+          "focusRing": true
         }
       ],
       "responsive": {
@@ -791,21 +845,24 @@
         "mobile": {
           "hOverflow": 0,
           "navItemsVisible": 4,
-          "moreBtn": false
+          "moreBtn": true
         }
       },
-      "consoleErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+      ],
       "consoleWarnings": [],
-      "pageErrors": []
+      "pageErrors": [],
+      "findDOMNode": 0
     }
   ],
   "errorVisibility": {
     "alertNodes": 1,
     "alertText": [
-      "boom重新加载"
+      "后端接口返回异常，请查看后端日志。重新加载"
     ],
     "hasKeyword": [],
-    "bodySnippet": "宜\n宜游轩\nERP\n工作台\n业务中心\n客户中心\n资金中心\n经营中心\n设置\n宜游轩 · 经营工作台\n工作台\n系统\n浅色\n深色\n用户中心\n当前角色（开发态）\n系统管理员\n退出登录\n今天从这里开始\n售出\n主推入口\n售出库存账号\n自营\n高频业务\n自营·回收\n分销\n提号\n代挂\n增值服务\n代分期服务\n今日关注\nboom\n重新加载\n进行中业务\n-\n已完成业务\n-"
+    "bodySnippet": "宜\n宜游轩\nERP\n工作台\n业务中心\n客户中心\n资金中心\n经营中心\n设置\n宜游轩 · 经营工作台\n工作台\n系统\n浅色\n深色\n用户中心\n当前角色（开发态）\n系统管理员\n退出登录\n今天从这里开始\n售出\n主推入口\n售出库存账号\n自营\n高频业务\n自营·回收\n分销\n提号\n代挂\n增值服务\n代分期服务\n今日关注\n后端接口返回异常，请查看后端日志。\n重新加载\n进行中业务\n-\n已完成业务\n-"
   },
   "stateRetention": {
     "tabNames": [

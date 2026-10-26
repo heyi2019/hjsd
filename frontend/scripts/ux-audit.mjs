@@ -229,19 +229,40 @@ async function navTo(page, p) {
     const tabSeq = []; let invisibleFocus = 0;
     for (let i = 0; i < 20; i++) {
       await page.keyboard.press("Tab");
+      // 等待 antd 焦点环 220ms 过渡动画结束再读，否则会读到透明首帧（F2 假阳性根因之一）
+      await page.waitForTimeout(320);
       const info = await page.evaluate(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return null;
+        // 排除 antd Select 内部搜索 input（键盘承载代理，自身无焦点环设计），与 A11Y_FN 一致，避免测内不测外
+        if ((el.className || "").toString().includes("ant-select-selection-search-input")) return null;
         const r = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
-        return { tag: el.tagName.toLowerCase(),
+        // antd 焦点环挂在祖先 wrapper 上（如 .ant-input-affix-wrapper-focused 的 box-shadow），
+        // 元素自身 outline/box-shadow 都可能为 none。向上查 4 层祖先判断是否有可见焦点反馈，
+        // 避免把「祖先有环、自身无环」误判为无焦点（F2 假阳性根因之二）。
+        let hasRing = false;
+        let node = el;
+        for (let k = 0; k < 5 && node; k++) {
+          const ncs = getComputedStyle(node);
+          if (ncs.outlineStyle !== "none" || ncs.boxShadow !== "none") { hasRing = true; break; }
+          node = node.parentElement;
+        }
+        return {
+          tag: el.tagName.toLowerCase(),
           text: ((el.textContent || el.getAttribute("placeholder") || el.getAttribute("aria-label") || "") + "").trim().slice(0, 24),
-          visible: r.width > 0 && r.height > 0,
-          outline: cs.outlineStyle, boxShadow: cs.boxShadow !== "none" };
+          visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden",
+          opacity: cs.opacity,
+          outline: cs.outlineStyle, boxShadow: cs.boxShadow !== "none", focusRing: hasRing,
+        };
       });
+      // 跳过 antd 透明承载元素（如 Select 内部 search-input，opacity:0 但尺寸>0）：
+      // 仅作键盘承载，非用户可见交互目标，不计入 Tab 序列与不可见焦点统计（F8 误报根因：测内不测外）
+      if (info && info.opacity === "0") continue;
       if (info) { tabSeq.push(info); if (!info.visible) invisibleFocus++; }
     }
-    const noFocusRing = tabSeq.filter((t) => t.outline === "none" && !t.boxShadow).length;
+    // 焦点环判定以「元素自身或祖先是否有可见焦点反馈」为准，而非仅看元素自身
+    const noFocusRing = tabSeq.filter((t) => !t.focusRing).length;
 
     const responsive = {};
     for (const vp of VIEWPORTS) {
@@ -250,7 +271,9 @@ async function navTo(page, p) {
       responsive[vp.name] = await page.evaluate(() => ({
         hOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         navItemsVisible: Array.from(document.querySelectorAll(".nav-item")).filter((n) => n.getBoundingClientRect().width > 0).length,
-        moreBtn: Array.from(document.querySelectorAll(".nav-item")).some((n) => n.textContent.includes("管理") && n.getBoundingClientRect().width > 0),
+        // 窄屏侧栏折叠出「更多导航」触发器（实测 class=.mobile-more-button / aria-label=更多导航），
+        // 不再用模糊文本 includes("管理") 匹配，避免误报
+        moreBtn: Array.from(document.querySelectorAll(".mobile-more-button, [aria-label='更多导航']")).some((n) => n.getBoundingClientRect().width > 0),
       }));
       await page.screenshot({ path: `${OUT}/shots/${p.key}-${vp.name}.png` });
     }
@@ -261,6 +284,8 @@ async function navTo(page, p) {
       tabSeqCount: tabSeq.length, invisibleFocus, noFocusRing, tabSample: tabSeq.slice(0, 6),
       responsive,
       consoleErrors: [...new Set(bucket.errors)], consoleWarnings: [...new Set(bucket.warns)].slice(0, 6), pageErrors: [...new Set(bucket.pageErrors)],
+      // 显式统计 findDOMNode 弃用告警（无论落在 errors 还是 warnings），避免分类遗漏
+      findDOMNode: bucket.errors.concat(bucket.warns).filter((t) => /findDOMNode/i.test(t)).length,
     });
     console.error(`[ok] ${p.name} clsNav=${cls.cls} contrastFails=${(contrast.fails || []).length} tinyTargets=${a11y?.tinyTargets.length} nav=${navMs}ms`);
     await page.close();

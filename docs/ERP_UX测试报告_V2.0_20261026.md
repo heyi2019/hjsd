@@ -117,6 +117,8 @@
 | 测内不测外 | antd 焦点态/触控区在外层容器 | 上溯有效交互容器 |
 | 选择器与实际 DOM 不符 | `moreBtn` 只在 `.nav-item` 内找，实际是普通 `button` | 实点验证 |
 
+> 上述三类（取样时机 / 测内不测外 / 选择器不符）及一类延伸（分类遗漏）已在第 7 章于脚本层修复：noFocusRing **10→0**、invisibleFocus **2→0**、mobile.moreBtn **False→True（7/7 页）**、findDOMNode 显式计数字段。
+
 ---
 
 ## 5. 已修复：F1 接口失败被静默降级为「0」
@@ -169,7 +171,7 @@
 | P2 | 辅助文字 11px → 12px | F7 | **已闭环**：`--font-nav-caption`/`--font-caption-2` 两令牌 bump 至 12px（0.7059rem）+ 两处字面量 11→12px，实测 caption 渲染 12px、无 11px 残留 |
 | P2 | 2 处零尺寸元素移出 Tab 序列 | F8 | **撤销（误报：antd Select 内部搜索 input，opacity:0 但功能须可聚焦）** |
 | P3 | Tab 状态写入 hash query | F9 | **已闭环（架构已满足）**：AppShell 为 hash 路由（`#/funds`），导航落点入 URL，实测点「资金中心」→`#/funds`→刷新仍停资金中心（`aria-current` 保持），无需额外改 |
-| — | 修 `ux-audit.mjs` 三类误报检测逻辑 | — | **待裁决** |
+| — | 修 `ux-audit.mjs` 三类误报检测逻辑 | — | **已修复并验证**（noFocusRing 10→0、invisibleFocus 2→0、moreBtn 漏检修正、findDOMNode 显式计数） |
 
 **F5 已修复并验证**（`shared/api/client.ts`）：将 5xx 拦截前置到 v1 统一结构解析之前——后端业务异常（AppError）全部落在 4xx、其中文语义须原样透出，而 5xx 仅源于未捕获异常或网关故障、原文对用户无意义且可能携带英文/堆栈，故统一降级为中文兜底（BACKEND_ERROR / BACKEND_UNAVAILABLE）。修复前：`status>=500` 分支被 `if (data?.message) return` 提前返回架空；现 5xx 一律走中文。新增 2 条契约测试（结构化 5xx→中文、4xx 中文原样透出）并做变异验证（撤拦截后新用例转红、其余 12 条仍绿）。调用面 20+ 处，仅影响原「上屏英文原文」的 5xx 路径，属纯改善、零波及业务文案。
 
@@ -177,7 +179,23 @@
 
 ---
 
-## 7. 附录
+## 7. 巡检脚本三类误报修复（ux-audit.mjs）
+
+用户裁决后已动手修复 `frontend/scripts/ux-audit.mjs`，四类（含一类延伸）改动，全部以真机复测为据：
+
+| 问题类别 | 代码位置 | 修复 | 验证（修复前→后） |
+| --- | --- | --- | --- |
+| 取样时机（F2 假阳性根因之一） | 焦点循环 `Tab` 后未等待 | `keyboard.press("Tab")` 后 `waitForTimeout(320)` 等 antd 220ms 过渡结束 | — |
+| 测内不测外（F2 根因之二） | `noFocusRing` 仅看 `activeElement` 自身 | 向上查 4 层祖先的 `outline/boxShadow`，祖先有环即判有焦点反馈 | noFocusRing **10→0** |
+| 测内不测外（F8 误报） | `invisibleFocus` 把 opacity:0 透明承载元素误判为不可见缺陷 | 焦点序列跳过 `opacity:0` 元素与 `ant-select-selection-search-input`（与 A11Y_FN 一致） | invisibleFocus **2→0** |
+| 选择器与真实 DOM 不符 | `moreBtn` 用 `includes("管理")` 模糊文本匹配 | 改为 `.mobile-more-button, [aria-label='更多导航']` | mobile.moreBtn **False→True（7/7 页）** |
+| 分类遗漏（延伸） | `findDOMNode` 落在 errors/warnings 易漏 | 每页新增 `findDOMNode` 计数字段（errors+warnings 合并过滤） | 新字段 =2（业务中心 2 页各 1，与 F6 结论一致） |
+
+> 实测佐证：375 下侧栏 6 个 nav-item 仅 4 个可见，折叠触发器实为 `.mobile-more-button`（`aria-label="更多导航"`、width=67 可见）；Tab 序列中确有 2 个 `138×34 / opacity:0` 的 antd 透明承载元素，须排除而非判缺陷。
+
+**零回归**：修复后重跑全站巡检，CLS 全 0、对比度违规数前后一致（均为 0）、tinyTargets 5→5 不变。`business-ledger` 的 CLS 由 0 变为 0.0273，为 Tab 循环增加等待后的渲染时序微抖，远低于 0.1 阈值，**非功能回归**。修前基线留存于 `docs/ux-audit/result-before-scriptfix.json`。
+
+## 8. 附录
 
 **复现命令**
 

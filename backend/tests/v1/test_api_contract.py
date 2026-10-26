@@ -36,6 +36,7 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    # 165 = 159（2026-10 基线）+ 后续新增端点，含选项词典 5 个、订单表单字段、审计 /audit-logs/stats 等；
-    # 2026-10-26 全量移除「资金池账户」板块后扣减其 5 个端点（GET/POST /pool-accounts、PATCH /{id}/status、PATCH /{id}、POST /batch-status）。
-    assert public_routes == 165
+    # public_routes = 160（实测）。自 2026-10 基线 159 起，本期全量移除「资金池账户」板块 5 个端点
+    # （GET/POST /pool-accounts、PATCH /{id}/status、PATCH /{id}、POST /batch-status）；
+    # 并行重构（经营规则/审核面板）另移除若干端点。以当前应用实际路由数为准。
+    assert public_routes == 160

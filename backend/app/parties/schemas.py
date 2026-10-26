@@ -244,53 +244,6 @@ class CounterpartyOut(BaseModel):
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
-class FieldDefinitionCreate(RequestModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    entity_type: str = Field(min_length=1, max_length=32)
-    field_key: str = Field(min_length=1, max_length=64, description="小写字母数字下划线")
-    label: str = Field(min_length=1, max_length=128)
-    field_type: str = "TEXT"
-    options: list[str] | None = None
-    option_set_code: str | None = Field(default=None, max_length=64)
-    default_value: Any = None
-    applicable_order_types: list[str] | None = None
-    validation_rule: dict[str, Any] | None = None
-    required: bool = False
-    sort_order: int = 0
-
-
-class FieldDefinitionUpdate(RequestModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    label: str | None = Field(default=None, min_length=1, max_length=128)
-    options: list[str] | None = None
-    option_set_code: str | None = Field(default=None, max_length=64)
-    default_value: Any = None
-    applicable_order_types: list[str] | None = None
-    validation_rule: dict[str, Any] | None = None
-    required: bool | None = None
-    sort_order: int | None = Field(default=None, ge=0)
-
-
-class FieldDefinitionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    entity_type: str
-    field_key: str
-    label: str
-    field_type: str
-    options: list[str] | None = None
-    option_set_code: str | None = None
-    default_value: Any = None
-    applicable_order_types: list[str] | None = None
-    validation_rule: dict[str, Any] | None = None
-    required: bool
-    sort_order: int
-    is_active: bool
-
-
 class ExtraValueIn(RequestModel):
     field_key: str
     value: str | int | float | bool | list | dict | None = None
@@ -312,9 +265,6 @@ __all__ = [
     "CustomerWithCandidates",
     "DuplicateCandidate",
     "ExtraValueIn",
-    "FieldDefinitionCreate",
-    "FieldDefinitionUpdate",
-    "FieldDefinitionOut",
     "MergeRequest",
     "LeadClose",
     "LeadConvert",

@@ -8,13 +8,12 @@ from sqlalchemy import select
 from app.core.errors import ErrorCode
 from app.domain.enums import AuditAction, CustomerStatus
 from app.domain.foundation import AuditLog
-from app.domain.parties import Customer, FieldDefinition, OrderCustomerRole
-from app.domain.trade import Order
+from app.domain.parties import Customer, OrderCustomerRole
+from app.domain.trade import Order, OrderFormField
 from app.parties import service
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
-FIELDS = "/api/v1/field-definitions"
 
 
 class TestCustomerNumbering:
@@ -192,13 +191,12 @@ class TestCounterparty:
 
 class TestFieldDefinitions:
     def test_inactive_field_keeps_history_and_blocks_new_value(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="preference",
-            label="客户偏好",
-            actor="pytest",
+        definition = OrderFormField(
+            order_type_code="CUSTOMER", field_key="preference", label="客户偏好",
+            field_type="TEXT", is_custom=True,
+            created_by="pytest", updated_by="pytest",
         )
+        seeded_db.add(definition)
         seeded_db.commit()
         customer = service.create_customer(seeded_db, display_name="甲", actor="pytest")
         seeded_db.commit()
@@ -211,7 +209,7 @@ class TestFieldDefinitions:
         seeded_db.commit()
         assert saved == {"preference": "低价"}
 
-        service.set_field_definition_active(seeded_db, definition.id, False, actor="pytest")
+        definition.is_active = False
         seeded_db.commit()
         assert service.get_extra_values(
             seeded_db, entity_type="customer", entity_id=customer.id
@@ -301,35 +299,23 @@ class TestPartiesApi:
         assert counterparty_updated.json()["phone"] is None
         assert counterparty_updated.json()["note"] is None
 
-    def test_field_definition_endpoints(self, seeded_client, headers):
-        created = seeded_client.post(
-            FIELDS,
-            json={"entity_type": "customer", "field_key": "budget", "label": "预算"},
-            headers=headers,
-        )
-        assert created.status_code == 201
-        listed = seeded_client.get(f"{FIELDS}?entity_type=customer", headers=headers)
-        assert len(listed.json()) == 1
-
-
 class TestCustomerExtraValues:
     """活字段随客户建档落库、类型校验、删除守卫（BAS-04）。"""
 
     def _defs(self, seeded_db):
-        service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="game_category",
-            label="常玩品类", actor="pytest", field_type="MULTI_SELECT",
-            options=["王者荣耀", "和平精英"], sort_order=10,
-        )
-        service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="credit_level",
-            label="信用评级", actor="pytest", field_type="SELECT",
-            options=["优质", "一般", "观察", "黑名单"], sort_order=20,
-        )
-        service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="budget",
-            label="预算", actor="pytest", field_type="NUMBER", required=True, sort_order=30,
-        )
+        for field_key, label, field_type, options, required, sort_order in (
+            ("game_category", "常玩品类", "MULTI_SELECT", ["王者荣耀", "和平精英"], False, 10),
+            ("credit_level", "信用评级", "SELECT", ["优质", "一般", "观察", "黑名单"], False, 20),
+            ("budget", "预算", "NUMBER", None, True, 30),
+        ):
+            seeded_db.add(
+                OrderFormField(
+                    order_type_code="CUSTOMER", field_key=field_key, label=label,
+                    field_type=field_type, options=options, required=required,
+                    sort_order=sort_order, is_custom=True,
+                    created_by="pytest", updated_by="pytest",
+                )
+            )
         seeded_db.commit()
 
     def test_create_customer_persists_extra_values(self, seeded_db):
@@ -405,45 +391,16 @@ class TestCustomerExtraValues:
         assert bulk[first.id] == {"budget": 100}
         assert bulk[second.id] == {"budget": 200}
 
-    def test_delete_definition_with_values_only_deactivates(self, seeded_db):
-        self._defs(seeded_db)
-        definition = seeded_db.scalar(
-            select(FieldDefinition).where(FieldDefinition.field_key == "budget")
-        )
-        customer = service.create_customer(
-            seeded_db, display_name="甲", actor="pytest", extra_values={"budget": 1}
-        )
-        seeded_db.commit()
-        with pytest.raises(Exception) as exc:
-            service.delete_field_definition(seeded_db, definition.id, actor="pytest")
-        assert exc.value.code == ErrorCode.FIELD_DEFINITION_HAS_VALUES
-        # 有历史值只能停用：停用后值仍在，新写被拒
-        service.set_field_definition_active(seeded_db, definition.id, False, actor="pytest")
-        seeded_db.commit()
-        assert service.get_extra_values(
-            seeded_db, entity_type="customer", entity_id=customer.id
-        ) == {"budget": 1}
-
-    def test_delete_definition_without_values_removed(self, seeded_db):
-        self._defs(seeded_db)
-        definition = seeded_db.scalar(
-            select(FieldDefinition).where(FieldDefinition.field_key == "budget")
-        )
-        service.delete_field_definition(seeded_db, definition.id, actor="pytest")
-        seeded_db.commit()
-        assert seeded_db.get(FieldDefinition, definition.id) is None
-
-
 class TestExtraValuesApi:
-    def test_create_and_read_customer_extra_values(self, seeded_client, headers):
-        seeded_client.post(
-            FIELDS,
-            json={
-                "entity_type": "customer", "field_key": "credit_level", "label": "信用评级",
-                "field_type": "SELECT", "options": ["优质", "观察"],
-            },
-            headers=headers,
+    def test_create_and_read_customer_extra_values(self, seeded_client, seeded_db, headers):
+        seeded_db.add(
+            OrderFormField(
+                order_type_code="CUSTOMER", field_key="credit_level", label="信用评级",
+                field_type="SELECT", options=["优质", "观察"], is_custom=True,
+                created_by="pytest", updated_by="pytest",
+            )
         )
+        seeded_db.commit()
         created = seeded_client.post(
             CUSTOMERS,
             json={"display_name": "甲", "extra_values": {"credit_level": "优质"}},
@@ -457,37 +414,3 @@ class TestExtraValuesApi:
         assert detail["extra_values"] == {"credit_level": "优质"}
         listed = seeded_client.get(CUSTOMERS, headers=headers).json()
         assert listed[0]["extra_values"] == {"credit_level": "优质"}
-
-    def test_delete_field_definition_guarded_by_values(self, seeded_client, headers):
-        field = seeded_client.post(
-            FIELDS,
-            json={"entity_type": "customer", "field_key": "budget", "label": "预算", "field_type": "NUMBER"},
-            headers=headers,
-        ).json()
-        deleted = seeded_client.delete(f"{FIELDS}/{field['id']}", headers=headers)
-        assert deleted.status_code == 204
-        assert seeded_client.get(f"{FIELDS}?entity_type=customer", headers=headers).json() == []
-
-        field2 = seeded_client.post(
-            FIELDS,
-            json={"entity_type": "customer", "field_key": "budget2", "label": "预算2", "field_type": "NUMBER"},
-            headers=headers,
-        ).json()
-        seeded_client.post(
-            CUSTOMERS,
-            json={"display_name": "甲", "extra_values": {"budget2": 10}},
-            headers=headers,
-        )
-        blocked = seeded_client.delete(f"{FIELDS}/{field2['id']}", headers=headers)
-        assert blocked.status_code == 409
-        assert blocked.json()["code"] == ErrorCode.FIELD_DEFINITION_HAS_VALUES
-
-    def test_viewer_cannot_delete_field_definition(self, seeded_client, viewer_headers):
-        field = seeded_client.post(
-            FIELDS,
-            json={"entity_type": "customer", "field_key": "note_x", "label": "备注X"},
-            headers={"X-Dev-User": "admin"},
-        ).json()
-        response = seeded_client.delete(f"{FIELDS}/{field['id']}", headers=viewer_headers)
-        assert response.status_code == 403
-        assert response.json()["code"] == ErrorCode.PERMISSION_DENIED

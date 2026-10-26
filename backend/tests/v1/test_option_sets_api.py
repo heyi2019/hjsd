@@ -62,19 +62,6 @@ def test_update_options_on_editable_set(client, headers):
     assert [o["value"] for o in updated.json()["options"]] == ["HOT", "CLASSIC"]
 
 
-def test_updating_option_set_refreshes_referencing_field_options(client, headers):
-    client.post(OPTION_SETS, json={"code": "CUSTOMER_LEVEL", "label": "客户等级", "editable": True, "options": [{"value": "A", "label": "A"}]}, headers=headers)
-    created = client.post(
-        "/api/v1/field-definitions",
-        json={"entity_type": "customer", "field_key": "level", "label": "等级", "field_type": "SELECT", "option_set_code": "CUSTOMER_LEVEL"},
-        headers=headers,
-    )
-    assert created.status_code == 201, created.text
-
-    client.put(f"{OPTION_SETS}/CUSTOMER_LEVEL", json={"options": [{"value": "B", "label": "B"}]}, headers=headers)
-    fields = client.get("/api/v1/field-definitions", headers=headers).json()
-    assert fields[0]["options"] == ["B"]
-
 
 def test_dead_enum_rejects_option_change(client, headers):
     client.post(

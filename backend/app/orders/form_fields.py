@@ -1,8 +1,10 @@
 """orders.form_fields：建单表单字段配置的 CRUD 与护栏。
 
-与 parties 活字段(FieldDefinition)解耦——本模块只描述「建单表单」的字段构成
-（显示/必填/停用/排序/增删），不存储实体附加属性值。核心核算字段 locked=True，
-仅禁止物理删除；required 与 is_active 仍可按业务需要配置（停用核心字段由前端提示风险）。
+本模块是**全站唯一的表单字段配置来源**：描述「建单表单」与「客户建档」等表单的字段构成
+（显示/必填/停用/排序/增删），不存储实体附加属性值。自定义字段（is_custom=1）即扩展字段，
+其值落在实体行内的 form_extra（订单 Order.form_extra、客户 Customer.form_extra）。
+核心核算字段 locked=True，仅禁止物理删除；required 与 is_active 仍可按业务需要配置
+（停用核心字段由前端提示风险）。
 """
 from __future__ import annotations
 

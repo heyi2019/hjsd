@@ -42,7 +42,6 @@ from app.domain.enums import (
     PolicyStatus,
     PolicyScopeType,
     CounterpartyRole,
-    FieldType,
 )
 
 
@@ -118,64 +117,6 @@ class PolicyVersion(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-# ------------------------------------------------------------------ 活字段
-class FieldDefinition(Base, AuditMixin):
-    """活字段定义：有历史值只能停用，不可删除（BAS-04-03）。"""
-
-    __tablename__ = "field_definitions"
-    __table_args__ = (
-        CheckConstraint(
-            f"entity_type IN {EntityType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="field_entity_valid",
-        ),
-        CheckConstraint(
-            f"field_type IN {FieldType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="field_type_valid",
-        ),
-        CheckConstraint("sort_order >= 0", name="field_sort_order_nonnegative"),
-        UniqueConstraint("entity_type", "field_key", name="uq_field_definitions_key"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    field_key: Mapped[str] = mapped_column(String(64), nullable=False)
-    label: Mapped[str] = mapped_column(String(128), nullable=False)
-    field_type: Mapped[str] = mapped_column(String(16), nullable=False, default="TEXT")
-    options: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    option_set_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    default_value: Mapped[object | None] = mapped_column(JSON, nullable=True)
-    applicable_order_types: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    validation_rule: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-
-class EntityExtraValue(Base, TimestampMixin):
-    """活字段值：只存辅助信息，不参与核算（BAS-04-04）。"""
-
-    __tablename__ = "entity_extra_values"
-    __table_args__ = (
-        Index("ix_entity_extra_values_field_definition_id", "field_definition_id"),
-        CheckConstraint(
-            f"entity_type IN {EntityType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="extra_value_entity_valid",
-        ),
-        UniqueConstraint(
-            "entity_type", "entity_id", "field_definition_id",
-            name="uq_entity_extra_values_unique",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    field_definition_id: Mapped[int] = mapped_column(
-        ForeignKey("field_definitions.id", ondelete="RESTRICT"), nullable=False
-    )
-    value: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-
-
 # ------------------------------------------------------------------ 客户
 class Customer(Base, AuditMixin):
     """客户主数据：编号 `CUS0001`，不可改、不可复用。"""
@@ -210,6 +151,9 @@ class Customer(Base, AuditMixin):
     )
     tags: Mapped[list | None] = mapped_column(JSON, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 扩展字段值：键取自「客户建档」表单的自定义字段（order_form_fields / CUSTOMER），
+    # 与订单 Order.form_extra 同构，一实体一行存值，不再单独建值表（BAS-04）。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     merged_into_id: Mapped[int | None] = mapped_column(
         ForeignKey("customers.id", ondelete="SET NULL"), nullable=True
     )
@@ -343,8 +287,6 @@ __all__ = [
     "Counterparty",
     "Customer",
     "CustomerLead",
-    "EntityExtraValue",
-    "FieldDefinition",
     "OrderCounterpartyRole",
     "OrderCustomerRole",
     "PolicyDefinition",

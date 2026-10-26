@@ -56,7 +56,6 @@ from app.parties.schemas import (
     CustomerStatusUpdate,
     CustomerUpdate,
     ExtraValueIn,
-    FieldDefinitionCreate,
     MergeRequest,
 )
 
@@ -97,10 +96,6 @@ from app.parties.schemas import (
         (MergeRequest, {"target_customer_id": 1, "reason": "重复建档"}),
         (CounterpartyCreate, {"display_name": "平台", "type": "PLATFORM"}),
         (CounterpartyUpdate, {}),
-        (
-            FieldDefinitionCreate,
-            {"entity_type": "customer", "field_key": "level", "label": "等级"},
-        ),
         (ExtraValueIn, {"field_key": "level"}),
         (DepositCreate, {"pool_id": 1, "amount": "1.00", "paid_on": date(2026, 10, 1)}),
         (DepositReturn, {"amount": "1.00", "released_on": date(2026, 10, 1)}),

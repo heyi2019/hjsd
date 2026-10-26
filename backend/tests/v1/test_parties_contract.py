@@ -27,12 +27,10 @@ from app.domain.enums import (
 )
 from app.domain.foundation import AuditLog
 from app.domain.parties import (
-    EntityExtraValue,
-    FieldDefinition,
     OrderCounterpartyRole,
     OrderCustomerRole,
 )
-from app.domain.trade import InstallmentSchedule
+from app.domain.trade import InstallmentSchedule, OrderFormField
 from app.accounts import service as accounts_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
@@ -42,7 +40,6 @@ from app.parties import schemas
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
-FIELDS = "/api/v1/field-definitions"
 
 
 def test_party_routes_use_declared_response_types():
@@ -50,7 +47,6 @@ def test_party_routes_use_declared_response_types():
     assert get_type_hints(parties_router.create_customer)["return"] == schemas.CustomerWithCandidates
     assert get_type_hints(parties_router.get_customer_detail)["return"] == schemas.CustomerDetailOut
     assert get_type_hints(parties_router.list_counterparties)["return"] == list[schemas.CounterpartyOut]
-    assert get_type_hints(parties_router.list_field_definitions)["return"] == list[schemas.FieldDefinitionOut]
 
 
 def _scoped_user() -> CurrentUser:
@@ -513,12 +509,16 @@ class TestMergeGuards:
         assert [r.customer_id for r in roles] == [target.id]
 
     def test_merge_copies_missing_extra_values_to_target(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="preferred_platform",
-            label="常用平台",
-            actor="pytest",
+        seeded_db.add(
+            OrderFormField(
+                order_type_code="CUSTOMER", field_key="preferred_platform",
+                label="常用平台", field_type="TEXT", is_custom=True,
+                created_by="pytest", updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+        definition = seeded_db.scalar(
+            select(OrderFormField).where(OrderFormField.field_key == "preferred_platform")
         )
         source = _customer(seeded_db, "带活字段的源")
         target = _customer(seeded_db, "没有活字段的目标")
@@ -640,388 +640,6 @@ class TestCounterpartyGuards:
 
 
 # ------------------------------------------------------------------ 活字段
-class TestFieldDefinitionGuards:
-    def test_extra_values_require_an_existing_customer(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="orphan_guard",
-            label="孤儿值校验",
-            actor="pytest",
-        )
-        with pytest.raises(NotFound, match="客户 999999 不存在"):
-            service.set_extra_values(
-                seeded_db,
-                entity_type="customer",
-                entity_id=999999,
-                values=[(definition.field_key, "不应落库")],
-            )
-
-    def test_extra_values_validate_as_a_batch_before_mutating(self, seeded_db):
-        text_definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="batch_note",
-            label="批量备注",
-            actor="pytest",
-        )
-        number_definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="batch_amount",
-            label="批量金额",
-            field_type="NUMBER",
-            actor="pytest",
-        )
-        customer = service.create_customer(seeded_db, display_name="批量字段客户", actor="pytest")
-
-        with pytest.raises(Validation, match="字段 批量金额 必须为数字"):
-            service.set_extra_values(
-                seeded_db,
-                entity_type="customer",
-                entity_id=customer.id,
-                values=[
-                    (text_definition.field_key, "应该回滚"),
-                    (number_definition.field_key, "不是数字"),
-                ],
-            )
-
-        seeded_db.commit()
-        assert service.get_extra_values(
-            seeded_db, entity_type="customer", entity_id=customer.id
-        ) == {}
-
-    def test_customer_update_does_not_partially_write_when_extra_value_fails(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="update_amount",
-            label="更新金额",
-            field_type="NUMBER",
-            actor="pytest",
-        )
-        customer = service.create_customer(
-            seeded_db, display_name="原客户名称", actor="pytest"
-        )
-
-        with pytest.raises(Validation, match="字段 更新金额 必须为数字"):
-            service.update_customer(
-                seeded_db,
-                customer.id,
-                actor="operator",
-                display_name="不应保存的新名称",
-                extra_values={definition.field_key: "不是数字"},
-            )
-
-        seeded_db.commit()
-        seeded_db.refresh(customer)
-        assert customer.display_name == "原客户名称"
-        assert customer.updated_by == "pytest"
-        assert service.get_extra_values(
-            seeded_db, entity_type="customer", entity_id=customer.id
-        ) == {}
-
-    def test_customer_creation_does_not_partially_write_when_extra_value_fails(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="create_amount",
-            label="创建金额",
-            field_type="NUMBER",
-            actor="pytest",
-        )
-
-        with pytest.raises(Validation, match="字段 创建金额 必须为数字"):
-            service.create_customer(
-                seeded_db,
-                display_name="不应落库的客户",
-                actor="operator",
-                extra_values={definition.field_key: "不是数字"},
-            )
-
-        seeded_db.commit()
-        assert seeded_db.scalar(
-            select(FieldDefinition.id).where(FieldDefinition.id == definition.id)
-        ) == definition.id
-        assert service.list_customers(seeded_db, keyword="不应落库的客户") == []
-
-    def test_database_rejects_unsupported_extra_value_entity(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="database_guard",
-            label="数据库校验",
-            actor="pytest",
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.execute(
-                EntityExtraValue.__table__.insert().values(
-                    entity_type="quality_issue",
-                    entity_id=1,
-                    field_definition_id=definition.id,
-                    value={"value": "invalid"},
-                )
-            )
-
-    @pytest.mark.parametrize("field_type", ["UNKNOWN", "JSON", "number"])
-    def test_invalid_field_type_rejected(self, seeded_db, field_type):
-        with pytest.raises(Validation) as exc:
-            service.create_field_definition(
-                seeded_db,
-                entity_type="customer",
-                field_key="custom_type",
-                label="字段",
-                field_type=field_type,
-                actor="pytest",
-            )
-        assert "字段类型必须为" in str(exc.value)
-
-    def test_negative_sort_order_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            service.create_field_definition(
-                seeded_db,
-                entity_type="customer",
-                field_key="negative_order",
-                label="字段",
-                sort_order=-1,
-                actor="pytest",
-            )
-        assert "排序值不能为负数" in str(exc.value)
-
-    def test_field_definition_inputs_are_strictly_typed(self, seeded_db):
-        with pytest.raises(Validation, match="实体类型必须为"):
-            service.create_field_definition(
-                seeded_db, entity_type=123, field_key="typed_entity", label="字段",
-                actor="pytest",
-            )
-        with pytest.raises(Validation, match="字段键必须为小写字母开头"):
-            service.create_field_definition(
-                seeded_db, entity_type="customer", field_key=123, label="字段",
-                actor="pytest",
-            )
-        with pytest.raises(Validation, match="字段名称不能为空"):
-            service.create_field_definition(
-                seeded_db, entity_type="customer", field_key="typed_label", label=123,
-                actor="pytest",
-            )
-        with pytest.raises(Validation, match="排序值必须为整数"):
-            service.create_field_definition(
-                seeded_db, entity_type="customer", field_key="typed_sort", label="字段",
-                sort_order="1", actor="pytest",
-            )
-
-    def test_database_rejects_invalid_field_definition_values(self, seeded_db):
-        with pytest.raises(IntegrityError):
-            seeded_db.execute(
-                FieldDefinition.__table__.insert().values(
-                    entity_type="customer",
-                    field_key="invalid_db_type",
-                    label="字段",
-                    field_type="UNKNOWN",
-                    options=[],
-                    required=False,
-                    sort_order=0,
-                    is_active=True,
-                    created_by="pytest",
-                    updated_by="pytest",
-                )
-            )
-
-    def test_database_rejects_negative_sort_order(self, seeded_db):
-        with pytest.raises(IntegrityError):
-            seeded_db.execute(
-                FieldDefinition.__table__.insert().values(
-                    entity_type="customer",
-                    field_key="negative_db_order",
-                    label="字段",
-                    field_type="TEXT",
-                    options=[],
-                    required=False,
-                    sort_order=-1,
-                    is_active=True,
-                    created_by="pytest",
-                    updated_by="pytest",
-                )
-            )
-
-    def test_invalid_entity_type_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            service.create_field_definition(
-                seeded_db, entity_type="BOGUS", field_key="k1", label="字段",
-                actor="pytest",
-            )
-        assert "实体类型必须为" in str(exc.value)
-
-    def test_order_and_account_support_live_fields(self, seeded_db):
-        account = accounts_service.create_account(
-            seeded_db,
-            game_account="live-field-account",
-            business_mode="SELF",
-            inventory_type="RECOVERY",
-            actor="pytest",
-        )
-        order = orders_service.create_order(
-            seeded_db,
-            order_type="HS",
-            trade_date=date(2026, 10, 4),
-            account_id=account.id,
-            actor="pytest",
-        )
-        order_definition = service.create_field_definition(
-            seeded_db,
-            entity_type="order",
-            field_key="seller_note",
-            label="卖家备注",
-            actor="pytest",
-        )
-        account_definition = service.create_field_definition(
-            seeded_db,
-            entity_type="account",
-            field_key="selling_point",
-            label="账号卖点",
-            actor="pytest",
-        )
-
-        service.set_extra_values(
-            seeded_db,
-            entity_type="order",
-            entity_id=order.id,
-            values=[(order_definition.field_key, "高等级")],
-        )
-        service.set_extra_values(
-            seeded_db,
-            entity_type="account",
-            entity_id=account.id,
-            values=[(account_definition.field_key, "稀有皮肤")],
-        )
-
-        assert service.get_extra_values(
-            seeded_db, entity_type="order", entity_id=order.id
-        ) == {"seller_note": "高等级"}
-        assert service.get_extra_values(
-            seeded_db, entity_type="account", entity_id=account.id
-        ) == {"selling_point": "稀有皮肤"}
-
-    def test_invalid_field_key_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            service.create_field_definition(
-                seeded_db, entity_type="customer", field_key="Bad_Key", label="字段",
-                actor="pytest",
-            )
-        assert "字段键必须为小写字母开头" in str(exc.value)
-
-    @pytest.mark.parametrize("field_type", ["SELECT", "MULTI_SELECT"])
-    def test_choice_field_requires_unique_nonempty_options(self, seeded_db, field_type):
-        with pytest.raises(Validation) as exc:
-            service.create_field_definition(
-                seeded_db,
-                entity_type="customer",
-                field_key="choice_field",
-                label="选项字段",
-                field_type=field_type,
-                actor="pytest",
-            )
-        assert "选项" in str(exc.value)
-
-        with pytest.raises(Validation):
-            service.create_field_definition(
-                seeded_db,
-                entity_type="customer",
-                field_key="choice_field_duplicate",
-                label="选项字段",
-                field_type=field_type,
-                options=["A", "A"],
-                actor="pytest",
-            )
-
-    def test_choice_field_rejects_blank_or_non_string_options(self, seeded_db):
-        with pytest.raises(Validation):
-            service.create_field_definition(
-                seeded_db,
-                entity_type="customer",
-                field_key="choice_blank",
-                label="选项字段",
-                field_type="SELECT",
-                options=[""],
-                actor="pytest",
-            )
-        with pytest.raises(Validation):
-            service.create_field_definition(
-                seeded_db,
-                entity_type="customer",
-                field_key="choice_number",
-                label="选项字段",
-                field_type="SELECT",
-                options=[1],
-                actor="pytest",
-            )
-
-    def test_duplicate_field_key_conflicts(self, seeded_db):
-        service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="k1", label="字段", actor="pytest"
-        )
-        with pytest.raises(Conflict) as exc:
-            service.create_field_definition(
-                seeded_db, entity_type="customer", field_key="k1", label="字段2",
-                actor="pytest",
-            )
-        assert "已存在" in str(exc.value)
-
-    def test_list_excludes_inactive_when_requested(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="k1", label="字段", actor="pytest"
-        )
-        service.set_field_definition_active(
-            seeded_db, definition.id, False, actor="pytest"
-        )
-        assert service.list_field_definitions(
-            seeded_db, entity_type="customer", include_inactive=False
-        ) == []
-        assert len(
-            service.list_field_definitions(seeded_db, entity_type="customer")
-        ) == 1
-
-    def test_field_definition_active_must_be_boolean_in_service(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db,
-            entity_type="customer",
-            field_key="bool_active",
-            label="布尔状态校验",
-            actor="pytest",
-        )
-        with pytest.raises(Validation, match="active 必须为布尔值"):
-            service.set_field_definition_active(
-                seeded_db, definition.id, "false", actor="pytest"
-            )
-        seeded_db.commit()
-        seeded_db.refresh(definition)
-        assert definition.is_active is True
-
-    def test_set_active_notfound(self, seeded_db):
-        with pytest.raises(NotFound):
-            service.set_field_definition_active(
-                seeded_db, 999999, False, actor="pytest"
-            )
-
-    def test_extra_value_overwrites_existing_row(self, seeded_db):
-        definition = service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="k1", label="字段", actor="pytest"
-        )
-        customer = _customer(seeded_db, "阿甲")
-        service.set_extra_values(
-            seeded_db, entity_type="customer", entity_id=customer.id,
-            values=[(definition.field_key, "v1")],
-        )
-        saved = service.set_extra_values(
-            seeded_db, entity_type="customer", entity_id=customer.id,
-            values=[(definition.field_key, "v2")],
-        )
-        assert saved == {"k1": "v2"}  # 618：已存在行走覆写分支，不重复插入
-        assert service.get_extra_values(
-            seeded_db, entity_type="customer", entity_id=customer.id
-        ) == {"k1": "v2"}
-
-
 # ------------------------------------------------------------------ 路由层
 class TestPartiesApi:
     def test_list_customers_endpoint(self, seeded_client, seeded_db, headers):
@@ -1120,19 +738,6 @@ class TestPartiesApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["note"] == "长期合作"
-
-    def test_set_field_definition_active_endpoint(self, seeded_client, seeded_db, headers):
-        definition = service.create_field_definition(
-            seeded_db, entity_type="customer", field_key="k1", label="字段", actor="pytest"
-        )
-        response = seeded_client.patch(
-            f"{FIELDS}/{definition.id}/active",
-            params={"active": "false"},
-            headers=headers,
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["is_active"] is False
-
 
 def test_customer_detail_reveal_records_contact_read_audit(seeded_client, seeded_db, headers):
     customer = _customer(seeded_db, "脱敏审计客户")

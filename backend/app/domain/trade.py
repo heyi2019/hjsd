@@ -749,15 +749,15 @@ class RebateSettlement(Base, AuditMixin):
 
 
 class OrderFormField(Base, AuditMixin):
-    """建单表单字段配置：按业务类型 code（HS/TH/DG/DFQ）维度描述「建单表单」的字段构成。
+    """表单字段配置：按表单作用域码（建单 HS/TH/DG/DFQ、客户建档 CUSTOMER 等）描述字段构成。
 
-    与 parties 活字段(FieldDefinition)解耦：活字段用于存储实体附加属性值且治理上
-    排除订单字段；本表专门描述表单字段的展示/必填/停用/排序，并可覆盖核心核算字段
-    的必填态。核心核算字段（建单/过账强依赖）以 locked=True 保护，禁止删除，
-    但仍可改必填/选填与停用（停用需业务侧自行承担过账风险，由前端提示）。
+    全站唯一的字段定义来源，替代已下线的独立「活字段」定义表（2026-10-26 合并）：
+    本表描述表单字段的展示/必填/停用/排序，并可覆盖核心核算字段的必填态。核心核算字段
+    （建单/过账强依赖）以 locked=True 保护，禁止删除，但仍可改必填/选填与停用
+    （停用需业务侧自行承担过账风险，由前端提示）。
 
-    field_key 与建单表单既有字段 name / 自定义字段键一一对应；自定义字段值落在
-    Order.form_extra（JSON）。
+    field_key 与表单既有字段 name / 自定义字段键一一对应；自定义字段（is_custom=1）
+    即扩展字段，其值落在实体行内的 form_extra（Order.form_extra / Customer.form_extra）。
     """
 
     __tablename__ = "order_form_fields"

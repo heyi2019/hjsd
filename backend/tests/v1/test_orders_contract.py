@@ -162,59 +162,6 @@ def test_sell_completes_non_installment_orders(seeded_db, order_type):
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
-    def test_order_and_account_live_fields_round_trip_through_api(
-        self, seeded_client, seeded_db, headers
-    ):
-        parties_service.create_field_definition(
-            seeded_db,
-            entity_type="order",
-            field_key="origin_note",
-            label="来源备注",
-            actor="pytest",
-        )
-        parties_service.create_field_definition(
-            seeded_db,
-            entity_type="account",
-            field_key="selling_point",
-            label="账号卖点",
-            actor="pytest",
-        )
-        account = accounts_service.create_account(
-            seeded_db,
-            game_account="api-live-field-account",
-            business_mode="SELF",
-            inventory_type="RECOVERY",
-            extra_values={"selling_point": "稀有皮肤"},
-            actor="pytest",
-        )
-
-        created = seeded_client.post(
-            "/api/v1/orders",
-            headers=headers,
-            json={
-                "order_type": "HS",
-                "trade_date": "2026-10-04",
-                "account_id": account.id,
-                "extra_values": {"origin_note": "朋友转介绍"},
-            },
-        )
-        assert created.status_code == 201, created.text
-        body = created.json()
-        assert body["extra_values"] == {"origin_note": "朋友转介绍"}
-
-        detail = seeded_client.get(
-            f"/api/v1/orders/{body['id']}", headers=headers
-        )
-        assert detail.status_code == 200
-        assert detail.json()["extra_values"] == {"origin_note": "朋友转介绍"}
-
-        accounts = seeded_client.get("/api/v1/accounts", headers=headers)
-        assert accounts.status_code == 200
-        account = next(
-            item for item in accounts.json()
-            if item["id"] == body["account_id"]
-        )
-        assert account["extra_values"] == {"selling_point": "稀有皮肤"}
 
     def test_order_owner_must_be_active(self, seeded_db):
         owner = seeded_db.get(User, 1)

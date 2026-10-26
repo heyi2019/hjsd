@@ -16,9 +16,7 @@ from app.core.security import CurrentUser
 from app.domain.parties import (
     Customer,
     CustomerLead,
-    EntityExtraValue,
     EntityType,
-    FieldDefinition,
     OrderCustomerRole,
 )
 from app.domain.trade import Order, OrderEvent
@@ -143,23 +141,8 @@ class TestPartiesMerge:
         source = _customer(seeded_db)
         target = _customer(seeded_db)
         seeded_db.commit()
-        fd = FieldDefinition(
-            entity_type="customer", field_key="k1", label="k1", field_type="TEXT"
-        )
-        seeded_db.add(fd)
-        seeded_db.flush()
-        seeded_db.add(
-            EntityExtraValue(
-                entity_type=EntityType.CUSTOMER.value, entity_id=source.id,
-                field_definition_id=fd.id, value={},
-            )
-        )
-        seeded_db.add(
-            EntityExtraValue(
-                entity_type=EntityType.CUSTOMER.value, entity_id=target.id,
-                field_definition_id=fd.id, value={},
-            )
-        )
+        source.form_extra = {"k1": "来源值"}
+        target.form_extra = {"k1": "目标值"}
         seeded_db.commit()
         # 不应抛错；来源仍被标记为 MERGED
         parties_service.merge_customers(

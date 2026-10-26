@@ -19,7 +19,6 @@ from app.core.security import (
     PERM_CUSTOMER_MERGE,
     PERM_CUSTOMER_READ,
     PERM_CUSTOMER_UPDATE,
-    PERM_FIELD_DEFINITION_MANAGE,
     CurrentUser,
     require_permissions,
 )
@@ -34,7 +33,6 @@ update_customers = require_permissions(PERM_CUSTOMER_UPDATE)
 merge_customers = require_permissions(PERM_CUSTOMER_MERGE)
 read_counterparties = require_permissions(PERM_COUNTERPARTY_READ)
 manage_counterparties = require_permissions(PERM_COUNTERPARTY_MANAGE)
-manage_fields = require_permissions(PERM_FIELD_DEFINITION_MANAGE)
 
 
 def _actor(user: CurrentUser) -> str:
@@ -428,89 +426,6 @@ def update_counterparty_status(
         db, counterparty_id, active, actor=_actor(user)
     )
     return _counterparty_output(db, item)
-
-
-# --------------------------------------------------------------------- 活字段
-@router.get("/field-definitions", response_model=list[schemas.FieldDefinitionOut])
-def list_field_definitions(
-    entity_type: str | None = Query(default=None),
-    include_inactive: bool = Query(default=True),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_customers,
-) -> list[schemas.FieldDefinitionOut]:
-    items = service.list_field_definitions(
-        db, entity_type=entity_type, include_inactive=include_inactive
-    )
-    return [schemas.FieldDefinitionOut.model_validate(item) for item in items]
-
-
-@router.post(
-    "/field-definitions", response_model=schemas.FieldDefinitionOut, status_code=201
-)
-def create_field_definition(
-    payload: schemas.FieldDefinitionCreate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_fields,
-) -> schemas.FieldDefinitionOut:
-    item = service.create_field_definition(
-        db,
-        entity_type=payload.entity_type,
-        field_key=payload.field_key,
-        label=payload.label,
-        actor=_actor(user),
-        field_type=payload.field_type,
-        options=payload.options,
-        option_set_code=payload.option_set_code,
-        default_value=payload.default_value,
-        applicable_order_types=payload.applicable_order_types,
-        validation_rule=payload.validation_rule,
-        required=payload.required,
-        sort_order=payload.sort_order,
-    )
-    return schemas.FieldDefinitionOut.model_validate(item)
-
-
-@router.patch(
-    "/field-definitions/{definition_id}",
-    response_model=schemas.FieldDefinitionOut,
-)
-def update_field_definition(
-    definition_id: int,
-    payload: schemas.FieldDefinitionUpdate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_fields,
-) -> schemas.FieldDefinitionOut:
-    item = service.update_field_definition(
-        db,
-        definition_id,
-        actor=_actor(user),
-        **payload.model_dump(exclude_unset=True),
-    )
-    return schemas.FieldDefinitionOut.model_validate(item)
-
-
-@router.patch(
-    "/field-definitions/{definition_id}/active",
-    response_model=schemas.FieldDefinitionOut,
-)
-def set_field_definition_active(
-    definition_id: int,
-    active: bool = Query(default=False),
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_fields,
-) -> schemas.FieldDefinitionOut:
-    item = service.set_field_definition_active(db, definition_id, active, actor=_actor(user))
-    return schemas.FieldDefinitionOut.model_validate(item)
-
-
-@router.delete("/field-definitions/{definition_id}", status_code=204, response_model=None)
-def delete_field_definition(
-    definition_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_fields,
-) -> None:
-    """删除字段定义：无历史值才可删；有值返回 409 只能停用（BAS-04-03）。"""
-    service.delete_field_definition(db, definition_id, actor=_actor(user))
 
 
 __all__ = ["router", "get_current_user"]

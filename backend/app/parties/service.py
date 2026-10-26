@@ -39,8 +39,6 @@ from app.domain.parties import (
     Counterparty,
     Customer,
     CustomerLead,
-    EntityExtraValue,
-    FieldDefinition,
     OrderCustomerRole,
 )
 from app.domain.foundation import AuditLog, Pool
@@ -74,14 +72,9 @@ from ._common import (
 from .fields import (
     _validate_extra_values,
     _validate_required_extras,
-    create_field_definition,
-    delete_field_definition,
     get_extra_values,
     get_extra_values_bulk,
-    list_field_definitions,
     set_extra_values,
-    set_field_definition_active,
-    update_field_definition,
 )
 
 # --------------------------------------------------------------------- 客户
@@ -632,36 +625,18 @@ def merge_customers(
         lead.customer_id = target.id
         lead.updated_by = actor
 
-    # 活字段是客户资料的一部分：目标已有同一字段时保留目标值，
-    # 目标缺失时复制一份；来源行不删除，保证合并前的历史值仍可审计。
-    source_extras = session.scalars(
-        select(EntityExtraValue).where(
-            EntityExtraValue.entity_type == EntityType.CUSTOMER.value,
-            EntityExtraValue.entity_id == source.id,
-        )
-    ).all()
-    target_extra_definition_ids = set(
-        session.scalars(
-            select(EntityExtraValue.field_definition_id).where(
-                EntityExtraValue.entity_type == EntityType.CUSTOMER.value,
-                EntityExtraValue.entity_id == target.id,
-            )
-        ).all()
-    )
+    # 扩展字段是客户资料的一部分：目标已有的键保留目标值，目标缺失的键复制一份；
+    # 来源行不删除（仅置 MERGED），保证合并前的历史值仍可审计。
+    source_extras = dict(source.form_extra or {})
+    merged_extras = dict(target.form_extra or {})
     migrated_extras = 0
-    for extra in source_extras:
-        if extra.field_definition_id in target_extra_definition_ids:
+    for field_key, value in source_extras.items():
+        if field_key in merged_extras:
             continue
-        session.add(
-            EntityExtraValue(
-                entity_type=extra.entity_type,
-                entity_id=target.id,
-                field_definition_id=extra.field_definition_id,
-                value=dict(extra.value or {}),
-            )
-        )
-        target_extra_definition_ids.add(extra.field_definition_id)
+        merged_extras[field_key] = value
         migrated_extras += 1
+    if migrated_extras:
+        target.form_extra = merged_extras
 
     before = {"status": source.status, "merged_into_id": source.merged_into_id}
     source.status = CustomerStatus.MERGED.value
@@ -1124,10 +1099,8 @@ __all__ = [
     "close_lead",
     "create_counterparty",
     "create_customer",
-    "create_field_definition",
     "create_lead",
     "convert_lead",
-    "delete_field_definition",
     "duplicate_candidates",
     "get_counterparty",
     "get_customer",
@@ -1139,14 +1112,12 @@ __all__ = [
     "list_counterparties",
     "list_leads",
     "list_customers",
-    "list_field_definitions",
     "mask_id",
     "mask_phone",
     "merge_customers",
     "set_counterparty_status",
     "set_customer_status",
     "set_extra_values",
-    "set_field_definition_active",
     "to_customer_out",
     "update_lead",
     "update_counterparty",

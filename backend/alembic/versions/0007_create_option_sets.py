@@ -129,9 +129,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     session = Session(bind=bind)
     try:
-        existing = {
-            row.code for row in session.scalars(select(OptionSet.code)).all()
-        }
+        existing = set(session.scalars(select(OptionSet.code)).all())
         for code, (label, group, options) in SEED.items():
             if code in existing:
                 continue

@@ -135,11 +135,11 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.getAllByText("更多⌄")).toHaveLength(2);
   });
 
-  it("行级更多菜单提供利润分配、登记退款和取消交易", async () => {
+  it("行级更多菜单提供分润、登记退款和取消交易", async () => {
     await openLedger("admin");
     fireEvent.click(screen.getAllByText("更多⌄")[0]);
 
-    expect(await screen.findByText("利润分配")).toBeInTheDocument();
+    expect(await screen.findByText("分润")).toBeInTheDocument();
     expect(await screen.findByText("登记退款")).toBeInTheDocument();
     expect(await screen.findByText("取消交易")).toBeInTheDocument();
   });

@@ -3,7 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
-import { FundsPage } from "./FundsPage";
+import { FundsPage, deriveCashflowNature } from "./FundsPage";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
@@ -108,55 +108,16 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.fund_nature).toBe("BUSINESS");
   });
 
-  it("新增流水（本方经营 + 支出）→ nature=BUSINESS_OUT", async () => {
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 101 });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 1, /支出/);
-    await ui.type(modal.querySelector("#category") ?? modal, "BUY");
-    await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
-    await ui.type(modal.querySelector("#note") ?? modal, "测试支出");
-    await ui.click(screen.getByRole("button", { name: /提交审核/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
-    expect((vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>).nature).toBe("BUSINESS_OUT");
-  });
-
-  it("新增流水（外部/受托）→ nature=EXTERNAL_IN", async () => {
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 102 });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /押金池/);
-    await pickSelect(modal, 2, /外部.*受托/);
-    await ui.type(modal.querySelector("#category") ?? modal, "DEPOSIT");
-    await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
-    await ui.type(modal.querySelector("#note") ?? modal, "外部资金");
-    await ui.click(screen.getByRole("button", { name: /提交审核/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
-    expect((vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>).nature).toBe("EXTERNAL_IN");
-  });
-
-  it("新增流水（内部调拨）→ nature=INTERNAL", async () => {
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 103 });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 2, /内部调拨/);
-    await ui.type(modal.querySelector("#category") ?? modal, "MOVE");
-    await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
-    await ui.type(modal.querySelector("#note") ?? modal, "内部调拨");
-    await ui.click(screen.getByRole("button", { name: /提交审核/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
-    expect((vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>).nature).toBe("INTERNAL");
+  // nature 口径矩阵走纯函数单测（deriveCashflowNature，毫秒级），不再为每个口径
+  // 重复整页挂载 + 弹窗全链路（原 3 条用例各 ~1s，2026-10-27 实测重构）；
+  // 弹窗→提交→payload 的接线正确性由下方「本方经营 + 收入」1 条全链路用例守护。
+  it("nature 口径矩阵：外部/内部/本方经营按资金性质与流向推导", () => {
+    expect(deriveCashflowNature("EXTERNAL", "IN")).toBe("EXTERNAL_IN");
+    expect(deriveCashflowNature("EXTERNAL", "OUT")).toBe("EXTERNAL_IN");
+    expect(deriveCashflowNature("INTERNAL", "OUT")).toBe("INTERNAL");
+    expect(deriveCashflowNature("INTERNAL", "IN")).toBe("INTERNAL");
+    expect(deriveCashflowNature("BUSINESS", "IN")).toBe("BUSINESS_IN");
+    expect(deriveCashflowNature("BUSINESS", "OUT")).toBe("BUSINESS_OUT");
   });
 
   it("待审核流水 → 确认审核调用 cashflowsApi.approve", async () => {

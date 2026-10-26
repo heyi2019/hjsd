@@ -56,6 +56,11 @@ const ALLOWED_ATTRIBUTES_BY_FUND_NATURE: Record<string, string[]> = {
   INTERNAL: ["INTERNAL_TRANSFER"],
 };
 
+/** 新增流水的 nature 口径（纯函数，供单测矩阵直接覆盖）：
+ *  外部/受托 → EXTERNAL_IN；内部调拨 → INTERNAL；本方经营按流向二分。 */
+export const deriveCashflowNature = (fundNature: string, direction: string): string =>
+  fundNature === "EXTERNAL" ? "EXTERNAL_IN" : fundNature === "INTERNAL" ? "INTERNAL" : direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT";
+
 export function FundsPage() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
@@ -233,7 +238,7 @@ export function FundsPage() {
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,
-        nature: fundNature === "EXTERNAL" ? "EXTERNAL_IN" : fundNature === "INTERNAL" ? "INTERNAL" : direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
+        nature: deriveCashflowNature(fundNature, direction),
         fund_nature: fundNature,
         accounting_attribute: String(values.accounting_attribute ?? "OPERATING_EXPENSE"),
         category: values.category as string,

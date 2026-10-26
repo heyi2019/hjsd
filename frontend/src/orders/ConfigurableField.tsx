@@ -77,11 +77,11 @@ export function fieldLabel(config: FieldConfigMap, key: string, fallback: string
   return config[key]?.label ?? fallback;
 }
 
-/** 合并必填（必填下限语义）：
- *  - 配置 required=true → 强制必填（保留基础与条件校验规则）；
- *  - 配置 required=false → 保留基础规则（含条件必填，如「其他来源」），不强行剥离；
- *  - 无配置 → 原 rules。
- * 这样种子默认值与表单当前必填态一致时开启功能零行为变化，用户改配置后才生效。
+/** 合并必填（配置为最终口径）：
+ *  - 配置 required=true → 强制必填（保留基础与条件校验规则，基础无必填时追加）；
+ *  - 配置 required=false → 剥离基础规则中的必填项（保留金额格式等校验器，空值时校验器自行放行），
+ *    即「设置里改成选填」对表单生效；条件必填（如「其他来源」）也随之解除——用户显式配置选填即最终口径；
+ *  - 无配置 → 原 rules（降级保持既有行为）。
  */
 export function resolveRules(config: FieldConfigMap, key: string, baseRules?: Rule[]): Rule[] {
   const def = config[key];
@@ -91,7 +91,7 @@ export function resolveRules(config: FieldConfigMap, key: string, baseRules?: Ru
     const hasRequired = base.some((rule) => rule && (rule as { required?: boolean }).required);
     return hasRequired ? base : [...base, { required: true, message: `${def.label}必填` } as Rule];
   }
-  return base;
+  return base.filter((rule) => !(rule as { required?: boolean }).required);
 }
 
 export function CfgItem(props: {

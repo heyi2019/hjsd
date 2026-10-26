@@ -1,5 +1,5 @@
 /** ConfigurableField 测试：
- *  - resolveRules 必填下限语义（纯函数）；
+ *  - resolveRules 必填以配置为最终口径（纯函数）；
  *  - CustomFormField 按类型渲染并把值归集到 form_extra.<field_key>；
  *  - CfgItem 在 FieldConfigContext 驱动下：停用字段不渲染、启用字段读配置标签。
  */
@@ -43,7 +43,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("resolveRules 必填下限语义", () => {
+describe("resolveRules 必填以配置为最终口径", () => {
   const base = [{ required: true, message: "基础必填" }] as Record<string, unknown>[];
 
   it("无配置返回基础规则", () => {
@@ -66,11 +66,21 @@ describe("resolveRules 必填下限语义", () => {
     expect(hit).toBe(true);
   });
 
-  it("配置 required=false 保留基础规则不剥离", () => {
+  it("配置 required=false 剥离基础规则中的必填项（设置选填生效）", () => {
     const cfg: FieldConfigMap = { x: makeField({ field_key: "x", required: false }) };
     const out = resolveRules(cfg, "x", base as never);
     const requiredCount = out.filter((r) => (r as { required?: boolean }).required).length;
-    expect(requiredCount).toBe(1);
+    expect(requiredCount).toBe(0);
+  });
+
+  it("配置 required=false 时保留金额格式等非必填校验器", () => {
+    const cfg: FieldConfigMap = { amount: makeField({ field_key: "amount", required: false }) };
+    const moneyValidator = { validator: vi.fn() };
+    const out = resolveRules(cfg, "amount", [
+      { required: true, message: "请输入金额" },
+      moneyValidator,
+    ] as never);
+    expect(out).toEqual([moneyValidator]);
   });
 });
 

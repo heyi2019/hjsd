@@ -1,5 +1,9 @@
-/** OptionSetsPanel 测试：只读死枚举展示 + 可编辑字典可增删改并写回。 */
-import { screen, waitFor } from "@testing-library/react";
+/** OptionSetsPanel 测试：死枚举改文案 + 可编辑字典可增删改并写回。
+ *
+ * 2026-10-26 裁决后死枚举的口径变了：值集合锁死（后端 CHECK 保护），
+ * 但展示文案可在设置页维护。故断言从「只读不可改」改为「值只读 · 文案可改」。
+ */
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as catalog from "../../shared/api/catalog";
@@ -30,20 +34,67 @@ const EDITABLE_SET = {
   description: "可自由增删",
 };
 
+/** 按卡片标题定位卡片，避免「保存文案」与「保存」按钮在整页范围内串位。 */
+function cardOf(title: string): HTMLElement {
+  const heading = screen.getByText(title);
+  const card = heading.closest(".ant-card");
+  if (!card) throw new Error(`未找到卡片：${title}`);
+  return card as HTMLElement;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.optionSetsApi.list).mockResolvedValue({
     items: [READONLY_SET, EDITABLE_SET],
   });
+  vi.mocked(catalog.optionSetsApi.update).mockResolvedValue(READONLY_SET);
 });
 
-describe("OptionSetsPanel：只读死枚举", () => {
-  it("展示只读标记与全部选项", async () => {
+describe("OptionSetsPanel：死枚举值只读 · 文案可改", () => {
+  it("展示新标记，每个值配一个展示文案输入框", async () => {
     renderLight(<OptionSetsPanel />, { user: "admin" });
     expect(await screen.findByText("库存状态")).toBeInTheDocument();
-    expect(screen.getByText("只读（后端死枚举）")).toBeInTheDocument();
-    expect(screen.getByText("在库（IN_STOCK）")).toBeInTheDocument();
-    expect(screen.getByText("已售（SOLD）")).toBeInTheDocument();
+    expect(screen.getByText("值只读 · 文案可改")).toBeInTheDocument();
+
+    const card = cardOf("库存状态");
+    // 值以 Tag 形式锁死展示
+    expect(within(card).getByText("IN_STOCK")).toBeInTheDocument();
+    expect(within(card).getByText("SOLD")).toBeInTheDocument();
+    // 文案可改：按 aria-label 定位输入框，初值为词典 label
+    expect(within(card).getByLabelText("库存状态 IN_STOCK 展示文案")).toHaveValue("在库");
+    expect(within(card).getByLabelText("库存状态 SOLD 展示文案")).toHaveValue("已售");
+  });
+
+  it("改文案保存：回传原 value 序列 + 新 label，值集合不变", async () => {
+    renderLight(<OptionSetsPanel />, { user: "admin" });
+    await screen.findByText("库存状态");
+    const card = cardOf("库存状态");
+
+    const input = within(card).getByLabelText("库存状态 IN_STOCK 展示文案");
+    await userEvent.clear(input);
+    await userEvent.type(input, "在库中");
+    await userEvent.click(within(card).getByRole("button", { name: /保存文案/ }));
+
+    await waitFor(() =>
+      expect(vi.mocked(catalog.optionSetsApi.update)).toHaveBeenCalledWith("INVENTORY_STATUS", {
+        options: [
+          { value: "IN_STOCK", label: "在库中" },
+          { value: "SOLD", label: "已售" },
+        ],
+      }),
+    );
+  });
+
+  it("文案清空时拒绝保存，不调用 update", async () => {
+    renderLight(<OptionSetsPanel />, { user: "admin" });
+    await screen.findByText("库存状态");
+    const card = cardOf("库存状态");
+
+    const input = within(card).getByLabelText("库存状态 SOLD 展示文案");
+    await userEvent.clear(input);
+    // 前端先拦（空文案不提交），后端另有二次校验，双保险
+    await userEvent.click(within(card).getByRole("button", { name: /保存文案/ }));
+    expect(vi.mocked(catalog.optionSetsApi.update)).not.toHaveBeenCalled();
   });
 });
 
@@ -53,22 +104,23 @@ describe("OptionSetsPanel：可编辑字典", () => {
     expect(await screen.findByText("游戏标签")).toBeInTheDocument();
     expect(screen.getByText("可编辑")).toBeInTheDocument();
 
-    // 新增一行
-    const addButtons = screen.getAllByRole("button", { name: /添加选项/ });
-    await userEvent.click(addButtons[0]);
-    const valueInputs = screen.getAllByPlaceholderText("value（后端枚举码/字典键）");
+    const card = cardOf("游戏标签");
+    await userEvent.click(within(card).getByRole("button", { name: /添加选项/ }));
+    const valueInputs = within(card).getAllByPlaceholderText("value（后端枚举码/字典键）");
     await userEvent.type(valueInputs[valueInputs.length - 1], "NEW");
-    const labelInputs = screen.getAllByPlaceholderText("label（展示名）");
+    const labelInputs = within(card).getAllByPlaceholderText("label（展示名）");
     await userEvent.type(labelInputs[labelInputs.length - 1], "新品");
 
-    const saveButtons = screen.getAllByRole("button", { name: /保存/ });
-    await userEvent.click(saveButtons[0]);
+    await userEvent.click(within(card).getByRole("button", { name: /保存/ }));
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.optionSetsApi.update).mock.calls.some((c) =>
-        c[0] === "GAME_TAG" &&
-        (c[1] as { options?: Array<{ value: string }> })?.options?.some((o) => o.value === "NEW"),
-      )).toBe(true),
+      expect(
+        vi.mocked(catalog.optionSetsApi.update).mock.calls.some(
+          (c) =>
+            c[0] === "GAME_TAG" &&
+            (c[1] as { options?: Array<{ value: string }> })?.options?.some((o) => o.value === "NEW"),
+        ),
+      ).toBe(true),
     );
   });
 });

@@ -39,6 +39,8 @@ COPY frontend/security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 # apk 版 nginx 默认用 /etc/nginx/http.d/，本镜像已在 nginx.global.conf 里改为
 # include /etc/nginx/conf.d/*.conf，故自带默认站点不会被加载，无端口冲突。
-EXPOSE 80
+# 443 由 nginx.conf 里的 ssl server 块监听；证书在运行时挂载到 /etc/nginx/certs，
+# 不打进镜像（私钥不进镜像层，换证书只需重启容器）。
+EXPOSE 80 443
 
 CMD ["nginx", "-g", "daemon off;"]

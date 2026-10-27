@@ -33,6 +33,14 @@ services:
       dockerfile: frontend/Dockerfile
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # 站点配置以仓库里的 frontend/nginx.conf 为准，运行时挂载覆盖镜像内副本。
+      # 这样改配置（如启用 HTTPS）只需 rsync + 重启容器，不必重建镜像。
+      - ../frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 自签证书（server.crt / server.key），由 scripts/gen_selfsigned.sh 生成。
+      # 只读挂载：私钥不进镜像层，换证书只需重启前端容器。
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       backend:
         condition: service_healthy

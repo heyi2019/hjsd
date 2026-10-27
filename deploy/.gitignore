@@ -1,2 +1,5 @@
 # 真实生产密钥不入库
 .env
+
+# 自签证书：私钥绝不入库，由 scripts/gen_selfsigned.sh 生成并下发
+certs/

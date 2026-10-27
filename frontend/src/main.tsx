@@ -1,4 +1,5 @@
-import { ConfigProvider } from "antd";
+import { App, ConfigProvider } from "antd";
+import { AppFeedbackBridge } from "./shared/ui/appFeedback";
 import zhCN from "antd/locale/zh_CN";
 import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
@@ -27,9 +28,12 @@ function ThemedApp() {
   const { resolvedMode } = useTheme();
   return (
     <ConfigProvider locale={zhCN} theme={buildTheme(resolvedMode)}>
-      <SessionProvider>
-        <AppShell />
-      </SessionProvider>
+      <App>
+        <AppFeedbackBridge />
+        <SessionProvider>
+          <AppShell />
+        </SessionProvider>
+      </App>
     </ConfigProvider>
   );
 }

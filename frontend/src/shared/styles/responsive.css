@@ -101,10 +101,21 @@
   .page-content { padding-bottom: calc(var(--space-5) + 68px + env(safe-area-inset-bottom)); }
   .dashboard-page .ui-entry-row { grid-template-columns: 1fr; }
   .dashboard-note { padding: var(--space-4); }
+  /* iOS 导航栏：移动端顶栏玻璃 + 吸顶 + 安全区，与底部 Tab 栏玻璃（blur(18px)）呼应。
+     仅 ≤640px 生效（此区间侧栏已 fixed 到底部，无顶部横栏冲突）；641–960px 侧栏为顶部横栏，顶栏保持常规流。 */
   .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 15;
     align-content: flex-start;
-    padding-inline: var(--space-3);
+    padding: calc(var(--space-3) + env(safe-area-inset-top))
+      max(var(--space-3), env(safe-area-inset-right)) var(--space-3)
+      max(var(--space-3), env(safe-area-inset-left));
     overflow: visible;
+    background: var(--glass-tint);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: var(--border-w) solid var(--glass-border);
   }
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
@@ -132,6 +143,16 @@
      只能靠 !important 覆盖：否则各列按「理想宽度之和」撑开，操作列按钮换行完全不生效。 */
   .ant-table-wrapper table { width: auto !important; min-width: 100%; }
   .ui-table-wrap .ant-table-content { overflow-x: auto; }
+  /* iOS 卡片容器：移动端表格包进圆角玻璃卡，内部仍横滑（滚动口在 .ant-table-content）。
+     用 overflow:clip（非 hidden）：clip 不创建滚动容器，sticky 首列仍相对 .ant-table-content 计算
+     （responsive.css:135-138 的陷阱仅针对 auto/hidden），同时裁出圆角；内部横滑不受影响。 */
+  .ant-table-wrapper {
+    border-radius: var(--radius-lg);
+    overflow: clip;
+    background: var(--glass);
+    border: var(--border-w) solid var(--glass-border);
+    box-shadow: var(--card-elevation), var(--card-top-hi);
+  }
   /* 首列常驻：横向滑动时保留行标识（订单号/流水号），避免"刷到右边不知道这行是谁"。 */
   .ant-table-wrapper .ant-table-tbody > tr > td:first-child,
   .ant-table-wrapper .ant-table-thead > tr > th:first-child {

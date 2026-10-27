@@ -279,9 +279,11 @@ def test_reverse_rebate_settlement_not_visible(seeded_db):
         )  # 399-400
 
 
-# 注：398 / 432 为外键保证不可达的防御分支（cashflow_id / fee_cashflow_id
-# 均带指向 cashflows.id 的外键，运行时测试库 FK 开启，不存在悬空引用）；
-# 与 reconciliation L153 纯逻辑死代码不同，此处是依赖 FK 的有效防御，保留不删。
+# 注：429 / 463 为外键保证的防御分支（cashflow_id / fee_cashflow_id 指向
+# cashflows.id；运行时测试库 FK 开启，常规 ORM 插入造不出悬空引用，故看似不可达）。
+# 与 reconciliation L153 纯逻辑死代码不同，此处是依赖 FK 的有效防御，保留不删；
+# 已由原生 sqlite3 连接绕过 FK 造脏态覆盖（见 test_finance_reporting_task5_tail.py 的
+# test_reverse_settlement_missing_cashflow_row / _missing_fee_cashflow_row）。
 
 
 # ----------------------------------------------------- list_overdue_rebates 作用域 (516-518)

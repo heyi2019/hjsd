@@ -25,7 +25,7 @@ FROM alpine:3.20
 
 # tzdata 保证日志时间与国内一致；nginx 包自带 nginx 用户，worker 进程以该身份运行。
 RUN apk add --no-cache nginx tzdata \
-    && mkdir -p /run/nginx /var/log/nginx /etc/nginx/conf.d \
+    && mkdir -p /run/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/snippets \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && rm -rf /var/cache/apk/*
@@ -33,6 +33,9 @@ RUN apk add --no-cache nginx tzdata \
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY frontend/nginx.global.conf /etc/nginx/nginx.conf
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# 安全头片段：被 server 块与三个自带 add_header 的 location 共同 include。
+# 必须放 snippets/ 而非 conf.d/，否则会被 conf.d/*.conf 的 include 当成站点加载。
+COPY frontend/security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 # apk 版 nginx 默认用 /etc/nginx/http.d/，本镜像已在 nginx.global.conf 里改为
 # include /etc/nginx/conf.d/*.conf，故自带默认站点不会被加载，无端口冲突。

@@ -26,6 +26,37 @@ fi
 export APP_VERSION
 echo "==> 发布版本 V${APP_VERSION}（镜像 tag 同此值）"
 
+# 基础镜像预检：Docker Hub 在部分网络（尤其 ECS 国内节点）不可达，而失败点落在 Dockerfile
+# 的 FROM 行、报错形似代码问题（TLS handshake timeout）。这里提前拉取，把网络问题变成明示。
+echo "==> 检查基础镜像"
+for img in alpine:3.20 node:22-alpine; do
+  if docker image inspect "$img" >/dev/null 2>&1; then
+    echo "  ✓ ${img} 已存在"
+    continue
+  fi
+  echo "  拉取 ${img} ..."
+  if docker pull "$img" >/dev/null; then
+    echo "  ✓ ${img} 已拉取"
+    continue
+  fi
+  cat >&2 <<EOF
+✗ 无法拉取 ${img}，构建会在 Dockerfile 的 FROM 行失败。
+  这是 ECS 最常见的阻塞项（TLS handshake timeout / connection reset），不是镜像或代码问题。
+
+  解决方式（任选其一）：
+    1) 配镜像加速器：
+         sudo mkdir -p /etc/docker
+         echo '{"registry-mirrors":["https://<你的ID>.mirror.aliyuncs.com"]}' | sudo tee /etc/docker/daemon.json
+         sudo systemctl daemon-reload && sudo systemctl restart docker
+       （加速地址在阿里云「容器镜像服务 → 镜像工具 → 镜像加速器」页面获取）
+    2) 从能联网的机器导出后上传：
+         docker save ${img} | gzip > ${img//[:.]/_}.tar.gz
+         scp <文件> root@<ECS_IP>:/tmp/ && ssh root@<ECS_IP> 'gunzip -c /tmp/xx.tar.gz | docker load'
+       注意：必须是 linux/amd64 镜像。Apple Silicon 等 arm64 机器构建的镜像不能用于 ECS。
+EOF
+  exit 1
+done
+
 echo "==> 构建镜像"
 docker compose build
 

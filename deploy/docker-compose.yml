@@ -16,7 +16,9 @@ services:
       - "8123"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8123/api/v1/health').status==200 else 1)"]
+      # 必须用 python3：alpine 基础镜像不提供 `python` 软链（slim 镜像才有）。
+      # 写成 python 会让 healthcheck 恒失败，frontend 的 depends_on service_healthy 永不满足。
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8123/api/v1/health').status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3

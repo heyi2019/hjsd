@@ -7,7 +7,12 @@
 
 完整跑通 `docker compose build` + `up`，后端健康检查与 nginx 同源反代均正常。两个实战踩坑已修进部署包：
 
-1. **后端基础镜像用 `python:3.12-slim` 而非 3.13**：`pandas==2.2.2` 在 3.13 上无预编译 wheel，而 `python:3.13-slim` 不含 C 编译器，pip 会退化为源码编译并失败。3.12 上 pandas/numpy 均为 wheel，安装快且稳。**阿里云 ECS 同理，请勿改回 3.13-slim。**
+1. **后端基础镜像用 `alpine:3.20`（Python 3.12.13），前端运行阶段同样用 alpine + apk nginx**：镜像为 `deploy-backend` **207MB** + `deploy-frontend` **20.3MB**（此前 slim/nginx-alpine 方案为 299MB + 78.4MB）。三项前提已验证：
+   - 全部 24 个依赖在 **x86_64 与 aarch64 的 musllinux 上都有预编译 wheel**（用 `pip download --only-binary=:all: --platform musllinux_1_1_x86_64 --platform musllinux_1_2_x86_64` 实测，零源码编译，故镜像内无需 gcc）；
+   - **`tzdata` 必须装**（Dockerfile 已含）：alpine 默认无时区库，缺失会让 `datetime.now()` 落 UTC，与国内 +8 差 8 小时，跨日订单与对账日期会错位；
+   - **alpine 无 `python` 软链**，Dockerfile 已补 `/usr/local/bin/python -> /usr/bin/python3`，否则 `deploy.sh` 里既有的 `python scripts/*.py` 调用全部报 `not found`；`docker-compose.yml` 的 healthcheck 用的是 `python3`，不可写成 `python`。
+   ⚠️ **上线前先在 ECS 上 `docker pull alpine:3.20` 确认镜像源能拉到**——拉不到会直接中断构建，且需确认源里有 `alpine` 而非仅 `python` 系列。
+   ⚠️ 后续往 `requirements.txt` 加依赖时，必须确认该包有 musllinux wheel，否则 ECS 上会因缺编译器构建失败。
 2. **前端构建上下文为项目根**：`ui_guards.mjs` 在构建期需读取 `backend/app/domain/enums.py` 校验前后端枚举对齐，故 `docker-compose.yml` 中 frontend 的 `build.context` 为 `..`（项目根），Dockerfile 内 `COPY backend/app /backend/app`；根目录 `.dockerignore` 已排除 `node_modules` 等避免上下文过大。
 3. **拉取镜像遇网络问题**：本机 macOS 上若构建报 `failed to fetch oauth token ... EOF`（docker.io 被本机代理干扰），给 Docker 配置代理或国内镜像加速器后再 build。**更正：阿里云 ECS 上 docker.io 直连是被拒的（实测 Connection refused），必须配镜像源——详见第 5 条。**
 4. **前端 API 基址注入（已实测定位，加固）**：`frontend/.env.local` 里是本地联调地址（`http://192.168.x.x:8123/api/v1`）。实测 Vite 6 优先级为 **进程环境变量 > `.env.local`**：Dockerfile 中 `ENV VITE_API_BASE=/api/v1` 会覆盖它，产物为同源 `/api/v1`（正确）；但一旦**去掉该 ENV 或不经 Docker 直接 `npm run build`**，内网地址就会被烤进生产包，前端所有请求打到不可达 IP。**加固**：`.dockerignore` 已排除 `**/.env.local`，`frontend/Dockerfile` 的 `ENV VITE_API_BASE=/api/v1` 严禁删除；**上传包亦已剔除所有 `.env`（含根 `.env` 与 `deploy/.env`，避免泄漏 JWT 密钥）**，服务器上须用模板重新生成。

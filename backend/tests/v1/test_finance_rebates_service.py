@@ -174,14 +174,14 @@ def test_rate_from_snapshot_bad_value():
 
 
 # ----------------------------------------------------- 返点类型与订单类型约束
-def test_create_rebate_buy_requires_hs_or_th(seeded_db):
+def test_create_rebate_buy_requires_hs_th_dfq(seeded_db):
     order_id = _order_with_sell(seeded_db)  # DG 订单已 ACTIVE
-    with pytest.raises(Validation, match="买号返点只能关联回收（HS）或提号（TH）"):
+    with pytest.raises(Validation, match="买号返点只能关联回收、提号或代分期"):
         rebates.create_rebate(
             seeded_db, source_order_id=order_id, rebate_type="BUY",
             base_amount=Decimal("1000"), rate=Decimal("5"),
             collected_on=TODAY, actor="pytest",
-        )  # 买号返点仅限 HS/TH，DG 不可
+        )  # 买号返点仅限 HS/TH/DFQ（代分期为垫资买入），DG 不可
 
 
 def test_create_rebate_buy_allows_th(seeded_db):

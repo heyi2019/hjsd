@@ -202,6 +202,9 @@ docker compose restart backend     # 服务需重启才会加载被替换的库�
 
 1. **JWT_SECRET_KEY 必须替换**，否则任何人可伪造 token。
 2. **CORS_ORIGINS**：前端经 nginx 同源反代访问 API，浏览器不跨域，**留空即可**（留空 = 不启用 CORS，是正确状态）；仅当前端独立域名时才填真实来源，生产禁止 `*`（启动校验会拒绝）。
-3. **正式库**：当前正式环境为 ECS 上的 SQLite v1 持久化库，部署前由脚本执行 `alembic upgrade head` 并保留数据卷，随后预置经营规则定义（幂等）；PostgreSQL 仅作为后续迁移目标，迁移完成前不得直接切换。
-4. **备份**：用 `scripts/backup_db.py` 做在线快照（见第六节），不要 `tar` 运行中的 `data/` 卷；换 PG 后改用 `pg_dump`。
-5. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离，配置已强制校验，勿手动改 `DATABASE_URL` 指向旧库。
+3. **公网 IP 不是 HTTPS**：`http://<ECS公网IP>` 仅适合临时受控验收；账号密码和令牌不能在这种连接上长期传输。正式开放前必须绑定域名、签发证书，并强制将 80 跳转到 443。裸 IP 通常无法取得受浏览器信任的 TLS 证书。
+4. **安全组最小开放**：80/443 可对公网开放；SSH 22 必须仅允许运维人员的固定公网 IP。不要将 8123、数据库端口或 Docker API 映射/开放到公网。
+5. **网关防护已内置**：Nginx 会限制单 IP 并发、对 API 限流，并对登录接口执行更严格的限流（超额返回 429）；同时发送防点击劫持、MIME 嗅探和权限策略响应头。生产 API 文档（`/docs`、`/redoc`、`/openapi.json`）已关闭。
+6. **正式库**：当前正式环境为 ECS 上的 SQLite v1 持久化库，部署前由脚本执行 `alembic upgrade head` 并保留数据卷，随后预置经营规则定义（幂等）；PostgreSQL 仅作为后续迁移目标，迁移完成前不得直接切换。
+7. **备份**：用 `scripts/backup_db.py` 做在线快照（见第六节），不要 `tar` 运行中的 `data/` 卷；换 PG 后改用 `pg_dump`。
+8. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离，配置已强制校验，勿手动改 `DATABASE_URL` 指向旧库。

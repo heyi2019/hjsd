@@ -12,8 +12,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 # 先装依赖（利用层缓存）
 # 用阿里云 pypi 镜像：ECS 直连 pypi.org 实测仅 ~15kB/s，慢到不可用；镜像可达且快。
+# requirements.txt 仅含运行时依赖；pandas/numpy(160MB) 与 pytest 系已移到 requirements-dev.txt。
+# 装完卸载 pip 本身：运行期不再需要包管理器，省约 7MB。
 COPY requirements.txt .
-RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt \
+    && pip uninstall -y pip \
+    && rm -rf /root/.cache/pip /tmp/*
 
 # 再拷源码（.dockerignore 已排除 .venv / data / .env）
 COPY . .

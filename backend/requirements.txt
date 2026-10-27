@@ -1,3 +1,6 @@
+# 生产运行时依赖 —— docker 镜像只装这一份。
+# 测试/开发工具见 requirements-dev.txt，不要混进来：
+# 曾经混装的 pandas+numpy（160MB）与 pytest 系在 app/ 内零引用，纯属镜像膨胀。
 fastapi==0.116.2
 starlette==0.48.0
 anyio==4.14.0
@@ -6,11 +9,5 @@ sqlalchemy==2.0.35
 alembic>=1.13.0
 pydantic==2.9.2
 pydantic-settings==2.4.0
-pandas==2.2.2
-openpyxl==3.1.5
-httpx==0.27.2
-pytest>=8.0.0
-pytest-xdist==3.8.0
-coverage>=7.0.0
-pyflakes>=3.2.0
+# FastAPI 解析 multipart/form-data 的隐式依赖，卸载后上传类端点会 500，勿删
 python-multipart==0.0.12

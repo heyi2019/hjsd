@@ -7,7 +7,7 @@ FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py
 ```bash
 # 0) 环境（一次性）
 python3 -m venv backend/.venv
-backend/.venv/bin/pip install -r backend/requirements.txt
+backend/.venv/bin/pip install -r backend/requirements-dev.txt
 cd frontend && npm install && cd ..
 
 # 1) 配置（一次性）—— .env 必须在**仓库根目录**

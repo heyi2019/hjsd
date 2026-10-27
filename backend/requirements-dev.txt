@@ -1,0 +1,11 @@
+# 开发与测试依赖：CI、本地回归、覆盖率门禁、变异验证都装这一份。
+# 用法：pip install -r requirements-dev.txt
+-r requirements.txt
+pytest>=8.0.0
+pytest-xdist==3.8.0
+coverage>=7.0.0
+pyflakes>=3.2.0
+# FastAPI TestClient 的传输层依赖（app/ 内不直接 import，但测试需要）
+httpx==0.27.2
+# 只在批量导入 Excel 场景才需要；当前代码库零引用，按需再开
+openpyxl==3.1.5

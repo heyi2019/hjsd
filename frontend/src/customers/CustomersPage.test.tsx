@@ -197,3 +197,63 @@ describe("CustomersPage：客户档案", () => {
     expect(within(drawer).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
   });
 });
+
+describe("CustomersPage：联系方式脱敏与按需查看", () => {
+  const masked = {
+    ...customers[0],
+    phone: "138****8888",
+    wechat: "zh***",
+    qq: "1***1",
+    contact_masked: true,
+  };
+  const revealedCustomer = {
+    ...masked,
+    phone: "13800008888",
+    wechat: "zhangsan",
+    qq: "10001",
+    contact_masked: false,
+  };
+
+  it("脱敏行先显示打码值，点「查看」才向后端要明文并就地替换", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.customersApi.list).mockResolvedValue([masked]);
+    vi.mocked(catalog.customersApi.get).mockResolvedValue(revealedCustomer);
+    renderLight(<CustomersPage />, { user: "admin" });
+
+    expect(await screen.findByText("138****8888")).toBeInTheDocument();
+    // 未点查看前，明文不应出现在页面上
+    expect(screen.queryByText("13800008888")).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: /查看/ })[0]);
+
+    await waitFor(() => expect(catalog.customersApi.get).toHaveBeenCalledWith(1, true));
+    expect(await screen.findByText("13800008888")).toBeInTheDocument();
+    // 三个联系字段一起放开
+    expect(screen.getByText("zhangsan")).toBeInTheDocument();
+    expect(screen.getByText("10001")).toBeInTheDocument();
+  });
+
+  it("脱敏且未查看时，编辑保存不提交联系方式，避免打码值覆盖真实号码", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.customersApi.list).mockResolvedValue([masked]);
+    vi.mocked(catalog.customersApi.patch).mockResolvedValue(masked);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("138****8888");
+
+    await user.click(screen.getAllByRole("button", { name: /详情/ })[0]);
+    const drawer = await screen.findByRole("dialog");
+    await user.click(within(drawer).getByRole("button", { name: /编辑/ }));
+
+    const nameInput = await screen.findByLabelText("名字");
+    await user.clear(nameInput);
+    await user.type(nameInput, "张三改");
+    await user.click(screen.getByRole("button", { name: /保存/ }));
+
+    await waitFor(() => expect(catalog.customersApi.patch).toHaveBeenCalled());
+    const payload = vi.mocked(catalog.customersApi.patch).mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.display_name).toBe("张三改");
+    expect(payload).not.toHaveProperty("phone");
+    expect(payload).not.toHaveProperty("wechat");
+    expect(payload).not.toHaveProperty("qq");
+  });
+});

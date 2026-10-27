@@ -7,7 +7,7 @@ import { SearchOutlined } from "@ant-design/icons";
 // 用别名避免 ui_guards 的字面量误伤（SearchButton 与 Button 是同一组件引用）。
 const SearchButton = Button;
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   counterpartiesApi,
   customersApi,
@@ -71,6 +71,8 @@ function MobileCustomerList(props: {
   onDetail: (row: Customer) => void;
   onMerge: (row: Customer) => void;
   onDisable: (row: Customer) => void;
+  /** 手机号脱敏时由父级注入「查看」入口，移动端不重复实现取数逻辑。 */
+  renderPhone: (row: Customer) => ReactNode;
 }) {
   if (!props.rows.length) return <div className="customers-mobile-empty muted">暂无客户档案</div>;
   return (
@@ -78,7 +80,7 @@ function MobileCustomerList(props: {
       {props.rows.map((row) => (
         <article className="customers-mobile-card" key={row.id}>
           <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} optionSet="CUSTOMER_STATUS" /></div>
-          <dl><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div><div><dt>手机</dt><dd>{row.phone || "-"}</dd></div></dl>
+          <dl><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div><div><dt>手机</dt><dd>{props.renderPhone(row)}</dd></div></dl>
           <Space size="small">
             <PermissionButton permission="customer.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
             <PermissionButton permission="customer.merge" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onMerge(row)}>合并</PermissionButton>
@@ -202,6 +204,9 @@ function CustomerPanel() {
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  /** 点「查看」后取到的完整联系方式，仅存活于当前会话内存（刷新即回到脱敏值）。 */
+  const [revealed, setRevealed] = useState<Record<number, Customer>>({});
+  const [revealingId, setRevealingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -260,6 +265,40 @@ function CustomerPanel() {
     }
   };
 
+  /** 后端默认脱敏；点「查看」才取明文，后端同时写一条 CONTACT_READ 审计。 */
+  const revealContact = async (id: number) => {
+    setRevealingId(id);
+    try {
+      const full = await customersApi.get(id, true);
+      setRevealed((prev) => ({ ...prev, [id]: full }));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setRevealingId(null);
+    }
+  };
+
+  /** 联系方式单元格：脱敏值 + 「查看」入口；无 contact.read 权限的人拿不到按钮，也拿不到明文。 */
+  const renderContact = (row: Customer, field: "phone" | "wechat" | "qq") => {
+    const full = revealed[row.id];
+    const value = (full ?? row)[field];
+    if (!row.contact_masked || full) return value || "-";
+    return (
+      <Space size={4}>
+        <span>{value || "-"}</span>
+        <PermissionButton
+          permission="customer.contact.read"
+          type="link"
+          size="small"
+          loading={revealingId === row.id}
+          onClick={() => void revealContact(row.id)}
+        >
+          查看
+        </PermissionButton>
+      </Space>
+    );
+  };
+
   const submitCreate = async (values: Record<string, unknown>) => {
     try {
       const extraValues = collectExtras(values, activeDefs);
@@ -289,12 +328,18 @@ function CustomerPanel() {
     if (!editTarget) return;
     try {
       const extraValues = collectExtras(values, activeDefs);
+      // 脱敏值不可回写：未取得明文时不提交联系方式，避免把 138****1234 覆盖进库。
+      const contactsVisible = !editTarget.contact_masked || Boolean(revealed[editTarget.id]);
       await customersApi.patch(editTarget.id, {
         display_name: values.display_name as string,
         contact_name: values.contact_name as string,
-        phone: values.phone as string,
-        wechat: values.wechat as string,
-        qq: values.qq as string,
+        ...(contactsVisible
+          ? {
+              phone: values.phone as string,
+              wechat: values.wechat as string,
+              qq: values.qq as string,
+            }
+          : {}),
         note: (values.note as string) || null,
         extra_values: extraValues,
       });
@@ -327,9 +372,9 @@ function CustomerPanel() {
   const columns: ColumnsType<Customer> = [
     { title: "客户编号", dataIndex: "customer_no" },
     { title: "名字", dataIndex: "display_name" },
-    { title: "手机", dataIndex: "phone" },
-    { title: "微信", dataIndex: "wechat" },
-    { title: "QQ", dataIndex: "qq" },
+    { title: "手机", render: (_v, row) => renderContact(row, "phone") },
+    { title: "微信", render: (_v, row) => renderContact(row, "wechat") },
+    { title: "QQ", render: (_v, row) => renderContact(row, "qq") },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
     {
       title: "扩展字段",
@@ -459,6 +504,7 @@ function CustomerPanel() {
         rows={rows}
         onDetail={(row) => void openDetail(row)}
         onMerge={setMergeTarget}
+        renderPhone={(row) => renderContact(row, "phone")}
         onDisable={async (row) => {
           await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
           message.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
@@ -532,9 +578,10 @@ function CustomerPanel() {
               ? {
                   display_name: editTarget.display_name,
                   contact_name: editTarget.contact_name ?? "",
-                  phone: editTarget.phone ?? "",
-                  wechat: editTarget.wechat ?? "",
-                  qq: editTarget.qq ?? "",
+                  // 点过「查看」则用明文填表，否则留空——脱敏值不能进编辑表单。
+                  phone: (revealed[editTarget.id] ?? editTarget).phone ?? "",
+                  wechat: (revealed[editTarget.id] ?? editTarget).wechat ?? "",
+                  qq: (revealed[editTarget.id] ?? editTarget).qq ?? "",
                   note: editTarget.note ?? "",
                   ...Object.fromEntries(
                     activeDefs.map((def) => [def.field_key, editTarget.extra_values?.[def.field_key]]),
@@ -612,9 +659,9 @@ function CustomerPanel() {
               <Descriptions.Item label="客户编号">{detailTarget.customer_no}</Descriptions.Item>
               <Descriptions.Item label="名字">{detailTarget.display_name}</Descriptions.Item>
               <Descriptions.Item label="联系人">{detailTarget.contact_name || "-"}</Descriptions.Item>
-              <Descriptions.Item label="手机">{detailTarget.phone || "-"}</Descriptions.Item>
-              <Descriptions.Item label="微信">{detailTarget.wechat || "-"}</Descriptions.Item>
-              <Descriptions.Item label="QQ">{detailTarget.qq || "-"}</Descriptions.Item>
+              <Descriptions.Item label="手机">{detailTarget ? renderContact(detailTarget, "phone") : "-"}</Descriptions.Item>
+              <Descriptions.Item label="微信">{detailTarget ? renderContact(detailTarget, "wechat") : "-"}</Descriptions.Item>
+              <Descriptions.Item label="QQ">{detailTarget ? renderContact(detailTarget, "qq") : "-"}</Descriptions.Item>
               <Descriptions.Item label="状态">
                 <StatusTag status={detailTarget.status} optionSet="CUSTOMER_STATUS" />
               </Descriptions.Item>

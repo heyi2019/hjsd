@@ -722,7 +722,7 @@ export function FundsPage() {
                   emptyText="尚未配置资金池"
                   loading={loading}
                   onPageChange={() => undefined}
-                scroll={{ x: "max-content" }}/>
+                />
               </Card>
             ),
           },
@@ -769,7 +769,7 @@ export function FundsPage() {
                   emptyText="暂无资金流水"
                   loading={loading}
                   onPageChange={() => undefined}
-                scroll={{ x: "max-content" }}/>
+                />
               </Card>
             ),
           },
@@ -799,7 +799,7 @@ export function FundsPage() {
                   emptyText="暂无押金占用"
                   loading={loading}
                   onPageChange={() => undefined}
-                scroll={{ x: "max-content" }}/>
+                />
               </Card>
             ),
           },
@@ -820,7 +820,7 @@ export function FundsPage() {
                   emptyText="暂无对账记录"
                   loading={loading}
                   onPageChange={() => undefined}
-                scroll={{ x: "max-content" }}/>
+                />
               </Card>
             ),
           },
@@ -839,7 +839,7 @@ export function FundsPage() {
                   emptyText="暂无单边划转异常"
                   loading={loading}
                   onPageChange={() => undefined}
-                   scroll={{ x: "max-content" }} />
+                   />
                 </Card>
                 <Card className="glass" title="月结锁定" extra={<PermissionButton permission="finance.period.lock" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
                   <DataTable
@@ -851,7 +851,7 @@ export function FundsPage() {
                     emptyText="暂无已锁定账期"
                     loading={loading}
                     onPageChange={() => undefined}
-                   scroll={{ x: "max-content" }} />
+                   />
                 </Card>
               </div>
             ),
@@ -1134,7 +1134,7 @@ export function FundsPage() {
           total={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)).length : 0}
           emptyText="当前列表未加载到对应流水"
           onPageChange={() => undefined}
-        scroll={{ x: "max-content" }}/>
+        />
       </Modal>
     </section>
   );

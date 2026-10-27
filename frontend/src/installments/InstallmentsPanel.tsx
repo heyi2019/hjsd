@@ -91,6 +91,7 @@ function ContractTable({
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const compact = useCompactLayout();
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [payForm] = Form.useForm();
@@ -867,10 +868,10 @@ function MobileInstallmentList({
               <div><dt>对方</dt><dd>{order?.party_name || "-"}</dd></div>
               <div><dt>总应收</dt><dd><MoneyText value={receivable(row).toFixed(2)} /></dd></div>
               <div><dt>已收</dt><dd><MoneyText value={row.paid_amount} /></dd></div>
-              <div><dt>坏账</dt><dd><MoneyText value={row.bad_debt} /></dd></div>
+              <div><dt>坏账</dt><dd><MoneyText value={row.bad_debt_amount ?? "0"} /></dd></div>
               <div>
                 <dt>剩余</dt>
-                <dd><MoneyText value={(receivable(row) - Number(row.paid_amount) - Number(row.bad_debt)).toFixed(2)} /></dd>
+                <dd><MoneyText value={(receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)).toFixed(2)} /></dd>
               </div>
             </dl>
             <Space size={2}>

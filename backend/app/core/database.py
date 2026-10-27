@@ -47,20 +47,44 @@ def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
     return create_engine(target, **kwargs)
 
 
-@event.listens_for(Engine, "connect")
-def _enable_sqlite_foreign_keys(dbapi_connection: Any, connection_record: Any) -> None:
-    """SQLite 连接级 PRAGMA：外键 + WAL。
+def _sqlite_pragma_statements(settings: Settings | None = None) -> list[str]:
+    """连接级 PRAGMA 清单（顺序敏感：journal_mode 必须在 synchronous 之前）。
 
-    - 外键默认关闭，不开启会导致 cascade 失效、脏行留存；
-    - journal_mode 默认 delete（读写互斥），改 WAL 后读不阻塞写、写不阻塞读。
-      该设置持久化在库头，此处每次连接再声明一次，保证新建库/临时库同样生效。
+    参数全部来自 `core.settings`，可按环境覆盖；`0` 表示不改该项、沿用 SQLite 默认。
+    """
+    cfg = settings or get_settings()
+    statements = [
+        # 外键默认关闭，不开启会导致 cascade 失效、脏行留存。
+        "PRAGMA foreign_keys=ON",
+        # delete 模式下读写互斥；WAL 下读不阻塞写、写不阻塞读。
+        "PRAGMA journal_mode=WAL",
+        # 必须在设 WAL 之后：切日志模式本身会重置该连接的回滚日志强度。
+        f"PRAGMA synchronous={cfg.sqlite_synchronous}",
+        f"PRAGMA temp_store={cfg.sqlite_temp_store}",
+    ]
+    if cfg.sqlite_cache_size_kb > 0:
+        # SQLite 负值表示 KB（正值是页数，会随 page_size 变化，不直观）。
+        statements.append(f"PRAGMA cache_size=-{cfg.sqlite_cache_size_kb}")
+    if cfg.sqlite_mmap_size_mb > 0:
+        statements.append(f"PRAGMA mmap_size={cfg.sqlite_mmap_size_mb * 1024 * 1024}")
+    return statements
+
+
+@event.listens_for(Engine, "connect")
+def _apply_sqlite_pragmas(dbapi_connection: Any, connection_record: Any) -> None:
+    """SQLite 连接级 PRAGMA：外键、WAL 与运行参数。
+
+    这些 PRAGMA 大多是**连接级**的（除 journal_mode 持久化在库头），
+    因此必须挂在 connect 事件上，池中每新建一条连接都要重新声明。
+    测试库会在自己的引擎上再挂一个监听覆盖本函数（见 tests/v1/conftest.py），
+    以 OFF/MEMORY 换取跑测速度——两者不冲突，后注册者生效。
     """
     if dbapi_connection.__class__.__module__ not in {"sqlite3", "pysqlite2.dbapi2"}:
         return
     try:
         cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA journal_mode=WAL")
+        for statement in _sqlite_pragma_statements():
+            cursor.execute(statement)
         cursor.close()
     except Exception:  # pragma: no cover - 非 SQLite 方言直接忽略
         pass

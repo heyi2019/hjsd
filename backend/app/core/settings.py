@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     # database（先 SQLite；生产换 PostgreSQL URL，业务代码零改动）
     database_url: str = f"sqlite:///./{DEFAULT_DEV_DB_RELPATH}"
 
+    # SQLite 运行参数（连接级 PRAGMA；非 SQLite 库自动忽略）
+    # synchronous：WAL 下 SQLite 官方推荐 NORMAL——提交不再逐次 fsync，
+    #   断电最多丢最后一个已提交事务，库本身不会损坏。要绝对持久性可设 FULL。
+    # cache_size_kb：页缓存（负 PRAGMA 的 KB 形式）；0 表示沿用 SQLite 默认 2MB。
+    # mmap_size_mb：只读映射窗口，0 表示关闭（SQLite 默认）。
+    # temp_store：排序/临时表位置，MEMORY 避免报表排序写盘。
+    sqlite_synchronous: str = "NORMAL"
+    sqlite_cache_size_kb: int = 16000
+    sqlite_mmap_size_mb: int = 64
+    sqlite_temp_store: str = "MEMORY"
+
     # cors（逗号分隔）：显式白名单，任何环境都生效
     cors_origins: str = (
         "http://localhost:5173,http://127.0.0.1:5173,"
@@ -107,6 +118,30 @@ class Settings(BaseSettings):
                 f"DATABASE_URL 不得指向旧库 {filename}；"
                 "v1 必须使用独立数据库（建议使用 data/heijin_erp_v1.db）"
             )
+        return value
+
+    @field_validator("sqlite_synchronous")
+    @classmethod
+    def _validate_synchronous(cls, value: str) -> str:
+        """只接受 SQLite 认识的四档，避免拼错后 PRAGMA 静默失效。"""
+        normalized = value.strip().upper()
+        if normalized not in {"OFF", "NORMAL", "FULL", "EXTRA"}:
+            raise ValueError("SQLITE_SYNCHRONOUS 只允许 OFF/NORMAL/FULL/EXTRA")
+        return normalized
+
+    @field_validator("sqlite_temp_store")
+    @classmethod
+    def _validate_temp_store(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"MEMORY", "FILE"}:
+            raise ValueError("SQLITE_TEMP_STORE 只允许 MEMORY/FILE")
+        return normalized
+
+    @field_validator("sqlite_cache_size_kb", "sqlite_mmap_size_mb")
+    @classmethod
+    def _validate_sqlite_sizes(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("SQLite 缓存 / mmap 尺寸不得为负数（0 表示不覆盖）")
         return value
 
     @staticmethod

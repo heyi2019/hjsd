@@ -141,3 +141,39 @@ def test_dev_wildcard_can_be_disabled():
     """显式关闭开关后立即收紧，便于生产或收紧策略。"""
     settings = Settings(app_env="development", cors_dev_allow_any_local_port=False)
     assert settings.cors_origin_regex is None
+
+
+class TestSqliteRuntimeKnobs:
+    """SQLite 运行参数可配可回退：默认走 WAL 推荐值，写错立即报错而非静默失效。"""
+
+    def test_defaults_match_wal_recommendation(self):
+        settings = Settings()
+        assert settings.sqlite_synchronous == "NORMAL"
+        assert settings.sqlite_cache_size_kb == 16000
+        assert settings.sqlite_mmap_size_mb == 64
+        assert settings.sqlite_temp_store == "MEMORY"
+
+    def test_values_are_normalized_and_env_overridable(self, monkeypatch):
+        monkeypatch.setenv("SQLITE_SYNCHRONOUS", "full")
+        monkeypatch.setenv("SQLITE_TEMP_STORE", "file")
+        monkeypatch.setenv("SQLITE_CACHE_SIZE_KB", "0")
+        monkeypatch.setenv("SQLITE_MMAP_SIZE_MB", "128")
+        settings = Settings()
+        assert settings.sqlite_synchronous == "FULL"
+        assert settings.sqlite_temp_store == "FILE"
+        assert settings.sqlite_cache_size_kb == 0
+        assert settings.sqlite_mmap_size_mb == 128
+
+    @pytest.mark.parametrize(
+        ("field", "value"), [("sqlite_synchronous", "FAST"), ("sqlite_temp_store", "DISK")]
+    )
+    def test_unknown_enum_is_rejected(self, field, value):
+        """拼错必须炸：PRAGMA 写错在 SQLite 里是静默无效，只能靠这里兜住。"""
+        with pytest.raises(ValidationError):
+            Settings(**{field: value})
+
+    @pytest.mark.parametrize("field", ["sqlite_cache_size_kb", "sqlite_mmap_size_mb"])
+    def test_negative_sizes_are_rejected(self, field):
+        with pytest.raises(ValidationError):
+            Settings(**{field: -1})
+

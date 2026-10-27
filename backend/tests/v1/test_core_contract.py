@@ -420,7 +420,54 @@ class TestDatabaseLifecycle:
         class _FakeConnection:
             __class__ = type("FakeConnection", (), {"__module__": "psycopg"})
 
-        assert database._enable_sqlite_foreign_keys(_FakeConnection(), None) is None
+        assert database._apply_sqlite_pragmas(_FakeConnection(), None) is None
+
+    def test_sqlite_pragma_statements_order_and_knobs(self):
+        """journal_mode 必须先于 synchronous；0 表示不覆盖，便于回退到 SQLite 默认。"""
+        custom = settings_module.Settings(
+            sqlite_synchronous="full",
+            sqlite_cache_size_kb=0,
+            sqlite_mmap_size_mb=0,
+            sqlite_temp_store="file",
+        )
+        statements = database._sqlite_pragma_statements(custom)
+        assert statements == [
+            "PRAGMA foreign_keys=ON",
+            "PRAGMA journal_mode=WAL",
+            "PRAGMA synchronous=FULL",
+            "PRAGMA temp_store=FILE",
+        ]
+        assert statements.index("PRAGMA journal_mode=WAL") < statements.index(
+            "PRAGMA synchronous=FULL"
+        )
+        # 缺省走 WAL 推荐组合
+        default = database._sqlite_pragma_statements(settings_module.Settings())
+        assert "PRAGMA cache_size=-16000" in default
+        assert "PRAGMA mmap_size=67108864" in default
+
+    def test_sqlite_pragmas_are_applied_on_every_connection(self, tmp_path):
+        """连接级参数必须挂 connect 事件：池里每新建一条连接都要重新声明。"""
+        engine = database.build_engine(f"sqlite:///{tmp_path / 'pragma.sqlite'}")
+        cfg = settings_module.get_settings()
+        expect_sync = {"OFF": 0, "NORMAL": 1, "FULL": 2, "EXTRA": 3}[cfg.sqlite_synchronous]
+        try:
+            for _ in range(2):  # 第二次走到池内复用/新建，值仍需一致
+                with engine.connect() as conn:
+                    assert conn.exec_driver_sql("PRAGMA journal_mode").scalar() == "wal"
+                    assert conn.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
+                    assert conn.exec_driver_sql("PRAGMA synchronous").scalar() == expect_sync
+                    expect_temp = 2 if cfg.sqlite_temp_store == "MEMORY" else 1
+                    assert conn.exec_driver_sql("PRAGMA temp_store").scalar() == expect_temp
+                    if cfg.sqlite_cache_size_kb:
+                        assert conn.exec_driver_sql("PRAGMA cache_size").scalar() == (
+                            -cfg.sqlite_cache_size_kb
+                        )
+                    if cfg.sqlite_mmap_size_mb:
+                        assert conn.exec_driver_sql("PRAGMA mmap_size").scalar() == (
+                            cfg.sqlite_mmap_size_mb * 1024 * 1024
+                        )
+        finally:
+            engine.dispose()
 
     def test_session_factory_defaults_to_engine_singleton(self, tmp_path, monkeypatch):
         engine = create_engine(f"sqlite:///{tmp_path / 'db3.sqlite'}")

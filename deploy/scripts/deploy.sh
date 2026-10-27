@@ -26,6 +26,29 @@ fi
 export APP_VERSION
 echo "==> 发布版本 V${APP_VERSION}（镜像 tag 同此值）"
 
+# 离线路径：ERP_SKIP_BUILD=1 表示镜像已由 docker load 导入，不走构建。
+# 价值在于彻底切断「ECS 必须能访问 Docker Hub / alpine 源 / pypi / npm」这条链——
+# 镜像在联网机器上构建完毕，ECS 只做 load，四个网络依赖全部归零。
+if [ "${ERP_SKIP_BUILD:-0}" = "1" ]; then
+  echo "==> 离线模式：跳过构建，校验已导入镜像"
+  for svc in backend frontend; do
+    img="heijin-${svc}:${APP_VERSION}"
+    if ! docker image inspect "$img" >/dev/null 2>&1; then
+      echo "✗ 缺少镜像 ${img}" >&2
+      echo "  请先导入离线包：gunzip -c heijin-images-${APP_VERSION}-amd64.tar.gz | docker load" >&2
+      exit 1
+    fi
+    # 架构必须逐字节对上：arm64 镜像在 x86_64 上会 exec format error，
+    # 而 compose 的启动报错只显示 exit 1，很难联想到架构。
+    arch="$(docker image inspect "$img" --format '{{.Architecture}}')"
+    if [ "$arch" != "amd64" ]; then
+      echo "✗ ${img} 架构为 ${arch}，本机需要 amd64" >&2
+      echo "  请在联网的 x86_64 机器上构建，或用 buildx --platform linux/amd64 交叉构建后导出" >&2
+      exit 1
+    fi
+    echo "  ✓ ${img} (${arch})"
+  done
+else
 # 基础镜像预检：Docker Hub 在部分网络（尤其 ECS 国内节点）不可达，而失败点落在 Dockerfile
 # 的 FROM 行、报错形似代码问题（TLS handshake timeout）。这里提前拉取，把网络问题变成明示。
 echo "==> 检查基础镜像"
@@ -59,6 +82,7 @@ done
 
 echo "==> 构建镜像"
 docker compose build
+fi
 
 if docker compose run --rm backend test -f /app/data/heijin_erp_v1.db; then
   echo "==> 迁移前备份正式库"

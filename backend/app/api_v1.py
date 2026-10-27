@@ -99,10 +99,16 @@ def install_exception_handlers(app: FastAPI) -> None:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    docs_url = "/docs" if settings.is_development else None
+    redoc_url = "/redoc" if settings.is_development else None
+    openapi_url = "/openapi.json" if settings.is_development else None
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         description="宜游轩 ERP v1.0（业务规则以 docs/ERP_PRD_v1.0.md 为准）",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
     )
 
     origin_regex = settings.cors_origin_regex

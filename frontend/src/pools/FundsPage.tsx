@@ -429,9 +429,15 @@ export function FundsPage() {
   }, [cashflows]);
 
   const poolColumns: ColumnsType<Pool> = [
-    { title: "资金池", dataIndex: "name", render: (_v, row) => `${row.name}（${row.code}）` },
-    { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
-    { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
+    {
+      title: "资金池",
+      dataIndex: "name",
+      render: (_v, row) => `${row.name}（${row.code}）`,
+      className: "ui-col-wrap",
+      onCell: () => ({ className: "ui-col-wrap" }),
+    },
+    { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "收入",
       align: "right",
@@ -444,6 +450,8 @@ export function FundsPage() {
     },
     {
       title: "押金",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       align: "right",
       render: (_v, row) => <MoneyText value={balances[row.id]?.deposit_held} />,
     },

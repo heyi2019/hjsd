@@ -174,7 +174,8 @@
     margin: 0;
     font: var(--font-caption);
   }
-  .orders-mobile-card__meta dt { color: var(--color-text-secondary); }
+  /* 标签列被长值挤压会折成两行（「对方/来源」→「对方/来」+「源」）。标签固定不收缩，值自己折。 */
+  .orders-mobile-card__meta dt { color: var(--color-text-secondary); flex: 0 0 auto; white-space: nowrap; }
   .orders-mobile-card__meta dd { margin: 0; color: var(--color-text-primary); }
   .orders-mobile-card .ant-btn { justify-self: start; min-height: var(--ui-control-height); padding-inline: 0; }
   .orders-mobile-empty {
@@ -244,6 +245,20 @@
   .ant-table col[style] { width: auto !important; }
   /* 操作列一排按钮会把列撑到 600px+；移动端允许换行，换取横向大幅收窄（纵向排布可接受）。 */
   .ant-table-tbody .ant-space { flex-wrap: wrap; }
+  /* 全站表格默认 white-space: nowrap（legacy 基础样式），长文本列会按 max-content 把表撑宽
+     （实测「投资款荷包（HJ_INVEST）」单列即占 328px）。
+     只在明确打了 ui-col-wrap 的列放开换行，不做全局放开——全局会连带把业务台账移动卡片
+     的「对方/来源」这类标签折成两行。 */
+  .ant-table-thead > tr > th.ui-col-wrap,
+  .ant-table-tbody > tr > td.ui-col-wrap { white-space: normal; word-break: break-word; min-width: 120px; }
+  /* antd Segmented 不像 Tabs 自带横向滚动：选项多时会把容器顶出屏外并被父级裁掉
+     （实测业务中心的「全部/回收/提号/…」溢出 28–30px）。
+     不用横滚而用换行：Segmented 没有 Tabs 的「…」折叠入口，横滚会把末项切在卡片
+     边缘且无任何可滚提示，看起来像坏版；筛选项通常不超过 6 个，换一行即可全见。 */
+  .ant-segmented { max-width: 100%; }
+  .ant-segmented-group { flex-wrap: wrap; }
+  .ant-segmented-item { flex: 0 0 auto; }
+  .ant-segmented-item-label { white-space: nowrap; }
 }
 
 @media (max-width: 640px) {

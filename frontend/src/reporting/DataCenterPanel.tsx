@@ -78,8 +78,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     },
     {
       title: "状态",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
+
       dataIndex: ["pool", "status"],
       width: 110,
       render: (status: string) => <StatusTag status={status} />,
@@ -96,8 +95,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     },
     {
       title: "押金",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
+
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.deposit_held} />,
     },

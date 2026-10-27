@@ -211,19 +211,17 @@ function InventoryReport() {
     { title: "平台", dataIndex: "platform", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     { title: "买入", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "附加成本", dataIndex: "extra_cost", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "附加成本", dataIndex: "extra_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "占用成本",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
+
       dataIndex: "total_cost",
       align: "right",
       render: (v: string) => <MoneyText value={v} strong />,
     },
     {
       title: "持有天数",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
+
       dataIndex: "holding_days",
       align: "right",
       width: 100,
@@ -267,9 +265,9 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
   const columns: ColumnsType<MonthlyPnlRow> = [
     { title: "月份", dataIndex: "month", width: 110 },
     { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "账号直接成本", dataIndex: "account_direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "账号直接成本", dataIndex: "account_direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "经营利润",
       dataIndex: "operating_profit",
@@ -311,10 +309,10 @@ function Commission({ range }: { range: ReportRange }) {
   const columns: ColumnsType<CommissionRow> = [
     { title: "人员 ID", dataIndex: "user_id", width: 100 },
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "费率", dataIndex: "rate", align: "right", width: 90, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "费率", dataIndex: "rate", align: "right", width: 90},
     { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "差异",
       dataIndex: "difference",
@@ -357,12 +355,12 @@ function DailyFunds() {
   );
   const columns: ColumnsType<DailyFundsRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 150 },
-    { title: "名称", dataIndex: "pool_name", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "名称", dataIndex: "pool_name"},
+    { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "可用余额",
       dataIndex: "available",
@@ -408,9 +406,9 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
   const columns: ColumnsType<FinanceDimensionRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 130 },
     { title: "资金性质", dataIndex: "fund_nature", width: 120, render: (v: string) => FUND_NATURE_LABEL[v] ?? v },
-    { title: "核算属性", dataIndex: "accounting_attribute", width: 160, render: (v: string) => ACCOUNTING_ATTRIBUTE_LABEL[v] ?? v, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "现金方向", dataIndex: "direction", width: 90, render: (v: string) => v === "IN" ? "收入" : "支出", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "笔数", dataIndex: "flow_count", align: "right", width: 80, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "核算属性", dataIndex: "accounting_attribute", width: 160, render: (v: string) => ACCOUNTING_ATTRIBUTE_LABEL[v] ?? v},
+    { title: "现金方向", dataIndex: "direction", width: 90, render: (v: string) => v === "IN" ? "收入" : "支出"},
+    { title: "笔数", dataIndex: "flow_count", align: "right", width: 80},
     { title: "发生额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "净方向金额", dataIndex: "signed_amount", align: "right", render: (v: string) => <MoneyText value={v} tone="auto" strong /> },
   ];
@@ -453,15 +451,15 @@ function BusinessPnl({ range }: { range: ReportRange }) {
       render: (v: string, row) => `${BUSINESS_MODE_LABEL[row.business_mode ?? ""] ?? "-"}·${BUSINESS_TYPE_LABEL[row.business_type ?? ""] ?? ORDER_TYPE_LABEL[v] ?? v}（${v}）`,
     },
     { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "主营毛利",
       dataIndex: "main_profit",
       align: "right",
       render: (v: string) => <MoneyText value={v} tone="auto" strong />,
     },
-    { title: "已结算返点", dataIndex: "settled_rebate", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "未归集返点", dataIndex: "uncollected_rebate", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "已结算返点", dataIndex: "settled_rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "未归集返点", dataIndex: "uncollected_rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "完整收益",
       dataIndex: "full_income",
@@ -506,12 +504,12 @@ function OrderProfit({ range }: { range: ReportRange }) {
   );
   const columns: ColumnsType<OrderProfitRow> = [
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）`, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）`},
     { title: "成交日", dataIndex: "trade_date", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "直接成本", dataIndex: "direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "返点", dataIndex: "rebate", align: "right", render: (v: string) => <MoneyText value={v} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "直接成本", dataIndex: "direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "返点", dataIndex: "rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "净利",
       dataIndex: "net_profit",

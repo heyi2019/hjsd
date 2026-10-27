@@ -94,6 +94,8 @@ export default defineConfig({
           name: "react",
           sequence: { groupOrder: 3 },
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          // [2026-10-27 提速] .deep 重型深度用例从 react 层剥离，独立成 react-deep 项目，
+          // 日常 test:full 不再覆盖（详见 scripts/test-full-sharded.mjs 模式说明）。
           exclude: [
             "src/test/fixtures.test.ts",
             "src/accounts/inventory-export.test.ts",
@@ -101,6 +103,7 @@ export default defineConfig({
             "src/shared/api/*.test.ts",
             "src/shared/lib/*.test.ts",
             "src/vite.config.test.ts",
+            "src/**/*.deep.test.tsx",
             ...quickTests,
           ],
           // [2026-10-20 实测] forks → threads：酸测 5 文件 31 用例中位数 29.37s → 25.57s（~13%），
@@ -109,6 +112,22 @@ export default defineConfig({
           pool: "threads",
           maxWorkers: 1,
           minWorkers: 1,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "react-deep",
+          sequence: { groupOrder: 4 },
+          include: ["src/**/*.deep.test.{ts,tsx}"],
+          // 与 react 同构：单 worker 避免 jsdom+antd 争抢。deep 重型用例（大量 userEvent
+          // 交互 + antd Modal）集中于此层，由 test:full:deep / test:full:all 触发，日常
+          // test:full 不含（提速日常反馈）。单进程跑以复用 vite transform 缓存（分片子进程
+          // 会各自重 transform antd 致 408s，单进程同层仅需 ~170s）。
+          pool: "threads",
+          maxWorkers: 1,
+          minWorkers: 1,
+          retry: 0,
         },
       },
     ],

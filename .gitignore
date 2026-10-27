@@ -29,6 +29,9 @@ htmlcov/
 /frontend/playwright-report/
 /frontend/playwright/.cache/
 
+# Vitest JSON 报告产物（--reporter=json 输出目录）
+/frontend/.vitest/
+
 # 运行期目录：日志、运行时状态、监控数据、截图产物，不入版本库
 /logs/*
 !/logs/.gitkeep

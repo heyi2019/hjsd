@@ -10,7 +10,7 @@ from calendar import monthrange
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -415,14 +415,15 @@ def _metric_months(
     return result
 
 
-def _in_range(value: date, start: date, end: date) -> bool:
-    return start <= value <= end
-
-
 def _percentage(numerator: int, denominator: int) -> float | None:
     if denominator == 0:
         return None
     return round(numerator * 100 / denominator, 2)
+
+
+def _pool_column_filter(column: Any, pool_ids: tuple[int, ...]) -> Any:
+    """池可见性过滤；空授权集合视为不可见任何池。"""
+    return column.in_(pool_ids) if pool_ids else false()
 
 
 def metrics(
@@ -432,104 +433,116 @@ def metrics(
     to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """按月计算质量指标；返回分子、分母和口径，前端不自行推算。"""
+    """按月计算质量指标；返回分子、分母和口径，前端不自行推算。
+
+    2026-10-28 性能改造：统计全部下沉 SQL 端聚合/过滤，不再把对账、流水、
+    事件、附件全表 ORM 水合进内存（并发下占满事件循环，是读路径 p95 8s 的
+    主因之一）。返回口径与旧实现逐字段一致：
+    - 逾期判定：金额列底层为 REAL 存储，SQL 端按「分位取整」比较，与
+      Python Decimal 2 位量化口径严格一致；
+    - 池可见性：can_see_pool 即 pool_ids 集合判定，直接翻译为 IN 过滤。
+    """
     months = _metric_months(from_date, to_date)
-    orders = _visible_orders(session, user)
-    order_by_id = {order.id: order for order in orders}
-    order_ids = set(order_by_id)
 
-    reconciliations = list(session.scalars(select(Reconciliation)).all())
-    if user is not None and not user.is_admin and user.owner_scope != "ALL":
-        reconciliations = [
-            item for item in reconciliations if user.can_see_pool(item.pool_id)
-        ]
+    order_ids_query = select(Order.id)
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            order_ids_query = order_ids_query.where(scope)
 
-    schedule_rows = list(
+    restricted = user is not None and not user.is_admin and user.owner_scope != "ALL"
+    pool_ids = tuple(user.pool_ids) if restricted else ()
+
+    # 对账：按月聚合（总数 + 已核销数），池可见性过滤下沉 SQL。
+    recon_stmt = select(
+        func.strftime("%Y-%m", Reconciliation.reconciled_on).label("month"),
+        func.count().label("total"),
+        func.sum(
+            case(
+                (Reconciliation.status == ReconciliationStatus.RESOLVED.value, 1),
+                else_=0,
+            )
+        ).label("resolved"),
+    ).group_by("month")
+    if restricted:
+        recon_stmt = recon_stmt.where(_pool_column_filter(Reconciliation.pool_id, pool_ids))
+    recon_by_month = {
+        row.month: (int(row.total or 0), int(row.resolved or 0))
+        for row in session.execute(recon_stmt).all()
+    }
+
+    # 分期计划：按月聚合（到期数 + 逾期数），订单可见性经子查询下沉 SQL。
+    sched_stmt = (
+        select(
+            func.strftime("%Y-%m", InstallmentSchedule.due_on).label("month"),
+            func.count().label("total"),
+            func.sum(
+                case(
+                    (
+                        func.round(
+                            InstallmentSchedule.received_amount * 100
+                            + InstallmentSchedule.waived_amount * 100
+                        )
+                        < func.round(InstallmentSchedule.due_amount * 100),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("overdue"),
+        )
+        .join(Installment, Installment.id == InstallmentSchedule.installment_id)
+        .where(Installment.order_id.in_(order_ids_query))
+        .group_by("month")
+    )
+    sched_by_month = {
+        row.month: (int(row.total or 0), int(row.overdue or 0))
+        for row in session.execute(sched_stmt).all()
+    }
+
+    # 缺附件判定的引用来源：金额事件 + 无关联事件的已审流水，只取编号与发生日。
+    event_refs_by_month: dict[str, list[str]] = defaultdict(list)
+    for event_no, occurred_on in session.execute(
+        select(OrderEvent.event_no, OrderEvent.occurred_on).where(
+            OrderEvent.order_id.in_(order_ids_query),
+            OrderEvent.is_posted.is_(True),
+            OrderEvent.event_type.in_(MONEY_EVENT_TYPES),
+        )
+    ).all():
+        event_refs_by_month[occurred_on.strftime("%Y-%m")].append(event_no)
+
+    flow_stmt = select(Cashflow.flow_no, Cashflow.occurred_on).where(
+        Cashflow.status == CashflowStatus.APPROVED.value,
+        Cashflow.order_event_id.is_(None),
+        or_(Cashflow.order_id.is_(None), Cashflow.order_id.in_(order_ids_query)),
+    )
+    if restricted:
+        flow_stmt = flow_stmt.where(_pool_column_filter(Cashflow.pool_id, pool_ids))
+    flow_refs_by_month: dict[str, list[str]] = defaultdict(list)
+    for flow_no, occurred_on in session.execute(flow_stmt).all():
+        flow_refs_by_month[occurred_on.strftime("%Y-%m")].append(flow_no)
+
+    # 附件引用集合：只取两列并限定相关实体类型，避免全列水合。
+    attachment_refs = set(
         session.execute(
-            select(InstallmentSchedule, Installment)
-            .join(Installment, Installment.id == InstallmentSchedule.installment_id)
+            select(Attachment.entity_type, Attachment.entity_id).where(
+                Attachment.deleted_at.is_(None),
+                Attachment.entity_type.in_(("order_event", "cashflow")),
+            )
         ).all()
     )
-    schedule_rows = [
-        (schedule, installment)
-        for schedule, installment in schedule_rows
-        if installment.order_id in order_ids
-    ]
-
-    cashflows = list(session.scalars(select(Cashflow)).all())
-    if user is not None and not user.is_admin and user.owner_scope != "ALL":
-        cashflows = [
-            flow
-            for flow in cashflows
-            if (
-                flow.order_id is not None
-                and flow.order_id in order_ids
-                and user.can_see_pool(flow.pool_id)
-            )
-            or (
-                flow.order_id is None
-                and user.can_see_pool(flow.pool_id)
-            )
-        ]
-    else:
-        cashflows = [
-            flow
-            for flow in cashflows
-            if flow.order_id is None or flow.order_id in order_ids
-        ]
-    cashflows = [
-        flow for flow in cashflows if flow.status == CashflowStatus.APPROVED.value
-    ]
-
-    events = list(
-        session.scalars(
-            select(OrderEvent).where(
-                OrderEvent.order_id.in_(order_ids),
-                OrderEvent.is_posted.is_(True),
-                OrderEvent.event_type.in_(MONEY_EVENT_TYPES),
-            )
-        ).all()
-    ) if order_ids else []
-    attachments = list(
-        session.scalars(
-            select(Attachment).where(Attachment.deleted_at.is_(None))
-        ).all()
-    )
-    attachment_refs = {(item.entity_type, item.entity_id) for item in attachments}
 
     items: list[dict[str, Any]] = []
     for month in months:
-        end = _month_end(month)
-        month_reconciliations = [
-            item
-            for item in reconciliations
-            if _in_range(item.reconciled_on, month, end)
-        ]
-        resolved_reconciliations = sum(
-            item.status == ReconciliationStatus.RESOLVED.value
-            for item in month_reconciliations
-        )
-
-        month_schedules = [
-            schedule
-            for schedule, _installment in schedule_rows
-            if _in_range(schedule.due_on, month, end)
-        ]
-        overdue_schedules = sum(
-            to_money(schedule.received_amount) + to_money(schedule.waived_amount)
-            < to_money(schedule.due_amount)
-            for schedule in month_schedules
-        )
+        key = month.strftime("%Y-%m")
+        recon_total, resolved_reconciliations = recon_by_month.get(key, (0, 0))
+        sched_total, overdue_schedules = sched_by_month.get(key, (0, 0))
 
         required_refs: list[tuple[str, str]] = [
-            ("order_event", event.event_no)
-            for event in events
-            if _in_range(event.occurred_on, month, end)
+            ("order_event", event_no)
+            for event_no in event_refs_by_month.get(key, ())
         ]
         required_refs.extend(
-            ("cashflow", flow.flow_no)
-            for flow in cashflows
-            if flow.order_event_id is None and _in_range(flow.occurred_on, month, end)
+            ("cashflow", flow_no) for flow_no in flow_refs_by_month.get(key, ())
         )
         missing_attachments = sum(
             reference not in attachment_refs for reference in required_refs
@@ -539,16 +552,14 @@ def metrics(
             {
                 "month": month.strftime("%Y-%m"),
                 "reconciliation_completion_rate": {
-                    "rate": _percentage(
-                        resolved_reconciliations, len(month_reconciliations)
-                    ),
+                    "rate": _percentage(resolved_reconciliations, recon_total),
                     "numerator": resolved_reconciliations,
-                    "denominator": len(month_reconciliations),
+                    "denominator": recon_total,
                 },
                 "overdue_rate": {
-                    "rate": _percentage(overdue_schedules, len(month_schedules)),
+                    "rate": _percentage(overdue_schedules, sched_total),
                     "numerator": overdue_schedules,
-                    "denominator": len(month_schedules),
+                    "denominator": sched_total,
                 },
                 "missing_attachment_rate": {
                     "rate": _percentage(missing_attachments, len(required_refs)),

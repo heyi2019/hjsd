@@ -16,8 +16,8 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import Validation
 from app.core.money import to_money
@@ -26,10 +26,10 @@ from app.domain.enums import (
     AccountStatus,
     CashflowStatus,
     Direction,
+    EventType,
     InstallmentDispositionAction,
     Nature,
     OrderStatus,
-    RebateStatus,
 )
 from app.domain.foundation import Pool
 from app.domain.trade import (
@@ -608,36 +608,90 @@ def r3_commission_reconciliation(
 
 
 # --------------------------------------------------------------------- R5 业务
+def _event_gain_cases(amount):
+    """事件损益的三个条件求和分支（income / buy / cost）。
+
+    口径与 order_event_totals 一致：SELL=收入 / BUY=买入成本 / COST=直接费用；
+    CANCEL 仅当显式 offset 且被冲销事件与本单同单时才冲销（跨单 offset 视同
+    无冲销——同单约束由外连接的 ON 条件保证，与 Python 侧按本单事件表解析
+    offset 类型行为一致）。
+    """
+    offset = aliased(OrderEvent)
+    return offset, [
+        case(
+            (OrderEvent.event_type == EventType.SELL.value, amount),
+            (and_(
+                OrderEvent.event_type == EventType.CANCEL.value,
+                offset.event_type == EventType.SELL.value,
+            ), -amount),
+            else_=0,
+        ),
+        case(
+            (OrderEvent.event_type == EventType.BUY.value, amount),
+            (and_(
+                OrderEvent.event_type == EventType.CANCEL.value,
+                offset.event_type == EventType.BUY.value,
+            ), -amount),
+            else_=0,
+        ),
+        case(
+            (OrderEvent.event_type == EventType.COST.value, amount),
+            (and_(
+                OrderEvent.event_type == EventType.CANCEL.value,
+                offset.event_type == EventType.COST.value,
+            ), -amount),
+            else_=0,
+        ),
+    ]
+
+
+def _event_offset_join(offset):
+    return and_(
+        offset.id == OrderEvent.offset_event_id,
+        offset.order_id == OrderEvent.order_id,
+    )
+
+
 def r5_business_pnl(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """R5 业务级损益：未归集返点独立列，不摊给业务。"""
+    """R5 业务级损益：未归集返点独立列，不摊给业务。
+
+    2026-10-28 性能改造：损益事件按「订单×业务」在 SQL 端条件求和（仍按单
+    聚合后再归业务，保证 order_types 语义不变），返点结算改为列级查询 +
+    条件求和；不再把全部订单×事件 ORM 水合进内存。返回口径与旧实现一致。
+    """
     _validate_date_range(from_date, to_date)
-    rows = session.execute(
-        _apply_order_scope(
-            select(Order, OrderEvent)
-            .join(OrderEvent, OrderEvent.order_id == Order.id)
-            .where(OrderEvent.is_posted.is_(True)),
-            user,
-            session,
+    offset, (income_case, buy_case, cost_case) = _event_gain_cases(OrderEvent.amount)
+    event_agg = (
+        select(
+            Order.id.label("order_id"),
+            Order.order_type,
+            func.coalesce(func.sum(income_case), 0).label("income"),
+            func.coalesce(func.sum(buy_case), 0).label("buy_amount"),
+            func.coalesce(func.sum(cost_case), 0).label("direct_cost"),
         )
-    ).all()
+        .join(OrderEvent, OrderEvent.order_id == Order.id)
+        .outerjoin(offset, _event_offset_join(offset))
+        .where(OrderEvent.is_posted.is_(True))
+        .group_by(Order.id, Order.order_type)
+    )
+    if from_date is not None:
+        event_agg = event_agg.where(OrderEvent.occurred_on >= from_date)
+    if to_date is not None:
+        event_agg = event_agg.where(OrderEvent.occurred_on <= to_date)
+    event_agg = _apply_order_scope(event_agg, user, session)
 
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
     cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
     order_types: dict[int, str] = {}
-    for order, event in rows:
-        events_by_order[order.id].append(event)
-        order_types[order.id] = order.order_type
-    for order_id, order_events in events_by_order.items():
-        order_type = order_types[order_id]
-        income, buy_amount, direct_cost = _event_totals(
-            order_events, from_date=from_date, to_date=to_date
-        )
-        revenue[order_type] += income
-        cost[order_type] += buy_amount + direct_cost
+    for order_id, order_type, income, buy_amount, direct_cost in session.execute(
+        event_agg
+    ).all():
+        revenue[order_type] += _money(income)
+        cost[order_type] += _money(buy_amount) + _money(direct_cost)
+        order_types[order_id] = order_type
 
     for order_id, amount, occurred_on in _bad_debt_rows(session, user=user):
         if from_date and occurred_on < from_date:
@@ -650,17 +704,41 @@ def r5_business_pnl(
 
     settled: dict[str, Decimal] = defaultdict(lambda: ZERO)
     unsettled: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    # 分次结算按返点记录聚合：冲销（reversal_of_id 非空）取负号；日期过滤
+    # 放进外连接 ON 条件——范围外的结算视同不存在，与旧 Python 过滤一致。
+    settlement_join = [RebateSettlement.rebate_record_id == RebateRecord.id]
+    if from_date is not None:
+        settlement_join.append(RebateSettlement.settled_on >= from_date)
+    if to_date is not None:
+        settlement_join.append(RebateSettlement.settled_on <= to_date)
     rebate_stmt = (
         select(
-            RebateRecord,
-            RebateSettlement.gross_amount,
-            RebateSettlement.platform_fee,
-            RebateSettlement.reversal_of_id,
-            RebateSettlement.settled_on,
+            RebateRecord.id,
+            RebateRecord.base_amount,
+            RebateRecord.rate,
             Order.order_type,
+            func.coalesce(
+                func.sum(
+                    case(
+                        (RebateSettlement.reversal_of_id.isnot(None), -RebateSettlement.gross_amount),
+                        else_=RebateSettlement.gross_amount,
+                    )
+                ),
+                0,
+            ).label("settled_gross"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (RebateSettlement.reversal_of_id.isnot(None), -RebateSettlement.platform_fee),
+                        else_=RebateSettlement.platform_fee,
+                    )
+                ),
+                0,
+            ).label("settled_fee"),
         )
-        .outerjoin(RebateSettlement, RebateSettlement.rebate_record_id == RebateRecord.id)
+        .outerjoin(RebateSettlement, and_(*settlement_join))
         .join(Order, Order.id == RebateRecord.source_order_id)
+        .group_by(RebateRecord.id, Order.order_type)
     )
     if user is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)
@@ -668,37 +746,16 @@ def r5_business_pnl(
             rebate_stmt = rebate_stmt.where(
                 scope,
             )
-    rebates = session.execute(rebate_stmt).all()
-    rebate_totals: dict[int, tuple[RebateRecord, str, Decimal, Decimal]] = {}
-    for record, gross, fee, reversal_of_id, settled_on, order_type in rebates:
-        previous = rebate_totals.get(record.id)
-        if previous is None:
-            rebate_totals[record.id] = (
-                record,
-                order_type,
-                ZERO,
-                ZERO,
-            )
-            previous = rebate_totals[record.id]
-        if gross is not None and (
-            (from_date is None or settled_on >= from_date)
-            and (to_date is None or settled_on <= to_date)
-        ):
-            sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
-            rebate_totals[record.id] = (
-                previous[0],
-                previous[1],
-                previous[2] + sign * _money(gross),
-                previous[3] + sign * _money(fee),
-            )
-
-    for record, order_type, settled_gross, settled_fee in rebate_totals.values():
+    for _record_id, base_amount, rate, order_type, settled_gross, settled_fee in (
+        session.execute(rebate_stmt).all()
+    ):
         bucket = order_type
-        expected = (
-            _money(record.base_amount) * _money(record.rate) / Decimal("100")
-        ).quantize(Decimal("0.01"))
+        settled_gross = _money(settled_gross)
         settled[bucket] += settled_gross
-        cost[bucket] += settled_fee
+        cost[bucket] += _money(settled_fee)
+        expected = (
+            _money(base_amount) * _money(rate) / Decimal("100")
+        ).quantize(Decimal("0.01"))
         # 分次结算只减少剩余未归集金额；没有结算记录时即为全部应收返点。
         unsettled[bucket] += max(ZERO, expected - settled_gross)
 
@@ -853,24 +910,53 @@ def order_profit_detail(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """订单利润明细：合计与 R5 对应维度一致，可导出但不改原始数据。"""
+    """订单利润明细：合计与 R5 对应维度一致，可导出但不改原始数据。
+
+    2026-10-28 性能改造：订单取列级元组、事件损益在 SQL 端按订单条件求和
+    （CANCEL 冲销经同单自连接解析），不再全量 ORM 水合事件。返回口径一致。
+    """
     _validate_date_range(from_date, to_date)
-    orders_stmt = _apply_order_scope(select(Order), user, session)
-    orders = session.scalars(orders_stmt).all()
-    order_ids = [order.id for order in orders]
+    orders_stmt = _apply_order_scope(
+        select(
+            Order.id.label("id"),
+            Order.order_no.label("order_no"),
+            Order.order_type.label("order_type"),
+            Order.trade_date.label("trade_date"),
+            Order.status.label("status"),
+        ),
+        user,
+        session,
+    )
+    orders = session.execute(orders_stmt).all()
+    order_ids = [row.id for row in orders]
     extra_values = parties_service.get_extra_values_bulk(
         session, entity_type="order", entity_ids=order_ids
     )
-    # 事件与返点结算一次批量取回再按订单分组，替代循环内逐单查询
-    # （486 单原本要发 974 条 SQL）。注意每个订单只把「本单事件」交给
-    # _event_totals：CANCEL 的 offset 归属判定依赖本单事件表，跨单混入会改口径。
-    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
+    # 事件损益一次分组聚合替代「全量事件水合 + 逐单 Python 汇总」。
+    # 注意每个订单只聚合本单事件：CANCEL 的 offset 归属判定依赖同单事件，
+    # 自连接带同单约束，跨单混入不会改口径（与旧实现注释口径一致）。
+    totals_by_order: dict[int, tuple[Decimal, Decimal, Decimal]] = {}
+    if order_ids:
+        offset, (income_case, buy_case, cost_case) = _event_gain_cases(OrderEvent.amount)
+        event_agg = (
+            select(
+                OrderEvent.order_id.label("order_id"),
+                func.coalesce(func.sum(income_case), 0).label("income"),
+                func.coalesce(func.sum(buy_case), 0).label("buy_amount"),
+                func.coalesce(func.sum(cost_case), 0).label("direct_cost"),
+            )
+            .outerjoin(offset, _event_offset_join(offset))
+            .where(OrderEvent.is_posted.is_(True))
+            .group_by(OrderEvent.order_id)
+        )
+        for order_id, income, buy_amount, direct_cost in session.execute(event_agg).all():
+            totals_by_order[order_id] = (
+                _money(income),
+                _money(buy_amount),
+                _money(direct_cost),
+            )
     settlements_by_order: dict[int, list[tuple[Any, Any, Any]]] = defaultdict(list)
     if order_ids:
-        for event in session.scalars(
-            select(OrderEvent).where(OrderEvent.order_id.in_(order_ids))
-        ):
-            events_by_order[event.order_id].append(event)
         settlement_rows = session.execute(
             select(
                 RebateRecord.source_order_id,
@@ -886,13 +972,14 @@ def order_profit_detail(
         for source_order_id, gross, fee, reversal_of_id in settlement_rows:
             settlements_by_order[source_order_id].append((gross, fee, reversal_of_id))
     bad_debt_by_order = _bad_debt_by_order(session, user=user)
+    no_totals = (_money(0), _money(0), _money(0))
     items = []
     for order in orders:
         if from_date and order.trade_date < from_date:
             continue
         if to_date and order.trade_date > to_date:
             continue
-        income, buy, direct_cost = _event_totals(events_by_order.get(order.id, []))
+        income, buy, direct_cost = totals_by_order.get(order.id, no_totals)
         direct_cost += bad_debt_by_order.get(order.id, ZERO)
         rebate = ZERO
         for gross, fee, reversal_of_id in settlements_by_order.get(order.id, []):

@@ -32,6 +32,7 @@ import {
   StatusTag,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
@@ -61,7 +62,7 @@ const ALLOWED_ATTRIBUTES_BY_FUND_NATURE: Record<string, string[]> = {
 export const deriveCashflowNature = (fundNature: string, direction: string): string =>
   fundNature === "EXTERNAL" ? "EXTERNAL_IN" : fundNature === "INTERNAL" ? "INTERNAL" : direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT";
 
-export function FundsPage() {
+export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -178,9 +179,8 @@ export function FundsPage() {
     }
   }, [fetchCashflows]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // keep-alive：建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
+  useReloadOnActive(active, load);
 
   const submitDeposit = async (values: Record<string, unknown>) => {
     await write.run(async () => {

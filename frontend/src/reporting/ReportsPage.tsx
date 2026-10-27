@@ -1,7 +1,7 @@
 /** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。 */
 import { Card, Input, Select, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
 import { QualityPanel } from "../quality/QualityPanel";
 import { NotificationsPanel } from "../notifications/NotificationsPanel";
@@ -37,6 +37,7 @@ import {
   StatusTag,
   PermissionButton,
 } from "../shared/ui";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 
 const REPORT_NAMES = [
   "inventory-health",
@@ -64,7 +65,7 @@ const REPORT_FALLBACK = REPORT_NAMES.map((name) => ({ value: name, label: REPORT
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
 type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
 
-export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void }) {
+export function ReportsPage({ onNavigate, active = true }: { onNavigate?: (key: string) => void; active?: boolean }) {
   const reportOptions = useOptionSet("REPORT_NAME") ?? REPORT_FALLBACK;
   const [activeTab, setActiveTab] = useState("r1");
   const [exportError, setExportError] = useState<string | null>(null);
@@ -128,6 +129,7 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
   ];
 
   return (
+    <ReportsActiveContext.Provider value={active}>
     <section className="ui-stack">
       <Card className="glass" title="报表导出">
         <div className="ui-filter-bar">
@@ -163,11 +165,16 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
         }))}
       />
     </section>
+    </ReportsActiveContext.Provider>
   );
 }
 
+/** 经营中心是否处于激活态：透传给 useReport，使 keep-alive 隐藏期间写入的数据在切回时自动重拉。 */
+const ReportsActiveContext = createContext(true);
+
 /** 所有报表共用的取数/错误态壳：避免每个报表各写一遍 try/catch。 */
 function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
+  const pageActive = useContext(ReportsActiveContext);
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -185,6 +192,8 @@ function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
   useEffect(() => {
     reload();
   }, [reload]);
+  // 首次挂载由上一 effect 覆盖，这里只负责「重新激活」的重拉，避免重复请求。
+  useReloadOnActive(pageActive, reload, { skipFirstMount: true });
 
   return { data, loading, error, reload };
 }

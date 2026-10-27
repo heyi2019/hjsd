@@ -695,6 +695,50 @@ def create_correction_batch(
     return {**_batch_out(new_batch), "corrects_batch_no": origin.batch_no}
 
 
+def reject_batch(
+    session: Session, batch_id: int, *, reason: str, actor: str = "system"
+) -> dict[str, Any]:
+    """整批驳回（REJECTED，终态）：审核判定该批数据不进系统。
+
+    规则：只有未确认（DRAFT/MAPPED）批次可驳回；已确认走
+    rollback_batch / create_correction_batch。驳回不删原始文件与审计，
+    行状态一律不动（原始行是留档事实）。
+    """
+    text = _required_text(reason, field="reason", message="驳回必须填写理由")
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        raise NotFound(f"导入批次 {batch_id} 不存在", details={"batch_id": batch_id})
+    if batch.status in {
+        ImportBatchStatus.REJECTED.value,
+        ImportBatchStatus.ROLLED_BACK.value,
+        ImportBatchStatus.CORRECTED.value,
+    }:
+        raise Validation(
+            "批次已终态，不可重复驳回",
+            details={"batch_id": batch_id, "status": batch.status},
+        )
+    if batch.status == ImportBatchStatus.COMMITTED.value:
+        raise Validation(
+            "已确认批次不可驳回，请改用回滚或更正批次（MIG-01-07/08）",
+            details={"batch_id": batch_id, "status": batch.status},
+        )
+    before = {"status": batch.status}
+    batch.status = ImportBatchStatus.REJECTED.value
+    batch.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.IMPORT_REJECT,
+        entity_type="import_batch",
+        entity_id=batch.id,
+        actor=actor,
+        before=before,
+        after={"status": batch.status, "reason": text},
+        reason=text,
+    )
+    return _batch_out(batch)
+
+
 __all__ = [
     "SOURCE_COLUMN_HINTS",
     "assign_mapping",
@@ -706,6 +750,7 @@ __all__ = [
     "mark_unlinked_transfer",
     "preview_mapping",
     "reconciliation_report",
+    "reject_batch",
     "rollback_batch",
     "skip_row",
 ]

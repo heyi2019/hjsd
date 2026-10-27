@@ -481,6 +481,28 @@ def return_deposit(
     return _deposit_out(item)
 
 
+@router.post("/deposits/{deposit_id}/cancel", response_model=schemas.DepositOut)
+def cancel_deposit(
+    deposit_id: int,
+    payload: schemas.DepositCancel,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.DepositOut:
+    """取消押金：仅未发生退还/损失的 PAID 押金；全额写 DEPOSIT_CANCEL 冲正流水。"""
+    deposit = db.get(Deposit, deposit_id)
+    if deposit is None or not user.can_see_pool(deposit.pool_id):
+        raise NotFound("押金不存在", details={"deposit_id": deposit_id})
+    item = service.cancel_deposit(
+        db,
+        deposit_id,
+        cancelled_on=payload.cancelled_on,
+        reason=payload.reason,
+        actor=_actor(user),
+        user=user,
+    )
+    return _deposit_out(item)
+
+
 @router.post("/deposits/{deposit_id}/losses", response_model=schemas.CashflowOut)
 def lose_deposit(
     deposit_id: int,
@@ -564,6 +586,20 @@ def create_rebate(
         channel=payload.channel,
         note=payload.note,
         user=user,
+    )
+    return _rebate_out(item)
+
+
+@router.post("/rebates/{rebate_id}/void", response_model=schemas.RebateOut)
+def void_rebate(
+    rebate_id: int,
+    payload: schemas.RebateVoid,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_rebate,
+) -> schemas.RebateOut:
+    """作废返点记录：仅零结算（OPEN）可作废；已有结算走结算冲销。"""
+    item = service.void_rebate(
+        db, rebate_id, reason=payload.reason, actor=_actor(user), user=user
     )
     return _rebate_out(item)
 

@@ -51,6 +51,15 @@ class DepositLoss(RequestModel):
     reason: str
 
 
+class DepositCancel(RequestModel):
+    cancelled_on: date
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class RebateVoid(RequestModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
 class DepositOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -19,9 +19,11 @@ from .rebates import (
     settle_rebate,
     settled_net_total,
     sync_overdue_rebate_notifications,
+    void_rebate,
 )
 from .cashflows import (
     approve_cashflow,
+    cancel_deposit,
     create_cashflow,
     create_deposit,
     create_period_lock,
@@ -57,6 +59,7 @@ def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
 
 __all__ = [
     "approve_cashflow",
+    "cancel_deposit",
     "create_cashflow",
     "create_deposit",
     "create_rebate",
@@ -80,4 +83,5 @@ __all__ = [
     "list_rebate_settlements",
     "reverse_rebate_settlement",
     "settled_net_total",
+    "void_rebate",
 ]

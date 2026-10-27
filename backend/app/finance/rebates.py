@@ -621,6 +621,49 @@ def settled_net_total(session: Session, rebate_record_id: int) -> Decimal:
     _, _, net = _effective_rebate_totals(session, rebate_record_id)
     return net
 
+def void_rebate(
+    session: Session,
+    rebate_id: int,
+    *,
+    reason: str,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> RebateRecord:
+    """作废返点记录（VOID）。守卫：只有零结算（OPEN）可作废。
+
+    有结算（PARTIALLY_SETTLED/SETTLED）的返点走结算冲销（REBATE_REVERSE），
+    不允许直接 VOID——否则已入池资金与返点台账脱钩。
+    """
+    record = get_rebate(session, rebate_id, user=user)
+    if record.status != RebateStatus.OPEN.value:
+        raise Validation(
+            "只有未发生结算的返点记录可作废；已有结算请走结算冲销",
+            details={"rebate_record_id": record.id, "status": record.status},
+        )
+    settled = settled_net_total(session, record.id)
+    if settled != Decimal("0"):
+        raise Validation(
+            "返点存在有效结算流水，不可作废",
+            details={"rebate_record_id": record.id, "settled_net": str(settled)},
+        )
+    text = _text(reason, field="reason", message="作废返点必须填写理由")
+    before = {"status": record.status}
+    record.status = RebateStatus.VOID.value
+    record.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.REBATE_VOID,
+        entity_type="rebate_record",
+        entity_id=record.rebate_no,
+        actor=actor,
+        before=before,
+        after={"status": record.status},
+        reason=text,
+    )
+    return record
+
+
 __all__ = [
     "create_rebate",
     "get_rebate",
@@ -631,5 +674,6 @@ __all__ = [
     "settle_rebate",
     "settled_net_total",
     "sync_overdue_rebate_notifications",
+    "void_rebate",
 ]
 

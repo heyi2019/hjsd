@@ -141,6 +141,39 @@ def approve_version(
     )
 
 
+@router.post(
+    "/policy-versions/{version_id}/supersede", response_model=schemas.PolicyVersionOut
+)
+def supersede_version(
+    version_id: int,
+    payload: schemas.PolicyVersionSupersede,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = manage_access,
+) -> schemas.PolicyVersionOut:
+    """作废草稿版本（SUPERSEDED）。已发布版本不可作废——它是历史日期的解析口径。"""
+    return schemas.PolicyVersionOut.model_validate(
+        service.supersede_draft_version(
+            db,
+            version_id,
+            actor=user.username,
+            reason=payload.reason,
+            replaced_by_version_id=payload.replaced_by_version_id,
+        )
+    )
+
+
+@router.post("/policies/versions/expire-sweep", response_model=schemas.PolicyExpireSweepOut)
+def expire_sweep(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = manage_access,
+    on: date = Query(...),
+) -> schemas.PolicyExpireSweepOut:
+    """把生效期已结束（effective_to < on）的 ACTIVE 版本固化为 EXPIRED。"""
+    return schemas.PolicyExpireSweepOut.model_validate(
+        service.expire_lapsed_versions(db, on=on, actor=user.username)
+    )
+
+
 @router.get("/policy-versions/resolve", response_model=schemas.PolicyResolveOut)
 def resolve(
     db: Annotated[Session, Depends(get_db)],

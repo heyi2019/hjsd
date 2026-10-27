@@ -34,6 +34,17 @@ class PolicyVersionApprove(RequestModel):
     note: str | None = None
 
 
+class PolicyVersionSupersede(RequestModel):
+    reason: str = Field(min_length=1, max_length=2000)
+    replaced_by_version_id: int | None = Field(default=None, gt=0)
+
+
+class PolicyExpireSweepOut(BaseModel):
+    swept: int
+    version_ids: list[int]
+    on: date
+
+
 class ProfitAllocationItem(RequestModel):
     user_id: int | None = Field(default=None, gt=0)
     role: str = Field(default="OWNER", min_length=1, max_length=32)

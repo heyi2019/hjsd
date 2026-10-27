@@ -190,4 +190,17 @@ def create_correction(
     )
 
 
+@router.post("/imports/batches/{batch_id}/reject", response_model=schemas.ImportBatchOut)
+def reject_batch(
+    batch_id: int,
+    payload: schemas.ImportBatchRollback,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = import_access,
+) -> schemas.ImportBatchOut:
+    """整批驳回（REJECTED，终态）：仅未确认批次可驳回；已确认走回滚/更正。"""
+    return schemas.ImportBatchOut.model_validate(
+        service.reject_batch(db, batch_id, reason=payload.reason, actor=user.username)
+    )
+
+
 __all__ = ["router"]

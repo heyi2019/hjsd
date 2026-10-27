@@ -384,6 +384,95 @@ def update_version_draft(
     return _ver_out(item)
 
 
+# ── 状态收口：SUPERSEDED（草稿替代作废）与 EXPIRED（过期清扫） ──────
+
+def supersede_draft_version(
+    session: Session,
+    version_id: int,
+    *,
+    actor: str,
+    reason: str,
+    replaced_by_version_id: int | None = None,
+) -> dict[str, Any]:
+    """作废草稿版本（SUPERSEDED）。
+
+    语义边界：**只有 DRAFT 可作废**。已发布（ACTIVE）版本是历史日期的
+    解析口径（resolve_version 按 status=ACTIVE + 生效期取版本），
+    作废会挖掉历史规则的落点；要下线生效版本请新建版本封口生效期。
+    replaced_by_version_id 用于记录替代关系（可选，须属同一规则定义）。
+    """
+    item = session.get(PolicyVersion, version_id)
+    if item is None:
+        raise NotFound(f"规则版本 {version_id} 不存在", details={"version_id": version_id})
+    if item.status != PolicyStatus.DRAFT.value:
+        raise Validation(
+            "只能作废草稿版本；已发布版本是历史解析口径，请用新建版本封口生效期",
+            details={"version_id": version_id, "status": item.status},
+        )
+    text = _required_text(reason, field="reason", message="作废必须填写理由")
+    if replaced_by_version_id is not None:
+        if replaced_by_version_id == version_id:
+            raise Validation("替代版本不能是被作废版本本身", details={"version_id": version_id})
+        replacement = session.get(PolicyVersion, replaced_by_version_id)
+        if replacement is None or (
+            replacement.policy_definition_id != item.policy_definition_id
+        ):
+            raise Validation(
+                "替代版本不存在或不属于同一规则定义",
+                details={"replaced_by_version_id": replaced_by_version_id},
+            )
+    before = {"status": item.status}
+    item.status = PolicyStatus.SUPERSEDED.value
+    item.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.POLICY_CHANGE,
+        entity_type="policy_version",
+        entity_id=item.id,
+        actor=actor,
+        before=before,
+        after={
+            "status": item.status,
+            "replaced_by_version_id": replaced_by_version_id,
+            "reason": text,
+        },
+        reason=text,
+    )
+    return _ver_out(item)
+
+
+def expire_lapsed_versions(
+    session: Session, *, on: date, actor: str = "system"
+) -> dict[str, Any]:
+    """把生效期已结束（effective_to < on）的 ACTIVE 版本固化为 EXPIRED。
+
+    resolve_version 本就按日期过滤，不会命中过期版本；本函数只做
+    状态落地，保证列表/报表按状态过滤时口径与日期口径一致。
+    """
+    rows = session.scalars(
+        select(PolicyVersion).where(PolicyVersion.status == PolicyStatus.ACTIVE.value)
+    ).all()
+    swept: list[int] = []
+    for item in rows:
+        if item.effective_to is not None and item.effective_to < on:
+            before = {"status": item.status}
+            item.status = PolicyStatus.EXPIRED.value
+            item.updated_by = actor
+            swept.append(item.id)
+            record_audit(
+                session,
+                action=AuditAction.POLICY_CHANGE,
+                entity_type="policy_version",
+                entity_id=item.id,
+                actor=actor,
+                before=before,
+                after={"status": item.status, "effective_to": item.effective_to.isoformat()},
+            )
+    session.flush()
+    return {"swept": len(swept), "version_ids": swept, "on": on.isoformat()}
+
+
 # ── T20 / BAS-06-04：生效期解析 + 快照固化 ───────────────────────
 
 def resolve_version(

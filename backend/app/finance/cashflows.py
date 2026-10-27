@@ -489,6 +489,74 @@ def return_deposit(
     return deposit
 
 
+def cancel_deposit(
+    session: Session,
+    deposit_id: int,
+    *,
+    cancelled_on: date,
+    reason: str,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> Deposit:
+    """取消押金（CANCELLED）。守卫：仅未发生任何退还/损失的 PAID 押金可取消。
+
+    语义：押金登记有误或租约取消且押金从未实际占用（如线下未收）。
+    全额写一笔反向流水（DEPOSIT_CANCEL，方向 IN）把占用冲平，
+    保证池内余额与押金台账始终勾稽。已发生退还/损失的走 return/loss。
+    """
+    deposit = session.get(Deposit, deposit_id)
+    if deposit is None or (user is not None and not user.can_see_pool(deposit.pool_id)):
+        raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+    if deposit.status != DepositStatus.PAID.value or to_money(
+        deposit.returned_amount
+    ) > 0 or to_money(deposit.lost_amount) > 0:
+        raise Validation(
+            "只有未发生退还/损失的押金可取消",
+            details={
+                "deposit_id": deposit.id,
+                "status": deposit.status,
+                "returned_amount": str(deposit.returned_amount),
+                "lost_amount": str(deposit.lost_amount),
+            },
+        )
+    assert_period_open(session, cancelled_on, operation="取消押金")
+    text = _text(reason, field="reason", message="取消押金必须填写理由")
+    money = to_money(deposit.paid_amount)
+    deposit.status = DepositStatus.CANCELLED.value
+    deposit.released_on = cancelled_on
+    deposit.updated_by = actor
+    session.add(
+        Cashflow(
+            flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+            pool_id=deposit.pool_id,
+            occurred_on=cancelled_on,
+            nature=Nature.BUSINESS_IN.value,
+            fund_nature=FundNature.EXTERNAL.value,
+            accounting_attribute=AccountingAttribute.DEPOSIT.value,
+            category="DEPOSIT_CANCEL",
+            direction=Direction.IN.value,
+            amount=money,
+            order_id=deposit.source_order_id,
+            deposit_id=deposit.id,
+            note=f"押金取消冲正：{text}"[:200],
+            created_by=actor,
+            updated_by=actor,
+        )
+    )
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.DEPOSIT_CANCEL,
+        entity_type="deposit",
+        entity_id=str(deposit.id),
+        actor=actor,
+        before={"status": DepositStatus.PAID.value},
+        after={"status": deposit.status, "reversed_amount": str(money)},
+        reason=text,
+    )
+    return deposit
+
+
 def lose_deposit(
     session: Session,
     deposit_id: int,
@@ -733,6 +801,7 @@ __all__ = [
     "list_cashflows",
     "list_deposits",
     "list_period_locks",
+    "cancel_deposit",
     "lose_deposit",
     "reject_cashflow",
     "return_deposit",

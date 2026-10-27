@@ -36,6 +36,7 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    # public_routes = 161（实测）。自 160 基线起新增 GET /order-form-fields/scopes
-    # （表单作用域注册表下发端点）。以当前应用实际路由数为准。
-    assert public_routes == 161
+    # public_routes = 166（实测）。基线演变：160 → 161（GET /order-form-fields/scopes）
+    # → 166（状态收口五端点：policy supersede / expire-sweep、rebate void、
+    # deposit cancel、import batch reject）。以当前应用实际路由数为准。
+    assert public_routes == 166

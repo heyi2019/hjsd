@@ -179,14 +179,14 @@ function ExtraFieldControl({ def, ...controlProps }: { def: OrderFormField; [key
   }
 }
 
-export function CustomersPage() {
+export function CustomersPage({ active = true }: { active?: boolean } = {}) {
   return (
     <section className="ui-stack">
       <Tabs
         defaultActiveKey="customers"
         items={[
-          { key: "customers", label: "客户档案", children: <CustomerPanel /> },
-          { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel /> },
+          { key: "customers", label: "客户档案", children: <CustomerPanel active={active} /> },
+          { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active} /> },
           { key: "leads", label: "客户需求池", children: <CustomerLeadPanel /> },
         ]}
       />
@@ -194,7 +194,7 @@ export function CustomersPage() {
   );
 }
 
-function CustomerPanel() {
+function CustomerPanel({ active = true }: { active?: boolean }) {
   const compact = useCompactLayout();
   const [rows, setRows] = useState<Customer[]>([]);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
@@ -241,8 +241,9 @@ function CustomerPanel() {
   }, [keyword, statusFilter]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
+    if (active) void load();
+  }, [active, load]);
 
   useEffect(() => {
     // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页
@@ -776,7 +777,7 @@ function CustomerPanel() {
   );
 }
 
-function CounterpartyPanel() {
+function CounterpartyPanel({ active = true }: { active?: boolean }) {
   const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
@@ -800,8 +801,9 @@ function CounterpartyPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // keep-alive：提号建单会自动建档供货方，重新激活时重拉避免列表过期。
+    if (active) void load();
+  }, [active, load]);
 
   const openDetail = async (row: Counterparty) => {
     setDetailTarget(row);

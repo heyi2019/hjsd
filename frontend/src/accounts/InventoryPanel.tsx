@@ -191,6 +191,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         return next;
       });
       await load();
+      // 作废会改订单/流水状态，同步通知上层重拉台账与分期列表。
+      onOrdersChanged?.();
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {
@@ -266,6 +268,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         return next;
       });
       await load();
+      // 取消交易产生 CANCEL 流水并可能回库，同步通知上层重拉台账与分期列表。
+      onOrdersChanged?.();
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {
@@ -295,6 +299,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         return next;
       });
       await load();
+      // 分期终止会改订单与合约状态，同步通知上层重拉台账与分期列表。
+      onOrdersChanged?.();
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {

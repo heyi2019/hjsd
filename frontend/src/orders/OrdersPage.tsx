@@ -691,7 +691,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => void load()} />,
+            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} />,
           },
           {
             key: "ledger",

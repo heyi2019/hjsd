@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.security import CurrentUser, build_access_token
+from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
@@ -1771,6 +1771,18 @@ class TestOrdersApi:
         )
         assert response.status_code == 201, response.text
         assert response.json()["owner_id"] == user.id
+
+    def test_admin_created_order_defaults_owner_to_operator(self, seeded_client, headers):
+        """未指定负责人时兜底为操作人本人：owner_id 落 NULL 会让单据在按归属过滤后
+        对 SELF 用户永久不可见（历史 153 单曾因此全为 NULL）。"""
+        response = seeded_client.post(
+            "/api/v1/orders",
+            json={"order_type": "HS", "trade_date": D.isoformat()},
+            headers=headers,
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["owner_id"] == DEV_USERS["admin"].id
 
     def test_order_creation_rejects_embedded_inventory_account(
         self, seeded_client, headers

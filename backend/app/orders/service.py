@@ -346,6 +346,10 @@ def create_order(
 
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         owner_id = user.id
+    # 兜底：admin / ALL 建单未指定负责人时记为操作人本人。否则落 NULL 的单据在
+    # 数据权限按 owner_id 过滤（owner_scope_filter）后，对 SELF 用户永久不可见。
+    if owner_id is None and user is not None:
+        owner_id = user.id
     if owner_id is not None:
         if isinstance(owner_id, bool) or not isinstance(owner_id, int) or owner_id <= 0:
             raise Validation(

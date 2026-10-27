@@ -31,20 +31,28 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
-## V1.1.0
+## V1.0.0（首发）
 
-**发布时间：** 2026-10-27 22:15 CST（Asia/Shanghai）
+**发布时间：** 2026-10-27 CST（Asia/Shanghai）
 
 | 项目 | 版本 / 标识 |
 | --- | --- |
-| 系统发布版本 | `V1.1.0` |
-| 前端构建版本 | `1.1.0` |
-| 后端 API 版本 | `1.1.0`（唯一事实源 `backend/app/version.py`） |
-| 数据库迁移基线 | Alembic `0001` |
+| 系统发布版本 | `V1.0.0` |
+| 前端构建版本 | `1.0.0` |
+| 后端 API 版本 | `1.0.0`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | Alembic `0001`（37 张业务表 + 68 索引） |
 
 ### 本次内容
 
-相对 V1.0.0（14 个提交、24 文件、+1067/-52 行），全部为上线前加固：
+**首发上线版本，此前无对外发布**，故不与上一版比对。生产库从空库起始（不搬迁开发库数据）。
+
+业务能力：
+
+- 订单 / 客户 / 分期 / 返点 / 资金池 / 对账 / 报表全链路；表单字段 47 个作用域；
+  选项词典 12 组 57 项；经营规则（返点 / 提成 / 分期 / 混合）保存即发布；权限 26 点 5 角色。
+- 修复订单创建表单的单控件绑定、代分期末期金额提示。
+
+上线前加固（本次交付的核心）：
 
 - **公开发布安全**：生产关闭 `/docs`、`/redoc`、`/openapi.json`；nginx 六个安全头（含 CSP）修复
   「子级 `add_header` 导致首页继承失效」的缺陷，改为公共片段逐 `location` 显式 include；
@@ -56,8 +64,9 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 - **备份灾备**：新增 `backup_daily.sh`（ECS 每日快照）与 `pull_backup.sh`（本机拉取，
   暂存校验后原子替换，坏备份不覆盖本地好备份）；`backup_db.py` 修掉 WAL 影子文件导致
   「SHA256 校验通过却丢页」的隐患，备份强制自洽单文件。
-- **版本可追溯**：新增 `backend/app/version.py` 作为版本唯一事实源；`/api/v1/health` 与
-  `root` 均返回 `app_version`；镜像 tag 由 `deploy.sh` 解析该文件生成；前端 `package.json` 同步。
+- **版本可追溯**：`backend/app/version.py` 为版本唯一事实源；`/api/v1/health` 与 `root`
+  均返回 `app_version`；镜像 tag 由 `deploy.sh` 解析生成；`scripts/ops/bump_version.sh`
+  一键改齐三处，并有测试断言前后端版本一致。
 
 ### 发布前检查
 
@@ -66,39 +75,13 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
   版本号**不要**写入 `.env`，由 `version.py` 决定。
 - `ADMIN_PASSWORD` 以临时 `export` 传入，不写入 `.env`。
 - 首次部署后核对：`docker compose ps` 中 backend 为 `Up (healthy)`；
-  `curl /api/v1/health` 的 `app_version` 为 `1.1.0`；`docker images | grep heijin-backend` 显示 `1.1.0`。
+  `curl /api/v1/health` 的 `app_version` 为 `1.0.0`；`docker images | grep heijin-backend` 显示 `1.0.0`。
 
 ### 回滚
 
 1. `docker compose down`（禁 `-v`，卷 `erp_db` 含正式库）。
 2. 用发布前备份 `data/backups/heijin_erp_v1_<时间戳>.db` + `.sha256` 经 `restore_db.py` 恢复。
-3. 切回 `v1.0.0` 对应镜像/提交并完成健康检查。数据库无需回退（本次无迁移变更）。
+3. 切回上一份已验证的镜像 tag 并完成健康检查。数据库无需回退（本次无迁移变更）。
 
-## V1.0.0
-
-**发布时间：** 2026-10-27 18:57 CST（Asia/Shanghai）
-
-| 项目 | 版本 / 标识 |
-| --- | --- |
-| 系统发布版本 | `V1.0.0` |
-| 前端构建版本 | `1.0.0` |
-| 后端 API 版本 | `1.0.0` |
-| 数据库迁移基线 | Alembic `0001` |
-
-### 本次内容
-
-- 固化首个正式发布版本标识与前后端语义版本。
-- 修复订单创建表单的单控件绑定及代分期末期金额提示。
-- 加固部署：首次空数据卷跳过备份；健康检查失败会中止部署；管理员初始化读取 `deploy/.env`。
-
-### 发布前检查
-
-- 在测试环境执行后端与前端测试、数据库迁移一致性检查。
-- 生产环境 `deploy/.env` 必须配置 `APP_ENV=production`、强随机 `JWT_SECRET_KEY`、正确的 `CORS_ORIGINS` 与 `ADMIN_PASSWORD`。
-- 发布脚本会在已有数据库时创建备份，并在启动后访问 `/api/v1/health`。
-
-### 回滚
-
-1. 停止新版本容器。
-2. 使用发布前生成的数据库备份及校验文件恢复数据。
-3. 切回本标签前的已验证镜像/提交，并完成健康检查。
+> V1.0.0 是首个上线版本，因此没有「上一版」可回退；真正的回退目标是 **部署前快照**
+> （数据库）+ **上一份通过验收的镜像**（代码）。这也是 `deploy.sh` 每次部署前强制备份的原因。

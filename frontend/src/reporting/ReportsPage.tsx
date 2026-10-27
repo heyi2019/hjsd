@@ -36,6 +36,7 @@ import {
   StatRow,
   StatusTag,
   PermissionButton,
+  useCompactLayout,
 } from "../shared/ui";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 
@@ -64,6 +65,47 @@ const REPORT_FALLBACK = REPORT_NAMES.map((name) => ({ value: name, label: REPORT
 
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
 type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
+
+/** 通用移动端报表卡片列表：复用各报表已有 columns（title→标签、render/dataIndex→值）。
+ * 仅 ≤640px（useCompactLayout）挂载；桌面与 jsdom 测试仅渲染表格，卡片不进 DOM，单测零破坏。 */
+type ReportCardColumn<T> = {
+  title?: ReactNode;
+  dataIndex?: string | string[];
+  render?: (value: any, row: T, index: number) => ReactNode;
+};
+
+export function MobileReportCards<T>({
+  rows,
+  columns,
+}: {
+  rows: readonly T[];
+  columns: readonly ReportCardColumn<T>[];
+}) {
+  return (
+    <div className="data-mobile-list">
+      {rows.map((row, index) => (
+        <article className="data-mobile-card" key={index}>
+          <dl className="data-mobile-meta">
+            {columns.map((col, i) => {
+              const value: ReactNode = col.render
+                ? col.render((row as Record<string, unknown>)[col.dataIndex as string], row, index)
+                : col.dataIndex
+                ? ((row as Record<string, unknown>)[col.dataIndex as string] as ReactNode)
+                : null;
+              const label = typeof col.title === "string" ? col.title : "";
+              return (
+                <div key={i}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
+}
 
 export function ReportsPage({ onNavigate, active = true }: { onNavigate?: (key: string) => void; active?: boolean }) {
   const reportOptions = useOptionSet("REPORT_NAME") ?? REPORT_FALLBACK;
@@ -202,6 +244,7 @@ function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
 
 
 function InventoryReport() {
+  const compact = useCompactLayout();
   const { data, loading, error, reload } = useReport<InventoryHealthReport>(
     () => reportsApi.inventoryHealth(),
     [],
@@ -242,7 +285,10 @@ function InventoryReport() {
           { label: "占用成本合计", amount: data?.total_cost ?? "-" },
         ]}
       />
-      <DataTable<InventoryHealthRow>
+      {compact ? (
+            <MobileReportCards<InventoryHealthRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<InventoryHealthRow>[]} />
+          ) : (
+            <DataTable<InventoryHealthRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -252,11 +298,13 @@ function InventoryReport() {
         emptyText="暂无在库账号"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }
 
 function MonthlyPnl({ range }: { range: ReportRange }) {
+  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<MonthlyPnlReport>(
     () => reportsApi.monthlyPnl(params),
@@ -286,7 +334,10 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
           { label: "经营利润", amount: data?.total.operating_profit ?? "-", tone: "auto" },
         ]}
       />
-      <DataTable<MonthlyPnlRow>
+      {compact ? (
+            <MobileReportCards<MonthlyPnlRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<MonthlyPnlRow>[]} />
+          ) : (
+            <DataTable<MonthlyPnlRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -296,11 +347,13 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
         emptyText="所选区间无数据"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }
 
 function Commission({ range }: { range: ReportRange }) {
+  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<CommissionReport>(
     () => reportsApi.commission(params),
@@ -333,7 +386,10 @@ function Commission({ range }: { range: ReportRange }) {
           { label: "差异", amount: data?.total.difference ?? "-", tone: "auto" },
         ]}
       />
-      <DataTable<CommissionRow>
+      {compact ? (
+            <MobileReportCards<CommissionRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<CommissionRow>[]} />
+          ) : (
+            <DataTable<CommissionRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -343,11 +399,13 @@ function Commission({ range }: { range: ReportRange }) {
         emptyText="所选区间无提成记录"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }
 
 function DailyFunds() {
+  const compact = useCompactLayout();
   const [reportOn, setReportOn] = useState(today());
   const { data, loading, error, reload } = useReport<DailyFundsReport>(
     () => reportsApi.dailyFunds({ on: reportOn }),
@@ -383,7 +441,10 @@ function DailyFunds() {
           { label: "可用余额", amount: data?.total.available ?? "-", tone: "auto" },
         ]}
       />
-      <DataTable<DailyFundsRow>
+      {compact ? (
+            <MobileReportCards<DailyFundsRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<DailyFundsRow>[]} />
+          ) : (
+            <DataTable<DailyFundsRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -393,11 +454,13 @@ function DailyFunds() {
         emptyText="当日无资金流水"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }
 
 function FinanceDimensions({ range }: { range: ReportRange }) {
+  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<FinanceDimensionReport>(
     () => reportsApi.financeDimensions(params),
@@ -423,7 +486,10 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
           { label: "净方向金额", amount: data?.total_signed_amount ?? "-", tone: "auto" },
         ]}
       />
-      <DataTable<FinanceDimensionRow>
+      {compact ? (
+            <MobileReportCards<FinanceDimensionRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<FinanceDimensionRow>[]} />
+          ) : (
+            <DataTable<FinanceDimensionRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -433,11 +499,13 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
         emptyText="所选区间无已审核流水"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }
 
 function BusinessPnl({ range }: { range: ReportRange }) {
+  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<BusinessPnlReport>(
     () => reportsApi.businessPnl(params),
@@ -482,7 +550,10 @@ function BusinessPnl({ range }: { range: ReportRange }) {
           { label: "完整收益", amount: data?.total.full_income ?? "-", tone: "auto" },
         ]}
       />
-      <DataTable<BusinessPnlRow>
+      {compact ? (
+            <MobileReportCards<BusinessPnlRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<BusinessPnlRow>[]} />
+          ) : (
+            <DataTable<BusinessPnlRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -492,11 +563,13 @@ function BusinessPnl({ range }: { range: ReportRange }) {
         emptyText="所选区间无业务数据"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }
 
 function OrderProfit({ range }: { range: ReportRange }) {
+  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<OrderProfitReport>(
     () => reportsApi.orderProfit(params),
@@ -529,7 +602,10 @@ function OrderProfit({ range }: { range: ReportRange }) {
           { label: "净利合计", amount: data?.total.net_profit ?? "-", tone: "auto" },
         ]}
       />
-      <DataTable<OrderProfitRow>
+      {compact ? (
+            <MobileReportCards<OrderProfitRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<OrderProfitRow>[]} />
+          ) : (
+            <DataTable<OrderProfitRow>
         columns={columns}
         rows={data?.items ?? []}
         loading={loading}
@@ -539,6 +615,7 @@ function OrderProfit({ range }: { range: ReportRange }) {
         emptyText="所选区间无订单"
         onPageChange={() => undefined}
      />
+          )}
     </Card>
   );
 }

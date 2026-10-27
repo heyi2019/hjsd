@@ -121,11 +121,14 @@ export function normalizeError(error: unknown): NormalizedError {
   return { message: String(error) };
 }
 
-/** 统一错误文案：后端只返回 v1 统一结构 { code, message, details }。 */
+/** 统一错误文案：后端只返回 v1 统一结构 { code, message, details }。
+ *  展示层只透出中文 message；code 是英文缩写，对终端用户无操作价值，
+ *  仅打 console 便于排查，不上屏（曾以 `AUTH_REQUIRED: 用户名或密码错误` 直出登录页）。 */
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const { message, code } = normalizeError(error);
-    return code ? `${code}: ${message}` : message;
+    if (code) console.debug(`[API] ${code}: ${message}`);
+    return message;
   }
   return String(error);
 }

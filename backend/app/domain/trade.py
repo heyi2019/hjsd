@@ -133,14 +133,6 @@ class Order(Base, AuditMixin):
         Index("ix_orders_link_status", "link_status"),
         Index("ix_orders_trade_date", "trade_date"),
         CheckConstraint(
-            "listing_price IS NULL OR listing_price >= 0",
-            name="listing_price_nonneg",
-        ),
-        CheckConstraint(
-            "service_fee IS NULL OR service_fee >= 0",
-            name="service_fee_nonneg",
-        ),
-        CheckConstraint(
             f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="order_link_status_valid",
         ),
@@ -171,11 +163,11 @@ class Order(Base, AuditMixin):
     order_type: Mapped[str] = mapped_column(String(16), nullable=False)
     capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
-    listing_price: Mapped[object | None] = mapped_column(Amount, nullable=True)
-    service_fee: Mapped[object | None] = mapped_column(Amount, nullable=True)
+    # listing_price / service_fee / expected_settlement_date 已删除（0024）：
+    # ORM 有定义但 schema 从未暴露、前端零引用、486 行全 NULL 的死列；
+    # 分期场景的 service_fee 走 installments.service_fee（活列），勿混淆。
     commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    expected_settlement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     # DFQ 建单时可只保留账号文本快照；逾期回收后会补建库存实体并写入 account_id。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(

@@ -468,24 +468,6 @@ class TestCreateOrderValidation:
             seeded_db.flush()
         seeded_db.rollback()
 
-    def test_order_amounts_cannot_be_negative_in_database(self, seeded_db):
-        seeded_db.add(
-            Order(
-                order_no="HS-NEGATIVE-AMOUNT",
-                order_type="HS",
-                capital_type=CapitalType.STOCK.value,
-                trade_date=D,
-                listing_price=Decimal("-1"),
-                status=OrderStatus.ACTIVE.value,
-                link_status="LINKED",
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
     def test_unknown_order_type_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             order_service.create_order(

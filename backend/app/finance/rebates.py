@@ -78,20 +78,18 @@ def create_rebate(
             f"返点类型必须为 {RebateType.values()}",
             details={"field": "rebate_type", "value": rebate_type},
         )
-    if rebate_type == RebateType.BUY.value and order.order_type != "HS":
+    if rebate_type == RebateType.BUY.value and order.order_type not in ("HS", "TH"):
         raise Validation(
-            "买号返点只能关联回收（HS）订单",
-            details={"rebate_type": rebate_type, "order_type": order.order_type},
-        )
-    if rebate_type == RebateType.SELL.value and order.order_type != "DG":
-        raise Validation(
-            "卖号返点只能关联分销（DG）订单",
+            "买号返点只能关联回收（HS）或提号（TH）订单",
             details={"rebate_type": rebate_type, "order_type": order.order_type},
         )
     required_event = {
         RebateType.BUY.value: EventType.BUY.value,
         RebateType.SELL.value: EventType.SELL.value,
     }[rebate_type]
+    if rebate_type == RebateType.SELL.value and order.order_type == "DFQ":
+        # 代分期没有 SELL 事件（只能走 PAYMENT 收款），其卖动作凭证为 PAYMENT。
+        required_event = EventType.PAYMENT.value
     if session.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order.id,

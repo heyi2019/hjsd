@@ -40,17 +40,25 @@ def _all_scope_user() -> CurrentUser:
     )
 
 
-def _order_with_buy(seeded_db) -> int:
+_ACCOUNT_CONTEXT = {
+    "HS": ("SELF", "RECOVERY"),
+    "TH": ("DISTRIBUTION", "PICKUP"),
+    "DG": ("DISTRIBUTION", "CONSIGNMENT"),
+}
+
+
+def _order_with_buy(seeded_db, order_type: str = "HS") -> int:
+    business_mode, inventory_type = _ACCOUNT_CONTEXT[order_type]
     account = accounts_service.create_account(
         seeded_db,
-        game_account="rebate-split-account",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
+        game_account=f"rebate-buy-{order_type.lower()}",
+        business_mode=business_mode,
+        inventory_type=inventory_type,
         actor="pytest",
     )
     order = orders_service.create_order(
         seeded_db,
-        order_type="HS",
+        order_type=order_type,
         trade_date=TODAY,
         actor="pytest",
         account_id=account.id,
@@ -67,21 +75,28 @@ def _order_with_buy(seeded_db) -> int:
     return order.id
 
 
-def _order_with_sell(seeded_db) -> int:
+def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
+    business_mode, inventory_type = _ACCOUNT_CONTEXT[order_type]
     account = accounts_service.create_account(
         seeded_db,
-        game_account="dg-rebate-account",
-        business_mode="DISTRIBUTION",
-        inventory_type="CONSIGNMENT",
+        game_account=f"{order_type.lower()}-sell-rebate-account",
+        business_mode=business_mode,
+        inventory_type=inventory_type,
         actor="pytest",
     )
     order = orders_service.create_order(
         seeded_db,
-        order_type="DG",
+        order_type=order_type,
         trade_date=TODAY,
         actor="pytest",
         account_id=account.id,
     )
+    if order_type == "HS":
+        # 回收单 SELL 前必须有采购入库（BUY）事件。
+        orders_service.post_event(
+            seeded_db, order.id, event_type="BUY",
+            amount=Decimal("1000"), occurred_on=TODAY, actor="pytest", pool_id=1,
+        )
     orders_service.post_event(
         seeded_db,
         order.id,
@@ -159,24 +174,59 @@ def test_rate_from_snapshot_bad_value():
 
 
 # ----------------------------------------------------- 返点类型与订单类型约束
-def test_create_rebate_buy_requires_hs(seeded_db):
+def test_create_rebate_buy_requires_hs_or_th(seeded_db):
     order_id = _order_with_sell(seeded_db)  # DG 订单已 ACTIVE
-    with pytest.raises(Validation, match="买号返点只能关联回收"):
+    with pytest.raises(Validation, match="买号返点只能关联回收（HS）或提号（TH）"):
         rebates.create_rebate(
             seeded_db, source_order_id=order_id, rebate_type="BUY",
             base_amount=Decimal("1000"), rate=Decimal("5"),
             collected_on=TODAY, actor="pytest",
-        )  # 77-81
+        )  # 买号返点仅限 HS/TH，DG 不可
 
 
-def test_create_rebate_sell_requires_dg(seeded_db):
-    order_id = _order_with_buy(seeded_db)  # HS 订单
-    with pytest.raises(Validation, match="卖号返点只能关联分销"):
+def test_create_rebate_buy_allows_th(seeded_db):
+    """TH（提号）订单有 BUY 事件即可登记买号返点（2026-10-28 口径放开）。"""
+    order_id = _order_with_buy(seeded_db, order_type="TH")
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="BUY",
+        base_amount=Decimal("1000"), rate=Decimal("5"),
+        collected_on=TODAY, actor="pytest",
+    )
+    assert record.rebate_type == "BUY"
+
+
+def test_create_rebate_sell_requires_sell_event(seeded_db):
+    order_id = _order_with_buy(seeded_db)  # HS 订单只有 BUY 事件
+    with pytest.raises(Validation, match="卖号返点必须关联已登记的 SELL"):
         rebates.create_rebate(
             seeded_db, source_order_id=order_id, rebate_type="SELL",
             base_amount=Decimal("1000"), rate=Decimal("5"),
             collected_on=TODAY, actor="pytest",
-        )  # 82-86
+        )
+
+
+def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
+    """2026-10-28 口径：卖号返点不再限 DG，回收单有 SELL 事件即可。"""
+    order_id = _order_with_sell(seeded_db, order_type="HS")
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="SELL",
+        base_amount=Decimal("1000"), rate=Decimal("5"),
+        collected_on=TODAY, actor="pytest",
+    )
+    assert record.rebate_type == "SELL"
+
+
+def test_create_rebate_sell_dfq_requires_payment_event(seeded_db):
+    """DFQ 代分期没有 SELL 事件，其卖动作凭证为 PAYMENT。"""
+    order = orders_service.create_order(
+        seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest",
+    )
+    with pytest.raises(Validation, match="卖号返点必须关联已登记的 PAYMENT"):
+        rebates.create_rebate(
+            seeded_db, source_order_id=order.id, rebate_type="SELL",
+            base_amount=Decimal("1000"), rate=Decimal("5"),
+            collected_on=TODAY, actor="pytest",
+        )
 
 
 # ----------------------------------------------------- settle_rebate 订单不可见 (201-202)

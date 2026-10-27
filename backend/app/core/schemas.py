@@ -22,6 +22,10 @@ class HealthOut(BaseModel):
     database: str
     env_file: str
     sqlite_exists: str
+    # 连接级 PRAGMA 现值（journal_mode/synchronous/cache_size/mmap_size/
+    # temp_store/foreign_keys）。配置写错在 SQLite 里是静默无效，运行期现值
+    # 只能这样读出来；非 SQLite 库为空 dict。
+    sqlite_pragmas: dict[str, str] = {}
 
 
 class EngineInfoOut(BaseModel):

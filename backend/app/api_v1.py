@@ -167,13 +167,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             with get_engine().connect() as connection:
                 connection.execute(text("SELECT 1"))
+                # PRAGMA 现值只在连接上可见：配置写错时 SQLite 静默无效，
+                # 排障必须能看到运行期到底生效了什么（非 SQLite 库为空）。
+                sqlite_pragmas: dict[str, str] = {}
+                if connection.dialect.name == "sqlite":
+                    sqlite_pragmas = {
+                        name: str(
+                            connection.exec_driver_sql(f"PRAGMA {name}").fetchone()[0]
+                        )
+                        for name in (
+                            "journal_mode",
+                            "synchronous",
+                            "cache_size",
+                            "mmap_size",
+                            "temp_store",
+                            "foreign_keys",
+                        )
+                    }
         except Exception:
             return JSONResponse(
                 status_code=503,
                 content={"status": "error", "database_status": "unavailable"},
             )
         return HealthOut.model_validate(
-            {"status": "ok", "database_status": "ok", **describe_engine(settings)}
+            {
+                "status": "ok",
+                "database_status": "ok",
+                "sqlite_pragmas": sqlite_pragmas,
+                **describe_engine(settings),
+            }
         )
 
     return app

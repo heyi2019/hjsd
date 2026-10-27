@@ -7,11 +7,13 @@
 
 完整跑通 `docker compose build` + `up`，后端健康检查与 nginx 同源反代均正常。两个实战踩坑已修进部署包：
 
-1. **后端基础镜像用 `alpine:3.20`（Python 3.12.13），前端运行阶段同样用 alpine + apk nginx**：镜像为 `deploy-backend` **207MB** + `deploy-frontend` **20.3MB**（此前 slim/nginx-alpine 方案为 299MB + 78.4MB）。三项前提已验证：
+1. **后端基础镜像用 `alpine:3.20`（Python 3.12.13），前端运行阶段同样用 alpine + apk nginx，前端构建阶段用 `node:22-alpine`**：镜像为 `deploy-backend` **207MB** + `deploy-frontend` **20.3MB**（此前 slim/nginx-alpine 方案为 299MB + 78.4MB）。四项前提已验证：
    - 全部 24 个依赖在 **x86_64 与 aarch64 的 musllinux 上都有预编译 wheel**（用 `pip download --only-binary=:all: --platform musllinux_1_1_x86_64 --platform musllinux_1_2_x86_64` 实测，零源码编译，故镜像内无需 gcc）；
    - **`tzdata` 必须装**（Dockerfile 已含）：alpine 默认无时区库，缺失会让 `datetime.now()` 落 UTC，与国内 +8 差 8 小时，跨日订单与对账日期会错位；
    - **alpine 无 `python` 软链**，Dockerfile 已补 `/usr/local/bin/python -> /usr/bin/python3`，否则 `deploy.sh` 里既有的 `python scripts/*.py` 调用全部报 `not found`；`docker-compose.yml` 的 healthcheck 用的是 `python3`，不可写成 `python`。
-   ⚠️ **上线前先在 ECS 上 `docker pull alpine:3.20` 确认镜像源能拉到**——拉不到会直接中断构建，且需确认源里有 `alpine` 而非仅 `python` 系列。
+   - **前端构建阶段用 `node:22-alpine`**（原 `node:20-alpine`）：node 20 已接近 EOL，且实测两者产出**字节级一致**——`dist/assets/index-*.js` 的 hash 同为 `index-BgcbdH21.js`，换版本不改产物。选择 22 的额外好处是本机已有该镜像，Docker Hub 不通时仍能离线构建。
+   ⚠️ **上线前先在 ECS 上 `docker pull alpine:3.20 node:22-alpine` 确认镜像源能拉到**——这两个是构建硬依赖，任一拉不到会直接中断构建。注意源里要有 `alpine` 与 `node`，不能只有 `python` 系列。
+   ⚠️ **构建缓存被清后即失去离线能力**：`docker builder prune -af` 会删掉 base 镜像的 metadata 缓存。若无外网且本地无 `node:22-alpine`/`alpine:3.20` 镜像，`docker compose build` 会在 `FROM` 行就报 TLS handshake timeout。
    ⚠️ 后续往 `requirements.txt` 加依赖时，必须确认该包有 musllinux wheel，否则 ECS 上会因缺编译器构建失败。
 2. **前端构建上下文为项目根**：`ui_guards.mjs` 在构建期需读取 `backend/app/domain/enums.py` 校验前后端枚举对齐，故 `docker-compose.yml` 中 frontend 的 `build.context` 为 `..`（项目根），Dockerfile 内 `COPY backend/app /backend/app`；根目录 `.dockerignore` 已排除 `node_modules` 等避免上下文过大。
 3. **拉取镜像遇网络问题**：本机 macOS 上若构建报 `failed to fetch oauth token ... EOF`（docker.io 被本机代理干扰），给 Docker 配置代理或国内镜像加速器后再 build。**更正：阿里云 ECS 上 docker.io 直连是被拒的（实测 Connection refused），必须配镜像源——详见第 5 条。**

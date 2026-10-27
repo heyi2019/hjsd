@@ -1,4 +1,4 @@
-import { message } from "antd";
+import { appMessage as message } from "../shared/ui/appFeedback";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,8 +77,11 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
     resolveMockOnce(vi.mocked(catalog.installmentsApi.pay), { id: 1 });
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
-    await ui.click(screen.getAllByRole("button", { name: /登记收款/ })[0] as Element);
-    // 两行合约都有「登记收款」按钮 → 弹窗标题另找：直接等 Modal 出现
+    // 列表按最新合约在前，首个「登记收款」可能是 DELIVERED 禁用态 → 点击可用的那个
+    const payButton = screen
+      .getAllByRole("button", { name: /登记收款/ })
+      .find((b) => !(b as HTMLButtonElement).disabled) as Element;
+    await ui.click(payButton);
     await waitFor(() =>
       expect(document.querySelectorAll(".ant-modal-content").length).toBeGreaterThan(0),
     );

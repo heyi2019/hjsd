@@ -253,6 +253,8 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
+  const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
@@ -606,7 +608,10 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
   useReloadOnActive(active, load);
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter);
+  // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)
+    .slice()
+    .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
   const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
@@ -747,6 +752,19 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
                     ]}
                     onChange={(value) => {
                       setLinkStatusFilter(value);
+                      setPage(1);
+                    }}
+                  />
+                  <Typography.Text strong>排序</Typography.Text>
+                  <Segmented
+                    aria-label="台账排序"
+                    value={ledgerSortDesc ? "desc" : "asc"}
+                    options={[
+                      { value: "desc", label: "最新在前" },
+                      { value: "asc", label: "最旧在前" },
+                    ]}
+                    onChange={(value) => {
+                      setLedgerSortDesc(value === "desc");
                       setPage(1);
                     }}
                   />
@@ -1102,7 +1120,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
             selectedOrder.account_snapshot.game_password ? (
               <>
                 <Typography.Paragraph type="secondary">账号快照（代分期建单时填写的文本信息）：</Typography.Paragraph>
-                <CfgItem name="snap_game_account" label="账号标识" rules={[{ required: true, message: "请输入账号标识" }]}>
+                <CfgItem name="snap_game_account" label="库存编号" rules={[{ required: true, message: "请输入库存编号" }]}>
                   <Input />
                 </CfgItem>
                 <CfgItem name="snap_game_type" label="产品"><Input /></CfgItem>

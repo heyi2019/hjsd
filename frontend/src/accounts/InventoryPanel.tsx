@@ -1,6 +1,6 @@
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Dropdown, Form, Input, Modal, Select, Space, message } from "antd";
+import { Card, Dropdown, Form, Input, Modal, Segmented, Select, Space, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
@@ -38,6 +38,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
   const [keyword, setKeyword] = useState("");
+  const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -70,7 +71,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const load = useCallback(async () => {
     try {
       const list = await accountsApi.list(status ? { status } : undefined);
-      setRows([...list].sort((a, b) => b.id - a.id));
+      setRows(list);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -93,6 +94,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     const matchesKeyword = !keyword.trim() || text.includes(keyword.trim().toLowerCase());
     return matchesBusiness && matchesType && matchesKeyword;
   });
+  // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
+  const orderedRows = [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id));
   const visibleOccupied = visibleRows.filter((row) => ["IN_STOCK", "INSTALLMENT"].includes(row.status));
   const totalCost = visibleOccupied.reduce((sum, row) => sum + Number(row.cost_amount), 0).toFixed(2);
 
@@ -329,7 +332,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
     { title: "产品", dataIndex: "game_type", render: (v: string | null) => v || "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "账号标识", dataIndex: "game_account", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "库存编号", dataIndex: "game_account", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "平台", dataIndex: "platform", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "未售时长",
@@ -569,12 +572,24 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
             >
               导出
             </PermissionButton>
+            <Space size={8}>
+              <Typography.Text type="secondary">排序</Typography.Text>
+              <Segmented
+                aria-label="库存排序"
+                value={sortDesc ? "desc" : "asc"}
+                options={[
+                  { value: "desc", label: "最新在前" },
+                  { value: "asc", label: "最旧在前" },
+                ]}
+                onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
+              />
+            </Space>
           </Space>
         }
       >
         <DataTable<Account>
           columns={columns}
-          rows={visibleRows}
+          rows={orderedRows}
           page={page}
           pageSize={pageSize}
           total={visibleRows.length}
@@ -698,8 +713,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">
             <label>
-              <span>账号标识</span>
-              <Input aria-label="编辑账号标识" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
+              <span>库存编号</span>
+              <Input aria-label="编辑库存编号" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
             </label>
             <label>
               <span>产品</span>

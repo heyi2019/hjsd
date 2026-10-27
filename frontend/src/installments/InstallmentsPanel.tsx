@@ -1,6 +1,6 @@
 /** 分期：按业务合约类型分列，支持 HS / DFQ / TH / DG 的收款与风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, Form, Input, Modal, Select, Space, Tabs, Typography, message } from "antd";
+import { Button, Card, Form, Input, Modal, Segmented, Select, Space, Tabs, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -71,6 +71,7 @@ function ContractTable({
   reloadKey: number;
 }) {
   const [rows, setRows] = useState<Installment[]>([]);
+  const [sortDesc, setSortDesc] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
@@ -538,10 +539,26 @@ function ContractTable({
         ]}
       />
 
-      <Card className="glass">
+      <Card
+        className="glass"
+        extra={
+          <Space size={8}>
+            <Typography.Text type="secondary">排序</Typography.Text>
+            <Segmented
+              aria-label="分期合约排序"
+              value={sortDesc ? "desc" : "asc"}
+              options={[
+                { value: "desc", label: "最新在前" },
+                { value: "asc", label: "最旧在前" },
+              ]}
+              onChange={(value) => setSortDesc(value === "desc")}
+            />
+          </Space>
+        }
+      >
         <DataTable<Installment>
           columns={columns}
-          rows={rows}
+          rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
           loading={loading}
           page={1}
           pageSize={Math.max(rows.length, 10)}

@@ -87,8 +87,10 @@ describe("InstallmentsPanel：分期合约", () => {
     await screen.findByText("HS0001-INS01");
     const payButtons = screen.getAllByRole("button", { name: /登记收款/ });
     const deliverButtons = screen.getAllByRole("button", { name: /换绑交付/ });
-    expect((payButtons[0] as HTMLButtonElement).disabled).toBe(false); // ACTIVE
-    expect((payButtons[1] as HTMLButtonElement).disabled).toBe(true); // DELIVERED
+    // 列表按最新合约在前排序，按钮状态断言不依赖行序：ACTIVE 可收款、DELIVERED 禁收款。
+    const payStates = payButtons.map((b) => (b as HTMLButtonElement).disabled);
+    expect(payStates).toContain(false); // ACTIVE
+    expect(payStates).toContain(true); // DELIVERED
     expect(deliverButtons.every((b) => (b as HTMLButtonElement).disabled)).toBe(true); // 都不是 SETTLED
   });
 

@@ -333,6 +333,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   }
 
   const columns: ColumnsType<Account> = [
+    { title: "库存编号", dataIndex: "game_account" },
     { title: "订单号", dataIndex: "source_order_no", render: (v: string | null) => v || "-" },
     { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-"},
     { title: "业务类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
@@ -343,7 +344,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       render: (v: string | null) => v ? VALUE_ADDED_SERVICE_LABEL[v] ?? v : "-",
     },
     { title: "产品", dataIndex: "game_type", render: (v: string | null) => v || "-"},
-    { title: "库存编号", dataIndex: "game_account"},
     { title: "平台", dataIndex: "platform"},
     {
       title: "未售时长",

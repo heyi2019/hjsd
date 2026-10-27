@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
  * 等元素几何位置连续两次采样一致再动手。
@@ -30,6 +30,29 @@ async function waitStableGeometry(locator: Locator) {
       { timeout: 12000 },
     )
     .toBe(true);
+}
+
+/**
+ * 逐帧拖拽：headless Chrome 会把 mousemove 合并进 rAF，全量套件负载下帧率下降，
+ * 即便 steps 拆分也可能被合并丢帧，拖拽位移随机缩水（实测 +120px 只生效 78px）。
+ * 每步之间等 16ms 强制走一帧，保证位移与手势一致。
+ */
+async function dragMouseSteps(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  steps = 8,
+): Promise<void> {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(
+      from.x + ((to.x - from.x) * i) / steps,
+      from.y + ((to.y - from.y) * i) / steps,
+    );
+    await page.waitForTimeout(16);
+  }
+  await page.mouse.up();
 }
 
 /**
@@ -143,14 +166,16 @@ test.describe("UI visual regression", () => {
       return { x: rect.left + 24, y: rect.top + rect.height / 2 };
     });
 
-    await page.mouse.move(point.x, point.y);
-    await page.mouse.down();
-    await page.mouse.move(point.x + 120, point.y + 80, { steps: 8 });
-    await page.mouse.up();
+    await dragMouseSteps(page, point, { x: point.x + 120, y: point.y + 80 });
 
+    // 强信号：拖拽 handler 一旦激活必然把 modal 置为 fixed（ResizableModal.tsx startDrag），
+    // 与「测试 before 读数」和「应用 pointerdown 基线」之间的竞态无关。
+    expect(await modal.evaluate((node) => node.style.position)).toBe("fixed");
+    // 位移断言只防「完全没拖动」（0px）：阈值取手势的一半即可。100px 硬阈值在
+    // before 读数与 pointerdown 基线错位（页面弹簧入场/数据加载位移）时会误报。
     const after = await modal.evaluate((node) => node.getBoundingClientRect().toJSON());
-    expect(after.x).toBeGreaterThan(before.x + 100);
-    expect(after.y).toBeGreaterThan(before.y + 60);
+    expect(after.x).toBeGreaterThan(before.x + 60);
+    expect(after.y).toBeGreaterThan(before.y + 40);
   });
 
   test("回收页桌面弹窗四角可缩放", async ({ page }) => {
@@ -174,10 +199,10 @@ test.describe("UI visual regression", () => {
         const rect = node.getBoundingClientRect();
         return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       });
-      await page.mouse.move(point.x, point.y);
-      await page.mouse.down();
-      await page.mouse.move(point.x - (currentWidth - targetWidth), point.y - 100, { steps: 8 });
-      await page.mouse.up();
+      await dragMouseSteps(page, point, {
+        x: point.x - (currentWidth - targetWidth),
+        y: point.y - 100,
+      });
       await expect(modal).toHaveAttribute("data-recovery-layout", layout);
       await expect.poll(() => modal.locator(".recovery-entry-fields").evaluate((node) => {
         return getComputedStyle(node).gridTemplateColumns.split(" ").length;
@@ -214,10 +239,7 @@ test.describe("UI visual regression", () => {
         const rect = node.getBoundingClientRect();
         return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       });
-      await page.mouse.move(point.x, point.y);
-      await page.mouse.down();
-      await page.mouse.move(point.x + deltaX, point.y + deltaY, { steps: 8 });
-      await page.mouse.up();
+      await dragMouseSteps(page, point, { x: point.x + deltaX, y: point.y + deltaY });
       const after = await modal.evaluate((node) => {
         const el = node as HTMLElement;
         return { width: el.offsetWidth, height: el.offsetHeight };

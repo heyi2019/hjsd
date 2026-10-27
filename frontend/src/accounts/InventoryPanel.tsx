@@ -333,7 +333,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   }
 
   const columns: ColumnsType<Account> = [
-    { title: "库存编号", dataIndex: "game_account" },
+    { title: "库存编号", dataIndex: "stock_no" },
+    { title: "游戏账号", dataIndex: "game_account", render: (v: string | null) => v || "-" },
     { title: "订单号", dataIndex: "source_order_no", render: (v: string | null) => v || "-" },
     { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-"},
     { title: "业务类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
@@ -723,8 +724,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">
             <label>
-              <span>库存编号</span>
-              <Input aria-label="编辑库存编号" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
+              <span>游戏账号</span>
+              <Input aria-label="编辑游戏账号" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
             </label>
             <label>
               <span>产品</span>

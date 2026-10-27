@@ -11,7 +11,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
-from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType
+from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
 from app.domain.trade import Account
 from app.parties import service as parties_service
 from ._common import (
@@ -62,6 +62,7 @@ def create_account(
             "增值服务无效",
             details={"field": "value_added_service", "value": value_added_service},
         )
+    stock_no = allocate_number(session, SequenceKey.STOCK_NO)
     has_secondary = validate_optional_bool(has_secondary, field="has_secondary")
     validated_images = validate_account_images(account_images)
     validate_account_profile_scope(inventory_type, account_description, validated_images)
@@ -70,6 +71,7 @@ def create_account(
         business_mode=business_mode,
         inventory_type=inventory_type,
         value_added_service=value_added_service,
+        stock_no=stock_no,
         game_account=identifier,
         game_password=game_password,
         channel_region=channel_region,
@@ -100,6 +102,7 @@ def create_account(
         actor=actor,
         after={
             "game_account": account.game_account,
+            "stock_no": account.stock_no,
             "game_type": account.game_type,
             "business_mode": account.business_mode,
             "inventory_type": account.inventory_type,

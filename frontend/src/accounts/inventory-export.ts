@@ -97,7 +97,7 @@ export function buildInventoryCsv(
         row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "",
         row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "",
         row.game_type,
-        row.game_account,
+        row.stock_no,
         row.platform,
         row.cost_amount,
         inventoryStatusLabel(row.status),

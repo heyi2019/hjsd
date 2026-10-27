@@ -71,6 +71,7 @@ class Account(Base, AuditMixin):
             name="account_status_valid",
         ),
         UniqueConstraint("game_account", name="uq_accounts_game_account"),
+        UniqueConstraint("stock_no", name="uq_accounts_stock_no"),
         Index("ix_accounts_status", "status"),
         CheckConstraint("cost_amount >= 0", name="cost_nonneg"),
         CheckConstraint(
@@ -96,6 +97,8 @@ class Account(Base, AuditMixin):
     inventory_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
     # 增值服务维度（与业务类型独立）：STOCK_SALE=自营分期 / ADVANCE_PURCHASE=分销分期（代分期）。
     value_added_service: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # 库存编号：台账唯一编码 KU + 四位流水（系统生成，不可手改）。
+    stock_no: Mapped[str | None] = mapped_column(String(32), nullable=True)
     game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
     game_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
     channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)

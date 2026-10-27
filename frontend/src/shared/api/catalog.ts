@@ -326,6 +326,7 @@ export interface EventPostResult {
 
 export interface Account {
   id: number;
+  stock_no?: string | null;
   source_order_no?: string | null;
   game_type?: string | null;
   business_mode?: string | null;
@@ -350,6 +351,7 @@ export interface Account {
 
 export interface AccountInventoryRow {
   account_id: number;
+  stock_no?: string | null;
   game_account?: string | null;
   business_mode?: string | null;
   inventory_type?: string | null;

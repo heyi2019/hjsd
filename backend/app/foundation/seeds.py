@@ -71,6 +71,8 @@ SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
     (SequenceKey.INSTALLMENT.value, "FQ", 4),
     (SequenceKey.IMPORT.value, "IMP", 4),
     (SequenceKey.ATTACHMENT.value, "ATT", 4),
+    # 库存编号（KU 序列，2026-10-28 口径）：独立于业务订单，账号创建时自动发放。
+    (SequenceKey.STOCK_NO.value, "KU", 4),
 )
 
 

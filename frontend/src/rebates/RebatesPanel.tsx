@@ -1,5 +1,6 @@
 /** 返点记录：分次到账与来源订单追踪（REB-01 / A06）。 */
-import { Card, Form, Input, Modal, Select, Space, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
+import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -102,7 +103,7 @@ export function RebatesPanel() {
           rate: (values.rate as string) ?? "0",
           collected_on: values.collected_on as string,
         });
-        message.success("返点记录已创建");
+        appMessage.success("返点记录已创建");
         setCreateOpen(false);
         form.resetFields();
         await load();
@@ -113,7 +114,7 @@ export function RebatesPanel() {
     if (!voidTarget) return;
     await write.run(async () => {
         await rebatesApi.voidRecord(voidTarget.id, values.reason as string);
-        message.success("返点记录已作废，未产生资金流水");
+        appMessage.success("返点记录已作废，未产生资金流水");
         setVoidTarget(null);
         voidForm.resetFields();
         await load();
@@ -129,7 +130,7 @@ export function RebatesPanel() {
           settled_on: values.settled_on as string,
           pool_id: Number(values.pool_id),
         });
-        message.success("返点结算已登记");
+        appMessage.success("返点结算已登记");
         setSettleTarget(null);
         settleForm.resetFields();
         await load();
@@ -143,7 +144,7 @@ export function RebatesPanel() {
           reversed_on: values.reversed_on as string,
           reason: values.reason as string,
         });
-        message.success("结算已冲销，已生成反向流水");
+        appMessage.success("结算已冲销，已生成反向流水");
         setReverseTarget(null);
         reverseForm.resetFields();
         await load();
@@ -186,8 +187,8 @@ export function RebatesPanel() {
     },
     {
       title: "对方",
-      className: "ui-col-wrap",
-      onCell: () => ({ className: "ui-col-wrap" }),
+      className: "ui-col-wrap ui-col-md-up",
+      onCell: () => ({ className: "ui-col-wrap ui-col-md-up" }),
       render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.party_name || "-",
     },
     {
@@ -256,12 +257,16 @@ export function RebatesPanel() {
     { title: "到账日", dataIndex: "settled_on" },
     {
       title: "到账金额",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "gross_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
     {
       title: "手续费",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "platform_fee",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,

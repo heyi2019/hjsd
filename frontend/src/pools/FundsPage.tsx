@@ -1,5 +1,6 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Select, Space, Tabs, Tooltip, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tabs, Tooltip, Typography } from "antd";
+import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -193,7 +194,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         expected_release_on: values.expected_release_on as string | undefined,
         note: values.note as string,
       });
-      message.success("押金占用已登记，不影响经营损益");
+      appMessage.success("押金占用已登记，不影响经营损益");
       setDepositOpen(false);
       depositForm.resetFields();
       await load();
@@ -208,7 +209,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         amount: values.amount as string,
         released_on: values.released_on as string,
       });
-      message.success("押金释放已登记");
+      appMessage.success("押金释放已登记");
       setReturnTarget(null);
       returnForm.resetFields();
       await load();
@@ -225,7 +226,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         category: values.category as string,
         reason: values.reason as string,
       });
-      message.success("押金损失已登记");
+      appMessage.success("押金损失已登记");
       setLossTarget(null);
       lossForm.resetFields();
       await load();
@@ -240,7 +241,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         cancelled_on: values.cancelled_on as string,
         reason: values.reason as string,
       });
-      message.success("押金已取消，已生成全额冲正流水");
+      appMessage.success("押金已取消，已生成全额冲正流水");
       setCancelTarget(null);
       cancelForm.resetFields();
       await load();
@@ -262,7 +263,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         amount: values.amount as string,
         note: values.note as string,
       });
-      message.success("独立资金流水已提交，等待审核");
+      appMessage.success("独立资金流水已提交，等待审核");
       setCashflowOpen(false);
       cashflowForm.resetFields();
       await load();
@@ -273,7 +274,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     await write.run(async () => {
       if (action === "approve") await cashflowsApi.approve(row.id);
       else await cashflowsApi.reject(row.id, reason ?? "");
-      message.success(action === "approve" ? "流水已审核" : "流水已拒绝");
+      appMessage.success(action === "approve" ? "流水已审核" : "流水已拒绝");
       setRejectTarget(null);
       rejectForm.resetFields();
       await load();
@@ -288,7 +289,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         reversed_on: values.reversed_on as string,
         reason: values.reason as string,
       });
-      message.success("流水已冲销");
+      appMessage.success("流水已冲销");
       setReverseTarget(null);
       reverseForm.resetFields();
       await load();
@@ -304,7 +305,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         occurred_on: values.occurred_on as string,
         note: values.note as string,
       });
-      message.success("资金池划转已登记");
+      appMessage.success("资金池划转已登记");
       setTransferOpen(false);
       transferForm.resetFields();
       await load();
@@ -319,7 +320,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         counterpart_pool_id: Number(values.counterpart_pool_id),
         reason: values.reason as string,
       });
-      message.success("单边划转已修复");
+      appMessage.success("单边划转已修复");
       setRepairTarget(null);
       repairForm.resetFields();
       await load();
@@ -329,7 +330,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const submitPeriodLock = async (values: Record<string, unknown>) => {
     await write.run(async () => {
       await periodLocksApi.create({ period: values.period as string, note: values.note as string });
-      message.success("账期已锁定");
+      appMessage.success("账期已锁定");
       setPeriodLockOpen(false);
       periodLockForm.resetFields();
       await load();
@@ -347,7 +348,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         (row) => row.pool_id === poolId && row.reconciled_on === reconciledOn && row.account_label === accountLabel,
       )
     ) {
-      message.warning("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户");
+      appMessage.warning("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户");
       return;
     }
     await write.run(async () => {
@@ -361,7 +362,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         reason: values.reason as string,
         note: values.note as string,
       });
-      message.success("对账记录已提交");
+      appMessage.success("对账记录已提交");
       setReconciliationOpen(false);
       reconciliationForm.resetFields();
       await load();
@@ -373,7 +374,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     const targetId = resolveTarget.id;
     await write.run(async () => {
       await reconciliationsApi.resolve(targetId, values.reason as string);
-      message.success("对账差异已核销");
+      appMessage.success("对账差异已核销");
       setResolveTarget(null);
       resolveForm.resetFields();
       await load();
@@ -445,6 +446,8 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     },
     {
       title: "支出",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       align: "right",
       render: (_v, row) => <MoneyText value={balances[row.id]?.expense} />,
     },
@@ -465,6 +468,8 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const depositColumns: ColumnsType<Deposit> = [
     {
       title: "占用金额",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "paid_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,

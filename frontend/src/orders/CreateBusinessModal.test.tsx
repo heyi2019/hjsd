@@ -8,7 +8,7 @@ import { FieldConfigContext } from "./ConfigurableField";
 import { Form } from "antd";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
-import { seedOrderFormFields } from "../test/formFieldsSeed";
+import { allFormFields, seedOrderFormFields } from "../test/formFieldsSeed";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -94,6 +94,32 @@ it("打开回收入口后只加载订单所需的业务数据", async () => {
     expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });
+
+it("回收订单不渲染后台遗留的自定义字段", async () => {
+  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+    ...allFormFields(),
+    {
+      id: 9901,
+      order_type_code: "HS",
+      field_key: "qa500_recovery_note",
+      label: "QA500 回收说明",
+      field_type: "TEXT",
+      options: null,
+      required: false,
+      is_active: true,
+      sort_order: 999,
+      locked: false,
+      is_custom: true,
+      note: null,
+    },
+  ]);
+
+  await openModal();
+
+  await screen.findByLabelText("客户昵称");
+  expect(screen.queryByLabelText("QA500 回收说明")).toBeNull();
+  expect(screen.queryByTestId("custom-fields")).toBeNull();
+});
 
 it("必填校验：未选业务类型不给提交", async () => {
     await openModal();

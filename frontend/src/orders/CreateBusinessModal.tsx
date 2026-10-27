@@ -1,7 +1,7 @@
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form, Modal, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
-import { useOrderFormConfig, CustomFormField, FieldConfigContext } from "./ConfigurableField";
+import { useEffect, useState } from "react";
+import { useOrderFormConfig, FieldConfigContext } from "./ConfigurableField";
 import {
   counterpartiesApi,
   customersApi,
@@ -66,14 +66,6 @@ export function CreateBusinessModal(props: {
   const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   const { config } = useOrderFormConfig(props.open ? orderType : undefined);
-  const customFields = useMemo(
-    () =>
-      Object.values(config)
-        .filter((field) => field.is_custom && field.is_active)
-        .sort((a, b) => a.sort_order - b.sort_order),
-    [config],
-  );
-
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
   useEffect(() => {
@@ -402,13 +394,6 @@ export function CreateBusinessModal(props: {
             <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
           </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
           {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
-          {customFields.length > 0 && (
-            <section className="ui-stack" data-testid="custom-fields">
-              {customFields.map((def) => (
-                <CustomFormField key={def.id} def={def} />
-              ))}
-            </section>
-          )}
         </FieldConfigContext.Provider>
       </Form>
     </Modal>

@@ -74,17 +74,12 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("客户来源选「其他」出现其他来源；改回非其他清除其值", async () => {
+  it("客户来源改为可输入的选填文本框，不再有「其他来源」遗留子字段", async () => {
     await openTypedModal("HS");
-    const selector = screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!;
-    await ui.click(selector);
-    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
-    const other = await screen.findByLabelText("其他来源");
-    await ui.type(other, "朋友介绍");
-    await ui.click(selector);
-    await ui.click(await screen.findByText("闲鱼", { selector: ".ant-select-item-option-content" }));
-    await ui.click(selector);
-    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
-    expect((screen.getByLabelText("其他来源") as HTMLInputElement).value).toBe("");
+    const source = screen.getByLabelText("客户来源") as HTMLInputElement;
+    await ui.type(source, "朋友介绍");
+    expect(source.value).toBe("朋友介绍");
+    // 砍掉「其他来源」遗留分支后，建单弹窗内不应再出现该子字段
+    expect(screen.queryByLabelText("其他来源")).toBeNull();
   });
 });

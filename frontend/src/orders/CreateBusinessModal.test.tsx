@@ -160,8 +160,7 @@ it("设计费走 DESIGN 资金分类（不再落到 OTHER）", async () => {
     await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
     await ui.type(screen.getByLabelText("设计费"), "50");
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
-    await ui.click(screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
-    await ui.click(await screen.findByText("闲鱼", { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("客户来源"), "闲鱼");
     await ui.click(screen.getByLabelText("付款资金账户").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
@@ -184,8 +183,7 @@ it("代挂单的佣金口径随建单提交（支付方式与承担方成对落�
   await ui.type(screen.getByLabelText("账号密码"), "secret");
   await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
   await ui.type(screen.getByLabelText("客户昵称"), "李四");
-  await ui.click(screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
-  await ui.click(await screen.findByText("闲鱼", { selector: ".ant-select-item-option-content" }));
+  await ui.type(screen.getByLabelText("客户来源"), "闲鱼");
   await ui.click(screen.getByLabelText("佣金支付方式").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
   await ui.click(await screen.findByText("结算扣减", { selector: ".ant-select-item-option-content" }));
   await ui.click(screen.getByLabelText("佣金承担方").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);

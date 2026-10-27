@@ -106,9 +106,7 @@ it("代挂新客户保存填写的姓名", async () => {
     await ui.type(screen.getByLabelText("游戏账号"), "test-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "一区");
-    await ui.click(screen.getByLabelText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
-    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
-    await ui.type(screen.getByLabelText("其他来源"), "介绍");
+    await ui.type(screen.getByLabelText("客户来源"), "介绍");
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({ contact_name: "李明" })));
   });

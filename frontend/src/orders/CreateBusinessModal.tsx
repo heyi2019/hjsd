@@ -64,7 +64,7 @@ export function CreateBusinessModal(props: {
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
-  const { customerSource, totalRecoveryCost } = useRecoveryFormState(form);
+  const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   const { config } = useOrderFormConfig(props.open ? orderType : undefined);
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
@@ -194,10 +194,7 @@ export function CreateBusinessModal(props: {
       }
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
-      const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
-      const resolvedCustomerSource = values[customerSourceField] === "其他"
-        ? values[customerSourceOtherField]
-        : values[customerSourceField];
+      const resolvedCustomerSource = values[customerSourceField] as string;
       const customerNickname = values[`${customerPrefix}customer_nickname`];
       if ((isRecovery || isDg) && customerNickname) {
         const existingCustomer = customers.find((customer) =>
@@ -369,7 +366,7 @@ export function CreateBusinessModal(props: {
             }
           }
           const clear: Record<string, undefined> = {};
-          for (const [source, other] of [["customer_source", "customer_source_other"], ["dg_customer_source", "dg_customer_source_other"], ["supplier_source", "supplier_source_other"]]) {
+          for (const [source, other] of [["supplier_source", "supplier_source_other"]]) {
             if (source in changed && changed[source] !== "其他") clear[other] = undefined;
           }
           if ("intermediary_fee" in changed && !(Number(changed.intermediary_fee) > 0)) {
@@ -394,7 +391,7 @@ export function CreateBusinessModal(props: {
           {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
             <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
           </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
-          {isRecovery ? <RecoveryCustomerSection customerSource={customerSource} /> : null}
+          {isRecovery ? <RecoveryCustomerSection /> : null}
         </FieldConfigContext.Provider>
       </Form>
     </Modal>

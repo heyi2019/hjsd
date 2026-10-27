@@ -24,8 +24,6 @@ function toOptions(dict: Record<string, string>) {
 
 /** 代挂前端表单：沿用统一出售事实登记，订单创建阶段只登记寄售账号与委托客户。 */
 export function DgOrderSection(props: { gameTypes?: GameTypeOption[] }) {
-  const customerSource = Form.useWatch("dg_customer_source");
-  const isOtherSource = customerSource === "其他";
   const commissionModeOptions = useOptionSet("COMMISSION_MODE") ?? toOptions(COMMISSION_MODE_LABEL);
   const commissionPayerOptions = useOptionSet("COMMISSION_PAYER") ?? toOptions(COMMISSION_PAYER_LABEL);
   return (
@@ -35,10 +33,7 @@ export function DgOrderSection(props: { gameTypes?: GameTypeOption[] }) {
       <section className="dg-customer-section recovery-customer-fields" aria-labelledby="dg-customer-info-title">
         <div id="dg-customer-info-title" className="recovery-customer-fields__title">委托客户</div>
         <CfgItem className="recovery-order-modal__party-field" name="dg_customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
-        <CfgItem className="recovery-order-modal__party-field" name="dg_customer_source" label="客户来源" rules={[{ required: true, message: "请选择客户来源" }]}><Select placeholder="请选择客户来源" /></CfgItem>
-        <CfgItem className="recovery-order-modal__party-field recovery-customer-source-other" name="dg_customer_source_other" label="其他来源" rules={isOtherSource ? [{ required: true, message: "请输入客户来源" }] : []}>
-          <Input disabled={!isOtherSource} placeholder={isOtherSource ? "请输入来源名称" : "选择其他后可填写"} />
-        </CfgItem>
+        <CfgItem className="recovery-order-modal__party-field" name="dg_customer_source" label="客户来源"><Input placeholder="可选填，如：转介绍 / 抖音 / 老客户" /></CfgItem>
         <div className="recovery-customer-contacts">
           <div className="recovery-customer-contacts__title">联系方式</div>
           <CfgNestedItem className="recovery-fee-field" name="dg_customer_contact" label="姓名"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>

@@ -24,6 +24,125 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ---- GET 轻量缓存：并发去重 + 短 TTL 陈旧重验（SWR） ----
+// 背景：性能压测发现页面/弹窗「换页慢」主要源于 useReloadOnActive 每次切页全量重拉、
+// 列表不分页全量拉取，以及多组件挂载并发打同一接口。本层在共享客户端统一收敛：
+//  1) 并发相同 GET 只发一次请求，其余复用（去重）；
+//  2) 命中新鲜缓存立即返回，并后台静默重验更新（stale-while-revalidate）；
+//  3) 任何写操作（POST/PUT/PATCH/DELETE）成功后清空全部 GET 缓存，
+//     保证建单/取消后再次读取立即可见最新数据。
+// 设计边界：TTL 仅 3s，避免长期服务陈旧数据；仅缓存成功响应（不缓存 5xx/网络错误）。
+const GET_CACHE_TTL_MS = 3_000;
+
+interface CacheEntry {
+  data: unknown;
+  status: number;
+  headers: unknown;
+  expireAt: number;
+}
+
+const responseCache = new Map<string, CacheEntry>();
+const pending = new Map<string, Promise<CacheEntry>>();
+
+// 纯传输层：复用相同 baseURL 与默认 xhr adapter，但不挂载本项目拦截器，
+// 供缓存层直接发起真实网络请求（避免与缓存拦截器相互递归）。
+const transport = axios.create({ baseURL: API_BASE, timeout: 15_000 });
+
+function buildCacheKey(config: { method?: string; url?: string; params?: unknown; headers?: Record<string, unknown> }): string {
+  const headers = (config.headers as Record<string, unknown>) || {};
+  const auth =
+    (headers.Authorization as string) ||
+    (headers["X-Dev-User"] as string) ||
+    (typeof (headers as { get?: (k: string) => unknown }).get === "function"
+      ? ((headers as { get: (k: string) => unknown }).get("Authorization") as string) ||
+        ((headers as { get: (k: string) => unknown }).get("X-Dev-User") as string)
+      : "") ||
+    "";
+  const params = config.params ? JSON.stringify(config.params) : "";
+  return `${String(config.method || "get").toUpperCase()} ${auth} ${config.url ?? ""} ${params}`;
+}
+
+async function realSend(config: any): Promise<CacheEntry> {
+  // transport 复用 baseURL + xhr adapter 但**不挂载本项目拦截器**，
+  // 因此 GET 请求在缓存拦截器（注册在后、先执行）抢先发出时，
+  // api 的鉴权拦截器（注册在前、后执行）尚未注入 X-Dev-User，
+  // 导致 header 缺失 → 后端 401「未登录或凭证已失效」。
+  // 在此显式补 dev 鉴权头，与 api 的鉴权拦截器保持同源口径。
+  const headers = new axios.AxiosHeaders(config.headers);
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  else headers.set("X-Dev-User", currentDevUser());
+  const cfg = {
+    ...config,
+    headers,
+    adapter: undefined,
+    transformRequest: config.transformRequest,
+    transformResponse: config.transformResponse,
+  };
+  const resp = await transport.request(cfg);
+  return { data: resp.data, status: resp.status, headers: resp.headers, expireAt: Date.now() + GET_CACHE_TTL_MS };
+}
+
+function fakeResponse(entry: CacheEntry): any {
+  return { data: entry.data, status: entry.status, statusText: "OK", headers: entry.headers, config: {}, request: {} };
+}
+
+function dedupAdapter(key: string, config: any): any {
+  return async () => {
+    const p = pending.get(key);
+    if (!p) {
+      // pending 已被写失效清掉（竞态），退化为实时请求
+      return fakeResponse(await realSend(config));
+    }
+    return fakeResponse(await p);
+  };
+}
+
+function swrAdapter(key: string, config: any): any {
+  return async () => {
+    const cached = responseCache.get(key)!;
+    // 前台立即返回陈旧值；后台静默重验，失败则保留旧值
+    realSend(config)
+      .then((entry) => responseCache.set(key, entry))
+      .catch(() => undefined);
+    return fakeResponse(cached);
+  };
+}
+
+api.interceptors.request.use((config: any) => {
+  const method = String(config.method || "get").toUpperCase();
+  if (method !== "GET") return config; // 写操作不参与缓存，仅触发失效（见响应拦截器）
+  const key = buildCacheKey(config);
+  const now = Date.now();
+  if (pending.has(key)) {
+    config.adapter = dedupAdapter(key, config);
+    return config;
+  }
+  const cached = responseCache.get(key);
+  if (cached && cached.expireAt > now) {
+    config.adapter = swrAdapter(key, config);
+    return config;
+  }
+  const p = realSend(config)
+    .then((entry) => {
+      responseCache.set(key, entry);
+      return entry;
+    })
+    .finally(() => {
+      pending.delete(key);
+    });
+  pending.set(key, p);
+  // 必须设置 adapter，否则 axios 默认适配器会再发一次请求（与 realSend 重复）
+  config.adapter = async () => fakeResponse(await p);
+  return config;
+});
+
+/** 清空全部 GET 缓存（写操作成功后自动调用；亦供测试在 beforeEach 重置客户端状态）。 */
+export function clearApiCache(): void {
+  responseCache.clear();
+  pending.clear();
+}
+
 export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean };
 
 export async function login(username: string, password: string) {
@@ -54,8 +173,13 @@ export async function logout(): Promise<void> {
 let lastNetworkFailure: { url: string; reason: string } | null = null;
 
 api.interceptors.response.use(
-  (response) => {
+  (response: any) => {
     lastNetworkFailure = null;
+    // 任何写操作成功后清空 GET 缓存，保证建单/取消后再次读取立即可见最新数据
+    const method = String(response.config?.method || "get").toUpperCase();
+    if (method !== "GET" && response.status >= 200 && response.status < 300) {
+      clearApiCache();
+    }
     return response;
   },
   (error) => {

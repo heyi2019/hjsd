@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -468,6 +468,27 @@ class TestDatabaseLifecycle:
                         )
         finally:
             engine.dispose()
+
+    def test_sqlite_engine_registers_checkin_optimize(self, tmp_path):
+        """统计信息自我维护：optimize 必须挂在池 checkin 上（池化连接不会 close）。"""
+        engine = database.build_engine(f"sqlite:///{tmp_path / 'opt.sqlite'}")
+        try:
+            assert event.contains(engine.pool, "checkin", database._sqlite_optimize_on_checkin)
+            with engine.connect():
+                pass  # 借出后归还，监听真实执行一次
+        finally:
+            engine.dispose()
+
+    def test_sqlite_optimize_is_safe_on_fresh_connection(self):
+        """对全新/无业务数据的连接执行 optimize 不报错（PRAGMA 失败必须静默）。"""
+        import sqlite3 as _sqlite3
+
+        conn = _sqlite3.connect(":memory:")
+        try:
+            database._sqlite_optimize_on_checkin(conn, None)
+            assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        finally:
+            conn.close()
 
     def test_session_factory_defaults_to_engine_singleton(self, tmp_path, monkeypatch):
         engine = create_engine(f"sqlite:///{tmp_path / 'db3.sqlite'}")

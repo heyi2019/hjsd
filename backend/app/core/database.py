@@ -35,15 +35,34 @@ def _sqlite_connect_args() -> dict[str, Any]:
     return {"check_same_thread": False}
 
 
+def _sqlite_optimize_on_checkin(dbapi_connection: Any, _record: Any) -> None:
+    """连接归还池时执行 `PRAGMA optimize`，让统计信息自我维护。
+
+    `sqlite_stat1` 只在手工 ANALYZE 后存在，数据涨了就失真、查询计划退化——
+    而 optimize 是 SQLite 官方的统计维护入口：绝大多数时候只是几百条指令的
+    快速检查，判定需要时才对**确实变化大的表**做受限 ANALYZE。挂在 checkin
+    而不是 close，是因为池化连接不 close；同一条连接做完工作归还时正是
+    官方文档建议的执行点。失败静默：它只是锦上添花，不能拖垮请求。
+    """
+    try:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA optimize")
+        cursor.close()
+    except Exception:  # pragma: no cover - 统计维护失败不影响业务
+        pass
+
+
 def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
-    """按 URL 构建 engine；SQLite 走 check_same_thread=False。"""
+    """按 URL 构建 engine；SQLite 走 check_same_thread=False + 连接归还自动 optimize。"""
     settings = get_settings()
     target = url or settings.sqlalchemy_url
     kwargs: dict[str, Any] = {"future": True, "echo": echo}
     if target.startswith("sqlite"):
         kwargs["connect_args"] = _sqlite_connect_args()
-    else:
-        kwargs["pool_pre_ping"] = True
+        engine = create_engine(target, **kwargs)
+        event.listens_for(engine.pool, "checkin")(_sqlite_optimize_on_checkin)
+        return engine
+    kwargs["pool_pre_ping"] = True
     return create_engine(target, **kwargs)
 
 

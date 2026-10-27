@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { message } from "antd";
 import { renderLight } from "../test/render";
-import { OrdersPage } from "./OrdersPage";
+import { OrdersPage, validateAllocations } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
 import { seedOptionSets } from "../test/formFieldsSeed";
@@ -481,7 +481,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
   });
 
-  it("分润：亏损单展示亏损提示并拒绝按金额分润", async () => {
+  it("分润：亏损单展示亏损提示（金额分润不可用）", async () => {
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: allocationRows,
       total: allocationRows.length,
@@ -492,23 +492,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getByText(/金额分润不可用/)).toBeInTheDocument();
     expect(within(modal).getByText("-800.00")).toBeInTheDocument();
-    await ui.clear(within(modal).getByLabelText("比例"));
-    await ui.type(within(modal).getByLabelText("金额"), "200");
-    await clickModalOk(modal);
-    await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith("该单当前为亏损或无利润，不能按金额分润，请改用比例"),
-    );
-    expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
   });
 
-  it("分润：同一行同时填比例与金额时拦截", async () => {
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
-    const modal = await modalOf(/分润 · HS-2026-0001/);
-    await ui.type(within(modal).getByLabelText("金额"), "200");
-    await clickModalOk(modal);
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith("同一行不能同时填比例和金额"));
-    expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
+  it("分润：同一行同时填比例与金额时拦截", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "50", allocation_amount: "200" }],
+      "5000.00",
+    );
+    expect(r).toEqual({ ok: false, error: "同一行不能同时填比例和金额" });
   });
 
   it("分润：保存失败提示错误", async () => {
@@ -642,5 +633,86 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.click(screen.getByRole("button", { name: /模拟新建成功/ }));
     await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
     expect(vi.mocked(catalog.ordersApi.list).mock.calls.length).toBeGreaterThan(before);
+  });
+});
+
+describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () => {
+  it("纯比例合计 100% → ok，归一化 item", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "100", allocation_amount: "0" }],
+      "5000.00",
+    );
+    expect(r).toEqual({
+      ok: true,
+      items: [{ user_id: 9, role: "OWNER", allocation_rate: "100", allocation_amount: "0" }],
+    });
+  });
+
+  it("按金额分润 → ok，金额归一化、比例置 0", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "200" }],
+      "5000.00",
+    );
+    expect(r).toEqual({
+      ok: true,
+      items: [{ user_id: 9, role: "OWNER", allocation_rate: "0", allocation_amount: "200" }],
+    });
+  });
+
+  it("COMPANY 行 → user_id 为 null", () => {
+    const r = validateAllocations(
+      [{ employee: "COMPANY", allocation_rate: "100" }],
+      "5000.00",
+    );
+    expect(r.ok && r.items[0].user_id).toBeNull();
+  });
+
+  it("role 透传（非兜底 OWNER）", () => {
+    const r = validateAllocations(
+      [{ employee: 9, role: "OPERATION", allocation_rate: "100" }],
+      "5000.00",
+    );
+    expect(r.ok && r.items[0].role).toBe("OPERATION");
+  });
+
+  it("纯比例合计非 100% → 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "50", allocation_amount: "0" }],
+      "5000.00",
+    );
+    expect(r).toEqual({ ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" });
+  });
+
+  it("同一行比例与金额同填 → 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "50", allocation_amount: "200" }],
+      "5000.00",
+    );
+    expect(r).toEqual({ ok: false, error: "同一行不能同时填比例和金额" });
+  });
+
+  it("亏损/无利润单按金额分润 → 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "200" }],
+      "-800.00",
+    );
+    expect(r).toEqual({ ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" });
+  });
+
+  it("金额合计超过订单总利润 → 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "800" }],
+      "500.00",
+    );
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toContain("分润金额合计不能超过订单总利润");
+  });
+
+  it("某行比例与金额均为空 → 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "0" }],
+      "5000.00",
+    );
+    expect(r).toEqual({ ok: false, error: "每行至少填比例或金额之一" });
   });
 });

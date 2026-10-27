@@ -106,6 +106,60 @@ type AllocationFormRow = {
   allocation_amount?: string;
 };
 
+/** 分润表单的纯校验函数（不依赖组件/副作用，供单测矩阵直接覆盖）。
+ *  入参 rows 已是「已选员工」过滤结果（组件层已剔除 employee 为空者）。
+ *  返回 ok 时带归一化后的 items；返回非 ok 时带与组件一致的报错文案。 */
+export type AllocationItem = {
+  user_id: number | null;
+  role: string;
+  allocation_rate: string;
+  allocation_amount: string;
+};
+export type AllocationValidation =
+  | { ok: true; items: AllocationItem[] }
+  | { ok: false; error: string };
+
+export function validateAllocations(
+  rows: AllocationFormRow[],
+  orderProfit: string,
+): AllocationValidation {
+  const items: AllocationItem[] = [];
+  let rateTotal = 0;
+  let amountTotal = 0;
+  for (const row of rows) {
+    const rate = String(row.allocation_rate ?? "").trim();
+    const amount = String(row.allocation_amount ?? "").trim();
+    // 「已填」按数值 > 0 判定：后端回显的 0.00 不算填了比例/金额，
+    // 否则金额分润的行会被互斥校验误拦。
+    const hasRate = Number(rate) > 0;
+    const hasAmount = Number(amount) > 0;
+    if (!hasRate && !hasAmount) return { ok: false, error: "每行至少填比例或金额之一" };
+    if (hasRate && hasAmount) return { ok: false, error: "同一行不能同时填比例和金额" };
+    if (hasRate) rateTotal += Number(rate);
+    if (hasAmount) amountTotal += Number(amount);
+      items.push({
+        user_id: row.employee === "COMPANY" ? null : Number(row.employee),
+        role: row.role || "OWNER",
+        allocation_rate: hasRate ? rate : "0",
+        allocation_amount: hasAmount ? amount : "0",
+      });
+  }
+  // 纯比例分润沿用「合计 100%」；一旦有人填金额，改为金额口径（后端校验不超利润）。
+  if (amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
+    return { ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" };
+  }
+  // 金额口径的前置拦截，与后端 _set_person_allocations 保持一致：
+  // 亏损/无利润单不接受金额分润，且金额合计不得超过订单总利润。
+  if (amountTotal > 0) {
+    const profit = Number(orderProfit);
+    if (profit <= 0) return { ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" };
+    if (amountTotal > profit) {
+      return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
+    }
+  }
+  return { ok: true, items };
+}
+
 /** 分润角色兜底文案：词典 PROFIT_ROLE 未加载/未配置时使用。
  *  取值受 DB CHECK `allocation_role_valid` 约束，与 backend AllocationRole 一致。 */
 const PROFIT_ROLE_FALLBACK: Array<{ value: string; label: string }> = [
@@ -707,12 +761,12 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   total={filteredOrders.length}
                   emptyText="暂无业务订单"
                   className="orders-ledger"
-                  scroll={{ x: "max-content" }}
+                 
                   onPageChange={(nextPage, nextSize) => {
                     setPage(nextPage);
                     setPageSize(nextSize);
                   }}
-                />
+                scroll={{ x: "max-content" }}/>
                 <MobileOrderList
                   orders={filteredOrders}
                   emptyText="暂无业务订单"
@@ -1133,56 +1187,12 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               message.error("请先在员工花名册里选择分润对象");
               return;
             }
-            const items: Array<{
-              user_id: number | null;
-              role: string;
-              allocation_rate: string;
-              allocation_amount: string;
-            }> = [];
-            let rateTotal = 0;
-            let amountTotal = 0;
-            for (const row of rows) {
-              const rate = String(row.allocation_rate ?? "").trim();
-              const amount = String(row.allocation_amount ?? "").trim();
-              // 「已填」按数值 > 0 判定：后端回显的 0.00 不算填了比例/金额，
-              // 否则金额分润的行会被互斥校验误拦。
-              const hasRate = Number(rate) > 0;
-              const hasAmount = Number(amount) > 0;
-              if (!hasRate && !hasAmount) {
-                message.error("每行至少填比例或金额之一");
-                return;
-              }
-              if (hasRate && hasAmount) {
-                message.error("同一行不能同时填比例和金额");
-                return;
-              }
-              if (hasRate) rateTotal += Number(rate);
-              if (hasAmount) amountTotal += Number(amount);
-              items.push({
-                user_id: row.employee === "COMPANY" ? null : Number(row.employee),
-                role: row.role || "OWNER",
-                allocation_rate: hasRate ? rate : "0",
-                allocation_amount: hasAmount ? amount : "0",
-              });
-            }
-            // 纯比例分润沿用「合计 100%」；一旦有人填金额，改为金额口径（后端校验不超利润）。
-            if (amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
-              message.error("按比例分润时合计必须为 100%（也可改用金额）");
+            const result = validateAllocations(rows, allocationProfit);
+            if (!result.ok) {
+              message.error(result.error);
               return;
             }
-            // 金额口径的前置拦截，与后端 _set_person_allocations 保持一致：
-            // 亏损/无利润单不接受金额分润，且金额合计不得超过订单总利润。
-            if (amountTotal > 0) {
-              const profit = Number(allocationProfit);
-              if (profit <= 0) {
-                message.error("该单当前为亏损或无利润，不能按金额分润，请改用比例");
-                return;
-              }
-              if (amountTotal > profit) {
-                message.error(`分润金额合计不能超过订单总利润 ${money(allocationProfit)}`);
-                return;
-              }
-            }
+            const items = result.items;
             setAllocationSubmitting(true);
             try {
               await policyApi.setAllocations(actionOrder.id, items, values.form_extra);

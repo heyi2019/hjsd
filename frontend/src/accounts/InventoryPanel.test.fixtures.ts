@@ -9,6 +9,15 @@ export const accounts = [
   { id: 2, source_order_no: "TH-2026-0002", stock_no: "KU0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
+// 库存编号（KU 编码）专项 fixture：含 DG 代挂 / DFQ 代分期衍生账号，供 InventoryPanel.stockNo 测试覆盖多业务类型。
+// 与共享 `accounts` 解耦，避免影响台账统计类断言（在库/已售计数依赖 accounts 条数）。
+export const stockNoAccounts = [
+  { id: 1, source_order_no: "HS-2026-0001", stock_no: "KU0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00" },
+  { id: 2, source_order_no: "TH-2026-0002", stock_no: "KU0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
+  { id: 3, source_order_no: "DG-2026-0003", stock_no: "KU0003", game_account: "acc-3", platform: "C平台", status: "IN_STOCK", inventory_type: "CONSIGNMENT", cost_amount: "300.00", buy_date: "2026-10-03", created_by: "admin", created_at: "2026-10-03T09:30:00" },
+  { id: 4, source_order_no: "DFQ-2026-0004", stock_no: "KU0004", game_account: "acc-4", platform: "D平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "400.00", buy_date: "2026-10-04", created_by: "admin", created_at: "2026-10-04T09:30:00" },
+];
+
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
   vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);

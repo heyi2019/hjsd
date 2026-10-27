@@ -43,6 +43,8 @@ const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserC
 type PageProps = {
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
   initialTab?: BusinessCenterEntryTab;
+  /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
+  active?: boolean;
 };
 const PAGES: Record<string, ComponentType<PageProps>> = {
   business: OrdersPage,
@@ -262,6 +264,7 @@ export function AppShell() {
                       <PageComponent
                         onNavigate={navigateTo}
                         initialTab={key === "business" ? businessTab : undefined}
+                        active={isActive}
                       />
                     )}
                   </div>

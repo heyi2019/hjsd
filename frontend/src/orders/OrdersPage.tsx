@@ -245,7 +245,7 @@ function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: Bus
   )).length;
 }
 
-export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab } = {}) {
+export function OrdersPage({ initialTab, active = true }: { initialTab?: BusinessCenterEntryTab; active?: boolean } = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -600,9 +600,11 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
     }
   };
 
+  // keep-alive：切走再切回不会重挂载。重新激活（active 翻回 true）时重拉列表，
+  // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (active) void load();
+  }, [active, load]);
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter);
@@ -688,7 +690,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel refreshKey={inventoryRefreshKey} />,
+            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => void load()} />,
           },
           {
             key: "ledger",

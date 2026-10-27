@@ -32,7 +32,7 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
-export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
+export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey?: number; onOrdersChanged?: () => void }) {
   const [rows, setRows] = useState<Account[]>([]);
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
@@ -596,6 +596,8 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         onCreated={async () => {
           setSaleTarget(null);
           await load();
+          // 售出会在业务台账生成新订单号，同步通知上层重拉台账，避免两边数据不同步。
+          onOrdersChanged?.();
         }}
       />
       <InventoryConsignmentModal
@@ -604,6 +606,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         onCreated={async () => {
           setConsignmentTarget(null);
           await load();
+          onOrdersChanged?.();
         }}
       />
       <InventoryRebateModal
@@ -612,6 +615,7 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
         onCreated={async () => {
           setRebateTarget(null);
           await load();
+          onOrdersChanged?.();
         }}
       />
       <Modal

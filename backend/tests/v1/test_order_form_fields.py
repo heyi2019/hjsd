@@ -848,3 +848,39 @@ def test_rename_every_configurable_field_updates_references(seeded_db):
     for r in final:
         dep = (r.required_when or {}).get("field") if isinstance(r.required_when, dict) else None
         assert dep is None or dep in keys, f"悬空引用：{r.field_key} → {dep}"
+
+
+# --------------------------------------------------------------------------- #
+# 数据契约护栏：字段类型固定 + 核心字段不可停用
+# --------------------------------------------------------------------------- #
+def test_update_rejects_field_type_change(seeded_db):
+    """字段类型创建后固定，禁止变更；历史 form_extra 值（字符串 vs 数组、类型语义）依赖类型。"""
+    field = ff.create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="ty_text", label="类型探针",
+        actor="admin", field_type="TEXT",
+    )
+    seeded_db.commit()  # 确保持久化，跨 fixture 事务配置稳定
+    with pytest.raises(Validation):
+        ff.update_order_form_field(seeded_db, field.id, actor="admin", field_type="NUMBER")
+    seeded_db.rollback()
+    # 回传与原类型相同不拦截（编辑弹窗会回传原类型）
+    ff.update_order_form_field(seeded_db, field.id, actor="admin", field_type="TEXT")
+    seeded_db.commit()
+    assert seeded_db.get(OrderFormField, field.id).field_type == "TEXT"
+
+
+def test_set_active_rejects_locked_field(seeded_db):
+    """核心字段(locked)不可停用：前端硬编码 Section 不读 is_active，停用将导致状态矛盾。"""
+    locked = OrderFormField(
+        order_type_code="HS", field_key="ty_locked", label="锁字探针",
+        field_type="TEXT", locked=True, is_active=True, is_custom=False,
+    )
+    seeded_db.add(locked)
+    seeded_db.commit()
+    with pytest.raises(Validation):
+        ff.set_order_form_field_active(seeded_db, locked.id, False, actor="admin")
+    seeded_db.rollback()
+    # 启用锁定字段不拦截
+    ff.set_order_form_field_active(seeded_db, locked.id, True, actor="admin")
+    seeded_db.commit()
+    assert seeded_db.get(OrderFormField, locked.id).is_active is True

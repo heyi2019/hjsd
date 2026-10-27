@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography, message } from "antd";
+import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -30,6 +31,7 @@ import {
   StatusTag,
   ConfirmButton,
 } from "../shared/ui";
+import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
 import {
@@ -282,6 +284,9 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // 订单详情展示自定义字段历史值：按 order_type 拉字段配置，对 form_extra 做兜底展开
+  // （含已删除/停用字段标注），保证字段生命周期操作后历史值始终可追溯。
+  const { config: orderFieldConfig } = useOrderFormConfig(selectedOrder?.order_type);
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
@@ -372,7 +377,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
       });
       setAllocationOpen(true);
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     }
   };
 
@@ -384,7 +389,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
       refundForm.resetFields();
       setRefundOpen(true);
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     }
   };
 
@@ -403,7 +408,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
         setSnapshotLoading(false);
       }
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     }
   };
 
@@ -437,12 +442,12 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
         note: values.note as string | undefined,
         form_extra: values.form_extra as Record<string, unknown> | undefined,
       });
-      message.success("订单关联已建立");
+      appMessage.success("订单关联已建立");
       setLinkOpen(false);
       linkForm.resetFields();
       setLinks(await ordersApi.links(selectedOrder.id));
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     } finally {
       setLinkSubmitting(false);
     }
@@ -451,7 +456,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
   const removeLink = async (link: OrderLink) => {
     if (!selectedOrder) return;
     await ordersApi.deleteLink(selectedOrder.id, link.id);
-    message.success("订单关联已删除");
+    appMessage.success("订单关联已删除");
     setLinks(await ordersApi.links(selectedOrder.id));
   };
 
@@ -463,7 +468,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
         const contracts = await installmentsApi.list({ order_id: order.id });
         const target = contracts.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
         if (!target) {
-          message.error("未找到可取消的分期合约");
+          appMessage.error("未找到可取消的分期合约");
           return;
         }
         setCancelInstallmentTarget(target);
@@ -481,7 +486,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
       }
       cancelForm.setFieldsValue({ cancelled_on: today() });
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     }
   };
 
@@ -500,7 +505,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
       if (installment) {
         const result = await installmentsApi.cancel(installment.id, values);
         const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
-        message.success(
+        appMessage.success(
           installment.contract_type === "PICKUP_SALE"
             ? `${refundSummary}，提号交易已结束`
             : installment.contract_type === "ADVANCE_PURCHASE"
@@ -515,11 +520,11 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
         if (selected) {
           const amount = (values.cancel_amount ?? "").trim() || selected.remaining.toFixed(2);
           if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
-            message.error("请输入有效的冲销金额");
+            appMessage.error("请输入有效的冲销金额");
             return;
           }
           if (Number(amount) > selected.remaining + 1e-9) {
-            message.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining.toFixed(2)}`);
+            appMessage.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining.toFixed(2)}`);
             return;
           }
           const result = await ordersApi.postEvent(order.id, {
@@ -531,17 +536,17 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
             note: "取消交易原路退款",
           form_extra: values.form_extra,
           });
-          message.success(`取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退款`);
+          appMessage.success(`取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退款`);
         } else {
           await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
-          message.success("交易已取消，无已登记款项需要退款");
+          appMessage.success("交易已取消，无已登记款项需要退款");
         }
         await load();
       }
       closeCancelTransaction();
       setSelectedOrder(null);
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     } finally {
       setCancelSubmitting(false);
     }
@@ -592,12 +597,12 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
         };
       }
       await ordersApi.patch(selectedOrder.id, payload);
-      message.success("订单已更新");
+      appMessage.success("订单已更新");
       setEditOpen(false);
       setSelectedOrder(await ordersApi.get(selectedOrder.id));
       await load();
     } catch (error) {
-      message.error(normalizeError(error).message);
+      appMessage.error(normalizeError(error).message);
     } finally {
       setEditSubmitting(false);
     }
@@ -825,6 +830,14 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
             <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", selectedOrder.link_status ?? "LINKED", LINK_STATUS_LABEL)} /></Descriptions.Item>
             <Descriptions.Item label="成交日">{selectedOrder.trade_date || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>
+            {buildFormExtraDisplay(selectedOrder?.form_extra, Object.values(orderFieldConfig)).map((it) => (
+              <Descriptions.Item
+                key={it.key}
+                label={`${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}`}
+              >
+                {formatExtraDisplayValue(it.value) || "-"}
+              </Descriptions.Item>
+            ))}
           </Descriptions>
         ) : null}
         {selectedOrder?.events?.length ? (
@@ -1204,23 +1217,23 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
               (row) => row.employee !== undefined && row.employee !== null,
             );
             if (rows.length === 0) {
-              message.error("请先在员工花名册里选择分润对象");
+              appMessage.error("请先在员工花名册里选择分润对象");
               return;
             }
             const result = validateAllocations(rows, allocationProfit);
             if (!result.ok) {
-              message.error(result.error);
+              appMessage.error(result.error);
               return;
             }
             const items = result.items;
             setAllocationSubmitting(true);
             try {
               await policyApi.setAllocations(actionOrder.id, items, values.form_extra);
-              message.success("分润已保存");
+              appMessage.success("分润已保存");
               setAllocationOpen(false);
               setActionOrder(null);
             } catch (error) {
-              message.error(normalizeError(error).message);
+              appMessage.error(normalizeError(error).message);
             } finally {
               setAllocationSubmitting(false);
             }
@@ -1342,12 +1355,12 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
                 refund_responsibility: values.refund_responsibility as "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER",
                 form_extra: values.form_extra,
               });
-              message.success("退款已登记");
+              appMessage.success("退款已登记");
               setRefundOpen(false);
               setActionOrder(null);
               await load();
             } catch (error) {
-              message.error(normalizeError(error).message);
+              appMessage.error(normalizeError(error).message);
             } finally {
               setRefundSubmitting(false);
             }

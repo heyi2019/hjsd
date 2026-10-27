@@ -247,13 +247,20 @@ def update_order_form_field(
         next_label = label.strip()
     else:
         next_label = definition.label
-    next_type = definition.field_type if field_type is None else field_type
-    if field_type is not None and (
-        not isinstance(field_type, str) or field_type not in FIELD_TYPES
-    ):
-        raise Validation(
-            f"字段类型必须为 {FIELD_TYPES}", details={"field": "field_type", "value": field_type}
-        )
+    # 类型创建后固定：值结构（单值/多值、标量类型）由类型决定，改类型会让
+    # 历史 form_extra 值（字符串 vs 数组、类型语义）渲染异常，故禁止变更。
+    # 前端编辑弹窗的类型选择器本就 disabled（仅新增时可定类型），此处为最终裁决。
+    next_type = definition.field_type
+    if field_type is not None:
+        if not isinstance(field_type, str) or field_type not in FIELD_TYPES:
+            raise Validation(
+                f"字段类型必须为 {FIELD_TYPES}", details={"field": "field_type", "value": field_type}
+            )
+        if field_type != definition.field_type:
+            raise Validation(
+                "字段类型创建后不可变更（如需变更请新增字段并迁移历史值）",
+                details={"field": "field_type", "value": field_type, "current": definition.field_type},
+            )
     next_options = list(definition.options or [])
     if options is not None:
         raw_options = list(options)
@@ -390,6 +397,13 @@ def set_order_form_field_active(
     if definition is None:
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
+        )
+    # 核心字段(locked)走前端硬编码 Section 渲染，不读 is_active；
+    # 若允许停用则界面仍渲染可填、与「停用=不出现」语义矛盾，故禁止停用。
+    if not active and definition.locked:
+        raise Validation(
+            f"核心字段「{definition.label}」已锁定，不可停用",
+            details={"field_key": definition.field_key},
         )
     if not active and definition.is_active:
         _reject_if_dependent(session, definition, action="停用")

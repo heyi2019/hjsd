@@ -19,6 +19,7 @@ import {
   isConditionActive,
   resolveOptionItems,
   resolveRules,
+  buildFormExtraDisplay,
   type FieldConfigMap,
 } from "./ConfigurableField";
 
@@ -391,5 +392,39 @@ describe("fieldLabel / 条件依赖标签 随配置改名更新（引用处同�
       buyer: makeField({ field_key: "buyer", label: "购买方" }),
     };
     expect(resolveDependentLabel(updated, "buyer_note")).toBe("购买方");
+  });
+});
+
+describe("buildFormExtraDisplay：历史扩展字段值统一展开（含删除/停用兜底）", () => {
+  const defs: Array<OrderFormField> = [
+    makeField({ field_key: "active_f", label: "活跃字段", is_active: true }),
+    makeField({ field_key: "inactive_f", label: "停用字段", is_active: false }),
+  ];
+
+  it("有定义：label 取配置名，status 按 is_active 区分 active / inactive", () => {
+    const items = buildFormExtraDisplay({ active_f: "甲", inactive_f: "乙" }, defs);
+    expect(items).toEqual([
+      { key: "active_f", label: "活跃字段", value: "甲", status: "active" },
+      { key: "inactive_f", label: "停用字段", value: "乙", status: "inactive" },
+    ]);
+  });
+
+  it("无定义（字段已删除）：label 回退裸 key，status = deleted", () => {
+    const items = buildFormExtraDisplay({ deleted_f: "丙" }, defs);
+    expect(items).toEqual([
+      { key: "deleted_f", label: "deleted_f", value: "丙", status: "deleted" },
+    ]);
+  });
+
+  it("过滤空值（null / 空串 / 空数组）；extra 为 null / undefined 返回 []", () => {
+    const items = buildFormExtraDisplay(
+      { empty1: null, empty2: "", empty3: [], keep: "x" },
+      defs,
+    );
+    expect(items).toEqual([
+      { key: "keep", label: "keep", value: "x", status: "deleted" },
+    ]);
+    expect(buildFormExtraDisplay(undefined, defs)).toEqual([]);
+    expect(buildFormExtraDisplay(null, defs)).toEqual([]);
   });
 });

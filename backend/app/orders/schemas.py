@@ -243,6 +243,7 @@ class EventOut(BaseModel):
 class OrderDetailOut(OrderOut):
     """订单详情：主字段 + 执行、资金、分期与审计摘要。"""
 
+    form_extra: dict[str, object] | None = None
     events: list[EventOut] = Field(default_factory=list)
     links: list["OrderLinkOut"] = Field(default_factory=list)
     cashflows: list["OrderCashflowOut"] = Field(default_factory=list)

@@ -26,7 +26,12 @@ import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
+import {
+  CfgItem,
+  FieldConfigScope,
+  buildFormExtraDisplay,
+  formatExtraDisplayValue,
+} from "../orders/ConfigurableField";
 import "./CustomersPage.css";
 import {
   DataTable,
@@ -46,14 +51,6 @@ const CUSTOMER_ROLE_LABEL: Record<string, string> = {
   CONSIGNOR: "寄售方",
   INSTALLMENT_CUSTOMER: "分期客户",
 };
-
-/** 扩展字段值展示：数组用「、」连接，布尔转是/否，空值回落占位。 */
-function formatExtraValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "";
-  if (Array.isArray(value)) return value.map((item) => String(item)).join("、");
-  if (typeof value === "boolean") return value ? "是" : "否";
-  return String(value);
-}
 
 function customerDateKey(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -222,10 +219,6 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
   const [mergeForm] = Form.useForm();
 
   const activeDefs = fieldDefs.filter((def) => def.is_active);
-  const labelOfKey = useCallback(
-    (key: string) => fieldDefs.find((def) => def.field_key === key)?.label ?? key,
-    [fieldDefs],
-  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -381,18 +374,11 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
       title: "扩展字段",
       key: "extra_values",
       render: (_v, row) => {
-        const entries = Object.entries(row.extra_values ?? {}).filter(
-          ([, value]) =>
-            value !== null &&
-            value !== undefined &&
-            value !== "" &&
-            !(Array.isArray(value) && value.length === 0),
-        );
-        if (entries.length === 0) return "-";
-        const shown = entries
-          .slice(0, 2)
-          .map(([key, value]) => `${labelOfKey(key)}：${formatExtraValue(value)}`);
-        return entries.length > 2 ? `${shown.join("；")} 等 ${entries.length} 项` : shown.join("；");
+        const items = buildFormExtraDisplay(row.extra_values, fieldDefs);
+        if (items.length === 0) return "-";
+        const shown = items.slice(0, 2).map((it) =>
+          `${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}：${formatExtraDisplayValue(it.value)}`);
+        return items.length > 2 ? `${shown.join("；")} 等 ${items.length} 项` : shown.join("；");
       },
     },
     {
@@ -671,25 +657,30 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
             <Typography.Title level={5} className="ui-title-spaced">
               扩展字段
             </Typography.Title>
-            {fieldDefs.length === 0 ? (
-              <Typography.Paragraph type="secondary">
-                未配置扩展字段；在「设置 › 表单字段 › 客户建档」新增自定义字段后，建档与详情会自动带出。
-              </Typography.Paragraph>
-            ) : (
-              <Descriptions column={1} bordered size="small">
-                {fieldDefs.map((def) => {
-                  const value = formatExtraValue(detailTarget.extra_values?.[def.field_key]);
-                  return (
+            {(() => {
+              const items = buildFormExtraDisplay(detailTarget.extra_values, fieldDefs);
+              if (items.length === 0) {
+                return (
+                  <Typography.Paragraph type="secondary">
+                    {fieldDefs.length === 0
+                      ? "未配置扩展字段；在「设置 › 表单字段 › 客户建档」新增自定义字段后，建档与详情会自动带出。"
+                      : "无扩展字段值"}
+                  </Typography.Paragraph>
+                );
+              }
+              return (
+                <Descriptions column={1} bordered size="small">
+                  {items.map((it) => (
                     <Descriptions.Item
-                      key={def.field_key}
-                      label={`${def.label}${def.is_active ? "" : "（已停用）"}`}
+                      key={it.key}
+                      label={`${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}`}
                     >
-                      {value || "未填写"}
+                      {formatExtraDisplayValue(it.value) || "未填写"}
                     </Descriptions.Item>
-                  );
-                })}
-              </Descriptions>
-            )}
+                  ))}
+                </Descriptions>
+              );
+            })()}
             {detailData ? (
               <>
                 <Typography.Title level={5} className="ui-title-spaced">经营概览</Typography.Title>

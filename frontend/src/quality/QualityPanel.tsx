@@ -184,11 +184,11 @@ export function QualityPanel() {
 
   const columns: ColumnsType<QualityIssue> = [
     { title: "工单号", dataIndex: "issue_no" },
-    { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} optionSet="QUALITY_SEVERITY" /> },
+    { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} optionSet="QUALITY_SEVERITY" />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "标题", dataIndex: "title" },
-    { title: "对象", render: (_v, row) => `${row.entity_type}:${row.entity_id}` },
+    { title: "对象", render: (_v, row) => `${row.entity_type}:${row.entity_id}`, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("QUALITY_STATUS", v, QUALITY_STATUS_LABEL)} /> },
-    { title: "问题", dataIndex: "message" },
+    { title: "问题", dataIndex: "message", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "操作",
       render: (_v, row) => row.status === "OPEN" ? (

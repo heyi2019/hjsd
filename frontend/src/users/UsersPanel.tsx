@@ -50,9 +50,9 @@ export function UsersPanel() {
         { title: "用户名", dataIndex: "username" },
         { title: "姓名", dataIndex: "display_name" },
         { title: "角色", dataIndex: "role", render: (v: string) => USER_ROLE_LABEL[v] ?? v },
-        { title: "数据范围", dataIndex: "owner_scope", render: (v: string) => OWNER_SCOPE_LABEL[v] ?? v },
-        { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" },
-        { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
+        { title: "数据范围", dataIndex: "owner_scope", render: (v: string) => OWNER_SCOPE_LABEL[v] ?? v, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+        { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+        { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-"), className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
         { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" },
         { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space size={2}><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><ConfirmButton
               permission="user.manage"

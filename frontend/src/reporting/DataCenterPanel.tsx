@@ -71,11 +71,15 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   const columns: ColumnsType<PoolRow> = [
     {
       title: "资金池",
+      className: "ui-col-wrap",
+      onCell: () => ({ className: "ui-col-wrap" }),
       dataIndex: ["pool", "code"],
       render: (_value, row) => `${row.pool.name}（${row.pool.code}）`,
     },
     {
       title: "状态",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: ["pool", "status"],
       width: 110,
       render: (status: string) => <StatusTag status={status} />,
@@ -92,6 +96,8 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     },
     {
       title: "押金",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.deposit_held} />,
     },

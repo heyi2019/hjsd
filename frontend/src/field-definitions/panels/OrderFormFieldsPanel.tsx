@@ -96,7 +96,10 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         : null;
       // 必填与条件必填互斥：配置了条件即按条件必填处理（基础态为选填）。
       const required = condField ? false : Boolean(values.required);
-      const options = needsOptions ? normalizeOptionItems(values.options) : undefined;
+      const rawOptions = needsOptions ? normalizeOptionItems(values.options) : [];
+      // 动态字典字段（游戏类型/资金池/客户等）库内 options 为空，编辑改名时
+      // 空选项数组按「未变更」处理（不传），否则后端会以「选择型字段至少需要一个选项」拒绝更新。
+      const options = needsOptions && rawOptions.length ? rawOptions : undefined;
       if (editingId === null) {
         await orderFormFieldsApi.create({
           order_type_code: activeType,
@@ -148,7 +151,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   };
 
   const columns: ColumnsType<OrderFormField> = [
-    { title: "字段键", dataIndex: "field_key" },
+    { title: "字段键", dataIndex: "field_key", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "标签", dataIndex: "label" },
     { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
     {
@@ -191,6 +194,8 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
     },
     {
       title: "选项",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "options",
       render: (value: Array<string | { value: string; label: string }> | null | undefined, row) =>
         row.field_key === "game_type" ? `游戏类型主数据 · ${gameTypeNames.slice(0, 2).join("、") || "暂无"}等 ${gameTypeNames.length} 项` :

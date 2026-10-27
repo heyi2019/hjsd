@@ -79,10 +79,10 @@ export function PoolsPanel() {
   };
 
   const columns: ColumnsType<Pool> = [
-    { title: "代码", dataIndex: "code" },
+    { title: "代码", dataIndex: "code", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "名称", dataIndex: "name" },
     { title: "类型", dataIndex: "pool_type", render: (v: string) => configurableLabel("POOL_TYPE", v, POOL_TYPE_LABEL) },
-    { title: "归属", dataIndex: "ownership", render: (v: string) => configurableLabel("POOL_OWNERSHIP", v, POOL_OWNERSHIP_LABEL) },
+    { title: "归属", dataIndex: "ownership", render: (v: string) => configurableLabel("POOL_OWNERSHIP", v, POOL_OWNERSHIP_LABEL), className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
     { title: "操作", render: (_v, row) => <Space size={2}><PermissionButton permission="pool.manage" size="small" onClick={() => { setEditing(row); editForm.setFieldsValue(row); }}>{"编辑"}</PermissionButton><ConfirmButton
               permission="pool.manage"

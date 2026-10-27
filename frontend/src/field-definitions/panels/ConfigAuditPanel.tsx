@@ -93,12 +93,16 @@ export function ConfigAuditPanel() {
     { title: "操作人", dataIndex: "actor", width: 110, render: (v: string | null) => v ?? "—" },
     {
       title: "配置项",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "entity_type",
       width: 160,
       render: (v: string | null) => ENTITY_TYPE_TO_ITEM[v ?? ""] ?? v ?? "—",
     },
     {
       title: "对象类型",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "entity_type",
       width: 110,
       render: (v: string | null) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL),
@@ -110,7 +114,7 @@ export function ConfigAuditPanel() {
       render: (v: string | null) => (v ? configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) : "—"),
     },
     { title: "对象", dataIndex: "entity_id", width: 120, render: (v: string | null) => v ?? "—" },
-    { title: "备注", dataIndex: "reason", render: (v: string | null) => v || "—", ellipsis: true },
+    { title: "备注", dataIndex: "reason", render: (v: string | null) => v || "—", ellipsis: true, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
   ];
 
   return (

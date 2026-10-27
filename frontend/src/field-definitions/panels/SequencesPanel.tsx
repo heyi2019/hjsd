@@ -46,9 +46,9 @@ export function SequencesPanel() {
 
   const columns: ColumnsType<DocumentSequence> = [
     { title: "编号域", dataIndex: "sequence_key", render: (v: string) => configurableLabel("SEQUENCE_KEY", v, SEQUENCE_KEY_LABEL) },
-    { title: "序列键", dataIndex: "sequence_key" },
+    { title: "序列键", dataIndex: "sequence_key", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "前缀", dataIndex: "prefix", render: (v: string) => v || "—" },
-    { title: "补齐位数", dataIndex: "padding", align: "right" },
+    { title: "补齐位数", dataIndex: "padding", align: "right", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "当前值", dataIndex: "current_value", align: "right" },
     { title: "下一编号", dataIndex: "next_number" },
   ];

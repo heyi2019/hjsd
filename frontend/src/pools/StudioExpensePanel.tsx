@@ -266,10 +266,14 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     { title: "日期", dataIndex: "occurred_on" },
     {
       title: "资金池",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id,
     },
     {
       title: "收支",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "direction",
       width: 70,
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
@@ -286,9 +290,11 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       dataIndex: "status",
       render: (v: string) => <StatusTag status={v} optionSet="FUND_FLOW_STATUS" />,
     },
-    { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
+    { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "审核追溯",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => (
         <span className="muted">
           {row.reviewed_by

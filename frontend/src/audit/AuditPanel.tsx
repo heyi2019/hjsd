@@ -47,8 +47,8 @@ export function AuditPanel() {
     { title: "时间", dataIndex: "occurred_at" },
     { title: "操作人", dataIndex: "actor" },
     { title: "动作", dataIndex: "action", render: (v: string) => configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) },
-    { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL) },
-    { title: "对象编号", dataIndex: "entity_id" },
+    { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL), className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "对象编号", dataIndex: "entity_id", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "原因", dataIndex: "reason", render: (v: string | null) => v || "-" },
   ];
   return (

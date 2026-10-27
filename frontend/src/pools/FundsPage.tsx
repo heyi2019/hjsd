@@ -475,21 +475,29 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     },
     {
       title: "来源订单",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => row.source_order_id == null ? "—" : `#${row.source_order_id}`,
     },
     {
       title: "预计释放",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "expected_release_on",
       render: (v: string | null | undefined) => v || "—",
     },
     {
       title: "已释放",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "returned_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
     {
       title: "已损失",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "lost_amount",
       align: "right",
       render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} />,
@@ -652,9 +660,9 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const reconciliationColumns: ColumnsType<Reconciliation> = [
     { title: "资金池", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
-    { title: "账户", dataIndex: "account_label" },
-    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已审核流水，剔除待审核/已拒绝">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
-    { title: "账面余额", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
+    { title: "账户", dataIndex: "account_label", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已审核流水，剔除待审核/已拒绝">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "账面余额", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} />, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "差异", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
     {
@@ -695,7 +703,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     { title: "账期", dataIndex: "period" },
     { title: "锁定时间", dataIndex: "locked_at", render: (v: string | undefined) => v ? new Date(v).toLocaleString("zh-CN") : "—" },
     { title: "锁定人", dataIndex: "locked_by" },
-    { title: "说明", dataIndex: "note", render: (v: string | null | undefined) => v || "—" },
+    { title: "说明", dataIndex: "note", render: (v: string | null | undefined) => v || "—", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
   ];
 
   return (

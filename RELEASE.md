@@ -1,5 +1,36 @@
 # 宜游轩 ERP 发布记录
 
+## 发版流程（每次发正式版照此执行）
+
+> **版本号不会自动升。** 必须显式执行下面第 1 步；不做则三处版本停在旧值，
+> 且 `test_frontend_version_matches_backend_release_version` 会在只改一处时直接红。
+
+```bash
+# 1 升版本号（patch=修 bug / minor=加功能 / major=不兼容）
+scripts/ops/bump_version.sh patch         # 先 --dry-run 看将要改什么
+scripts/ops/bump_version.sh --check       # 确认三处一致
+
+# 2 写本文件的发布说明（新版本章节，脚本不代写）
+
+# 3 提交并打 tag（tag 必须指向含本次版本改动的提交）
+git add backend/app/version.py frontend/package.json frontend/package-lock.json RELEASE.md
+git commit -m "release: v1.1.1 ..."
+scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
+```
+
+一次改动三处，缺一处即失效：
+
+| 文件 | 作用 | 漏改的后果 |
+| --- | --- | --- |
+| `backend/app/version.py` | 唯一事实源；`deploy.sh` 据此生成镜像 tag | `/health` 与镜像 tag 报旧版本 |
+| `frontend/package.json` | 前端包版本 | 前端无法反查 |
+| `frontend/package-lock.json` | 根包版本（顶层 + `packages[""]` 两处） | `npm ci` 结果与 package.json 不符 |
+
+部署侧**无需任何配置**：`deploy.sh` 用 `sed` 从 `version.py` 解析并 `export APP_VERSION`，
+镜像 tag（`heijin-backend:<版本>`）与容器内 `/api/v1/health` 的 `app_version` 自动跟随。
+
+---
+
 ## V1.1.0
 
 **发布时间：** 2026-10-27 22:15 CST（Asia/Shanghai）

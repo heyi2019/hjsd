@@ -31,6 +31,36 @@ def test_default_application_version_is_semver_without_release_prefix():
     assert re.fullmatch(r"\d+\.\d+\.\d+", release_version), "必须是 x.y.z 形式，且不带 v 前缀"
 
 
+def test_frontend_version_matches_backend_release_version():
+    """前后端版本必须同源，否则线上无法判断前端跑的是哪份代码。
+
+    典型漂移：只改 `backend/app/version.py` 就发版 → 前端包版本仍是旧的，
+    页面/构建产物与 `/health` 报的版本号打架。发版请走
+    `scripts/ops/bump_version.sh`，它一次改齐三处（version.py / package.json /
+    package-lock.json），本断言是事后兜底。
+    """
+    import json
+
+    from app.version import __version__ as release_version
+
+    pkg_path = PROJECT_ROOT / "frontend" / "package.json"
+    lock_path = PROJECT_ROOT / "frontend" / "package-lock.json"
+    assert pkg_path.is_file(), f"缺少前端 package.json：{pkg_path}"
+
+    pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
+    assert pkg["version"] == release_version, (
+        f"frontend/package.json={pkg['version']} 与 backend/app/version.py="
+        f"{release_version} 不一致，请运行 scripts/ops/bump_version.sh"
+    )
+
+    if lock_path.is_file():
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        assert lock["version"] == release_version, "package-lock.json 顶层版本未同步"
+        assert lock["packages"][""]["version"] == release_version, (
+            "package-lock.json 根包版本未同步"
+        )
+
+
 def test_env_file_is_project_root_dotenv():
     """本地开发与联调指南 §1：必须读根目录 .env，而不是 backend/.env。"""
     path = locate_env_file()

@@ -188,7 +188,8 @@ docker compose down               # 停止
 docker compose pull && docker compose up -d   # 更新（若镜像改了需先 build）
 ```
 
-**数据备份**（在线快照，WAL 安全；`deploy.sh` 每次部署前自动执行，默认保留 30 份）：
+**数据备份**（在线快照，WAL 安全；`deploy.sh` 每次部署前自动执行，默认保留 30 份。**日常快照必须另挂 `backup_daily.sh`
+的 cron**——两次部署之间不会有任何备份）：
 ```bash
 docker compose exec -T backend python scripts/backup_db.py \
   --db /app/data/heijin_erp_v1.db --out-dir /app/data/backups --keep 30
@@ -202,6 +203,49 @@ docker compose restart backend     # 服务需重启才会加载被替换的库�
 
 > **不要用 `tar` 直接打包运行中的 `data/`**：SQLite 在 WAL 模式下 `db` / `-wal` / `-shm` 三个文件的时刻不一致，可能得到损坏快照。
 > `backup_db.py` 走 SQLite 在线备份 API，产出单文件一致快照；`restore_db.py` 恢复前会先验签再验页完整性。
+
+### 备份异地留存（必做，否则不构成灾备）
+
+`backup_db.py` 把备份写在 `/app/data/backups`，**与正式库同处一个 Docker 卷**。因此
+`docker compose down -v`、卷损坏或磁盘故障会让「库 + 备份」一起消失——它只能防部署失败，不能防灾难。
+
+两步补齐：
+
+**① ECS 上每日自动备份**（部署时备份只在部署前触发，日常不产生快照）：
+```bash
+# deploy/scripts/backup_daily.sh 已随仓库上传，库不存在时自动跳过（首部署前不报错）
+crontab -e
+20 3 * * * /bin/bash /opt/heijin/deploy/scripts/backup_daily.sh >> /var/log/heijin_backup.log 2>&1
+```
+
+**② 本机（或另一台机器）每日拉取**，形成物理分离的第二份：
+```bash
+# 首次手动执行，确认 SSH 免密与卷名
+bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>
+
+# 成功后再挂 cron（本机每日 04:10 拉一次，保留 30 份）
+10 4 * * * /bin/bash /path/to/黑金时代/deploy/scripts/pull_backup.sh --host root@<ECS_IP> >> ~/heijin_pull.log 2>&1
+```
+
+脚本行为与安全语义：
+
+| 项 | 说明 |
+|---|---|
+| 传输 | `ssh` + 容器内 `tar` 流式拉到本机，不依赖 ECS 宿主机的 tar 与卷路径 |
+| 校验 | 每份比对 `.sha256` sidecar + `PRAGMA integrity_check` |
+| **失败保护** | 先落 `$DEST/.incoming` 暂存区，**全部校验通过才原子替换**；校验失败时本地一份不动，坏备份留在暂存区供排查 |
+| 保留 | 本地滚动保留最近 N 份（默认 30），文件名时间戳即排序依据 |
+| 默认目录 | `~/heijin_backups`（可用 `--dest` 或 `ERP_BACKUP_DEST` 覆盖） |
+
+> 若 ECS 与本机之间无公网可达（本机在 NAT 后），改为 ECS 侧推送对象存储：
+> `ossutil cp /app/data/backups/ oss://<bucket>/heijin/ -r -u`，再本地按需下载。
+
+恢复演练（建议每季度做一次，验证备份真的能用）：
+```bash
+# 本机校验通过的最新一份 → 传到 ECS 卷内 → 用 restore_db.py 回滚
+bash deploy/scripts/pull_backup.sh --host root@<ECS_IP> --dest /tmp/restore_check
+ls -1t /tmp/restore_check/*.db | head -1
+```
 
 ---
 

@@ -74,9 +74,20 @@ def backup_database(src: Path, out_dir: Path, keep: int = 30) -> Path:
     dest_conn = sqlite3.connect(str(dest))
     try:
         src_conn.backup(dest_conn)
+        # 备份库会继承源库的 WAL 标志。若此时备份库自己的 -wal 里还留有页，而 SHA256 只
+        # 覆盖 .db 主文件，恢复端就会「校验通过却丢掉这些页」。故显式合并 WAL 并切回
+        # rollback journal，让「单文件 + 单 SHA256」真正自洽。
+        dest_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        mode = dest_conn.execute("PRAGMA journal_mode=DELETE").fetchone()[0]
+        if str(mode).lower() != "delete":
+            raise RuntimeError(f"备份库未能切回 rollback journal（当前 {mode}），拒绝产出不自洽的备份")
     finally:
         src_conn.close()
         dest_conn.close()
+
+    # 清掉可能残留的空 WAL 影子文件：备份目录应只有 .db 与 .sha256 两类文件。
+    for suffix in ("-wal", "-shm"):
+        Path(str(dest) + suffix).unlink(missing_ok=True)
 
     # 3) 校验和 sidecar
     digest = sha256_of(dest)

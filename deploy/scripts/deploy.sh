@@ -67,3 +67,8 @@ else
   echo "  ✗ 健康检查未通过，请查 docker compose logs backend" >&2
   exit 1
 fi
+
+# 部署前备份与正式库同处 erp_db 卷，卷丢失会一起没；异地留存必须在另一台机器上做。
+echo "==> 备份提醒（本次已做部署前快照，日常快照需另挂 cron）"
+echo "  ECS: crontab -e → 20 3 * * * /bin/bash $(pwd)/scripts/backup_daily.sh"
+echo "  本机: bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>"

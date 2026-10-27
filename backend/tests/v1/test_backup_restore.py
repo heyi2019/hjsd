@@ -123,6 +123,40 @@ def test_backup_then_restore_roundtrip(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_backup_is_single_self_contained_file_under_wal(tmp_path: Path) -> None:
+    """备份必须是「单文件 + 单 SHA256」自洽快照。
+
+    回归背景：备份库会继承源库的 WAL 标志，若备份库自己的 -wal 里还留有页，SHA256 只覆盖
+    .db 主文件，恢复端就会「校验通过却丢数据」。此处锁死三件事：产物无 -wal/-shm、
+    journal_mode 已切回 delete、行数完整且 integrity ok。
+    """
+    import sqlite3
+
+    src = tmp_path / "wal_src.db"
+    conn = sqlite3.connect(str(src))
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        conn.executemany("INSERT INTO t(v) VALUES (?)", [(f"x{i}",) for i in range(3000)])
+        conn.commit()
+        wal = Path(str(src) + "-wal")
+        assert wal.exists() and wal.stat().st_size > 0, "前置条件不成立：源库应有未合并 WAL"
+    finally:
+        conn.close()
+
+    dest = backup_mod.backup_database(src, tmp_path / "bak_wal", keep=5)
+
+    assert not Path(str(dest) + "-wal").exists(), "备份不应残留 -wal（SHA 覆盖不到其中的页）"
+    assert not Path(str(dest) + "-shm").exists(), "备份不应残留 -shm"
+    check = sqlite3.connect(f"file:{dest}?mode=ro", uri=True)
+    try:
+        assert check.execute("PRAGMA journal_mode").fetchone()[0].lower() == "delete"
+        assert check.execute("SELECT count(*) FROM t").fetchone()[0] == 3000
+        assert check.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        check.close()
+
+
 def test_restore_rejects_corrupted_backup(tmp_path: Path) -> None:
     src = tmp_path / "src.db"
     engine = create_engine(f"sqlite:///{src}", future=True)

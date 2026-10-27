@@ -17,6 +17,11 @@ from app.core.settings import (
 SECURE_TEST_SECRET = "test-production-secret-0123456789-abcdef"
 
 
+def test_default_application_version_is_semver_without_release_prefix():
+    """API 对外使用 SemVer；V 前缀只属于系统发布标签。"""
+    assert Settings().app_version == "1.0.0"
+
+
 def test_env_file_is_project_root_dotenv():
     """本地开发与联调指南 §1：必须读根目录 .env，而不是 backend/.env。"""
     path = locate_env_file()

@@ -10,15 +10,24 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+# 让管理员初始化与 docker compose 使用同一份部署配置；.env 由运维维护且不入库。
+set -a
+. ./.env
+set +a
+
 echo "==> 构建镜像"
 docker compose build
 
-echo "==> 迁移前备份正式库"
-docker compose run --rm backend \
-  python /app/scripts/backup_db.py \
-  --db /app/data/heijin_erp_v1.db \
-  --out-dir /app/data/backups \
-  --keep 30
+if docker compose run --rm backend test -f /app/data/heijin_erp_v1.db; then
+  echo "==> 迁移前备份正式库"
+  docker compose run --rm backend \
+    python /app/scripts/backup_db.py \
+    --db /app/data/heijin_erp_v1.db \
+    --out-dir /app/data/backups \
+    --keep 30
+else
+  echo "==> 首次部署：正式库尚不存在，跳过备份"
+fi
 
 echo "==> 执行数据库迁移"
 docker compose run --rm backend alembic upgrade head
@@ -41,4 +50,9 @@ docker compose ps
 
 echo "==> 后端健康检查"
 sleep 5
-curl -fsS http://127.0.0.1/api/v1/health && echo "  OK" || echo "  ⚠ 健康检查未通过，请查 docker compose logs backend"
+if curl -fsS http://127.0.0.1/api/v1/health; then
+  echo "  OK"
+else
+  echo "  ✗ 健康检查未通过，请查 docker compose logs backend" >&2
+  exit 1
+fi

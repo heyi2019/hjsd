@@ -181,7 +181,7 @@ export function injectOptionsIfMissing(
   if (!def) return children;
   const items = resolveOptionItems(def.options);
   if (items.length === 0) return children;
-  return Children.map(children, (child) => {
+  const mapped = Children.map(children, (child) => {
     if (!isValidElement(child)) return child;
     const childProps = child.props as { options?: unknown };
     // 同时兼容 antd Select、shared/ui 的 Select 封装（forwardRef 封装组件，类型与裸 antd Select 不同）、
@@ -193,6 +193,9 @@ export function injectOptionsIfMissing(
     }
     return child;
   });
+  // Form.Item(name) 必须接收单一控件。Children.map 即使只有一个 child 也会返回数组，
+  // 会让 antd 放弃控件绑定并持续报警；单控件场景还原为元素本身。
+  return mapped?.length === 1 ? mapped[0] : mapped;
 }
 
 /** 受配置驱动的 NestedFormField 布局项（name 在内层 Form.Item，如「联系方式」网格内的子字段）。 */

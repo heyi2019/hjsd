@@ -74,9 +74,8 @@ function DfqInstallmentInfo() {
       <CfgNestedItem noStyle={false} name="dfq_period_amount" label="每期金额" rules={[{ validator: async (_, value) => {
         const count = Number(periods), total = Number(totalAmount) + Number(serviceFee || 0), amount = Number(value);
         if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(totalAmount) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配");
-      } }]}><MoneyInput placeholder="请输入金额" />
-        {totalAmount != null && Number(periods) > 0 && periodAmount != null && Number.isFinite(Number(periodAmount)) && <span>最后一期：{((Math.round((Number(totalAmount) + Number(serviceFee || 0)) * 100) - Math.round(Number(periodAmount) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元</span>}
-      </CfgNestedItem>
+      } }]}><MoneyInput placeholder="请输入金额" /></CfgNestedItem>
+      {totalAmount != null && Number(periods) > 0 && periodAmount != null && Number.isFinite(Number(periodAmount)) && <span>最后一期：{((Math.round((Number(totalAmount) + Number(serviceFee || 0)) * 100) - Math.round(Number(periodAmount) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元</span>}
     </AdaptiveFormGrid>
   );
 }

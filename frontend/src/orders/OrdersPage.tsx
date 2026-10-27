@@ -1237,7 +1237,6 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                 {fields.map((field) => (
                   <Space key={field.key} align="baseline" className="orders-allocation-row" wrap>
                     <Form.Item
-                      {...field}
                       name={[field.name, "employee"]}
                       label="姓名"
                       rules={[{ required: true, message: "请选择姓名" }]}
@@ -1249,7 +1248,6 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                       />
                     </Form.Item>
                     <Form.Item
-                      {...field}
                       name={[field.name, "role"]}
                       label="角色"
                       initialValue="OWNER"
@@ -1261,7 +1259,6 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                       />
                     </Form.Item>
                     <Form.Item
-                      {...field}
                       name={[field.name, "allocation_rate"]}
                       label="比例"
                       rules={percentRules("比例")}
@@ -1269,7 +1266,6 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                       <Input suffix="%" inputMode="decimal" className="ui-control-width-120" />
                     </Form.Item>
                     <Form.Item
-                      {...field}
                       name={[field.name, "allocation_amount"]}
                       label="金额"
                       rules={moneyRules("金额")}

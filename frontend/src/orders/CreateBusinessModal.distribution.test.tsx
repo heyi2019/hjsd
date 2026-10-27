@@ -156,6 +156,21 @@ it("代分期显示最后一期承担尾差", async () => {
     expect(await screen.findByText("最后一期：333.32 元")).toBeInTheDocument();
   });
 
+it("代分期每期金额保持表单控件唯一，说明文本不参与字段绑定", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await openTypedModal("DFQ");
+    await ui.type(screen.getByPlaceholderText("账号全款基础价格"), "1000");
+    const periods = screen.getByPlaceholderText("请输入期数");
+    await ui.clear(periods);
+    await ui.type(periods, "3");
+
+    expect(await screen.findByText("最后一期：333.32 元")).toBeInTheDocument();
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("A `Form.Item` with a `name` prop must have a single child element"),
+    );
+    errorSpy.mockRestore();
+  });
+
 it("增加代分期期数时自动补充分期计划", async () => {
     await openTypedModal("DFQ");
     const periods = screen.getByPlaceholderText("请输入期数");

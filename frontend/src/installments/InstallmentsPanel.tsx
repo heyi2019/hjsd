@@ -282,10 +282,14 @@ function ContractTable({
     },
     {
       title: "业务",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.order_id)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.order_id);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
@@ -293,6 +297,8 @@ function ContractTable({
     },
     {
       title: "产品",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
@@ -300,6 +306,8 @@ function ContractTable({
     },
     {
       title: "对方",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => orders.find((order) => order.id === row.order_id)?.party_name || "-",
     },
     {
@@ -309,12 +317,16 @@ function ContractTable({
     },
     {
       title: "服务费",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "service_fee",
       align: "right",
       render: (v: string) => <MoneyText value={v ?? "0"} />,
     },
     {
       title: "每期服务费",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "per_period_service_fee",
       align: "right",
       render: (v: string) => <MoneyText value={v ?? "0"} />,
@@ -327,6 +339,8 @@ function ContractTable({
     },
     {
       title: "坏账",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "bad_debt_amount",
       align: "right",
       render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,

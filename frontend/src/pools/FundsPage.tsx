@@ -540,17 +540,21 @@ export function FundsPage() {
 
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
-    { title: "流水号", dataIndex: "flow_no" },
+    { title: "流水号", dataIndex: "flow_no", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "日期", dataIndex: "occurred_on" },
-    { title: "类别", dataIndex: "category" },
+    { title: "类别", dataIndex: "category", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "资金性质",
       dataIndex: "fund_nature",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (v: string | null | undefined, row) => FUND_NATURE_LABEL[v ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? v ?? "—",
     },
     {
       title: "核算属性",
       dataIndex: "accounting_attribute",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (v: string | null | undefined) => ACCOUNTING_ATTRIBUTE_LABEL[v ?? ""] ?? v ?? "—",
     },
     {
@@ -561,6 +565,8 @@ export function FundsPage() {
     {
       title: "流向",
       dataIndex: "nature",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       render: (v: string | null | undefined) =>
         natureOptionSet?.find((o) => o.value === (v ?? ""))?.label ?? NATURE_LABEL[v ?? ""] ?? v ?? "—",
     },
@@ -570,10 +576,12 @@ export function FundsPage() {
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "来源", dataIndex: "source" },
+    { title: "来源", dataIndex: "source", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" })} /> },
     {
       title: "审核追溯",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       width: 190,
       render: (_v, row) => (
         <span className="muted">
@@ -584,7 +592,7 @@ export function FundsPage() {
         </span>
       ),
     },
-    { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
+    { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "操作",
       width: 170,

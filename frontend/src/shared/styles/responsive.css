@@ -126,7 +126,11 @@
      注意：sticky 列只会相对最近的 overflow 容器计算，滚动口必须落在 content 层，
      放在 wrapper 上时粘性失效（实测列会随表一起滑走）。 */
   .ant-table-wrapper .ant-table { width: 100%; min-width: 0; }
-  .ant-table-wrapper table { width: max-content; min-width: 100%; }
+  /* 不写 width: max-content：那会让浏览器按「各列理想宽度之和」布局，操作列按钮的换行
+     完全失效（实测分期表 6 个按钮把操作列撑到 484px）。交给 min-content 自适应即可。 */
+  /* DataTable 传 scroll.x="max-content" → rc-table 在 <table> 上写死内联 width:max-content，
+     只能靠 !important 覆盖：否则各列按「理想宽度之和」撑开，操作列按钮换行完全不生效。 */
+  .ant-table-wrapper table { width: auto !important; min-width: 100%; }
   .ui-table-wrap .ant-table-content { overflow-x: auto; }
   /* 首列常驻：横向滑动时保留行标识（订单号/流水号），避免"刷到右边不知道这行是谁"。 */
   .ant-table-wrapper .ant-table-tbody > tr > td:first-child,
@@ -221,6 +225,25 @@
   .customers-mobile-card dd { margin: 0; color: var(--color-text-primary); }
   .customers-mobile-card .ant-space { flex-wrap: wrap; }
   .customers-mobile-empty { padding: var(--space-5) var(--space-3); text-align: center; border: var(--border-w) dashed var(--color-border); border-radius: var(--radius-md); }
+}
+
+/* 次要列移动端隐藏（<768px，含平板竖屏）：ui-col-md-up = 仅 md 及以上显示。
+   实现上必须「双写」：列的 className 管表头 th，onCell 管表体 td —— antd 的
+   column.className 只落到表头，只写一处理会出现「表头隐藏、表体不隐藏」的列错位。
+   为什么不用 antd 的 responsive 属性：那在 jsdom（无 breakpoint）里会把列整个过滤掉，
+   批量单测直接失败；CSS 隐藏保留 DOM，取值断言不受影响。
+   已打标：资金流水 8 列、库存 5 列、分期合约 7 列。 */
+@media (max-width: 767px) {
+  .ant-table-thead > tr > th.ui-col-md-up,
+  .ant-table-tbody > tr > td.ui-col-md-up { display: none; }
+  /* 隐藏列的格子虽已 display:none，rc-table 的 measure-row 仍会按原列数占位
+     （实测每列 ~42px，8 列约 336px 虚高）。隐藏列的宽度已确定，无需再测。 */
+  .ant-table-measure-row { display: none; }
+  /* <col> 上的 inline 固定宽度（如审核追溯 190 / 操作 170）在列已隐藏后仍占宽度，
+     移动端统一放开按内容自适应（inline style 只能被 !important 覆盖）。 */
+  .ant-table col[style] { width: auto !important; }
+  /* 操作列一排按钮会把列撑到 600px+；移动端允许换行，换取横向大幅收窄（纵向排布可接受）。 */
+  .ant-table-tbody .ant-space { flex-wrap: wrap; }
 }
 
 @media (max-width: 640px) {

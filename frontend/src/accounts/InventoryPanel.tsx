@@ -320,13 +320,15 @@ export function InventoryPanel({ refreshKey = 0 }: { refreshKey?: number }) {
 
   const columns: ColumnsType<Account> = [
     { title: "订单号", dataIndex: "source_order_no", render: (v: string | null) => v || "-" },
-    { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-" },
+    { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
-    { title: "产品", dataIndex: "game_type", render: (v: string | null) => v || "-" },
-    { title: "账号标识", dataIndex: "game_account" },
-    { title: "平台", dataIndex: "platform" },
+    { title: "产品", dataIndex: "game_type", render: (v: string | null) => v || "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "账号标识", dataIndex: "game_account", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "平台", dataIndex: "platform", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "未售时长",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
       key: "inventoryAge",
       render: (_value, row) => {
         const age = inventoryAge(row);

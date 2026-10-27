@@ -131,6 +131,46 @@
 - Tab 栏溢出依赖 antd 原生横滑，未改（可接受）。
 - `.main` 的 `scrollWidth=445` 为顶栏装饰层溢出，`body` 的 `overflow-x: hidden` 已兜住，无可见破损。
 
+## 七、批次 2 实施结果（三张超宽表瘦身，已验证）
+
+改动文件：
+- `frontend/src/pools/FundsPage.tsx`（资金流水列）
+- `frontend/src/accounts/InventoryPanel.tsx`（库存列）
+- `frontend/src/installments/InstallmentsPanel.tsx`（分期合约列）
+- `frontend/src/shared/styles/responsive.css`（新增 `@media (max-width: 767px)` 块）
+
+### 7.1 隐藏清单（业务取舍，可按需微调）
+
+| 表 | 原列数 | 移动端保留 | 隐藏 |
+|---|---|---|---|
+| 资金流水 | 14 | 订单号 / 日期 / 收支 / 金额 / 状态 / 操作 | 流水号、类别、资金性质、核算属性、流向、来源、审核追溯、备注 |
+| 库存明细 | 10 | 展开 / 订单号 / 类型 / 状态 / 成本 / 操作 | 业务、产品、账号标识、平台、未售时长 |
+| 分期合约 | 14 | 展开 / 合约号 / 订单 / 总应收 / 已收 / 剩余 / 状态 / 操作 | 业务、类型、产品、对方、服务费、每期服务费、坏账 |
+
+### 7.2 实现方式（踩了三个坑，都记在 CSS 注释里）
+
+1. **必须 className + onCell 双写**：antd 的 `column.className` 只作用于表头 `th`，表体 `td` 拿不到。只写一处理会出现「表头隐藏、表体不隐藏」的**列错位**（实测 th=6 / td=14）。
+2. **不能用 antd 的 `responsive` 属性**：jsdom 无 breakpoint，`Grid.useBreakpoint()` 全为 false，antd 会把列整个过滤掉，批量单测失败（实测 9 例，改 CSS 后恢复）。曾尝试把测试桩 `matchMedia` 改成按 `innerWidth` 判定，可行但属全局测试基建改动，影响面大，最终放弃、退回 CSS 方案。
+3. **rc-table 的 `measure-row` 与 `<col>` 内联宽度会残留**：隐藏列的格子已 `display:none`，但 measure-row 仍按原列数占位（实测每列 ~42px，8 列约 336px 虚高），`<col style="width:190px">` 也照样占宽 → 需 `.ant-table-measure-row{display:none}` + `.ant-table col[style]{width:auto!important}`。
+4. **`width: max-content` 会让按钮换行彻底失效**：DataTable 传 `scroll.x="max-content"`，rc-table 在 `<table>` 上写死内联宽度，必须 `width:auto!important` 覆盖；同时给 `.ant-table-tbody .ant-space{flex-wrap:wrap}`，操作列由 516px 降到 146px。
+
+### 7.3 实测结果（375×812）
+
+| 表 | 改前表宽 | 改后表宽 | 还需横滚 |
+|---|---|---|---|
+| 资金流水 | 2362px | **538px** | 221px（约 0.7 屏） |
+| 库存明细 | 1161px | **472px** | 155px |
+| 分期合约 | 未实测基线（约 1400+） | **809px** | 492px |
+
+- 表头/表体列数一致（6/6、6/6、8/8），**无错位**；首列 sticky 仍生效。
+- **桌面端 1280px 零回归**：资金流水 14 列全部可见（hidden=0）、Space 恢复 nowrap、measure-row 正常渲染。
+- 针对性测试：pools / accounts / installments / orders / customers / app / reporting 共 **41 文件 335 用例全过**；ui_guards 13 条、tsc、vite build 全绿。
+
+### 7.4 遗留
+
+- 分期合约操作按钮多（6 个），换行后仍有 492px 余量；如需进一步压缩，建议把低频动作收进「更多」下拉（属交互改造，需业务确认）。
+- 其余报表（经营中心月度损益 818px 等）未做列隐藏，如需可复用同一套 `ui-col-md-up` 标记。
+
 ## 五、证据文件
 
 | 文件 | 内容 |

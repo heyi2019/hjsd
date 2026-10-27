@@ -109,8 +109,12 @@ export default defineConfig({
           // [2026-10-20 实测] forks → threads：酸测 5 文件 31 用例中位数 29.37s → 25.57s（~13%），
           // 且两组区间不重叠（threads 24.17~26.96 vs forks 27.62~31.12）。threads 复用 worker
           // 线程而非每次 fork 进程，省下进程创建开销；正确性零回归（31/31 两次全绿）。
+          // [2026-10-27 提速定案] react 项目内 threads maxWorkers 由 1→2：线程级并行（共享同进程
+          // vite + transform 缓存，与「分片子进程」机制不同），实测 test:react 150.1s→112s（↓25%，
+          // 432 用例零失败零 retry）；jsdom+antd 在 2 worker 下稳定，故采纳。react-deep 重型用例
+          // 多线程争抢风险未实测，维持 1 worker。
           pool: "threads",
-          maxWorkers: 1,
+          maxWorkers: 2,
           minWorkers: 1,
         },
       },

@@ -824,9 +824,10 @@ function ContractTable({
   );
 }
 
-export function InstallmentsPanel() {
+export function InstallmentsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [reloadKey, setReloadKey] = useState(0);
   const write = useAsyncAction();
+  // refreshKey：外部建单（如代分期建单生成新合约）后由上层递增，触发合约列表重拉。
   // 逾期标记是全局动作（后端按 as_of 扫描全部合约），故放在 Tab 外层并触发全量刷新。
   const runMarkOverdue = async () => {
     await write.run(async () => {
@@ -854,22 +855,22 @@ export function InstallmentsPanel() {
         {
           key: "stock",
           label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "STOCK_SALE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey} />,
+          children: <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey + refreshKey} />,
         },
         {
           key: "advance",
           label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "ADVANCE_PURCHASE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey} />,
+          children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey + refreshKey} />,
         },
         {
           key: "pickup",
           label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "PICKUP_SALE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="PICKUP_SALE" reloadKey={reloadKey} />,
+          children: <ContractTable contractType="PICKUP_SALE" reloadKey={reloadKey + refreshKey} />,
         },
         {
           key: "consignment",
           label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "CONSIGNMENT_SALE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="CONSIGNMENT_SALE" reloadKey={reloadKey} />,
+          children: <ContractTable contractType="CONSIGNMENT_SALE" reloadKey={reloadKey + refreshKey} />,
         },
       ]}
     />

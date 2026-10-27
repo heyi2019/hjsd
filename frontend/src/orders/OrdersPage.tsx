@@ -614,6 +614,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
     initialTab === "inventory" ? "inventory" : DEFAULT_BUSINESS_CENTER_TAB,
   );
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
+  const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);
 
   const ledgerColumns: ColumnsType<Order> = [
     { title: "订单号", dataIndex: "order_no" },
@@ -780,7 +781,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
           {
             key: "collections",
             label: "分期与回款",
-            children: <InstallmentsPanel />,
+            children: <InstallmentsPanel refreshKey={installmentRefreshKey} />,
           },
         ]}
       />
@@ -1356,6 +1357,8 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
         onCreated={async () => {
           setCreateType(undefined);
           setInventoryRefreshKey((key) => key + 1);
+          // 代分期建单会同时生成新分期合约，同步重拉「分期回款」列表。
+          setInstallmentRefreshKey((key) => key + 1);
           await load();
         }}
         initialOrderType={createType ?? "HS"}

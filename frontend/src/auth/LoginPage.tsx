@@ -37,7 +37,7 @@ export function LoginPage() {
           <span>宜游轩</span>
         </div>
         <div className="login-aside__content">
-          <p className="login-kicker">BUSINESS OPERATIONS</p>
+          <p className="login-kicker">业务运营中枢</p>
           <h1>经营，<br /><em>进入高速模式。</em></h1>
           <p className="login-aside__copy">订单、资金、库存与利润，在一个工作台里实时同步。</p>
         </div>
@@ -47,7 +47,7 @@ export function LoginPage() {
       </section>
       <Card className="login-card" variant="borderless">
         <div className="login-card-head">
-          <p className="login-kicker">WELCOME BACK</p>
+          <p className="login-kicker">欢迎回来</p>
           <h2>登录工作台</h2>
           <p className="login-sub">使用你的账号继续经营工作</p>
         </div>

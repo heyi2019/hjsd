@@ -850,6 +850,9 @@ export const depositsApi = {
     api.post<Deposit>(`/deposits/${id}/returns`, payload).then((r) => r.data),
   loss: (id: number, payload: { amount: string; lost_on: string; category: string; reason: string }) =>
     api.post<Cashflow>(`/deposits/${id}/losses`, payload).then((r) => r.data),
+  /** 取消押金：仅未发生退还/损失的 PAID 押金；服务端全额写 DEPOSIT_CANCEL 冲正流水。 */
+  cancel: (id: number, payload: { cancelled_on: string; reason: string }) =>
+    api.post<Deposit>(`/deposits/${id}/cancel`, payload).then((r) => r.data),
 };
 
 export const cashflowsApi = {
@@ -911,6 +914,9 @@ export const rebatesApi = {
     api
       .post<Settlement>(`/rebates/${id}/settlements/${settlementId}/reverse`, payload)
       .then((r) => r.data),
+  /** 作废返点记录：仅零结算（OPEN）可作废；已有结算须走结算冲销。 */
+  voidRecord: (id: number, reason: string) =>
+    api.post<Rebate>(`/rebates/${id}/void`, { reason }).then((r) => r.data),
 };
 
 export interface RequiredWhen {
@@ -1287,6 +1293,9 @@ export const importsApi = {
     api.post<ImportBatch>(`/imports/batches/${batchId}/rollback`, { reason }).then((r) => r.data),
   createCorrection: (batchId: number, payload: { rows: Record<string, unknown>[]; reason: string }) =>
     api.post<ImportBatch>(`/imports/batches/${batchId}/corrections`, payload).then((r) => r.data),
+  /** 整批驳回（终态）：仅未确认批次可驳回；已确认走回滚/更正。 */
+  reject: (batchId: number, reason: string) =>
+    api.post<ImportBatch>(`/imports/batches/${batchId}/reject`, { reason }).then((r) => r.data),
 };
 
 /* ── M5：经营规则与订单利润分配（T19 / T20，BAS-06-01~04）───────── */
@@ -1341,6 +1350,16 @@ export const policyApi = {
     api.patch<PolicyVersion>(`/policy-versions/${versionId}`, { config }).then((r) => r.data),
   approve: (versionId: number, payload: { approver?: string; note?: string }) =>
     api.post<PolicyVersion>(`/policy-versions/${versionId}/approve`, payload).then((r) => r.data),
+  /** 作废草稿版本（SUPERSEDED）：仅 DRAFT 可作废；已发布版本是历史解析口径，服务端拒绝。 */
+  supersede: (versionId: number, payload: { reason: string; replaced_by_version_id?: number }) =>
+    api.post<PolicyVersion>(`/policy-versions/${versionId}/supersede`, payload).then((r) => r.data),
+  /** 过期清扫：把 effective_to < on 的 ACTIVE 版本固化为 EXPIRED（幂等）。 */
+  expireSweep: (on: string) =>
+    api
+      .post<{ swept: number; version_ids: number[]; on: string }>("/policies/versions/expire-sweep", undefined, {
+        params: { on },
+      })
+      .then((r) => r.data),
   resolve: (policyCode: string, on: string, scope?: { scope_type?: string; scope_id?: number }) =>
     api
       .get<{ found: boolean; version: PolicyVersion | null }>("/policy-versions/resolve", {

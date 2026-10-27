@@ -1,5 +1,5 @@
 /** 返点记录：分次到账与来源订单追踪（REB-01 / A06）。 */
-import { Card, Form, Input, Modal, Select, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -47,6 +47,7 @@ export function RebatesPanel() {
   const [createOpen, setCreateOpen] = useState(false);
   const [settleTarget, setSettleTarget] = useState<Rebate | null>(null);
   const [reverseTarget, setReverseTarget] = useState<{ rebate: Rebate; settlement: Settlement } | null>(null);
+  const [voidTarget, setVoidTarget] = useState<Rebate | null>(null);
   const [settlements, setSettlements] = useState<Record<number, Settlement[]>>({});
   const [overdueDays, setOverdueDays] = useState<Record<number, number>>({});
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -56,6 +57,7 @@ export function RebatesPanel() {
   const [form] = Form.useForm();
   const [settleForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
+  const [voidForm] = Form.useForm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,6 +109,17 @@ export function RebatesPanel() {
     });
   };
 
+  const submitVoid = async (values: Record<string, unknown>) => {
+    if (!voidTarget) return;
+    await write.run(async () => {
+        await rebatesApi.voidRecord(voidTarget.id, values.reason as string);
+        message.success("返点记录已作废，未产生资金流水");
+        setVoidTarget(null);
+        voidForm.resetFields();
+        await load();
+    });
+  };
+
   const submitSettle = async (values: Record<string, unknown>) => {
     if (!settleTarget) return;
     await write.run(async () => {
@@ -137,7 +150,7 @@ export function RebatesPanel() {
     });
   };
 
-  const pending = rows.filter((row) => row.status !== "SETTLED").length;
+  const pending = rows.filter((row) => row.status !== "SETTLED" && row.status !== "VOID").length;
 
   const columns: ColumnsType<Rebate> = [
     { title: "返点单号", dataIndex: "rebate_no" },
@@ -193,19 +206,34 @@ export function RebatesPanel() {
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="REBATE_STATUS" /> },
     {
       title: "操作",
+      width: 190,
       render: (_v, row) => (
-        <PermissionButton
-          permission="order.event.post"
-          size="small"
-          disabled={row.status === "SETTLED"}
-          onClick={() => {
-            settleForm.resetFields();
-            setSettleTarget(row);
-            settleForm.setFieldsValue({ settled_on: today() });
-          }}
-        >
-          登记结算
-        </PermissionButton>
+        <Space size={2}>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            disabled={row.status === "SETTLED" || row.status === "VOID"}
+            onClick={() => {
+              settleForm.resetFields();
+              setSettleTarget(row);
+              settleForm.setFieldsValue({ settled_on: today() });
+            }}
+          >
+            登记结算
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            danger
+            disabled={row.status !== "OPEN"}
+            onClick={() => {
+              voidForm.resetFields();
+              setVoidTarget(row);
+            }}
+          >
+            作废
+          </PermissionButton>
+        </Space>
       ),
     },
   ];
@@ -301,7 +329,7 @@ export function RebatesPanel() {
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-          scroll={{ x: "max-content" }}
+         
           emptyText="暂无返点记录"
           onPageChange={() => undefined}
           expandable={{
@@ -317,7 +345,7 @@ export function RebatesPanel() {
               />
             ),
           }}
-        />
+        scroll={{ x: "max-content" }}/>
       </Card>
 
       <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
@@ -412,6 +440,34 @@ export function RebatesPanel() {
             确认冲销
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
+      </Modal>
+      <Modal
+        title={voidTarget ? `作废返点 · ${voidTarget.rebate_no}` : "作废返点"}
+        open={Boolean(voidTarget)}
+        onCancel={() => setVoidTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        <Typography.Paragraph type="warning">
+          作废仅适用于<strong>尚未发生任何结算</strong>的返点记录；作废后该记录不再计入待结算，也不会产生资金流水。
+          若已有到账记录，请在结算明细里逐笔冲销。
+        </Typography.Paragraph>
+        <FieldConfigScope scope="REBATEVOID" active={Boolean(voidTarget)}>
+          <Form form={voidForm} layout="vertical" onFinish={submitVoid}>
+            <CfgItem name="reason" label="作废原因" rules={[{ required: true, message: "请填写作废原因" }]}>
+              <Input.TextArea rows={3} />
+            </CfgItem>
+            <PermissionButton
+              permission="order.event.post"
+              type="primary"
+              danger
+              htmlType="submit"
+              loading={write.pending}
+            >
+              确认作废
+            </PermissionButton>
+          </Form>
         </FieldConfigScope>
       </Modal>
     </section>

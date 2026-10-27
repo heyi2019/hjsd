@@ -178,3 +178,40 @@ it("生效期自查：未命中时提示该日该作用域无生效版本", asyn
   await ui.click(screen.getByRole("button", { name: /解析/ }));
   expect(await screen.findByText(/没有生效的规则版本/)).toBeInTheDocument();
 });
+
+it("草稿版本可作废（SUPERSEDED）：填理由后调用 policyApi.supersede", async () => {
+  const draft = {
+    id: 9,
+    policy_definition_id: 1,
+    version: 2,
+    effective_from: "2027-01-01",
+    effective_to: "2027-12-31",
+    config: { rate: "5" },
+    status: "DRAFT",
+    approved_by: null,
+    approved_at: null,
+    note: null,
+  } as unknown as import("../shared/api/catalog").PolicyVersion;
+  vi.mocked(catalog.policyApi.versions).mockResolvedValue({ items: [activeVersions[0], draft], total: 2 });
+  vi.mocked(catalog.policyApi.supersede).mockResolvedValue({ ...draft, status: "SUPERSEDED" } as never);
+
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("返点比例");
+  await ui.click(await screen.findByRole("button", { name: /作\s*废/ }));
+  await screen.findByText(/作废草稿 · v2/);
+  await ui.type(screen.getByLabelText("作废理由"), "未采用的规划");
+  await ui.click(screen.getByRole("button", { name: /确认作废/ }));
+  await waitFor(() =>
+    expect(catalog.policyApi.supersede).toHaveBeenCalledWith(9, { reason: "未采用的规划" }),
+  );
+});
+
+it("过期清扫：二次确认后调用 policyApi.expireSweep（不改生效期）", async () => {
+  vi.mocked(catalog.policyApi.expireSweep).mockResolvedValue({ swept: 1, version_ids: [1], on: "2026-10-27" });
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("返点比例");
+  await ui.click(screen.getByRole("button", { name: /过期清扫/ }));
+  await ui.click(await screen.findByRole("button", { name: /开始清扫/ }));
+  await waitFor(() => expect(catalog.policyApi.expireSweep).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(catalog.policyApi.expireSweep).mock.calls[0][0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+});

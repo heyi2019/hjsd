@@ -20,7 +20,8 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
   const METHODS = [
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
     "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
+    "reverse", "close", "convert", "detail", "allocations", "setAllocations", "cancel", "voidRecord",
+    "supersede", "expireSweep",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
   ];
   const mk = (api: Record<string, unknown>) => {
@@ -164,6 +165,26 @@ describe("FundsPage：资金写路径", () => {
     expect(vi.mocked(catalog.periodLocksApi.create).mock.calls[0]).toEqual([{
       period: "2026-10",
       note: "10 月对账完成",
+    }]);
+  });
+
+  it("押金取消：PAID 押金填原因后调用 depositsApi.cancel（全额冲正由后端写）", async () => {
+    vi.mocked(catalog.depositsApi.list).mockResolvedValue([
+      { id: 12, pool_id: 1, paid_amount: "300.00", returned_amount: "0.00", lost_amount: "0.00", status: "PAID" },
+    ] as unknown as Awaited<ReturnType<typeof catalog.depositsApi.list>>);
+    resolveMockOnce(vi.mocked(catalog.depositsApi.cancel), { id: 12 });
+    renderLight(<FundsPage />, { user: "finance" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /取\s*消/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await waitFor(() => expect(modal).toBeTruthy());
+    await ui.type(modal.querySelector("#reason") as Element, "押金登记有误");
+    await ui.click(screen.getByRole("button", { name: /确认取消/ }));
+    await waitFor(() => expect(vi.mocked(catalog.depositsApi.cancel)).toHaveBeenCalled(), { timeout: 5000 });
+    expect(vi.mocked(catalog.depositsApi.cancel).mock.calls[0]).toEqual([12, {
+      cancelled_on: expect.any(String),
+      reason: "押金登记有误",
     }]);
   });
 });

@@ -148,4 +148,26 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
     expect(screen.queryByRole("button", { name: /新增返点记录/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /登记结算/ })).toBeNull();
   });
+
+  it("作废仅对 OPEN 可用：非 OPEN 禁用，提交回传作废原因", async () => {
+    vi.mocked(catalog.rebatesApi.list).mockResolvedValue([
+      { ...rebates[0], status: "OPEN" },
+      { ...rebates[1], status: "SETTLED" },
+    ]);
+    resolveMockOnce(vi.mocked(catalog.rebatesApi.voidRecord), { id: 1 });
+    renderLight(<RebatesPanel />, { user: "admin" });
+    await screen.findByText("HS0001-RB01");
+    const voidButtons = screen.getAllByRole("button", { name: /作\s*废/ });
+    expect((voidButtons[0] as HTMLButtonElement).disabled).toBe(false);
+    expect((voidButtons[1] as HTMLButtonElement).disabled).toBe(true);
+
+    await ui.click(voidButtons[0] as Element);
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await waitFor(() => expect(modal).toBeTruthy());
+    await ui.type(modal.querySelector("#reason") as Element, "挂错订单");
+    await ui.click(within(modal).getByRole("button", { name: /确认作废/ }));
+    await waitFor(() =>
+      expect(vi.mocked(catalog.rebatesApi.voidRecord)).toHaveBeenCalledWith(1, "挂错订单"),
+    );
+  });
 });

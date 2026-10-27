@@ -1,7 +1,7 @@
 import { Card, Descriptions, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { PolicyDefinition, PolicyVersion } from "../shared/api/catalog";
-import { DataTable, PermissionButton, StatusTag } from "../shared/ui";
+import { ConfirmButton, DataTable, PermissionButton, StatusTag } from "../shared/ui";
 import { describeConfig } from "./policyConfigSchema";
 
 interface PolicyDetailProps {
@@ -12,6 +12,10 @@ interface PolicyDetailProps {
   canManage: boolean;
   onOpenEditor: () => void;
   onOpenResolve: () => void;
+  /** 作废草稿版本（SUPERSEDED）：已发布版本是历史解析口径，服务端拒绝作废。 */
+  onSupersede: (version: PolicyVersion) => void;
+  /** 过期清扫：把生效期已结束的 ACTIVE 版本固化为 EXPIRED。 */
+  onExpireSweep: () => Promise<void>;
 }
 
 /** 经营规则详情（右栏）：规则元信息 + 版本历史 + 操作入口。 */
@@ -23,6 +27,8 @@ export function PolicyDetail({
   canManage,
   onOpenEditor,
   onOpenResolve,
+  onSupersede,
+  onExpireSweep,
 }: PolicyDetailProps) {
   const scopeLabel = scopeOptions.find((o) => o.value === definition.scope_type)?.label ?? definition.scope_type;
 
@@ -46,6 +52,18 @@ export function PolicyDetail({
     },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="POLICY_STATUS" /> },
     { title: "发布人", dataIndex: "approved_by", width: 100 },
+    {
+      title: "操作",
+      width: 100,
+      render: (_v, row) =>
+        canManage && row.status === "DRAFT" ? (
+          <PermissionButton permission="policy.manage" size="small" danger onClick={() => onSupersede(row)}>
+            作废
+          </PermissionButton>
+        ) : (
+          <span className="muted">—</span>
+        ),
+    },
   ];
 
   return (
@@ -68,6 +86,15 @@ export function PolicyDetail({
             <PermissionButton permission="policy.manage" onClick={onOpenResolve}>
               生效期自查
             </PermissionButton>
+            <ConfirmButton
+              permission="policy.manage"
+              title="确认过期清扫"
+              description="把生效期已结束（失效日早于今天）的已发布版本状态固化为「已失效」。只改状态、不改生效期与参数，可重复执行。"
+              okText="开始清扫"
+              onConfirm={onExpireSweep}
+            >
+              过期清扫
+            </ConfirmButton>
           </Space>
         ) : null}
       </Card>
@@ -86,7 +113,7 @@ export function PolicyDetail({
           total={versions.length}
           emptyText="该规则还没有版本"
           onPageChange={() => undefined}
-        />
+        scroll={{ x: "max-content" }}/>
       </Card>
     </section>
   );

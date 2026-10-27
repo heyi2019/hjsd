@@ -121,6 +121,7 @@ export function ImportWorkbench({
   const [unlinkedTarget, setUnlinkedTarget] = useState<ImportRow | null>(null);
   const [skipTarget, setSkipTarget] = useState<ImportRow | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<ImportBatch | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<ImportBatch | null>(null);
   const [correctionTarget, setCorrectionTarget] = useState<ImportBatch | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<UploadFile | null>(null);
@@ -198,6 +199,8 @@ export function ImportWorkbench({
     current !== null && ["DRAFT", "MAPPED"].includes(current.status);
   // 已确认批次禁止回滚，只能以更正批次分层保存（MIG-01-08）。
   const canCorrect = current !== null && current.status === "COMMITTED";
+  // 驳回仅对未确认批次开放，且为终态：已确认批次只能回滚 / 更正。
+  const canReject = canRollback;
 
   const rowColumns: ColumnsType<ImportRow> = [
     { title: "行号", dataIndex: "row_no", width: 70 },
@@ -302,6 +305,14 @@ export function ImportWorkbench({
       </PermissionButton>
       <PermissionButton
         permission="import.manage"
+        danger
+        disabled={!canReject}
+        onClick={() => current && setRejectTarget(current)}
+      >
+        驳回
+      </PermissionButton>
+      <PermissionButton
+        permission="import.manage"
         disabled={!canCorrect}
         onClick={() => current && setCorrectionTarget(current)}
       >
@@ -359,7 +370,7 @@ export function ImportWorkbench({
                   total={rows.length}
                   emptyText="该批次暂无行"
                   onPageChange={() => undefined}
-                />
+                scroll={{ x: "max-content" }}/>
               </Card>
             ),
           },
@@ -403,7 +414,7 @@ export function ImportWorkbench({
                       pageSize={Math.max(preview.columns.length, 10)}
                       total={preview.columns.length}
                       onPageChange={() => undefined}
-                    />
+                     scroll={{ x: "max-content" }} />
                   </>
                 ) : (
                   <Typography.Text type="secondary">请选择批次</Typography.Text>
@@ -475,7 +486,7 @@ export function ImportWorkbench({
                       total={Object.keys(report.amounts.before).length}
                       onPageChange={() => undefined}
                       rowKey="key"
-                    />
+                    scroll={{ x: "max-content" }}/>
                     {report.requires_adjudication ? (
                       <ErrorBanner error={{ message: "存在未映射、未裁决或未平项：差异须裁决后方可上线。" }} />
                     ) : null}
@@ -654,6 +665,29 @@ export function ImportWorkbench({
         extra={
           <p className="ui-drawer-hint">
             回滚是逻辑操作：原始行与审计日志全部保留，不删除任何数据。
+          </p>
+        }
+      />
+
+      <FormDrawer
+        open={rejectTarget !== null}
+        title={`驳回批次 · ${rejectTarget?.batch_no ?? ""}`}
+        fields={[{ name: "reason", label: "驳回理由", required: true, kind: "textarea" as const }]}
+        submitText="确认驳回"
+        submitting={acting}
+        error={error}
+        onClose={() => setRejectTarget(null)}
+        onSubmit={(values) => {
+          const target = rejectTarget;
+          if (!target) return;
+          void act(async () => {
+            await importsApi.reject(target.id, String(values.reason ?? ""));
+            setRejectTarget(null);
+          });
+        }}
+        extra={
+          <p className="ui-drawer-hint">
+            驳回是终态：批次不再提交，原始行与审计日志全部保留、状态不变；如需再导入请新建批次。
           </p>
         }
       />

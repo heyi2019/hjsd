@@ -78,6 +78,7 @@ export function FundsPage() {
   const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
   const [lossTarget, setLossTarget] = useState<Deposit | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Deposit | null>(null);
   const [repairTarget, setRepairTarget] = useState<Cashflow | null>(null);
   const [periodLockOpen, setPeriodLockOpen] = useState(false);
   const [unmatchedTarget, setUnmatchedTarget] = useState<Reconciliation | null>(null);
@@ -115,6 +116,7 @@ export function FundsPage() {
   const [rejectForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
   const [lossForm] = Form.useForm();
+  const [cancelForm] = Form.useForm();
   const [repairForm] = Form.useForm();
   const [periodLockForm] = Form.useForm();
 
@@ -226,6 +228,21 @@ export function FundsPage() {
       message.success("押金损失已登记");
       setLossTarget(null);
       lossForm.resetFields();
+      await load();
+    });
+  };
+
+  const submitCancelDeposit = async (values: Record<string, unknown>) => {
+    if (!cancelTarget) return;
+    const targetId = cancelTarget.id;
+    await write.run(async () => {
+      await depositsApi.cancel(targetId, {
+        cancelled_on: values.cancelled_on as string,
+        reason: values.reason as string,
+      });
+      message.success("押金已取消，已生成全额冲正流水");
+      setCancelTarget(null);
+      cancelForm.resetFields();
       await load();
     });
   };
@@ -479,13 +496,13 @@ export function FundsPage() {
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",
-      width: 190,
+      width: 270,
       render: (_v, row) => (
         <Space size={2}>
           <PermissionButton
             permission="deposit.post"
             size="small"
-            disabled={row.status === "RETURNED" || row.status === "LOST"}
+            disabled={row.status === "RETURNED" || row.status === "LOST" || row.status === "CANCELLED"}
             onClick={() => {
               setReturnTarget(row);
               returnForm.setFieldsValue({ released_on: today() });
@@ -496,13 +513,25 @@ export function FundsPage() {
           <PermissionButton
             permission="deposit.post"
             size="small"
-            disabled={row.status === "RETURNED" || row.status === "LOST"}
+            disabled={row.status === "RETURNED" || row.status === "LOST" || row.status === "CANCELLED"}
             onClick={() => {
               setLossTarget(row);
               lossForm.setFieldsValue({ lost_on: today() });
             }}
           >
             登记损失
+          </PermissionButton>
+          <PermissionButton
+            permission="deposit.post"
+            size="small"
+            danger
+            disabled={row.status !== "PAID"}
+            onClick={() => {
+              setCancelTarget(row);
+              cancelForm.setFieldsValue({ cancelled_on: today() });
+            }}
+          >
+            取消
           </PermissionButton>
         </Space>
       ),
@@ -693,7 +722,7 @@ export function FundsPage() {
                   emptyText="尚未配置资金池"
                   loading={loading}
                   onPageChange={() => undefined}
-                />
+                scroll={{ x: "max-content" }}/>
               </Card>
             ),
           },
@@ -740,7 +769,7 @@ export function FundsPage() {
                   emptyText="暂无资金流水"
                   loading={loading}
                   onPageChange={() => undefined}
-                />
+                scroll={{ x: "max-content" }}/>
               </Card>
             ),
           },
@@ -770,7 +799,7 @@ export function FundsPage() {
                   emptyText="暂无押金占用"
                   loading={loading}
                   onPageChange={() => undefined}
-                />
+                scroll={{ x: "max-content" }}/>
               </Card>
             ),
           },
@@ -791,7 +820,7 @@ export function FundsPage() {
                   emptyText="暂无对账记录"
                   loading={loading}
                   onPageChange={() => undefined}
-                />
+                scroll={{ x: "max-content" }}/>
               </Card>
             ),
           },
@@ -810,7 +839,7 @@ export function FundsPage() {
                   emptyText="暂无单边划转异常"
                   loading={loading}
                   onPageChange={() => undefined}
-                  />
+                   scroll={{ x: "max-content" }} />
                 </Card>
                 <Card className="glass" title="月结锁定" extra={<PermissionButton permission="finance.period.lock" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
                   <DataTable
@@ -822,7 +851,7 @@ export function FundsPage() {
                     emptyText="暂无已锁定账期"
                     loading={loading}
                     onPageChange={() => undefined}
-                  />
+                   scroll={{ x: "max-content" }} />
                 </Card>
               </div>
             ),
@@ -1035,6 +1064,37 @@ export function FundsPage() {
         </FieldConfigScope>
       </Modal>
 
+      <Modal
+        title="取消押金"
+        open={Boolean(cancelTarget)}
+        onCancel={() => setCancelTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        {cancelTarget ? (
+          <Typography.Paragraph type="secondary">
+            押金占用合计 <MoneyText value={cancelTarget.paid_amount} />，尚未发生任何退还或损失。
+          </Typography.Paragraph>
+        ) : null}
+        <Typography.Paragraph type="warning">
+          取消用于「押金登记有误 / 租约取消且押金从未实际占用」。系统会按占用全额自动写一笔
+          DEPOSIT_CANCEL 冲正流水把资金池占用冲平，操作不可撤销；已发生退还或损失的押金请改用释放 / 登记损失。
+        </Typography.Paragraph>
+        <FieldConfigScope scope="FUNDCANCEL" active={Boolean(cancelTarget)}>
+          <Form form={cancelForm} layout="vertical" onFinish={submitCancelDeposit}>
+            <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
+              <Input placeholder="YYYY-MM-DD" />
+            </CfgItem>
+            <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请填写取消原因" }]}>
+              <Input.TextArea rows={3} />
+            </CfgItem>
+            <PermissionButton permission="deposit.post" type="primary" danger htmlType="submit" loading={write.pending}>
+              确认取消
+            </PermissionButton>
+          </Form>
+        </FieldConfigScope>
+      </Modal>
+
       <Modal title="修复单边划转" open={Boolean(repairTarget)} onCancel={() => setRepairTarget(null)} footer={null}>
         <Typography.Paragraph type="secondary">
           划转号：{repairTarget?.transfer_id}；现有流水：{repairTarget?.flow_no}
@@ -1074,7 +1134,7 @@ export function FundsPage() {
           total={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)).length : 0}
           emptyText="当前列表未加载到对应流水"
           onPageChange={() => undefined}
-        />
+        scroll={{ x: "max-content" }}/>
       </Modal>
     </section>
   );

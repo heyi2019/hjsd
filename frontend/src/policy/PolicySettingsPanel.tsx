@@ -10,13 +10,14 @@
  * - 已发布版本不可改，点「设置配置」会生成新版本并立即发布；
  * - 新版本生效期不得与已有版本重叠。
  */
-import { Card, Col, Empty, Row } from "antd";
+import { Card, Col, Empty, Row, message } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { policyApi, type PolicyDefinition, type PolicyVersion } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
-import { ErrorBanner, PageHeader, StatRow } from "../shared/ui";
+import { ErrorBanner, FormDrawer, PageHeader, StatRow } from "../shared/ui";
 import { useOptionSet } from "../shared/lib/optionSets";
+import { today } from "../shared/lib/format";
 import { POLICY_CODE_OPTIONS, SCOPE_OPTIONS } from "./policyConstants";
 import { PolicyMasterList } from "./PolicyMasterList";
 import { PolicyDetail } from "./PolicyDetail";
@@ -38,6 +39,7 @@ export function PolicySettingsPanel() {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [supersedeTarget, setSupersedeTarget] = useState<PolicyVersion | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveResult, setResolveResult] = useState<PolicyResolveResult | null>(null);
@@ -110,6 +112,28 @@ export function PolicySettingsPanel() {
     setEditorOpen(false);
   };
 
+  /** 作废草稿版本：草稿只是未发布的规划，作废不影响任何历史订单口径。 */
+  const submitSupersede = async (values: Record<string, unknown>) => {
+    const target = supersedeTarget;
+    if (!target) return;
+    const succeeded = await act(async () => {
+      await policyApi.supersede(target.id, { reason: String(values.reason ?? "") });
+    });
+    if (succeeded) {
+      setSupersedeTarget(null);
+      message.success(`草稿 v${target.version} 已作废`);
+    }
+  };
+
+  /** 过期清扫：只固化状态，不改生效期与参数；可重复执行。 */
+  const runExpireSweep = async () => {
+    const result = await policyApi.expireSweep(today());
+    await loadVersions();
+    message.success(
+      result.swept > 0 ? `已固化 ${result.swept} 个过期版本为「已失效」` : "没有需要固化的过期版本",
+    );
+  };
+
   const submitResolve = async (values: PolicyResolveValues) => {
     setResolving(true);
     setError(null);
@@ -176,6 +200,8 @@ export function PolicySettingsPanel() {
               canManage={canManage}
               onOpenEditor={() => setEditorOpen(true)}
               onOpenResolve={openResolve}
+              onSupersede={setSupersedeTarget}
+              onExpireSweep={runExpireSweep}
             />
           ) : (
             <Card className="glass">
@@ -205,6 +231,23 @@ export function PolicySettingsPanel() {
         result={resolveResult}
         onCancel={() => setResolveOpen(false)}
         onOk={submitResolve}
+      />
+
+      <FormDrawer
+        open={supersedeTarget !== null}
+        title={`作废草稿 · v${supersedeTarget?.version ?? ""}`}
+        fields={[{ name: "reason", label: "作废理由", required: true, kind: "textarea" as const }]}
+        submitText="确认作废"
+        submitting={acting}
+        error={error}
+        onClose={() => setSupersedeTarget(null)}
+        onSubmit={(values) => void submitSupersede(values)}
+        extra={
+          <p className="ui-drawer-hint">
+            只有草稿版本可作废。已发布版本是历史日期的解析口径，作废会挖掉历史规则的落点；
+            要下线生效中的版本，请「设置配置」新建版本并把生效期接上。
+          </p>
+        }
       />
     </section>
   );

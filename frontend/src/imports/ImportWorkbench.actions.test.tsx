@@ -74,6 +74,7 @@ function setDefaults() {
   resolveMock(vi.mocked(catalog.importsApi.markUnlinked), {});
   resolveMock(vi.mocked(catalog.importsApi.commit), {});
   resolveMock(vi.mocked(catalog.importsApi.rollback), {});
+  resolveMock(vi.mocked(catalog.importsApi.reject), {});
   resolveMock(vi.mocked(catalog.importsApi.createBatch), {
     id: 2,
     batch_no: "MIG-01-02",
@@ -179,8 +180,18 @@ describe("ImportWorkbench：操作分支补充", () => {
     await waitFor(() => expect(catalog.importsApi.rollback).toHaveBeenCalledWith(1, "误导入"));
   });
 
-  it("已回滚行的操作按钮全部禁用", async () => {
-    await openWorkbench([makeRow({ status: "ROLLED_BACK" })]);
+  it("驳回批次：填理由后调用 importsApi.reject（终态，不再提交）", async () => {
+    await openWorkbench();
+    await ui.click(screen.getByRole("button", { name: /驳\s*回/ }));
+    await screen.findByText("驳回批次 · MIG-01-01");
+    await ui.type(screen.getByLabelText("驳回理由"), "源文件口径错误");
+    await ui.click(screen.getByRole("button", { name: /确认驳回/ }));
+    await waitFor(() =>
+      expect(catalog.importsApi.reject).toHaveBeenCalledWith(1, "源文件口径错误"),
+    );
+  });
+
+  it("已回滚行的操作按钮全部禁用", async () => {    await openWorkbench([makeRow({ status: "ROLLED_BACK" })]);
     const row = await rowAt(0);
     expect(within(row).getByRole("button", { name: /指派/ })).toBeDisabled();
     expect(within(row).getByRole("button", { name: /标单边划转/ })).toBeDisabled();

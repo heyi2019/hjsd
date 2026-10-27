@@ -42,9 +42,11 @@ async function dragMouseSteps(
   from: { x: number; y: number },
   to: { x: number; y: number },
   steps = 8,
+  onDown?: () => Promise<void>,
 ): Promise<void> {
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
+  if (onDown) await onDown();
   for (let i = 1; i <= steps; i++) {
     await page.mouse.move(
       from.x + ((to.x - from.x) * i) / steps,
@@ -159,23 +161,35 @@ test.describe("UI visual regression", () => {
     // 等待响应式布局落定：入场 scale 动画期间 getBoundingClientRect 会返回 1200×0.2 的假宽度。
     await expect(modal).toHaveAttribute("data-recovery-layout", /.+/);
     await waitStableGeometry(modal);
-    const before = await modal.evaluate((node) => node.getBoundingClientRect().toJSON());
     const handle = page.locator(".resizable-modal__drag-handle");
     const point = await handle.evaluate((node) => {
       const rect = node.getBoundingClientRect();
       return { x: rect.left + 24, y: rect.top + rect.height / 2 };
     });
 
-    await dragMouseSteps(page, point, { x: point.x + 120, y: point.y + 80 });
+    // 基线必须在 pointerdown 之后、首次位移之前读：弹窗入场是「从窄到宽撑开」动画，
+    // 撑开过程中重新居中会让 pointerdown 之前读的几何值与应用 startDrag 捕获的
+    // initial 相差近百 px（实测 245.7 vs 147.6，终点 267.6 即 147.6+120）。
+    // down 与首个 move 之间拖拽尚未激活（6px 阈值），此刻 rect == 应用的 initial。
+    let before: { x: number; y: number } | null = null;
+    await dragMouseSteps(
+      page,
+      point,
+      { x: point.x + 120, y: point.y + 80 },
+      8,
+      async () => {
+        before = await modal.evaluate((node) => {
+          const r = node.getBoundingClientRect();
+          return { x: r.x, y: r.y };
+        });
+      },
+    );
 
-    // 强信号：拖拽 handler 一旦激活必然把 modal 置为 fixed（ResizableModal.tsx startDrag），
-    // 与「测试 before 读数」和「应用 pointerdown 基线」之间的竞态无关。
+    // 强信号：拖拽 handler 一旦激活必然把 modal 置为 fixed（ResizableModal.tsx startDrag）。
     expect(await modal.evaluate((node) => node.style.position)).toBe("fixed");
-    // 位移断言只防「完全没拖动」（0px）：阈值取手势的一半即可。100px 硬阈值在
-    // before 读数与 pointerdown 基线错位（页面弹簧入场/数据加载位移）时会误报。
     const after = await modal.evaluate((node) => node.getBoundingClientRect().toJSON());
-    expect(after.x).toBeGreaterThan(before.x + 60);
-    expect(after.y).toBeGreaterThan(before.y + 40);
+    expect(after.x).toBeGreaterThan(before!.x + 100);
+    expect(after.y).toBeGreaterThan(before!.y + 60);
   });
 
   test("回收页桌面弹窗四角可缩放", async ({ page }) => {

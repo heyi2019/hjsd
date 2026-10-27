@@ -15,6 +15,7 @@ import {
   PermissionButton,
   StatRow,
   StatusTag,
+  useCompactLayout,
 } from "../shared/ui";
 import { InventorySaleModal } from "./InventorySaleModal";
 import { InventoryConsignmentModal } from "./InventoryConsignmentModal";
@@ -33,6 +34,81 @@ import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+
+/** 移动端（≤640px）库存卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
+export function MobileInventoryList({
+  rows,
+  onSale,
+  onConsign,
+  onVoid,
+  onRebate,
+  onEdit,
+  onMoreAction,
+  editingAccount,
+}: {
+  rows: Account[];
+  onSale: (row: Account) => void;
+  onConsign: (row: Account) => void;
+  onVoid: (row: Account) => void;
+  onRebate: (row: Account) => void;
+  onEdit: (row: Account) => void;
+  onMoreAction: (key: string, row: Account) => void;
+  editingAccount: number | null;
+}) {
+  if (rows.length === 0) return <div className="data-mobile-empty">暂无账号</div>;
+  return (
+    <div className="data-mobile-list">
+      {rows.map((row) => {
+        const age = inventoryAge(row);
+        return (
+          <article key={row.id} className="data-mobile-card">
+            <div className="data-mobile-card__topline">
+              <span className="data-mobile-card__title">{row.stock_no || row.game_account || `账号 ${row.id}`}</span>
+              <StatusTag status={row.status} label={row.status === "VOID" ? "下架" : undefined} />
+            </div>
+            <dl className="data-mobile-card__meta">
+              <div><dt>游戏账号</dt><dd>{row.game_account || "-"}</dd></div>
+              <div><dt>订单号</dt><dd>{row.source_order_no || "-"}</dd></div>
+              <div><dt>业务</dt><dd>{row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-"}</dd></div>
+              <div><dt>业务类型</dt><dd>{row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-"}</dd></div>
+              <div><dt>增值服务</dt><dd>{row.value_added_service ? VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service : "-"}</dd></div>
+              <div><dt>产品</dt><dd>{row.game_type || "-"}</dd></div>
+              <div><dt>平台</dt><dd>{row.platform || "-"}</dd></div>
+              <div><dt>未售时长</dt><dd>{age ? `${age.days}天` : "-"}</dd></div>
+              <div><dt>成本</dt><dd><MoneyText value={row.cost_amount} /></dd></div>
+            </dl>
+            <div className="data-mobile-card__actions">
+              <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "IN_STOCK"} onClick={() => onSale(row)}>售出</PermissionButton>
+              <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
+              <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>下架</PermissionButton>
+              <PermissionButton permission="order.event.post" type="link" size="small" onClick={() => onRebate(row)}>返点</PermissionButton>
+              {isEditableAccountType(row.inventory_type) ? (
+                <>
+                  <PermissionButton permission="order.create" type="link" size="small" disabled={editingAccount !== null} onClick={() => onEdit(row)}>编辑</PermissionButton>
+                  <Dropdown
+                    trigger={["click"]}
+                    placement="bottomRight"
+                    menu={{
+                      items: [
+                        { key: "remove", label: "下架", disabled: row.status === "SOLD" || row.status === "VOID" },
+                        { key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true, disabled: !["SOLD", "INSTALLMENT"].includes(row.status) },
+                        { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
+                        { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
+                      ],
+                      onClick: ({ key }) => onMoreAction(key, row),
+                    }}
+                  >
+                    <PermissionButton permission="order.create" type="link" size="small">更多</PermissionButton>
+                  </Dropdown>
+                </>
+              ) : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
 
 export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey?: number; onOrdersChanged?: () => void }) {
   const [rows, setRows] = useState<Account[]>([]);
@@ -54,6 +130,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const [exporting, setExporting] = useState(false);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const compact = useCompactLayout();
   const [savingAccount, setSavingAccount] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
@@ -598,28 +675,41 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
           </Space>
         }
       >
-        <DataTable<Account>
-          columns={columns}
-          rows={orderedRows}
-          page={page}
-          pageSize={pageSize}
-          total={visibleRows.length}
-          controlledPaging
-         
-          expandable={{
-            expandedRowKeys: expandedAccountIds,
-            expandedRowRender: (row) => (
-            <InventoryDetail row={row} detail={executionDetails[row.id]} loading={Boolean(executionLoading[row.id])} />
-          ),
-            expandRowByClick: true,
-            onExpand: (expanded, row) => void handleExpand(expanded, row),
-          }}
-          emptyText="暂无账号"
-          onPageChange={(nextPage, nextSize) => {
-            setPage(nextPage);
-            setPageSize(nextSize);
-          }}
-        />
+        {compact ? (
+          <MobileInventoryList
+            rows={orderedRows}
+            onSale={setSaleTarget}
+            onConsign={setConsignmentTarget}
+            onVoid={(row) => void openVoid(row)}
+            onRebate={setRebateTarget}
+            onEdit={openEditor}
+            onMoreAction={handleMoreAction}
+            editingAccount={editingAccount ? editingAccount.id : null}
+          />
+        ) : (
+          <DataTable<Account>
+            columns={columns}
+            rows={orderedRows}
+            page={page}
+            pageSize={pageSize}
+            total={visibleRows.length}
+            controlledPaging
+          
+            expandable={{
+              expandedRowKeys: expandedAccountIds,
+              expandedRowRender: (row) => (
+              <InventoryDetail row={row} detail={executionDetails[row.id]} loading={Boolean(executionLoading[row.id])} />
+            ),
+              expandRowByClick: true,
+              onExpand: (expanded, row) => void handleExpand(expanded, row),
+            }}
+            emptyText="暂无账号"
+            onPageChange={(nextPage, nextSize) => {
+              setPage(nextPage);
+              setPageSize(nextSize);
+            }}
+          />
+        )}
       </Card>
 
       <InventorySaleModal

@@ -60,7 +60,7 @@ const IMPORT_TEMPLATES: Record<string, { filename: string; content: string }> = 
   },
   STANDARD_ACCOUNT: {
     filename: "账号导入模板.csv",
-    content: "账号标识,平台,区服,状态,买入日期,买入成本,预计售价,备注\n,, ,IN_STOCK,2026-01-31,0.00,0.00,",
+    content: "库存编号,平台,区服,状态,买入日期,买入成本,预计售价,备注\n,, ,IN_STOCK,2026-01-31,0.00,0.00,",
   },
   STANDARD_CASHFLOW: {
     filename: "资金流水导入模板.csv",

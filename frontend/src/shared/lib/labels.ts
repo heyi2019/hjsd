@@ -28,7 +28,7 @@ export const BUSINESS_TYPE_LABEL: Record<string, string> = {
 };
 
 export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
-  STOCK_SALE: "分期出售",
+  STOCK_SALE: "分期",
   ADVANCE_PURCHASE: "代分期",
   PICKUP_SALE: "提号分期",
   CONSIGNMENT_SALE: "代挂分期",

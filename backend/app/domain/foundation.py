@@ -149,15 +149,19 @@ class OrderTypePool(Base, TimestampMixin):
 
 
 class DocumentSequence(Base, TimestampMixin):
-    """编号序列表：事务内递增，超出 4 位即报 `SEQUENCE_EXHAUSTED`（BAS-02-04）。"""
+    """编号序列表：事务内递增，超出位数上限即报 `SEQUENCE_EXHAUSTED`（BAS-02-04）。
+
+    位数上限 6 位（2026-10-28 放宽：资金流水按方向五位流水 ZC00001/SR00001）；
+    实际上限按 padding 计算（10^padding - 1），见 core.numbering。
+    """
 
     __tablename__ = "document_sequences"
     __table_args__ = (
         UniqueConstraint("sequence_key", name="uq_document_sequences_key"),
         CheckConstraint("padding > 0", name="padding_positive"),
-        CheckConstraint("padding <= 4", name="padding_max"),
+        CheckConstraint("padding <= 6", name="padding_max"),
         CheckConstraint("current_value >= 0", name="current_value_nonneg"),
-        CheckConstraint("current_value <= 9999", name="current_value_max"),
+        CheckConstraint("current_value <= 999999", name="current_value_max"),
         CheckConstraint("length(trim(sequence_key)) > 0", name="sequence_key_nonempty"),
         CheckConstraint("length(trim(prefix)) > 0", name="prefix_nonempty"),
     )

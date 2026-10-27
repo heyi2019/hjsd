@@ -20,6 +20,12 @@ export const INVENTORY_TYPE_LABEL: Record<string, string> = {
   CONSIGNMENT: "代挂",
 };
 
+/** 增值服务维度（accounts.value_added_service）：与业务类型独立。 */
+export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
+  STOCK_SALE: "分期",
+  ADVANCE_PURCHASE: "代分期",
+};
+
 export const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
 export const EDITABLE_ACCOUNT_TYPES = new Set(["RECOVERY", "PICKUP", "CONSIGNMENT"]);
 

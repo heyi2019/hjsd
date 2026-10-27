@@ -328,6 +328,7 @@ export interface Account {
   game_type?: string | null;
   business_mode?: string | null;
   inventory_type?: string | null;
+  value_added_service?: string | null;
   game_account?: string | null;
   game_password?: string | null;
   channel_region?: string | null;

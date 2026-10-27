@@ -738,7 +738,8 @@ class TestCreateOrderValidation:
                 commission_payer="BUYER",
             )
 
-    def test_dfq_account_snapshot_does_not_create_inventory_account(self, seeded_db):
+    def test_dfq_account_snapshot_materializes_inventory_account(self, seeded_db):
+        """2026-10-28 裁决：代分期垫资账号计入本方库存——建单即建账并回挂。"""
         order = order_service.create_order(
             seeded_db,
             order_type="DFQ",
@@ -753,11 +754,17 @@ class TestCreateOrderValidation:
             },
         )
 
-        assert order.account_id is None
         assert order.account_snapshot["game_account"] == "dfq-text-account"
-        assert seeded_db.scalar(
-            select(Account.id).where(Account.game_account == "dfq-text-account")
-        ) is None
+        account = seeded_db.scalar(
+            select(Account).where(Account.game_account == "dfq-text-account")
+        )
+        assert account is not None
+        assert order.account_id == account.id
+        # 业务类型留空，以增值服务维度（代分期/分销）标识。
+        assert account.business_mode == "DISTRIBUTION"
+        assert account.inventory_type is None
+        assert account.value_added_service == "ADVANCE_PURCHASE"
+        assert account.status == "IN_STOCK"
 
     def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
         account = accounts_service.create_account(

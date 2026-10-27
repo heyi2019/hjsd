@@ -11,10 +11,10 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import ErrorCode, Validation
-from app.domain.enums import SequenceKey
+from app.domain.enums import Direction, SequenceKey
 from app.domain.foundation import DocumentSequence
 
-MAX_SEQUENCE_VALUE = 9999
+MAX_SEQUENCE_VALUE = 9999  # 默认 4 位序列上限；实际按各序列 padding 计算（10^padding - 1）
 DEFAULT_PADDING = 4
 
 
@@ -61,11 +61,13 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
             details={"sequence_key": key_value},
         )
     next_value = row.current_value + 1
-    if next_value > MAX_SEQUENCE_VALUE:
+    # 上限按序列自身位数计算（4 位 9999 / 5 位 99999……），禁止静默进位。
+    max_value = 10**row.padding - 1
+    if next_value > max_value:
         raise Validation(
-            f"编号已超出 {MAX_SEQUENCE_VALUE} 上限，禁止静默进位，请联系管理员裁决",
+            f"编号已超出 {max_value} 上限，禁止静默进位，请联系管理员裁决",
             code=ErrorCode.SEQUENCE_EXHAUSTED,
-            details={"sequence_key": key_value, "max": MAX_SEQUENCE_VALUE},
+            details={"sequence_key": key_value, "max": max_value},
         )
     session.execute(
         update(DocumentSequence)
@@ -104,8 +106,16 @@ def current_value(session: Session, key: str | SequenceKey) -> int:
     return 0 if row is None else row.current_value
 
 
+def allocate_flow_no(session: Session, direction: str) -> str:
+    """资金流水编号（2026-10-28 用户口径）：按方向独立递增——
+    支出 ZC+五位流水（ZC00001）、收入 SR+五位流水（SR00001）。"""
+    key = SequenceKey.CASHFLOW_OUT if direction == Direction.OUT.value else SequenceKey.CASHFLOW_IN
+    return allocate_number(session, key)
+
+
 __all__ = [
     "MAX_SEQUENCE_VALUE",
+    "allocate_flow_no",
     "allocate_number",
     "current_value",
     "ensure_sequence",

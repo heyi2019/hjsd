@@ -58,16 +58,19 @@ SEED_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("DFQ", Portion.PROFIT.value, "HJ_PROFIT"),
 )
 
-# (sequence_key, prefix) —— 订单编号域随业务动态生成，此处只初始化非订单域
-SEED_SEQUENCES: tuple[tuple[str, str], ...] = (
-    (SequenceKey.CUSTOMER.value, "CUS"),
-    (SequenceKey.COUNTERPARTY.value, "CP"),
-    (SequenceKey.LEAD.value, "REQ"),
-    (SequenceKey.QUALITY_ISSUE.value, "QI"),
-    (SequenceKey.NOTIFICATION.value, "NTF"),
-    (SequenceKey.CASHFLOW.value, "CF"),
-    (SequenceKey.IMPORT.value, "IMP"),
-    (SequenceKey.ATTACHMENT.value, "ATT"),
+# (sequence_key, prefix, padding) —— 订单编号域随业务动态生成，此处只初始化非订单域
+SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
+    (SequenceKey.CUSTOMER.value, "CUS", 4),
+    (SequenceKey.COUNTERPARTY.value, "CP", 4),
+    (SequenceKey.LEAD.value, "REQ", 4),
+    (SequenceKey.QUALITY_ISSUE.value, "QI", 4),
+    (SequenceKey.NOTIFICATION.value, "NTF", 4),
+    # 资金流水按方向独立递增（2026-10-28 口径）：支出 ZC+五位、收入 SR+五位。
+    (SequenceKey.CASHFLOW_OUT.value, "ZC", 5),
+    (SequenceKey.CASHFLOW_IN.value, "SR", 5),
+    (SequenceKey.INSTALLMENT.value, "FQ", 4),
+    (SequenceKey.IMPORT.value, "IMP", 4),
+    (SequenceKey.ATTACHMENT.value, "ATT", 4),
 )
 
 
@@ -154,8 +157,8 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         if _route_exists_any(session, order_type.id):
             service.set_order_type_active(session, order_type.id, True, actor=actor)
 
-    for sequence_key, prefix in SEED_SEQUENCES:
-        _ensure_sequence_once(session, sequence_key, prefix, stats)
+    for sequence_key, prefix, padding in SEED_SEQUENCES:
+        _ensure_sequence_once(session, sequence_key, prefix, stats, padding=padding)
 
     record_audit(
         session,
@@ -182,7 +185,7 @@ def _route_exists(session: Session, order_type_id: int, portion: str) -> bool:
 
 
 def _ensure_sequence_once(
-    session: Session, sequence_key: str, prefix: str, stats: dict[str, int]
+    session: Session, sequence_key: str, prefix: str, stats: dict[str, int], *, padding: int = 4
 ) -> None:
     from app.domain.foundation import DocumentSequence
 
@@ -192,7 +195,7 @@ def _ensure_sequence_once(
         .first()
     )
     if exists is None:
-        ensure_sequence(session, sequence_key, prefix, 4)
+        ensure_sequence(session, sequence_key, prefix, padding)
         stats["sequences_created"] += 1
 
 

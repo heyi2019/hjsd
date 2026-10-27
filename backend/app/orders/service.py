@@ -36,6 +36,7 @@ from app.domain.enums import (
     CustomerRole,
     Direction,
     BusinessMode,
+    InstallmentContractType,
     InventoryType,
     Nature,
     OrderLinkType,
@@ -199,17 +200,20 @@ def _validate_participant_roles(
 
 
 # --------------------------------------------------------------------- 订单
-def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None) -> Account:
+def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, value_added_service: str | None = None, platform: str | None = None) -> Account:
     mode, inventory_type = {
         "HS": ("SELF", "RECOVERY"),
         "TH": ("DISTRIBUTION", "PICKUP"),
         "DG": ("DISTRIBUTION", "CONSIGNMENT"),
+        # 代分期（垫资买入）：业务类型留空，以增值服务维度（代分期/分销）标识。
+        "DFQ": ("DISTRIBUTION", None),
     }[order_type]
     return accounts_service.create_account(
         session, game_account=game_account, actor=actor, game_type=game_type,
         business_mode=mode, inventory_type=inventory_type, game_password=game_password,
         channel_region=channel_region, bound_phone=bound_phone,
         has_secondary=has_secondary, note=account_note,
+        value_added_service=value_added_service, platform=platform,
     )
 
 
@@ -390,6 +394,18 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+        ).id
+
+    # 代分期垫资买入：账号计入本方库存（业务类型留空，增值服务=分销分期/代分期）。
+    if definition.code == "DFQ" and account_id is None and account_snapshot is not None:
+        snap = account_snapshot or {}
+        account_id = _create_inline_inventory_account(
+            session, order_type="DFQ", game_account=snap["game_account"], actor=actor,
+            game_type=snap.get("game_type"), game_password=snap.get("game_password"),
+            channel_region=snap.get("channel_region"), bound_phone=snap.get("bound_phone"),
+            has_secondary=snap.get("has_secondary"), account_note=snap.get("note"),
+            value_added_service=InstallmentContractType.ADVANCE_PURCHASE.value,
+            platform=snap.get("platform"),
         ).id
 
     order = Order(

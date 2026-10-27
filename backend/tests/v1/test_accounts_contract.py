@@ -76,7 +76,7 @@ class TestCreateAccountGuards:
             )
 
     def test_unknown_inventory_type_is_rejected(self, seeded_db):
-        with pytest.raises(Validation, match="库存类型无效"):
+        with pytest.raises(Validation, match="业务类型无效"):
             _account(
                 seeded_db,
                 "invalid-inventory-type",
@@ -84,7 +84,7 @@ class TestCreateAccountGuards:
             )
 
     def test_business_mode_and_inventory_type_must_match(self, seeded_db):
-        with pytest.raises(Validation, match="业务模式与库存类型不匹配"):
+        with pytest.raises(Validation, match="业务模式与业务类型不匹配"):
             _account(
                 seeded_db,
                 "invalid-inventory-context",
@@ -256,14 +256,14 @@ class TestCreateAccountGuards:
     def test_empty_identifier_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             service.create_account(seeded_db, game_account="  ", actor="pytest")
-        assert "账号标识必填" in str(exc.value)
+        assert "库存编号必填" in str(exc.value)
 
     def test_identifier_must_be_text_in_service(self, seeded_db):
-        with pytest.raises(Validation, match="账号标识必填"):
+        with pytest.raises(Validation, match="库存编号必填"):
             service.create_account(seeded_db, game_account=123, actor="pytest")
 
         account = _account(seeded_db, "update-identifier-type")
-        with pytest.raises(Validation, match="账号标识必填"):
+        with pytest.raises(Validation, match="库存编号必填"):
             service.update_account_profile(
                 seeded_db, account.id, actor="pytest", game_account=123
             )

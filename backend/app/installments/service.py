@@ -82,7 +82,10 @@ def _materialize_dfq_recovery_account(
     *,
     actor: str,
 ) -> Account:
-    """DFQ 原本只存账号快照；首次回收时把资产快照转为可售库存账号。"""
+    """DFQ 回收转自营：垫资账号（建单已入库）转为 SELF/RECOVERY 可售库存。
+
+    迁移 0002 之前的旧订单未挂账号时，回退为从快照补建（历史兼容路径）。
+    """
     snapshot = order.account_snapshot or {}
     game_account = snapshot.get("game_account")
     if not isinstance(game_account, str) or not game_account.strip():
@@ -91,9 +94,15 @@ def _materialize_dfq_recovery_account(
         select(Account).where(Account.game_account == game_account.strip())
     )
     if existing is not None:
-        raise Conflict(
-            f"账号 {game_account.strip()} 已存在，不能从 DFQ 快照重复建库存账号"
-        )
+        # 建单即入库的代分期账号：转自营回收，清增值服务标识。
+        order.account_id = existing.id
+        existing.business_mode = "SELF"
+        existing.inventory_type = "RECOVERY"
+        existing.value_added_service = None
+        return existing
+    if order.account_id is not None:
+        # 挂了账号但台账里查不到：数据异常，显式报错而非静默重建。
+        raise NotFound("分期合约关联账号不存在")
     account = accounts_service.create_account(
         session,
         game_account=game_account,
@@ -458,8 +467,15 @@ def create_installment(
     if per_period_amount + adjustment < 0:
         raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
 
+    # 分期合约号（用户口径 2026-10-28）：统一「订单号-INS序号」衍生。
+    # 代分期沿用代分期订单号（DFQ0001 → DFQ0001-INS01）；
+    # 自营分期以独立 FQ 序列为分期订单号，合约号同式衍生（FQ0001 → FQ0001-INS01）。
+    if contract_type == InstallmentContractType.ADVANCE_PURCHASE.value:
+        installment_no_value = order_installment_no(order.order_no)
+    else:
+        installment_no_value = order_installment_no(allocate_number(session, SequenceKey.INSTALLMENT.value))
     installment = Installment(
-        inst_no=order_installment_no(order.order_no),
+        inst_no=installment_no_value,
         order_id=order.id,
         contract_type=contract_type,
         policy_version_id=policy_version_id,
@@ -525,8 +541,10 @@ def create_installment(
         require_all=True,
     )
 
-    if account is not None:
-        account.status = AccountStatus.INSTALLMENT.value
+    if account is not None and account.status == AccountStatus.IN_STOCK.value:
+        account.status = transition(
+            ACCOUNT_TRANSITIONS, account.status, "INSTALLMENT", entity="账号"
+        )
         account.updated_by = actor
     link_recovered_sale(
         session,
@@ -1116,7 +1134,8 @@ def recover_account(
     order = session.get(Order, installment.order_id)
     if order is None:
         raise Validation("分期合约没有所属订单")
-    if order.account_id is None and order.order_type == "DFQ":
+    if order.order_type == "DFQ":
+        # 建单即入库（迁移 0002 后）或旧快照单（回退补建）：统一转自营可售。
         _materialize_dfq_recovery_account(session, order, actor=actor)
     if order.account_id is None:
         raise Validation("分期合约没有可回收的账号")

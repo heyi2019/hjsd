@@ -741,12 +741,11 @@ def _apply_account_effect(
     if event_type == EventType.BUY.value:
         account.cost_amount = to_money(account.cost_amount) + amount
         account.buy_date = order.trade_date
-        account.status = transition(
-            ACCOUNT_TRANSITIONS,
-            account.status,
-            "BUY_STOCK" if stock_type else "BUY_CREDIT",
-            entity="账号",
-        )
+        next_action = "BUY_STOCK" if stock_type else "BUY_CREDIT"
+        # 合约先行（代分期建约已把账号置为分期中）时，BUY 仅补记成本，不重复转换。
+        target = ACCOUNT_TRANSITIONS.get(account.status, {}).get(next_action)
+        if target is not None:
+            account.status = target
     elif event_type == EventType.COST.value:
         account.cost_amount = to_money(account.cost_amount) + amount
     elif event_type == EventType.SELL.value:

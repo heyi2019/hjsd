@@ -196,6 +196,9 @@ class TestA05HsStockSale:
         )
         seeded_db.commit()
 
+        # 用户口径 2026-10-28：自营分期合约号 = 分期订单号（FQ 序列）-INS 衍生
+        assert contract.inst_no == "FQ0001-INS01"
+
         # 创建合约不新增 BUY 支出
         buys = seeded_db.scalars(
             select(Cashflow).where(

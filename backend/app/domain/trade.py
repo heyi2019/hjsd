@@ -94,6 +94,8 @@ class Account(Base, AuditMixin):
     game_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     business_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
     inventory_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    # 增值服务维度（与业务类型独立）：STOCK_SALE=自营分期 / ADVANCE_PURCHASE=分销分期（代分期）。
+    value_added_service: Mapped[str | None] = mapped_column(String(32), nullable=True)
     game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
     game_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
     channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)

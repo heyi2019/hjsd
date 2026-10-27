@@ -69,12 +69,17 @@ class SequenceKey(StrEnum):
     ORDER_TH = "ORDER_TH"
     ORDER_DG = "ORDER_DG"
     ORDER_DFQ = "ORDER_DFQ"
+    # 分期订单独立编号域（自营分期，关联回收/提号/代挂来源订单）；
+    # 分期合约号统一「订单号-INS序号」衍生：自营 FQ0001-INS01 / 代分期 DFQ0001-INS01。
+    INSTALLMENT = "INSTALLMENT"
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
     LEAD = "LEAD"
     QUALITY_ISSUE = "QUALITY_ISSUE"
     NOTIFICATION = "NOTIFICATION"
-    CASHFLOW = "CASHFLOW"
+    # 资金流水按方向独立递增（用户口径 2026-10-28）：支出 ZC+五位流水、收入 SR+五位流水。
+    CASHFLOW_OUT = "CASHFLOW_OUT"
+    CASHFLOW_IN = "CASHFLOW_IN"
     IMPORT = "IMPORT"
     ATTACHMENT = "ATTACHMENT"
 

@@ -25,6 +25,7 @@ import {
   EDITABLE_ACCOUNT_TYPES,
   INVENTORY_TYPE_LABEL,
   PROFILE_ACCOUNT_TYPES,
+  VALUE_ADDED_SERVICE_LABEL,
   inventoryAge,
 } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
@@ -37,6 +38,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
+  const [valueAddedService, setValueAddedService] = useState<string | undefined>(undefined);
   const [keyword, setKeyword] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -64,14 +66,15 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const [cancellingInstallment, setCancellingInstallment] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型）。
+  // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型 / 增值服务）。
   const statusOptions = useOptionSet("INVENTORY_STATUS");
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
+  const valueAddedOptions = useOptionSet("VALUE_ADDED_SERVICE");
   const load = useCallback(async () => {
     try {
       const list = await accountsApi.list(status ? { status } : undefined);
-      setRows(list);
+      setRows(list ?? []);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -86,9 +89,10 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     if (refreshKey > 0) setPage(1);
   }, [refreshKey]);
 
-  const visibleRows = rows.filter((row) => {
+  const visibleRows = (rows ?? []).filter((row) => {
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
     const matchesType = !inventoryType || row.inventory_type === inventoryType;
+    const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
     const text = [row.game_account, row.game_type, row.channel_region, row.platform]
       .filter(Boolean).join(" ").toLowerCase();
     const matchesKeyword = !keyword.trim() || text.includes(keyword.trim().toLowerCase());
@@ -330,7 +334,14 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const columns: ColumnsType<Account> = [
     { title: "订单号", dataIndex: "source_order_no", render: (v: string | null) => v || "-" },
     { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
+    { title: "业务类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
+    {
+      title: "增值服务",
+      dataIndex: "value_added_service",
+      className: "ui-col-md-up",
+      onCell: () => ({ className: "ui-col-md-up" }),
+      render: (v: string | null) => v ? VALUE_ADDED_SERVICE_LABEL[v] ?? v : "-",
+    },
     { title: "产品", dataIndex: "game_type", render: (v: string | null) => v || "-", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "库存编号", dataIndex: "game_account", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "平台", dataIndex: "platform", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },

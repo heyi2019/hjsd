@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.numbering import allocate_number
+from app.core.numbering import allocate_flow_no
 from app.core.periods import assert_period_open, normalize_period
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
@@ -23,7 +23,6 @@ from app.domain.enums import (
     Direction,
     FundNature,
     Nature,
-    SequenceKey,
 )
 from app.domain.foundation import PeriodLock
 from app.domain.trade import Cashflow, Deposit, Order
@@ -158,7 +157,7 @@ def create_cashflow(
         orders_service.get_order(session, order_id, user)
     money = _positive(amount, field="amount")
     flow = Cashflow(
-        flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
+        flow_no=allocate_flow_no(session, direction),
         pool_id=pool.id,
         occurred_on=occurred_on,
         nature=nature,
@@ -306,7 +305,7 @@ def reverse_cashflow(
         reverse_direction = Direction.OUT.value
         reverse_nature = Nature.BUSINESS_OUT.value
     reversal = Cashflow(
-        flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
+        flow_no=allocate_flow_no(session, reverse_direction),
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
         nature=reverse_nature,
@@ -387,7 +386,7 @@ def create_deposit(
     session.flush()
     session.add(
         Cashflow(
-            flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+            flow_no=allocate_flow_no(session, Direction.OUT.value),
             pool_id=pool.id,
             occurred_on=paid_on,
             nature=Nature.BUSINESS_OUT.value,
@@ -458,7 +457,7 @@ def return_deposit(
     deposit.updated_by = actor
     session.add(
         Cashflow(
-            flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+            flow_no=allocate_flow_no(session, Direction.IN.value),
             pool_id=deposit.pool_id,
             occurred_on=released_on,
             nature=Nature.BUSINESS_IN.value,
@@ -527,7 +526,7 @@ def cancel_deposit(
     deposit.updated_by = actor
     session.add(
         Cashflow(
-            flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+            flow_no=allocate_flow_no(session, Direction.IN.value),
             pool_id=deposit.pool_id,
             occurred_on=cancelled_on,
             nature=Nature.BUSINESS_IN.value,
@@ -609,7 +608,7 @@ def lose_deposit(
         deposit.status = DepositStatus.LOST.value
     deposit.updated_by = actor
     flow = Cashflow(
-        flow_no=allocate_number(session, SequenceKey.CASHFLOW),
+        flow_no=allocate_flow_no(session, Direction.OUT.value),
         pool_id=deposit.pool_id,
         occurred_on=lost_on,
         nature=Nature.BUSINESS_OUT.value,

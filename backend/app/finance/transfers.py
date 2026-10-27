@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
-from app.core.numbering import allocate_number
+from app.core.numbering import allocate_flow_no
 from app.core.periods import assert_period_open
 from app.core.security import CurrentUser
-from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature, SequenceKey
+from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
 from app.domain.trade import Cashflow
 from app.foundation import service as foundation_service
 
@@ -147,7 +147,7 @@ def repair_transfer(
     else:
         raise Validation("单边划转方向无效", details={"transfer_id": transfer})
     flow = Cashflow(
-        flow_no=allocate_number(session, SequenceKey.CASHFLOW.value),
+        flow_no=allocate_flow_no(session, direction),
         pool_id=target.id,
         occurred_on=source.occurred_on,
         nature=Nature.INTERNAL.value,

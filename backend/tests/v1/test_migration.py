@@ -162,10 +162,19 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 row[0] for row in connection.execute(text("SELECT sequence_key FROM document_sequences"))
             }
             assert {"ORDER_HS", "ORDER_TH", "ORDER_DG", "ORDER_DFQ", "CUSTOMER", "COUNTERPARTY"} <= sequences
-            assert {"INSTALLMENT", "EVENT", "REBATE"}.isdisjoint(sequences)
+            # 2026-10-28 裁决：分期合约启用独立编号域 FQ；EVENT/REBATE 仍禁止。
+            assert {"EVENT", "REBATE"}.isdisjoint(sequences)
             assert connection.execute(
-                text("SELECT prefix FROM document_sequences WHERE sequence_key = 'CASHFLOW'")
-            ).scalar_one() == "CF"
+                text("SELECT prefix FROM document_sequences WHERE sequence_key = 'INSTALLMENT'")
+            ).scalar_one() == "FQ"
+            # 2026-10-28 裁决：资金流水按方向独立编号（支出 ZC+五位 / 收入 SR+五位），CF 共用域退役。
+            assert connection.execute(
+                text(
+                    "SELECT sequence_key || '=' || prefix || '=' || padding FROM document_sequences "
+                    "WHERE sequence_key IN ('CASHFLOW_OUT', 'CASHFLOW_IN') ORDER BY sequence_key"
+                )
+            ).fetchall() == [("CASHFLOW_IN=SR=5",), ("CASHFLOW_OUT=ZC=5",)]
+            assert {"CASHFLOW"}.isdisjoint(sequences)
     finally:
         engine.dispose()
 
@@ -191,7 +200,7 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0001 (head)"
+    assert result.stdout.strip() == "0003 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

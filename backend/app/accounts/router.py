@@ -59,6 +59,7 @@ class AccountOut(BaseModel):
     game_type: str | None = None
     business_mode: str | None = None
     inventory_type: str | None = None
+    value_added_service: str | None = None
     game_password: str | None = None
     channel_region: str | None = None
     bound_phone: str | None = None
@@ -193,6 +194,7 @@ class AccountInventoryOut(BaseModel):
     game_account: str | None = None
     business_mode: str | None = None
     inventory_type: str | None = None
+    value_added_service: str | None = None
     platform: str | None = None
     status: str
     cost_amount: Decimal

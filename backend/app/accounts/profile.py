@@ -11,7 +11,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
-from app.domain.enums import AccountStatus, AuditAction
+from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType
 from app.domain.trade import Account
 from app.parties import service as parties_service
 from ._common import (
@@ -32,6 +32,7 @@ def create_account(
     game_type: str | None = None,
     business_mode: str | None = None,
     inventory_type: str | None = None,
+    value_added_service: str | None = None,
     game_password: str | None = None,
     channel_region: str | None = None,
     bound_phone: str | None = None,
@@ -44,7 +45,7 @@ def create_account(
 ) -> Account:
     identifier = game_account.strip() if isinstance(game_account, str) else ""
     if not identifier:
-        raise Validation("账号标识必填", details={"field": "game_account"})
+        raise Validation("库存编号必填", details={"field": "game_account"})
     exists = session.scalar(select(Account).where(Account.game_account == identifier))
     if exists is not None:
         raise Conflict(
@@ -53,6 +54,14 @@ def create_account(
             details={"game_account": identifier},
         )
     validate_inventory_context(business_mode, inventory_type)
+    if value_added_service is not None and value_added_service not in {
+        InstallmentContractType.STOCK_SALE.value,
+        InstallmentContractType.ADVANCE_PURCHASE.value,
+    }:
+        raise Validation(
+            "增值服务无效",
+            details={"field": "value_added_service", "value": value_added_service},
+        )
     has_secondary = validate_optional_bool(has_secondary, field="has_secondary")
     validated_images = validate_account_images(account_images)
     validate_account_profile_scope(inventory_type, account_description, validated_images)
@@ -60,6 +69,7 @@ def create_account(
         game_type=game_type,
         business_mode=business_mode,
         inventory_type=inventory_type,
+        value_added_service=value_added_service,
         game_account=identifier,
         game_password=game_password,
         channel_region=channel_region,
@@ -93,6 +103,7 @@ def create_account(
             "game_type": account.game_type,
             "business_mode": account.business_mode,
             "inventory_type": account.inventory_type,
+            "value_added_service": account.value_added_service,
             "platform": account.platform,
             "status": account.status,
             "account_description": account.account_description,
@@ -144,7 +155,7 @@ def update_account_profile(
     if game_account is not _UNSET:
         identifier = game_account.strip() if isinstance(game_account, str) else ""
         if not identifier:
-            raise Validation("账号标识必填", details={"field": "game_account"})
+            raise Validation("库存编号必填", details={"field": "game_account"})
         exists = session.scalar(select(Account).where(Account.game_account == identifier, Account.id != account_id))
         if exists is not None:
             raise Conflict(

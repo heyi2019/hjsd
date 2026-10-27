@@ -128,7 +128,7 @@ describe("InventoryPanel：写入与长路径", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
-    const input = await screen.findByLabelText("编辑账号标识");
+    const input = await screen.findByLabelText("编辑库存编号");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "updated-account" } });
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));

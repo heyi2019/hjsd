@@ -37,7 +37,7 @@ def validate_inventory_context(business_mode: str | None, inventory_type: str | 
     if business_mode is not None and business_mode not in BusinessMode.values():
         raise Validation("业务模式无效", details={"field": "business_mode"})
     if inventory_type is not None and inventory_type not in InventoryType.values():
-        raise Validation("库存类型无效", details={"field": "inventory_type"})
+        raise Validation("业务类型无效", details={"field": "inventory_type"})
     if business_mode is None or inventory_type is None:
         return
     allowed_types = {
@@ -49,7 +49,7 @@ def validate_inventory_context(business_mode: str | None, inventory_type: str | 
     }[business_mode]
     if inventory_type not in allowed_types:
         raise Validation(
-            "业务模式与库存类型不匹配",
+            "业务模式与业务类型不匹配",
             details={
                 "field": "inventory_type",
                 "business_mode": business_mode,

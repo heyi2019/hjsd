@@ -28,7 +28,7 @@ LOCAL_VOLUME=""
 DEST="${ERP_BACKUP_DEST:-$HOME/heijin_backups}"
 VOLUME="${COMPOSE_PROJECT_NAME:-deploy}_erp_db"
 KEEP="${ERP_BACKUP_KEEP:-30}"
-IMAGE="alpine:3.20"
+IMAGE="${ERP_BACKUP_IMAGE:-}"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o LogLevel=ERROR)
 
 usage() { sed -n '2,23p' "$0"; }
@@ -56,7 +56,31 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
 # ---------- 1) 拉取到暂存区：远端卷 → tar 流 → $STAGE ----------
-# 用 alpine 容器挂卷打包，避免依赖 ECS 宿主机的 tar 与卷路径知识。
+# 用容器挂卷打包，避免依赖 ECS 宿主机的 tar 与卷路径知识。
+#
+# 镜像不能写死 alpine:3.20：国内 ECS 普遍拉不动 Docker Hub（报
+# `failed to decode referrers index` / TLS timeout），而备份脚本恰恰只在无法联网时最需要。
+# heijin-backend 自身就基于 alpine:3.20，含 sh/tar，可等价代替读卷镜像——
+# 它必然已在机器上（否则服务根本起不来）。故按「显式指定 → alpine → 已部署后端镜像」探测。
+resolve_image() {
+  local cands
+  if [ -n "$LOCAL_VOLUME" ]; then
+    for cand in alpine:3.20 $(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E '^heijin-backend:' | head -1); do
+      if docker image inspect "$cand" >/dev/null 2>&1; then echo "$cand"; return 0; fi
+    done
+    return 1
+  fi
+  ssh "${SSH_OPTS[@]}" "$HOST" 'for cand in alpine:3.20 $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "^heijin-backend:" | head -1); do if docker image inspect "$cand" >/dev/null 2>&1; then echo "$cand"; exit 0; fi; done; exit 1'
+}
+
+if [ -z "$IMAGE" ]; then
+  if ! IMAGE="$(resolve_image)"; then
+    die "找不到可用于读卷的镜像（既无 alpine:3.20 也无 heijin-backend）
+  可显式指定：ERP_BACKUP_IMAGE=<镜像> bash $0 ..."
+  fi
+fi
+echo "==> 读卷镜像：${IMAGE}"
+
 echo "==> 拉取备份：${LOCAL_VOLUME:+local 卷 $LOCAL_VOLUME}${HOST:+$HOST 卷 $VOLUME} → ${DEST}（暂存校验）"
 
 read_remote() {

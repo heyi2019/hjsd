@@ -5,6 +5,7 @@ import { ordersApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
 export function DashboardPage({ onNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; active?: boolean }) {
@@ -28,11 +29,7 @@ export function DashboardPage({ onNavigate, active = true }: { onNavigate?: (key
     mountedRef.current = false;
   }, []);
   // keep-alive：工作台常驻挂载，重新激活时重拉汇总，避免其他页面完成的业务不反映在计数里。
-  useEffect(() => {
-    if (active) void loadSummary();
-    // loadSummary 每次渲染重建，仅按 active 触发。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  useReloadOnActive(active, loadSummary);
   const openCreate = (orderType: BusinessOrderType) => {
     setCreateType(orderType);
     setCreateOpen(true);

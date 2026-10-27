@@ -19,6 +19,7 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { InventoryPanel } from "../accounts/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import {
   DataTable,
   ErrorBanner,
@@ -602,9 +603,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
 
   // keep-alive：切走再切回不会重挂载。重新激活（active 翻回 true）时重拉列表，
   // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
-  useEffect(() => {
-    if (active) void load();
-  }, [active, load]);
+  useReloadOnActive(active, load);
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter);

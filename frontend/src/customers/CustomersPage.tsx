@@ -24,6 +24,7 @@ import { money, today } from "../shared/lib/format";
 import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import "./CustomersPage.css";
 import {
@@ -240,10 +241,8 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
     }
   }, [keyword, statusFilter]);
 
-  useEffect(() => {
-    // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
-    if (active) void load();
-  }, [active, load]);
+  // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
+  useReloadOnActive(active, load);
 
   useEffect(() => {
     // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页
@@ -800,10 +799,8 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
     }
   }, []);
 
-  useEffect(() => {
-    // keep-alive：提号建单会自动建档供货方，重新激活时重拉避免列表过期。
-    if (active) void load();
-  }, [active, load]);
+  // keep-alive：提号建单会自动建档供货方，重新激活时重拉避免列表过期。
+  useReloadOnActive(active, load);
 
   const openDetail = async (row: Counterparty) => {
     setDetailTarget(row);

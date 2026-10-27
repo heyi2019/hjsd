@@ -15,9 +15,12 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.accounts import service as account_service
 from app.core.errors import Validation
+from app.domain.enums import AuditAction
+from app.domain.foundation import AuditLog
 from app.orders import service as order_service
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
@@ -190,6 +193,45 @@ def test_person_mode_company_row_has_no_user(seeded_db):
     )
 
     assert [row["user_id"] for row in rows] == [1, None]
+
+
+def _latest_audit(seeded_db, entity_type: str, entity_id: int) -> AuditLog | None:
+    return seeded_db.scalars(
+        select(AuditLog)
+        .where(AuditLog.entity_type == entity_type, AuditLog.entity_id == str(entity_id))
+        .order_by(AuditLog.id.desc())
+    ).first()
+
+
+def test_person_allocation_writes_dedicated_audit_action(seeded_db):
+    """分润审计单独成动作：不再混进 EXCEPTION_APPROVE（否则审计页按异常审批筛会串味）。"""
+    order_id = _order_with_profit(seeded_db)
+
+    policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
+    )
+
+    entry = _latest_audit(seeded_db, "order", order_id)
+    assert entry is not None
+    assert entry.action == AuditAction.PROFIT_ALLOCATION_SET.value
+    assert entry.action != AuditAction.EXCEPTION_APPROVE.value
+
+
+def test_policy_definition_creation_audits_as_policy_change(seeded_db):
+    """政策定义/版本属「变更经营规则」，不是「审批异常」。"""
+    definition = policy_service.create_definition(
+        seeded_db,
+        policy_code="AUDIT_PROBE",
+        name="审计动作探针",
+        scope_type="GLOBAL",
+        actor="pytest",
+    )
+
+    entry = _latest_audit(seeded_db, "policy_definition", int(definition["id"]))
+    assert entry is not None
+    assert entry.action == AuditAction.POLICY_CHANGE.value
 
 
 def test_commission_report_uses_amount_as_payable_base(seeded_db):

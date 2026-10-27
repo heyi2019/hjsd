@@ -142,6 +142,8 @@ class TestAuditLogApi:
         response = seeded_client.get("/api/v1/audit-logs/actions", headers=headers)
         assert response.status_code == 200, response.text
         assert AuditAction.ORDER_CREATE.value in response.json()["items"]
+        # 分润单独成动作（不再混进 EXCEPTION_APPROVE），前端下拉由此清单驱动。
+        assert AuditAction.PROFIT_ALLOCATION_SET.value in response.json()["items"]
 
     def test_entity_id_accepts_business_numbers(self, seeded_client, seeded_db, headers):
         _audit(

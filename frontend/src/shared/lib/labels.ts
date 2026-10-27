@@ -212,6 +212,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   TEAM_UPDATE: "编辑团队",
   FIELD_DEFINITION_CHANGE: "变更活字段定义",
   POLICY_CHANGE: "变更经营规则",
+  PROFIT_ALLOCATION_SET: "设置利润分润",
   EXCEPTION_APPROVE: "审批异常",
   REPORT_EXPORT: "导出报表",
   ATTACHMENT_UPLOAD: "上传附件",

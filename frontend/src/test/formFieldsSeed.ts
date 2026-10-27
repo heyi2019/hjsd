@@ -386,6 +386,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "FIELD_DEFINITION_CHANGE", label: "变更活字段定义" },
     { value: "ORDER_FORM_FIELD_CHANGE", label: "变更订单表单字段" },
     { value: "POLICY_CHANGE", label: "变更经营规则" },
+    { value: "PROFIT_ALLOCATION_SET", label: "设置利润分润" },
     { value: "EXCEPTION_APPROVE", label: "审批异常" },
     { value: "REPORT_EXPORT", label: "导出报表" },
     { value: "ATTACHMENT_UPLOAD", label: "上传附件" },

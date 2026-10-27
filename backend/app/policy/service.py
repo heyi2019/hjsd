@@ -196,7 +196,7 @@ def create_definition(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.POLICY_CHANGE,
         entity_type="policy_definition",
         entity_id=item.id,
         actor=actor,
@@ -311,7 +311,7 @@ def create_version(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.POLICY_CHANGE,
         entity_type="policy_version",
         entity_id=item.id,
         actor=actor,
@@ -374,7 +374,7 @@ def update_version_draft(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.POLICY_CHANGE,
         entity_type="policy_version",
         entity_id=item.id,
         actor=actor,
@@ -756,7 +756,7 @@ def _set_person_allocations(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.PROFIT_ALLOCATION_SET,
         entity_type="order",
         entity_id=order_id,
         actor=actor,
@@ -910,7 +910,7 @@ def _set_action_allocations(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.EXCEPTION_APPROVE,
+        action=AuditAction.PROFIT_ALLOCATION_SET,
         entity_type="order",
         entity_id=order_id,
         actor=actor,

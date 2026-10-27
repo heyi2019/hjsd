@@ -422,7 +422,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           emptyText="暂无工作室支出"
           loading={loading}
           onPageChange={() => undefined}
-        />
+       />
       </Card>
 
       <Modal

@@ -398,7 +398,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         onPageChange={() => undefined}
         // 7 列（字段键/标签/类型/必填/选项/启用/操作）在窄容器内会被压到换行，
         // 统一按内容宽度渲染，由 .ui-table-wrap 的 overflow:auto 承担左右滑动。
-        scroll={{ x: "max-content" }}
+       
         expandable={{
           expandedRowKeys: editingId === null ? [] : [String(editingId)],
           showExpandColumn: false,

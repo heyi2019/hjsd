@@ -108,7 +108,7 @@ export function PoolsPanel() {
         total={rows.length}
         emptyText="暂无资金池"
         onPageChange={() => undefined}
-      />
+     />
       <PermissionGate
         permission="pool.manage"
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限。</Typography.Paragraph>}

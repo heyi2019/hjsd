@@ -68,7 +68,7 @@ export function SequencesPanel() {
         emptyText="暂无编号序列"
         loading={loading}
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }

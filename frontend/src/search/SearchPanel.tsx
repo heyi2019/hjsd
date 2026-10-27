@@ -30,7 +30,7 @@ export function SearchPanel() {
     <Card className="glass" title="全局搜索">
       <Form layout="inline" onFinish={runSearch} className="ui-filter-bar"><Form.Item name="q" rules={[{ required: true }]}><Input placeholder="订单号 / 库存号 / 客户 / 合作方 / 返点号" /></Form.Item><button type="submit" className="ui-button ui-button--primary">搜索</button></Form>
       <ErrorBanner error={error} onRetry={() => query && void runSearch({ q: query })} />
-      <DataTable<SearchResult> columns={columns} rows={rows} loading={loading} page={1} pageSize={20} total={rows.length} emptyText={query ? "没有匹配结果" : "输入关键词开始搜索"} onPageChange={() => undefined} />
+      <DataTable<SearchResult> columns={columns} rows={rows} loading={loading} page={1} pageSize={20} total={rows.length} emptyText={query ? "没有匹配结果" : "输入关键词开始搜索"} onPageChange={() => undefined}/>
     </Card>
   </section>;
 }

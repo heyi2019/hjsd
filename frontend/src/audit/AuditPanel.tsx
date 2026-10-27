@@ -77,7 +77,7 @@ export function AuditPanel() {
           <Input aria-label="审计开始日期" placeholder="开始日期" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
           <Input aria-label="审计结束日期" placeholder="结束日期" value={toDate} onChange={(event) => setToDate(event.target.value)} />
         </div>
-        <DataTable<AuditLogRow> columns={columns} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无审计记录" onPageChange={() => undefined} />
+        <DataTable<AuditLogRow> columns={columns} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无审计记录" onPageChange={() => undefined}/>
       </Card>
     </section>
   );

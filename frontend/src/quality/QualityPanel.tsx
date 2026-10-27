@@ -137,7 +137,7 @@ export function QualityPanel() {
       <ErrorBanner error={error} onRetry={() => void load()} />
       <StatRow items={[{ label: "异常总数", kind: "count", amount: String(summary?.total ?? 0) }, { label: "高严重度", kind: "count", amount: String(summary?.by_severity?.HIGH ?? 0), tone: "warn" }]} />
       <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.exception.approve" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
-        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} scroll={{ x: "max-content" }} emptyText="暂无质量异常" onPageChange={() => undefined} />
+        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length}emptyText="暂无质量异常" onPageChange={() => undefined} />
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <Modal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>

@@ -220,7 +220,7 @@ export function OrderTypeRoutesPanel() {
           loading={loading}
           emptyText="暂无资金路由"
           onPageChange={() => undefined}
-        />
+       />
       </Card>
       <PermissionGate
         permission="order-type.manage"

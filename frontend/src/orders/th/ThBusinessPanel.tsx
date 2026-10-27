@@ -65,7 +65,7 @@ export function ThBusinessPanel() {
           total={orders.length}
           emptyText="暂无提号订单"
           onPageChange={() => undefined}
-        />
+       />
       </Card>
       <CreateBusinessModal
         open={createOpen}

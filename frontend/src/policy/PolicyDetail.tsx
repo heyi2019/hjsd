@@ -113,7 +113,7 @@ export function PolicyDetail({
           total={versions.length}
           emptyText="该规则还没有版本"
           onPageChange={() => undefined}
-        />
+       />
       </Card>
     </section>
   );

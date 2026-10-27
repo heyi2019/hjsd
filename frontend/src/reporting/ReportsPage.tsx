@@ -240,7 +240,7 @@ function InventoryReport() {
         total={data?.items.length ?? 0}
         emptyText="暂无在库账号"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }
@@ -284,7 +284,7 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
         total={data?.items.length ?? 0}
         emptyText="所选区间无数据"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }
@@ -331,7 +331,7 @@ function Commission({ range }: { range: ReportRange }) {
         total={data?.items.length ?? 0}
         emptyText="所选区间无提成记录"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }
@@ -381,7 +381,7 @@ function DailyFunds() {
         total={data?.items.length ?? 0}
         emptyText="当日无资金流水"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }
@@ -421,7 +421,7 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
         total={data?.items.length ?? 0}
         emptyText="所选区间无已审核流水"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }
@@ -480,7 +480,7 @@ function BusinessPnl({ range }: { range: ReportRange }) {
         total={data?.items.length ?? 0}
         emptyText="所选区间无业务数据"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }
@@ -527,7 +527,7 @@ function OrderProfit({ range }: { range: ReportRange }) {
         total={data?.items.length ?? 0}
         emptyText="所选区间无订单"
         onPageChange={() => undefined}
-      />
+     />
     </Card>
   );
 }

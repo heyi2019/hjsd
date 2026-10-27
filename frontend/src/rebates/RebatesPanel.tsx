@@ -345,7 +345,7 @@ export function RebatesPanel() {
               />
             ),
           }}
-        scroll={{ x: "max-content" }}/>
+       />
       </Card>
 
       <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>

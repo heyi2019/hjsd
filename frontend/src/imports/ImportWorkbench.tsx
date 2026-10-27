@@ -370,7 +370,7 @@ export function ImportWorkbench({
                   total={rows.length}
                   emptyText="该批次暂无行"
                   onPageChange={() => undefined}
-                />
+               />
               </Card>
             ),
           },
@@ -414,7 +414,7 @@ export function ImportWorkbench({
                       pageSize={Math.max(preview.columns.length, 10)}
                       total={preview.columns.length}
                       onPageChange={() => undefined}
-                     />
+                    />
                   </>
                 ) : (
                   <Typography.Text type="secondary">请选择批次</Typography.Text>
@@ -486,7 +486,7 @@ export function ImportWorkbench({
                       total={Object.keys(report.amounts.before).length}
                       onPageChange={() => undefined}
                       rowKey="key"
-                    />
+                   />
                     {report.requires_adjudication ? (
                       <ErrorBanner error={{ message: "存在未映射、未裁决或未平项：差异须裁决后方可上线。" }} />
                     ) : null}

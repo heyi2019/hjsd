@@ -766,7 +766,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     setPage(nextPage);
                     setPageSize(nextSize);
                   }}
-                scroll={{ x: "max-content" }}/>
+               />
                 <MobileOrderList
                   orders={filteredOrders}
                   emptyText="暂无业务订单"

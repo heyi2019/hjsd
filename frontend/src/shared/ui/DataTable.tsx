@@ -33,7 +33,7 @@ export function DataTable<T>(props: {
   emptyText?: string;
   /** 需要展开行（如分期期次明细）时透传，其余场景不必传。 */
   expandable?: TableProps<T>["expandable"];
-  /** 横向内容超出时启用 antd 固定列/滚动能力。 */
+  /** 横向滚动默认已开（x:"max-content"）：内容超出容器时自动可滑动；传此 prop 可覆盖默认值。 */
   scroll?: TableProps<T>["scroll"];
   /** 需要隐藏或自定义分页时透传给 antd；未传时保持统一默认分页。 */
   pagination?: TableProps<T>["pagination"];
@@ -111,7 +111,9 @@ export function DataTable<T>(props: {
         dataSource={props.rows}
         rowKey={props.rowKey ?? defaultRowKey}
         expandable={props.expandable}
-        scroll={props.scroll}
+        // 横向滚动为表格默认标准：内容超出容器（“看不到了”）时自动可滑动；
+        // 调用方传 scroll 则覆盖默认值（如 InventoryDetail 的固定宽度）。
+        scroll={props.scroll ?? { x: "max-content" }}
         pagination={pagination}
         locale={{
           emptyText: <Empty description={props.emptyText ?? "暂无数据"} />,

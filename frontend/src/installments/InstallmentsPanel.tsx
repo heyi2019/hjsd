@@ -532,7 +532,7 @@ function ContractTable({
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-          scroll={{ x: "max-content" }}
+         
           emptyText="暂无分期合约"
           onPageChange={() => undefined}
           expandable={{

@@ -449,7 +449,7 @@ function CustomerPanel() {
         pageSize={pageSize}
         total={rows.length}
         className="customer-table"
-        scroll={{ x: "max-content" }}
+       
         emptyText="暂无客户档案"
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
@@ -678,7 +678,7 @@ function CustomerPanel() {
                   onPageChange={() => undefined}
                   pagination={false}
                   emptyText="暂无关联订单"
-                />
+               />
                 <Typography.Title level={5} className="ui-title-spaced">分期收款</Typography.Title>
                 <DataTable<CustomerInstallment>
                   columns={[
@@ -696,7 +696,7 @@ function CustomerPanel() {
                   onPageChange={() => undefined}
                   pagination={false}
                   emptyText="暂无分期合约"
-                />
+               />
               </>
             ) : null}
           </>
@@ -865,7 +865,7 @@ function CounterpartyPanel() {
         total={rows.length}
         emptyText="暂无合作方"
         onPageChange={() => undefined}
-      /> : <MobileCounterpartyList
+     /> : <MobileCounterpartyList
         rows={rows}
         onDetail={(row) => void openDetail(row)}
         onEdit={setEditTarget}

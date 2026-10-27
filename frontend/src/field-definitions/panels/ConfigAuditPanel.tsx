@@ -170,7 +170,7 @@ export function ConfigAuditPanel() {
           loading={loading}
           emptyText="当前筛选下没有配置改动记录"
           onPageChange={() => undefined}
-        />
+       />
       </Card>
       <Card className="glass" size="small" title="说明">
         <Typography.Paragraph type="secondary">

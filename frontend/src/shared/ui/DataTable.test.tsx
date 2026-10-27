@@ -56,7 +56,7 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     const { container } = render(
       <DataTable columns={columns} rows={rows} page={1} pageSize={20} total={12} onPageChange={() => {}} />,
     );
-    expect(container.querySelectorAll("tbody tr").length).toBe(12);
+    expect(container.querySelectorAll(".ant-table-row").length).toBe(12);
     expect(screen.getByText("第11行")).toBeInTheDocument();
   });
 
@@ -65,7 +65,7 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     const { container } = render(
       <DataTable columns={columns} rows={big} page={1} pageSize={20} total={25} onPageChange={() => {}} />,
     );
-    expect(container.querySelectorAll("tbody tr").length).toBe(20);
+    expect(container.querySelectorAll(".ant-table-row").length).toBe(20);
     expect(screen.queryByText("R21")).toBeNull(); // 第 21 行在第 2 页
   });
 });
@@ -117,7 +117,7 @@ describe("DataTable：两种分页模式", () => {
         onPageChange={() => {}}
       />,
     );
-    expect(container.querySelectorAll("tbody tr").length).toBe(1);
+    expect(container.querySelectorAll(".ant-table-row").length).toBe(1);
     expect(screen.getByText("自定义键")).toBeInTheDocument();
   });
 });

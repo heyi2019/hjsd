@@ -46,7 +46,7 @@ export function NotificationsPanel() {
       title="系统提醒"
       extra={<Space wrap><Checkbox checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)}>仅看未读</Checkbox><PermissionButton permission="order.exception.approve" onClick={() => void syncOverdue()}>同步返点逾期提醒</PermissionButton></Space>}
     >
-      <DataTable<NotificationItem> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText={unreadOnly ? "暂无未读提醒" : "暂无系统提醒"} onPageChange={() => undefined} />
+      <DataTable<NotificationItem> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText={unreadOnly ? "暂无未读提醒" : "暂无系统提醒"} onPageChange={() => undefined}/>
     </Card>
   </section>;
 }

@@ -150,7 +150,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
             rowKey="key"
             emptyText="尚未配置资金池"
             onPageChange={() => undefined}
-          />
+         />
         </Card>
       </PermissionGate>
 

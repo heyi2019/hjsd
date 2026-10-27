@@ -93,7 +93,7 @@ export function PeriodLocksPanel() {
         total={rows.length}
         emptyText="暂无锁定的账期"
         onPageChange={() => undefined}
-      />
+     />
 
       <Modal title="锁定账期" open={open} onCancel={() => setOpen(false)} footer={null}>
         <InlineError error={write.error} />

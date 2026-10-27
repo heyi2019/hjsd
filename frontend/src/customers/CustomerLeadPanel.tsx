@@ -78,7 +78,7 @@ export function CustomerLeadPanel() {
     <ErrorBanner error={error} onRetry={() => void load()} />
     <StatRow items={[{ label: "需求总数", kind: "count", amount: String(rows.length) }, { label: "待跟进", kind: "count", amount: String(rows.filter((row) => row.status === "OPEN").length), tone: "warn" }]} />
     <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" onClick={() => setCreateOpen(true)}>新增需求</PermissionButton>}>
-      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" onPageChange={() => undefined} />
+      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" onPageChange={() => undefined}/>
     </Card>
     <Modal title="新增客户需求" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
       <FieldConfigContext.Provider value={config}>

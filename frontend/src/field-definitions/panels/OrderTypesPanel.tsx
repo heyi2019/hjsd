@@ -185,7 +185,7 @@ export function OrderTypesPanel() {
         total={rows.length}
         emptyText="暂无业务类型"
         onPageChange={() => undefined}
-      />
+     />
       <PermissionGate
         permission="order-type.manage"
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限，仅可查看。</Typography.Paragraph>}
@@ -266,7 +266,7 @@ export function OrderTypesPanel() {
           total={routes.length}
           emptyText="暂无路由配置"
           onPageChange={() => undefined}
-        />
+       />
         <Typography.Paragraph strong className="ui-form-spaced">新增 / 覆盖路由</Typography.Paragraph>
         <Form form={routeForm} layout="vertical" onFinish={submitRoute} initialValues={{ portion: "PRINCIPAL", priority: 0 }}>
           <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}>

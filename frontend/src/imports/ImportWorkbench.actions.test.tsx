@@ -104,11 +104,17 @@ async function openWorkbench(rows: ImportRow[] = [makeRow()]) {
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }
 
-/** 异步取表格行：等首行渲染完成，避免 tabpanel/渲染时序导致的 undefined。 */
+/** 异步取表格行：等首数据行渲染完成，避免 tabpanel/渲染时序导致的 undefined。
+ *  antd 在 tbody 首行渲染隐藏的 ant-table-measure-row（列宽测量用，aria-hidden），
+ *  必须用真实数据行选择器 .ant-table-row 跳过它，否则 [0] 命中空测量行，
+ *  其内无任何按钮/状态文本，导致 within(row).getBy… 全数失败（2026-10-27 实测）。 */
 async function rowAt(index: number): Promise<HTMLElement> {
   let el: HTMLElement | undefined;
   await waitFor(() => {
-    el = document.querySelectorAll("tbody tr")[index] as HTMLElement;
+    const rows = Array.from(
+      document.querySelectorAll("tbody tr.ant-table-row"),
+    ) as HTMLElement[];
+    el = rows[index];
     expect(el).toBeTruthy();
   });
   return el!;

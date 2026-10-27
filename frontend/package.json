@@ -12,6 +12,8 @@
     "test:quick": "vitest run --project=quick",
     "test:react": "vitest run --project=react",
     "test:full": "node scripts/test-full-sharded.mjs",
+    "test:full:deep": "node scripts/test-full-sharded.mjs --deep-only",
+    "test:full:all": "node scripts/test-full-sharded.mjs --all",
     "test:full:serial": "vitest run",
     "test:serial": "vitest run --project=react --no-file-parallelism",
     "test:watch": "vitest",

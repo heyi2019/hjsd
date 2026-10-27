@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 系统提醒：查看未读通知、标记已读并同步返点逾期提醒（SYS-01-04）。 */
-import { Card, Checkbox, Space, message } from "antd";
+import { Card, Checkbox, Space } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { notificationsApi, type NotificationItem } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
@@ -24,11 +25,11 @@ export function NotificationsPanel() {
     return () => window.clearInterval(timer);
   }, [load]);
   const markRead = async (row: NotificationItem) => {
-    try { await notificationsApi.markRead(row.id); message.success("提醒已标记为已读"); await load(); }
+    try { await notificationsApi.markRead(row.id); appMessage.success("提醒已标记为已读"); await load(); }
     catch (err) { setError(normalizeError(err)); }
   };
   const syncOverdue = async () => {
-    try { const result = await notificationsApi.syncOverdueRebates(); message.success(`逾期返点提醒已同步，新增 ${result.created} 条`); await load(); }
+    try { const result = await notificationsApi.syncOverdueRebates(); appMessage.success(`逾期返点提醒已同步，新增 ${result.created} 条`); await load(); }
     catch (err) { setError(normalizeError(err)); }
   };
   const columns: ColumnsType<NotificationItem> = [

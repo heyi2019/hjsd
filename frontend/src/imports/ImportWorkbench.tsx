@@ -1,3 +1,4 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 导入工作台（MIG-01）：导入 → 映射预览 → 人工指派 → 对账 → 提交 / 回滚 / 更正。
  *
  * 页面必须持续强调的红线（对应任务清单「阻断规则」）：
@@ -5,7 +6,7 @@
  * - 系统**不做自动匹配**，映射必须人工指派且留依据
  * - **不补造单边划转**，未裁决的只打 UNLINKED_TRANSFER 标记
  */
-import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, Upload, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -543,7 +544,7 @@ export function ImportWorkbench({
         onOk={() => {
           void importForm.validateFields().then(async (values) => {
             if (!importFile?.originFileObj) {
-              message.error("请选择 JSON 或 CSV 文件");
+              appMessage.error("请选择 JSON 或 CSV 文件");
               return;
             }
             setImporting(true);
@@ -561,7 +562,7 @@ export function ImportWorkbench({
               importForm.resetFields();
               await loadBatches();
               setBatchId(created.id);
-              message.success(`已导入 ${rows.length} 行数据`);
+              appMessage.success(`已导入 ${rows.length} 行数据`);
             } catch (err) {
               setError(normalizeError(err));
             } finally {
@@ -718,11 +719,11 @@ export function ImportWorkbench({
           try {
             rows = JSON.parse(String(values.rows ?? "[]"));
             if (!Array.isArray(rows) || rows.length === 0) {
-              message.error("更正内容必须是非空 JSON 数组");
+              appMessage.error("更正内容必须是非空 JSON 数组");
               return;
             }
           } catch {
-            message.error("更正内容不是合法 JSON，请检查格式");
+            appMessage.error("更正内容不是合法 JSON，请检查格式");
             return;
           }
           void act(async () => {

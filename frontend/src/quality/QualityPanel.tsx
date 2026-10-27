@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
-import { Card, Form, Input, Modal, Select, Space, Tooltip, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualityMetricRow, type QualityMetricValue, type QualityMetrics, type QualitySummary } from "../shared/api/catalog";
@@ -102,7 +103,7 @@ export function QualityPanel() {
         entity_id: values.entity_id as string,
         message: values.message as string,
       });
-      message.success("质量工单已创建");
+      appMessage.success("质量工单已创建");
       setCreateOpen(false);
       createForm.resetFields();
       await load();
@@ -115,7 +116,7 @@ export function QualityPanel() {
     setClosing(true);
     try {
       await qualityApi.close(closeTarget.id, { resolution: values.resolution as string, evidence: values.evidence as string });
-      message.success("质量工单已关闭");
+      appMessage.success("质量工单已关闭");
       setCloseTarget(null);
       closeForm.resetFields();
       await load();
@@ -127,18 +128,18 @@ export function QualityPanel() {
     const openIds = rows.filter((row) => row.status !== "CLOSED").map((row) => row.id);
     const ids = openIds.slice(0, 50);
     const capped = openIds.length > ids.length;
-    if (!ids.length) { message.info("暂无可批量关闭的工单"); return; }
+    if (!ids.length) { appMessage.info("暂无可批量关闭的工单"); return; }
     setBatchClosing(true);
     try {
       await qualityApi.batchClose({ issue_ids: ids, resolution: values.resolution as string, evidence: values.evidence as string });
-      message.success(`已批量关闭 ${ids.length} 个未关闭工单${capped ? "（仅处理前 50 条，剩余请再次操作）" : ""}`);
+      appMessage.success(`已批量关闭 ${ids.length} 个未关闭工单${capped ? "（仅处理前 50 条，剩余请再次操作）" : ""}`);
       setBatchCloseOpen(false);
       batchCloseForm.resetFields();
       await load();
     } catch (err) {
       const normalized = normalizeError(err);
       setError(normalized);
-      message.error(`批量关闭失败：${normalized.message}`);
+      appMessage.error(`批量关闭失败：${normalized.message}`);
     }
     finally { setBatchClosing(false); }
   };
@@ -147,7 +148,7 @@ export function QualityPanel() {
     setUpdating(true);
     try {
       await qualityApi.update(row.id, { status });
-      message.success("工单已进入处理中");
+      appMessage.success("工单已进入处理中");
       await load();
     } catch (err) { setError(normalizeError(err)); }
     finally { setUpdating(false); }
@@ -157,7 +158,7 @@ export function QualityPanel() {
     setScanning(true);
     try {
       const created = await qualityApi.scan();
-      message.success(created.length > 0 ? `扫描发现 ${created.length} 个新异常，已生成工单` : "扫描完成，未发现新异常");
+      appMessage.success(created.length > 0 ? `扫描发现 ${created.length} 个新异常，已生成工单` : "扫描完成，未发现新异常");
       await load();
     } catch (err) { setError(normalizeError(err)); }
     finally { setScanning(false); }

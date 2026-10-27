@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
-import { Card, Form, Input, Modal, Select, Space, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/catalog";
@@ -39,7 +40,7 @@ export function CustomerLeadPanel() {
       setError(null);
       setActing(true);
       await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string });
-      message.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
+      appMessage.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
     } catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
   };
@@ -48,7 +49,7 @@ export function CustomerLeadPanel() {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.close(closeTarget.id, values.reason as string); message.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
+      await leadsApi.close(closeTarget.id, values.reason as string); appMessage.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
     }
     catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -58,7 +59,7 @@ export function CustomerLeadPanel() {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.convert(convertTarget.id, Number(values.order_id)); message.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
+      await leadsApi.convert(convertTarget.id, Number(values.order_id)); appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
     }
     catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }

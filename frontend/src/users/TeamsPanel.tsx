@@ -1,4 +1,5 @@
-import { Card, Form, Input, message } from "antd";
+import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { Card, Form, Input } from "antd";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "../shared/api/client";
 import { ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
@@ -8,10 +9,10 @@ type Team = { id: number; code: string; name: string; description?: string | nul
 export function TeamsPanel() {
   const [rows, setRows] = useState<Team[]>([]);
   const [form] = Form.useForm();
-  const load = async () => { try { setRows((await api.get<Team[]>("/teams")).data); } catch (err) { message.error(errorMessage(err)); } };
+  const load = async () => { try { setRows((await api.get<Team[]>("/teams")).data); } catch (err) { appMessage.error(errorMessage(err)); } };
   useEffect(() => { void load(); }, []);
-  const submit = async (values: Record<string, string>) => { try { await api.post("/teams", values); message.success("团队已创建"); form.resetFields(); await load(); } catch (err) { message.error(errorMessage(err)); } };
-  const toggle = async (team: Team) => { try { await api.patch(`/teams/${team.id}`, { is_active: !team.is_active }); message.success(team.is_active ? "团队已停用" : "团队已启用"); await load(); } catch (err) { message.error(errorMessage(err)); } };
+  const submit = async (values: Record<string, string>) => { try { await api.post("/teams", values); appMessage.success("团队已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const toggle = async (team: Team) => { try { await api.patch(`/teams/${team.id}`, { is_active: !team.is_active }); appMessage.success(team.is_active ? "团队已停用" : "团队已启用"); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
   return <Card className="glass" title="团队管理">
     <DataTable<Team>
       className="ui-admin-table"

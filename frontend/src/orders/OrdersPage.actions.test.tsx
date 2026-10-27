@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { message } from "antd";
+import { appMessage as message } from "../shared/ui/appFeedback";
 import { renderLight } from "../test/render";
 import { OrdersPage, validateAllocations } from "./OrdersPage";
 

@@ -1,4 +1,5 @@
-import { Card, Form, Input, Modal, Select, Space, Typography, message } from "antd";
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
+import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { poolsApi, type Pool } from "../../shared/api/catalog";
@@ -48,7 +49,7 @@ export function PoolsPanel() {
         pool_type: (values.pool_type as string) ?? "OTHER",
         ownership: (values.ownership as string) ?? "OWNED",
       });
-      message.success("资金池已创建");
+      appMessage.success("资金池已创建");
       form.resetFields();
       await load();
     } catch (err) {
@@ -57,7 +58,7 @@ export function PoolsPanel() {
   };
 
   const toggleStatus = async (row: Pool) => {
-    try { await poolsApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE"); message.success(row.status === "ACTIVE" ? "资金池已停用" : "资金池已启用"); await load(); }
+    try { await poolsApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE"); appMessage.success(row.status === "ACTIVE" ? "资金池已停用" : "资金池已启用"); await load(); }
     catch (err) { setError(normalizeError(err)); }
   };
 
@@ -70,7 +71,7 @@ export function PoolsPanel() {
         ownership: values.ownership as string,
         note: (values.note as string) || null,
       });
-      message.success("资金池已更新");
+      appMessage.success("资金池已更新");
       setEditing(null);
       await load();
     } catch (err) {

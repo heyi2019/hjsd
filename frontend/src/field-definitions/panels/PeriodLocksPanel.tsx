@@ -1,3 +1,4 @@
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
 /** 月结账期锁（设置页入口）：锁定后该账期不允许再登记/修改现金流。
  *
  * 为什么单独写一份、不复用资金中心那段：
@@ -5,7 +6,7 @@
  * 风险大于收益；因此这里按同一端点（/period-locks）另写一份设置页视角的面板，两端数据同源。
  * 表单标签走与资金中心**同一个作用域 FUNDLOCK**：一处改标签/必填，两边同时生效，不会分叉。
  */
-import { Form, Input, Modal, Typography, message } from "antd";
+import { Form, Input, Modal, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { periodLocksApi, type PeriodLock } from "../../shared/api/catalog";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
@@ -52,7 +53,7 @@ export function PeriodLocksPanel() {
         period: values.period as string,
         note: values.note as string | undefined,
       });
-      message.success("账期已锁定");
+      appMessage.success("账期已锁定");
       setOpen(false);
       form.resetFields();
       await load();

@@ -1,3 +1,4 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 工作室收支：在指定资金池上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
  *
  * 设计约束（刻意不新增后端表）：
@@ -8,7 +9,7 @@
  * - **承载资金池可勾选**：配置落在选项词典 `STUDIO_EXPENSE_POOL`（value=池 code），
  *   科目字典落在 `STUDIO_EXPENSE_ITEM`；首次保存时自动补建词典，服务端存储 ⇒ 全员同步。
  */
-import { Card, Form, Input, Modal, Select, Space, Typography, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -171,7 +172,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     await write.run(async () => {
       if (action === "approve") await cashflowsApi.approve(row.id);
       else await cashflowsApi.reject(row.id, reason ?? "", formExtra);
-      message.success(action === "approve" ? "支出已审核" : "支出已拒绝");
+      appMessage.success(action === "approve" ? "支出已审核" : "支出已拒绝");
       setRejectTarget(null);
       rejectForm.resetFields();
       await load();
@@ -199,10 +200,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         try {
           await cashflowsApi.approve(flowId);
         } catch {
-          message.warning("已登记但自动审核未成功，请在「流水」页手动审核");
+          appMessage.warning("已登记但自动审核未成功，请在「流水」页手动审核");
         }
       }
-      message.success(direction === "OUT" ? "支出已登记入账" : "收入已登记入账");
+      appMessage.success(direction === "OUT" ? "支出已登记入账" : "收入已登记入账");
       setRegisterOpen(false);
       registerForm.resetFields();
       await load();
@@ -218,7 +219,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         reason: values.reason as string,
         form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
-      message.success("支出已冲销");
+      appMessage.success("支出已冲销");
       setReverseTarget(null);
       reverseForm.resetFields();
       await load();
@@ -244,7 +245,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           inputItems.map((value) => ({ value, label: value })),
         );
       }
-      message.success("工作室支出配置已保存");
+      appMessage.success("工作室支出配置已保存");
       setConfigOpen(false);
       await load();
     });

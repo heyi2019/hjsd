@@ -49,6 +49,8 @@ htmlcov/
 
 # 数据库备份运行产物，不纳入代码版本库
 /backend/data/backups/*
+# 迁移/压平前的 tarball 备份（含历史迁移快照），同样不入库（git 历史已留档）
+/backend/backups/
 
 # 迁移前的临时库备份（带时间戳后缀，*.db 规则匹配不到）
 /backend/data/*.bak*

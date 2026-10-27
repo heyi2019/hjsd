@@ -5,6 +5,8 @@
 #   docker compose up -d
 services:
   backend:
+    # 镜像 tag 取 deploy.sh 从 backend/app/version.py 解析出的版本；本地直接 compose up 时回落 latest。
+    image: heijin-backend:${APP_VERSION:-latest}
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -25,6 +27,7 @@ services:
       start_period: 20s
 
   frontend:
+    image: heijin-frontend:${APP_VERSION:-latest}
     build:
       context: ..
       dockerfile: frontend/Dockerfile

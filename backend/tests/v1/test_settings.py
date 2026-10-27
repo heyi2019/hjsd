@@ -1,6 +1,8 @@
 """T01 / SYS-01-01：配置必须来自**根目录 .env**，且不得指向旧库。"""
 from __future__ import annotations
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -18,8 +20,15 @@ SECURE_TEST_SECRET = "test-production-secret-0123456789-abcdef"
 
 
 def test_default_application_version_is_semver_without_release_prefix():
-    """API 对外使用 SemVer；V 前缀只属于系统发布标签。"""
-    assert Settings().app_version == "1.0.0"
+    """API 对外使用 SemVer；V 前缀只属于系统发布标签。
+
+    版本号的唯一事实源是 `app/version.py`：这里断言"配置默认值 == 事实源"，
+    再校验格式。发版只改 version.py，本测试无需跟着改，但能挡住手滑写坏。
+    """
+    from app.version import __version__ as release_version
+
+    assert Settings().app_version == release_version
+    assert re.fullmatch(r"\d+\.\d+\.\d+", release_version), "必须是 x.y.z 形式，且不带 v 前缀"
 
 
 def test_env_file_is_project_root_dotenv():

@@ -14,6 +14,8 @@ from pathlib import Path
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.version import __version__
+
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # app/core/settings.py -> backend
 PROJECT_ROOT = BACKEND_DIR.parent  # 黑金时代/
 
@@ -48,7 +50,7 @@ class Settings(BaseSettings):
     # application
     app_env: str = "development"
     app_name: str = "宜游轩ERP"
-    app_version: str = "1.0.0"
+    app_version: str = __version__
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"
 

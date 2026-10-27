@@ -1,7 +1,6 @@
 /** 分期：按业务合约类型分列，支持 HS / DFQ / TH / DG 的收款与风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import type { MenuProps } from "antd";
-import { Button, Card, Dropdown, Form, Input, Modal, Segmented, Select, Space, Tabs, Typography } from "antd";
+import { Button, Card, Form, Input, Modal, Segmented, Select, Space, Tabs, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -29,7 +28,7 @@ import {
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
-import { useSession , type Permission} from "../shared/state/session";
+import { useSession } from "../shared/state/session";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 /** 合约类型页签与违约处置文案的回落值；词典加载后由选项词典接管（改造前即为这些文案）。 */
@@ -64,140 +63,6 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
   DG: "代挂",
   DFQ: "代分期",
 };
-
-function InstallmentActions({
-  row,
-  dispositions,
-  settlePermission,
-  onPay,
-  onDeliver,
-  onRecover,
-  onRefund,
-  onSettle,
-  onDefault,
-  onResale,
-}: {
-  row: Installment;
-  dispositions: InstallmentDisposition[];
-  settlePermission: Permission;
-  onPay: () => void;
-  onDeliver: () => void;
-  onRecover: () => void;
-  onRefund: () => void;
-  onSettle: () => void;
-  onDefault: () => void;
-  onResale: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  type ActionItem = {
-    key: string;
-    permission: Permission;
-    label: string;
-    type?: "primary" | "default";
-    danger?: boolean;
-    disabled?: boolean;
-    onClick: () => void;
-  };
-  const actions: ActionItem[] = [
-    {
-      key: "pay",
-      permission: "order.event.post",
-      label: "登记收款",
-      disabled: ["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status),
-      onClick: onPay,
-    },
-    {
-      key: "deliver",
-      permission: "order.event.post",
-      label: "换绑交付",
-      type: "primary",
-      disabled: row.status !== "SETTLED",
-      onClick: onDeliver,
-    },
-    {
-      key: "recover",
-      permission: "order.exception.approve",
-      label: "登记回收",
-      disabled:
-        !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
-        dispositions.some((item) => item.action === "RECOVER"),
-      onClick: onRecover,
-    },
-    {
-      key: "refund",
-      permission: "order.event.post",
-      label: "终止分期并退款",
-      danger: true,
-      disabled: !(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status)),
-      onClick: onRefund,
-    },
-    {
-      key: "settle",
-      permission: settlePermission,
-      label: "提前结清",
-      disabled: !(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status)),
-      onClick: onSettle,
-    },
-    {
-      key: "default",
-      permission: "order.exception.approve",
-      label: "登记违约",
-      danger: true,
-      disabled: !(["ACTIVE", "OVERDUE"].includes(row.status)),
-      onClick: onDefault,
-    },
-  ];
-  if (
-    ["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) &&
-    dispositions.some((item) => item.action === "RECOVER") &&
-    !dispositions.some((item) => item.action === "RESELL")
-  ) {
-    actions.push({
-      key: "resale",
-      permission: "order.exception.approve",
-      label: "登记出售",
-      onClick: onResale,
-    });
-  }
-  const renderButton = (a: ActionItem) => (
-    <PermissionButton
-      key={a.key}
-      permission={a.permission}
-      size="small"
-      type={a.type ?? "default"}
-      danger={a.danger}
-      disabled={a.disabled}
-      onClick={a.onClick}
-    >
-      {a.label}
-    </PermissionButton>
-  );
-  const menuItems: MenuProps["items"] = actions.map((a) => ({
-    key: a.key,
-    label: renderButton(a),
-  }));
-  return (
-    <>
-      {/* 桌面端：操作按钮内联（DOM 保留，单测按文本定位不受影响）；移动端由 responsive.css 隐藏。 */}
-      <Space size={2} className="ui-op-md-up">
-        {actions.map(renderButton)}
-      </Space>
-      {/* 移动端（≤767px）：折叠为「更多」下拉，避免操作列横向撑破（pageScroll=0）。 */}
-      <Dropdown
-        className="ui-op-mobile"
-        open={open}
-        onOpenChange={setOpen}
-        trigger={["click"]}
-        menu={{ items: menuItems, onClick: () => setOpen(false) }}
-      >
-        <PermissionButton permission={settlePermission} type="link" size="small">
-          更多⌄
-        </PermissionButton>
-      </Dropdown>
-    </>
-  );
-}
-
 
 function ContractTable({
   contractType,
@@ -415,20 +280,14 @@ function ContractTable({
     { title: "合约号", dataIndex: "inst_no" },
     {
       title: "订单",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => orders.find((order) => order.id === row.order_id)?.order_no ?? row.order_id,
     },
     {
       title: "业务",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.order_id)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.order_id);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
@@ -436,8 +295,6 @@ function ContractTable({
     },
     {
       title: "产品",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
@@ -445,8 +302,6 @@ function ContractTable({
     },
     {
       title: "对方",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => orders.find((order) => order.id === row.order_id)?.party_name || "-",
     },
     {
@@ -456,16 +311,12 @@ function ContractTable({
     },
     {
       title: "服务费",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "service_fee",
       align: "right",
       render: (v: string) => <MoneyText value={v ?? "0"} />,
     },
     {
       title: "每期服务费",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "per_period_service_fee",
       align: "right",
       render: (v: string) => <MoneyText value={v ?? "0"} />,
@@ -478,16 +329,12 @@ function ContractTable({
     },
     {
       title: "坏账",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "bad_debt_amount",
       align: "right",
       render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
     },
     {
       title: "剩余",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       align: "right",
       render: (_v, row) => (
         <MoneyText
@@ -501,18 +348,73 @@ function ContractTable({
     {
       title: "操作",
       render: (_v, row) => (
-        <InstallmentActions
-          row={row}
-          dispositions={dispositions[row.id] ?? []}
-          settlePermission={settlePermission}
-          onPay={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
-          onDeliver={() => { deliverForm.resetFields(); setDeliverTarget(row); deliverForm.setFieldsValue({ delivered_on: today() }); }}
-          onRecover={() => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
-          onRefund={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
-          onSettle={() => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
-          onDefault={() => { defaultForm.resetFields(); setDefaultTarget(row); }}
-          onResale={() => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
-        />
+        <Space size={2}>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
+            onClick={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
+          >
+            登记收款
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            type="primary"
+            disabled={row.status !== "SETTLED"}
+            onClick={() => { deliverForm.resetFields(); setDeliverTarget(row); deliverForm.setFieldsValue({ delivered_on: today() }); }}
+          >
+            换绑交付
+          </PermissionButton>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            disabled={
+              !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
+              dispositions[row.id]?.some((item) => item.action === "RECOVER")
+            }
+            onClick={() => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
+          >
+            登记回收
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            danger
+            disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
+            onClick={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
+          >
+            终止分期并退款
+          </PermissionButton>
+          <PermissionButton
+            permission={settlePermission}
+            size="small"
+            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
+            onClick={() => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
+          >
+            提前结清
+          </PermissionButton>
+          <PermissionButton
+            permission="order.exception.approve"
+            size="small"
+            danger
+            disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
+            onClick={() => { defaultForm.resetFields(); setDefaultTarget(row); }}
+          >
+            登记违约
+          </PermissionButton>
+          {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) &&
+            dispositions[row.id]?.some((item) => item.action === "RECOVER") &&
+            !dispositions[row.id]?.some((item) => item.action === "RESELL") && (
+              <PermissionButton
+                permission="order.exception.approve"
+                size="small"
+                onClick={() => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
+              >
+                登记出售
+              </PermissionButton>
+            )}
+        </Space>
       ),
     },
   ];
@@ -528,24 +430,18 @@ function ContractTable({
     },
     {
       title: "已收",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "received_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
     {
       title: "已减免",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "waived_amount",
       align: "right",
       render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
     },
     {
       title: "服务费率",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "service_fee_rate",
       align: "right",
       render: (v: string | undefined) => (v == null || v === "" ? "—" : `${v}%`),

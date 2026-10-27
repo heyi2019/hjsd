@@ -157,20 +157,14 @@ export function RebatesPanel() {
     { title: "返点单号", dataIndex: "rebate_no" },
     {
       title: "来源订单",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.order_no ?? "-",
     },
     {
       title: "业务",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.source_order_id)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.source_order_id);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
@@ -178,8 +172,6 @@ export function RebatesPanel() {
     },
     {
       title: "产品",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.source_order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
@@ -187,19 +179,17 @@ export function RebatesPanel() {
     },
     {
       title: "对方",
-      className: "ui-col-wrap ui-col-md-up",
-      onCell: () => ({ className: "ui-col-wrap ui-col-md-up" }),
+      className: "ui-col-wrap",
+      onCell: () => ({ className: "ui-col-wrap" }),
       render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.party_name || "-",
     },
     {
       title: "基数",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "base_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "费率", dataIndex: "rate", align: "right", render: (v: string) => `${v}%`, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "费率", dataIndex: "rate", align: "right", render: (v: string) => `${v}%` },
     {
       title: "预计到账",
       dataIndex: "expected_on",
@@ -257,16 +247,12 @@ export function RebatesPanel() {
     { title: "到账日", dataIndex: "settled_on" },
     {
       title: "到账金额",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "gross_amount",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
     {
       title: "手续费",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "platform_fee",
       align: "right",
       render: (v: string) => <MoneyText value={v} />,

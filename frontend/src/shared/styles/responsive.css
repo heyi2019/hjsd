@@ -228,11 +228,6 @@
   .customers-mobile-empty { padding: var(--space-5) var(--space-3); text-align: center; border: var(--border-w) dashed var(--color-border); border-radius: var(--radius-md); }
 }
 
-/* 操作列响应式：桌面内联按钮（ui-op-md-up）、移动端折叠为「更多」下拉（ui-op-mobile）。
-   与 ui-col-md-up 同源：CSS 隐藏保留 DOM，jsdom 单测按文本/role 定位不受影响。
-   桌面默认态隐藏移动端下拉，移动端（≤767px）反隐藏内联按钮。 */
-.ui-op-mobile { display: none; }
-
 /* 次要列移动端隐藏（<768px，含平板竖屏）：ui-col-md-up = 仅 md 及以上显示。
    实现上必须「双写」：列的 className 管表头 th，onCell 管表体 td —— antd 的
    column.className 只落到表头，只写一处理会出现「表头隐藏、表体不隐藏」的列错位。
@@ -242,9 +237,6 @@
 @media (max-width: 767px) {
   .ant-table-thead > tr > th.ui-col-md-up,
   .ant-table-tbody > tr > td.ui-col-md-up { display: none; }
-  /* 操作列：移动端隐藏内联按钮，改由「更多」下拉承载（ui-op-mobile 在桌面默认 display:none）。 */
-  .ui-op-md-up { display: none; }
-  .ui-op-mobile { display: inline-flex; }
   /* 隐藏列的格子虽已 display:none，rc-table 的 measure-row 仍会按原列数占位
      （实测每列 ~42px，8 列约 336px 虚高）。隐藏列的宽度已确定，无需再测。 */
   .ant-table-measure-row { display: none; }

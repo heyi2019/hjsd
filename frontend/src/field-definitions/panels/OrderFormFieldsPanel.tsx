@@ -152,9 +152,9 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   };
 
   const columns: ColumnsType<OrderFormField> = [
-    { title: "字段键", dataIndex: "field_key", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "字段键", dataIndex: "field_key" },
     { title: "标签", dataIndex: "label" },
-    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL), className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
     {
       title: "必填",
       dataIndex: "required",
@@ -195,8 +195,6 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
     },
     {
       title: "选项",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "options",
       render: (value: Array<string | { value: string; label: string }> | null | undefined, row) =>
         row.field_key === "game_type" ? `游戏类型主数据 · ${gameTypeNames.slice(0, 2).join("、") || "暂无"}等 ${gameTypeNames.length} 项` :

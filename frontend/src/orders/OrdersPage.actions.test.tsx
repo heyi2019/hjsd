@@ -390,6 +390,40 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThan(0);
   });
 
+  it("分润：既有角色回显并原样提交，不被默认 OWNER 覆盖", async () => {
+    // 存量行角色为 SALES：编辑保存必须保留，否则会被默认值静默改写（数据损坏）。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [
+        { id: 1, order_id: 1, user_id: 9, role: "SALES", allocation_type: null, allocation_rate: "100" },
+      ],
+      total: 1,
+      order_profit: "5000.00",
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getByText("销售")).toBeInTheDocument();
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    expect(payload[0]).toMatchObject({ user_id: 9, role: "SALES", allocation_rate: "100" });
+  });
+
+  it("分润：角色下拉改成服务后随提交上送", async () => {
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    fireEvent.mouseDown(within(modal).getByRole("combobox", { name: "角色" }));
+    await ui.click(await screen.findByTitle("服务"));
+    const rates = within(modal).getAllByLabelText("比例");
+    await ui.clear(rates[0]);
+    await ui.type(rates[0], "100");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    expect(payload[0]).toMatchObject({ user_id: 9, role: "SERVICE", allocation_rate: "100" });
+  });
+
   it("分润：纯比例合计非 100% 时拒绝提交", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");

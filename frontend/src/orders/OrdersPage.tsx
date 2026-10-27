@@ -98,12 +98,22 @@ const BUSINESS_CREATE_ITEMS = [
   { key: "DFQ", label: "新建代分期订单" },
 ];
 
-/** 分润弹窗的一行：姓名（员工 id 或 COMPANY）+ 比例 + 金额（比例/金额都选填、互斥）。 */
+/** 分润弹窗的一行：姓名（员工 id 或 COMPANY）+ 角色 + 比例 + 金额（比例/金额都选填、互斥）。 */
 type AllocationFormRow = {
   employee?: number | "COMPANY";
+  role?: string;
   allocation_rate?: string;
   allocation_amount?: string;
 };
+
+/** 分润角色兜底文案：词典 PROFIT_ROLE 未加载/未配置时使用。
+ *  取值受 DB CHECK `allocation_role_valid` 约束，与 backend AllocationRole 一致。 */
+const PROFIT_ROLE_FALLBACK: Array<{ value: string; label: string }> = [
+  { value: "OWNER", label: "业绩归属人" },
+  { value: "BUYER", label: "买方" },
+  { value: "SALES", label: "销售" },
+  { value: "SERVICE", label: "服务" },
+];
 
 // 与 backend/app/domain/enums.py ScheduleStatus 一致（StatusTag 未内置 PARTIAL/WAIVED）
 const SCHEDULE_STATUS_LABEL: Record<string, string> = {
@@ -210,6 +220,8 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
   // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
   const relationTypeOptions: Opt[] =
     useOptionSet("ORDER_RELATION_TYPE") ?? RELATION_TYPE_FALLBACK;
+  // 分润角色：此前每行写死 "OWNER"，导致编辑既有分润时把 BUYER/SALES/SERVICE 静默抹平。
+  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? PROFIT_ROLE_FALLBACK;
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -291,13 +303,15 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
       setAllocationProfit(result.order_profit ?? "0");
       // 分润按「姓名」录入：存量行直接映射成姓名（COMPANY / 无收益人 → 公司归属），
       // 不再暴露 BUY/SELL/OPERATION/COMPANY 四个动作位——那种结构只允许一人拿运营份额。
+      // 角色必须原样带回表单：不回填就会在保存时被默认值 OWNER 覆盖掉。
       const rows = result.items.map((item) => ({
         employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
+        role: item.role || "OWNER",
         allocation_rate: item.allocation_rate,
         allocation_amount: item.allocation_amount ?? "",
       }));
       allocationForm.setFieldsValue({
-        allocations: rows.length > 0 ? rows : [{ employee: undefined, allocation_rate: "", allocation_amount: "" }],
+        allocations: rows.length > 0 ? rows : [{ employee: undefined, role: "OWNER", allocation_rate: "", allocation_amount: "" }],
       });
       setAllocationOpen(true);
     } catch (error) {
@@ -1146,7 +1160,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
               if (hasAmount) amountTotal += Number(amount);
               items.push({
                 user_id: row.employee === "COMPANY" ? null : Number(row.employee),
-                role: "OWNER",
+                role: row.role || "OWNER",
                 allocation_rate: hasRate ? rate : "0",
                 allocation_amount: hasAmount ? amount : "0",
               });
@@ -1226,6 +1240,18 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                     </Form.Item>
                     <Form.Item
                       {...field}
+                      name={[field.name, "role"]}
+                      label="角色"
+                      initialValue="OWNER"
+                    >
+                      <AntSelect
+                        placeholder="选择角色"
+                        options={profitRoleOptions}
+                        className="ui-control-width-120"
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      {...field}
                       name={[field.name, "allocation_rate"]}
                       label="比例"
                       rules={percentRules("比例")}
@@ -1255,7 +1281,7 @@ export function OrdersPage({ initialTab }: { initialTab?: BusinessCenterEntryTab
                   permission="policy.manage"
                   type="dashed"
                   block
-                  onClick={() => add({ allocation_rate: "", allocation_amount: "" })}
+                  onClick={() => add({ role: "OWNER", allocation_rate: "", allocation_amount: "" })}
                 >
                   + 增加一行
                 </PermissionButton>

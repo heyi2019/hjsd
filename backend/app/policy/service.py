@@ -666,6 +666,7 @@ def _set_person_allocations(
     total_rate = Decimal("0")
     total_amount = Decimal("0")
     user_ids: set[int] = set()
+    person_roles: set[tuple[int, str]] = set()
     company_rows = 0
     for item in items:
         rate = to_money(item.get("allocation_rate") or 0)
@@ -687,8 +688,14 @@ def _set_person_allocations(
             if company_rows > 1:
                 raise Validation("公司归属只能有一行", details={"field": "items"})
         else:
-            if int(user_id) in user_ids:
-                raise Validation("同一人员不可重复分润", details={"field": "items.user_id"})
+            # 去重键与 DB 唯一约束 uq_order_profit_alloc(order_id, allocation_type, user_id, role) 对齐：
+            # 同一人可担任多个角色（如既做销售又做服务），但不能在同一角色下拿两份。
+            if (int(user_id), role) in person_roles:
+                raise Validation(
+                    "同一人员在同一角色下不可重复分润",
+                    details={"field": "items.user_id", "role": role},
+                )
+            person_roles.add((int(user_id), role))
             user_ids.add(int(user_id))
         total_rate += rate
         total_amount += amount

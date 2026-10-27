@@ -53,6 +53,32 @@ def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> i
     return order.id
 
 
+def test_person_mode_allows_same_user_in_two_roles(seeded_db):
+    """同一人可担任多个角色（对齐 DB 唯一约束 uq_order_profit_alloc），但同角色不可重复。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"user_id": 1, "role": "SALES", "allocation_rate": "60"},
+            {"user_id": 1, "role": "SERVICE", "allocation_rate": "40"},
+        ],
+    )
+
+    assert [row["role"] for row in rows] == ["SALES", "SERVICE"]
+
+    with pytest.raises(Validation, match="同一角色下不可重复分润"):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[
+                {"user_id": 1, "role": "SALES", "allocation_rate": "50"},
+                {"user_id": 1, "role": "SALES", "allocation_rate": "50"},
+            ],
+        )
+
+
 def test_person_mode_accepts_one_name_with_full_rate(seeded_db):
     """按人模式不再强制四项：一个人拿 100% 是合法的。"""
     order_id = _order_with_profit(seeded_db)

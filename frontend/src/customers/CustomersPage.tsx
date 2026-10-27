@@ -41,6 +41,7 @@ import {
   PermissionGate,
   StatRow,
   StatusTag,
+  useCompactLayout,
 } from "../shared/ui";
 
 /** 订单客户角色兜底文案：词典 ORDER_CUSTOMER_ROLE 未加载/未配置时兜底。
@@ -113,19 +114,6 @@ function MobileCounterpartyList(props: {
       ))}
     </div>
   );
-}
-
-function useCompactLayout() {
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia?.("(max-width: 640px)");
-    if (!media) return undefined;
-    const sync = () => setCompact(media.matches);
-    sync();
-    media.addEventListener?.("change", sync);
-    return () => media.removeEventListener?.("change", sync);
-  }, []);
-  return compact;
 }
 
 /** DatePicker 值是 dayjs 对象；不引入 dayjs 依赖，按鸭子类型取 format。 */

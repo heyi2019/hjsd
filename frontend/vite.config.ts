@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
     // 页面从局域网地址打开时，浏览器会将直连 127.0.0.1 视为跨网络请求。
     // 开发时统一走同源路径，由 Vite 在本机转发到后端，避免 CORS/PNA 拦截。
     server: {
+      host: "0.0.0.0",
       proxy: {
         "/api/v1": {
           target: `http://127.0.0.1:${backendPort}`,

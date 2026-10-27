@@ -25,10 +25,11 @@ import {
   PermissionButton,
   StatRow,
   StatusTag,
+  useCompactLayout,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
-import { useSession } from "../shared/state/session";
+import { useSession, type Permission } from "../shared/state/session";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 
 /** 合约类型页签与违约处置文案的回落值；词典加载后由选项词典接管（改造前即为这些文案）。 */
@@ -514,20 +515,35 @@ function ContractTable({
           </Space>
         }
       >
-        <DataTable<Installment>
-          columns={columns}
-          rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
-          loading={loading}
-          page={1}
-          pageSize={Math.max(rows.length, 10)}
-          total={rows.length}
-         
-          emptyText="暂无分期合约"
-          onPageChange={() => undefined}
-          expandable={{
-            expandedRowRender: (row) => (
-              <Space direction="vertical" size="middle" className="installment-detail-stack">
-                <DataTable<Schedule>
+        {compact ? (
+          <MobileInstallmentList
+            rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
+            orders={orders}
+            dispositions={dispositions}
+            settlePermission={settlePermission}
+            onPay={(row) => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
+            onDeliver={(row) => { deliverForm.resetFields(); setDeliverTarget(row); deliverForm.setFieldsValue({ delivered_on: today() }); }}
+            onRecover={(row) => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
+            onRefund={(row) => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
+            onSettle={(row) => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
+            onDefault={(row) => { defaultForm.resetFields(); setDefaultTarget(row); }}
+            onResale={(row) => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
+          />
+        ) : (
+          <DataTable<Installment>
+            columns={columns}
+            rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
+            loading={loading}
+            page={1}
+            pageSize={Math.max(rows.length, 10)}
+            total={rows.length}
+           
+            emptyText="暂无分期合约"
+            onPageChange={() => undefined}
+            expandable={{
+              expandedRowRender: (row) => (
+                <Space direction="vertical" size="middle" className="installment-detail-stack">
+                  <DataTable<Schedule>
                   rows={schedules[row.id] ?? []}
                   page={1}
                   pageSize={20}
@@ -547,6 +563,7 @@ function ContractTable({
             ),
           }}
         />
+        )}
       </Card>
 
       <Modal
@@ -796,6 +813,128 @@ function ContractTable({
         </FieldConfigScope>
       </Modal>
     </section>
+  );
+}
+
+/** 移动端（≤640px）分期合约卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
+function MobileInstallmentList({
+  rows,
+  orders,
+  dispositions,
+  settlePermission,
+  onPay,
+  onDeliver,
+  onRecover,
+  onRefund,
+  onSettle,
+  onDefault,
+  onResale,
+}: {
+  rows: Installment[];
+  orders: Order[];
+  dispositions: Record<number, InstallmentDisposition[]>;
+  settlePermission: Permission;
+  onPay: (row: Installment) => void;
+  onDeliver: (row: Installment) => void;
+  onRecover: (row: Installment) => void;
+  onRefund: (row: Installment) => void;
+  onSettle: (row: Installment) => void;
+  onDefault: (row: Installment) => void;
+  onResale: (row: Installment) => void;
+}) {
+  const receivable = (row: Installment) =>
+    row.total_receivable != null
+      ? Number(row.total_receivable)
+      : Number(row.down_payment) + Number(row.per_period) * row.periods + Number(row.final_period_adjustment ?? 0) - Number(row.waived_amount ?? 0);
+
+  if (rows.length === 0) return <div className="data-mobile-empty">暂无分期合约</div>;
+  return (
+    <div className="data-mobile-list">
+      {[...rows].map((row) => {
+        const order = orders.find((item) => item.id === row.order_id);
+        const dispo = dispositions[row.id] ?? [];
+        return (
+          <article className="data-mobile-card" key={row.id}>
+            <div className="data-mobile-card__topline">
+              <span>{row.inst_no}</span>
+              <StatusTag status={row.status} label={configurableLabel("INSTALLMENT_STATUS", row.status, INSTALLMENT_STATUS_LABEL)} />
+            </div>
+            <dl className="data-mobile-card__meta">
+              <div><dt>订单</dt><dd>{order?.order_no ?? row.order_id}</dd></div>
+              <div><dt>业务</dt><dd>{order ? BUSINESS_MODE_LABEL[order.account_business_mode ?? ""] || "-" : "-"}</dd></div>
+              <div><dt>类型</dt><dd>{order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-"}</dd></div>
+              <div><dt>产品</dt><dd>{order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-"}</dd></div>
+              <div><dt>对方</dt><dd>{order?.party_name || "-"}</dd></div>
+              <div><dt>总应收</dt><dd><MoneyText value={receivable(row).toFixed(2)} /></dd></div>
+              <div><dt>已收</dt><dd><MoneyText value={row.paid_amount} /></dd></div>
+              <div><dt>坏账</dt><dd><MoneyText value={row.bad_debt} /></dd></div>
+              <div>
+                <dt>剩余</dt>
+                <dd><MoneyText value={(receivable(row) - Number(row.paid_amount) - Number(row.bad_debt)).toFixed(2)} /></dd>
+              </div>
+            </dl>
+            <Space size={2}>
+              <PermissionButton
+                permission="order.event.post"
+                size="small"
+                disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
+                onClick={() => onPay(row)}
+              >
+                登记收款
+              </PermissionButton>
+              <PermissionButton
+                permission="order.event.post"
+                size="small"
+                type="primary"
+                disabled={row.status !== "SETTLED"}
+                onClick={() => onDeliver(row)}
+              >
+                换绑交付
+              </PermissionButton>
+              <PermissionButton
+                permission="order.exception.approve"
+                size="small"
+                disabled={!(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) || dispo.some((item) => item.action === "RECOVER")}
+                onClick={() => onRecover(row)}
+              >
+                登记回收
+              </PermissionButton>
+              <PermissionButton
+                permission="order.event.post"
+                size="small"
+                danger
+                disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
+                onClick={() => onRefund(row)}
+              >
+                终止分期并退款
+              </PermissionButton>
+              <PermissionButton
+                permission={settlePermission}
+                size="small"
+                disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
+                onClick={() => onSettle(row)}
+              >
+                提前结清
+              </PermissionButton>
+              <PermissionButton
+                permission="order.exception.approve"
+                size="small"
+                danger
+                disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
+                onClick={() => onDefault(row)}
+              >
+                登记违约
+              </PermissionButton>
+              {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) && dispo.some((item) => item.action === "RECOVER") && !dispo.some((item) => item.action === "RESELL") && (
+                <PermissionButton permission="order.exception.approve" size="small" onClick={() => onResale(row)}>
+                  登记出售
+                </PermissionButton>
+              )}
+            </Space>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 

@@ -29,6 +29,11 @@ export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
 export const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
 export const EDITABLE_ACCOUNT_TYPES = new Set(["RECOVERY", "PICKUP", "CONSIGNMENT"]);
 
+/** 可编辑/更多操作适用范围：三类业务类型，以及业务类型留空的代分期账号（DFQ 建单即入库，inventory_type 为空）。 */
+export function isEditableAccountType(inventoryType?: string | null): boolean {
+  return inventoryType == null || EDITABLE_ACCOUNT_TYPES.has(inventoryType);
+}
+
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export function inventoryStatusLabel(value: string): string {

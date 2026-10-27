@@ -1,6 +1,7 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Dropdown, Form, Input, Modal, Segmented, Select, Space, Typography, message } from "antd";
+import { Card, Dropdown, Form, Input, Modal, Segmented, Select, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
@@ -22,11 +23,11 @@ import { InventoryDetail } from "./InventoryDetail";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
 import {
   BUSINESS_MODE_LABEL,
-  EDITABLE_ACCOUNT_TYPES,
   INVENTORY_TYPE_LABEL,
   PROFILE_ACCOUNT_TYPES,
   VALUE_ADDED_SERVICE_LABEL,
   inventoryAge,
+  isEditableAccountType,
 } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
@@ -164,7 +165,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const buy = findCancelableBuy(detail);
       if (!buy) {
-        message.warning("未找到可冲销的买入流水，无法下架");
+        appMessage.warning("未找到可冲销的买入流水，无法下架");
         return;
       }
       setVoidTarget({ account, ...buy });
@@ -188,7 +189,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         form_extra: values.form_extra,
         note: "账号下架，冲销买入",
       });
-      message.success("账号已下架");
+      appMessage.success("账号已下架");
       const accountId = voidTarget.account.id;
       setVoidTarget(null);
       voidForm.resetFields();
@@ -213,7 +214,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const sale = findCancelableSale(detail);
       if (!sale) {
-        message.warning("未找到可退款的售出流水，请先检查交易明细");
+        appMessage.warning("未找到可退款的售出流水，请先检查交易明细");
         return;
       }
       setCancelTarget({ account, ...sale });
@@ -229,13 +230,13 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const order = [...detail.orders].reverse().find((item) => item.status === "ACTIVE");
       if (!order) {
-        message.warning("未找到进行中的分期订单");
+        appMessage.warning("未找到进行中的分期订单");
         return;
       }
       const contracts = await installmentsApi.list({ order_id: order.order_id });
       const contract = contracts.find((item) => ["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(item.status));
       if (!contract) {
-        message.warning("未找到可终止的分期合约");
+        appMessage.warning("未找到可终止的分期合约");
         return;
       }
       setInstallmentCancelTarget({ account, installmentId: contract.id, contractType: contract.contract_type });
@@ -248,7 +249,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   async function submitCancellation(values: { refund_amount: string; reason: string; form_extra?: Record<string, unknown> }) {
     if (!cancelTarget) return;
     if (!values.refund_amount?.trim() || Number.isNaN(Number(values.refund_amount)) || Number(values.refund_amount) <= 0) {
-      message.error("请输入有效的退款金额");
+      appMessage.error("请输入有效的退款金额");
       return;
     }
     setCancelling(true);
@@ -263,7 +264,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         form_extra: values.form_extra,
         note: "取消交易，原路退款",
       });
-      message.success(cancelTarget.account.inventory_type === "PICKUP"
+      appMessage.success(cancelTarget.account.inventory_type === "PICKUP"
         ? "退款已登记，提号交易已结束"
         : "退款已登记，账号已回到在库");
       const accountId = cancelTarget.account.id;
@@ -286,7 +287,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
 
   async function submitInstallmentCancellation(values: { reason: string; form_extra?: Record<string, unknown> }) {
     if (!installmentCancelTarget || !values.reason?.trim()) {
-      message.error("请填写退款原因");
+      appMessage.error("请填写退款原因");
       return;
     }
     setCancellingInstallment(true);
@@ -296,7 +297,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         reason: values.reason.trim(),
         form_extra: values.form_extra,
       });
-      message.success(installmentCancelTarget.contractType === "PICKUP_SALE" ? "退款已登记，提号交易已结束" : "退款已登记，账号已回到库存");
+      appMessage.success(installmentCancelTarget.contractType === "PICKUP_SALE" ? "退款已登记，提号交易已结束" : "退款已登记，账号已回到库存");
       const accountId = installmentCancelTarget.account.id;
       setInstallmentCancelTarget(null);
       instCancelForm.resetFields();
@@ -418,7 +419,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
           >
             返点
           </PermissionButton>
-          {EDITABLE_ACCOUNT_TYPES.has(row.inventory_type ?? "") ? <>
+          {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton
               permission="order.create"
               type="link"
@@ -482,7 +483,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         } catch (refreshError) {
           setExecutionDetails((current) => { const next = { ...current }; delete next[id]; return next; });
           setError(normalizeError(refreshError));
-          message.warning("修改已保存，但刷新明细失败，请重新加载");
+          appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
         }
       } else {
         const updated = await accountsApi.updateProfile(id, profile);
@@ -491,7 +492,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       setEditingAccount(null);
       setEventDrafts({});
       invEditExtraForm.resetFields();
-      message.success("修改已保存");
+      appMessage.success("修改已保存");
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -539,7 +540,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       const failedCount = detailResults.filter(([, detail]) => !detail).length;
       downloadInventoryCsv(visibleRows, details);
       if (failedCount) {
-        message.warning(`${failedCount} 条明细读取失败，已导出其余可用字段`);
+        appMessage.warning(`${failedCount} 条明细读取失败，已导出其余可用字段`);
       }
     } finally {
       setExporting(false);

@@ -77,6 +77,60 @@
 - `responsive.css` 为全站共享样式，改动会影响所有已适配页面（台账、客户档案），需回归 `erp-frontend-browser-verify` 流程 + 相关 vitest。
 - 操作列 sticky 与 antd `fix-right` 列可能冲突（现有台账已用 `position: static !important` 反制 fixed 列），需统一策略。
 
+## 六、批次 1 实施结果（2026-10-28 完成，已验证）
+
+改动文件：
+- `frontend/src/shared/styles/responsive.css`（640px 断点块）
+- `frontend/src/reporting/ReportsPage.tsx`（导出日期区间 Space 加类名 `ui-filter-bar__range`）
+
+### 6.1 表格滚动容器归位（根因修复）
+
+原规则 `.ant-table-wrapper .ant-table { min-width: 680px }` 有两个问题：窄表被撑宽白受一次横滚；滚动发生在 wrapper 层。改为：
+
+```css
+.ant-table-wrapper .ant-table { width: 100%; min-width: 0; }
+.ant-table-wrapper table { width: max-content; min-width: 100%; }
+.ui-table-wrap .ant-table-content { overflow-x: auto; }
+```
+
+**关键坑（实测踩到，务必记住）**：`.ant-table-content` 自带 `overflow-x: auto`，是 sticky 的参照系。把滚动口放在 `.ant-table-wrapper` 时，粘性列会随表一起滑走（实测 `scrollLeft=900` 后首列 `left=-871`）。滚动口必须落在 `.ant-table-content` 层，sticky 才生效。
+
+修复后实测：`scrollLeft=900` 时首列 `left=29 = content left`，**常驻成立**。
+
+### 6.2 首列常驻（行标识不丢失）
+
+```css
+.ant-table-tbody > tr > td:first-child,
+.ant-table-thead > tr > th:first-child {
+  position: sticky; inset-inline-start: 0; z-index: 2;
+  background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
+}
+```
+
+背景用双层写法：玻璃层压实底上。单写 `--glass`（alpha 0.62）会透出滚过去的内容。
+
+### 6.3 报表导出日期区间堆叠
+
+`.ui-filter-bar__range` 在 640px 以下改两行栅格（起始日期独占一行 / 「至 + 结束日期」同行），原生 date 输入 `width: 100%`。修复前最远越界元素为日期框，修复后经营中心非表格越界元素归零。
+
+### 6.4 验证结果
+
+| 验证项 | 结果 |
+|---|---|
+| 页面级横向溢出（8 路由） | `scrollWidth = 375` 全部无破版 |
+| 首列 sticky | sticky 生效，横滚 900px 后仍停左沿（此前会滑走） |
+| 单/双层滚动 | 归位 `.ant-table-content`，不再整页平移 |
+| 窄适配表免横滚 | settings / customers 表格零滚动需求（此前强制 680px 必滚） |
+| 日期区间溢出 | 归零 |
+| 针对性测试 | ReportsPage / InventoryPanel / OrdersPage / CustomersPage 共 4 文件 **42 用例全过** |
+| ui_guards（13 条） / tsc / vite build | 全绿 |
+
+### 6.5 遗留（批次 2）
+
+- 资金中心·流水表 2362px、库存/分期表 1161px 仍需大幅横滚 → 建议移动端卡片化（参照 `orders-mobile-card`）或隐藏次要列。
+- Tab 栏溢出依赖 antd 原生横滑，未改（可接受）。
+- `.main` 的 `scrollWidth=445` 为顶栏装饰层溢出，`body` 的 `overflow-x: hidden` 已兜住，无可见破损。
+
 ## 五、证据文件
 
 | 文件 | 内容 |

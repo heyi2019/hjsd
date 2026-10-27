@@ -108,9 +108,36 @@
   }
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
+  /* 报表导出日期区间：两枚原生 date 输入并排会溢出右边缘（实测 375px 下第二个被切），
+     改为「起始日期独占一行 / 至 + 结束日期同行」的两行栅格。 */
+  .ui-filter-bar__range {
+    display: grid !important;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    width: 100%;
+  }
+  .ui-filter-bar__range > .ant-space-item:first-child { grid-column: 1 / -1; }
+  .ui-filter-bar__range .ui-control-width-date { width: 100%; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
   .ant-table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
-  .ant-table-wrapper .ant-table { min-width: var(--sz-680); }
+  /* 单一滚动容器 = .ant-table-content（antd 默认已是 overflow-x:auto 的那层）：
+     表宽取 max-content 撑开，横向滚动发生在 content 内而非 wrapper / page-content。
+     注意：sticky 列只会相对最近的 overflow 容器计算，滚动口必须落在 content 层，
+     放在 wrapper 上时粘性失效（实测列会随表一起滑走）。 */
+  .ant-table-wrapper .ant-table { width: 100%; min-width: 0; }
+  .ant-table-wrapper table { width: max-content; min-width: 100%; }
+  .ui-table-wrap .ant-table-content { overflow-x: auto; }
+  /* 首列常驻：横向滑动时保留行标识（订单号/流水号），避免"刷到右边不知道这行是谁"。 */
+  .ant-table-wrapper .ant-table-tbody > tr > td:first-child,
+  .ant-table-wrapper .ant-table-thead > tr > th:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 2;
+    /* 两层背景：玻璃层压实底上，保证常驻列不透明（单写 --glass 会透出滚过去的内容）。 */
+    background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
+  }
+  .ant-table-wrapper .ant-table-thead > tr > th:first-child { z-index: 3; }
   /* 业务台账移动端保留核心字段，详情信息进入卡片，避免核心动作被推到屏外。 */
   .orders-ledger .ant-table { min-width: 0 !important; width: 100%; }
   .orders-ledger .ant-table-thead > tr > th:nth-child(4),

@@ -131,7 +131,7 @@ export function ReportsPage({ onNavigate }: { onNavigate?: (key: string) => void
     <section className="ui-stack">
       <Card className="glass" title="报表导出">
         <div className="ui-filter-bar">
-          <Space size="small">
+          <Space size="small" className="ui-filter-bar__range">
             <Input type="date" value={exportFrom} onChange={(event) => setExportFrom(event.target.value)} aria-label="导出开始日期" className="ui-control-width-date" />
             <span className="muted">至</span>
             <Input type="date" value={exportTo} onChange={(event) => setExportTo(event.target.value)} aria-label="导出结束日期" className="ui-control-width-date" />

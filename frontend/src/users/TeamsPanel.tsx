@@ -23,9 +23,9 @@ export function TeamsPanel() {
       onPageChange={() => undefined}
       emptyText="暂无团队"
       columns={[
-        { title: "编码", dataIndex: "code", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+        { title: "编码", dataIndex: "code" },
         { title: "团队名称", dataIndex: "name" },
-        { title: "说明", dataIndex: "description", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+        { title: "说明", dataIndex: "description" },
         { title: "状态", dataIndex: "is_active", render: (value: boolean) => value ? "启用" : "停用" },
         { title: "操作", render: (_: unknown, team: Team) => <ConfirmButton
               permission="user.manage"

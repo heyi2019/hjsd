@@ -220,14 +220,12 @@ export function ImportWorkbench({
     { title: "行状态", dataIndex: "status", width: 130, render: (v: string) => <StatusTag status={v} optionSet="IMPORT_ROW_STATUS" /> },
     {
       title: "单边划转",
-      className: "ui-col-md-up",
-      onCell: () => ({ className: "ui-col-md-up" }),
       dataIndex: "unlinked_transfer",
       width: 100,
       render: (v: boolean) => (v ? <StatusTag status="OVERDUE" label="未裁决" /> : "-"),
     },
-    { title: "补录依据", dataIndex: "mapping_basis", width: 140, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
-    { title: "补录人", dataIndex: "mapped_by", width: 100, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "补录依据", dataIndex: "mapping_basis", width: 140 },
+    { title: "补录人", dataIndex: "mapped_by", width: 100 },
     {
       title: "操作",
       width: 220,

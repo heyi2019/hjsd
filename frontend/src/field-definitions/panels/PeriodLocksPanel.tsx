@@ -84,7 +84,7 @@ export function PeriodLocksPanel() {
           { title: "账期", dataIndex: "period" },
           { title: "锁定时间", dataIndex: "locked_at", render: (v: string | undefined) => formatAt(v) },
           { title: "锁定人", dataIndex: "locked_by" },
-          { title: "说明", dataIndex: "note", render: (v: string | null | undefined) => v || "—", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+          { title: "说明", dataIndex: "note", render: (v: string | null | undefined) => v || "—" },
         ]}
         rows={rows}
         rowKey="period"

@@ -33,10 +33,10 @@ export function NotificationsPanel() {
     catch (err) { setError(normalizeError(err)); }
   };
   const columns: ColumnsType<NotificationItem> = [
-    { title: "提醒编号", dataIndex: "notification_no", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "提醒编号", dataIndex: "notification_no" },
     { title: "标题", dataIndex: "title" },
     { title: "内容", dataIndex: "message" },
-    { title: "对象", render: (_v, row) => `${ENTITY_TYPE_LABEL[row.entity_type] ?? row.entity_type} ${row.entity_id}`, className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
+    { title: "对象", render: (_v, row) => `${ENTITY_TYPE_LABEL[row.entity_type] ?? row.entity_type} ${row.entity_id}` },
     { title: "状态", render: (_v, row) => <StatusTag status={row.read_at ? "READ" : "UNREAD"} /> },
     { title: "操作", render: (_v, row) => row.read_at ? null : <PermissionButton permission="finance.read" size="small" onClick={() => void markRead(row)}>标记已读</PermissionButton> },
   ];

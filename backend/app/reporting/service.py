@@ -742,96 +742,90 @@ def daily_funds_report(
     session: Session, *, on: date | None = None, user: CurrentUser | None = None
 ) -> dict[str, Any]:
     """资金日报：各池期初、经营收支、内部划转、押金与可用余额。"""
-    from app.orders.service import pool_balance
+    from app.orders.service import pool_balances
 
     target = on or date.today()
-    items = []
     pool_stmt = select(Pool)
-    pool_ids = _visible_pool_ids(user)
-    if pool_ids is not None:
-        pool_stmt = pool_stmt.where(Pool.id.in_(pool_ids))
-    for pool in session.scalars(pool_stmt).all():
-        opening = _money(
-            session.scalar(
-                select(
-                    func.coalesce(
-                        func.sum(
-                            case(
-                                (Cashflow.direction == Direction.IN.value, Cashflow.amount),
-                                else_=-Cashflow.amount,
-                            )
-                        ),
-                        0,
-                    )
-                ).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on < target,
-                    Cashflow.status == CashflowStatus.APPROVED.value,
-                )
+    visible = _visible_pool_ids(user)
+    if visible is not None:
+        pool_stmt = pool_stmt.where(Pool.id.in_(visible))
+    pools = session.scalars(pool_stmt).all()
+    ids = [pool.id for pool in pools]
+
+    # 逐池标量查询改为一次分组聚合：期初按池累计有符号和，当日按 (方向, 性质) 分箱。
+    opening_by_pool: dict[int, Decimal] = {}
+    day_cells: dict[int, dict[tuple[str, str], Decimal]] = {}
+    deposit_paid_by_pool: dict[int, Decimal] = {}
+    if ids:
+        for pool_id, amount in session.execute(
+            select(
+                Cashflow.pool_id,
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Cashflow.direction == Direction.IN.value, Cashflow.amount),
+                            else_=-Cashflow.amount,
+                        )
+                    ),
+                    0,
+                ),
             )
-        )
-        day_in = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on == target,
-                    Cashflow.direction == Direction.IN.value,
-                    Cashflow.nature == Nature.BUSINESS_IN.value,
-                    Cashflow.status == CashflowStatus.APPROVED.value,
-                )
+            .where(
+                Cashflow.pool_id.in_(ids),
+                Cashflow.occurred_on < target,
+                Cashflow.status == CashflowStatus.APPROVED.value,
             )
-        )
-        day_out = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on == target,
-                    Cashflow.direction == Direction.OUT.value,
-                    Cashflow.nature == Nature.BUSINESS_OUT.value,
-                    Cashflow.status == CashflowStatus.APPROVED.value,
-                )
+            .group_by(Cashflow.pool_id)
+        ):
+            opening_by_pool[pool_id] = _money(amount)
+        for pool_id, direction, nature, amount in session.execute(
+            select(
+                Cashflow.pool_id,
+                Cashflow.direction,
+                Cashflow.nature,
+                func.coalesce(func.sum(Cashflow.amount), 0),
             )
-        )
-        transfer_in = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on == target,
-                    Cashflow.direction == Direction.IN.value,
-                    Cashflow.nature == Nature.INTERNAL.value,
-                    Cashflow.status == CashflowStatus.APPROVED.value,
-                )
+            .where(
+                Cashflow.pool_id.in_(ids),
+                Cashflow.occurred_on == target,
+                Cashflow.status == CashflowStatus.APPROVED.value,
             )
-        )
-        transfer_out = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
-                    Cashflow.pool_id == pool.id,
-                    Cashflow.occurred_on == target,
-                    Cashflow.direction == Direction.OUT.value,
-                    Cashflow.nature == Nature.INTERNAL.value,
-                    Cashflow.status == CashflowStatus.APPROVED.value,
-                )
-            )
-        )
-        deposit_paid = _money(
-            session.scalar(
-                select(func.coalesce(func.sum(Deposit.paid_amount), 0)).where(
-                    Deposit.pool_id == pool.id, Deposit.paid_on == target
-                )
-            )
-        )
-        balance = pool_balance(session, pool.id)
+            .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
+        ):
+            day_cells.setdefault(pool_id, {})[(direction, nature)] = _money(amount)
+        for pool_id, amount in session.execute(
+            select(Deposit.pool_id, func.coalesce(func.sum(Deposit.paid_amount), 0))
+            .where(Deposit.pool_id.in_(ids), Deposit.paid_on == target)
+            .group_by(Deposit.pool_id)
+        ):
+            deposit_paid_by_pool[pool_id] = _money(amount)
+
+    # 池可见性已由上面的 pool_stmt 收敛，这里不再重复做 can_see_pool 校验，
+    # 与改动前 pool_balance(session, pool.id) 不传 user 的行为一致。
+    balances = pool_balances(session, ids) if ids else {}
+
+    items = []
+    for pool in pools:
+        bucket = day_cells.get(pool.id, {})
+        balance = balances[pool.id]
         items.append(
             {
                 "pool_code": pool.code,
                 "pool_name": pool.name,
-                "opening": opening,
-                "income": day_in,
-                "expense": day_out,
-                "transfer_in": transfer_in,
-                "transfer_out": transfer_out,
-                "deposit_paid": deposit_paid,
+                "opening": opening_by_pool.get(pool.id, ZERO),
+                "income": bucket.get(
+                    (Direction.IN.value, Nature.BUSINESS_IN.value), ZERO
+                ),
+                "expense": bucket.get(
+                    (Direction.OUT.value, Nature.BUSINESS_OUT.value), ZERO
+                ),
+                "transfer_in": bucket.get(
+                    (Direction.IN.value, Nature.INTERNAL.value), ZERO
+                ),
+                "transfer_out": bucket.get(
+                    (Direction.OUT.value, Nature.INTERNAL.value), ZERO
+                ),
+                "deposit_paid": deposit_paid_by_pool.get(pool.id, ZERO),
                 "deposit_held": balance["deposit_held"],
                 "cash_balance": balance["cash_balance"],
                 "available": balance["available"],
@@ -863,9 +857,34 @@ def order_profit_detail(
     _validate_date_range(from_date, to_date)
     orders_stmt = _apply_order_scope(select(Order), user, session)
     orders = session.scalars(orders_stmt).all()
+    order_ids = [order.id for order in orders]
     extra_values = parties_service.get_extra_values_bulk(
-        session, entity_type="order", entity_ids=[order.id for order in orders]
+        session, entity_type="order", entity_ids=order_ids
     )
+    # 事件与返点结算一次批量取回再按订单分组，替代循环内逐单查询
+    # （486 单原本要发 974 条 SQL）。注意每个订单只把「本单事件」交给
+    # _event_totals：CANCEL 的 offset 归属判定依赖本单事件表，跨单混入会改口径。
+    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
+    settlements_by_order: dict[int, list[tuple[Any, Any, Any]]] = defaultdict(list)
+    if order_ids:
+        for event in session.scalars(
+            select(OrderEvent).where(OrderEvent.order_id.in_(order_ids))
+        ):
+            events_by_order[event.order_id].append(event)
+        settlement_rows = session.execute(
+            select(
+                RebateRecord.source_order_id,
+                RebateSettlement.gross_amount,
+                RebateSettlement.platform_fee,
+                RebateSettlement.reversal_of_id,
+            )
+            .join(
+                RebateSettlement, RebateSettlement.rebate_record_id == RebateRecord.id
+            )
+            .where(RebateRecord.source_order_id.in_(order_ids))
+        )
+        for source_order_id, gross, fee, reversal_of_id in settlement_rows:
+            settlements_by_order[source_order_id].append((gross, fee, reversal_of_id))
     bad_debt_by_order = _bad_debt_by_order(session, user=user)
     items = []
     for order in orders:
@@ -873,22 +892,10 @@ def order_profit_detail(
             continue
         if to_date and order.trade_date > to_date:
             continue
-        events = session.scalars(
-            select(OrderEvent).where(OrderEvent.order_id == order.id)
-        ).all()
-        income, buy, direct_cost = _event_totals(events)
+        income, buy, direct_cost = _event_totals(events_by_order.get(order.id, []))
         direct_cost += bad_debt_by_order.get(order.id, ZERO)
         rebate = ZERO
-        settlements = session.execute(
-            select(
-                RebateSettlement.gross_amount,
-                RebateSettlement.platform_fee,
-                RebateSettlement.reversal_of_id,
-            )
-            .join(RebateRecord, RebateRecord.id == RebateSettlement.rebate_record_id)
-            .where(RebateRecord.source_order_id == order.id)
-        ).all()
-        for gross, fee, reversal_of_id in settlements:
+        for gross, fee, reversal_of_id in settlements_by_order.get(order.id, []):
             sign = Decimal("-1") if reversal_of_id is not None else Decimal("1")
             rebate += sign * _money(gross)
             direct_cost += sign * _money(fee)

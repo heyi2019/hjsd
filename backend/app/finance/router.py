@@ -77,7 +77,13 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
     order_event_id = value("order_event_id")
     transfer_id = value("transfer_id")
     deposit_id = value("deposit_id")
-    order = db.get(Order, order_id) if order_id else None
+    # 列表路径的 flow 来自 service 层 outerjoin 出的 dict，order_no 已在其中，
+    # 不必再逐行 db.get(Order)（原实现每页多发 N 条 SQL）。非 dict 入参才回查。
+    if isinstance(flow, dict):
+        order_no = flow.get("order_no")
+    else:
+        order = db.get(Order, order_id) if order_id else None
+        order_no = order.order_no if order else None
     if order_event_id is not None:
         source = "ORDER_EVENT"
     elif category in {"REBATE", "REBATE_REVERSAL"}:
@@ -109,7 +115,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         reviewed_at=value("reviewed_at"),
         reversal_of_id=value("reversal_of_id"),
         order_id=order_id,
-        order_no=order.order_no if order else None,
+        order_no=order_no,
         deposit_id=deposit_id,
         order_event_id=order_event_id,
         transfer_id=transfer_id,

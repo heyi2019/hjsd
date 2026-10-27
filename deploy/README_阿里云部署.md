@@ -102,17 +102,58 @@ scp heijin.tar.gz user@<ECS公网IP>:~/ && ssh user@<ECS公网IP> 'tar xzf heiji
 ```bash
 cd deploy
 cp env/.env.production.example .env
-# 编辑 .env：JWT_SECRET_KEY 用 `openssl rand -hex 32` 生成，CORS_ORIGINS 填你的域名
+# 编辑 .env：JWT_SECRET_KEY 用 `openssl rand -hex 32` 生成（≥32 位，否则生产启动校验拒绝）。
+# CORS_ORIGINS：前端由 nginx 同源反代 /api/v1/，浏览器不跨域，可整行删除或留空；
+#   仅当前端部署在独立域名/端口时才填（生产禁止 *）。
 nano .env
 
 # 首次部署时设置管理员密码；脚本会在迁移完成后创建/更新 admin 账号。
-export ADMIN_PASSWORD='请替换为至少 8 位的强密码'
+# 密码不要写进 .env：该文件由 env_file 注入 backend 常驻进程环境。此处临时 export 即可。
+export ADMIN_PASSWORD='请替换为至少 12 位的强密码'
 
 chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 ```
 
+`deploy.sh` 依次执行：构建镜像 → （库已存在则）迁移前备份 → `alembic upgrade head` →
+**预置经营规则定义与默认版本（幂等）** → 启动服务 → 创建管理员 → 健康检查。
+
+> 为什么必须预置经营规则：规则编码是系统闭集（REBATE / COMMISSION / INSTALLMENT / WRITE_DOWN / REFUND / DG_MIXED），
+> 迁移只建表不预置。缺定义时 `make_snapshot` 返回空快照且**不报错**——下单不失败，但返点/提成/分期规则静默失效。
+
 浏览器访问 `http://<ECS公网IP>/` 即前端；API 在 `http://<ECS公网IP>/api/v1`。
+
+### 存量旧库（带旧版本戳）怎么办
+
+迁移在发布前已压平为单基线 `0001`，旧版本戳（`0002`~`0023`）归档不再参与解析。`deploy.sh` 的迁移步骤是
+`alembic upgrade head || python scripts/stamp_baseline.py`，与容器启动的 CMD 一致：
+
+- 版本戳是旧号、但**结构已等价** → `stamp_baseline.py` 自动对齐到 `0001` 并继续部署；
+- 版本戳是旧号、且**结构落后** → 打印缺口清单（缺表 / 缺列 / 缺索引）并**报错退出**，
+  绝不把落后的库伪装成已迁移。
+
+遇到第二种（旧库结构落后）时，先取备份再决定：
+
+```bash
+# 1) 先把库取到宿主机 —— 这是唯一必须保留的东西
+docker compose run --rm backend python scripts/backup_db.py \
+  --db /app/data/heijin_erp_v1.db --out-dir /app/data/backups --keep 30
+docker compose cp backend:/app/data/backups ./backups_local
+
+# 2-A) 库内数据不要 → 删卷重建，走首次部署流程
+docker compose down -v      # ⚠ 会连同卷内 backup 目录一起删除，务必先做完第 1 步
+
+# 2-B) 库内数据要保留 → 不要删卷；先把缺口补齐（或把数据导出到新库重导），再跑 deploy.sh
+```
+
+### 首次上线后必做（空库起始时）
+
+| 顺序 | 事项 | 说明 |
+|---|---|---|
+| 1 | 核对经营规则配置 | 预置版本是占位口径（返点 5%、分期 3 期等），在「设置 → 经营规则」按实际改；每次保存生成新版本并发布 |
+| 2 | 建团队 | `teams` 空库为 0 条；不影响登录（用户 `team_ids` 默认 `[]`），但团队管理页是空的 |
+| 3 | 补游戏类型 | 空库只有 2 类（迁移内置），按实际在收的游戏补齐 |
+| 4 | 核对资金池 | 空库只有 `HJ_INVEST` / `HJ_PROFIT`；运营支出若需独立池，手工新建 |
 
 ---
 
@@ -140,18 +181,27 @@ docker compose down               # 停止
 docker compose pull && docker compose up -d   # 更新（若镜像改了需先 build）
 ```
 
-**数据备份**（SQLite 单文件）：
+**数据备份**（在线快照，WAL 安全；`deploy.sh` 每次部署前自动执行，默认保留 30 份）：
 ```bash
-docker compose exec -T backend tar czf - -C /app data > erp_db_$(date +%F).tar.gz
-# 恢复：docker compose down; 解包到卷；docker compose up -d
+docker compose exec -T backend python scripts/backup_db.py \
+  --db /app/data/heijin_erp_v1.db --out-dir /app/data/backups --keep 30
+# 备份落在 erp_db 卷内，每份带 .sha256 校验文件
+
+# 恢复：自动校验 SHA256 + PRAGMA integrity_check，原子替换，旧库保留为 .bak
+docker compose exec -T backend \
+  python scripts/restore_db.py --backup /app/data/backups/<文件名>.db --force
+docker compose restart backend     # 服务需重启才会加载被替换的库文件
 ```
+
+> **不要用 `tar` 直接打包运行中的 `data/`**：SQLite 在 WAL 模式下 `db` / `-wal` / `-shm` 三个文件的时刻不一致，可能得到损坏快照。
+> `backup_db.py` 走 SQLite 在线备份 API，产出单文件一致快照；`restore_db.py` 恢复前会先验签再验页完整性。
 
 ---
 
 ## 七、生产注意事项
 
 1. **JWT_SECRET_KEY 必须替换**，否则任何人可伪造 token。
-2. **CORS_ORIGINS** 填真实域名；同源反代下也可留空，但显式更安全。
-3. **正式库**：当前正式环境为 ECS 上的 SQLite v1 持久化库，部署前由脚本执行 `alembic upgrade head` 并保留数据卷；PostgreSQL 仅作为后续迁移目标，迁移完成前不得直接切换。
-4. **备份**：SQLite 是单文件，按第六节定期打包 `data` 卷即可；换 PG 后改用 `pg_dump`。
+2. **CORS_ORIGINS**：前端经 nginx 同源反代访问 API，浏览器不跨域，**留空即可**（留空 = 不启用 CORS，是正确状态）；仅当前端独立域名时才填真实来源，生产禁止 `*`（启动校验会拒绝）。
+3. **正式库**：当前正式环境为 ECS 上的 SQLite v1 持久化库，部署前由脚本执行 `alembic upgrade head` 并保留数据卷，随后预置经营规则定义（幂等）；PostgreSQL 仅作为后续迁移目标，迁移完成前不得直接切换。
+4. **备份**：用 `scripts/backup_db.py` 做在线快照（见第六节），不要 `tar` 运行中的 `data/` 卷；换 PG 后改用 `pg_dump`。
 5. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离，配置已强制校验，勿手动改 `DATABASE_URL` 指向旧库。

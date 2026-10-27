@@ -30,7 +30,18 @@ else
 fi
 
 echo "==> 执行数据库迁移"
-docker compose run --rm backend alembic upgrade head
+# 迁移已压平为单基线 0001：存量库若仍带旧版本戳（0002~0023），
+# `alembic upgrade head` 会报 Can't locate revision 并退出。
+# 与 Dockerfile CMD 保持同一兜底：upgrade 失败时交 stamp_baseline.py,
+# 只有确认「库结构与 ORM 等价」才对齐版本戳；结构真的落后则打印缺口清单并报错退出
+# （绝不把落后的库伪装成已迁移）。首次部署空库时 upgrade 直接成功，不会走到兜底。
+docker compose run --rm backend sh -c 'alembic upgrade head || python scripts/stamp_baseline.py'
+
+# 经营规则定义是系统闭集（REBATE / COMMISSION / INSTALLMENT / WRITE_DOWN / REFUND / DG_MIXED），
+# 迁移只建表不预置，缺定义时 make_snapshot 返回空快照且不报错（静默失效）。
+# 脚本幂等：定义按 (policy_code, GLOBAL) 判重、已有版本的跳过，可反复执行。
+echo "==> 预置经营规则定义与默认版本（幂等）"
+docker compose run --rm backend python scripts/seed_policy_definitions.py --apply
 
 echo "==> 启动服务"
 docker compose up -d

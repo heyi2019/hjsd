@@ -159,6 +159,66 @@ def test_create_reconciliation_with_difference_and_reason(seeded_db):
     assert item.reason == "差异说明"
 
 
+def test_create_reconciliation_survives_decimal_balances(seeded_db):
+    """P1-01 回归：小数余额对账不再被 CHECK 浮点残差 IntegrityError 打爆。
+
+    严格等式 `difference = statement_balance - system_balance` 下，SQLite 按
+    REAL 求值，0.30-0.10=0.19999999999999929 ≠ 0.20 必炸（实测 5 组常见金额
+    3 组 500）。CHECK 改容差 <=0.005（半分）后以下组合都应正常落库。
+    """
+    pool = _seed_recon(seeded_db)
+    # 系统余额再加一笔 0.10 → 70.10（system_balance 带角分，最贴近真实流水）
+    flow = create_cashflow(
+        seeded_db,
+        pool_id=pool.id,
+        occurred_on=date(2026, 10, 17),
+        direction="IN",
+        nature="BUSINESS_IN",
+        fund_nature="BUSINESS",
+        accounting_attribute="OPERATING_EXPENSE",
+        category="OTHER",
+        amount=Decimal("0.10"),
+        actor="pytest",
+    )
+    approve_cashflow(seeded_db, flow.id, actor="finance")
+
+    # 组合一：70.30 - 70.10，严格等式下 70.30-70.10=0.19999999999999929 必炸
+    item = create_reconciliation(
+        seeded_db,
+        pool_id=pool.id,
+        reconciled_on=date(2026, 10, 18),
+        account_label="小数对账-系统带角分",
+        statement_balance=Decimal("70.30"),
+        actor="pytest",
+        reason="银行手续费",
+    )
+    assert item.system_balance == Decimal("70.10")
+    assert item.difference == Decimal("0.20")
+
+    # 组合二：负差异（70.00-70.10=-0.10000000000000142 严格等式下必炸）
+    item2 = create_reconciliation(
+        seeded_db,
+        pool_id=pool.id,
+        reconciled_on=date(2026, 10, 19),
+        account_label="小数对账-报表带角分",
+        statement_balance=Decimal("70.00"),
+        actor="pytest",
+        reason="在途利息",
+    )
+    assert item2.difference == Decimal("-0.10")
+
+    # 组合三：两余额相等但均带角分（差 0，严格等式下 x-x=0 本就精确，兜底验证）
+    item3 = create_reconciliation(
+        seeded_db,
+        pool_id=pool.id,
+        reconciled_on=date(2026, 10, 20),
+        account_label="小数对账-零差异",
+        statement_balance=Decimal("70.10"),
+        actor="pytest",
+    )
+    assert item3.difference == Decimal("0")
+
+
 def test_create_reconciliation_rejects_user_not_visible(seeded_db):
     pool = _seed_recon(seeded_db)
     with pytest.raises(NotFound, match="资金池不存在"):

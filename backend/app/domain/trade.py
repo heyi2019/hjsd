@@ -421,7 +421,10 @@ class Reconciliation(Base, AuditMixin):
         ),
         CheckConstraint("statement_balance >= 0", name="reconciliation_statement_nonneg"),
         CheckConstraint(
-            "difference = statement_balance - system_balance",
+            # 容差 0.005（半分）：SQLite 无 DECIMAL，Amount 落库即 REAL，严格等式
+            # 对角分不为零的余额组合必然浮点残差 IntegrityError（0.30-0.10≠0.20）。
+            # 真实口径偏差只可能是 0 或 >=0.01，半分窗口不会误放行。
+            "abs(difference - (statement_balance - system_balance)) <= 0.005",
             name="difference_matches_balances",
         ),
     )

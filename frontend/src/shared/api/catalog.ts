@@ -1387,6 +1387,28 @@ export interface AttachmentItem { id: number; attachment_no: string; file_name: 
 export interface Lead { id: number; lead_no: string; customer_id: number; request_type: string; budget?: string | null; target: string; status: string }
 export interface QualityIssue { id: number; issue_no: string; severity: string; title: string; entity_type: string; entity_id: string; status: string; message: string }
 export interface QualitySummary { total: number; by_severity: Record<string, number> }
+
+/** 单个指标的月度取值：rate 为空表示分母为 0（当月无该口径的数据），前端不得自行推算。 */
+export interface QualityMetricValue {
+  rate: number | null;
+  numerator: number | null;
+  denominator: number | null;
+  amount: string | null;
+}
+/** 指标口径由后端下发（label/formula/unit），前端只负责展示，不在前端复写公式。 */
+export interface QualityMetricDefinition { label: string; formula: string; unit: string }
+export interface QualityMetricRow {
+  month: string;
+  reconciliation_completion_rate: QualityMetricValue;
+  overdue_rate: QualityMetricValue;
+  missing_attachment_rate: QualityMetricValue;
+}
+export interface QualityMetrics {
+  from: string;
+  to: string;
+  definitions: Record<string, QualityMetricDefinition>;
+  items: QualityMetricRow[];
+}
 export interface NotificationItem { id: number; notification_no: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
 export interface SearchResult { id: number; type: string; code: string; title: string; subtitle?: string | null; route: string }
 export const transfersApi = {
@@ -1427,6 +1449,9 @@ export const leadsApi = {
 };
 export const qualityApi = {
   summary: () => api.get<QualitySummary>("/quality/exceptions").then(r => r.data),
+  /** 月度质量指标（对账完成率/分期逾期率/缺附件率）；不传区间时后端只给当月。 */
+  metrics: (range?: { from?: string; to?: string }) =>
+    api.get<QualityMetrics>("/quality/metrics", { params: range }).then(r => r.data),
   list: () => api.get<{ items: QualityIssue[] }>("/quality/issues").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<QualityIssue>("/quality/issues", data).then(r => r.data),
   update: (id: number, data: { status: string }) => api.patch<QualityIssue>(`/quality/issues/${id}`, data).then(r => r.data),

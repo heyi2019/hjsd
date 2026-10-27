@@ -1,18 +1,55 @@
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
-import { Card, Form, Input, Modal, Select, Space, message } from "antd";
+import { Card, Form, Input, Modal, Select, Space, Tooltip, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { qualityApi, type QualityIssue, type QualitySummary } from "../shared/api/catalog";
+import { qualityApi, type QualityIssue, type QualityMetricRow, type QualityMetricValue, type QualityMetrics, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { DataTable, ErrorBanner, InlineError, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 
 const QUALITY_STATUS_LABEL: Record<string, string> = { OPEN: "待处理", IN_PROGRESS: "处理中", CLOSED: "已关闭" };
 
+/** 指标窗口：只向后端要区间，月份分组与分子分母一律由后端给口径。 */
+const METRIC_WINDOWS = [
+  { value: 3, label: "近 3 个月" },
+  { value: 6, label: "近 6 个月" },
+  { value: 12, label: "近 12 个月" },
+];
+
+function monthRange(months: number): { from: string; to: string } {
+  const now = new Date();
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return {
+    from: fmt(new Date(now.getFullYear(), now.getMonth() - (months - 1), 1)),
+    to: fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  };
+}
+
+/** rate 为 null = 分母为 0，显示占位而不是 0%（0% 会被误读成「做得很差」）。 */
+function metricText(value: QualityMetricValue | undefined): string {
+  if (!value || value.rate === null || value.rate === undefined) return "—";
+  return `${value.rate.toFixed(2)}%`;
+}
+
+function metricHint(value: QualityMetricValue | undefined, formula?: string): string {
+  const parts: string[] = [];
+  if (formula) parts.push(`口径：${formula}`);
+  if (value && value.denominator !== null) parts.push(`样本：${value.numerator ?? 0}/${value.denominator}`);
+  return parts.join("；") || "无口径说明";
+}
+
+function renderMetric(value: QualityMetricValue | undefined, formula?: string) {
+  return <Tooltip title={metricHint(value, formula)}><span>{metricText(value)}</span></Tooltip>;
+}
+
 export function QualityPanel() {
   const severityOptions = useOptionSet("QUALITY_SEVERITY") ?? [];
   const qualityStatusOptions = useOptionSet("QUALITY_STATUS") ?? [];
   const [summary, setSummary] = useState<QualitySummary | null>(null);
+  const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
+  const [metricWindow, setMetricWindow] = useState(6);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const [rows, setRows] = useState<QualityIssue[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<QualityIssue | null>(null);
@@ -39,6 +76,20 @@ export function QualityPanel() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  /** 指标独立取数：失败只让本卡片留空，不拖垮工单列表（两者口径与权限门槛不同）。 */
+  const loadMetrics = useCallback(async () => {
+    setMetricsLoading(true);
+    try {
+      setMetrics(await qualityApi.metrics(monthRange(metricWindow)));
+    } catch {
+      setMetrics(null);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [metricWindow]);
+
+  useEffect(() => { void loadMetrics(); }, [loadMetrics]);
 
   const createIssue = async (values: Record<string, unknown>) => {
     setCreating(true);
@@ -112,6 +163,25 @@ export function QualityPanel() {
     finally { setScanning(false); }
   };
 
+  const metricDefinitions = metrics?.definitions ?? {};
+  const metricColumns: ColumnsType<QualityMetricRow> = [
+    { title: "月份", dataIndex: "month" },
+    {
+      title: metricDefinitions.reconciliation_completion_rate?.label ?? "对账完成率",
+      render: (_v, row) =>
+        renderMetric(row.reconciliation_completion_rate, metricDefinitions.reconciliation_completion_rate?.formula),
+    },
+    {
+      title: metricDefinitions.overdue_rate?.label ?? "分期逾期率",
+      render: (_v, row) => renderMetric(row.overdue_rate, metricDefinitions.overdue_rate?.formula),
+    },
+    {
+      title: metricDefinitions.missing_attachment_rate?.label ?? "缺附件率",
+      render: (_v, row) =>
+        renderMetric(row.missing_attachment_rate, metricDefinitions.missing_attachment_rate?.formula),
+    },
+  ];
+
   const columns: ColumnsType<QualityIssue> = [
     { title: "工单号", dataIndex: "issue_no" },
     { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} optionSet="QUALITY_SEVERITY" /> },
@@ -136,8 +206,32 @@ export function QualityPanel() {
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
       <StatRow items={[{ label: "异常总数", kind: "count", amount: String(summary?.total ?? 0) }, { label: "高严重度", kind: "count", amount: String(summary?.by_severity?.HIGH ?? 0), tone: "warn" }]} />
+      <Card
+        className="glass"
+        title="月度质量指标"
+        extra={
+          <Select
+            aria-label="指标统计区间"
+            value={metricWindow}
+            options={METRIC_WINDOWS}
+            onChange={setMetricWindow}
+            popupMatchSelectWidth={false}
+          />
+        }
+      >
+        <DataTable<QualityMetricRow>
+          columns={metricColumns}
+          rows={metrics?.items ?? []}
+          loading={metricsLoading}
+          page={1}
+          pageSize={12}
+          total={metrics?.items.length ?? 0}
+          emptyText="暂无指标数据"
+          onPageChange={() => undefined}
+        />
+      </Card>
       <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.exception.approve" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
-        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length}emptyText="暂无质量异常" onPageChange={() => undefined} />
+        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <Modal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>

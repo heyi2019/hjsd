@@ -2,7 +2,7 @@ import { screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
-import { Modal } from "antd";
+import { appModal as Modal } from "../shared/ui/appFeedback";
 import { CreateBusinessModal } from "./CreateBusinessModal";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";

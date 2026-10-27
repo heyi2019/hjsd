@@ -1,10 +1,11 @@
+import { appMessage, appModal } from "./appFeedback";
 /** 破坏性/不可逆操作的统一按钮：二次确认 + loading + 防重 + 权限门控。
  *
  * 背景：此前全站 Popconfirm 仅 4 处，流水审核、规则发布、停用资金池/业务类型/用户、
  * 客户拉黑等都是一键生效——误点即落库且不可撤销。这里把「确认 + 反馈 + 防重 + 权限」
  * 收成一个组件，调用方只需提供 `title`（做什么）与 `description`（影响什么/能否撤销）。
  */
-import { Button, Popconfirm, message } from "antd";
+import { Button, Popconfirm } from "antd";
 import type { ButtonProps } from "antd";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -39,7 +40,7 @@ export function ConfirmButton(
       await onConfirm();
       setOpen(false);
     } catch (err) {
-      message.error(normalizeError(err).message);
+      appMessage.error(normalizeError(err).message);
     } finally {
       setPending(false);
     }

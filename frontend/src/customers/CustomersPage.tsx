@@ -1,7 +1,8 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
  *  扩展字段（BAS-04）：定义即「客户建档」表单的自定义字段（设置 › 表单字段 › 客户建档），
  *  建档/编辑表单与详情抽屉按定义动态渲染，值随客户行存 form_extra。 */
-import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography, message } from "antd";
+import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 // 搜索按钮是只读查询操作，不属于「写操作须用 PermissionButton 门控」的约束范围；
 // 用别名避免 ui_guards 的字面量误伤（SearchButton 与 Button 是同一组件引用）。
@@ -312,9 +313,9 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
         extra_values: Object.keys(extraValues).length > 0 ? extraValues : undefined,
       });
       if (result.duplicate_candidates.length > 0) {
-        message.warning(`已建档，检测到 ${result.duplicate_candidates.length} 条重复候选（未拦截）`);
+        appMessage.warning(`已建档，检测到 ${result.duplicate_candidates.length} 条重复候选（未拦截）`);
       } else {
-        message.success("客户已建档");
+        appMessage.success("客户已建档");
       }
       setCreateOpen(false);
       form.resetFields();
@@ -343,7 +344,7 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
         note: (values.note as string) || null,
         extra_values: extraValues,
       });
-      message.success("客户已更新");
+      appMessage.success("客户已更新");
       setEditTarget(null);
       editForm.resetFields();
       await load();
@@ -360,7 +361,7 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
         Number(values.target_customer_id),
         values.reason as string,
       );
-      message.success("合并完成，来源客户已置 MERGED 并迁移关联关系");
+      appMessage.success("合并完成，来源客户已置 MERGED 并迁移关联关系");
       setMergeTarget(null);
       mergeForm.resetFields();
       await load();
@@ -419,7 +420,7 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
             danger={row.status === "ACTIVE"}
             onConfirm={async () => {
               await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
-              message.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
+              appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
               await load();
             }}
           >
@@ -507,7 +508,7 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
         renderPhone={(row) => renderContact(row, "phone")}
         onDisable={async (row) => {
           await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
-          message.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
+          appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
           await load();
         }}
       />}
@@ -824,7 +825,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
         phone: values.phone as string,
         wechat: values.wechat as string,
       });
-      message.success("合作方已建档");
+      appMessage.success("合作方已建档");
       setOpen(false);
       form.resetFields();
       await load();
@@ -844,7 +845,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
         qq: values.qq as string,
         note: (values.note as string) || null,
       });
-      message.success("合作方已更新");
+      appMessage.success("合作方已更新");
       setEditTarget(null);
       editForm.resetFields();
       await load();
@@ -878,7 +879,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
             danger={row.status === "ACTIVE"}
             onConfirm={async () => {
               await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
-              message.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
+              appMessage.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
               await load();
             }}
           >
@@ -917,7 +918,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
         onEdit={setEditTarget}
         onToggle={async (row) => {
           await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
-          message.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
+          appMessage.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
           await load();
         }}
       />}

@@ -1,4 +1,5 @@
-import { Input, Modal, Select, Space, Upload, message } from "antd";
+import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { Input, Modal, Select, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { accountsApi, type Account } from "../shared/api/catalog";
@@ -92,7 +93,7 @@ export function InventoryProfileModal({
       const updated = await accountsApi.updateProfile(target.account.id, payload);
       onSaved(updated);
       onClose();
-      message.success("账号资料已保存");
+      appMessage.success("账号资料已保存");
     } catch (error) {
       onError(error);
     } finally {

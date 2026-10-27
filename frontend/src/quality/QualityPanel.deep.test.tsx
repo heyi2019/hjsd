@@ -5,7 +5,7 @@ import { renderLight } from "../test/render";
 import { QualityPanel } from "./QualityPanel";
 import * as catalog from "../shared/api/catalog";
 import { seedOptionSets } from "../test/formFieldsSeed";
-import { message } from "antd";
+import { appMessage as message } from "../shared/ui/appFeedback";
 import type { QualityIssue, QualitySummary } from "../shared/api/catalog";
 
 vi.mock("../shared/api/catalog");

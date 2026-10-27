@@ -1,6 +1,7 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存账号返点：买号返点关联买入订单，卖号返点关联实际售出订单。 */
 import { configurableLabel } from "../shared/lib/optionSets";
-import { Checkbox, Form, Input, Modal, Spin, message } from "antd";
+import { Checkbox, Form, Input, Modal, Spin } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   accountsApi,
@@ -97,7 +98,7 @@ export function InventoryRebateModal(props: {
         channel: kind === "BUY" ? "买号返点" : "卖号返点",
         note: REBATE_KIND_LABEL[kind],
       });
-      message.success("返点已登记");
+      appMessage.success("返点已登记");
       form.resetFields();
       props.onClose();
       await props.onCreated();

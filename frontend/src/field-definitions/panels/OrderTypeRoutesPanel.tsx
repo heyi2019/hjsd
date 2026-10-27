@@ -1,3 +1,4 @@
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
 /** 资金路由页：跨业务类型一览「订单过账往哪个资金池走」。
  *
  * 存在理由：路由（order_type_pools）此前只嵌在「业务类型」页里，必须逐个类型点「路由」
@@ -8,7 +9,7 @@
  * 份额与资金性质的选项来自选项词典（ROUTE_PORTION / ROUTE_FUND_NATURE），设置页改文案后
  * 本页同步变化。
  */
-import { Card, Form, InputNumber, Select as AntSelect, Space, Typography, message } from "antd";
+import { Card, Form, InputNumber, Select as AntSelect, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -123,7 +124,7 @@ export function OrderTypeRoutesPanel() {
         fund_nature: values.fund_nature ? (values.fund_nature as string) : null,
         priority: Number(values.priority ?? 0),
       });
-      message.success("资金路由已保存");
+      appMessage.success("资金路由已保存");
       form.resetFields();
       setPreview(null);
       await load();
@@ -135,7 +136,7 @@ export function OrderTypeRoutesPanel() {
   const runPreview = async () => {
     const values = form.getFieldsValue();
     if (!values.order_type_code || !values.portion || !values.pool_code) {
-      message.warning("请先选择业务类型、资金份额与目标资金池");
+      appMessage.warning("请先选择业务类型、资金份额与目标资金池");
       return;
     }
     try {
@@ -147,7 +148,7 @@ export function OrderTypeRoutesPanel() {
           values.fund_nature ? String(values.fund_nature) : undefined,
         ),
       );
-      message.success("已生成影响预览");
+      appMessage.success("已生成影响预览");
     } catch (err) {
       setError(normalizeError(err));
     }

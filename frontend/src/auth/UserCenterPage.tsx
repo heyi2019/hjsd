@@ -1,8 +1,9 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 用户中心：当前账号/角色信息 + 修改登录密码（顶栏入口进入）。
  *  区别于 auth/ChangePasswordPage（首登强制改密）：本组件挂载在顶栏「用户中心」Modal 内，
  *  改密走同一 changePassword API（后端校验旧密码），成功后本次会话直接生效。
  *  onClose 由 Modal 容器注入：退出登录需先关弹窗再 logout。 */
-import { Button, Card, Form, Input, message } from "antd";
+import { Button, Card, Form, Input } from "antd";
 import { useState } from "react";
 import { ErrorBanner } from "../shared/ui";
 import { normalizeError } from "../shared/api/client";
@@ -25,7 +26,7 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
       setError(null);
       setSubmitting(true);
       await changePassword(values.old_password, values.new_password);
-      message.success("密码已更新");
+      appMessage.success("密码已更新");
       form.resetFields();
     } catch (err) {
       // 出错保留已填内容（含旧密码），仅顶部横幅提示，不清空表单。

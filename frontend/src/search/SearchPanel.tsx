@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 全局搜索：仅展示后端按权限过滤后的可跳转摘要（SYS-01-02）。 */
-import { Card, Form, Input, message } from "antd";
+import { Card, Form, Input } from "antd";
 import { useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import { searchApi, type SearchResult } from "../shared/api/catalog";
@@ -13,7 +14,7 @@ export function SearchPanel() {
   const [loading, setLoading] = useState(false);
   const runSearch = async (values: Record<string, unknown>) => {
     const text = String(values.q ?? "").trim();
-    if (!text) { message.warning("请输入搜索关键词"); return; }
+    if (!text) { appMessage.warning("请输入搜索关键词"); return; }
     setLoading(true); setQuery(text);
     try { const result = await searchApi.query(text); setRows(result.items); setError(null); }
     catch (err) { setError(normalizeError(err)); }

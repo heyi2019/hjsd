@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存账号寄售：选择已维护的寄售平台，并为当前账号登记代挂业务记录。 */
-import { Checkbox, Form, Modal, message } from "antd";
+import { Checkbox, Form, Modal } from "antd";
 import { useEffect, useState } from "react";
 import {
   counterpartiesApi,
@@ -56,7 +57,7 @@ export function InventoryConsignmentModal(props: {
           role: "PLATFORM",
         })),
       });
-      message.success("寄售已登记，账号仍保持在库");
+      appMessage.success("寄售已登记，账号仍保持在库");
       form.resetFields();
       props.onClose();
       await props.onCreated();

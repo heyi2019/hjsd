@@ -1,4 +1,5 @@
-import { Card, Form, Input, Modal, Select, Space, Typography, message, InputNumber } from "antd";
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
+import { Card, Form, Input, Modal, Select, Space, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { orderTypesApi, type OrderType, type OrderTypeRoute } from "../../shared/api/catalog";
@@ -75,7 +76,7 @@ export function OrderTypesPanel() {
 
   const runPreview = async (values: Record<string, unknown>) => {
     if (!previewTarget) return;
-    try { setPreview(await orderTypesApi.impactPreview(previewTarget.code, values.portion as string, values.pool_code as string, values.fund_nature ? String(values.fund_nature) : undefined)); message.success("已生成路由影响预览"); }
+    try { setPreview(await orderTypesApi.impactPreview(previewTarget.code, values.portion as string, values.pool_code as string, values.fund_nature ? String(values.fund_nature) : undefined)); appMessage.success("已生成路由影响预览"); }
     catch (err) { setError(normalizeError(err)); }
   };
 
@@ -89,11 +90,11 @@ export function OrderTypesPanel() {
         sort_order: Number(values.sort_order ?? 0),
         description: values.description ? String(values.description) : null,
       });
-      message.success("业务类型已创建");
+      appMessage.success("业务类型已创建");
       setCreateOpen(false);
       createForm.resetFields();
       await load();
-    } catch (err) { message.error(normalizeError(err).message); }
+    } catch (err) { appMessage.error(normalizeError(err).message); }
   };
 
   const openRoutes = async (row: OrderType) => {
@@ -103,7 +104,7 @@ export function OrderTypesPanel() {
       const list = await orderTypesApi.routes(row.id);
       setRoutes(list ?? []);
     } catch (err) {
-      message.error(normalizeError(err).message);
+      appMessage.error(normalizeError(err).message);
       setRoutes([]);
     }
   };
@@ -117,10 +118,10 @@ export function OrderTypesPanel() {
         fund_nature: values.fund_nature ? String(values.fund_nature) : null,
         priority: Number(values.priority ?? 0),
       });
-      message.success("资金路由已保存");
+      appMessage.success("资金路由已保存");
       routeForm.resetFields();
       setRoutes(await orderTypesApi.routes(routeTarget.id));
-    } catch (err) { message.error(normalizeError(err).message); }
+    } catch (err) { appMessage.error(normalizeError(err).message); }
   };
 
   const update = async (values: Record<string, unknown>) => {
@@ -131,7 +132,7 @@ export function OrderTypesPanel() {
         description: (values.description as string) || null,
         sort_order: values.sort_order as number,
       });
-      message.success("业务类型已更新");
+      appMessage.success("业务类型已更新");
       setEditTarget(null);
       editForm.resetFields();
       await load();

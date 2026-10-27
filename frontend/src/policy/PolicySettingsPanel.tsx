@@ -1,3 +1,4 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 经营规则配置（T19 / BAS-06-01~02）：定义 → 版本 → 发布 → 生效期。
  *
  * 2026-10-26 重构：
@@ -10,7 +11,7 @@
  * - 已发布版本不可改，点「设置配置」会生成新版本并立即发布；
  * - 新版本生效期不得与已有版本重叠。
  */
-import { Card, Col, Empty, Row, message } from "antd";
+import { Card, Col, Empty, Row } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { policyApi, type PolicyDefinition, type PolicyVersion } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
@@ -121,7 +122,7 @@ export function PolicySettingsPanel() {
     });
     if (succeeded) {
       setSupersedeTarget(null);
-      message.success(`草稿 v${target.version} 已作废`);
+      appMessage.success(`草稿 v${target.version} 已作废`);
     }
   };
 
@@ -129,7 +130,7 @@ export function PolicySettingsPanel() {
   const runExpireSweep = async () => {
     const result = await policyApi.expireSweep(today());
     await loadVersions();
-    message.success(
+    appMessage.success(
       result.swept > 0 ? `已固化 ${result.swept} 个过期版本为「已失效」` : "没有需要固化的过期版本",
     );
   };

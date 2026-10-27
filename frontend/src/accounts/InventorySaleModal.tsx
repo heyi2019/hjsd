@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存账号售出：回收 / 代挂账号从库存中心售出，按货源类型映射订单类型。 */
-import { DatePicker, Form, Input, Modal, Radio, message } from "antd";
+import { DatePicker, Form, Input, Modal, Radio } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -137,7 +138,7 @@ export function InventorySaleModal(props: {
           first_due_on: firstDueOn,
           note: values.note as string | undefined,
         });
-        message.success("分期售出已创建，账号已进入分期中");
+        appMessage.success("分期售出已创建，账号已进入分期中");
       } else {
         await ordersApi.postEvent(order.id, {
           event_type: "SELL",
@@ -147,7 +148,7 @@ export function InventorySaleModal(props: {
           portion: "PROFIT",
           note: values.note as string | undefined,
         });
-        message.success("账号已售出");
+        appMessage.success("账号已售出");
       }
       form.resetFields();
       props.onClose();

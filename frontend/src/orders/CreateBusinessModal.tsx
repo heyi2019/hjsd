@@ -1,5 +1,6 @@
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
-import { Form, Modal, message } from "antd";
+import { Form, Modal } from "antd";
 import { useEffect, useState } from "react";
 import { useOrderFormConfig, FieldConfigContext } from "./ConfigurableField";
 import {
@@ -185,7 +186,7 @@ export function CreateBusinessModal(props: {
             note: values.dfq_note as string,
           },
         });
-        message.success("代分期订单已创建");
+        appMessage.success("代分期订单已创建");
         props.onClose();
         form.resetFields();
         await props.onCreated();
@@ -305,7 +306,7 @@ export function CreateBusinessModal(props: {
         initial_costs: initialCosts,
         form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
-      message.success(isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建");
+      appMessage.success(isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建");
       props.onClose();
       form.resetFields();
       await props.onCreated();
@@ -323,7 +324,7 @@ export function CreateBusinessModal(props: {
       destroyOnHidden
       onCancel={() => {
         if (form.isFieldsTouched()) {
-          Modal.confirm({
+          appModal.confirm({
             title: "放弃未保存的建单内容？",
             content: "表单已填写但未提交，关闭后将丢失本次输入。",
             okText: "放弃",
@@ -363,7 +364,7 @@ export function CreateBusinessModal(props: {
                 ? [...schedule, ...Array.from({ length: count - schedule.length }, () => ({}))]
                 : schedule.slice(0, count));
               if (count < schedule.length && schedule.slice(count).some((item) => item?.due_on)) {
-                Modal.confirm({ title: "减少期数会删除已填写的到期日", okText: "确认删除", cancelText: "保留期次", content: "确认删除超出期数的计划吗？", onOk: apply, onCancel: () => form.setFieldValue("dfq_periods", schedule.length) });
+                appModal.confirm({ title: "减少期数会删除已填写的到期日", okText: "确认删除", cancelText: "保留期次", content: "确认删除超出期数的计划吗？", onOk: apply, onCancel: () => form.setFieldValue("dfq_periods", schedule.length) });
               } else apply();
             }
           }

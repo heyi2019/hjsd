@@ -1,3 +1,4 @@
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
 import { DatePicker, Form, Input, Modal } from "antd";
 import { useEffect, useRef } from "react";
 import type { GameTypeOption, Pool } from "../../shared/api/catalog";
@@ -101,7 +102,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
                     <span className="dfq-schedule-row__period">第 {index + 1} 期</span>
                     <Form.Item name={[field.name, "due_on"]} label="到期日" rules={[{ required: true, message: "请选择到期日" }]}><DatePicker placeholder="请选择日期" /></Form.Item>
                     {fields.length > 1 && <button type="button" className="dfq-schedule-row__remove" onClick={() => {
-                      if (form.getFieldValue(["dfq_schedule", field.name, "due_on"])) Modal.confirm({ title: "删除已填写的期次？", onOk: () => remove(field.name) });
+                      if (form.getFieldValue(["dfq_schedule", field.name, "due_on"])) appModal.confirm({ title: "删除已填写的期次？", okText: "删除", cancelText: "取消", onOk: () => remove(field.name) });
                       else remove(field.name);
                     }}>删除</button>}
                   </div>

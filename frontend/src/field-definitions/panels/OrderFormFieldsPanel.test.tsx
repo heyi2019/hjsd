@@ -2,7 +2,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { message } from "antd";
+import { appMessage as message } from "../../shared/ui/appFeedback";
 import * as catalog from "../../shared/api/catalog";
 vi.mock("../../shared/api/catalog");
 import * as client from "../../shared/api/client";

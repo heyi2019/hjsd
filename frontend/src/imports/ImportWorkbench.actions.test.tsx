@@ -1,7 +1,7 @@
 import { act, fireEvent, within, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { message } from "antd";
+import { appMessage as message } from "../shared/ui/appFeedback";
 import { renderLight } from "../test/render";
 import { ImportWorkbench } from "./ImportWorkbench";
 import { resolveMock } from "../test/mock-api";

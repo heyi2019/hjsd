@@ -1,4 +1,5 @@
-import { Card, Checkbox, Form, Input, InputNumber, Space, Table, Typography, message } from "antd";
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
+import { Card, Checkbox, Form, Input, InputNumber, Space, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
@@ -30,10 +31,10 @@ export function GameTypeSettingsPanel() {
       if (editingId === null) {
         // 后端 create 支持 is_default（自动清其他默认项）；update 不支持，编辑态不传。
         await gameTypesApi.create(values.is_default ? { ...payload, is_default: true } : payload);
-        message.success("游戏类型已新增");
+        appMessage.success("游戏类型已新增");
       } else {
         await gameTypesApi.update(editingId, payload);
-        message.success("游戏类型已更新");
+        appMessage.success("游戏类型已更新");
       }
       setEditingId(null);
       form.resetFields();

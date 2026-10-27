@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { message } from "antd";
+import { appMessage as message } from "../shared/ui/appFeedback";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";

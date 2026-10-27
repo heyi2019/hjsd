@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { message } from "antd";
+import { appMessage as message } from "../shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";

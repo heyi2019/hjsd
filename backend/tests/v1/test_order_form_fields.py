@@ -107,6 +107,72 @@ def test_update_field_label_required_options(seeded_db):
     ]
 
 
+def test_update_dynamic_select_field_rename_with_empty_options(seeded_db):
+    """动态字典字段（库内 options 为空，如 game_type/payment_pool_id）编辑改名时
+    前端会回传空选项数组，不应被「选择型字段至少需要一个选项」拦截（回归）。"""
+    dynamic = OrderFormField(
+        order_type_code="HS",
+        field_key="dynamic_pick",
+        label="动态选择",
+        field_type="SELECT",
+        options=None,
+        locked=True,
+        is_active=True,
+        required=False,
+        is_custom=False,
+    )
+    seeded_db.add(dynamic)
+    seeded_db.commit()
+
+    updated = ff.update_order_form_field(
+        seeded_db, dynamic.id, actor="admin",
+        label="动态选择改名", options=[], required=False,
+        required_when=None, sort_order=0,
+    )
+    seeded_db.commit()
+    assert updated.label == "动态选择改名"
+    # 选项按「未变更」保持为空（运行时由主数据填充）
+    assert updated.options is None
+    assert updated.field_key == "dynamic_pick"
+
+
+def test_update_dynamic_multiselect_field_rename_with_empty_options(seeded_db):
+    """MULTI_SELECT 动态字典字段同样按「未变更」处理（与 SELECT 对称覆盖）。"""
+    dynamic = OrderFormField(
+        order_type_code="HS",
+        field_key="dynamic_multi",
+        label="动态多选",
+        field_type="MULTI_SELECT",
+        options=None,
+        locked=True,
+        is_active=True,
+        required=False,
+        is_custom=False,
+    )
+    seeded_db.add(dynamic)
+    seeded_db.commit()
+
+    updated = ff.update_order_form_field(
+        seeded_db, dynamic.id, actor="admin",
+        label="动态多选改名", options=[], required=False,
+        required_when=None, sort_order=0,
+    )
+    seeded_db.commit()
+    assert updated.label == "动态多选改名"
+    assert updated.options is None
+
+
+def test_update_static_select_field_empty_options_still_rejected(seeded_db):
+    """有静态选项的 SELECT 字段，清空选项提交仍被护栏拦截。"""
+    created = ff.create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="static_sel", label="静态选择",
+        actor="admin", field_type="SELECT", options=["a", "b"],
+    )
+    seeded_db.commit()
+    with pytest.raises(Validation):
+        ff.update_order_form_field(seeded_db, created.id, actor="admin", options=[])
+
+
 def test_set_active_toggle(seeded_db):
     created = ff.create_order_form_field(
         seeded_db, order_type_code="HS", field_key="tog", label="Tog", actor="admin"
@@ -261,6 +327,60 @@ def test_router_update_required_and_active(seeded_client, headers):
     assert dis.json()["is_active"] is False
 
 
+def test_router_dynamic_field_rename_with_empty_options(seeded_client, seeded_db, headers):
+    """路由层回归：动态字典字段编辑改名时前端回传 options=[]，应 200 而非 422。"""
+    dynamic = OrderFormField(
+        order_type_code="HS",
+        field_key="rt_dynamic",
+        label="路由动态字段",
+        field_type="SELECT",
+        options=None,
+        locked=True,
+        is_active=True,
+        required=False,
+        is_custom=False,
+    )
+    seeded_db.add(dynamic)
+    seeded_db.commit()
+
+    resp = seeded_client.patch(
+        f"/api/v1/order-form-fields/{dynamic.id}",
+        headers=headers,
+        json={"label": "路由动态字段改名", "options": [], "required": False,
+              "required_when": None, "sort_order": 0},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["label"] == "路由动态字段改名"
+    assert body["options"] in (None, [])
+
+
+def test_router_dynamic_multiselect_rename_with_empty_options(seeded_client, seeded_db, headers):
+    """路由层回归：MULTI_SELECT 动态字典字段编辑改名时前端回传 options=[]，应 200。"""
+    dynamic = OrderFormField(
+        order_type_code="HS",
+        field_key="rt_dynamic_multi",
+        label="路由动态多选",
+        field_type="MULTI_SELECT",
+        options=None,
+        locked=True,
+        is_active=True,
+        required=False,
+        is_custom=False,
+    )
+    seeded_db.add(dynamic)
+    seeded_db.commit()
+
+    resp = seeded_client.patch(
+        f"/api/v1/order-form-fields/{dynamic.id}",
+        headers=headers,
+        json={"label": "路由动态多选改名", "options": [], "required": False,
+              "required_when": None, "sort_order": 0},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["label"] == "路由动态多选改名"
+
+
 def test_router_locked_delete_rejected_400(seeded_client, seeded_db, headers):
     locked = OrderFormField(
         order_type_code="HS",
@@ -307,6 +427,51 @@ def test_router_permission_denied_for_viewer(seeded_client, viewer_headers):
         ).model_dump(mode="json"),
     )
     assert resp.status_code == 403
+
+
+def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, headers):
+    """闭环实证：设置页改名 → 落库 → 前端数据源(GET /order-form-fields)实时返回新名、旧名消失。
+
+    前端 OrderFormFieldsPanel 保存后调 load() 重新 list；业务表单 useOrderFormConfig
+    挂载时亦调 list。本用例验证 list 端点从 DB 实时读（无缓存），改名后取到的是新名。
+    """
+    # 1) 建一个字段（走与前端相同的创建端点）
+    created = seeded_client.post(
+        "/api/v1/order-form-fields",
+        headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS", field_key="rt_backfill",
+            label="回填探针原名", field_type="TEXT",
+        ).model_dump(mode="json"),
+    )
+    assert created.status_code == 201, created.text
+    fid = created.json()["id"]
+
+    # 2) GET 列表：前端此刻拿到的就是"原名"（数据源读取验证）
+    first = seeded_client.get(
+        "/api/v1/order-form-fields", headers=headers,
+        params={"order_type_code": "HS", "include_inactive": True},
+    )
+    assert first.status_code == 200, first.text
+    first_labels = [f["label"] for f in first.json()]
+    assert "回填探针原名" in first_labels
+
+    # 3) 改名（走与设置页 submit 相同的 PATCH 端点）
+    patched = seeded_client.patch(
+        f"/api/v1/order-form-fields/{fid}", headers=headers,
+        json={"label": "回填探针新名"},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["label"] == "回填探针新名"
+
+    # 4) 再次 GET 列表（前端重新拉取时）：新名在、旧名不在 —— 证明无陈旧缓存
+    second = seeded_client.get(
+        "/api/v1/order-form-fields", headers=headers,
+        params={"order_type_code": "HS", "include_inactive": True},
+    )
+    second_labels = [f["label"] for f in second.json()]
+    assert "回填探针新名" in second_labels
+    assert "回填探针原名" not in second_labels
 
 
 def test_router_requires_auth(seeded_client):
@@ -600,3 +765,86 @@ def test_router_rejects_deactivate_dependent(seeded_client, headers):
         f"/api/v1/order-form-fields/{dep['id']}/active?active=true", headers=headers
     )
     assert enabled.status_code == 200, enabled.text
+
+
+# --------------------------------------------------------------------------- #
+# 改名引用一致性：对每个可配置字段改名，验证引用处（按 field_key 解析）同步更新
+# --------------------------------------------------------------------------- #
+def test_rename_every_configurable_field_updates_references(seeded_db):
+    """防回归（用户质疑「改名后引用处是否更新」的实证）：
+
+    造一组覆盖**全部字段类型 + 条件依赖网**的字段，对每个字段改名，断言：
+    ① 改名落库且 field_key 不变 → 所有按 key 的引用天然存活；
+    ② 重新拉取配置（复刻前端 fieldLabel(config,key) 的输入）拿到新名；
+    ③ 被本字段引用的条件，其展示依赖标签解析到新名
+       （复刻前端面板 OrderFormFieldsPanel 行188：
+        rows.find(i => i.field_key === dep.required_when.field)?.label）。
+    """
+    # —— 造数：核心锁定 / 自定义 / SELECT(静态·动态空选项) / MULTI_SELECT(动态) / 依赖网 ——
+    # 锁定字段（locked）服务层固定为 False，故直接建 ORM 对象（与既有动态字段测试一致）
+    seeded_db.add(OrderFormField(
+        order_type_code="HS", field_key="game_type", label="游戏类型",
+        field_type="SELECT", options=None, locked=True, is_active=True,
+        required=False, is_custom=False,
+    ))
+    seeded_db.add(OrderFormField(
+        order_type_code="HS", field_key="buyer", label="买家",
+        field_type="TEXT", locked=True, is_active=True,
+        required=False, is_custom=False,
+    ))
+    ff.create_order_form_field(seeded_db, order_type_code="HS", field_key="pay_method",
+        label="支付方式", actor="admin", field_type="SELECT", options=["微信", "支付宝"])
+    # 动态 MULTI_SELECT（options 为空，运行时由主数据填充）同样以 ORM 直接建
+    seeded_db.add(OrderFormField(
+        order_type_code="HS", field_key="custom_tag", label="自定义标签",
+        field_type="MULTI_SELECT", options=None, locked=True, is_active=True,
+        required=False, is_custom=False,
+    ))
+    # 条件依赖：pay_method==微信 → custom_tag 必填；buyer 有值 → game_type 必填
+    ff.create_order_form_field(seeded_db, order_type_code="HS", field_key="pm_other",
+        label="渠道备注", actor="admin",
+        required_when={"field": "pay_method", "op": "eq", "values": ["微信"]})
+    ff.create_order_form_field(seeded_db, order_type_code="HS", field_key="gt_note",
+        label="游戏备注", actor="admin", required_when={"field": "buyer", "op": "filled"})
+    seeded_db.commit()
+
+    all_rows = ff.list_order_form_fields(seeded_db, order_type_code="HS", include_inactive=True)
+    assert len(all_rows) == 6
+
+    # 计算每个字段被哪些条件引用（按 field_key，同作用域）
+    references: dict[str, list[str]] = {}
+    for r in all_rows:
+        dep = (r.required_when or {}).get("field") if isinstance(r.required_when, dict) else None
+        if dep:
+            references.setdefault(dep, []).append(r.field_key)
+
+    renamed = 0
+    for row in all_rows:
+        new_label = f"{row.label}·改名"
+        ff.update_order_form_field(seeded_db, row.id, actor="admin", label=new_label)
+        seeded_db.commit()
+
+        # 复刻前端：重新拉取配置并建 map（fieldLabel 以 field_key 为键）
+        fresh = ff.list_order_form_fields(seeded_db, order_type_code="HS")
+        config_by_key = {r.field_key: r for r in fresh}
+
+        # ① 自身 label 落库 + key 不变
+        assert config_by_key[row.field_key].label == new_label
+        assert config_by_key[row.field_key].field_key == row.field_key
+
+        # ② 被本字段引用的条件，其展示依赖标签解析到新名
+        for dependent_key in references.get(row.field_key, []):
+            dep = config_by_key[dependent_key]
+            resolved = config_by_key.get((dep.required_when or {}).get("field"))
+            assert resolved is not None, f"条件引用断裂：{dependent_key} → {dep.required_when}"
+            assert resolved.label == new_label
+        renamed += 1
+
+    assert renamed == 6
+
+    # 改名后整表再校验：没有任何条件引用指向不存在的字段（无悬空引用）
+    final = ff.list_order_form_fields(seeded_db, order_type_code="HS")
+    keys = {r.field_key for r in final}
+    for r in final:
+        dep = (r.required_when or {}).get("field") if isinstance(r.required_when, dict) else None
+        assert dep is None or dep in keys, f"悬空引用：{r.field_key} → {dep}"

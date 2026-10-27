@@ -254,11 +254,18 @@ def update_order_form_field(
         raise Validation(
             f"字段类型必须为 {FIELD_TYPES}", details={"field": "field_type", "value": field_type}
         )
-    next_options = (
-        _normalize_field_options(next_type, options)
-        if options is not None
-        else list(definition.options or [])
-    )
+    next_options = list(definition.options or [])
+    if options is not None:
+        raw_options = list(options)
+        if raw_options:
+            next_options = _normalize_field_options(next_type, raw_options)
+        elif not next_options:
+            # 动态字典字段（game_type/customer_id/pool_id 等）库内 options 为空，
+            # 前端编辑改名时会把空选项数组一并回传 → 按「未变更」处理，
+            # 避免单纯改名被「选择型字段至少需要一个选项」误拦（新增路径仍强制非空）。
+            pass
+        else:
+            raise Validation("选择型字段至少需要一个选项", details={"field": "options"})
     before = {
         "label": definition.label,
         "field_type": definition.field_type,

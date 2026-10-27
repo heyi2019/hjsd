@@ -1,7 +1,8 @@
+import { appMessage, appModal } from "../../shared/ui/appFeedback";
 /** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
  *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
-import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography, message } from "antd";
+import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { gameTypesApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
@@ -111,7 +112,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           required_when: requiredWhen,
           sort_order: sortOrder,
         });
-        message.success("字段已创建");
+        appMessage.success("字段已创建");
       } else {
         await orderFormFieldsApi.update(editingId, {
           label: values.label as string,
@@ -120,7 +121,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           required_when: requiredWhen,
           sort_order: sortOrder,
         });
-        message.success("字段已更新");
+        appMessage.success("字段已更新");
       }
       setEditingId(null);
       form.resetFields();
@@ -153,7 +154,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   const columns: ColumnsType<OrderFormField> = [
     { title: "字段键", dataIndex: "field_key", className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     { title: "标签", dataIndex: "label" },
-    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
+    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL), className: "ui-col-md-up", onCell: () => ({ className: "ui-col-md-up" }) },
     {
       title: "必填",
       dataIndex: "required",
@@ -171,7 +172,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
                 try {
                   setTogglingId(row.id);
                   await orderFormFieldsApi.update(row.id, { required: checked });
-                  message.success(checked ? "已设为必填" : row.required_when ? "已设为条件必填" : "已设为选填");
+                  appMessage.success(checked ? "已设为必填" : row.required_when ? "已设为条件必填" : "已设为选填");
                   await load(activeType);
                 } catch (err) {
                   setError(normalizeError(err));
@@ -246,11 +247,11 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
                   onConfirm={async () => {
                     try {
                       await orderFormFieldsApi.remove(row.id);
-                      message.success("字段已删除");
+                      appMessage.success("字段已删除");
                       await load(activeType);
                     } catch (err) {
                       // 顶部 ErrorBanner 语义是「加载失败」，操作失败需即时可见
-                      message.error(normalizeError(err).message);
+                      appMessage.error(normalizeError(err).message);
                     }
                   }}
                 >

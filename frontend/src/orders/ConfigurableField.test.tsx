@@ -14,6 +14,7 @@ import {
   CfgItem,
   CustomFormField,
   FieldConfigContext,
+  fieldLabel,
   injectOptionsIfMissing,
   isConditionActive,
   resolveOptionItems,
@@ -357,5 +358,38 @@ describe("CfgItem 条件必填：依赖值变化实时生效", () => {
     await ui.click(screen.getByRole("button", { name: "提交" }));
 
     expect(await screen.findByText("其他来源必填")).toBeInTheDocument();
+  });
+});
+
+describe("fieldLabel / 条件依赖标签 随配置改名更新（引用处同步）", () => {
+  it("配置标签变更后 fieldLabel 立即返回新名", () => {
+    const cfg: FieldConfigMap = { buyer: makeField({ field_key: "buyer", label: "买家" }) };
+    expect(fieldLabel(cfg, "buyer", "买家")).toBe("买家");
+    // 设置页改名后前端重新拉取配置（同 field_key、新 label）
+    const updated: FieldConfigMap = { buyer: makeField({ field_key: "buyer", label: "购买方" }) };
+    expect(fieldLabel(updated, "buyer", "买家")).toBe("购买方");
+  });
+
+  it("条件必填的展示依赖标签，随被引用字段改名而更新（复刻面板行188 解析）", () => {
+    // 引用方按 field_key 解析被引用方的 label（并非写死原 label）
+    const cfg: FieldConfigMap = {
+      buyer: makeField({ field_key: "buyer", label: "买家" }),
+      buyer_note: makeField({
+        field_key: "buyer_note",
+        label: "买家备注",
+        required_when: { field: "buyer", op: "filled" },
+      }),
+    };
+    const resolveDependentLabel = (c: FieldConfigMap, key: string) => {
+      const dep = c[key].required_when;
+      return dep ? c[dep.field]?.label : undefined;
+    };
+    expect(resolveDependentLabel(cfg, "buyer_note")).toBe("买家");
+    // 被引用字段改名后，引用处展示新名
+    const updated: FieldConfigMap = {
+      ...cfg,
+      buyer: makeField({ field_key: "buyer", label: "购买方" }),
+    };
+    expect(resolveDependentLabel(updated, "buyer_note")).toBe("购买方");
   });
 });

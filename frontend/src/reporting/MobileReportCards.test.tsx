@@ -10,7 +10,7 @@ type Row = {
 };
 
 const columns = [
-  { title: "游戏账号", dataIndex: "game_account" as const },
+  { title: "游戏账号/产品", dataIndex: "game_account" as const },
   { title: "买入", dataIndex: "buy_amount" as const, render: (v: string) => <MoneyText value={v} /> },
   { title: "状态", dataIndex: "status" as const, render: (v: string) => <span>{v}</span> },
 ];
@@ -30,7 +30,7 @@ describe("MobileReportCards", () => {
 
     // 第一张卡片含全部列标签
     const firstLabels = Array.from(cards[0].querySelectorAll("dt")).map((d) => d.textContent);
-    expect(firstLabels).toEqual(["游戏账号", "买入", "状态"]);
+    expect(firstLabels).toEqual(["游戏账号/产品", "买入", "状态"]);
 
     // 数据值正确呈现（含 MoneyText 渲染的金额与 render 后的状态）
     expect(getAllByText("acc-1").length).toBeGreaterThanOrEqual(1);

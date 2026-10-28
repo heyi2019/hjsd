@@ -62,7 +62,11 @@ from app.domain.enums import (
 
 
 class Account(Base, AuditMixin):
-    """游戏账号台账：成本由 BUY + COST 事件累计（ACC-01-04）。"""
+    """游戏账号台账：每行就是一个可独立交易的产品实体。
+
+    ``game_account`` 是产品标识，``game_type`` 是产品类型；同一标识可因复购
+    产生多条独立库存记录，彼此拥有独立成本、状态和执行流水。
+    """
 
     __tablename__ = "stocks"
     __table_args__ = (
@@ -806,6 +810,10 @@ class OrderFormField(Base, AuditMixin):
     )
     is_custom: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("0")
+    )
+    # 字段归属板块：账号/产品、参与方、费用资金、业务方案、其他补充。
+    section: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="EXTRA"
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

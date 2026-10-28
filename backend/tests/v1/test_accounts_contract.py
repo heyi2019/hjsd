@@ -561,6 +561,23 @@ class TestAccountsApi:
         item = next(row for row in response.json() if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
+    def test_list_accounts_keeps_cancelled_source_order_number(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "cancelled-source")
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        orders_service.cancel_order(seeded_db, order.id, actor="pytest", reason="测试取消")
+
+        response = seeded_client.get("/api/v1/stocks", headers=headers)
+
+        assert response.status_code == 200, response.text
+        item = next(row for row in response.json() if row["game_account"] == account.game_account)
+        assert item["source_order_no"] == order.order_no
+
     def test_list_accounts_resolves_th_source_order(self, seeded_client, seeded_db, headers):
         account = _account(
             seeded_db,

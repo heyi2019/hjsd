@@ -1,5 +1,6 @@
-import { Input } from "antd";
+import { Form, Input } from "antd";
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
 import { CfgItem } from "../ConfigurableField";
@@ -18,6 +19,7 @@ export function RecoveryAccountSection(props: {
     hasSecondary: string;
     accountNote: string;
   }>;
+  accountExtras?: ReactNode;
   gameTypes?: GameTypeOption[];
 }) {
   const fieldNames = {
@@ -30,6 +32,17 @@ export function RecoveryAccountSection(props: {
     accountNote: "game_account_note",
     ...props.fieldNames,
   };
+  const form = Form.useFormInstance();
+  const selectedGameType = Form.useWatch(fieldNames.gameType, form);
+  const channelRegions = props.gameTypes?.find((item) => item.name === selectedGameType)?.channel_regions ?? [];
+  const selectedChannelRegion = Form.useWatch(fieldNames.channelRegion, form);
+  const filterLibraryOption = (input: string, option?: { label?: ReactNode }) =>
+    String(option?.label ?? "").toLocaleLowerCase().includes(input.trim().toLocaleLowerCase());
+  useEffect(() => {
+    if (channelRegions.length && selectedChannelRegion && !channelRegions.includes(String(selectedChannelRegion))) {
+      form.setFieldValue(fieldNames.channelRegion, undefined);
+    }
+  }, [channelRegions, fieldNames.channelRegion, form, selectedChannelRegion]);
   return (
     <section className="recovery-account-section recovery-entry-fields" aria-labelledby="game-account-info-title">
       <div id="game-account-info-title" className="recovery-entry-fields__title">
@@ -40,9 +53,11 @@ export function RecoveryAccountSection(props: {
           <Select
             showSearch
             optionFilterProp="label"
-            filterOption={(input, option) => String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+            filterOption={filterLibraryOption}
+            defaultActiveFirstOption
             options={props.gameTypes.map((item) => ({ value: item.name, label: item.name }))}
             placeholder="请选择或搜索游戏类型"
+            notFoundContent="没有匹配的库内选项"
           />
         ) : (
           <Input placeholder="例如：王者荣耀" />
@@ -55,7 +70,19 @@ export function RecoveryAccountSection(props: {
         <Input placeholder="请输入账号密码" />
       </CfgItem>
       <CfgItem name={fieldNames.channelRegion} label="渠道／区服" rules={[{ required: true, message: "渠道／区服必填" }]}>
-        <Input placeholder="例如：安卓一区／微信" />
+        {channelRegions.length ? (
+          <Select
+            showSearch
+            optionFilterProp="label"
+            filterOption={filterLibraryOption}
+            defaultActiveFirstOption
+            options={channelRegions.map((item) => ({ value: item, label: item }))}
+            placeholder="请选择或搜索渠道／区服"
+            notFoundContent="没有匹配的库内选项"
+          />
+        ) : (
+          <Input placeholder="例如：安卓一区／微信" />
+        )}
       </CfgItem>
       <CfgItem name={fieldNames.boundPhone} label="绑定手机号">
         <Input placeholder="可选填" />
@@ -66,6 +93,7 @@ export function RecoveryAccountSection(props: {
       <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">
         <Input placeholder="可选填" />
       </CfgItem>
+      {props.accountExtras}
       {props.children}
     </section>
   );

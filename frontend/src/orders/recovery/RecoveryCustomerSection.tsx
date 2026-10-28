@@ -1,8 +1,9 @@
 import { Input } from "antd";
 import { CfgItem, CfgNestedItem } from "../ConfigurableField";
+import type { ReactNode } from "react";
 import "./RecoveryCustomerSection.css";
 
-export function RecoveryCustomerSection() {
+export function RecoveryCustomerSection(props: { customerExtras?: ReactNode } = {}) {
   return (
     <section className="recovery-customer-section recovery-customer-fields" aria-labelledby="customer-info-title">
       <div id="customer-info-title" className="recovery-customer-fields__title">客户信息</div>
@@ -20,6 +21,7 @@ export function RecoveryCustomerSection() {
       <CfgItem className="recovery-order-modal__note-field" name="note" label="客户备注">
         <Input.TextArea rows={2} placeholder="可填写账号来源、特殊说明等" />
       </CfgItem>
+      {props.customerExtras}
     </section>
   );
 }

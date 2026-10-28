@@ -1,0 +1,20 @@
+.game-type-settings__container {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass-tint);
+  box-shadow: var(--e1);
+}
+
+.game-type-settings__container .ant-typography {
+  margin-top: 0;
+}
+
+.game-type-settings__container .ant-table-wrapper {
+  margin-top: var(--space-3);
+}
+
+.game-type-settings__container .ui-form-spaced {
+  margin-top: var(--space-3);
+}

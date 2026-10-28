@@ -6,7 +6,7 @@
  *  降级策略：配置未加载或某字段无配置时，视为「启用 + 使用原硬编码必填/标签」，
  *  保证既有表单在无配置或接口异常时与现状一致。
  */
-import { DatePicker, Form, Input, InputNumber, Radio, Select, Switch } from "antd";
+import { DatePicker, Form, Input, InputNumber, Radio, Select, Switch, Typography } from "antd";
 import { Select as UiSelect } from "../shared/ui";
 import type { ReactElement, ReactNode } from "react";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
@@ -15,6 +15,30 @@ import { NestedFormField } from "../shared/ui";
 import { orderFormFieldsApi, type OrderFormField, type RequiredWhen } from "../shared/api/catalog";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
+
+const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, string> = {
+  ACCOUNT_PRODUCT: "账号 / 产品补充信息",
+  BUSINESS: "业务方案补充信息",
+  FINANCE: "费用与资金补充信息",
+  PARTICIPANT: "参与方补充信息",
+  EXTRA: "其他补充信息",
+};
+const DFQ_SHARED_FIELD_ALIASES: Record<string, string> = {
+  game_type: "dfq_game_type",
+  game_account: "dfq_game_account",
+  game_password: "dfq_game_password",
+  channel_region: "dfq_channel_region",
+  bound_phone: "dfq_bound_phone",
+  has_secondary: "dfq_has_secondary",
+  game_account_note: "dfq_account_note",
+  customer_nickname: "dfq_customer_nickname",
+  customer_source: "dfq_customer_source",
+  customer_contact_name: "dfq_customer_contact",
+  customer_phone: "dfq_customer_phone",
+  customer_wechat: "dfq_customer_wechat",
+  customer_qq: "dfq_customer_qq",
+  note: "dfq_note",
+};
 
 export function useOrderFormConfig(orderType: string | undefined): {
   config: FieldConfigMap;
@@ -34,6 +58,12 @@ export function useOrderFormConfig(orderType: string | undefined): {
         if (cancelled) return;
         const map: FieldConfigMap = {};
         for (const row of rows ?? []) map[row.field_key] = row;
+        if (orderType === "DFQ") {
+          for (const [canonicalKey, dfqKey] of Object.entries(DFQ_SHARED_FIELD_ALIASES)) {
+            const source = map[dfqKey];
+            if (source && !map[canonicalKey]) map[canonicalKey] = { ...source, field_key: canonicalKey };
+          }
+        }
         setConfig(map);
       })
       .catch(() => {
@@ -229,14 +259,15 @@ export function CfgNestedItem(props: {
 
 /** 渲染当前作用域（FieldConfigContext）下的自定义字段区块；无自定义字段时不渲染。
  *  值通过 CustomFormField 归集到 form_extra.<field_key>，随表单提交上报。 */
-export function CustomFieldSection(props: { testIdSuffix?: string } = {}): ReactElement | null {
+export function CustomFieldSection(props: { testIdSuffix?: string; section?: OrderFormField["section"] } = {}): ReactElement | null {
   const cfg = useFieldConfig();
   const defs = Object.values(cfg)
-    .filter((field) => field.is_custom && field.is_active)
+    .filter((field) => field.is_custom && field.is_active && (field.section ?? "EXTRA") === (props.section ?? "EXTRA"))
     .sort((a, b) => a.sort_order - b.sort_order);
   if (defs.length === 0) return null;
   return (
     <section className="ui-stack" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
+      <Typography.Text type="secondary" strong>{CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"]}</Typography.Text>
       {defs.map((def) => (
         <CustomFormField key={def.id} def={def} />
       ))}

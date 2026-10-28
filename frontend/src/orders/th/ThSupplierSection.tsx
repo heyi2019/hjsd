@@ -1,9 +1,10 @@
 import { Form, Input } from "antd";
+import type { ReactNode } from "react";
 import { Select } from "../../shared/ui";
 import { CfgItem, CfgNestedItem } from "../ConfigurableField";
 
 /** 提号复用回收页客户信息的结构，只将业务主体替换为供货方。 */
-export function ThSupplierSection() {
+export function ThSupplierSection(props: { participantExtras?: ReactNode } = {}) {
   const supplierSource = Form.useWatch("supplier_source");
   return (
     <section className="th-supplier-section recovery-customer-fields" aria-labelledby="supplier-info-title">
@@ -27,6 +28,7 @@ export function ThSupplierSection() {
       <CfgItem className="recovery-order-modal__note-field" name="supplier_note" label="供货方备注">
         <Input.TextArea rows={2} placeholder="可填写供货来源、特殊说明等" />
       </CfgItem>
+      {props.participantExtras}
     </section>
   );
 }

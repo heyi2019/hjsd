@@ -676,6 +676,7 @@ def create_order_form_field(
             ),
             is_active=payload.is_active,
             sort_order=payload.sort_order,
+            section=payload.section,
             note=payload.note,
         )
     )
@@ -711,6 +712,7 @@ def update_order_form_field(
             options=payload.options,
             required=payload.required,
             sort_order=payload.sort_order,
+            section=payload.section,
             note=payload.note,
             **extra,
         )

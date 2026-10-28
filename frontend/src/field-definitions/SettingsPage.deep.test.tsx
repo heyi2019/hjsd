@@ -57,7 +57,7 @@ describe("SettingsPage.deep", () => {
     expect(screen.getByRole("tab", { name: "人员与权限" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "团队管理" })).toBeInTheDocument();
     // 基础 Tab 始终存在
-    expect(screen.getByRole("tab", { name: "游戏类型" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "游戏与渠道配置" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "外观" })).toBeInTheDocument();
   });
 
@@ -128,7 +128,7 @@ describe("SettingsPage.deep", () => {
     await ui.click(screen.getByRole("tab", { name: "业务类型" }));
     expect(await screen.findByText("HS")).toBeInTheDocument();
 
-    await ui.click(screen.getByRole("tab", { name: "游戏类型" }));
+    await ui.click(screen.getByRole("tab", { name: "游戏与渠道配置" }));
     await waitFor(() => expect(vi.mocked(catalog.gameTypesApi.list)).toHaveBeenCalled());
 
     await ui.click(screen.getByRole("tab", { name: "经营规则" }));

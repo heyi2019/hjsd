@@ -134,6 +134,7 @@ export interface Counterparty {
   note?: string | null;
   created_at?: string;
   extra_values?: Record<string, unknown>;
+  extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
 }
 
 export interface Order {
@@ -434,8 +435,10 @@ export interface AccountExecutionOrder {
   trade_date: string;
   created_at?: string | null;
   status: string;
+  account_platform?: string | null;
   note?: string | null;
   extra_values?: Record<string, unknown>;
+  extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
   cashflows?: AccountExecutionCashflow[];
   counterparties?: AccountExecutionCounterparty[];
   rebates?: AccountExecutionRebate[];
@@ -443,9 +446,20 @@ export interface AccountExecutionOrder {
   operator: string;
 }
 
+export interface AccountAuditEntry {
+  id: number;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  actor: string;
+  reason?: string | null;
+  occurred_at: string;
+}
+
 export interface AccountExecutionDetail {
   account: Account;
   orders: AccountExecutionOrder[];
+  audit?: AccountAuditEntry[];
 }
 
 export interface Installment {
@@ -596,6 +610,7 @@ export interface GameTypeOption {
   sort_order: number;
   is_active: boolean;
   is_default: boolean;
+  channel_regions?: string[];
 }
 
 export const poolsApi = {
@@ -626,14 +641,15 @@ export const orderTypesApi = {
 export const gameTypesApi = {
   list: (params?: { include_inactive?: boolean }) =>
     api.get<GameTypeOption[]>("/game-types", { params }).then((r) => r.data),
-  create: (payload: { name: string; sort_order?: number; is_default?: boolean }) =>
+  create: (payload: { name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) =>
     api.post<GameTypeOption>("/game-types", payload).then((r) => r.data),
-  update: (id: number, payload: { name?: string; sort_order?: number }) =>
+  update: (id: number, payload: { name?: string; sort_order?: number; channel_regions?: string[] }) =>
     api.patch<GameTypeOption>(`/game-types/${id}`, payload).then((r) => r.data),
   setActive: (id: number, active: boolean) =>
     api.patch<GameTypeOption>(`/game-types/${id}/active?active=${active}`).then((r) => r.data),
   setDefault: (id: number, isDefault: boolean) =>
     api.patch<GameTypeOption>(`/game-types/${id}/default?is_default=${isDefault}`).then((r) => r.data),
+  remove: (id: number) => api.delete(`/game-types/${id}`),
 };
 
 export const customersApi = {
@@ -820,15 +836,15 @@ export const stocksApi = {
   list: (params?: { status?: string }) =>
     api.get<Account[]>("/stocks", { params }).then((r) => r.data),
   updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
-    api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
+    api.patch<Account>(`/stocks/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api
       .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/stocks/inventory")
       .then((r) => r.data),
   executionDetail: (id: number) =>
-    api.get<AccountExecutionDetail>(`/accounts/${id}/execution-detail`).then((r) => r.data),
+    api.get<AccountExecutionDetail>(`/stocks/${id}/execution-detail`).then((r) => r.data),
   updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[] }) =>
-    api.patch<{ ok: boolean }>(`/accounts/${id}/execution-edit`, payload).then((r) => r.data),
+    api.patch<{ ok: boolean }>(`/stocks/${id}/execution-edit`, payload).then((r) => r.data),
 };
 
 export const installmentsApi = {
@@ -977,6 +993,7 @@ export interface OrderFormField {
   locked: boolean;
   /** 用户自定义字段（区别于种子预置的系统字段）；自定义字段可增删停 */
   is_custom: boolean;
+  section?: "EXTRA" | "ACCOUNT_PRODUCT" | "PARTICIPANT" | "FINANCE" | "BUSINESS";
   note?: string | null;
 }
 

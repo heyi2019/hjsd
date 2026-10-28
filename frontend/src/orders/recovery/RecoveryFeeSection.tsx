@@ -1,4 +1,5 @@
 import { CfgItem } from "../ConfigurableField";
+import type { ReactNode } from "react";
 import type { Pool } from "../../shared/api/catalog";
 import { MoneyInput } from "../../shared/ui";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
@@ -8,6 +9,7 @@ import "./RecoveryFeeSection.css";
 export function RecoveryFeeSection(props: {
   totalRecoveryCost: number;
   pools: Pool[];
+  financeExtras?: ReactNode;
 }) {
   return (
     <section className="recovery-fee-section recovery-fees" aria-labelledby="recovery-fees-title">
@@ -27,6 +29,7 @@ export function RecoveryFeeSection(props: {
       </div>
       <AdditionalFeeFields />
       <RecoveryPaymentSection pools={props.pools} />
+      {props.financeExtras}
       <div className="recovery-fees__total"><span>付款金额（含全部附加费用）</span><strong>¥ {props.totalRecoveryCost.toFixed(2)}</strong></div>
     </section>
   );

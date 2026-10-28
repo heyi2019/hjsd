@@ -45,7 +45,10 @@ describe("InventoryDetail", () => {
 
     render(<InventoryDetail row={account} detail={detail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    expect(within(panel).getByText("执行明细")).toBeInTheDocument();
+    expect(within(panel).getByText("HS0001")).toBeInTheDocument();
+    expect(within(panel).getByText("渠道 / 区服")).toBeInTheDocument();
+    expect(within(panel).getByText("流转记录")).toBeInTheDocument();
+    expect(within(panel).getByText("操作记录")).toBeInTheDocument();
     expect(within(panel).getAllByText("admin").length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getAllByText("100.00").length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getByText("买号本金")).toBeInTheDocument();
@@ -55,10 +58,25 @@ describe("InventoryDetail", () => {
   it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
     render(<InventoryDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    expect(within(panel).getByText("账号 / 产品信息")).toBeInTheDocument();
+    expect(within(panel).getByText("登记与流转信息")).toBeInTheDocument();
+    expect(within(panel).queryByText("其他补充信息")).toBeNull();
+    expect(within(panel).queryByText("订单扩展字段")).toBeNull();
+    expect(within(panel).getByText("账号补充资料")).toBeInTheDocument();
     expect(panel.querySelector(".inventory-detail__meta")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
     expect(panel.querySelector(".inventory-finance-summary__item--amount")).toBeTruthy();
+  });
+
+  it("在桌面详情中让描述、图片、备注各占整行", () => {
+    render(<InventoryDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
+    for (const label of ["账号描述", "账号图片", "备注"]) {
+      const node = screen.getByText(label);
+      const row = node.closest("tr") ?? node.parentElement?.parentElement;
+      expect(row).toBeTruthy();
+      expect(row?.textContent ?? "").not.toContain("有无二次");
+    }
   });
 
   it("编辑执行明细时操作员选择器保持可读宽度", () => {

@@ -265,6 +265,7 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],
   ["src/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],
   ["src/field-definitions/panels/GameTypeSettingsPanel.tsx", "配置管理界面本身"],
+  ["src/field-definitions/panels/IntermediaryPlatformSettingsPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/OrderFormFieldsPanel.tsx", "表单字段配置界面本身（即守卫所保护的设置页）"],
   ["src/field-definitions/panels/OrderTypeRoutesPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/OrderTypesPanel.tsx", "配置管理界面本身"],

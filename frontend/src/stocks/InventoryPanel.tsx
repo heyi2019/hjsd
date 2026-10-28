@@ -35,9 +35,14 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
+function inventoryCellValue(value: string | null | undefined) {
+  return value ? value : <span className="inventory-empty-cell">-</span>;
+}
+
 /** 移动端（≤640px）库存卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
 export function MobileInventoryList({
   rows,
+  onDetail,
   onSale,
   onConsign,
   onVoid,
@@ -47,6 +52,7 @@ export function MobileInventoryList({
   editingAccount,
 }: {
   rows: Account[];
+  onDetail: (row: Account) => void;
   onSale: (row: Account) => void;
   onConsign: (row: Account) => void;
   onVoid: (row: Account) => void;
@@ -67,17 +73,18 @@ export function MobileInventoryList({
               <StatusTag status={row.status} label={row.status === "VOID" ? "下架" : undefined} />
             </div>
             <dl className="data-mobile-card__meta">
-              <div><dt>游戏账号</dt><dd>{row.game_account || "-"}</dd></div>
+              <div><dt>游戏/产品类型</dt><dd>{row.game_type || "-"}</dd></div>
+              <div><dt>游戏账号/产品</dt><dd>{row.game_account || "-"}</dd></div>
               <div><dt>订单号</dt><dd>{row.source_order_no || "-"}</dd></div>
               <div><dt>业务</dt><dd>{row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-"}</dd></div>
               <div><dt>业务类型</dt><dd>{row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-"}</dd></div>
               <div><dt>增值服务</dt><dd>{row.value_added_service ? VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service : "-"}</dd></div>
-              <div><dt>产品</dt><dd>{row.game_type || "-"}</dd></div>
               <div><dt>平台</dt><dd>{row.platform || "-"}</dd></div>
               <div><dt>未售时长</dt><dd>{age ? `${age.days}天` : "-"}</dd></div>
               <div><dt>成本</dt><dd><MoneyText value={row.cost_amount} /></dd></div>
             </dl>
             <div className="data-mobile-card__actions">
+              <PermissionButton permission="order.create" type="link" size="small" onClick={() => onDetail(row)}>详情</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "IN_STOCK"} onClick={() => onSale(row)}>售出</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>下架</PermissionButton>
@@ -130,6 +137,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const [exporting, setExporting] = useState(false);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const compact = useCompactLayout();
   const [savingAccount, setSavingAccount] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
@@ -190,6 +198,11 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     setEventDrafts({});
     void employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause)));
     void loadExecution(account);
+  }
+
+  async function openDetail(account: Account) {
+    await loadExecution(account);
+    setDetailTarget(account);
   }
 
   function findCancelableSale(detail: AccountExecutionDetail) {
@@ -410,38 +423,43 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   }
 
   const columns: ColumnsType<Account> = [
-    { title: "库存编号", dataIndex: "stock_no" },
-    { title: "游戏账号", dataIndex: "game_account", render: (v: string | null) => v || "-" },
-    { title: "订单号", dataIndex: "source_order_no", render: (v: string | null) => v || "-" },
-    { title: "业务", dataIndex: "business_mode", render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : "-"},
-    { title: "业务类型", dataIndex: "inventory_type", render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : "-" },
+    { title: "库存编号", dataIndex: "stock_no", width: 86, ellipsis: true },
+    { title: "游戏/产品类型", dataIndex: "game_type", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
+    { title: "游戏账号/产品", dataIndex: "game_account", width: 120, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+    { title: "订单号", dataIndex: "source_order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+    { title: "业务", dataIndex: "business_mode", width: 56, ellipsis: true, render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : inventoryCellValue(v)},
+    { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
     {
       title: "增值服务",
       dataIndex: "value_added_service",
+      width: 64,
+      ellipsis: true,
 
-      render: (v: string | null) => v ? VALUE_ADDED_SERVICE_LABEL[v] ?? v : "-",
+      render: (v: string | null) => v ? VALUE_ADDED_SERVICE_LABEL[v] ?? v : inventoryCellValue(v),
     },
-    { title: "产品", dataIndex: "game_type", render: (v: string | null) => v || "-"},
-    { title: "平台", dataIndex: "platform"},
+    { title: "平台", dataIndex: "platform", width: 60, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
     {
       title: "未售时长",
+      width: 68,
 
       key: "inventoryAge",
       render: (_value, row) => {
         const age = inventoryAge(row);
-        return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : "-";
+        return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);
       },
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={v === "VOID" ? "下架" : undefined} /> },
+    { title: "状态", dataIndex: "status", width: 68, render: (v: string) => <StatusTag status={v} label={v === "VOID" ? "下架" : undefined} /> },
     {
       title: "成本",
       dataIndex: "cost_amount",
+      width: 90,
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
     {
       title: "操作",
       key: "actions",
+      width: 230,
       render: (_value, row) => (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
@@ -646,7 +664,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
             <Input
               allowClear
               value={keyword}
-              placeholder="搜索账号 / 产品 / 平台"
+              placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
               aria-label="搜索库存账号"
               className="ui-control-width-inventory"
               onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
@@ -678,6 +696,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         {compact ? (
           <MobileInventoryList
             rows={orderedRows}
+            onDetail={(row) => void openDetail(row)}
             onSale={setSaleTarget}
             onConsign={setConsignmentTarget}
             onVoid={(row) => void openVoid(row)}
@@ -815,12 +834,12 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">
             <label>
-              <span>游戏账号</span>
-              <Input aria-label="编辑游戏账号" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
+              <span>游戏账号/产品</span>
+              <Input aria-label="编辑游戏账号/产品" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
             </label>
             <label>
-              <span>产品</span>
-              <Input aria-label="编辑产品" value={editingAccount.game_type ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_type: e.target.value })} />
+              <span>游戏/产品类型</span>
+              <Input aria-label="编辑游戏/产品类型" value={editingAccount.game_type ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_type: e.target.value })} />
             </label>
             <label>
               <span>平台</span>
@@ -834,6 +853,16 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
           </Form>
           <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} />
         </> : null}
+      </Modal>
+      <Modal
+        className="inventory-detail-modal"
+        title="库存详情"
+        open={Boolean(detailTarget)}
+        footer={null}
+        width="min(1200px, calc(100vw - 24px))"
+        onCancel={() => setDetailTarget(null)}
+      >
+        {detailTarget ? <InventoryDetail row={detailTarget} detail={executionDetails[detailTarget.id]} loading={Boolean(executionLoading[detailTarget.id])} /> : null}
       </Modal>
       <InventoryProfileModal
         target={profileTarget}

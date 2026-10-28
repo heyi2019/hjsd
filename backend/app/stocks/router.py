@@ -8,13 +8,14 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.schemas import RequestModel
 from app.core.security import (
+    PERM_AUDIT_READ,
     PERM_FINANCE_READ,
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_ORDER_CREATE,
@@ -25,7 +26,7 @@ from app.core.security import (
 )
 from app.stocks import service
 from app.parties import service as parties_service
-from app.domain.foundation import Pool
+from app.domain.foundation import AuditLog, Pool
 from app.domain.parties import Counterparty, OrderCounterpartyRole
 from app.domain.users import User
 from app.domain.trade import (
@@ -33,6 +34,7 @@ from app.domain.trade import (
     Cashflow,
     Order,
     OrderEvent,
+    OrderFormField,
     RebateRecord,
     RebateSettlement,
     Installment,
@@ -41,6 +43,7 @@ from app.domain.trade import (
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.periods import assert_period_open
+from app.core.schemas import normalize_product_aliases
 from app.orders import service as orders_service
 
 router = APIRouter(tags=["ACC-01 账号台账"])
@@ -79,6 +82,11 @@ class AccountOut(BaseModel):
 
 class AccountProfileUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_product_aliases(cls, value: object) -> object:
+        return normalize_product_aliases(value)
 
     game_account: str | None = Field(default=None, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
@@ -288,8 +296,10 @@ class AccountExecutionOrderOut(BaseModel):
     trade_date: date
     created_at: datetime
     status: str
+    account_platform: str | None = None
     note: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
+    extra_fields: list[dict[str, object]] = Field(default_factory=list)
     cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)
     counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
     rebates: list[ExecutionRebateOut] = Field(default_factory=list)
@@ -297,9 +307,20 @@ class AccountExecutionOrderOut(BaseModel):
     operator: str
 
 
+class AccountAuditOut(BaseModel):
+    id: int
+    action: str
+    entity_type: str
+    entity_id: str
+    actor: str
+    reason: str | None = None
+    occurred_at: datetime
+
+
 class AccountExecutionDetailOut(BaseModel):
     account: AccountOut
     orders: list[AccountExecutionOrderOut]
+    audit: list[AccountAuditOut] = Field(default_factory=list)
 
 
 INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
@@ -333,17 +354,22 @@ def _source_orders(
         ).all()
     )
     inventory_orders: dict[int, Order] = {}
+    fallback_orders: dict[int, Order] = {}
     for order in orders:
         if order.account_id is None:
             continue
+        # 已取消/未过账的来源订单没有 BUY 事件，但库存记录仍应显示其订单编号，
+        # 否则详情页会出现大量“订单号 -”。正式入库订单优先使用带 BUY 的记录。
+        if order.order_type in INVENTORY_SOURCE_ORDER_TYPES:
+            fallback_orders.setdefault(order.account_id, order)
         if order.order_type == "DG" or (
             order.id in buy_order_ids and order.order_type in INVENTORY_SOURCE_ORDER_TYPES
         ):
             inventory_orders.setdefault(order.account_id, order)
     return {
-        account_id: inventory_orders[account_id]
+        account_id: inventory_orders.get(account_id) or fallback_orders[account_id]
         for account_id in account_ids
-        if account_id in inventory_orders
+        if account_id in inventory_orders or account_id in fallback_orders
     }
 
 
@@ -446,9 +472,15 @@ def execution_detail(
         order_stmt = order_stmt.where(order_scope)
     orders = list(db.scalars(order_stmt.order_by(Order.id)).all())
     order_ids = [item.id for item in orders]
-    order_extra_values = parties_service.get_extra_values_bulk(
-        db, entity_type="order", entity_ids=order_ids
-    )
+    # 建单自定义字段写入订单 form_extra；parties_service 的扩展字段读取仅适用于客户实体。
+    order_extra_values = {
+        order.id: dict(order.form_extra or {})
+        for order in orders
+    }
+    field_defs = list(db.scalars(select(OrderFormField).where(OrderFormField.order_type_code.in_({order.order_type for order in orders}), OrderFormField.is_active.is_(True))).all()) if orders else []
+    field_defs_by_type = {}
+    for definition in field_defs:
+        field_defs_by_type.setdefault(definition.order_type_code, {})[definition.field_key] = definition
     counterparties_by_order: dict[int, list[ExecutionCounterpartyOut]] = {}
     if order_ids:
         for role, counterparty in db.execute(
@@ -589,6 +621,27 @@ def execution_detail(
                 operator_names=[operator_names.get(uid, f"用户 {uid}") for uid in (event.operator_user_ids or [])],
             )
         )
+    audit_rows: list[AccountAuditOut] = []
+    if _user.has(PERM_AUDIT_READ):
+        audit_filters = [
+            (AuditLog.entity_type == "account") & (AuditLog.entity_id == str(account.id)),
+        ]
+        if order_ids:
+            audit_filters.append((AuditLog.entity_type == "order") & AuditLog.entity_id.in_([order.order_no for order in orders]))
+        if event_ids:
+            audit_filters.append((AuditLog.entity_type == "inventory_event_edit") & AuditLog.entity_id.in_([str(event_id) for event_id in event_ids]))
+        audit_rows = [
+            AccountAuditOut(
+                id=row.id,
+                action=row.action,
+                entity_type=row.entity_type,
+                entity_id=row.entity_id,
+                actor=row.actor,
+                reason=row.reason,
+                occurred_at=row.occurred_at,
+            )
+            for row in db.scalars(select(AuditLog).where(or_(*audit_filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
+        ]
     return AccountExecutionDetailOut(
         account=_account_outputs(
             db,
@@ -604,8 +657,16 @@ def execution_detail(
                 trade_date=order.trade_date,
                 created_at=order.created_at,
                 status=order.status,
+                account_platform=(order.account_snapshot or {}).get("platform"),
                 note=order.note,
                 extra_values=order_extra_values.get(order.id, {}),
+                extra_fields=[
+                    {"key": key, "label": field_defs_by_type.get(order.order_type, {}).get(key).label if field_defs_by_type.get(order.order_type, {}).get(key) else key,
+                     "section": field_defs_by_type.get(order.order_type, {}).get(key).section if field_defs_by_type.get(order.order_type, {}).get(key) else "EXTRA",
+                     "value": value}
+                    for key, value in order_extra_values.get(order.id, {}).items()
+                    if value not in (None, "", [])
+                ],
                 cashflows=cashflows_by_order.get(order.id, []),
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
@@ -614,6 +675,7 @@ def execution_detail(
             )
             for order in orders
         ],
+        audit=audit_rows,
     )
 
 

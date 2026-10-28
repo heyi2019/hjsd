@@ -1,10 +1,11 @@
 import { appMessage, appModal } from "../../shared/ui/appFeedback";
-import { Card, Checkbox, Form, Input, InputNumber, Space, Table, Typography } from "antd";
+import { Card, Checkbox, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import "./GameTypeSettingsPanel.css";
 
 export function GameTypeSettingsPanel() {
   const [rows, setRows] = useState<GameTypeOption[]>([]);
@@ -25,9 +26,9 @@ export function GameTypeSettingsPanel() {
     void load();
   }, [load]);
 
-  const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean }) => {
+  const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) => {
     try {
-      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? 0) };
+      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? 0), channel_regions: (values.channel_regions ?? []).map((item) => item.trim()).filter(Boolean) };
       if (editingId === null) {
         // 后端 create 支持 is_default（自动清其他默认项）；update 不支持，编辑态不传。
         await gameTypesApi.create(values.is_default ? { ...payload, is_default: true } : payload);
@@ -46,7 +47,7 @@ export function GameTypeSettingsPanel() {
 
   const startEditing = (row: GameTypeOption) => {
     setEditingId(row.id);
-    form.setFieldsValue({ game_type_name: row.name, sort_order: row.sort_order });
+    form.setFieldsValue({ game_type_name: row.name, sort_order: row.sort_order, channel_regions: row.channel_regions ?? [] });
   };
 
   const cancelEditing = () => {
@@ -65,6 +66,7 @@ export function GameTypeSettingsPanel() {
 
   const columns: ColumnsType<GameTypeOption> = [
     { title: "游戏类型", dataIndex: "name" },
+    { title: "渠道／区服", render: (_value, row) => row.channel_regions?.length ? row.channel_regions.join("、") : "未配置" },
     { title: "排序", dataIndex: "sort_order" },
     {
       title: "默认",
@@ -109,6 +111,13 @@ export function GameTypeSettingsPanel() {
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
+            <Popconfirm
+              title={`删除游戏类型「${row.name}」？`}
+              description="删除后不可恢复；默认游戏类型需先取消默认。"
+              onConfirm={() => run(() => gameTypesApi.remove(row.id))}
+            >
+              <PermissionButton permission="order-type.manage" size="small" danger>删除</PermissionButton>
+            </Popconfirm>
           </Space>
         </PermissionGate>
       ),
@@ -116,42 +125,58 @@ export function GameTypeSettingsPanel() {
   ];
 
   return (
-    <Card className="glass" title="游戏类型">
+    <Card className="glass" title="游戏与渠道配置">
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
-        新建订单和账号时使用这里的标准选项，支持模糊搜索；勾选默认后，新建表单会自动带出该类型。默认项不能停用。
+        新建订单和账号时使用这里的标准选项，支持模糊搜索；每个游戏类型可配置对应的渠道／区服。勾选默认后，新建表单会自动带出该类型。默认项不能停用。
       </Typography.Paragraph>
-      <Table<GameTypeOption>
-        rowKey="id"
-        columns={columns}
-        dataSource={rows}
-        pagination={false}
-        locale={{ emptyText: "暂无游戏类型" }}
-      />
+      <div className="game-type-settings__container">
+        <Typography.Title level={5}>已配置游戏类型</Typography.Title>
+        <Table<GameTypeOption>
+          rowKey="id"
+          columns={columns}
+          dataSource={rows}
+          pagination={false}
+          locale={{ emptyText: "暂无游戏类型" }}
+        />
+      </div>
       <PermissionGate permission="order-type.manage">
-        <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced" initialValues={{ sort_order: 0 }}>
-          <Form.Item name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}>
-            <Input name="game_type_name" autoComplete="off" placeholder="如：王者荣耀" />
-          </Form.Item>
-          <Form.Item name="sort_order" label="排序">
-            <InputNumber min={0} />
-          </Form.Item>
-          {editingId === null ? (
-            <Form.Item name="is_default" valuePropName="checked" label="默认类型">
-              <Checkbox>新建表单自动带出（保存后其他类型取消默认）</Checkbox>
+        <div className="game-type-settings__container">
+          <Typography.Title level={5}>{editingId === null ? "新增游戏类型" : "编辑游戏类型"}</Typography.Title>
+          <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced" initialValues={{ sort_order: 0 }}>
+            <Form.Item name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}> 
+              <Input name="game_type_name" autoComplete="off" placeholder="如：王者荣耀" />
             </Form.Item>
-          ) : null}
-          <Form.Item>
-            <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
-              {editingId === null ? "新增游戏类型" : "保存游戏类型"}
-            </PermissionButton>
-          </Form.Item>
-          {editingId !== null && (
+            <Form.Item name="sort_order" label="排序">
+              <InputNumber min={0} />
+            </Form.Item>
+            <Form.Item name="channel_regions" label="渠道／区服">
+              <Select
+                mode="tags"
+                showSearch
+                tokenSeparators={[",", "，", "/", "／"]}
+                placeholder="输入后回车新增，例如：安卓QQ"
+                notFoundContent="回车即可新增"
+                className="ui-control-width-260"
+              />
+            </Form.Item>
+            {editingId === null ? (
+              <Form.Item name="is_default" valuePropName="checked" label="默认类型">
+                <Checkbox>新建表单自动带出（保存后其他类型取消默认）</Checkbox>
+              </Form.Item>
+            ) : null}
             <Form.Item>
-              <PermissionButton permission="order-type.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
+              <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
+                {editingId === null ? "新增游戏类型" : "保存游戏类型"}
+              </PermissionButton>
             </Form.Item>
-          )}
-        </Form>
+            {editingId !== null && (
+              <Form.Item>
+                <PermissionButton permission="order-type.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
+              </Form.Item>
+            )}
+          </Form>
+        </div>
       </PermissionGate>
     </Card>
   );

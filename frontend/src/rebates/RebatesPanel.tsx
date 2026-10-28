@@ -171,7 +171,7 @@ export function RebatesPanel() {
       },
     },
     {
-      title: "产品",
+      title: "游戏/产品类型",
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.source_order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";

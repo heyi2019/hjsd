@@ -56,8 +56,8 @@ it("业务字典仅说明业务口径，不展示配置跳转按钮", async () =
   const tabs = await screen.findAllByRole("tab");
   expect(tabs.slice(0, 3).map((tab) => tab.textContent)).toEqual([
     "业务字典",
-    "表单字段",
     "业务类型",
+      "表单字段",
   ]);
   expect(screen.getByText("业务分类口径")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /配置字段与表单/ })).toBeNull();

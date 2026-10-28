@@ -81,6 +81,7 @@ def create_game_type(
         name=payload.name,
         sort_order=payload.sort_order,
         is_default=payload.is_default,
+        channel_regions=payload.channel_regions,
         actor=_actor(user),
     )
     return schemas.GameTypeOut.model_validate(item)
@@ -117,6 +118,17 @@ def set_game_type_default(
 ) -> schemas.GameTypeOut:
     item = service.set_game_type_default(db, game_type_id, is_default, actor=_actor(user))
     return schemas.GameTypeOut.model_validate(item)
+
+
+@router.delete("/game-types/{game_type_id}", status_code=204)
+def delete_game_type(
+    game_type_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage_game_types,
+) -> Response:
+    service.delete_game_type(db, game_type_id, actor=_actor(user))
+    db.commit()
+    return Response(status_code=204)
 
 
 # --------------------------------------------------------------------- 资金池

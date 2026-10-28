@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import RequestModel
 from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
@@ -99,6 +99,7 @@ class GameTypeCreate(RequestModel):
     name: str = Field(min_length=1, max_length=64)
     sort_order: int = Field(default=0, ge=0)
     is_default: bool = False
+    channel_regions: list[str] = Field(default_factory=list)
 
 
 class GameTypeUpdate(RequestModel):
@@ -106,6 +107,7 @@ class GameTypeUpdate(RequestModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=64)
     sort_order: int | None = Field(default=None, ge=0)
+    channel_regions: list[str] | None = None
 
 
 class GameTypeOut(BaseModel):
@@ -116,6 +118,13 @@ class GameTypeOut(BaseModel):
     sort_order: int
     is_active: bool
     is_default: bool
+    channel_regions: list[str] = Field(default_factory=list)
+
+    @field_validator("channel_regions", mode="before")
+    @classmethod
+    def normalize_channel_regions(cls, value: object) -> list[str]:
+        """兼容迁移前或旧数据里的 NULL，前端统一收到空数组。"""
+        return value if isinstance(value, list) else []
     created_at: datetime
     updated_at: datetime
 

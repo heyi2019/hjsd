@@ -477,6 +477,36 @@
 .recovery-order-modal__party-field {
   width: min(100%, 420px);
 }
+.recovery-customer-fields > .recovery-order-modal__party-field .ant-form-item-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 160px);
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.recovery-customer-fields > .recovery-order-modal__party-field .ant-form-item-label {
+  width: auto !important;
+  padding: 0 !important;
+}
+.recovery-customer-fields > .recovery-order-modal__party-field .ant-form-item-label > label {
+  color: var(--color-text-secondary);
+  font: var(--font-body-m);
+  line-height: 1.25;
+}
+.recovery-customer-fields .recovery-order-modal__note-field .ant-form-item-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.recovery-customer-fields .recovery-order-modal__note-field .ant-form-item-label {
+  width: auto !important;
+  padding: 0 !important;
+}
+.recovery-customer-fields .recovery-order-modal__note-field .ant-form-item-label > label {
+  color: var(--color-text-secondary);
+  font: var(--font-body-m);
+  line-height: 1.25;
+}
 .recovery-order-modal__note-field { width: min(100%, 720px); }
 .recovery-order-modal .ant-form-item-control-input-content > .ant-input,
 .recovery-order-modal .ant-form-item-control-input-content > .ant-input-affix-wrapper,
@@ -632,8 +662,9 @@
 .primary-amount-section {
   display: grid;
   grid-template-columns: max-content auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: var(--space-2);
+  row-gap: var(--space-4);
   width: 100%;
   padding: var(--space-3);
   border: 1px solid var(--glass-border);
@@ -645,6 +676,12 @@
   background: color-mix(in srgb, var(--color-primary) 7%, var(--glass));
 }
 .recovery-fee-card--primary .ant-form-item { margin: 0; }
+.recovery-fee-card--primary .ant-form-item-control,
+.recovery-fee-card--primary .ant-form-item-control-input,
+.recovery-fee-card--primary .ant-form-item-control-input-content {
+  min-width: 0;
+  max-width: 100%;
+}
 .recovery-fee-card--primary .ant-form-item { grid-column: 2; grid-row: 1; }
 .recovery-fee-card__label { color: var(--color-text-primary); font-weight: 600; }
 .recovery-fee-card--primary .recovery-fee-card__desc { grid-column: 3; grid-row: 1; white-space: nowrap; }
@@ -692,43 +729,6 @@
   grid-column: 1 / 4;
   color: var(--color-text-primary);
   font-weight: 650;
-}
-.inventory-detail { margin: calc(var(--space-2) * -1) 0; }
-.inventory-detail .ant-descriptions-item-label { white-space: nowrap; }
-.inventory-edit-modal .ant-modal-body { padding-top: var(--space-2); }
-.inventory-edit-core { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--glass-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-primary) 6%, var(--glass)); }
-.inventory-edit-core label, .inventory-edit-more__fields label { display: grid; gap: var(--space-1); min-width: 0; }
-.inventory-edit-core label > span, .inventory-edit-more__fields label > span { color: var(--color-text-secondary); font: var(--font-caption-2); }
-.inventory-edit-more { margin-top: var(--space-3); border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--soft) 42%, transparent); }
-.inventory-edit-more summary { padding: var(--space-2) var(--space-3); color: var(--color-text-primary); font-weight: 650; cursor: pointer; }
-.inventory-edit-more summary::marker { color: var(--color-primary); }
-.inventory-edit-more__fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); }
-.inventory-edit-more__note { grid-column: 1 / -1; }
-.inventory-detail--editing { margin-top: var(--space-4); }
-.inventory-detail--editing .inventory-execution-list, .inventory-detail--editing .inventory-finance-list { margin-top: var(--space-4); }
-.inventory-edit-operator { min-width: var(--col-w-190); }
-.inventory-execution-list { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
-.inventory-execution-table .ant-table-container { border: 1px solid var(--glass-border); border-radius: var(--radius-sm); overflow: hidden; }
-.inventory-execution-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
-.inventory-execution-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
-.inventory-execution-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
-.inventory-finance-list { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
-.inventory-finance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.inventory-finance-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
-.inventory-finance-summary__item { display: grid; gap: 2px; padding: var(--space-2); border: 1px solid var(--glass-border); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--soft) 52%, transparent); color: var(--color-text-secondary); font: var(--font-caption-2); }
-.inventory-finance-summary__item strong, .inventory-finance-summary__item--amount .ui-money { color: var(--color-text-primary); font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; }
-.inventory-finance-note { font-size: var(--fs-caption-2); }
-.inventory-finance-table { margin-top: var(--space-1); margin-inline: calc(var(--space-2) * -1) 0; }
-.inventory-finance-table .ant-table-container { border: 1px solid var(--glass-border); border-radius: var(--radius-sm); overflow: hidden; }
-.inventory-finance-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
-.inventory-finance-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
-.inventory-finance-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
-.inventory-finance-table__amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
-.inventory-finance-table__amount .ui-money { font-weight: 700; }
-@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (--bp-sm) {
-  .inventory-edit-core, .inventory-edit-more__fields { grid-template-columns: 1fr; }
-  .inventory-edit-more__note { grid-column: auto; }
 }
 .payment-info-fields .ant-form-item { margin: 0; }
 .payment-info-fields > .ant-form-item { min-width: 0; }

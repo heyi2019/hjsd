@@ -44,7 +44,7 @@ describe("InventoryPanel：账号台账", () => {
 
   it("提供库存导出入口，并按当前库存字段生成 CSV", async () => {
     expect(buildInventoryCsv(accounts)).toContain(
-      "订单号,业务,类型,产品,库存编号,平台,成本,库存状态",
+      "订单号,业务,类型,游戏/产品类型,库存编号,平台,成本,库存状态",
     );
     expect(buildInventoryCsv(accounts)).toContain(
       "HS-2026-0001,,回收,,KU_00001,A平台,100.00,在库",
@@ -231,8 +231,8 @@ describe("InventoryPanel：账号台账", () => {
 
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑游戏账号")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑产品")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑游戏/产品类型")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑平台")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑账号密码")).not.toBeVisible();
     expect(screen.getByLabelText("编辑绑定手机号")).not.toBeVisible();
@@ -301,13 +301,13 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
-    expect(await screen.findByText("执行明细")).toBeInTheDocument();
+    expect(await screen.findByText("流转记录")).toBeInTheDocument();
     const detailPanel = document.querySelector(".inventory-detail") as HTMLElement;
-    const accountSummary = detailPanel.querySelector(".ant-descriptions") as HTMLElement;
+    const accountSummary = detailPanel.querySelector(".inventory-detail__meta") as HTMLElement;
     expect(within(accountSummary).getByText("建档操作人")).toBeInTheDocument();
     expect(within(accountSummary).queryByText("业务", { exact: true })).toBeNull();
     expect(within(accountSummary).queryByText("类型", { exact: true })).toBeNull();
-    expect(within(accountSummary).queryByText("产品", { exact: true })).toBeNull();
+    expect(within(accountSummary).queryByText("游戏/产品类型", { exact: true })).toBeNull();
     expect(within(accountSummary).queryByText("平台", { exact: true })).toBeNull();
     expect(within(accountSummary).queryByText("成本", { exact: true })).toBeNull();
     expect(within(accountSummary).getByText("登记时间")).toBeInTheDocument();
@@ -325,7 +325,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(accountSummary).getByText("2026-10-16 16:45")).toBeInTheDocument();
     expect(within(accountSummary).getByText("2026-10-17 11:35")).toBeInTheDocument();
     expect(within(accountSummary).getByText("2026-10-12 09:10")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("寄售平台A")).toBeInTheDocument();
+    expect(within(accountSummary).getAllByText("寄售平台A").length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
     const executionTable = detailPanel.querySelector(".inventory-execution-table") as HTMLElement;

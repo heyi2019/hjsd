@@ -1,0 +1,153 @@
+.inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td {
+  /* 保留主表展开单元格的原始水平留白，主表卡片位置不参与详情对齐。 */
+  padding: var(--space-3) var(--space-4) !important;
+  background: transparent !important;
+  border-bottom: 0;
+}
+.inventory-table .ant-table-tbody > tr.ant-table-row > td { vertical-align: middle; }
+.inventory-table .ant-table-tbody > tr.ant-table-row:hover > td { background: color-mix(in srgb, var(--color-primary) 5%, var(--glass)); }
+.inventory-empty-cell { display: inline-block; min-width: 100%; text-align: center; color: var(--color-text-secondary); }
+.inventory-row-actions { flex-wrap: nowrap; white-space: nowrap; }
+.inventory-row-actions .ant-space-item { display: inline-flex; }
+.inventory-row-actions .ant-btn-link { min-height: var(--sz-30); padding-inline: var(--space-1); color: var(--primary-ink); font-size: var(--fs-caption-2); }
+.inventory-row-actions .ant-space-item:first-child .ant-btn-link { font-weight: 650; color: var(--color-primary-text); }
+.inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
+.inventory-detail {
+  margin: 0;
+  padding: var(--space-4) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
+  /* 保留展开容器的水平留白，让四个详情表格与外层容器之间有明确间距。 */
+  width: auto;
+  margin-inline: 0;
+}
+.inventory-detail__meta {
+  overflow: hidden;
+  box-sizing: border-box;
+  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.inventory-detail__meta .ant-descriptions-view { overflow: hidden; }
+.inventory-detail__meta-group + .inventory-detail__meta-group { margin-top: var(--space-3); }
+.inventory-detail__meta-group-title { padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); background: var(--soft); font: var(--font-caption-2); font-weight: 650; }
+.inventory-detail .ui-table-wrap,
+.inventory-detail .ant-table-wrapper {
+  width: 100%;
+  max-width: none;
+  overflow-x: clip;
+  overflow-y: clip;
+}
+.inventory-detail__section > .ui-table-wrap {
+  justify-self: stretch;
+  margin-inline: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  transform: none;
+}
+.inventory-detail__section > .ui-table-wrap.inventory-execution-table,
+.inventory-detail__section > .ui-table-wrap.inventory-finance-table {
+  margin-inline: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  transform: none !important;
+}
+.inventory-detail .ui-table-wrap .ant-table,
+.inventory-detail .ant-table-wrapper .ant-table { min-width: 100%; }
+.inventory-detail__meta .ant-descriptions-item-label,
+.inventory-detail__meta .ant-descriptions-item-content { min-width: 0; padding: var(--space-1) var(--space-2) !important; }
+.inventory-detail .ant-descriptions-item-label { white-space: nowrap; color: var(--color-text-secondary); font: var(--font-caption-2); }
+.inventory-detail .ant-descriptions-item-content { max-width: 280px; color: var(--color-text-primary); font: var(--font-caption); white-space: normal; overflow-wrap: anywhere; }
+.inventory-detail__meta .ant-descriptions-item-label { width: 96px; }
+.inventory-detail__meta .ant-descriptions-item-content { width: auto; max-width: none; }
+.inventory-detail .ant-descriptions-item-content .ant-typography { overflow-wrap: anywhere; }
+.inventory-detail .ant-descriptions-view > table { width: min(100%, 1200px) !important; margin-inline-end: auto; table-layout: fixed !important; }
+.inventory-detail .ant-descriptions-view > table col { width: auto !important; }
+.inventory-detail .ant-descriptions-item-label.inventory-detail__datetime,
+.inventory-detail .ant-descriptions-item-content.inventory-detail__datetime { width: auto; max-width: none; }
+.inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label { background: var(--soft); }
+.inventory-detail .ant-descriptions-bordered .ant-descriptions-row { border-color: var(--color-border); }
+.inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label,
+.inventory-detail .ant-descriptions-bordered .ant-descriptions-item-content { border-color: var(--color-border); }
+.inventory-edit-modal .ant-modal-body { padding-top: var(--space-2); }
+.inventory-edit-core { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--glass-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-primary) 6%, var(--glass)); }
+.inventory-edit-core label, .inventory-edit-more__fields label { display: grid; gap: var(--space-1); min-width: 0; }
+.inventory-edit-core label > span, .inventory-edit-more__fields label > span { color: var(--color-text-secondary); font: var(--font-caption-2); }
+.inventory-edit-more { margin-top: var(--space-3); border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--soft) 42%, transparent); }
+.inventory-edit-more summary { padding: var(--space-2) var(--space-3); color: var(--color-text-primary); font-weight: 650; cursor: pointer; }
+.inventory-edit-more summary::marker { color: var(--color-primary); }
+.inventory-edit-more__fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); }
+.inventory-edit-more__note { grid-column: 1 / -1; }
+.inventory-detail--editing { margin-top: var(--space-4); }
+.inventory-detail--editing .inventory-execution-list, .inventory-detail--editing .inventory-finance-list { margin-top: var(--space-4); }
+.inventory-edit-operator { min-width: var(--col-w-190); }
+.inventory-detail__section { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.inventory-detail__section--profile { margin-top: 0; }
+.inventory-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
+.inventory-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
+.inventory-execution-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.inventory-execution-table {
+  box-sizing: border-box;
+  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
+  border-radius: var(--radius-sm);
+  overflow-x: clip;
+  overflow-y: clip;
+}
+.inventory-execution-table .ant-table,
+.inventory-finance-table .ant-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+.inventory-execution-table .ant-table-content,
+.inventory-finance-table .ant-table-content { overflow-x: clip !important; }
+.inventory-execution-table th,
+.inventory-execution-table td,
+.inventory-finance-table th,
+.inventory-finance-table td { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.inventory-execution-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
+.inventory-execution-table .ant-table-container,
+.inventory-finance-table .ant-table-container { margin-inline-start: calc(var(--space-5) * -2); width: calc(100% + var(--space-5) * 2); }
+.inventory-execution-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
+.inventory-execution-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
+.inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.inventory-execution-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
+.inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
+.inventory-execution-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
+.inventory-finance-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.inventory-finance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.inventory-finance-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.inventory-finance-summary__item { display: grid; gap: 2px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-secondary); font: var(--font-caption-2); }
+.inventory-finance-summary__item--expense { border-inline-start: var(--border-w-3) solid var(--color-error); }
+.inventory-finance-summary__item--income { border-inline-start: var(--border-w-3) solid var(--color-success); }
+.inventory-finance-summary__item strong, .inventory-finance-summary__item--amount .ui-money { color: var(--color-text-primary); font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; }
+.inventory-finance-note { font-size: var(--fs-caption-2); }
+.inventory-finance-table {
+  margin-top: 0;
+  box-sizing: border-box;
+  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
+  border-radius: var(--radius-sm);
+  overflow-x: clip;
+  overflow-y: clip;
+}
+.inventory-finance-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
+.inventory-finance-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
+.inventory-finance-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
+.inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.inventory-finance-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
+.inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
+.inventory-finance-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
+.inventory-finance-table__amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
+.inventory-finance-table__amount .ui-money { font-weight: 700; }
+@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (--bp-sm) {
+  .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
+  .inventory-detail { padding: var(--space-3) 0; }
+  .inventory-edit-core, .inventory-edit-more__fields { grid-template-columns: 1fr; }
+  .inventory-edit-more__note { grid-column: auto; }
+}

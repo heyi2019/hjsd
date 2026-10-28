@@ -36,7 +36,7 @@ describe("MobileInventoryList", () => {
   it("有数据时渲染卡片并展示全部字段标签", () => {
     renderCard(<MobileInventoryList rows={[makeRow()]} onSale={() => {}} onConsign={() => {}} onVoid={() => {}} onRebate={() => {}} onEdit={() => {}} onMoreAction={() => {}} editingAccount={null} />);
     expect(screen.getByText("KU_00001")).toBeInTheDocument();
-    for (const label of ["游戏账号", "订单号", "业务", "业务类型", "增值服务", "产品", "平台", "成本"]) {
+    for (const label of ["游戏账号/产品", "订单号", "业务", "业务类型", "增值服务", "游戏/产品类型", "平台", "成本"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     // 成本金额经 MoneyText 渲染

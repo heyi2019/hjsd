@@ -111,6 +111,7 @@ class GameTypeOption(Base, AuditMixin):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    channel_regions: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
 class OrderTypePool(Base, TimestampMixin):
     """业务↔资金池路由；按业务、份额和可选资金性质区分默认池（BAS-03-02）。"""

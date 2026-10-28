@@ -2,7 +2,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form, Modal } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useOrderFormConfig, FieldConfigContext } from "./ConfigurableField";
+import { useOrderFormConfig, FieldConfigContext, CustomFieldSection } from "./ConfigurableField";
 import {
   counterpartiesApi,
   customersApi,
@@ -127,7 +127,7 @@ export function CreateBusinessModal(props: {
     }
     if (isTh) defaults.supplier_source = "氪金联盟";
     const defaultGameType = gameTypes.find((item) => item.is_default)?.name;
-    const gameTypeField = isDfq ? "dfq_game_type" : "game_type";
+    const gameTypeField = "game_type";
     if (defaultGameType && form.getFieldValue(gameTypeField) == null) {
       defaults[gameTypeField] = defaultGameType;
     }
@@ -139,41 +139,41 @@ export function CreateBusinessModal(props: {
     try {
       if (isDfq) {
         const customer = await customersApi.create({
-          display_name: values.dfq_customer_nickname as string,
-          contact_name: values.dfq_customer_contact as string,
-          phone: values.dfq_customer_phone as string,
-          wechat: values.dfq_customer_wechat as string,
-          qq: values.dfq_customer_qq as string,
-          source: values.dfq_customer_source as string,
-          note: values.dfq_note as string,
+          display_name: values.customer_nickname as string,
+          contact_name: values.customer_contact_name as string,
+          phone: values.customer_phone as string,
+          wechat: values.customer_wechat as string,
+          qq: values.customer_qq as string,
+          source: values.customer_source as string,
+          note: values.note as string,
         });
         const order = await ordersApi.create({
           order_type: "DFQ",
           trade_date: today(),
-          note: values.dfq_note as string,
+          note: values.note as string,
           form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
           account_snapshot: {
-            game_type: values.dfq_game_type as string,
-            game_account: values.dfq_game_account as string,
-            game_password: values.dfq_game_password as string,
-            channel_region: values.dfq_channel_region as string,
-            bound_phone: values.dfq_bound_phone as string,
-            has_secondary: values.dfq_has_secondary ? values.dfq_has_secondary === "有" : undefined,
-            purchase_price: values.dfq_purchase_price as string | undefined,
-            note: values.dfq_account_note as string,
+            game_type: values.game_type as string,
+            game_account: values.game_account as string,
+            game_password: values.game_password as string,
+            channel_region: values.channel_region as string,
+            bound_phone: values.bound_phone as string,
+            has_secondary: values.has_secondary ? values.has_secondary === "有" : undefined,
+            purchase_price: values.recovery_price as string | undefined,
+            note: values.game_account_note as string,
           },
           customer_roles: [{ customer_id: customer.customer.id, role: "INSTALLMENT_CUSTOMER" }],
           initial_buy: {
             amount: String(values.dfq_total_amount ?? 0),
             occurred_on: today(),
             portion: "PRINCIPAL",
-            pool_id: values.dfq_payment_pool_id as number,
-            note: `付款：剩余号款｜付款对象：${String(values.dfq_payment_recipient || "供货方")}${values.dfq_payment_note ? `｜${String(values.dfq_payment_note)}` : ""}`,
+            pool_id: values.payment_pool_id as number,
+            note: `付款：剩余号款｜付款对象：${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
           },
           installment: {
             contract_type: "ADVANCE_PURCHASE",
             adjust_final_period: true,
-            principal: String(values.dfq_purchase_price ?? 0),
+            principal: String(values.recovery_price ?? 0),
             down_payment: String(values.dfq_down_payment ?? 0),
             service_fee: String(values.dfq_service_fee ?? 0),
             periods: Number(values.dfq_periods ?? 1),
@@ -184,7 +184,7 @@ export function CreateBusinessModal(props: {
               period_no: index + 1,
               due_on: toDateString(item.due_on),
             })),
-            note: values.dfq_note as string,
+            note: values.note as string,
           },
         });
         appMessage.success("代分期订单已创建");
@@ -392,10 +392,10 @@ export function CreateBusinessModal(props: {
         }}
       >
         <FieldConfigContext.Provider value={config}>
-          {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes}>
-            <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} />
+          {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
+            <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
           </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
-          {isRecovery ? <RecoveryCustomerSection /> : null}
+          {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
         </FieldConfigContext.Provider>
       </Form>
     </Modal>

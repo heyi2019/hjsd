@@ -26,10 +26,11 @@ def _get_game_type_or_404(session: Session, game_type_id: int) -> GameTypeOption
 
 
 def create_game_type(
-    session: Session, *, name: str, actor: str, sort_order: int = 0, is_default: bool = False
+    session: Session, *, name: str, actor: str, sort_order: int = 0, is_default: bool = False, channel_regions: list[str] | None = None
 ) -> GameTypeOption:
     normalized_name = _required_name(name, field="name")
     sort_order = _non_negative_int(sort_order, field="sort_order")
+    regions = list(dict.fromkeys(str(item).strip() for item in (channel_regions or []) if str(item).strip()))
     if session.scalar(select(GameTypeOption).where(GameTypeOption.name == normalized_name)) is not None:
         raise Validation(
             f"游戏类型已存在：{normalized_name}",
@@ -41,6 +42,7 @@ def create_game_type(
         sort_order=sort_order,
         is_active=True,
         is_default=bool(is_default),
+        channel_regions=regions,
         created_by=actor,
         updated_by=actor,
     )
@@ -66,6 +68,7 @@ def update_game_type(
     actor: str,
     name: str | None = None,
     sort_order: int | None = None,
+    channel_regions: list[str] | None = None,
 ) -> GameTypeOption:
     item = _get_game_type_or_404(session, game_type_id)
     normalized_name = _required_name(name, field="name") if name is not None else None
@@ -75,11 +78,14 @@ def update_game_type(
             raise Validation(f"游戏类型已存在：{normalized_name}", code=ErrorCode.DUPLICATE_CODE)
     if sort_order is not None:
         sort_order = _non_negative_int(sort_order, field="sort_order")
+    regions = None if channel_regions is None else list(dict.fromkeys(str(item).strip() for item in channel_regions if str(item).strip()))
     before = _snapshot(item, ("name", "sort_order"))
     if normalized_name is not None:
         item.name = normalized_name
     if sort_order is not None:
         item.sort_order = sort_order
+    if regions is not None:
+        item.channel_regions = regions
     item.updated_by = actor
     session.flush()
     record_audit(
@@ -136,3 +142,18 @@ def set_game_type_default(session: Session, game_type_id: int, is_default: bool,
         after=_snapshot(item, ("is_default",)),
     )
     return item
+
+
+def delete_game_type(session: Session, game_type_id: int, *, actor: str) -> None:
+    item = _get_game_type_or_404(session, game_type_id)
+    if item.is_default:
+        raise Validation("默认游戏类型不能删除")
+    record_audit(
+        session,
+        action="GAME_TYPE_DELETE",
+        entity_type="GameTypeOption",
+        entity_id=item.id,
+        actor=actor,
+        before=_snapshot(item, ("name", "sort_order", "is_active", "is_default")),
+    )
+    session.delete(item)

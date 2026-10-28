@@ -134,8 +134,8 @@ export function InventoryProfileModal({
         />
       ) : (
         <Space className="inventory-profile-editor" direction="vertical" size="middle">
-          <Input aria-label="游戏账号" placeholder="游戏账号" value={form.gameAccount} onChange={(event) => setForm((current) => ({ ...current, gameAccount: event.target.value }))} />
-          <Input aria-label="游戏类型" placeholder="游戏类型" value={form.gameType} onChange={(event) => setForm((current) => ({ ...current, gameType: event.target.value }))} />
+          <Input aria-label="游戏账号/产品" placeholder="游戏账号/产品" value={form.gameAccount} onChange={(event) => setForm((current) => ({ ...current, gameAccount: event.target.value }))} />
+          <Input aria-label="游戏/产品类型" placeholder="游戏/产品类型" value={form.gameType} onChange={(event) => setForm((current) => ({ ...current, gameType: event.target.value }))} />
           <Input.Password aria-label="账号密码" placeholder="账号密码" value={form.gamePassword} onChange={(event) => setForm((current) => ({ ...current, gamePassword: event.target.value }))} />
           <Input aria-label="渠道 / 区服" placeholder="渠道 / 区服" value={form.channelRegion} onChange={(event) => setForm((current) => ({ ...current, channelRegion: event.target.value }))} />
           <Input aria-label="绑定手机号" placeholder="绑定手机号" value={form.boundPhone} onChange={(event) => setForm((current) => ({ ...current, boundPhone: event.target.value }))} />

@@ -7,9 +7,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.attachments.schemas import AttachmentOut
+from app.core.schemas import normalize_product_aliases
 
 
 class CustomerRoleInput(BaseModel):
@@ -27,9 +28,18 @@ class CounterpartyRoleInput(BaseModel):
 
 
 class OrderAccountSnapshot(BaseModel):
-    """DFQ 建单时的账号文本快照，逾期回收时可转为库存账号。"""
+    """订单中的产品快照：游戏账号是单一交易实体，游戏类型是产品类型。
+
+    ``product`` / ``product_type`` 仅作为兼容输入别名，归一化后仍以
+    ``game_account`` / ``game_type`` 作为唯一存储口径。
+    """
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_product_aliases(cls, value: object) -> object:
+        return normalize_product_aliases(value)
 
     game_account: str = Field(min_length=1, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
@@ -84,6 +94,11 @@ class OrderInstallmentCreate(BaseModel):
 
 class OrderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_product_aliases(cls, value: object) -> object:
+        return normalize_product_aliases(value)
 
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
@@ -432,6 +447,7 @@ class OrderFormFieldOut(BaseModel):
     sort_order: int
     locked: bool
     is_custom: bool
+    section: str = "EXTRA"
     note: str | None = None
 
 
@@ -458,6 +474,7 @@ class OrderFormFieldCreate(BaseModel):
     is_active: bool = True
     sort_order: int = 0
     is_custom: bool = True
+    section: str = Field(default="EXTRA", pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS)$")
     note: str | None = None
 
 
@@ -475,6 +492,7 @@ class OrderFormFieldUpdate(BaseModel):
     required: bool | None = None
     required_when: RequiredWhen | None = None
     sort_order: int | None = None
+    section: str | None = Field(default=None, pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS)$")
     note: str | None = None
 
 

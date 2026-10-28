@@ -51,16 +51,6 @@ const noCount = async (): Promise<null> => null;
 
 export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
-    key: "form-fields",
-    label: "表单字段",
-    summary: `${FORM_SCOPES_FALLBACK.length} 个业务表单的字段：选填/必填、停用/启用、增删自定义字段`,
-    group: "FIELD",
-    permission: "field-definition.manage",
-    entityTypes: ["order_form_field"],
-    // 表单数是注册表静态已知量；逐作用域的明细由总览面板按需展开时再拉。
-    count: async () => FORM_SCOPES_FALLBACK.length,
-  },
-  {
     key: "order-types",
     label: "业务类型",
     summary: "回收/提号/代挂/代分期等定义，含资金性质与编号前缀",
@@ -69,6 +59,16 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool / pool_account 的处理口径一致）。
     entityTypes: ["OrderTypeDef"],
     count: async () => (await orderTypesApi.list()).length,
+  },
+  {
+    key: "form-fields",
+    label: "表单字段",
+    summary: `${FORM_SCOPES_FALLBACK.length} 个业务表单的字段：选填/必填、停用/启用、增删自定义字段`,
+    group: "FIELD",
+    permission: "field-definition.manage",
+    entityTypes: ["order_form_field"],
+    // 表单数是注册表静态已知量；逐作用域的明细由总览面板按需展开时再拉。
+    count: async () => FORM_SCOPES_FALLBACK.length,
   },
   {
     key: "pools",
@@ -85,7 +85,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   },
   {
     key: "game-types",
-    label: "游戏类型",
+    label: "游戏与渠道配置",
     summary: "产品分类选项，建单与库存共用",
     group: "MASTER",
     entityTypes: ["GameTypeOption"],

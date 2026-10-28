@@ -103,8 +103,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
   it("all 模式：预填账号字段并整体提交", async () => {
     renderModal({ account, mode: "all" });
     expect(await screen.findByText("编辑账号资料")).toBeInTheDocument();
-    expect(screen.getByLabelText("游戏账号")).toHaveValue("acc-001");
-    const typeInput = screen.getByLabelText("游戏类型");
+    expect(screen.getByLabelText("游戏账号/产品")).toHaveValue("acc-001");
+    const typeInput = screen.getByLabelText("游戏/产品类型");
     await ui.clear(typeInput);
     await ui.type(typeInput, "星穹铁道");
     await ui.type(screen.getByLabelText("绑定手机号"), "9");

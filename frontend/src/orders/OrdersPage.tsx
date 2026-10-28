@@ -40,6 +40,15 @@ import {
   type BusinessCenterTab,
 } from "./businessCenter";
 
+const ORDER_FIELD_SECTION_LABEL: Record<string, string> = {
+  ACCOUNT_PRODUCT: "账号 / 产品信息",
+  BUSINESS: "业务方案信息",
+  FINANCE: "费用与资金",
+  PARTICIPANT: "参与方信息",
+  EXTRA: "其他补充信息",
+};
+const ORDER_FIELD_SECTION_ORDER = ["ACCOUNT_PRODUCT", "BUSINESS", "FINANCE", "EXTRA", "PARTICIPANT"];
+
 function MobileOrderList(props: {
   orders: Order[];
   emptyText: string;
@@ -56,8 +65,8 @@ function MobileOrderList(props: {
           </div>
           <dl className="orders-mobile-card__meta">
             <div><dt>对方 / 来源</dt><dd>{[order.party_name, order.party_source].filter(Boolean).join(" · ") || "-"}</dd></div>
-            <div><dt>产品</dt><dd>{order.account_game_type || "-"}</dd></div>
-            <div><dt>账号</dt><dd>{order.account_game_account || "-"}</dd></div>
+            <div><dt>游戏/产品类型</dt><dd>{order.account_game_type || "-"}</dd></div>
+            <div><dt>游戏账号/产品</dt><dd>{order.account_game_account || "-"}</dd></div>
             <div><dt>平台</dt><dd>{order.account_platform || "-"}</dd></div>
             <div><dt>金额</dt><dd>{formatOrderAmount(order)}</dd></div>
             <div><dt>库存状态</dt><dd>{order.account_status || "-"}</dd></div>
@@ -630,8 +639,8 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
   const ledgerColumns: ColumnsType<Order> = [
     { title: "订单号", dataIndex: "order_no" },
     { title: "对方 / 来源", key: "party", render: (_, order) => [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
-    { title: "产品", dataIndex: "account_game_type", render: (v: string | null) => v || "-" },
-    { title: "账号", dataIndex: "account_game_account", render: (v: string | null) => v || "-" },
+    { title: "游戏/产品类型", dataIndex: "account_game_type", render: (v: string | null) => v || "-" },
+    { title: "游戏账号/产品", dataIndex: "account_game_account", render: (v: string | null) => v || "-" },
     { title: "平台", dataIndex: "account_platform", render: (v: string | null) => v || "-" },
     { title: "金额", dataIndex: "event_total", render: (_v: string | null, order) => formatOrderAmount(order) },
     { title: "库存状态", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} optionSet="INVENTORY_STATUS" /> : "-" },
@@ -672,13 +681,25 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
                 },
               }}
             >
-              <PermissionButton permission="order.event.post" type="link">更多⌄</PermissionButton>
+              <PermissionButton permission="order.event.post" type="link">更多</PermissionButton>
             </Dropdown>
           </PermissionGate>
         </Space>
       ),
     },
   ];
+
+  const orderExtraItems = buildFormExtraDisplay(selectedOrder?.form_extra, Object.values(orderFieldConfig));
+  const orderFieldSections = new Map(Object.values(orderFieldConfig).map((field) => [field.field_key, field.section ?? "EXTRA"]));
+  const orderExtraGroups = [...orderExtraItems.reduce((groups, item) => {
+    const section = orderFieldSections.get(item.key) ?? "EXTRA";
+    const current = groups.get(section) ?? [];
+    current.push(item);
+    groups.set(section, current);
+    return groups;
+  }, new Map<string, typeof orderExtraItems>())]
+    .sort(([left], [right]) => (ORDER_FIELD_SECTION_ORDER.indexOf(left) === -1 ? 99 : ORDER_FIELD_SECTION_ORDER.indexOf(left)) - (ORDER_FIELD_SECTION_ORDER.indexOf(right) === -1 ? 99 : ORDER_FIELD_SECTION_ORDER.indexOf(right)))
+    .map(([section, items]) => ({ section, items }));
 
   return (
     <section className="ui-stack orders-page">
@@ -695,7 +716,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
             }}
             trigger={["click"]}
           >
-            <PermissionButton permission="order.create" type="primary">新建订单⌄</PermissionButton>
+            <PermissionButton permission="order.create" type="primary">新建订单</PermissionButton>
           </Dropdown>
         )}
         items={[
@@ -713,7 +734,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
                   <Input
                     allowClear
                     value={keyword}
-                    placeholder="搜索订单号 / 游戏账号 / 对方 / 备注"
+                    placeholder="搜索订单号 / 游戏账号/产品 / 对方 / 备注"
                     aria-label="搜索订单"
                     className="orders-ledger-search"
                     onChange={(event) => {
@@ -821,7 +842,8 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
             <Descriptions.Item label="业务">{BUSINESS_MODE_LABEL[selectedOrder.business_mode ?? ""] || "-"}</Descriptions.Item>
             <Descriptions.Item label="类型">{BUSINESS_TYPE_LABEL[selectedOrder.business_type ?? ""] || orderTypeLabel(selectedOrder.order_type, typeNames)}</Descriptions.Item>
             <Descriptions.Item label="增值服务">{configurableLabel("INSTALLMENT_CONTRACT_TYPE", selectedOrder.value_added_service, VALUE_ADDED_SERVICE_LABEL)}</Descriptions.Item>
-            <Descriptions.Item label="产品">{[selectedOrder.account_game_type, selectedOrder.account_game_account, selectedOrder.account_channel_region].filter(Boolean).join(" / ") || "-"}</Descriptions.Item>
+            <Descriptions.Item label="游戏/产品类型">{selectedOrder.account_game_type || "-"}</Descriptions.Item>
+            <Descriptions.Item label="游戏账号/产品">{[selectedOrder.account_game_account, selectedOrder.account_channel_region].filter(Boolean).join(" / ") || "-"}</Descriptions.Item>
             <Descriptions.Item label="对方">{selectedOrder.party_name || "-"}</Descriptions.Item>
             <Descriptions.Item label="获客来源">{selectedOrder.party_source || "-"}</Descriptions.Item>
             <Descriptions.Item label="获客负责人">{selectedOrder.party_created_by || "-"}</Descriptions.Item>
@@ -832,16 +854,23 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
             <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", selectedOrder.link_status ?? "LINKED", LINK_STATUS_LABEL)} /></Descriptions.Item>
             <Descriptions.Item label="成交日">{selectedOrder.trade_date || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>
-            {buildFormExtraDisplay(selectedOrder?.form_extra, Object.values(orderFieldConfig)).map((it) => (
-              <Descriptions.Item
-                key={it.key}
-                label={`${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}`}
-              >
-                {formatExtraDisplayValue(it.value) || "-"}
-              </Descriptions.Item>
-            ))}
           </Descriptions>
         ) : null}
+        {selectedOrder && orderExtraGroups.map(({ section, items }) => (
+          <div className="ui-form-spaced" key={section}>
+            <Typography.Text strong>{ORDER_FIELD_SECTION_LABEL[section] ?? section}</Typography.Text>
+            <Descriptions column={1} bordered size="small">
+              {items.map((it) => (
+                <Descriptions.Item
+                  key={it.key}
+                  label={`${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}`}
+                >
+                  {formatExtraDisplayValue(it.value) || "-"}
+                </Descriptions.Item>
+              ))}
+            </Descriptions>
+          </div>
+        ))}
         {selectedOrder?.events?.length ? (
           <div className="ui-form-spaced">
             <Typography.Text strong>动作记录</Typography.Text>
@@ -1040,7 +1069,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
                 },
               }}
             >
-              <PermissionButton permission="order.event.post">更多⌄</PermissionButton>
+              <PermissionButton permission="order.event.post">更多</PermissionButton>
             </Dropdown>
             {selectedOrder.account_id ? (
               <PermissionButton permission="order.event.post" type="link" onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
@@ -1138,7 +1167,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
                 <CfgItem name="snap_game_account" label="库存编号" rules={[{ required: true, message: "请输入库存编号" }]}>
                   <Input />
                 </CfgItem>
-                <CfgItem name="snap_game_type" label="产品"><Input /></CfgItem>
+                <CfgItem name="snap_game_type" label="游戏/产品类型"><Input /></CfgItem>
                 <CfgItem name="snap_game_password" label="账号密码"><Input placeholder="留空表示清除密码" /></CfgItem>
                 <CfgItem name="snap_channel_region" label="区服"><Input /></CfgItem>
                 <CfgItem name="snap_bound_phone" label="绑定手机"><Input /></CfgItem>

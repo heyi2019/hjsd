@@ -1,5 +1,6 @@
 import { Form } from "antd";
 import type { Pool } from "../../shared/api/catalog";
+import type { ReactNode } from "react";
 import { MoneyInput } from "../../shared/ui";
 import { CfgItem } from "../ConfigurableField";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
@@ -8,7 +9,7 @@ import "../recovery/RecoveryFeeSection.css";
 import "./ThFeeSection.css";
 
 /** 提号沿用回收页费用明细，仅将付款对象切换为供货方。 */
-export function ThFeeSection(props: { pools: Pool[] }) {
+export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }) {
   const purchaseAmount = Form.useWatch("th_purchase_amount");
   const intermediaryFee = Form.useWatch("intermediary_fee");
   const otherFeeAmount = Form.useWatch("other_fee_amount");
@@ -37,6 +38,7 @@ export function ThFeeSection(props: { pools: Pool[] }) {
       </div>
       <AdditionalFeeFields />
       <PaymentInfoSection pools={props.pools} recipientDefault="供货方" recipientPlaceholder="供货方" />
+      {props.financeExtras}
       <div className="recovery-fees__total">
         <span>总成本（含全部附加费用）</span>
         <strong>¥ {totalCost.toFixed(2)}</strong>

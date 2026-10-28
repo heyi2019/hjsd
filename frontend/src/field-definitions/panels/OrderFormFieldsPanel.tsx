@@ -2,24 +2,40 @@ import { appMessage, appModal } from "../../shared/ui/appFeedback";
 /** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
  *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
-import { Card, Form, Input, InputNumber, Popconfirm, Select, Space, Switch, Tooltip, Typography } from "antd";
+import { Card, Form, Input, InputNumber, Popconfirm, Segmented, Select, Space, Switch, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { gameTypesApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
+import { gameTypesApi, optionSetsApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { FORM_SCOPE_LABEL, buildGroupedScopeOptions, useFormScopes } from "../formScopes";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import "./OrderFormFieldsPanel.css";
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
+const MANAGED_OPTION_FIELD_KEYS = ["game_type", "channel_region", "intermediary_platform", "intermediary_type", "compensation_type"];
 const CONDITION_OP_OPTIONS = [
   { value: "eq", label: "等于" },
   { value: "ne", label: "不等于" },
   { value: "filled", label: "有值" },
 ];
 const OP_TEXT: Record<string, string> = { eq: "等于", ne: "不等于", filled: "有值" };
+const FIELD_SECTION_OPTIONS = [
+  { value: "ACCOUNT_PRODUCT", label: "账号 / 产品信息" },
+  { value: "BUSINESS", label: "业务方案信息" },
+  { value: "FINANCE", label: "费用与资金" },
+  { value: "EXTRA", label: "其他补充信息" },
+  { value: "PARTICIPANT", label: "参与方信息" },
+];
+const ORDER_SCOPE_OPTIONS = [
+  { value: "HS", label: "回收" },
+  { value: "TH", label: "提号" },
+  { value: "DG", label: "代挂" },
+  { value: "DFQ", label: "代分期" },
+];
+const ORDER_SCOPE_CODES = new Set(ORDER_SCOPE_OPTIONS.map((item) => item.value));
 
 /** 条件描述文案：如「客户来源 等于 其他」。 */
 const describeCondition = (fieldLabel: string, cond: { op: string; values?: string[] | null }): string => {
@@ -40,9 +56,10 @@ export interface OrderFormFieldsPanelProps {
   /** 初始选中的表单作用域；缺省为 HS。 */
   initialScope?: string;
   onConfigureGameTypes?: () => void;
+  onConfigureIntermediaryPlatforms?: () => void;
 }
 
-export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: OrderFormFieldsPanelProps = {}) {
+export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onConfigureIntermediaryPlatforms }: OrderFormFieldsPanelProps = {}) {
   // 词典未加载时回落模块常量，保证与改造前完全一致。
   const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
   // 作用域清单以后端注册表为单一事实源；接口不可用时回落本地兜底。
@@ -53,13 +70,22 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   );
   const [rows, setRows] = useState<OrderFormField[]>([]);
   const [gameTypeNames, setGameTypeNames] = useState<string[]>([]);
+  const [intermediaryPlatformNames, setIntermediaryPlatformNames] = useState<string[]>([]);
+  const [intermediaryTypeNames, setIntermediaryTypeNames] = useState<string[]>([]);
+  const [compensationTypeNames, setCompensationTypeNames] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [sectionFilter, setSectionFilter] = useState<string>("ALL");
+  const [activeFilter, setActiveFilter] = useState<string>("ALL");
   const editingField = rows.find((row) => row.id === editingId) ?? null;
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const fieldType = Form.useWatch("field_type", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
+  const managedOptionField = MANAGED_OPTION_FIELD_KEYS.includes(editingField?.field_key ?? "");
+  const editorFieldTypeOptions = editingField && MANAGED_OPTION_FIELD_KEYS.includes(editingField.field_key)
+    ? [{ value: editingField.field_type, label: "联动选择（库内主数据）" }]
+    : fieldTypeOptions;
   const condFieldKey = Form.useWatch("cond_field", form) as string | undefined;
   const condOp = (Form.useWatch("cond_op", form) as string | undefined) ?? "eq";
   // 依赖字段候选：同作用域内、启用中、且不是自身。
@@ -72,6 +98,10 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
     value: item.value,
     label: item.label,
   }));
+  const visibleRows = rows.filter((row) => (
+    (sectionFilter === "ALL" || (row.section ?? "EXTRA") === sectionFilter) &&
+    (activeFilter === "ALL" || (activeFilter === "ACTIVE" ? row.is_active : !row.is_active))
+  ));
 
   const load = useCallback(async (code: string) => {
     try {
@@ -85,7 +115,12 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   useEffect(() => {
     void load(activeType);
   }, [activeType, load]);
-  useEffect(() => { void gameTypesApi.list({ include_inactive: false }).then((items) => setGameTypeNames(items.map((item) => item.name))).catch(() => undefined); }, []);
+  useEffect(() => {
+    void gameTypesApi.list({ include_inactive: false }).then((items) => setGameTypeNames(items.map((item) => item.name))).catch(() => undefined);
+    void optionSetsApi.get("INTERMEDIARY_PLATFORM").then((item) => setIntermediaryPlatformNames((item.options ?? []).map((option) => option.label))).catch(() => undefined);
+    void optionSetsApi.get("INTERMEDIARY_TYPE").then((item) => setIntermediaryTypeNames((item.options ?? []).map((option) => option.label))).catch(() => undefined);
+    void optionSetsApi.get("COMPENSATION_TYPE").then((item) => setCompensationTypeNames((item.options ?? []).map((option) => option.label))).catch(() => undefined);
+  }, []);
 
   const submit = async (values: Record<string, unknown>) => {
     try {
@@ -111,6 +146,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           required,
           required_when: requiredWhen,
           sort_order: sortOrder,
+          section: values.section as OrderFormField["section"],
         });
         appMessage.success("字段已创建");
       } else {
@@ -120,6 +156,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           required,
           required_when: requiredWhen,
           sort_order: sortOrder,
+          section: values.section as OrderFormField["section"],
         });
         appMessage.success("字段已更新");
       }
@@ -143,6 +180,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
       cond_op: row.required_when?.op ?? "eq",
       cond_values: row.required_when?.values ?? [],
       sort_order: row.sort_order,
+      section: row.section ?? "EXTRA",
     });
   };
 
@@ -154,7 +192,13 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
   const columns: ColumnsType<OrderFormField> = [
     { title: "字段键", dataIndex: "field_key" },
     { title: "标签", dataIndex: "label" },
-    { title: "类型", dataIndex: "field_type", render: (v: string) => configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
+    {
+      title: "归属板块",
+      dataIndex: "section",
+      render: (value: OrderFormField["section"]) => FIELD_SECTION_OPTIONS.find((item) => item.value === value)?.label ?? "其他补充信息",
+    },
+    { title: "排序", dataIndex: "sort_order", width: 72 },
+    { title: "类型", dataIndex: "field_type", render: (v: string, row) => MANAGED_OPTION_FIELD_KEYS.includes(row.field_key) ? "联动选择" : configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
     {
       title: "必填",
       dataIndex: "required",
@@ -198,6 +242,10 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
       dataIndex: "options",
       render: (value: Array<string | { value: string; label: string }> | null | undefined, row) =>
         row.field_key === "game_type" ? `游戏类型主数据 · ${gameTypeNames.slice(0, 2).join("、") || "暂无"}等 ${gameTypeNames.length} 项` :
+        row.field_key === "channel_region" ? "游戏类型渠道／区服主数据 · 随游戏类型联动" :
+        row.field_key === "intermediary_platform" ? `经手平台主数据 · ${intermediaryPlatformNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryPlatformNames.length} 项` :
+        row.field_key === "intermediary_type" ? `中介类型主数据 · ${intermediaryTypeNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryTypeNames.length} 项` :
+        row.field_key === "compensation_type" ? `包赔类型主数据 · ${compensationTypeNames.slice(0, 2).join("、") || "暂无"}等 ${compensationTypeNames.length} 项` :
         value && value.length
           ? value.map((o) => (typeof o === "string" ? o : o.label)).join("、")
           : "-",
@@ -272,7 +320,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         layout="inline"
         onFinish={submit}
         className="ui-form-spaced"
-        initialValues={{ field_type: "TEXT", sort_order: 0 }}
+        initialValues={{ field_type: "TEXT", sort_order: 0, section: "EXTRA" }}
       >
         <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
           <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
@@ -281,9 +329,12 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
           <Input placeholder="页面显示名" />
         </Form.Item>
         <Form.Item name="field_type" label="类型">
-          <Select options={fieldTypeOptions} className="ui-control-width-110" disabled={editingId !== null} />
+          <Select options={editorFieldTypeOptions} className="ui-control-width-180" disabled={editingId !== null} />
         </Form.Item>
-        {needsOptions && (
+        <Form.Item name="section" label="归属板块">
+          <Select options={FIELD_SECTION_OPTIONS} className="ui-control-width-160" />
+        </Form.Item>
+        {needsOptions && !managedOptionField && (
           <Form.Item label="选项（值 / 展示名）">
             <Form.List name="options">
               {(fields, { add, remove }) => (
@@ -312,6 +363,21 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         {editingField?.field_key === "game_type" && onConfigureGameTypes ? (
           <Form.Item>
             <PermissionButton permission="field-definition.manage" onClick={onConfigureGameTypes}>配置游戏类型</PermissionButton>
+          </Form.Item>
+        ) : null}
+        {editingField?.field_key === "channel_region" && onConfigureGameTypes ? (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={onConfigureGameTypes}>配置游戏类型渠道／区服</PermissionButton>
+          </Form.Item>
+        ) : null}
+        {editingField?.field_key === "intermediary_platform" && onConfigureIntermediaryPlatforms ? (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={onConfigureIntermediaryPlatforms}>配置经手平台</PermissionButton>
+          </Form.Item>
+        ) : null}
+        {editingField && ["intermediary_type", "compensation_type"].includes(editingField.field_key) && onConfigureIntermediaryPlatforms ? (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={onConfigureIntermediaryPlatforms}>配置中介业务</PermissionButton>
           </Form.Item>
         ) : null}
         <Form.Item
@@ -377,39 +443,81 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes }: Ord
         「条件必填」（如客户来源等于「其他」时其他来源必填）。改动即时反映到对应表单。
         当前：{FORM_SCOPE_LABEL[activeType] ?? activeType}
       </Typography.Paragraph>
-      <Space className="ui-toolbar-spaced" align="center">
-        <Typography.Text strong>表单</Typography.Text>
-        <Select
-          className="ui-control-width-260"
-          value={activeType}
-          onChange={(value: string) => {
-            setActiveType(value);
-            setEditingId(null);
-            form.resetFields();
+      <div className="order-form-fields__container">
+        <Space className="ui-toolbar-spaced" align="center">
+          <Typography.Text strong>表单</Typography.Text>
+          <Select
+            className="ui-control-width-260"
+            value={activeType}
+            onChange={(value: string) => {
+              setActiveType(value);
+              setEditingId(null);
+              setSectionFilter("ALL");
+              setActiveFilter("ALL");
+              form.resetFields();
+            }}
+            options={groupedScopeOptions}
+            optionFilterProp="label"
+            showSearch
+          />
+          <Typography.Text strong>建单快捷入口</Typography.Text>
+          <Segmented
+            aria-label="建单表快捷入口"
+            options={ORDER_SCOPE_OPTIONS}
+            value={ORDER_SCOPE_CODES.has(activeType) ? activeType : undefined}
+            onChange={(value) => {
+              const next = String(value);
+              setActiveType(next);
+              setEditingId(null);
+              setSectionFilter("ALL");
+              setActiveFilter("ALL");
+              form.resetFields();
+            }}
+          />
+          <Typography.Text strong>板块筛选</Typography.Text>
+          <Select
+            aria-label="字段板块筛选"
+            value={sectionFilter}
+            onChange={setSectionFilter}
+            className="ui-control-width-180"
+            options={[{ value: "ALL", label: "全部板块" }, ...FIELD_SECTION_OPTIONS]}
+          />
+          <Typography.Text strong>状态筛选</Typography.Text>
+          <Select
+            aria-label="字段启用状态筛选"
+            value={activeFilter}
+            onChange={setActiveFilter}
+            className="ui-control-width-140"
+            options={[
+              { value: "ALL", label: "全部状态" },
+              { value: "ACTIVE", label: "已启用" },
+              { value: "INACTIVE", label: "已停用" },
+            ]}
+          />
+        </Space>
+        <DataTable<OrderFormField>
+          columns={columns}
+          rows={visibleRows}
+          page={1}
+          pageSize={Math.max(visibleRows.length, 10)}
+          total={visibleRows.length}
+          emptyText="该表单暂无字段配置"
+          onPageChange={() => undefined}
+          // 7 列（字段键/标签/类型/必填/选项/启用/操作）在窄容器内会被压到换行，
+          // 统一按内容宽度渲染，由 .ui-table-wrap 的 overflow:auto 承担左右滑动。
+          expandable={{
+            expandedRowKeys: editingId === null ? [] : [String(editingId)],
+            showExpandColumn: false,
+            expandedRowRender: (row) => <div aria-label={`编辑区${row.label}`} className="order-form-fields__edit-container">{editorForm}</div>,
           }}
-          options={groupedScopeOptions}
-          optionFilterProp="label"
-          showSearch
         />
-      </Space>
-      <DataTable<OrderFormField>
-        columns={columns}
-        rows={rows}
-        page={1}
-        pageSize={Math.max(rows.length, 10)}
-        total={rows.length}
-        emptyText="该表单暂无字段配置"
-        onPageChange={() => undefined}
-        // 7 列（字段键/标签/类型/必填/选项/启用/操作）在窄容器内会被压到换行，
-        // 统一按内容宽度渲染，由 .ui-table-wrap 的 overflow:auto 承担左右滑动。
-       
-        expandable={{
-          expandedRowKeys: editingId === null ? [] : [String(editingId)],
-          showExpandColumn: false,
-          expandedRowRender: (row) => <div aria-label={`编辑区${row.label}`}>{editorForm}</div>,
-        }}
-      />
-      {editingId === null ? editorForm : null}
+      </div>
+      {editingId === null ? (
+        <div className="order-form-fields__container order-form-fields__create-container">
+          <Typography.Title level={5}>新增自定义字段</Typography.Title>
+          {editorForm}
+        </div>
+      ) : null}
     </Card>
   );
 }

@@ -1,7 +1,29 @@
 """Shared request-model behavior for the v1 API."""
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from pydantic import BaseModel, ConfigDict
+
+
+def normalize_product_aliases(value: object) -> object:
+    """将产品口径别名归一化为历史 API 字段名。
+
+    ``game_account`` 是单一交易实体（产品），``game_type`` 是产品类型。
+    接口继续输出并存储历史字段名，同时接受产品口径客户端提交的
+    ``product`` / ``product_type``，避免两套字段形成双事实源。
+    """
+    if not isinstance(value, Mapping):
+        return value
+    data = dict(value)
+    for alias, canonical in (("product", "game_account"), ("product_type", "game_type")):
+        if alias not in data:
+            continue
+        alias_value = data.pop(alias)
+        if canonical in data and data[canonical] not in (None, alias_value):
+            raise ValueError(f"{canonical} 与 {alias} 不能同时填写不同值")
+        data.setdefault(canonical, alias_value)
+    return data
 
 
 class RequestModel(BaseModel):
@@ -41,4 +63,4 @@ class EngineInfoOut(BaseModel):
     docs: str
 
 
-__all__ = ["EngineInfoOut", "HealthOut", "RequestModel"]
+__all__ = ["EngineInfoOut", "HealthOut", "RequestModel", "normalize_product_aliases"]

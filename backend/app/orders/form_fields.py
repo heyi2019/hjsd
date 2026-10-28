@@ -144,6 +144,7 @@ def create_order_form_field(
     required_when: Any = None,
     is_active: bool = True,
     sort_order: int = 0,
+    section: str = "EXTRA",
     note: str | None = None,
 ) -> OrderFormField:
     """新增自定义表单字段；核心字段由种子锁定，不在 UI 暴露新增入口。"""
@@ -201,6 +202,7 @@ def create_order_form_field(
         sort_order=sort_order,
         locked=False,
         is_custom=True,
+        section=section,
         note=note,
         created_by=actor,
         updated_by=actor,
@@ -233,6 +235,7 @@ def update_order_form_field(
     required: bool | None = None,
     required_when: Any = _UNSET,
     sort_order: int | None = None,
+    section: str | None = None,
     note: str | None = None,
 ) -> OrderFormField:
     """编辑字段：label/类型/选项/必填态/排序/备注可改；field_key 与 code 固定。"""
@@ -283,6 +286,10 @@ def update_order_form_field(
         "note": definition.note,
     }
     definition.label = next_label
+    if section is not None:
+        if section not in {"EXTRA", "ACCOUNT_PRODUCT", "PARTICIPANT", "FINANCE", "BUSINESS"}:
+            raise Validation("字段归属板块不合法", details={"field": "section"})
+        definition.section = section
     definition.field_type = next_type
     definition.options = next_options or None
     if required is not None:

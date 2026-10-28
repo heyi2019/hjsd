@@ -121,7 +121,7 @@ describe("OrdersPage：四类业务台账", () => {
   it("业务台账统一展示通用字段", async () => {
     await openLedger();
 
-    for (const label of ["订单号", "对方 / 来源", "产品", "账号", "平台", "金额", "库存状态", "最新动作", "状态", "日期", "操作"]) {
+    for (const label of ["订单号", "对方 / 来源", "游戏/产品类型", "游戏账号/产品", "平台", "金额", "库存状态", "最新动作", "状态", "日期", "操作"]) {
       expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
     }
     for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "¥1,234.00", "在库"]) {
@@ -132,12 +132,12 @@ describe("OrdersPage：四类业务台账", () => {
   it("操作列提供更多菜单入口", async () => {
     await openLedger("admin");
 
-    expect(screen.getAllByText("更多⌄")).toHaveLength(2);
+    expect(screen.getAllByText("更多")).toHaveLength(2);
   });
 
   it("行级更多菜单提供分润、登记退款和取消交易", async () => {
     await openLedger("admin");
-    fireEvent.click(screen.getAllByText("更多⌄")[0]);
+    fireEvent.click(screen.getAllByText("更多")[0]);
 
     expect(await screen.findByText("分润")).toBeInTheDocument();
     expect(await screen.findByText("登记退款")).toBeInTheDocument();

@@ -47,7 +47,7 @@ describe("InventoryPanel：账号台账", () => {
       "订单号,业务,类型,产品,库存编号,平台,成本,库存状态",
     );
     expect(buildInventoryCsv(accounts)).toContain(
-      "HS-2026-0001,,回收,,KU0001,A平台,100.00,在库",
+      "HS-2026-0001,,回收,,KU_00001,A平台,100.00,在库",
     );
 
     renderLight(<InventoryPanel />, { user: "admin" });

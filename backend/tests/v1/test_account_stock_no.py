@@ -1,8 +1,8 @@
 """库存编号（stock_no）生成规则 fixture 测试。
 
-覆盖 KU 编码改造的核心逻辑：
-- 新建账号自动获得 stock_no，格式 KU + 4 位数字；
-- 连续创建按序递增（KU0001 → KU0002 → KU0003）；
+覆盖 KU 编码改造的核心逻辑（2026-10-28 口径：KU_ + 五位流水）：
+- 新建账号自动获得 stock_no，格式 KU_ + 5 位数字；
+- 连续创建按序递增（KU_00001 → KU_00002 → KU_00003）；
 - stock_no 唯一、可经账号列表 API 回读；
 - 不同业务类型（回收/提号/代挂/代分期衍生）账号均生成 stock_no；
 - STOCK_NO 序列 current_value 随创建递增。
@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from app.accounts import service
 
-KU_PATTERN = re.compile(r"^KU\d{4}$")
+KU_PATTERN = re.compile(r"^KU_\d{5}$")
 
 
 def _make(db, game_account, inventory_type="RECOVERY", **kw):
@@ -44,9 +44,9 @@ class TestStockNoGeneration:
         a1 = _make(seeded_db, "acc-seq-1")
         a2 = _make(seeded_db, "acc-seq-2")
         a3 = _make(seeded_db, "acc-seq-3")
-        assert a1.stock_no == "KU0001"
-        assert a2.stock_no == "KU0002"
-        assert a3.stock_no == "KU0003"
+        assert a1.stock_no == "KU_00001"
+        assert a2.stock_no == "KU_00002"
+        assert a3.stock_no == "KU_00003"
 
     def test_stock_no_is_unique_per_account(self, seeded_db):
         a1 = _make(seeded_db, "acc-uniq-1")

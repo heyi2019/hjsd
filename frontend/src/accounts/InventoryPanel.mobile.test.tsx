@@ -14,7 +14,7 @@ vi.mock("../shared/state/session", () => ({
 function makeRow(over: Partial<Account> = {}): Account {
   return {
     id: 1,
-    stock_no: "KU0001",
+    stock_no: "KU_00001",
     game_account: "player01",
     source_order_no: "ORD-9",
     business_mode: "BUY",
@@ -35,7 +35,7 @@ function renderCard(ui: React.ReactNode) {
 describe("MobileInventoryList", () => {
   it("有数据时渲染卡片并展示全部字段标签", () => {
     renderCard(<MobileInventoryList rows={[makeRow()]} onSale={() => {}} onConsign={() => {}} onVoid={() => {}} onRebate={() => {}} onEdit={() => {}} onMoreAction={() => {}} editingAccount={null} />);
-    expect(screen.getByText("KU0001")).toBeInTheDocument();
+    expect(screen.getByText("KU_00001")).toBeInTheDocument();
     for (const label of ["游戏账号", "订单号", "业务", "业务类型", "增值服务", "产品", "平台", "成本"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }

@@ -16,14 +16,14 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：库存编号（KU 编码）", () => {
-  // 表格按 id 倒序，KU0004(id=4) 为首个数据行，作为等待锚点最稳。
+  // 表格按 id 倒序，KU_00004(id=4) 为首个数据行，作为等待锚点最稳。
   it("台账首列库存编号展示账号的 stock_no（KU+4位）", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("KU0004");
+    await screen.findByText("KU_00004");
 
     const rows = screen.getAllByRole("row");
     const first = within(rows[1]);
-    expect(first.getByText("KU0004")).toBeInTheDocument();
+    expect(first.getByText("KU_00004")).toBeInTheDocument();
     // 首列库存编号应排在订单号之前
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers.indexOf("库存编号")).toBeLessThan(headers.indexOf("订单号"));
@@ -40,17 +40,17 @@ describe("InventoryPanel：库存编号（KU 编码）", () => {
 
   it("不同业务类型的库存账号均显示各自 stock_no（含 DG/DFQ 衍生）", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("KU0004");
+    await screen.findByText("KU_00004");
     // HS 回收 / TH 提号 / DG 代挂 / DFQ 代分期 各自的库存编号
-    expect(screen.getByText("KU0001")).toBeInTheDocument();
-    expect(screen.getByText("KU0002")).toBeInTheDocument();
-    expect(screen.getByText("KU0003")).toBeInTheDocument();
-    expect(screen.getByText("KU0004")).toBeInTheDocument();
+    expect(screen.getByText("KU_00001")).toBeInTheDocument();
+    expect(screen.getByText("KU_00002")).toBeInTheDocument();
+    expect(screen.getByText("KU_00003")).toBeInTheDocument();
+    expect(screen.getByText("KU_00004")).toBeInTheDocument();
   });
 
   it("导出 CSV 的库存编号列取自 stock_no（含 DG/DFQ 衍生）", () => {
     const csv = buildInventoryCsv(stockNoAccounts);
-    expect(csv).toContain("KU0003");
-    expect(csv).toContain("KU0004");
+    expect(csv).toContain("KU_00003");
+    expect(csv).toContain("KU_00004");
   });
 });

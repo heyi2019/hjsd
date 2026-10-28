@@ -171,6 +171,8 @@ def post_event(
             details={"order_no": order.order_no, "current_status": order.status},
         )
 
+    # HS/TH BUY：订单未关联库存账号时用内联账号资料补建（正常流程建单时已建号，
+    # 此处是 API 直调/异常数据的兜底；游戏账号必填是建号前提）。
     if order.order_type in {"HS", "TH"} and event_type == EventType.BUY.value and order.account_id is None and order.game_account:
         account = _create_inline_inventory_account(
             session, order_type=order.order_type, game_account=order.game_account, actor=actor,

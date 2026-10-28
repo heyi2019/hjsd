@@ -389,6 +389,15 @@ def create_order(
         if primary_version_id is None:
             primary_version_id = version_id
 
+    # 内联建库存账号（2026-10-28 口径）：建单成功即生成库存编号，不再等 BUY 事件。
+    # HS/TH 表单的账号资料为必填，game_account 必有值；缺资料时退回 BUY 事件兜底建号。
+    if definition.code in {"HS", "TH"} and account_id is None and game_account:
+        account_id = _create_inline_inventory_account(
+            session, order_type=definition.code, game_account=game_account, actor=actor,
+            game_type=game_type, game_password=game_password, channel_region=channel_region,
+            bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+        ).id
+
     if definition.code == "DG" and account_id is None and game_account:
         account_id = _create_inline_inventory_account(
             session, order_type=definition.code, game_account=game_account, actor=actor,

@@ -10,11 +10,14 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.accounts import service
+from app.domain.trade import Account, OrderEvent
+from app.orders import events as order_events
 
 KU_PATTERN = re.compile(r"^KU_\d{5}$")
 
@@ -87,3 +90,48 @@ class TestStockNoGeneration:
             text("SELECT current_value FROM document_sequences WHERE sequence_key='STOCK_NO'")
         ).scalar()
         assert after - before == 2
+
+
+class TestStockNoAtOrderCreation:
+    """2026-10-28 口径：建单成功即生成库存编号（不等 BUY 事件）。"""
+
+    def test_hs_order_creation_allocates_stock_no_immediately(self, seeded_db):
+        from app.domain.trade import Order
+
+        order = service_create_order(
+            seeded_db, game_account="hs-stockno-at-create", game_type="王者荣耀",
+            game_password="pwd", channel_region="微信一区",
+        )
+        assert order.account_id is not None
+        account = seeded_db.get(Account, order.account_id)
+        assert account.stock_no is not None
+        assert KU_PATTERN.match(account.stock_no)
+        assert account.game_account == "hs-stockno-at-create"
+        assert account.status == "IN_STOCK"
+        # 订单本体尚无任何事件（BUY 未登记），编号已就位
+        assert seeded_db.scalar(
+            select(OrderEvent.id).where(OrderEvent.order_id == order.id)
+        ) is None
+
+    def test_hs_order_without_game_account_rejected_at_buy(self, seeded_db):
+        """缺账号资料（API 直调）时建单不建号，BUY 被明确拦截不发号。"""
+        from decimal import Decimal
+
+        from app.core.errors import Validation
+
+        order = service_create_order(seeded_db)
+        assert order.account_id is None
+        with pytest.raises(Validation, match="回收订单买入必须填写游戏账号"):
+            order_events.post_event(
+                seeded_db, order.id, event_type="BUY",
+                amount=Decimal("300"), occurred_on=order.trade_date, actor="pytest",
+            )
+        assert order.account_id is None
+
+
+def service_create_order(db, **kw):
+    from app.orders import service as orders_service
+
+    return orders_service.create_order(
+        db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", **kw
+    )

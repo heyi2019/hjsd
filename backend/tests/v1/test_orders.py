@@ -307,6 +307,7 @@ class TestA03DgZeroCapital:
 class TestEventRules:
     @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP")])
     def test_inline_purchase_creates_inventory(self, seeded_db, order_type, inventory_type):
+        """2026-10-28 口径：建单成功即内联建库存账号（编号已发放），BUY 只累计成本。"""
         order = service.create_order(
             seeded_db,
             order_type=order_type,
@@ -315,7 +316,14 @@ class TestEventRules:
             game_account="inline-recovery-account",
         )
 
-        assert order.account_id is None
+        assert order.account_id is not None
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert account.game_account == "inline-recovery-account"
+        assert account.inventory_type == inventory_type
+        assert account.status == "IN_STOCK"
+        assert account.cost_amount == Decimal("0.00")
+
         event, _ = service.post_event(
             seeded_db,
             order.id,
@@ -326,12 +334,9 @@ class TestEventRules:
         )
 
         assert event.event_type == "BUY"
-        account = seeded_db.get(Account, order.account_id)
-        assert account is not None
-        assert account.game_account == "inline-recovery-account"
-        assert account.inventory_type == inventory_type
-        assert account.status == "IN_STOCK"
         assert account.cost_amount == Decimal("100.00")
+        assert account.buy_date == TODAY
+        assert account.status == "IN_STOCK"
 
     def test_inline_consignment_creates_inventory(self, seeded_db):
         order = service.create_order(

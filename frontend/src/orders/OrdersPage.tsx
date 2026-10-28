@@ -395,19 +395,21 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
 
   const openOrder = async (order: Order) => {
     try {
-      setSelectedOrder(await ordersApi.get(order.id));
-      // 关联单失败不阻断详情展示。
-      setLinks(await ordersApi.links(order.id).catch(() => []));
-      // 规则快照（BAS-06-04）：无权查看时静默降级为 null，不阻断详情展示。
+      // 先取详情，抽屉立即可见；关联单与规则快照互不依赖，并行补齐、各自独立回写
+      //（setLinks 不再等快照返回，避免未 mock 快照接口时阻塞关联行渲染）。
+      const detail = await ordersApi.get(order.id);
+      setSelectedOrder(detail);
       setSnapshotLoading(true);
-      try {
-        setOrderSnapshot(await policyApi.orderSnapshot(order.id));
-      } catch {
-        setOrderSnapshot(null);
-      } finally {
-        setSnapshotLoading(false);
-      }
+      ordersApi.links(order.id)
+        .then((linksResult) => setLinks(linksResult))
+        .catch(() => setLinks([]));
+      policyApi.orderSnapshot(order.id)
+        .then((s) => setOrderSnapshot(s))
+        // 规则快照（BAS-06-04）：无权查看时静默降级为 null，不阻断详情展示。
+        .catch(() => setOrderSnapshot(null))
+        .finally(() => setSnapshotLoading(false));
     } catch (error) {
+      setSnapshotLoading(false);
       appMessage.error(normalizeError(error).message);
     }
   };

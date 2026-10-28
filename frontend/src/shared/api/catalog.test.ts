@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./client", () => ({
-  api: { get: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
 import { api } from "./client";
-import { auditApi, installmentsApi, reportsApi } from "./catalog";
+import { auditApi, installmentsApi, reportsApi, teamsApi, usersApi } from "./catalog";
 
 describe("auditApi：与后端审计查询契约一致", () => {
   beforeEach(() => {
@@ -28,5 +28,41 @@ describe("页面接口契约", () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
     expect(await installmentsApi.dispositions(7)).toEqual([]);
     expect(api.get).toHaveBeenCalledWith("/installments/7/dispositions");
+  });
+});
+
+describe("组织 API：统一通过领域客户端访问", () => {
+  beforeEach(() => {
+    vi.mocked(api.get).mockReset();
+    vi.mocked(api.post).mockReset();
+    vi.mocked(api.patch).mockReset();
+  });
+
+  it("用户列表、创建、更新和重置密码使用固定路径", async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({ data: { id: 1 } })
+      .mockResolvedValueOnce({ data: { ok: true } });
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: { id: 1 } });
+    await usersApi.list();
+    await usersApi.create({ username: "u", password: "password123" });
+    await usersApi.update(1, { is_active: false });
+    await usersApi.resetPassword(1, "password123");
+    expect(api.get).toHaveBeenCalledWith("/users");
+    expect(api.post).toHaveBeenCalledWith("/users", { username: "u", password: "password123" });
+    expect(api.patch).toHaveBeenCalledWith("/users/1", { is_active: false });
+    expect(api.post).toHaveBeenCalledWith("/users/1/reset-password", { password: "password123" });
+  });
+
+  it("团队列表、创建和更新使用固定路径", async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 1 } });
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: { id: 1 } });
+    await teamsApi.list();
+    await teamsApi.create({ code: "T1", name: "一队" });
+    await teamsApi.update(1, { is_active: false });
+    expect(api.get).toHaveBeenCalledWith("/teams");
+    expect(api.post).toHaveBeenCalledWith("/teams", { code: "T1", name: "一队" });
+    expect(api.patch).toHaveBeenCalledWith("/teams/1", { is_active: false });
   });
 });

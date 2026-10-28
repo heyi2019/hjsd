@@ -1,6 +1,6 @@
 """foundation.router：基础主数据 API（BAS-02 / BAS-03）。
 
-端点与《ERP_API接口规范_v1.0.md》一致：
+端点与《ERP_API接口规范_v1.1.md》一致：
 - GET/POST `/pools`、PATCH `/pools/{id}`、PATCH `/pools/{id}/status`、DELETE `/pools/{id}`；
 - GET/POST `/order-types`、GET/POST `/order-types/{code}/routes`；
 - GET `/sequences`（编号域与下一个可用编号）。

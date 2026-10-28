@@ -135,7 +135,7 @@ class TestPartiesMerge:
         assert len(migrated) == 1
 
     def test_merge_skips_existing_extra(self, seeded_db):
-        # 654: 目标已存在同字段活字段值时跳过（保留目标值）
+        # 654: 目标已存在同字段扩展值时跳过（保留目标值）
         source = _customer(seeded_db)
         target = _customer(seeded_db)
         seeded_db.commit()

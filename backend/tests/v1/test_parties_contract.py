@@ -5,7 +5,7 @@
 本文件补脱敏边界（空值/短串）、建单必填校验、查重空条件、查询三过滤+作用域、
 客户更新（含已合并冲突与联系方式审计分流）、状态机 MERGED 守卫、
 合并同源/已合并/重复角色去重、合作方查询与更新、字段定义三项校验与停用过滤、
-活字段覆写，以及 7 个未测路由端点。
+表单扩展字段覆写，以及 7 个未测路由端点。
 """
 from __future__ import annotations
 
@@ -48,6 +48,23 @@ def test_party_routes_use_declared_response_types():
     assert get_type_hints(parties_router.list_counterparties)["return"] == list[schemas.CounterpartyOut]
 
 
+def test_customer_list_supports_limit_and_offset(seeded_client, seeded_db):
+    _customer(seeded_db, "客户一")
+    _customer(seeded_db, "客户二")
+    _customer(seeded_db, "客户三")
+
+    response = seeded_client.get(
+        CUSTOMERS, params={"limit": 1, "offset": 1}, headers={"X-Dev-User": "admin"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 3
+    assert response.json()["limit"] == 1
+    assert response.json()["offset"] == 1
+    assert len(response.json()["items"]) == 1
+    assert response.json()["items"][0]["display_name"] == "客户二"
+
+
 def _scoped_user() -> CurrentUser:
     """非 admin、SELF 作用域用户（可见集只有自己）。"""
     return CurrentUser.build(
@@ -87,17 +104,17 @@ class TestCreateCustomerGuards:
         assert "称呼/昵称必填" in str(exc.value)
 
     def test_extra_values_require_object_with_string_keys(self, seeded_db):
-        with pytest.raises(Validation, match="活字段值必须为对象"):
+        with pytest.raises(Validation, match="表单扩展字段值必须为对象"):
             service.create_customer(
                 seeded_db,
-                display_name="活字段结构错误",
+                display_name="表单扩展字段结构错误",
                 actor="pytest",
                 extra_values=["not-an-object"],
             )
-        with pytest.raises(Validation, match="活字段键必须为非空字符串"):
+        with pytest.raises(Validation, match="表单扩展字段键必须为非空字符串"):
             service.create_customer(
                 seeded_db,
-                display_name="活字段键错误",
+                display_name="表单扩展字段键错误",
                 actor="pytest",
                 extra_values={1: "value"},
             )
@@ -519,8 +536,8 @@ class TestMergeGuards:
         definition = seeded_db.scalar(
             select(OrderFormField).where(OrderFormField.field_key == "preferred_platform")
         )
-        source = _customer(seeded_db, "带活字段的源")
-        target = _customer(seeded_db, "没有活字段的目标")
+        source = _customer(seeded_db, "带表单扩展字段的源")
+        target = _customer(seeded_db, "没有表单扩展字段的目标")
         service.set_extra_values(
             seeded_db,
             entity_type="customer",
@@ -638,7 +655,7 @@ class TestCounterpartyGuards:
         assert peer.updated_by == "pytest"
 
 
-# ------------------------------------------------------------------ 活字段
+# ------------------------------------------------------------------ 表单扩展字段
 # ------------------------------------------------------------------ 路由层
 class TestPartiesApi:
     def test_list_customers_endpoint(self, seeded_client, seeded_db, headers):
@@ -648,10 +665,10 @@ class TestPartiesApi:
         )
         assert response.status_code == 200, response.text
         # admin 具备 customer.contact.read → 不脱敏
-        assert response.json()[0]["contact_masked"] is False
-        assert response.json()[0]["id"] == customer.id
-        assert response.json()[0]["order_roles"] == []
-        assert response.json()[0]["active_order_count"] == 0
+        assert response.json()["items"][0]["contact_masked"] is False
+        assert response.json()["items"][0]["id"] == customer.id
+        assert response.json()["items"][0]["order_roles"] == []
+        assert response.json()["items"][0]["active_order_count"] == 0
 
     def test_customer_detail_endpoint_returns_four_tabs(self, seeded_client, seeded_db, headers):
         customer = _customer(seeded_db, "详情接口客户", owner_id=9)

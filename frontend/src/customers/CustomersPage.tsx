@@ -8,7 +8,7 @@ import { SearchOutlined } from "@ant-design/icons";
 // 用别名避免 ui_guards 的字面量误伤（SearchButton 与 Button 是同一组件引用）。
 const SearchButton = Button;
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   counterpartiesApi,
   customersApi,
@@ -225,7 +225,16 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
   }, [keyword, statusFilter]);
 
   // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
-  useReloadOnActive(active, load);
+  // 首次挂载由筛选 effect 负责；keep-alive 重新激活时仍由统一入口刷新。
+  useReloadOnActive(active, load, { skipFirstMount: true });
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    const wasActive = wasActiveRef.current;
+    wasActiveRef.current = active;
+    // 从隐藏页切回时交给 useReloadOnActive，避免激活瞬间重复请求。
+    if (!active || !wasActive) return;
+    void load();
+  }, [active, keyword, statusFilter, load]);
 
   useEffect(() => {
     // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页

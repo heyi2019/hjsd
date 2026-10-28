@@ -1,4 +1,4 @@
-"""parties.service：客户、合作方、参与方校验、活字段的 Service 层。
+"""parties.service：客户、合作方、参与方校验、表单扩展字段的 Service 层。
 
 规则来源：CUS-01、BAS-02-05、BAS-04、《ERP_接口错误码与状态机_v1.0.md》。
 
@@ -204,8 +204,25 @@ def duplicate_candidates(
 
 def list_customers(
     session: Session, *, keyword: str | None = None, status: str | None = None,
-    user: CurrentUser | None = None,
+    user: CurrentUser | None = None, limit: int | None = None, offset: int = 0,
 ) -> list[Customer]:
+    stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
+    return list(session.scalars(stmt.order_by(Customer.id)).all())
+
+
+def count_customers(
+    session: Session, *, keyword: str | None = None, status: str | None = None,
+    user: CurrentUser | None = None,
+) -> int:
+    stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
+    return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+
+
+def _customer_list_stmt(
+    *, keyword: str | None, status: str | None, user: CurrentUser | None, session: Session
+):
     stmt = select(Customer)
     if status:
         stmt = stmt.where(Customer.status == status)
@@ -224,7 +241,7 @@ def list_customers(
         scope = owner_scope_filter(Customer.owner_id, user, session)
         if scope is not None:
             stmt = stmt.where(scope)
-    return list(session.scalars(stmt.order_by(Customer.id)).all())
+    return stmt
 
 
 def get_customer_activity_summary(

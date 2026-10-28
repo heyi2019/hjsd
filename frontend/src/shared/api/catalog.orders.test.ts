@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 受控 axios mock：transport 按 params.offset/limit 从一个共 627 条的数据集切片返回，
-// 验证 ordersApi.list 在无显式 limit 时自动翻页取全量、显式 limit 时单发透传。
+// 使用统一分页响应，验证 ordersApi.list 在无显式 limit 时自动翻页取全量。
 const TOTAL = 627;
 
 vi.mock("axios", () => {
@@ -15,7 +15,7 @@ vi.mock("axios", () => {
     const slice = Math.max(0, Math.min(limit, TOTAL - offset));
     const pageData = Array.from({ length: slice }, (_, i) => ({ id: offset + i + 1 }));
     return {
-      data: pageData,
+      data: { items: pageData, total: TOTAL, limit, offset },
       status: 200,
       headers: {},
       config: { method: String(config.method || "get").toUpperCase() },
@@ -59,6 +59,8 @@ vi.mock("axios", () => {
   const apiDefault = {
     create,
     AxiosHeaders: class {
+      map: Record<string, any>;
+
       constructor(h: any) {
         this.map = h || {};
       }

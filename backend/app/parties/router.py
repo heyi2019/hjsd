@@ -1,4 +1,4 @@
-"""parties.router：客户、合作方与活字段 API（CUS-01 / BAS-02-05 / BAS-04）。
+"""parties.router：客户、合作方与表单扩展字段 API（CUS-01 / BAS-02-05 / BAS-04）。
 
 联系方式默认脱敏；读取完整值须 `customer.contact.read` 且**写审计**；
 修改联系方式/备注须 `customer.contact.write`；合并须 `customer.merge`。
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import PermissionDenied
+from app.core.schemas import PageOut
 from app.core.security import (
     PERM_COUNTERPARTY_MANAGE,
     PERM_COUNTERPARTY_READ,
@@ -56,30 +57,39 @@ def _counterparty_output(db: Session, item) -> schemas.CounterpartyOut:
 
 
 # --------------------------------------------------------------------- 客户
-@router.get("/customers", response_model=list[schemas.CustomerOut])
+@router.get("/customers", response_model=PageOut[schemas.CustomerOut])
 def list_customers(
     keyword: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> list[schemas.CustomerOut]:
     reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
-    customers = service.list_customers(db, keyword=keyword, status=status, user=user)
+    customers = service.list_customers(
+        db, keyword=keyword, status=status, user=user, limit=limit, offset=offset
+    )
     extras = service.get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
     )
     activity = service.get_customer_activity_summary(
         db, [item.id for item in customers]
     )
-    return [
-        service.to_customer_out(
-            item,
-            reveal_contact=reveal,
-            extra_values=extras.get(item.id),
-            activity_summary=activity.get(item.id),
-        )
-        for item in customers
-    ]
+    return PageOut(
+        items=[
+            service.to_customer_out(
+                item,
+                reveal_contact=reveal,
+                extra_values=extras.get(item.id),
+                activity_summary=activity.get(item.id),
+            )
+            for item in customers
+        ],
+        total=service.count_customers(db, keyword=keyword, status=status, user=user),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post(

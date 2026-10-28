@@ -84,9 +84,9 @@ describe("normalizeError：只认 v1 统一错误结构", () => {
 });
 
 describe("errorMessage：展示层统一文案", () => {
-  it("带 code 时拼成 `code: message`", () => {
+  it("带 code 时只展示用户可执行的中文 message", () => {
     const err = axiosError({ responseData: { code: "POOL_ROUTE_MISSING", message: "缺少资金路由" } });
-    expect(errorMessage(err)).toBe("POOL_ROUTE_MISSING: 缺少资金路由");
+    expect(errorMessage(err)).toBe("缺少资金路由");
   });
 
   it("无 code 时只给 message", () => {

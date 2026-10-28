@@ -56,6 +56,24 @@ def _buy(seeded_db, account, amount="500"):
     return order
 
 
+def test_account_list_supports_limit_and_offset(seeded_client, seeded_db):
+    _account(seeded_db, "page-account-1")
+    _account(seeded_db, "page-account-2")
+    _account(seeded_db, "page-account-3")
+
+    response = seeded_client.get(
+        "/api/v1/stocks", headers={"X-Dev-User": "admin"},
+        params={"limit": 1, "offset": 1},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 3
+    assert response.json()["limit"] == 1
+    assert response.json()["offset"] == 1
+    assert len(response.json()["items"]) == 1
+    assert response.json()["items"][0]["game_account"] == "page-account-2"
+
+
 class TestCreateAccountGuards:
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
         account = service.create_account(
@@ -386,8 +404,8 @@ class TestAccountsApi:
 
         listed = seeded_client.get("/api/v1/stocks", headers=headers)
         assert listed.status_code == 200, listed.text
-        assert [row["game_account"] for row in listed.json()] == [mine.game_account]
-        assert all("risk_level" not in row for row in listed.json())
+        assert [row["game_account"] for row in listed.json()["items"]] == [mine.game_account]
+        assert all("risk_level" not in row for row in listed.json()["items"])
 
         hidden_detail = seeded_client.get(
             f"/api/v1/stocks/{other.id}/execution-detail", headers=headers
@@ -457,7 +475,7 @@ class TestAccountsApi:
 
         listed = seeded_client.get("/api/v1/stocks", headers=viewer_headers)
         assert listed.status_code == 200, listed.text
-        item = next(row for row in listed.json() if row["id"] == account.id)
+        item = next(row for row in listed.json()["items"] if row["id"] == account.id)
         assert item["game_password"] is None
 
         detail = seeded_client.get(
@@ -517,13 +535,13 @@ class TestAccountsApi:
             headers=headers,
         )
         assert response.status_code == 200, response.text
-        assert response.json() == []
+        assert response.json()["items"] == []
 
         stocked = seeded_client.get(
             "/api/v1/stocks", params={"status": AccountStatus.IN_STOCK.value},
             headers=headers,
         )
-        assert [item["game_account"] for item in stocked.json()] == [account.game_account]
+        assert [item["game_account"] for item in stocked.json()["items"]] == [account.game_account]
 
     def test_list_accounts_resolves_each_source_order(self, seeded_client, seeded_db, headers):
         first = _account(seeded_db, "batch-source-first")
@@ -535,7 +553,7 @@ class TestAccountsApi:
 
         assert response.status_code == 200, response.text
         source_orders = {
-            item["game_account"]: item["source_order_no"] for item in response.json()
+            item["game_account"]: item["source_order_no"] for item in response.json()["items"]
         }
         assert source_orders[first.game_account] == first_order.order_no
         assert source_orders[second.game_account] == second_order.order_no
@@ -558,7 +576,7 @@ class TestAccountsApi:
         response = seeded_client.get("/api/v1/stocks", headers=headers)
 
         assert response.status_code == 200, response.text
-        item = next(row for row in response.json() if row["game_account"] == account.game_account)
+        item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
     def test_list_accounts_keeps_cancelled_source_order_number(self, seeded_client, seeded_db, headers):
@@ -575,7 +593,7 @@ class TestAccountsApi:
         response = seeded_client.get("/api/v1/stocks", headers=headers)
 
         assert response.status_code == 200, response.text
-        item = next(row for row in response.json() if row["game_account"] == account.game_account)
+        item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
     def test_list_accounts_resolves_th_source_order(self, seeded_client, seeded_db, headers):
@@ -604,7 +622,7 @@ class TestAccountsApi:
         response = seeded_client.get("/api/v1/stocks", headers=headers)
 
         assert response.status_code == 200, response.text
-        item = next(row for row in response.json() if row["game_account"] == account.game_account)
+        item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
     def test_order_creation_rejects_legacy_consignment_account_payload(self, seeded_client, headers):

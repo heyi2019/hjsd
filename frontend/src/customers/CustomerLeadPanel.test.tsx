@@ -95,7 +95,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
     await ui.type(within(modal).getByLabelText("关闭原因"), "已成交");
     await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
-    await waitFor(() => expect(catalog.leadsApi.close).toHaveBeenCalledWith(1, "已成交"));
+    await waitFor(() => expect(catalog.leadsApi.close).toHaveBeenCalledWith(1, "已成交", undefined));
   });
 
   it("点击行内转单打开弹窗并提交调用 leadsApi.convert", async () => {
@@ -105,7 +105,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
     await ui.type(within(modal).getByLabelText("订单 ID"), "99");
     await ui.click(within(modal).getByRole("button", { name: /确认转单/ }));
-    await waitFor(() => expect(catalog.leadsApi.convert).toHaveBeenCalledWith(1, 99));
+    await waitFor(() => expect(catalog.leadsApi.convert).toHaveBeenCalledWith(1, 99, undefined));
   });
 
   it("配置停用后关闭弹窗不渲染「关闭原因」字段", async () => {
@@ -118,7 +118,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
     await waitFor(() => expect(within(modal).queryByLabelText("关闭原因")).toBeNull());
     await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
-    await waitFor(() => expect(catalog.leadsApi.close).toHaveBeenCalledWith(1, undefined));
+    await waitFor(() => expect(catalog.leadsApi.close).toHaveBeenCalledWith(1, undefined, undefined));
   });
 
   it("转单弹窗「订单 ID」标签取配置值", async () => {

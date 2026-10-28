@@ -737,6 +737,38 @@ def list_orders(
     offset: int = 0,
     user: CurrentUser | None = None,
 ) -> list[Order]:
+    stmt = _order_list_stmt(
+        order_type=order_type, status=status, trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
+        keyword=keyword, user=user, session=session,
+    )
+    return list(
+        session.scalars(
+            stmt.order_by(Order.id).limit(limit).offset(offset)
+        ).unique().all()
+    )
+
+
+def count_orders(
+    session: Session, *, order_type: str | None = None, status: str | None = None,
+    trade_date_from: date | None = None, trade_date_to: date | None = None,
+    owner_id: int | None = None, pool_id: int | None = None,
+    keyword: str | None = None, user: CurrentUser | None = None,
+) -> int:
+    stmt = _order_list_stmt(
+        order_type=order_type, status=status, trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
+        keyword=keyword, user=user, session=session,
+    )
+    return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+
+
+def _order_list_stmt(
+    *, order_type: str | None, status: str | None,
+    trade_date_from: date | None, trade_date_to: date | None,
+    owner_id: int | None, pool_id: int | None, keyword: str | None,
+    user: CurrentUser | None, session: Session,
+):
     stmt = select(Order).outerjoin(Account, Account.id == Order.account_id)
     if order_type:
         stmt = stmt.where(Order.order_type == order_type)
@@ -772,11 +804,7 @@ def list_orders(
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:
             stmt = stmt.where(scope)
-    return list(
-        session.scalars(
-            stmt.order_by(Order.id).limit(limit).offset(offset)
-        ).unique().all()
-    )
+    return stmt
 
 
 def update_order(

@@ -1,4 +1,4 @@
-"""tests/v1/test_parties：客户、合作方、活字段（CUS-01 / BAS-02-05 / BAS-04 / A10 / A11）。"""
+"""tests/v1/test_parties：客户、合作方、表单扩展字段（CUS-01 / BAS-02-05 / BAS-04 / A10 / A11）。"""
 from __future__ import annotations
 
 import pytest
@@ -300,7 +300,7 @@ class TestPartiesApi:
         assert counterparty_updated.json()["note"] is None
 
 class TestCustomerExtraValues:
-    """活字段随客户建档落库、类型校验、删除守卫（BAS-04）。"""
+    """表单扩展字段随客户建档落库、类型校验、删除守卫（BAS-04）。"""
 
     def _defs(self, seeded_db):
         for field_key, label, field_type, options, required, sort_order in (
@@ -413,4 +413,4 @@ class TestExtraValuesApi:
         ).json()
         assert detail["extra_values"] == {"credit_level": "优质"}
         listed = seeded_client.get(CUSTOMERS, headers=headers).json()
-        assert listed[0]["extra_values"] == {"credit_level": "优质"}
+        assert listed["items"][0]["extra_values"] == {"credit_level": "优质"}

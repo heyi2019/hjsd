@@ -383,7 +383,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "PASSWORD_RESET", label: "重置密码" },
     { value: "TEAM_CREATE", label: "新建团队" },
     { value: "TEAM_UPDATE", label: "编辑团队" },
-    { value: "FIELD_DEFINITION_CHANGE", label: "变更活字段定义" },
+    { value: "FIELD_DEFINITION_CHANGE", label: "变更表单字段配置" },
     { value: "ORDER_FORM_FIELD_CHANGE", label: "变更订单表单字段" },
     { value: "POLICY_CHANGE", label: "变更经营规则" },
     { value: "PROFIT_ALLOCATION_SET", label: "设置利润分润" },

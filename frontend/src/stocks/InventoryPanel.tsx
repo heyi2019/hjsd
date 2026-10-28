@@ -55,6 +55,39 @@ function moreMenuItems(row: Account) {
   ];
 }
 
+/** 倒序取最近一条仍有余额可冲销的 BUY/SELL 事件（「先冲销最近的」为原语义，此处保持一致）。
+ *  下架（VOID）走后端「全额冲销买入事件」路径：CANCEL offset=BUY 且全额消耗时账号转入 VOID
+ *  （core/state_machine.py ACCOUNT_TRANSITIONS；orders/events.py _apply_account_effect）。
+ *
+ *  注：曾尝试把内部 filter 改为「按 offset_event_id 预聚合的 Map」，实测在真实数据规模
+ *  （单账号 3 单 × 8 事件）下反而慢约 3%（Map 构建开销 > 小规模 filter），故保留直写。
+ *  此处仅省去 [...].reverse() 的数组副本，改为倒序索引。 */
+export function findCancelableEvent(detail: AccountExecutionDetail, eventType: "BUY" | "SELL") {
+  for (let i = detail.orders.length - 1; i >= 0; i -= 1) {
+    const order = detail.orders[i];
+    for (let j = order.events.length - 1; j >= 0; j -= 1) {
+      const event = order.events[j];
+      if (event.event_type !== eventType) continue;
+      const cancelledAmount = order.events
+        .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
+        .reduce((sum, item) => sum + Number(item.amount), 0);
+      const remaining = Number(event.amount) - cancelledAmount;
+      if (remaining > 0) {
+        return {
+          orderId: order.order_id,
+          eventId: event.id,
+          amount: remaining.toFixed(2),
+          portion: event.portion,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+export const findCancelableSale = (detail: AccountExecutionDetail) => findCancelableEvent(detail, "SELL");
+export const findCancelableBuy = (detail: AccountExecutionDetail) => findCancelableEvent(detail, "BUY");
+
 /** 移动端（≤640px）库存卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
 export function MobileInventoryList({
   rows,
@@ -215,39 +248,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     await loadExecution(account);
     setDetailTarget(account);
   }
-
-  /** 倒序取最近一条仍有余额可冲销的 BUY/SELL 事件（「先冲销最近的」为原语义，此处保持一致）。
-   *  下架（VOID）走后端「全额冲销买入事件」路径：CANCEL offset=BUY 且全额消耗时账号转入 VOID
-   *  （core/state_machine.py ACCOUNT_TRANSITIONS；orders/events.py _apply_account_effect）。
-   *
-   *  注：曾尝试把内部 filter 改为「按 offset_event_id 预聚合的 Map」，实测在真实数据规模
-   *  （单账号 3 单 × 8 事件）下反而慢约 3%（Map 构建开销 > 小规模 filter），故保留直写。
-   *  此处仅省去 [...].reverse() 的数组副本，改为倒序索引。 */
-  function findCancelableEvent(detail: AccountExecutionDetail, eventType: "BUY" | "SELL") {
-    for (let i = detail.orders.length - 1; i >= 0; i -= 1) {
-      const order = detail.orders[i];
-      for (let j = order.events.length - 1; j >= 0; j -= 1) {
-        const event = order.events[j];
-        if (event.event_type !== eventType) continue;
-        const cancelledAmount = order.events
-          .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
-          .reduce((sum, item) => sum + Number(item.amount), 0);
-        const remaining = Number(event.amount) - cancelledAmount;
-        if (remaining > 0) {
-          return {
-            orderId: order.order_id,
-            eventId: event.id,
-            amount: remaining.toFixed(2),
-            portion: event.portion,
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  const findCancelableSale = (detail: AccountExecutionDetail) => findCancelableEvent(detail, "SELL");
-  const findCancelableBuy = (detail: AccountExecutionDetail) => findCancelableEvent(detail, "BUY");
 
   async function openVoid(account: Account) {
     try {

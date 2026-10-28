@@ -7,7 +7,6 @@ from typing import Any
 NON_JSON_ROUTES = frozenset(
     {
         ("DELETE", "/api/v1/pools/{pool_id}"),
-        ("DELETE", "/api/v1/field-definitions/{definition_id}"),
         ("DELETE", "/api/v1/order-form-fields/{field_id}"),
         ("DELETE", "/api/v1/option-sets/{code}"),
         ("DELETE", "/api/v1/orders/{order_id}/links/{link_id}"),

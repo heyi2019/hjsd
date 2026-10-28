@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
+
+T = TypeVar("T")
 
 
 def normalize_product_aliases(value: object) -> object:
@@ -30,6 +33,17 @@ class RequestModel(BaseModel):
     """Reject fields outside the published request contract."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+class PageOut(BaseModel, Generic[T]):
+    """统一列表响应：分页元数据与数据项始终同层返回。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[T]
+    total: int
+    limit: int
+    offset: int
 
 
 class HealthOut(BaseModel):
@@ -63,4 +77,4 @@ class EngineInfoOut(BaseModel):
     docs: str
 
 
-__all__ = ["EngineInfoOut", "HealthOut", "RequestModel", "normalize_product_aliases"]
+__all__ = ["EngineInfoOut", "HealthOut", "PageOut", "RequestModel", "normalize_product_aliases"]

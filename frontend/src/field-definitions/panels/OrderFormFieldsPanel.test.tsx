@@ -48,6 +48,7 @@ beforeEach(() => {
   vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
   vi.mocked(catalog.orderFormFieldsApi).scopes = vi.fn().mockResolvedValue([]);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.optionSetsApi).get = vi.fn().mockResolvedValue({ options: [] } as never);
 });
 
 describe("OrderFormFieldsPanel", () => {

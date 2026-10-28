@@ -8,7 +8,6 @@
  * 不要按模型名推断，必须照抄实际值，否则查不到改动记录。
  */
 
-import { api } from "../shared/api/client";
 import {
   gameTypesApi,
   importsApi,
@@ -17,6 +16,8 @@ import {
   policyApi,
   poolsApi,
   sequencesApi,
+  teamsApi,
+  usersApi,
 } from "../shared/api/catalog";
 import { FORM_SCOPES_FALLBACK } from "./formScopes";
 
@@ -106,7 +107,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "ORG",
     permission: "user.manage",
     entityTypes: ["user"],
-    count: async () => (await api.get<unknown[]>("/users")).data.length,
+    count: async () => (await usersApi.list()).length,
   },
   {
     key: "teams",
@@ -115,7 +116,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "ORG",
     permission: "user.manage",
     entityTypes: [],
-    count: async () => (await api.get<unknown[]>("/teams")).data.length,
+    count: async () => (await teamsApi.list()).length,
   },
   {
     key: "imports",

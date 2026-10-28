@@ -27,9 +27,10 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
+          // 只固定 React 公共包；antd/rc-* 内部存在循环依赖，交给 Rollup
+          // 根据页面动态 import 自动分包，避免手工拆分造成循环 chunk。
           manualChunks: {
             react: ["react", "react-dom", "react-router-dom"],
-            antd: ["antd", "@ant-design/icons"],
           },
         },
       },

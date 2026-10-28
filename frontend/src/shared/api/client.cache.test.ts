@@ -47,6 +47,8 @@ vi.mock("axios", () => {
     create,
     // 与真实 axios 对齐：AxiosHeaders 构造器接受 headers 对象并支持 set/get
     AxiosHeaders: class {
+      map: Record<string, any>;
+
       constructor(h: any) {
         this.map = h || {};
       }

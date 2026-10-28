@@ -49,6 +49,8 @@ beforeEach(() => {
   vi.mocked(catalog.rebatesApi.list).mockResolvedValue(rebates);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(catalog.rebatesApi.settlements).mockResolvedValue([]);
+  vi.mocked(catalog.rebatesApi.overdue).mockResolvedValue([]);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -167,7 +169,7 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
     await ui.type(modal.querySelector("#reason") as Element, "挂错订单");
     await ui.click(within(modal).getByRole("button", { name: /确认作废/ }));
     await waitFor(() =>
-      expect(vi.mocked(catalog.rebatesApi.voidRecord)).toHaveBeenCalledWith(1, "挂错订单"),
+      expect(vi.mocked(catalog.rebatesApi.voidRecord)).toHaveBeenCalledWith(1, "挂错订单", undefined),
     );
   });
 });

@@ -1,14 +1,13 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 import { Card, Form, Input, Modal, Select, Space } from "antd";
 import { useEffect, useState } from "react";
-import { api, errorMessage } from "../shared/api/client";
-import { poolsApi, type Pool } from "../shared/api/catalog";
+import { errorMessage } from "../shared/api/client";
+import { poolsApi, teamsApi, usersApi, type ManagedUser, type Pool, type Team } from "../shared/api/catalog";
 import { ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 
-type User = { id: number; username: string; display_name: string; role: string; owner_scope: string; pool_ids: number[]; team_ids: number[]; is_active: boolean; must_change_password: boolean };
-type Team = { id: number; code: string; name: string; is_active: boolean };
+type User = ManagedUser;
 
 export function UsersPanel() {
   const roleOptions = useOptionSet("USER_ROLE") ?? [];
@@ -21,21 +20,21 @@ export function UsersPanel() {
   const [resetForm] = Form.useForm();
   const [editing, setEditing] = useState<User | null>(null);
   const [resetting, setResetting] = useState<User | null>(null);
-  const load = async () => { try { const [users, teamList, poolList] = await Promise.all([api.get<User[]>("/users"), api.get<Team[]>("/teams"), poolsApi.list()]); setRows(users.data); setTeams(teamList.data); setPools(poolList); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const load = async () => { try { const [users, teamList, poolList] = await Promise.all([usersApi.list(), teamsApi.list(), poolsApi.list()]); setRows(users); setTeams(teamList); setPools(poolList); } catch (err) { appMessage.error(errorMessage(err)); } };
   useEffect(() => { void load(); }, []);
-  const submit = async (values: Record<string, string>) => { try { await api.post("/users", values); appMessage.success("用户已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const submit = async (values: Record<string, string>) => { try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
   const updateUser = async (values: Record<string, string>) => {
     if (!editing) return;
-    try { await api.patch(`/users/${editing.id}`, values); appMessage.success("用户信息已更新"); setEditing(null); await load(); }
+    try { await usersApi.update(editing.id, values); appMessage.success("用户信息已更新"); setEditing(null); await load(); }
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   const toggleUser = async (user: User) => {
-    try { await api.patch(`/users/${user.id}`, { is_active: !user.is_active }); appMessage.success(user.is_active ? "用户已停用" : "用户已启用"); await load(); }
+    try { await usersApi.update(user.id, { is_active: !user.is_active }); appMessage.success(user.is_active ? "用户已停用" : "用户已启用"); await load(); }
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   const resetPassword = async (values: { password: string }) => {
     if (!resetting) return;
-    try { await api.post(`/users/${resetting.id}/reset-password`, { password: values.password }); appMessage.success("密码已重置，下次登录需修改"); setResetting(null); resetForm.resetFields(); }
+    try { await usersApi.resetPassword(resetting.id, values.password); appMessage.success("密码已重置，下次登录需修改"); setResetting(null); resetForm.resetFields(); }
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   return <Card className="glass" title="用户管理">

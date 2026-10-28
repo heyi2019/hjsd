@@ -1,6 +1,13 @@
-/** 全部 v1 接口：路径与 docs/ERP_API接口规范_v1.0.md 一致。
+/** 全部 v1 接口：路径与 docs/ERP_API接口规范_v1.1.md 一致。
  * 金额一律以字符串传输，前端不做浮点数计算。 */
 import { api } from "./client";
+
+export interface PageResponse<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
 
 export interface Pool {
   id: number;
@@ -62,7 +69,7 @@ export interface Customer {
   created_at?: string | null;
   contact_masked?: boolean;
   merged_into_id?: number | null;
-  /** 活字段值：field_key → 值，由设置页字段定义驱动（BAS-04） */
+  /** 表单扩展字段值：field_key → 值，由统一字段配置驱动（BAS-04） */
   extra_values?: Record<string, unknown> | null;
 }
 
@@ -655,8 +662,21 @@ export const gameTypesApi = {
 };
 
 export const customersApi = {
-  list: (params?: { keyword?: string; status?: string }) =>
-    api.get<Customer[]>("/customers", { params }).then((r) => r.data),
+  list: async (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> => {
+    if (params?.limit != null) {
+      return api.get<PageResponse<Customer>>("/customers", { params }).then((r) => r.data.items);
+    }
+    const all: Customer[] = [];
+    const PAGE = 500;
+    for (let i = 0; i < 50; i++) {
+      const page = await api.get<PageResponse<Customer>>("/customers", {
+        params: { ...params, limit: PAGE, offset: i * PAGE },
+      }).then((r) => r.data.items);
+      all.push(...page);
+      if (page.length < PAGE) break;
+    }
+    return all;
+  },
   create: (payload: Partial<Customer>) =>
     api.post<{ customer: Customer; duplicate_candidates: unknown[] }>(
       "/customers",
@@ -698,14 +718,14 @@ export const ordersApi = {
     offset?: number;
   }): Promise<Order[]> => {
     if (params?.limit != null) {
-      return api.get<Order[]>("/orders", { params }).then((r) => r.data);
+      return api.get<PageResponse<Order>>("/orders", { params }).then((r) => r.data.items);
     }
     const all: Order[] = [];
     const PAGE = 500;
     for (let i = 0; i < 50; i++) {
-      const page = await api.get<Order[]>("/orders", {
+      const page = await api.get<PageResponse<Order>>("/orders", {
         params: { ...params, limit: PAGE, offset: i * PAGE },
-      }).then((r) => r.data);
+      }).then((r) => r.data.items);
       all.push(...page);
       if (page.length < PAGE) break;
     }
@@ -838,9 +858,53 @@ export const employeesApi = {
   list: () => api.get<EmployeeOption[]>("/users").then((r) => r.data),
 };
 
+export interface ManagedUser extends EmployeeOption {
+  role: string;
+  owner_scope: string;
+  pool_ids: number[];
+  team_ids: number[];
+  must_change_password: boolean;
+}
+
+export interface Team {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+}
+
+/** 组织与权限领域 API：页面不得再直接拼接 /users、/teams 路径。 */
+export const usersApi = {
+  list: () => api.get<ManagedUser[]>("/users").then((r) => r.data),
+  create: (payload: Record<string, unknown>) => api.post<ManagedUser>("/users", payload).then((r) => r.data),
+  update: (id: number, payload: Record<string, unknown>) => api.patch<ManagedUser>(`/users/${id}`, payload).then((r) => r.data),
+  resetPassword: (id: number, password: string) =>
+    api.post<{ ok: boolean }>(`/users/${id}/reset-password`, { password }).then((r) => r.data),
+};
+
+export const teamsApi = {
+  list: () => api.get<Team[]>("/teams").then((r) => r.data),
+  create: (payload: Record<string, unknown>) => api.post<Team>("/teams", payload).then((r) => r.data),
+  update: (id: number, payload: Record<string, unknown>) => api.patch<Team>(`/teams/${id}`, payload).then((r) => r.data),
+};
+
 export const stocksApi = {
-  list: (params?: { status?: string }) =>
-    api.get<Account[]>("/stocks", { params }).then((r) => r.data),
+  list: async (params?: { status?: string; limit?: number; offset?: number }): Promise<Account[]> => {
+    if (params?.limit != null) {
+      return api.get<PageResponse<Account>>("/stocks", { params }).then((r) => r.data.items);
+    }
+    const all: Account[] = [];
+    const PAGE = 500;
+    for (let i = 0; i < 50; i++) {
+      const page = await api.get<PageResponse<Account>>("/stocks", {
+        params: { ...params, limit: PAGE, offset: i * PAGE },
+      }).then((r) => r.data.items);
+      all.push(...page);
+      if (page.length < PAGE) break;
+    }
+    return all;
+  },
   updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
     api.patch<Account>(`/stocks/${id}`, payload).then((r) => r.data),
   inventory: () =>

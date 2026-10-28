@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import PermissionDenied, Validation
+from app.core.schemas import PageOut
 from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FIELD_DEFINITION_MANAGE,
@@ -312,7 +313,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
     return payloads
 
 
-@router.get("/orders", response_model=list[schemas.OrderListOut])
+@router.get("/orders", response_model=PageOut[schemas.OrderListOut])
 def list_orders(
     order_type: str | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -339,7 +340,16 @@ def list_orders(
         offset=offset,
         user=_user,
     )
-    return [schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders)]
+    return PageOut(
+        items=[schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders)],
+        total=service.count_orders(
+            db, order_type=order_type, status=status, trade_date_from=trade_date_from,
+            trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
+            keyword=keyword, user=_user,
+        ),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)

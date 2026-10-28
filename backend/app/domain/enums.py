@@ -153,7 +153,7 @@ class CounterpartyRole(StrEnum):
 
 
 class EntityType(StrEnum):
-    """活字段可挂载的业务实体域；只承载非核算辅助信息。"""
+    """表单扩展字段可挂载的业务实体域；只承载非核算辅助信息。"""
 
     ORDER = "order"
     ACCOUNT = "account"
@@ -166,7 +166,7 @@ class EntityType(StrEnum):
 
 
 class FieldType(StrEnum):
-    """活字段支持的值类型；前后端与数据库共用同一封闭集合。"""
+    """表单扩展字段支持的值类型；前后端与数据库共用同一封闭集合。"""
 
     TEXT = "TEXT"
     NUMBER = "NUMBER"

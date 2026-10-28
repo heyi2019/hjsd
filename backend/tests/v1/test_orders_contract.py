@@ -1067,7 +1067,8 @@ class TestGetAndListOrders:
         )
 
         assert response.status_code == 200, response.text
-        assert [item["id"] for item in response.json()] == [mine.id]
+        assert response.json()["total"] == 1
+        assert [item["id"] for item in response.json()["items"]] == [mine.id]
 
 
 # ------------------------------------------------------------------ 事件入参
@@ -1646,7 +1647,7 @@ class TestOrdersApi:
         listed = seeded_client.get("/api/v1/orders", headers=headers)
 
         assert listed.status_code == 200, listed.text
-        row = next(item for item in listed.json() if item["id"] == created.json()["id"])
+        row = next(item for item in listed.json()["items"] if item["id"] == created.json()["id"])
         assert row["account_game_type"] == "王者荣耀"
         assert row["account_game_account"] == "dfq-list-account"
         assert row["account_channel_region"] == "安卓一区"
@@ -2063,7 +2064,7 @@ class TestOrdersApi:
             headers=headers,
         )
         assert listed.status_code == 200, listed.text
-        assert [item["order_no"] for item in listed.json()] == [order.order_no]
+        assert [item["order_no"] for item in listed.json()["items"]] == [order.order_no]
 
         fetched = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
         assert fetched.status_code == 200

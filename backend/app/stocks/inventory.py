@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
@@ -15,7 +15,10 @@ from app.parties import service as parties_service
 from ._common import INVENTORY_STATUSES, scope_filter
 
 
-def list_accounts(session: Session, *, status: str | None = None, user: CurrentUser | None = None) -> list[Account]:
+def list_accounts(
+    session: Session, *, status: str | None = None, user: CurrentUser | None = None,
+    limit: int | None = None, offset: int = 0,
+) -> list[Account]:
     # 账号台账包含 TH 的 PICKUP 库存实体；自营资产健康与成本统计单独排除提号库存。
     stmt = select(Account)
     if status:
@@ -23,7 +26,20 @@ def list_accounts(session: Session, *, status: str | None = None, user: CurrentU
     scope = scope_filter(session, user)
     if scope is not None:
         stmt = stmt.where(scope)
-    return list(session.scalars(stmt.order_by(Account.id)).all())
+    stmt = stmt.order_by(Account.id)
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
+    return list(session.scalars(stmt).all())
+
+
+def count_accounts(session: Session, *, status: str | None = None, user: CurrentUser | None = None) -> int:
+    stmt = select(Account)
+    if status:
+        stmt = stmt.where(Account.status == status)
+    scope = scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
 
 def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict[str, Any]]:
@@ -67,4 +83,4 @@ def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> lis
     return list(session.scalars(stmt).all())
 
 
-__all__ = ["inventory", "list_accounts", "total_inventory_cost"]
+__all__ = ["count_accounts", "inventory", "list_accounts", "total_inventory_cost"]

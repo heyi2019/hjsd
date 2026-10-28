@@ -248,6 +248,90 @@ def test_cancel_skips_payment_already_reversed(seeded_db):
     assert result["refund_amount"] == Decimal("0.00")  # 696-712
 
 
+def test_cancel_refund_total_matches_per_event_recompute(seeded_db):
+    """取消退款总额必须与「逐笔 PAYMENT 独立核算」一致。
+
+    2026-10-28 把 cancel_installment 内逐笔 SUM(CANCEL) 改写成一次 GROUP BY
+    （原实现是循环内查询，N+1）。这条用例用**与实现无关的循环重算**做交叉验证：
+    退款 = Σ max(0, 该笔 PAYMENT 金额 − 该笔已被冲销金额)。
+    覆盖三种情形：全额未退、部分已退、多笔并存（应退 100 / 80 / 300）。
+    """
+    account = _account(seeded_db, "cancel-multi-refund")
+    purchase = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, purchase.id, amount="800")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    contract = _contract(
+        seeded_db,
+        order.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000",
+        down_payment="100",
+        periods=1,
+        per_period="900",
+    )
+    # 两笔真实收款（走 pay 才会"被合约承认"，后续才有可退金额）
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
+    )
+    installment_service.pay(
+        seeded_db, contract.id, amount=Decimal("300"), paid_on=TODAY, period_no=1, actor="pytest"
+    )
+    payments = list(
+        seeded_db.scalars(
+            select(OrderEvent)
+            .where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.PAYMENT.value,
+                OrderEvent.is_posted.is_(True),
+            )
+            .order_by(OrderEvent.id)
+        ).all()
+    )
+    # 第 2 笔先手工冲销 120（直接写事件，避免再触发资金池路由），应只剩 180 可退
+    seeded_db.add(OrderEvent(
+        event_no="EVT-OFFSET-PRIOR-120",
+        order_id=order.id,
+        event_type=EventType.CANCEL.value,
+        amount=Decimal("120"),
+        occurred_on=TODAY,
+        is_posted=True,
+        offset_event_id=payments[1].id,
+    ))
+    seeded_db.flush()
+
+    def _loop_total() -> Decimal:
+        """原口径重算：逐笔查该 PAYMENT 的已冲销额。"""
+        expected = Decimal("0")
+        for payment in payments:
+            already = sum(
+                (
+                    item.amount
+                    for item in seeded_db.scalars(
+                        select(OrderEvent).where(
+                            OrderEvent.offset_event_id == payment.id,
+                            OrderEvent.event_type == EventType.CANCEL.value,
+                            OrderEvent.is_posted.is_(True),
+                        )
+                    ).all()
+                ),
+                Decimal("0"),
+            )
+            remaining = payment.amount - already
+            if remaining > 0:
+                expected += remaining
+        return expected
+
+    expected = _loop_total()
+    assert expected == Decimal("280.00")  # 100 + (300 - 120)
+
+    result = installment_service.cancel_installment(
+        seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
+    )
+    assert result["refund_amount"] == expected
+    # 两笔可退：第 1 笔 100 + 第 2 笔剩余 180
+    assert len(result["cancel_event_ids"]) == 2
+
+
 # ------------------------------------------------------------- 减免：期次守卫
 def test_waive_rejects_missing_period(seeded_db):
     order = _order(seeded_db, order_type="DFQ")

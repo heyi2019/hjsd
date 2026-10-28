@@ -43,7 +43,7 @@ from app.domain.trade import (
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.periods import assert_period_open
-from app.core.schemas import normalize_product_aliases
+from app.core.schemas import PageOut, normalize_product_aliases
 from app.orders import service as orders_service
 
 router = APIRouter(tags=["ACC-01 账号台账"])
@@ -78,6 +78,10 @@ class AccountOut(BaseModel):
     buy_date: date | None = None
     created_by: str
     created_at: datetime
+
+
+class AccountListOut(PageOut[AccountOut]):
+    pass
 
 
 class AccountProfileUpdate(RequestModel):
@@ -413,18 +417,25 @@ def _account_outputs(
     ]
 
 
-@router.get("/stocks", response_model=list[AccountOut])
+@router.get("/stocks", response_model=AccountListOut)
 def list_accounts(
     status: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
-) -> list[AccountOut]:
-    items = service.list_accounts(db, status=status, user=_user)
-    return _account_outputs(
-        db,
-        items,
-        _user,
-        include_credentials=_user.has(PERM_ORDER_CREATE),
+) -> AccountListOut:
+    items = service.list_accounts(db, status=status, user=_user, limit=limit, offset=offset)
+    return AccountListOut(
+        items=_account_outputs(
+            db,
+            items,
+            _user,
+            include_credentials=_user.has(PERM_ORDER_CREATE),
+        ),
+        total=service.count_accounts(db, status=status, user=_user),
+        limit=limit,
+        offset=offset,
     )
 
 

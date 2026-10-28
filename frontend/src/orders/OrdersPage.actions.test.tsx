@@ -171,6 +171,9 @@ beforeEach(() => {
     total: allocationRows.length,
     order_profit: "5000.00",
   });
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+    { id: 9, username: "lisi", display_name: "李四", is_active: true },
+  ]);
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([installment]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
   vi.mocked(client.api).get.mockResolvedValue({

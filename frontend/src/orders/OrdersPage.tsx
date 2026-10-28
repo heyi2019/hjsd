@@ -8,12 +8,13 @@ import {
   ordersApi,
   orderTypesApi,
   policyApi,
+  employeesApi,
   type Installment,
   type Order,
   type OrderLink,
   type OrderType,
 } from "../shared/api/catalog";
-import { api, normalizeError } from "../shared/api/client";
+import { normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -367,10 +368,10 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
       if (!order) return;
       const [result, userResult] = await Promise.all([
         policyApi.allocations(order.id),
-        api.get<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>("/users"),
+        employeesApi.list(),
       ]);
       setActionOrder(order);
-      setUsers(userResult.data.filter((item) => item.is_active));
+      setUsers(userResult.filter((item) => item.is_active));
       setAllocationProfit(result.order_profit ?? "0");
       // 分润按「姓名」录入：存量行直接映射成姓名（COMPANY / 无收益人 → 公司归属），
       // 不再暴露 BUY/SELL/OPERATION/COMPANY 四个动作位——那种结构只允许一人拿运营份额。

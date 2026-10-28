@@ -117,14 +117,14 @@ def _normalize_extra_values(
     if values is None:
         return {}
     if not isinstance(values, Mapping):
-        raise Validation("活字段值必须为对象", details={"field": "extra_values"})
+        raise Validation("表单扩展字段值必须为对象", details={"field": "extra_values"})
     normalized = dict(values)
     invalid_keys = [
         key for key in normalized if not isinstance(key, str) or not key.strip()
     ]
     if invalid_keys:
         raise Validation(
-            "活字段键必须为非空字符串",
+            "表单扩展字段键必须为非空字符串",
             details={"field": "extra_values"},
         )
     return normalized

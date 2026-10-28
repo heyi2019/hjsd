@@ -34,7 +34,7 @@ function renderCard(ui: React.ReactNode) {
 
 describe("MobileInventoryList", () => {
   it("有数据时渲染卡片并展示全部字段标签", () => {
-    renderCard(<MobileInventoryList rows={[makeRow()]} onSale={() => {}} onConsign={() => {}} onVoid={() => {}} onRebate={() => {}} onEdit={() => {}} onMoreAction={() => {}} editingAccount={null} />);
+    renderCard(<MobileInventoryList rows={[makeRow()]} onDetail={() => {}} onSale={() => {}} onConsign={() => {}} onVoid={() => {}} onRebate={() => {}} onEdit={() => {}} onMoreAction={() => {}} editingAccount={null} />);
     expect(screen.getByText("KU_00001")).toBeInTheDocument();
     for (const label of ["游戏账号/产品", "订单号", "业务", "业务类型", "增值服务", "游戏/产品类型", "平台", "成本"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("MobileInventoryList", () => {
   });
 
   it("空数据渲染空态不报错", () => {
-    renderCard(<MobileInventoryList rows={[]} onSale={() => {}} onConsign={() => {}} onVoid={() => {}} onRebate={() => {}} onEdit={() => {}} onMoreAction={() => {}} editingAccount={null} />);
+    renderCard(<MobileInventoryList rows={[]} onDetail={() => {}} onSale={() => {}} onConsign={() => {}} onVoid={() => {}} onRebate={() => {}} onEdit={() => {}} onMoreAction={() => {}} editingAccount={null} />);
     expect(screen.getByText("暂无账号")).toBeInTheDocument();
   });
 
@@ -55,6 +55,7 @@ describe("MobileInventoryList", () => {
     renderCard(
       <MobileInventoryList
         rows={[makeRow({ inventory_type: "SELF", status: "IN_STOCK" })]}
+        onDetail={() => {}}
         onSale={onSale}
         onConsign={() => {}}
         onVoid={() => {}}

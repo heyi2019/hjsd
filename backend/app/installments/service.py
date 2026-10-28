@@ -9,6 +9,8 @@
 """
 from __future__ import annotations
 
+from calendar import monthrange
+from collections import Counter
 from datetime import date
 from decimal import Decimal
 from collections.abc import Mapping
@@ -174,16 +176,24 @@ def link_recovered_sale(
         )
         .order_by(InstallmentDisposition.occurred_on.desc(), InstallmentDisposition.id.desc())
     ).all()
+    if not candidates:
+        return None
+    # 一次性取「已转售过」的合约集合，避免在 candidates 上逐条 EXISTS（N+1）。
+    resold_installment_ids = set(
+        session.scalars(
+            select(InstallmentDisposition.installment_id).where(
+                InstallmentDisposition.action == InstallmentDispositionAction.RESELL.value,
+                InstallmentDisposition.installment_id.in_(
+                    {candidate.installment_id for candidate in candidates}
+                ),
+            )
+        ).all()
+    )
     recovered = next(
         (
             candidate
             for candidate in candidates
-            if session.scalar(
-                select(InstallmentDisposition.id).where(
-                    InstallmentDisposition.installment_id == candidate.installment_id,
-                    InstallmentDisposition.action == InstallmentDispositionAction.RESELL.value,
-                )
-            ) is None
+            if candidate.installment_id not in resold_installment_ids
         ),
         None,
     )
@@ -239,18 +249,15 @@ def _normalize_schedule(schedule: list[dict[str, Any]] | None) -> list[dict[str,
 
 
 def _add_months(base: date, months: int) -> date:
-    """按月推进到期日（不引入第三方依赖）。"""
+    """按月推进到期日：`base + months` 个月，超出目标月天数时截断到月末。
+
+    例：2026-01-31 + 1 个月 = 2026-02-28（闰年 29）。走标准库 calendar，
+    不自己维护闰年与月末表，避免两者不一致导致到期日漂移。
+    """
     total = base.month - 1 + months
     year = base.year + total // 12
     month = total % 12 + 1
-    day = min(base.day, _days_in_month(year, month))
-    return date(year, month, day)
-
-
-def _days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - date(year, month, 1)).days
+    return date(year, month, min(base.day, monthrange(year, month)[1]))
 
 
 def total_receivable(installment: Installment) -> Decimal:
@@ -307,6 +314,15 @@ def _service_fee_from_snapshot(
     return (base * rate / Decimal("100")).quantize(Decimal("0.01"))
 
 
+#: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
+_CONTRACT_ALLOWED_ORDER_TYPE = {
+    InstallmentContractType.STOCK_SALE.value: "HS",
+    InstallmentContractType.ADVANCE_PURCHASE.value: "DFQ",
+    InstallmentContractType.PICKUP_SALE.value: "TH",
+    InstallmentContractType.CONSIGNMENT_SALE.value: "DG",
+}
+
+
 def create_installment(
     session: Session,
     *,
@@ -348,14 +364,17 @@ def create_installment(
         )
     account = session.get(Account, order.account_id) if order.account_id is not None else None
 
+    # 合约类型 → 允许的订单类型。四个分支原本结构完全相同、只差这一个值，
+    # 表驱动比复制四遍 if/elif 更难漏改、也更好审计（新增类型必须在此登记或显式例外）。
+    allowed_order_type = _CONTRACT_ALLOWED_ORDER_TYPE.get(contract_type)
+    if allowed_order_type is not None and order.order_type != allowed_order_type:
+        raise Validation(
+            f"{contract_type} 只能用于 {allowed_order_type} 订单",
+            code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+            details={"order_no": order.order_no, "order_type": order.order_type},
+        )
+
     if contract_type == InstallmentContractType.STOCK_SALE.value:
-        # HS 分期出售：账号必须已买入且在库。
-        if order.order_type != "HS":
-            raise Validation(
-                "STOCK_SALE 只能用于 HS 订单",
-                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
-                details={"order_no": order.order_no, "order_type": order.order_type},
-            )
         # 售出订单本身不再重复 BUY；采购事实来自该库存账号的历史订单。
         has_buy_event = account is not None and session.scalar(
             select(OrderEvent.id)
@@ -373,32 +392,13 @@ def create_installment(
                 details={"account_status": account.status if account else None},
             )
     elif contract_type == InstallmentContractType.ADVANCE_PURCHASE.value:
-        if order.order_type != "DFQ":
-            raise Validation(
-                "ADVANCE_PURCHASE 只能用于 DFQ 订单",
-                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
-                details={"order_no": order.order_no, "order_type": order.order_type},
-            )
         if order.account_id is not None and account is None:
             raise Validation(
                 "ADVANCE_PURCHASE 关联的库存账号不存在",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"order_no": order.order_no, "account_id": order.account_id},
             )
-    elif contract_type == InstallmentContractType.PICKUP_SALE.value:
-        if order.order_type != "TH":
-            raise Validation(
-                "PICKUP_SALE 只能用于 TH 订单",
-                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
-                details={"order_no": order.order_no, "order_type": order.order_type},
-            )
-    elif contract_type == InstallmentContractType.CONSIGNMENT_SALE.value:
-        if order.order_type != "DG":
-            raise Validation(
-                "CONSIGNMENT_SALE 只能用于 DG 订单",
-                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
-                details={"order_no": order.order_no, "order_type": order.order_type},
-            )
+    # PICKUP_SALE → TH、CONSIGNMENT_SALE → DG 的订单类型校验已在上方表驱动分支统一处理。
 
     existing = session.scalar(
         select(Installment).where(Installment.order_id == order.id)
@@ -782,21 +782,24 @@ def cancel_installment(
         )
         .order_by(OrderEvent.id)
     ).all()
+    # 一次性取回全部已登记冲销，本地按被冲销事件归集，避免逐笔查询（N+1）。
+    # 不在 SQL 里 SUM：金额列是 DECIMAL TypeDecorator，SQLite 聚合存在浮点精度风险；
+    # 金额一律 Python 侧 Decimal 累加，与「逐笔求和」的原实现完全等价。
+    original_ids = [original.id for original in original_events]
+    refunded_by_event: dict[int, Decimal] = {}
+    if original_ids:
+        for offset_id, cancel_amount in session.execute(
+            select(OrderEvent.offset_event_id, OrderEvent.amount).where(
+                OrderEvent.offset_event_id.in_(original_ids),
+                OrderEvent.event_type == EventType.CANCEL.value,
+                OrderEvent.is_posted.is_(True),
+            )
+        ).all():
+            refunded_by_event[offset_id] = refunded_by_event.get(
+                offset_id, Decimal("0")
+            ) + to_money(cancel_amount)
     for original in original_events:
-        cancelled = sum(
-            (
-                to_money(item.amount)
-                for item in session.scalars(
-                    select(OrderEvent).where(
-                        OrderEvent.offset_event_id == original.id,
-                        OrderEvent.event_type == EventType.CANCEL.value,
-                        OrderEvent.is_posted.is_(True),
-                    )
-                ).all()
-            ),
-            Decimal("0"),
-        )
-        remaining = to_money(original.amount) - cancelled
+        remaining = to_money(original.amount) - refunded_by_event.get(original.id, Decimal("0"))
         if remaining <= 0:
             continue
         reversal, _flow = orders_service.post_event(
@@ -1426,14 +1429,21 @@ def mark_overdue(
         if scope is not None:
             stmt = stmt.where(scope)
     rows = session.scalars(stmt).all()
-    count = 0
+    count = len(rows)
     for row in rows:
         row.status = ScheduleStatus.OVERDUE.value
-        count += 1
     if rows:
-        installment_ids = {row.installment_id for row in rows}
-        for installment_id in installment_ids:
-            installment = session.get(Installment, installment_id)
+        # 一次性统计每个合约本次被标记的期数：原实现在合约循环里再扫一遍全量 rows，
+        # 是 O(合约数 × 期次数)；Counter 单趟线性。
+        overdue_counts = Counter(row.installment_id for row in rows)
+        installments = {
+            item.id: item
+            for item in session.scalars(
+                select(Installment).where(Installment.id.in_(overdue_counts))
+            ).all()
+        }
+        for installment_id, overdue_periods in overdue_counts.items():
+            installment = installments.get(installment_id)
             if installment and installment.status in {
                 InstallmentStatus.PENDING.value,
                 InstallmentStatus.ACTIVE.value,
@@ -1454,11 +1464,7 @@ def mark_overdue(
                     after={
                         "status": installment.status,
                         "as_of": as_of.isoformat(),
-                        "overdue_periods": sum(
-                            1
-                            for row in rows
-                            if row.installment_id == installment.id
-                        ),
+                        "overdue_periods": overdue_periods,
                     },
                 )
     session.flush()

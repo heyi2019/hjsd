@@ -210,7 +210,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   PASSWORD_RESET: "重置密码",
   TEAM_CREATE: "新建团队",
   TEAM_UPDATE: "编辑团队",
-  FIELD_DEFINITION_CHANGE: "变更活字段定义",
+  FIELD_DEFINITION_CHANGE: "变更表单字段配置",
   POLICY_CHANGE: "变更经营规则",
   PROFIT_ALLOCATION_SET: "设置利润分润",
   EXCEPTION_APPROVE: "审批异常",

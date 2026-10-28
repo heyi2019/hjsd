@@ -79,7 +79,7 @@ describe("设置面板：游戏类型", () => {
     await ui.type(screen.getByPlaceholderText("如：王者荣耀"), "和平精英");
     await ui.click(screen.getByRole("button", { name: /新增游戏类型/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).create).toHaveBeenCalledWith({ name: "和平精英", sort_order: 0 }));
+    await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).create).toHaveBeenCalledWith({ name: "和平精英", sort_order: 0, channel_regions: [] }));
   });
 
   it("管理员可编辑游戏类型名称和排序", async () => {
@@ -95,6 +95,7 @@ describe("设置面板：游戏类型", () => {
     await waitFor(() => expect(vi.mocked(catalog.gameTypesApi).update).toHaveBeenCalledWith(1, {
       name: "王者荣耀手游",
       sort_order: 10,
+      channel_regions: [],
     }));
   });
 });

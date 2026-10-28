@@ -377,3 +377,64 @@ def test_metrics_scope_filters(seeded_db):
     seeded_db.commit()
     result = quality_service.metrics(seeded_db, user=_scoped_user([1]))
     assert "items" in result
+
+
+# ------------------------------------------------------- N+1 回归护栏（scan）
+def _count_selects(session, fn) -> int:
+    """统计 fn() 执行期间发出的 SELECT 条数（不区分参数，只看次数）。"""
+    from sqlalchemy import event
+
+    engine = session.get_bind().engine
+    seen: list[str] = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany):  # noqa: ANN001
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        fn()
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+    return len(seen)
+
+
+def test_scan_sql_count_does_not_grow_with_rows(seeded_db):
+    """scan() 的 SQL 条数必须与行数无关。
+
+    2026-10-28 优化前，真实库单次请求 919 条 SQL：逐事件 COUNT 现金流、
+    逐单 EXISTS 分期、逐行 session.get 合约、逐池 pool_balance 都是循环内查询。
+    这里不钉精确条数（新增检查项应当允许增长），只钉"不随行数线性增长"这一性质：
+    再加 4 个订单 + 4 个已过账事件后条数必须不变，一旦有人改回循环内查询就会红。
+    """
+    pool = _pool(seeded_db)
+
+    def _add_order_with_event(seq: int) -> None:
+        order = _order(seeded_db, order_no=f"Q-N1-{seq}")
+        seeded_db.add(
+            OrderEvent(
+                order_id=order.id,
+                event_type="BUY",
+                is_posted=True,
+                amount=to_money("100"),
+                portion="PRINCIPAL",
+                occurred_on=date.today(),
+                event_no=f"EV-N1-{seq}",
+                pool_id=pool.id,
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.commit()
+
+    _add_order_with_event(1)
+    base = _count_selects(seeded_db, lambda: quality_service.scan(seeded_db, user=None))
+
+    for seq in (2, 3, 4, 5):
+        _add_order_with_event(seq)
+    grown = _count_selects(seeded_db, lambda: quality_service.scan(seeded_db, user=None))
+
+    assert grown == base, (
+        f"scan() 的 SELECT 条数随行数增长（{base} → {grown}），说明又出现了 N+1；"
+        "请改为批量聚合 / IN 预取，而不是在循环里逐条查询。"
+    )

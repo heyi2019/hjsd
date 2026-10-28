@@ -111,10 +111,17 @@ def test_database_allows_inventory_links_for_th_orders(seeded_db):
     assert order.account_snapshot is None
 
 
-def test_database_rejects_th_order_snapshots(seeded_db):
+def test_database_accepts_th_order_snapshot_and_rejects_custom_type(seeded_db):
+    """2026-10-28 口径：快照 CHECK 放宽为四类业务通用，自定义类型仍被库层拒绝。"""
     order = _order(seeded_db, order_type="TH")
     order.account_snapshot = {"game_account": "th-text-only"}
+    seeded_db.flush()
+    assert order.account_snapshot == {"game_account": "th-text-only"}
+    seeded_db.rollback()
 
+    custom = Order(order_no=f"XX{uuid4().hex[:8]}", order_type="XX", trade_date=D)
+    custom.account_snapshot = {"game_account": "custom-text"}
+    seeded_db.add(custom)
     with pytest.raises(IntegrityError):
         seeded_db.flush()
     seeded_db.rollback()
@@ -786,14 +793,32 @@ class TestCreateOrderValidation:
         assert order.account_id == account.id
         assert order.account_snapshot is None
 
-    def test_th_rejects_order_account_snapshot(self, seeded_db):
-        with pytest.raises(Validation, match="只有 DFQ 代分期订单可以填写订单账号快照"):
+    def test_th_accepts_order_account_snapshot_and_creates_inline_account(self, seeded_db):
+        """2026-10-28 口径：account_snapshot 四类业务通用，TH 快照建单即建号。"""
+        order = order_service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=D,
+            actor="pytest",
+            account_snapshot={"game_account": "th-snapshot-account"},
+        )
+
+        assert order.account_id is not None
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert account.game_account == "th-snapshot-account"
+        assert account.stock_no is not None
+        assert order.account_snapshot == {"game_account": "th-snapshot-account"}
+
+    def test_th_rejects_snapshot_with_flat_fields(self, seeded_db):
+        with pytest.raises(Validation, match="不要与单独账号字段混用"):
             order_service.create_order(
                 seeded_db,
                 order_type="TH",
                 trade_date=D,
                 actor="pytest",
                 account_snapshot={"game_account": "th-text-account"},
+                game_account="th-flat-account",
             )
 
     def test_dfq_account_snapshot_rejects_unknown_fields(self, seeded_db):
@@ -1668,7 +1693,25 @@ class TestOrdersApi:
         assert valid.status_code == 200, valid.text
         assert valid.json()["account_snapshot"]["game_account"] == "dfq-edit-account"
 
-    def test_th_account_snapshot_is_rejected_by_order_account_contract(
+    def test_th_account_snapshot_creates_inline_account_via_api(
+        self, seeded_client, headers
+    ):
+        """2026-10-28 口径：TH 快照建单即建号（API 契约层）。"""
+        created = seeded_client.post(
+            "/api/v1/orders",
+            json={
+                "order_type": "TH",
+                "trade_date": D.isoformat(),
+                "account_snapshot": {"game_account": "th-snapshot-api"},
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["account_id"] is not None
+        assert body["account_snapshot"] == {"game_account": "th-snapshot-api"}
+
+    def test_th_snapshot_with_flat_fields_rejected_by_api(
         self, seeded_client, headers
     ):
         created = seeded_client.post(
@@ -1676,12 +1719,13 @@ class TestOrdersApi:
             json={
                 "order_type": "TH",
                 "trade_date": D.isoformat(),
-                "account_snapshot": {"game_account": "th-before"},
+                "account_snapshot": {"game_account": "th-snapshot-api"},
+                "game_account": "th-flat-api",
             },
             headers=headers,
         )
         assert created.status_code == 422, created.text
-        assert "只有 DFQ 代分期订单可以填写订单账号快照" in created.json()["message"]
+        assert "不要与单独账号字段混用" in created.json()["message"]
 
     def test_update_and_cancel_order_api(self, seeded_client, headers):
         created = seeded_client.post(

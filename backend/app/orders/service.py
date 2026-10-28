@@ -270,8 +270,16 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    if definition.code != "DFQ" and account_snapshot is not None:
-        raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
+    # 2026-10-28 口径：account_snapshot 四类业务通用（HS/TH/DG/DFQ），
+    # 与平铺账号字段互斥——快照传了就不允许再单独传游戏账号字段。
+    if account_snapshot is not None and definition.code not in {"HS", "TH", "DG", "DFQ"}:
+        raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
+    if (
+        account_snapshot is not None
+        and definition.code in {"HS", "TH", "DG"}
+        and any(v is not None for v in (game_account, game_type, game_password, channel_region))
+    ):
+        raise Validation("游戏账号资料请通过 account_snapshot 传递，不要与单独账号字段混用")
     if definition.code == "DFQ" and any(
         v is not None
         for v in (
@@ -388,6 +396,18 @@ def create_order(
         # policy_version_id 只存一个主版本（返点优先），完整参数在 policy_snapshot 里
         if primary_version_id is None:
             primary_version_id = version_id
+
+    # 2026-10-28 口径：HS/TH/DG 快照建单——快照值展开为账号资料，
+    # 复用内联建号逻辑（建单成功即发库存编号），订单行同时落快照与展开字段。
+    if account_snapshot is not None and definition.code in {"HS", "TH", "DG"}:
+        snap = account_snapshot
+        game_account = snap["game_account"]
+        game_type = snap.get("game_type")
+        game_password = snap.get("game_password")
+        channel_region = snap.get("channel_region")
+        bound_phone = snap.get("bound_phone")
+        has_secondary = snap.get("has_secondary")
+        account_note = snap.get("note")
 
     # 内联建库存账号（2026-10-28 口径）：建单成功即生成库存编号，不再等 BUY 事件。
     # HS/TH 表单的账号资料为必填，game_account 必有值；缺资料时退回 BUY 事件兜底建号。

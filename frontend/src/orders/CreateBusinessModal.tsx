@@ -272,16 +272,19 @@ export function CreateBusinessModal(props: {
       await ordersApi.create({
         order_type: props.initialOrderType,
         trade_date: today(),
-        account_snapshot: undefined,
+        // 2026-10-28 口径：账号资料统一走 account_snapshot（与 DFQ 建单一致），
+        // 后端据此内联建库存账号并发放 KU_ 编号；与单独账号字段互斥。
+        account_snapshot: {
+          game_account: values.game_account as string,
+          game_type: values.game_type as string | undefined,
+          game_password: values.game_password as string | undefined,
+          channel_region: values.channel_region as string | undefined,
+          bound_phone: values.bound_phone as string | undefined,
+          has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
+          note: values.game_account_note as string | undefined,
+        },
         account_id: undefined,
         note,
-        game_type: values.game_type as string | undefined,
-        game_account: values.game_account as string | undefined,
-        game_password: values.game_password as string | undefined,
-        channel_region: values.channel_region as string | undefined,
-        bound_phone: values.bound_phone as string | undefined,
-        has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
-        account_note: values.game_account_note as string | undefined,
         // 佣金口径仅 DG 生效，其余业务类型一律不带这两个字段。
         commission_mode: isDg ? (values.commission_mode as string | undefined) : undefined,
         commission_payer: isDg ? (values.commission_payer as string | undefined) : undefined,

@@ -185,6 +185,7 @@ export interface Order {
     game_password?: string | null;
     channel_region?: string | null;
     bound_phone?: string | null;
+    bound_phone_owner?: string | null;
     has_secondary?: boolean | null;
     platform?: string | null;
     purchase_price?: string | null;
@@ -337,6 +338,7 @@ export interface Account {
   game_password?: string | null;
   channel_region?: string | null;
   bound_phone?: string | null;
+  bound_phone_owner?: string | null;
   has_secondary?: boolean | null;
   account_description?: string | null;
   account_images?: string[] | null;
@@ -737,6 +739,7 @@ export const ordersApi = {
       game_password?: string;
       channel_region?: string;
       bound_phone?: string;
+      bound_phone_owner?: string;
       has_secondary?: boolean;
       purchase_price?: string;
       note?: string;
@@ -749,6 +752,7 @@ export const ordersApi = {
     game_password?: string;
     channel_region?: string;
     bound_phone?: string;
+    bound_phone_owner?: string;
     has_secondary?: boolean;
     account_note?: string;
     note?: string;

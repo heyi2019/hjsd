@@ -57,6 +57,13 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
+it("回收和代分期均提供手机号绑定人这一核心账号字段", async () => {
+  await openTypedModal("HS");
+  expect(screen.getByLabelText("手机号绑定人")).toBeInTheDocument();
+  await openTypedModal("DFQ");
+  expect((await screen.findAllByLabelText("手机号绑定人")).length).toBeGreaterThan(0);
+});
+
 it("代分期的金额字段与账号备注读取表单字段配置", async () => {
   renderLight(
     <Form>
@@ -157,6 +164,7 @@ it("设计费走 DESIGN 资金分类（不再落到 OTHER）", async () => {
     await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.type(screen.getByLabelText("手机号绑定人"), "张三");
     await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
     await ui.type(screen.getByLabelText("设计费"), "50");
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
@@ -168,6 +176,7 @@ it("设计费走 DESIGN 资金分类（不再落到 OTHER）", async () => {
     const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
     const costs = payload.initial_costs as Array<Record<string, unknown>>;
     expect(costs).toEqual([expect.objectContaining({ amount: "50", flow_category: "DESIGN", note: "设计费" })]);
+    expect(payload.account_snapshot).toMatchObject({ bound_phone_owner: "张三" });
   });
 
 it("代挂单的佣金口径随建单提交（支付方式与承担方成对落到顶层字段）", async () => {

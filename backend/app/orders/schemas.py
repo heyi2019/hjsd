@@ -46,6 +46,7 @@ class OrderAccountSnapshot(BaseModel):
     game_password: str | None = Field(default=None, max_length=256)
     channel_region: str | None = Field(default=None, max_length=128)
     bound_phone: str | None = Field(default=None, max_length=64)
+    bound_phone_owner: str | None = Field(default=None, max_length=128)
     has_secondary: bool | None = None
     platform: str | None = Field(default=None, max_length=64)
     purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")

@@ -761,11 +761,13 @@ class TestCreateOrderValidation:
                 "game_account": "dfq-text-account",
                 "game_password": "secret",
                 "channel_region": "安卓一区",
+                "bound_phone_owner": "张三",
                 "note": "仅订单文本",
             },
         )
 
         assert order.account_snapshot["game_account"] == "dfq-text-account"
+        assert order.account_snapshot["bound_phone_owner"] == "张三"
         account = seeded_db.scalar(
             select(Account).where(Account.game_account == "dfq-text-account")
         )

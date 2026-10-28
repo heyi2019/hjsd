@@ -16,6 +16,7 @@ export function RecoveryAccountSection(props: {
     gamePassword: string;
     channelRegion: string;
     boundPhone: string;
+    boundPhoneOwner: string;
     hasSecondary: string;
     accountNote: string;
   }>;
@@ -28,6 +29,7 @@ export function RecoveryAccountSection(props: {
     gamePassword: "game_password",
     channelRegion: "channel_region",
     boundPhone: "bound_phone",
+    boundPhoneOwner: "bound_phone_owner",
     hasSecondary: "has_secondary",
     accountNote: "game_account_note",
     ...props.fieldNames,
@@ -85,6 +87,9 @@ export function RecoveryAccountSection(props: {
         )}
       </CfgItem>
       <CfgItem name={fieldNames.boundPhone} label="绑定手机号">
+        <Input placeholder="可选填" />
+      </CfgItem>
+      <CfgItem name={fieldNames.boundPhoneOwner} label="手机号绑定人" alwaysActive>
         <Input placeholder="可选填" />
       </CfgItem>
       <CfgItem name={fieldNames.hasSecondary} label="有无二次">

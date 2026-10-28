@@ -1,5 +1,4 @@
 import { beforeEach, vi } from "vitest";
-import type { AccountExecutionDetail } from "../shared/api/catalog";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
 import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
@@ -109,5 +108,3 @@ export const resetInventoryPanelMocks = () => {
 export const setupInventoryPanelMocks = () => {
   beforeEach(() => resetInventoryPanelMocks());
 };
-
-export type InventoryDetailFixture = AccountExecutionDetail;

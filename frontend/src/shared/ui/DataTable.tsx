@@ -10,14 +10,6 @@ import { Empty, Spin, Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import { useEffect, useRef, useState } from "react";
 
-export interface ListQuery {
-  page: number;
-  page_size: number;
-  keyword?: string;
-  from?: string;
-  to?: string;
-}
-
 export function DataTable<T>(props: {
   columns: ColumnsType<T>;
   rows: T[];

@@ -69,11 +69,6 @@ export const EXECUTION_ACTION_LABEL: Record<string, string> = {
   REFUND: "退款",
 };
 
-/** 跨业务复用的能力，不作为买卖资金事件落账。 */
-export const COMMON_CAPABILITY_LABEL: Record<string, string> = {
-  ACQUISITION: "获客",
-};
-
 export function executionActionLabel(
   eventType: string | null | undefined,
   orderType?: string | null,

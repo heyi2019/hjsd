@@ -1,7 +1,7 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form, Modal } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, FieldConfigContext } from "./ConfigurableField";
 import {
   counterpartiesApi,
@@ -66,7 +66,9 @@ export function CreateBusinessModal(props: {
   const [form] = Form.useForm();
   const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
-  const { config } = useOrderFormConfig(props.open ? orderType : undefined);
+  // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
+  // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
+  const { config } = useOrderFormConfig(orderType);
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
   useEffect(() => {
@@ -89,9 +91,11 @@ export function CreateBusinessModal(props: {
     });
   };
 
+  // 基础数据随页面挂载即预热并常驻内存：后续每次打开弹窗直接读 state，不再发网络请求。
+  // 仅成功初始化一次；失败不置位，下次打开可重试。
+  const didInitLookup = useRef(false);
   useEffect(() => {
-    if (!props.open) return;
-    let cancelled = false;
+    if (didInitLookup.current) return;
     void (async () => {
       try {
         const [customerList, cpList, poolList, gameTypeList] = await Promise.all([
@@ -100,20 +104,17 @@ export function CreateBusinessModal(props: {
           poolsApi.list(),
           gameTypesApi.list({ include_inactive: false }),
         ]);
-        if (cancelled) return;
         setCustomers(customerList);
         setCounterparties(cpList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
         setGameTypes(gameTypeList);
         setLoadError(null);
+        didInitLookup.current = true;
       } catch (error) {
-        if (!cancelled) setLoadError(normalizeError(error));
+        setLoadError(normalizeError(error));
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [props.open]);
+  }, []);
 
   useEffect(() => {
     if (!props.open || !orderType) return;
@@ -318,12 +319,12 @@ export function CreateBusinessModal(props: {
     <Modal
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
       open={props.open}
-      destroyOnHidden
       onCancel={() => {
         if (form.isFieldsTouched()) {
           appModal.confirm({
             title: "放弃未保存的建单内容？",
             content: "表单已填写但未提交，关闭后将丢失本次输入。",
+            className: "heijin-fast-confirm",
             okText: "放弃",
             cancelText: "继续编辑",
             okButtonProps: { danger: true },

@@ -505,3 +505,20 @@
   .ant-table-tbody > tr.ant-table-row:nth-child(11) { animation-delay: 240ms; }
   .ant-table-tbody > tr.ant-table-row:nth-child(12) { animation-delay: 264ms; }
 }
+
+/* ── 建单弹窗 / 二次确认框：入场动画压至 50ms（用户 2026-10-28 裁决）──
+ * 背景：弹窗内容盒默认走 `ui-spring-in var(--dur-spring)`（--dur-spring: 0.5s），
+ *   弹簧回弹 500ms 在「打开/关闭」时造成明显拖沓感，用户明确要压到 50ms。
+ * 做法：仅覆盖 animation-duration + timing-function，保留 ui-spring-in keyframes
+ *   （避免重写整套弹簧动画），作用域限定在
+ *   - .adaptive-business-modal（建单弹窗，Modal wrapClassName 已带此标识）
+ *   - .heijin-fast-confirm（二次确认框，由 appModal.confirm({className}) 注入）
+ *   不影响抽屉/下拉/tooltip/message 等其它弹层。
+ * 量化：入场 500ms → 50ms（降 90%）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .adaptive-business-modal .ant-modal-content,
+  .heijin-fast-confirm .ant-modal-content {
+    animation-duration: 50ms !important;
+    animation-timing-function: ease-out !important;
+  }
+}

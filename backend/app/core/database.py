@@ -80,6 +80,8 @@ def _sqlite_pragma_statements(settings: Settings | None = None) -> list[str]:
         # 必须在设 WAL 之后：切日志模式本身会重置该连接的回滚日志强度。
         f"PRAGMA synchronous={cfg.sqlite_synchronous}",
         f"PRAGMA temp_store={cfg.sqlite_temp_store}",
+        # 多 worker 并发写同一 SQLite 文件时，等待而非立即失败（默认 5s，可经 settings 调整）。
+        f"PRAGMA busy_timeout={cfg.sqlite_busy_timeout_ms}",
     ]
     if cfg.sqlite_cache_size_kb > 0:
         # SQLite 负值表示 KB（正值是页数，会随 page_size 变化，不直观）。

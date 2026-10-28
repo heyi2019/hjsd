@@ -436,6 +436,7 @@ class TestDatabaseLifecycle:
             "PRAGMA journal_mode=WAL",
             "PRAGMA synchronous=FULL",
             "PRAGMA temp_store=FILE",
+            "PRAGMA busy_timeout=5000",
         ]
         assert statements.index("PRAGMA journal_mode=WAL") < statements.index(
             "PRAGMA synchronous=FULL"
@@ -465,6 +466,10 @@ class TestDatabaseLifecycle:
                     if cfg.sqlite_mmap_size_mb:
                         assert conn.exec_driver_sql("PRAGMA mmap_size").scalar() == (
                             cfg.sqlite_mmap_size_mb * 1024 * 1024
+                        )
+                    if cfg.sqlite_busy_timeout_ms:
+                        assert conn.exec_driver_sql("PRAGMA busy_timeout").scalar() == (
+                            cfg.sqlite_busy_timeout_ms
                         )
         finally:
             engine.dispose()

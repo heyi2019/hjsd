@@ -48,4 +48,4 @@ EXPOSE 8123
 # 故 upgrade 失败时交给 stamp_baseline.py：只有确认库结构与 ORM 等价才对齐版本戳，
 # 结构真的落后则报错退出，避免把缺表的库伪装成已迁移。
 # 注意：下面的 python3 显式写出（不仅依赖 python 软链），避免软链若被移除时启动直接失败。
-CMD ["sh", "-c", "alembic upgrade head || python3 scripts/stamp_baseline.py && uvicorn app.main:app --host 0.0.0.0 --port 8123"]
+CMD ["sh", "-c", "alembic upgrade head || python3 scripts/stamp_baseline.py && uvicorn app.main:app --host 0.0.0.0 --port 8123 --workers 2"]

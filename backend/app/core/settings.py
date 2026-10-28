@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     sqlite_cache_size_kb: int = 16000
     sqlite_mmap_size_mb: int = 64
     sqlite_temp_store: str = "MEMORY"
+    # busy_timeout（ms）：并发写等待时长。多 worker 部署时多个进程争写同一 SQLite 文件，
+    #   不设会立即抛 `database is locked`；5s 足以覆盖本系统短事务。显式声明使行为可配、可演进
+    #   （python sqlite3 默认即 5s，这里落为显式配置，对应压测报告 P2-⑦）。
+    sqlite_busy_timeout_ms: int = 5000
 
     # cors（逗号分隔）：显式白名单，任何环境都生效
     cors_origins: str = (
@@ -139,11 +143,11 @@ class Settings(BaseSettings):
             raise ValueError("SQLITE_TEMP_STORE 只允许 MEMORY/FILE")
         return normalized
 
-    @field_validator("sqlite_cache_size_kb", "sqlite_mmap_size_mb")
+    @field_validator("sqlite_cache_size_kb", "sqlite_mmap_size_mb", "sqlite_busy_timeout_ms")
     @classmethod
     def _validate_sqlite_sizes(cls, value: int) -> int:
         if value < 0:
-            raise ValueError("SQLite 缓存 / mmap 尺寸不得为负数（0 表示不覆盖）")
+            raise ValueError("SQLite 缓存 / mmap 尺寸 / busy_timeout 不得为负数（0 表示不覆盖）")
         return value
 
     @staticmethod

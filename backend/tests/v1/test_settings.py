@@ -196,6 +196,7 @@ class TestSqliteRuntimeKnobs:
         assert settings.sqlite_cache_size_kb == 16000
         assert settings.sqlite_mmap_size_mb == 64
         assert settings.sqlite_temp_store == "MEMORY"
+        assert settings.sqlite_busy_timeout_ms == 5000
 
     def test_values_are_normalized_and_env_overridable(self, monkeypatch):
         monkeypatch.setenv("SQLITE_SYNCHRONOUS", "full")
@@ -216,7 +217,9 @@ class TestSqliteRuntimeKnobs:
         with pytest.raises(ValidationError):
             Settings(**{field: value})
 
-    @pytest.mark.parametrize("field", ["sqlite_cache_size_kb", "sqlite_mmap_size_mb"])
+    @pytest.mark.parametrize(
+        "field", ["sqlite_cache_size_kb", "sqlite_mmap_size_mb", "sqlite_busy_timeout_ms"]
+    )
     def test_negative_sizes_are_rejected(self, field):
         with pytest.raises(ValidationError):
             Settings(**{field: -1})

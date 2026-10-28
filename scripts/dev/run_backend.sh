@@ -17,6 +17,16 @@ LOG_DIR="$PROJECT_ROOT/logs"
 mkdir -p "$LOG_DIR"
 
 cd "$BACKEND_DIR"
-exec "$VENV_PY" -m uvicorn app.main:app \
-  --host 0.0.0.0 --port 8123 \
-  --reload --reload-dir app
+# 默认单 worker + --reload（开发态：改代码热更新，首次拉起即生效）。
+# 多 worker 与 --reload 互斥；设 HEIJIN_UVICORN_WORKERS>1 即关闭 reload，进入「类生产」多进程形态
+# （对应压测报告 P1-②：2 核服务器用 --workers 2，CPU 利用率翻倍）。
+WORKERS="${HEIJIN_UVICORN_WORKERS:-1}"
+if [ "$WORKERS" -gt 1 ]; then
+  exec "$VENV_PY" -m uvicorn app.main:app \
+    --host 0.0.0.0 --port 8123 \
+    --workers "$WORKERS"
+else
+  exec "$VENV_PY" -m uvicorn app.main:app \
+    --host 0.0.0.0 --port 8123 \
+    --reload --reload-dir app
+fi

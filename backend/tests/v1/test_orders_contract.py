@@ -12,7 +12,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
@@ -71,7 +71,11 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
         })
     assert response.status_code == 422, response.text
     assert seeded_db.scalar(select(Account).where(Account.game_account == "rollback-inline")) is None
-    assert seeded_db.scalar(select(Order).where(Order.game_account == "rollback-inline")) is None
+    assert seeded_db.scalar(
+        select(Order).where(
+            func.json_extract(Order.account_snapshot, "$.game_account") == "rollback-inline"
+        )
+    ) is None
 
 
 def _order(seeded_db, *, order_type="HS", account_id=None, owner_id=None, trade_date=D):
@@ -983,7 +987,8 @@ class TestGetAndListOrders:
         self, seeded_client, seeded_db, headers
     ):
         mine = _order(seeded_db, owner_id=9, trade_date=date(2026, 10, 3))
-        mine.game_account = "workbench-keyword-account"
+        # 2026-10-28 去冗余：订单侧账号关键词走 account_snapshot JSON 检索
+        mine.account_snapshot = {"game_account": "workbench-keyword-account"}
         _order(seeded_db, order_type="TH", owner_id=1, trade_date=date(2026, 10, 4))
         seeded_db.flush()
 

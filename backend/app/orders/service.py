@@ -397,8 +397,26 @@ def create_order(
         if primary_version_id is None:
             primary_version_id = version_id
 
-    # 2026-10-28 口径：HS/TH/DG 快照建单——快照值展开为账号资料，
-    # 复用内联建号逻辑（建单成功即发库存编号），订单行同时落快照与展开字段。
+    # 2026-10-28 去冗余：账号资料单一事实源 = account_snapshot。
+    # 旧调用方传平铺字段时自动转为快照（API 契约保留，物理冗余列已删除）。
+    if (
+        account_snapshot is None
+        and definition.code in {"HS", "TH", "DG"}
+        and game_account
+    ):
+        account_snapshot = {
+            "game_account": game_account,
+            "game_type": game_type,
+            "game_password": game_password,
+            "channel_region": channel_region,
+            "bound_phone": bound_phone,
+            "has_secondary": has_secondary,
+            "note": account_note,
+        }
+        account_snapshot = _normalize_account_snapshot(account_snapshot)
+
+    # 2026-10-28 口径：HS/TH/DG 快照建单——快照值展开为局部变量，
+    # 供内联建号使用；订单行只落快照，不再写平铺列。
     if account_snapshot is not None and definition.code in {"HS", "TH", "DG"}:
         snap = account_snapshot
         game_account = snap["game_account"]
@@ -444,13 +462,6 @@ def create_order(
         trade_date=trade_date,
         account_snapshot=account_snapshot,
         account_id=account_id,
-        game_type=game_type,
-        game_account=game_account,
-        game_password=game_password,
-        channel_region=channel_region,
-        bound_phone=bound_phone,
-        has_secondary=has_secondary,
-        account_note=account_note,
         status=OrderStatus.ACTIVE.value,
         policy_version_id=primary_version_id,
         policy_snapshot=snapshot or None,
@@ -716,7 +727,8 @@ def list_orders(
         stmt = stmt.where(
             or_(
                 Order.order_no.ilike(pattern),
-                Order.game_account.ilike(pattern),
+                # 2026-10-28 去冗余：平铺列已删，订单侧账号搜索走快照 JSON
+                func.json_extract(Order.account_snapshot, "$.game_account").ilike(pattern),
                 Account.game_account.ilike(pattern),
                 Order.note.ilike(pattern),
             )

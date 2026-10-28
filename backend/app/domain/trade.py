@@ -179,15 +179,9 @@ class Order(Base, AuditMixin):
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
     )
-    # HS / TH / DG 内联填写的游戏账号资料：库存编号由库存中心建档时自动生成，
-    # 这里的字段逐个独立落库，不塞进 account_snapshot（非 DFQ 的 account_snapshot 必须为 NULL）。
-    game_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    game_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    bound_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    account_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 2026-10-28 去冗余：HS/TH/DG 账号资料统一存 account_snapshot（单一事实源），
+    # 原平铺列（game_type/game_account/game_password/channel_region/bound_phone/
+    # has_secondary/account_note）已由迁移 0008 删除；展示与筛选统一从快照取。
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=OrderStatus.ACTIVE.value
     )

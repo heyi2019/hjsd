@@ -72,7 +72,14 @@ it("提号建单：复用回收费用与付款结构，并登记供货方", asyn
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.order_type).toBe("TH");
-    expect(payload.account_snapshot).toBeUndefined();
+    // 2026-10-28 口径：账号资料统一走 account_snapshot（与 DFQ 对齐），平铺字段不再下发
+    expect(payload.account_snapshot).toMatchObject({
+      game_type: "王者荣耀",
+      game_account: "pickup-account",
+      game_password: "secret",
+      channel_region: "安卓一区",
+    });
+    expect(payload.game_account).toBeUndefined();
     expect(payload.account).toBeUndefined();
     expect(payload.account_id).toBeUndefined();
     expect(payload.customer_roles).toEqual([]);

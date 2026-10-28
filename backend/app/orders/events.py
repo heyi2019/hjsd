@@ -171,14 +171,25 @@ def post_event(
             details={"order_no": order.order_no, "current_status": order.status},
         )
 
-    # HS/TH BUY：订单未关联库存账号时用内联账号资料补建（正常流程建单时已建号，
-    # 此处是 API 直调/异常数据的兜底；游戏账号必填是建号前提）。
-    if order.order_type in {"HS", "TH"} and event_type == EventType.BUY.value and order.account_id is None and order.game_account:
+    # HS/TH BUY：订单未关联库存账号时用建单快照里的账号资料补建（正常流程建单时
+    # 已建号，此处是 API 直调/异常数据的兜底；游戏账号必填是建号前提）。
+    # 2026-10-28 去冗余：平铺列已删除，账号资料统一从 account_snapshot 读取。
+    _buy_snapshot = order.account_snapshot or {}
+    if (
+        order.order_type in {"HS", "TH"}
+        and event_type == EventType.BUY.value
+        and order.account_id is None
+        and _buy_snapshot.get("game_account")
+    ):
         account = _create_inline_inventory_account(
-            session, order_type=order.order_type, game_account=order.game_account, actor=actor,
-            game_type=order.game_type, game_password=order.game_password,
-            channel_region=order.channel_region, bound_phone=order.bound_phone,
-            has_secondary=order.has_secondary, account_note=order.account_note,
+            session, order_type=order.order_type,
+            game_account=_buy_snapshot["game_account"], actor=actor,
+            game_type=_buy_snapshot.get("game_type"),
+            game_password=_buy_snapshot.get("game_password"),
+            channel_region=_buy_snapshot.get("channel_region"),
+            bound_phone=_buy_snapshot.get("bound_phone"),
+            has_secondary=_buy_snapshot.get("has_secondary"),
+            account_note=_buy_snapshot.get("note"),
         )
         order.account_id = account.id
 
@@ -477,8 +488,8 @@ def _assert_event_allowed(
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
-        # account_id 为空只可能是订单未内联填写游戏账号（有值时上方已自动建号）。
-        if not order.game_account:
+        # account_id 为空只可能是建单快照缺游戏账号（有值时上方已自动建号）。
+        if not (order.account_snapshot or {}).get("game_account"):
             raise Validation(
                 "回收订单买入必须填写游戏账号，系统将据此创建库存账号",
                 details={"field": "game_account"},

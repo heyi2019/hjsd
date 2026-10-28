@@ -1,4 +1,4 @@
-"""parties.schemas：客户、合作方、活字段的请求/响应模型。
+"""parties.schemas：客户、合作方、表单扩展字段的请求/响应模型。
 
 联系方式对外**默认脱敏**；只有具备 `customer.contact.read` 且显式请求时才返回完整值。
 """
@@ -27,7 +27,7 @@ class CustomerCreate(RequestModel):
     tags: list[str] | None = None
     note: str | None = None
     extra_values: dict[str, Any] | None = Field(
-        default=None, description="活字段值：field_key → 值，仅接受已启用的字段定义（BAS-04-04）"
+        default=None, description="表单扩展字段值：field_key → 值，仅接受已启用的字段配置（BAS-04-04）"
     )
 
 
@@ -48,6 +48,8 @@ class CustomerUpdate(RequestModel):
 
 class CustomerStatusUpdate(RequestModel):
     status: CustomerStatus
+    # 状态变更同时可写扩展字段值（只校验本次提交的字段，不做全量必填校验）。
+    extra_values: dict[str, Any] | None = None
 
 
 class DuplicateCandidate(BaseModel):

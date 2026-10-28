@@ -538,6 +538,7 @@ def set_customer_status(
     status: str,
     *,
     actor: str,
+    extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Customer:
     customer = get_customer(session, customer_id, user)
@@ -556,10 +557,32 @@ def set_customer_status(
             code=ErrorCode.MERGE_TARGET_INVALID,
             details={"customer_no": customer.customer_no, "status": customer.status},
         )
+    extras = _normalize_extra_values(extra_values)
+    if extras:
+        _validate_required_extras(
+            session, EntityType.CUSTOMER.value, extras, partial=True
+        )
+        _validate_extra_values(
+            session,
+            entity_type=EntityType.CUSTOMER.value,
+            entity_id=customer.id,
+            values=extras.items(),
+        )
+
     before = customer.status
     customer.status = status
     customer.updated_by = actor
     session.flush()
+
+    saved_extras: dict[str, Any] = {}
+    if extras:
+        saved_extras = set_extra_values(
+            session,
+            entity_type=EntityType.CUSTOMER.value,
+            entity_id=customer.id,
+            values=extras.items(),
+        )
+
     record_audit(
         session,
         action=AuditAction.CUSTOMER_UPDATE,
@@ -567,7 +590,10 @@ def set_customer_status(
         entity_id=customer.customer_no,
         actor=actor,
         before={"status": before},
-        after={"status": status},
+        after={
+            "status": status,
+            **({"extra_values": saved_extras} if saved_extras else {}),
+        },
     )
     return customer
 

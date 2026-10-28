@@ -169,6 +169,8 @@ class OrderCancelIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
     # 表单字段配置体系（ORDERCANC 作用域）：合并进订单 form_extra。
     form_extra: dict[str, object] | None = None
+    # 作用域可显式指定（如从库存发起的作废），缺省按取消单 ORDERCANC 校验。
+    form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
 
 
 class OrderOut(BaseModel):

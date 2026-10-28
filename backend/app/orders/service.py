@@ -865,6 +865,7 @@ def cancel_order(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     """作废尚未登记事件的订单；已产生业务事实的订单必须走事件冲销。"""
@@ -880,8 +881,12 @@ def cancel_order(
         raise Validation("订单已有登记事件，不能直接作废，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     if form_extra:
-        # ORDERCANC 作用域自定义字段值合并进订单 form_extra。
-        checked = validate_form_extra(session, order_type_code="ORDERCANC", values=form_extra)
+        # 自定义字段值按作用域校验后合并进订单 form_extra（缺省取消单 ORDERCANC）。
+        checked = validate_form_extra(
+            session,
+            order_type_code=form_extra_scope or "ORDERCANC",
+            values=form_extra,
+        )
         order.form_extra = {**(order.form_extra or {}), **checked}
     order.updated_by = actor
     session.flush()

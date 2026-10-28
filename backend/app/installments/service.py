@@ -1436,6 +1436,7 @@ def mark_overdue(
         # 一次性统计每个合约本次被标记的期数：原实现在合约循环里再扫一遍全量 rows，
         # 是 O(合约数 × 期次数)；Counter 单趟线性。
         overdue_counts = Counter(row.installment_id for row in rows)
+        # 一次性预取涉及的合约，避免在循环里逐条 session.get（N+1）。
         installments = {
             item.id: item
             for item in session.scalars(

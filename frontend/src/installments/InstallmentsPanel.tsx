@@ -30,7 +30,7 @@ import {
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { useSession, type Permission } from "../shared/state/session";
-import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
 /** 合约类型页签与违约处置文案的回落值；词典加载后由选项词典接管（改造前即为这些文案）。 */
 const CONTRACT_TYPE_LABEL: Record<string, string> = {
@@ -141,6 +141,7 @@ function ContractTable({
           amount: values.amount as string,
           paid_on: values.paid_on as string,
           period_no: values.period_no === undefined ? undefined : Number(values.period_no),
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("收款已登记");
         setPayTarget(null);
@@ -156,6 +157,7 @@ function ContractTable({
           delivery_mode: values.delivery_mode as string,
           delivered_on: values.delivered_on as string,
           note: values.note as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("已完成交付，不新增现金流");
         setDeliverTarget(null);
@@ -170,6 +172,7 @@ function ContractTable({
         await installmentsApi.recover(recoverTarget.id, {
           occurred_on: values.occurred_on as string,
           note: values.note as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("逾期账号已登记回收");
         setRecoverTarget(null);
@@ -185,6 +188,7 @@ function ContractTable({
           resale_order_id: Number(values.resale_order_id),
           occurred_on: values.occurred_on as string,
           note: values.note as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("已登记出售，原分期与出售订单的利润关联保留");
         setResaleTarget(null);
@@ -199,6 +203,7 @@ function ContractTable({
         const result = await installmentsApi.cancel(cancelTarget.id, {
           cancelled_on: values.cancelled_on as string,
           reason: values.reason as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
         appMessage.success(
@@ -219,6 +224,7 @@ function ContractTable({
           paid_on: values.paid_on as string,
           pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
           note: values.note as string | undefined,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("已提前结清，剩余应收一次性收清");
         setSettleTarget(null);
@@ -230,7 +236,7 @@ function ContractTable({
   const submitDefault = async (values: Record<string, unknown>) => {
     if (!defaultTarget) return;
     await write.run(async () => {
-        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string });
+        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string, form_extra: values.form_extra as Record<string, unknown> | undefined });
         appMessage.success("已登记违约，合约进入 DEFAULTED");
         setDefaultTarget(null);
         defaultForm.resetFields();
@@ -245,6 +251,7 @@ function ContractTable({
           amount: values.amount as string,
           waived_on: values.waived_on as string,
           reason: values.reason as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("期次减免已登记");
         setWaiveTarget(null);
@@ -259,6 +266,7 @@ function ContractTable({
         await installmentsApi.extendSchedule(extendTarget.installment_id, extendTarget.period_no, {
           new_due_on: values.new_due_on as string,
           reason: values.reason as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("期次展期已登记");
         setExtendTarget(null);
@@ -591,6 +599,7 @@ function ContractTable({
           <CfgItem name="paid_on" label="收款日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-pay" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认收款
           </PermissionButton>
@@ -613,6 +622,7 @@ function ContractTable({
           <CfgItem name="note" label="回收说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-recover" />
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
           </PermissionButton>
@@ -652,6 +662,7 @@ function ContractTable({
           <CfgItem name="note" label="出售说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-resale" />
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认登记
           </PermissionButton>
@@ -677,6 +688,7 @@ function ContractTable({
           <CfgItem name="note" label="换绑凭证" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-deliver" />
           <Typography.Paragraph type="secondary">
             仅已结清合约可交付；DELIVER 无金额、不生成现金流，不再确认收入。
           </Typography.Paragraph>
@@ -707,6 +719,7 @@ function ContractTable({
           <CfgItem name="reason" label="取消原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-cancel" />
           <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit" loading={write.pending}>
             确认退款并终止分期
           </PermissionButton>
@@ -732,6 +745,7 @@ function ContractTable({
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="可选" />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-settle" />
           <PermissionButton permission={settlePermission} type="primary" htmlType="submit" loading={write.pending}>
             确认提前结清
           </PermissionButton>
@@ -754,6 +768,7 @@ function ContractTable({
           <CfgItem name="reason" label="违约原因" rules={[{ required: true, message: "请填写违约原因" }]}>
             <Input.TextArea rows={3} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-default" />
           <PermissionButton permission="order.exception.approve" type="primary" danger htmlType="submit" loading={write.pending}>
             确认登记违约
           </PermissionButton>
@@ -782,6 +797,7 @@ function ContractTable({
           <CfgItem name="reason" label="减免原因" rules={[{ required: true, message: "请填写减免原因" }]}>
             <Input.TextArea rows={2} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-waive" />
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认减免
           </PermissionButton>
@@ -807,6 +823,7 @@ function ContractTable({
           <CfgItem name="reason" label="展期原因" rules={[{ required: true, message: "请填写展期原因" }]}>
             <Input.TextArea rows={2} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="installment-extend" />
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认展期
           </PermissionButton>

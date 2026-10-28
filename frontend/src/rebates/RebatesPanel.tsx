@@ -27,7 +27,7 @@ import {
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
-import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -102,6 +102,7 @@ export function RebatesPanel() {
           base_amount: values.base_amount as string,
           rate: (values.rate as string) ?? "0",
           collected_on: values.collected_on as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("返点记录已创建");
         setCreateOpen(false);
@@ -113,7 +114,7 @@ export function RebatesPanel() {
   const submitVoid = async (values: Record<string, unknown>) => {
     if (!voidTarget) return;
     await write.run(async () => {
-        await rebatesApi.voidRecord(voidTarget.id, values.reason as string);
+        await rebatesApi.voidRecord(voidTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined);
         appMessage.success("返点记录已作废，未产生资金流水");
         setVoidTarget(null);
         voidForm.resetFields();
@@ -129,6 +130,7 @@ export function RebatesPanel() {
           platform_fee: (values.platform_fee as string) ?? "0",
           settled_on: values.settled_on as string,
           pool_id: Number(values.pool_id),
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("返点结算已登记");
         setSettleTarget(null);
@@ -143,6 +145,7 @@ export function RebatesPanel() {
         await rebatesApi.reverseSettlement(reverseTarget.rebate.id, reverseTarget.settlement.id, {
           reversed_on: values.reversed_on as string,
           reason: values.reason as string,
+          form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("结算已冲销，已生成反向流水");
         setReverseTarget(null);
@@ -377,6 +380,7 @@ export function RebatesPanel() {
           <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="rebate-create" />
           <Typography.Paragraph type="secondary">
             新返点必须关联来源订单；返点不能独立创建为订单（REB-01-02）。
           </Typography.Paragraph>
@@ -408,6 +412,7 @@ export function RebatesPanel() {
           <CfgItem name="settled_on" label="到账日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="rebate-settle" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认结算
           </PermissionButton>
@@ -433,6 +438,7 @@ export function RebatesPanel() {
           <CfgItem name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
             <Input.TextArea rows={3} />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="rebate-reverse" />
           <PermissionButton
             permission="order.event.post"
             type="primary"
@@ -461,6 +467,7 @@ export function RebatesPanel() {
             <CfgItem name="reason" label="作废原因" rules={[{ required: true, message: "请填写作废原因" }]}>
               <Input.TextArea rows={3} />
             </CfgItem>
+            <CustomFieldSection testIdSuffix="rebate-void" />
             <PermissionButton
               permission="order.event.post"
               type="primary"

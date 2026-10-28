@@ -375,16 +375,27 @@ class TestFoundationApi:
         assert response.status_code == 200, response.text
         assert response.json()["name"] == "代挂API"
 
-    def test_sequences_endpoint_marks_exhausted(self, seeded_client, seeded_db, headers, monkeypatch):
-        from app.foundation import router as foundation_router
+    def test_sequences_endpoint_marks_exhausted(self, seeded_client, seeded_db, headers):
+        """序列耗尽时 next_number 渲染为占位提示。
 
-        def _boom(session, key):
-            raise Validation("编号已达上限")
+        设真实序列行到上限来触发分支，而不是 mock 路由层内部符号：
+        这样断言的是对外行为，重构内部实现（如改为按已加载行直接格式化）不会误伤。
+        """
+        from app.core.numbering import MAX_SEQUENCE_VALUE
+        from app.domain.foundation import DocumentSequence
 
-        monkeypatch.setattr(foundation_router, "peek_number", _boom)
+        target = seeded_db.scalar(
+            select(DocumentSequence).order_by(DocumentSequence.sequence_key)
+        )
+        target.current_value = MAX_SEQUENCE_VALUE
+        seeded_db.commit()
+
         response = seeded_client.get("/api/v1/sequences", headers=headers)
         assert response.status_code == 200, response.text
-        assert response.json()[0]["next_number"].startswith("<已达上限")
+        row = next(
+            item for item in response.json() if item["sequence_key"] == target.sequence_key
+        )
+        assert row["next_number"] == f"<已达上限 {MAX_SEQUENCE_VALUE}>"
 
     def test_route_impact_preview_does_not_change_history(
         self, seeded_client, seeded_db, headers

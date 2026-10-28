@@ -2,7 +2,8 @@
 
 本模块是**全站唯一的表单字段配置来源**：描述「建单表单」与「客户建档」等表单的字段构成
 （显示/必填/停用/排序/增删），不存储实体附加属性值。自定义字段（is_custom=1）即扩展字段，
-其值落在实体行内的 form_extra（订单 Order.form_extra、客户 Customer.form_extra）。
+其值落在所属实体行内的 form_extra：建单订单使用 Order.form_extra，账号/产品字段写入
+Account.form_extra，客户建档字段使用 Customer.form_extra；同一字段定义仍由本表统一维护。
 核心核算字段 locked=True，仅禁止物理删除；required 与 is_active 仍可按业务需要配置
 （停用核心字段由前端提示风险）。
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import Any
 
 from sqlalchemy import select
@@ -129,6 +131,84 @@ def _normalize_field_options(
     if not normalized:
         raise Validation("选择型字段至少需要一个选项", details={"field": "options"})
     return normalized
+
+
+def validate_form_extra(
+    session: Session,
+    *,
+    order_type_code: str,
+    values: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """校验任意设置→表单字段作用域的扩展值。
+
+    表单字段配置虽然历史上以 ``order_type_code`` 命名，但现在覆盖订单、
+    库存操作、分期、资金、客户等全部作用域。值仍采用同一 JSON 约定；
+    已删除/停用字段的历史键允许继续保留，以保证历史单据可读。
+    """
+    normalized = dict(values or {})
+    active_custom = list(session.scalars(
+        select(OrderFormField).where(
+            OrderFormField.order_type_code == order_type_code.strip().upper(),
+            OrderFormField.is_custom.is_(True),
+            OrderFormField.is_active.is_(True),
+        )
+    ))
+    definitions = {field.field_key: field for field in active_custom}
+    for field_key, value in normalized.items():
+        definition = definitions.get(field_key)
+        if definition is None:
+            continue
+        if definition.field_type == "NUMBER":
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise Validation(f"字段 {definition.label} 必须为数字", details={"field_key": field_key})
+        elif definition.field_type == "BOOLEAN":
+            if not isinstance(value, bool):
+                raise Validation(f"字段 {definition.label} 必须为布尔值", details={"field_key": field_key})
+        elif definition.field_type == "TEXT":
+            if not isinstance(value, str):
+                raise Validation(f"字段 {definition.label} 必须为字符串", details={"field_key": field_key})
+        elif definition.field_type == "DATE":
+            if not isinstance(value, str):
+                raise Validation(f"字段 {definition.label} 必须为日期字符串", details={"field_key": field_key})
+            try:
+                date.fromisoformat(value[:10])
+            except ValueError as exc:
+                raise Validation(f"字段 {definition.label} 必须为 YYYY-MM-DD 日期", details={"field_key": field_key}) from exc
+        elif definition.field_type in {"SELECT", "MULTI_SELECT"}:
+            options = {str(item.get("value")) for item in (definition.options or []) if isinstance(item, Mapping)}
+            if definition.field_type == "SELECT":
+                if not isinstance(value, str) or (options and value not in options):
+                    raise Validation(f"字段 {definition.label} 的取值不合法", details={"field_key": field_key})
+            elif not isinstance(value, list) or any(not isinstance(item, str) or (options and item not in options) for item in value):
+                raise Validation(f"字段 {definition.label} 的取值不合法", details={"field_key": field_key})
+
+    def filled(value: Any) -> bool:
+        return value is not None and value != "" and value != []
+
+    for definition in active_custom:
+        required = definition.required
+        condition = definition.required_when
+        if condition:
+            dependency = normalized.get(condition.get("field"))
+            if condition.get("op") == "filled":
+                required = filled(dependency)
+            else:
+                current = dependency if isinstance(dependency, list) else [dependency]
+                hit = any(str(item) in (condition.get("values") or []) for item in current)
+                required = (not hit) if condition.get("op") == "ne" else hit
+        if required and not filled(normalized.get(definition.field_key)):
+            raise Validation(f"字段 {definition.label} 必填", details={"field_key": definition.field_key})
+    return normalized
+
+
+def validate_order_form_extra(
+    session: Session,
+    *,
+    order_type_code: str,
+    values: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """兼容旧调用方：校验建单作用域扩展值。"""
+    return validate_form_extra(session, order_type_code=order_type_code, values=values)
 
 
 def create_order_form_field(
@@ -462,4 +542,6 @@ __all__ = [
     "list_order_form_fields",
     "set_order_form_field_active",
     "update_order_form_field",
+    "validate_form_extra",
+    "validate_order_form_extra",
 ]

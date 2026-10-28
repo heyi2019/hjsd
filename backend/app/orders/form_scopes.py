@@ -70,6 +70,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("REBATE", "新建返点", GROUP_REBATE),
     FormScope("REBSETTLE", "返点结算", GROUP_REBATE),
     FormScope("REBREVERSE", "返点冲销", GROUP_REBATE),
+    FormScope("REBATEVOID", "作废返点", GROUP_REBATE),
     # ---- 资金（迁移 0003）----
     FormScope("FUNDDEPOSIT", "押金占用", GROUP_FUND),
     FormScope("FUNDFLOW", "录入流水", GROUP_FUND),
@@ -82,6 +83,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("FUNDLOSS", "损失", GROUP_FUND),
     FormScope("FUNDREPAIR", "划转修复", GROUP_FUND),
     FormScope("FUNDLOCK", "月结锁定", GROUP_FUND),
+    FormScope("FUNDCANCEL", "取消押金", GROUP_FUND),
     # ---- 工作室（迁移 0019）----
     FormScope("STUDIOEXP", "工作室收支登记", GROUP_STUDIO),
     FormScope("STUDIOREJ", "工作室拒绝", GROUP_STUDIO),

@@ -28,6 +28,7 @@ import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import {
   CfgItem,
+  CustomFieldSection,
   FieldConfigScope,
   buildFormExtraDisplay,
   formatExtraDisplayValue,
@@ -761,6 +762,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [rows, setRows] = useState<Counterparty[]>([]);
+  const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [open, setOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Counterparty | null>(null);
   const [detailTarget, setDetailTarget] = useState<Counterparty | null>(null);
@@ -781,6 +783,12 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
 
   // keep-alive：提号建单会自动建档供货方，重新激活时重拉避免列表过期。
   useReloadOnActive(active, load);
+
+  useEffect(() => {
+    orderFormFieldsApi.list("COUNTERPARTY", true)
+      .then((items) => setFieldDefs((items ?? []).filter((item) => item.is_custom)))
+      .catch(() => setFieldDefs([]));
+  }, []);
 
   const openDetail = async (row: Counterparty) => {
     setDetailTarget(row);
@@ -803,6 +811,9 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
         contact_name: values.contact_name as string,
         phone: values.phone as string,
         wechat: values.wechat as string,
+        qq: values.qq as string,
+        note: (values.note as string) || null,
+        extra_values: collectExtras(values, fieldDefs),
       });
       appMessage.success("合作方已建档");
       setOpen(false);
@@ -823,6 +834,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
         wechat: values.wechat as string,
         qq: values.qq as string,
         note: (values.note as string) || null,
+        extra_values: collectExtras(values, fieldDefs),
       });
       appMessage.success("合作方已更新");
       setEditTarget(null);
@@ -919,6 +931,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
           <CfgItem name="wechat" label="微信号">
             <Input />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="counterparty-create" />
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             建档
           </PermissionButton>
@@ -936,6 +949,7 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
         footer={null}
         destroyOnHidden
       >
+        <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
         <Form
           form={editForm}
           layout="vertical"
@@ -975,10 +989,12 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
           <Form.Item name="note" label="备注">
             <Input.TextArea rows={3} />
           </Form.Item>
+          <CustomFieldSection testIdSuffix="counterparty-edit" />
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             保存
           </PermissionButton>
         </Form>
+        </FieldConfigScope>
       </Modal>
 
       <Drawer

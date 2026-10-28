@@ -18,11 +18,13 @@ class DepositCreate(RequestModel):
     source_order_id: int | None = None
     expected_release_on: date | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class PeriodLockCreate(RequestModel):
     period: str = Field(min_length=7, max_length=7)
     note: str | None = Field(default=None, max_length=500)
+    form_extra: dict[str, Any] | None = None
 
 
 class PeriodLockOut(BaseModel):
@@ -37,11 +39,13 @@ class PeriodLockOut(BaseModel):
     updated_at: datetime
     created_by: str
     updated_by: str
+    form_extra: dict[str, Any] | None = None
 
 
 class DepositReturn(RequestModel):
     amount: Decimal
     released_on: date
+    form_extra: dict[str, Any] | None = None
 
 
 class DepositLoss(RequestModel):
@@ -49,15 +53,18 @@ class DepositLoss(RequestModel):
     lost_on: date
     category: str
     reason: str
+    form_extra: dict[str, Any] | None = None
 
 
 class DepositCancel(RequestModel):
     cancelled_on: date
     reason: str = Field(min_length=1, max_length=2000)
+    form_extra: dict[str, Any] | None = None
 
 
 class RebateVoid(RequestModel):
     reason: str = Field(min_length=1, max_length=2000)
+    form_extra: dict[str, Any] | None = None
 
 
 class DepositOut(BaseModel):
@@ -78,6 +85,7 @@ class DepositOut(BaseModel):
     note: str | None = None
     created_at: datetime
     operator: str
+    form_extra: dict[str, Any] | None = None
 
 
 class CashflowOut(BaseModel):
@@ -129,12 +137,14 @@ class CashflowCreate(RequestModel):
     extra_values: dict[str, Any] | None = None
     # 表单字段配置体系（STUDIOEXP 作用域）：自定义字段值落 Cashflow.form_extra。
     form_extra: dict[str, Any] | None = None
+    form_extra_scope: str = "FUNDFLOW"
 
 
 class CashflowReject(RequestModel):
     reason: str
     # 表单字段配置体系（STUDIOREJ 作用域）：合并进流水 form_extra。
     form_extra: dict[str, Any] | None = None
+    form_extra_scope: str = "FUNDREJECT"
 
 
 class CashflowReverse(RequestModel):
@@ -142,6 +152,7 @@ class CashflowReverse(RequestModel):
     reason: str
     # 表单字段配置体系（STUDIOREV 作用域）：落冲销流水 form_extra。
     form_extra: dict[str, Any] | None = None
+    form_extra_scope: str = "FUNDREVERSE"
 
 
 class ReconciliationCreate(RequestModel):
@@ -152,10 +163,12 @@ class ReconciliationCreate(RequestModel):
     unmatched_flow_ids: list[int] = Field(default_factory=list)
     reason: str | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class ReconciliationResolve(RequestModel):
     reason: str
+    form_extra: dict[str, Any] | None = None
 
 
 class ReconciliationOut(BaseModel):
@@ -176,6 +189,7 @@ class ReconciliationOut(BaseModel):
     note: str | None = None
     created_at: datetime
     operator: str
+    form_extra: dict[str, Any] | None = None
 
 
 class TransferCreate(RequestModel):
@@ -184,11 +198,13 @@ class TransferCreate(RequestModel):
     amount: Decimal
     occurred_on: date
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class TransferRepair(RequestModel):
     counterpart_pool_id: int
     reason: str
+    form_extra: dict[str, Any] | None = None
 
 
 class TransferOut(BaseModel):
@@ -212,6 +228,7 @@ class RebateCreate(RequestModel):
     rate: Decimal | None = None
     channel: str | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class RebateOut(BaseModel):
@@ -231,6 +248,7 @@ class RebateOut(BaseModel):
     note: str | None = None
     created_at: datetime
     operator: str
+    form_extra: dict[str, Any] | None = None
 
 
 class RebateOverdueOut(RebateOut):
@@ -243,6 +261,7 @@ class SettlementCreate(RequestModel):
     pool_id: int
     platform_fee: Decimal = Decimal("0")
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class SettlementOut(BaseModel):
@@ -260,11 +279,14 @@ class SettlementOut(BaseModel):
     note: str | None = None
     created_at: datetime
     operator: str
+    form_extra: dict[str, Any] | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class SettlementReverse(RequestModel):
     reversed_on: date
     reason: str
+    form_extra: dict[str, Any] | None = None
 
 
 __all__ = [

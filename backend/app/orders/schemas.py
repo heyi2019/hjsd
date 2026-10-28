@@ -51,6 +51,8 @@ class OrderAccountSnapshot(BaseModel):
     platform: str | None = Field(default=None, max_length=64)
     purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")
     note: str | None = None
+    # 账号／产品板块的自定义字段，随建单内联写入库存账号扩展资料。
+    extra_values: dict[str, object] | None = None
 
 
 class InitialBuyCreate(BaseModel):
@@ -126,6 +128,9 @@ class OrderCreate(BaseModel):
     extra_values: dict[str, object] = Field(default_factory=dict)
     # 建单表单自定义字段值（由 OrderFormField 配置驱动），独立存储于订单 form_extra。
     form_extra: dict[str, object] | None = None
+    form_extra_scope: str | None = None
+    # 库存售出/寄售等从库存发起的操作表单，值仍落订单，但按操作作用域校验。
+    form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
     counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
     initial_buy: InitialBuyCreate | None = None

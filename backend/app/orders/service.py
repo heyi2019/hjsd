@@ -47,11 +47,12 @@ from app.domain.enums import (
     SequenceKey,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderLink
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
 from app.orders.schemas import OrderAccountSnapshot
+from app.orders.form_fields import validate_form_extra, validate_order_form_extra
 
 _UNSET = object()
 
@@ -200,7 +201,7 @@ def _validate_participant_roles(
 
 
 # --------------------------------------------------------------------- 订单
-def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, value_added_service: str | None = None, platform: str | None = None) -> Account:
+def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, value_added_service: str | None = None, platform: str | None = None, extra_values: Mapping[str, Any] | None = None) -> Account:
     mode, inventory_type = {
         "HS": ("SELF", "RECOVERY"),
         "TH": ("DISTRIBUTION", "PICKUP"),
@@ -214,6 +215,7 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         channel_region=channel_region, bound_phone=bound_phone,
         has_secondary=has_secondary, note=account_note,
         value_added_service=value_added_service, platform=platform,
+        extra_values=extra_values,
     )
 
 
@@ -257,6 +259,7 @@ def create_order(
     counterparty_roles: Sequence[tuple[int, str]] = (),
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     definition = foundation_service.get_order_type_by_code(session, order_type)
@@ -295,6 +298,36 @@ def create_order(
         raise Validation("DFQ 代分期订单的游戏账号资料应填写在 account_snapshot 内，不应单独传游戏账号字段")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
+    # 账号/产品扩展值以库存账号为事实来源；兼容旧调用方把它放在
+    # form_extra 的写法，但落订单前先拆出账号字段，避免订单与库存双写。
+    snapshot_extra = dict((account_snapshot or {}).get("extra_values") or {})
+    submitted_extra = dict(form_extra or {})
+    merged_extra = {**snapshot_extra, **submitted_extra}
+    form_extra = validate_form_extra(
+        session,
+        order_type_code=(form_extra_scope or definition.code),
+        values=merged_extra,
+    )
+    account_field_keys = set(session.scalars(
+        select(OrderFormField.field_key).where(
+            OrderFormField.order_type_code == definition.code,
+            OrderFormField.is_custom.is_(True),
+            OrderFormField.is_active.is_(True),
+            OrderFormField.section == "ACCOUNT_PRODUCT",
+        )
+    ).all())
+    if account_snapshot is not None:
+        account_values = {
+            **snapshot_extra,
+            **{key: value for key, value in form_extra.items() if key in account_field_keys},
+        }
+        if account_values:
+            account_snapshot["extra_values"] = account_values
+        else:
+            account_snapshot.pop("extra_values", None)
+        form_extra = {
+            key: value for key, value in form_extra.items() if key not in account_field_keys
+        }
     selected_capital_type = (
         definition.capital_type if capital_type is None else capital_type
     )
@@ -434,6 +467,7 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 
     if definition.code == "DG" and account_id is None and game_account:
@@ -441,6 +475,7 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 
     # 代分期垫资买入：账号计入本方库存（业务类型留空，增值服务=分销分期/代分期）。
@@ -452,7 +487,7 @@ def create_order(
             channel_region=snap.get("channel_region"), bound_phone=snap.get("bound_phone"),
             has_secondary=snap.get("has_secondary"), account_note=snap.get("note"),
             value_added_service=InstallmentContractType.ADVANCE_PURCHASE.value,
-            platform=snap.get("platform"),
+            platform=snap.get("platform"), extra_values=snap.get("extra_values"),
         ).id
 
     order = Order(
@@ -805,7 +840,8 @@ def update_order(
         )
     if form_extra is not _UNSET and form_extra:
         # ORDEREDIT 作用域自定义字段值合并进订单 form_extra。
-        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
+        checked = validate_form_extra(session, order_type_code="ORDEREDIT", values=form_extra)
+        order.form_extra = {**(order.form_extra or {}), **checked}
     record_audit(
         session,
         action=AuditAction.ORDER_UPDATE,
@@ -845,7 +881,8 @@ def cancel_order(
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     if form_extra:
         # ORDERCANC 作用域自定义字段值合并进订单 form_extra。
-        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
+        checked = validate_form_extra(session, order_type_code="ORDERCANC", values=form_extra)
+        order.form_extra = {**(order.form_extra or {}), **checked}
     order.updated_by = actor
     session.flush()
     record_audit(

@@ -58,7 +58,7 @@ def create_period_lock(
     user: CurrentUser = manage_period_locks,
 ) -> schemas.PeriodLockOut:
     item = service.create_period_lock(
-        db, period=payload.period, note=payload.note, actor=_actor(user)
+        db, period=payload.period, note=payload.note, form_extra=payload.form_extra, actor=_actor(user)
     )
     return schemas.PeriodLockOut.model_validate(item)
 
@@ -268,6 +268,7 @@ def create_cashflow(
         note=payload.note,
         extra_values=payload.extra_values,
         form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
         actor=_actor(user),
         user=user,
     )
@@ -293,7 +294,7 @@ def reject_cashflow(
 ) -> schemas.CashflowOut:
     flow = service.reject_cashflow(
         db, cashflow_id, actor=_actor(user), reason=payload.reason,
-        form_extra=payload.form_extra, user=user,
+        form_extra=payload.form_extra, form_extra_scope=payload.form_extra_scope, user=user,
     )
     return _cashflow_out(db, flow)
 
@@ -312,6 +313,7 @@ def reverse_cashflow(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
         user=user,
     )
     return _cashflow_out(db, flow)
@@ -353,6 +355,7 @@ def create_reconciliation(
         unmatched_flow_ids=payload.unmatched_flow_ids,
         reason=payload.reason,
         note=payload.note,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -374,6 +377,7 @@ def resolve_reconciliation(
         reconciliation_id,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _reconciliation_out(item)
@@ -395,6 +399,7 @@ def create_transfer(
         occurred_on=payload.occurred_on,
         actor=_actor(user),
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _transfer_out(db, result)
@@ -418,6 +423,7 @@ def repair_transfer(
         counterpart_pool_id=payload.counterpart_pool_id,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _transfer_out(db, result)
@@ -461,6 +467,7 @@ def create_deposit(
         source_order_id=payload.source_order_id,
         expected_release_on=payload.expected_release_on,
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _deposit_out(item)
@@ -481,6 +488,7 @@ def return_deposit(
         deposit_id,
         amount=payload.amount,
         released_on=payload.released_on,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -503,6 +511,7 @@ def cancel_deposit(
         deposit_id,
         cancelled_on=payload.cancelled_on,
         reason=payload.reason,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -526,6 +535,7 @@ def lose_deposit(
         lost_on=payload.lost_on,
         category=payload.category,
         reason=payload.reason,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -591,6 +601,7 @@ def create_rebate(
         rate=payload.rate,
         channel=payload.channel,
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _rebate_out(item)
@@ -605,7 +616,7 @@ def void_rebate(
 ) -> schemas.RebateOut:
     """作废返点记录：仅零结算（OPEN）可作废；已有结算走结算冲销。"""
     item = service.void_rebate(
-        db, rebate_id, reason=payload.reason, actor=_actor(user), user=user
+        db, rebate_id, reason=payload.reason, form_extra=payload.form_extra, actor=_actor(user), user=user
     )
     return _rebate_out(item)
 
@@ -632,6 +643,7 @@ def settle_rebate(
         actor=_actor(user),
         platform_fee=payload.platform_fee,
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _settlement_out(item)
@@ -667,6 +679,7 @@ def reverse_rebate_settlement(
         reversed_on=payload.reversed_on,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _settlement_out(item)

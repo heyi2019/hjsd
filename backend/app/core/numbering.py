@@ -85,6 +85,24 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     return f"{prefix}{allocated:0{padding}d}"
 
 
+def format_next_number(
+    *, sequence_key: str, prefix: str, padding: int, current_value: int
+) -> str:
+    """按序列行字段拼出下一个编号（不碰数据库，纯函数）。
+
+    `peek_number` 与列表页共用同一份格式化口径：调用方若已持有序列行，
+    直接用本函数即可，无需再逐行回查数据库。
+    """
+    candidate = current_value + 1
+    if candidate > MAX_SEQUENCE_VALUE:
+        raise Validation(
+            "编号已达上限",
+            code=ErrorCode.SEQUENCE_EXHAUSTED,
+            details={"sequence_key": sequence_key},
+        )
+    return f"{prefix}{candidate:0{padding}d}"
+
+
 def peek_number(session: Session, key: str | SequenceKey) -> str:
     """预览下一个编号（不消耗序列），用于前端占位提示。"""
     key_value = key.value if isinstance(key, SequenceKey) else key
@@ -95,14 +113,12 @@ def peek_number(session: Session, key: str | SequenceKey) -> str:
         raise Validation(
             f"编号序列 {key_value} 尚未初始化", details={"sequence_key": key_value}
         )
-    candidate = row.current_value + 1
-    if candidate > MAX_SEQUENCE_VALUE:
-        raise Validation(
-            "编号已达上限",
-            code=ErrorCode.SEQUENCE_EXHAUSTED,
-            details={"sequence_key": key_value},
-        )
-    return f"{row.prefix}{candidate:0{row.padding}d}"
+    return format_next_number(
+        sequence_key=key_value,
+        prefix=row.prefix,
+        padding=row.padding,
+        current_value=row.current_value,
+    )
 
 
 def current_value(session: Session, key: str | SequenceKey) -> int:

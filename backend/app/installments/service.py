@@ -51,6 +51,7 @@ from app.domain.users import User
 from app.stocks import service as stocks_service
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
+from app.orders.form_fields import validate_form_extra
 from app.orders.amounts import order_amounts
 from app.installments.schemas import ScheduleCreate
 from app.parties import service as parties_service
@@ -74,6 +75,19 @@ def _required_text(value: Any, *, field: str, message: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise Validation(message, details={"field": field})
     return value.strip()
+
+
+def _merge_form_extra(
+    session: Session,
+    installment: Installment,
+    *,
+    scope: str,
+    values: Mapping[str, Any] | None,
+) -> None:
+    if not values:
+        return
+    checked = validate_form_extra(session, order_type_code=scope, values=values)
+    installment.form_extra = {**(installment.form_extra or {}), **checked}
 
 
 def _materialize_dfq_recovery_account(
@@ -618,10 +632,12 @@ def pay(
     actor: str,
     pool_id: int | None = None,
     note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
     """收款：`PAYMENT` 是收入事实，派生现金流并累计已收（DFQ-01-04/05）。"""
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTPAY", values=form_extra)
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
@@ -752,8 +768,7 @@ def cancel_installment(
             details={"order_no": order.order_no, "status": order.status},
         )
     if form_extra:
-        # INVCANCEL 作用域自定义字段值落分期合约 form_extra。
-        installment.form_extra = {**(installment.form_extra or {}), **dict(form_extra)}
+        _merge_form_extra(session, installment, scope="INSTCANCEL", values=form_extra)
 
     event_ids: list[int] = []
     refund_amount = Decimal("0")
@@ -856,11 +871,13 @@ def waive_schedule(
     waived_on: date,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentSchedule:
     """登记经授权的期次减免，不改写原应收金额。"""
     text_reason = _required_text(reason, field="reason", message="减免必须填写原因")
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTWAIVE", values=form_extra)
     schedule = session.scalar(
         select(InstallmentSchedule).where(
             InstallmentSchedule.installment_id == installment.id,
@@ -936,11 +953,13 @@ def extend_schedule(
     new_due_on: date,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentSchedule:
     """修改未收期次到期日，并通过审计保留原计划日期。"""
     text_reason = _required_text(reason, field="reason", message="展期必须填写原因")
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTEXTEND", values=form_extra)
     schedule = session.scalar(
         select(InstallmentSchedule).where(
             InstallmentSchedule.installment_id == installment.id,
@@ -1014,10 +1033,12 @@ def settle_early(
     actor: str,
     pool_id: int | None = None,
     note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
     """提前收清剩余应收，逐期生成 PAYMENT 并关闭未来计划（DFQ-01-08）。"""
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTSETTLE", values=form_extra)
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
@@ -1080,6 +1101,7 @@ def mark_default(
     *,
     actor: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
     """将逾期合约置为违约，保留未收计划供后续追偿（DFQ-01-08）。"""
@@ -1087,6 +1109,7 @@ def mark_default(
         reason, field="reason", message="违约处置必须填写原因"
     )
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTDEFAULT", values=form_extra)
     if installment.status != InstallmentStatus.OVERDUE.value:
         raise Validation(
             f"合约 {installment.inst_no} 当前不是逾期状态，不能登记违约",
@@ -1120,11 +1143,13 @@ def recover_account(
     occurred_on: date,
     actor: str,
     note: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
     """登记账号回收并关闭原分期，不改写原分期应收。"""
     text_note = _required_text(note, field="note", message="回收必须填写说明")
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTRECOVER", values=form_extra)
     if installment.status not in {
         InstallmentStatus.OVERDUE.value,
         InstallmentStatus.DEFAULTED.value,
@@ -1197,11 +1222,13 @@ def record_sale(
     occurred_on: date,
     actor: str,
     note: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
     """登记回收账号的出售订单，并保留原分期与出售订单的利润关联。"""
     text_note = _required_text(note, field="note", message="出售必须填写说明")
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTRESALE", values=form_extra)
     if installment.status not in {
         InstallmentStatus.CLOSED.value,
         InstallmentStatus.OVERDUE.value,
@@ -1273,6 +1300,7 @@ def record_resale(
     occurred_on: date,
     actor: str,
     note: str,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
     """兼容旧调用；新流程统一使用 record_sale。"""
@@ -1283,6 +1311,7 @@ def record_resale(
         occurred_on=occurred_on,
         actor=actor,
         note=note,
+        form_extra=form_extra,
         user=user,
     )
 
@@ -1310,11 +1339,13 @@ def deliver(
     delivery_mode: str,
     delivered_on: date,
     note: str,
+    form_extra: Mapping[str, Any] | None = None,
     actor: str,
     user: CurrentUser | None = None,
 ) -> Installment:
     """换绑交付：只能从 `SETTLED` 进入，生成无金额 `DELIVER`（DFQ-01-07 / A04 / A05）。"""
     installment = get_installment(session, installment_id, user)
+    _merge_form_extra(session, installment, scope="INSTDELIVER", values=form_extra)
     if installment.status != InstallmentStatus.SETTLED.value:
         raise Validation(
             f"合约 {installment.inst_no} 未结清（{installment.status}），不可换绑交付",

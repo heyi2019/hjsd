@@ -35,6 +35,7 @@ class InstallmentCreate(RequestModel):
     note: str | None = None
     schedule: list[ScheduleCreate] | None = None
     extra_values: dict[str, Any] | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class InstallmentOut(BaseModel):
@@ -60,6 +61,7 @@ class InstallmentOut(BaseModel):
     first_due_on: date | None = None
     note: str | None = None
     extra_values: dict[str, Any] = Field(default_factory=dict)
+    form_extra: dict[str, Any] | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -97,16 +99,19 @@ class PaymentIn(RequestModel):
     period_no: int | None = None
     pool_id: int | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class EarlySettlementIn(RequestModel):
     paid_on: date
     pool_id: int | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
 
 
 class DefaultIn(RequestModel):
     reason: str = Field(min_length=1)
+    form_extra: dict[str, Any] | None = None
 
 
 class CancelIn(RequestModel):
@@ -119,6 +124,7 @@ class CancelIn(RequestModel):
 class DispositionIn(RequestModel):
     occurred_on: date
     note: str = Field(min_length=1)
+    form_extra: dict[str, Any] | None = None
 
 
 class ResaleIn(DispositionIn):
@@ -141,17 +147,20 @@ class ScheduleWaiveIn(RequestModel):
     amount: Decimal = Field(gt=0)
     waived_on: date
     reason: str = Field(min_length=1)
+    form_extra: dict[str, Any] | None = None
 
 
 class ScheduleExtendIn(RequestModel):
     new_due_on: date
     reason: str = Field(min_length=1)
+    form_extra: dict[str, Any] | None = None
 
 
 class DeliverIn(RequestModel):
     delivery_mode: str
     delivered_on: date
     note: str = Field(min_length=1, description="换绑凭证说明")
+    form_extra: dict[str, Any] | None = None
 
 
 class PaymentResult(BaseModel):

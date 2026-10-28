@@ -11,7 +11,7 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ErrorBanner, PermissionButton } from "../shared/ui";
-import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 export function InventoryConsignmentModal(props: {
   account: Account | null;
@@ -42,7 +42,7 @@ export function InventoryConsignmentModal(props: {
     };
   }, [open]);
 
-  const submit = async (values: { platform_ids?: number[] }) => {
+  const submit = async (values: { platform_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const selected = platforms.filter((platform) => values.platform_ids?.includes(platform.id));
     setSubmitting(true);
@@ -52,6 +52,8 @@ export function InventoryConsignmentModal(props: {
         trade_date: today(),
         account_id: props.account.id,
         note: `寄售平台：${selected.map((platform) => platform.display_name).join("、")}`,
+        form_extra: values.form_extra,
+        form_extra_scope: "CONSIGN",
         counterparty_roles: selected.map((platform) => ({
           counterparty_id: platform.id,
           role: "PLATFORM",
@@ -100,6 +102,7 @@ export function InventoryConsignmentModal(props: {
               <span className="muted">暂无可用寄售平台，请先在合作方中维护平台</span>
             )}
           </CfgItem>
+          <CustomFieldSection testIdSuffix="inventory-consignment" />
         </Form>
       </FieldConfigContext.Provider>
     </Modal>

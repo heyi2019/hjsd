@@ -743,6 +743,7 @@ export const ordersApi = {
       has_secondary?: boolean;
       purchase_price?: string;
       note?: string;
+      extra_values?: Record<string, unknown>;
     };
     account_id?: number;
     owner_id?: number;
@@ -760,6 +761,7 @@ export const ordersApi = {
     commission_mode?: string;
     commission_payer?: string;
     form_extra?: Record<string, unknown>;
+    form_extra_scope?: string;
     customer_roles?: { customer_id: number; role: string }[];
     counterparty_roles?: { counterparty_id: number; role: string }[];
     initial_buy?: {
@@ -853,9 +855,9 @@ export const stocksApi = {
 
 export const installmentsApi = {
   dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),
-  recover: (id: number, data: {occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
+  recover: (id: number, data: {occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
   /** 回收转售登记：把已回收账号的新售出订单关联回分期合约（后端只认 resale_order_id）。 */
-  resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
+  resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
   create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[] }) =>
@@ -864,7 +866,7 @@ export const installmentsApi = {
     api.get<Schedule[]>(`/installments/${id}/schedules`).then((r) => r.data),
   pay: (
     id: number,
-    payload: { amount: string; paid_on: string; period_no?: number; note?: string },
+    payload: { amount: string; paid_on: string; period_no?: number; note?: string; form_extra?: Record<string, unknown> },
   ) =>
     api
       .post<{ installment: Installment; schedule: Schedule }>(
@@ -874,17 +876,17 @@ export const installmentsApi = {
       .then((r) => r.data),
   cancel: (id: number, payload: { cancelled_on: string; reason: string; form_extra?: Record<string, unknown> }) =>
     api.post<InstallmentCancelResult>(`/installments/${id}/cancel`, payload).then((r) => r.data),
-  settleEarly: (id: number, payload: { paid_on: string; pool_id?: number; note?: string }) =>
+  settleEarly: (id: number, payload: { paid_on: string; pool_id?: number; note?: string; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/settle-early`, payload).then((r) => r.data),
-  markDefault: (id: number, payload: { reason: string }) =>
+  markDefault: (id: number, payload: { reason: string; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/default`, payload).then((r) => r.data),
-  waiveSchedule: (id: number, periodNo: number, payload: { amount: string; waived_on: string; reason: string }) =>
+  waiveSchedule: (id: number, periodNo: number, payload: { amount: string; waived_on: string; reason: string; form_extra?: Record<string, unknown> }) =>
     api.post<Schedule>(`/installments/${id}/schedules/${periodNo}/waive`, payload).then((r) => r.data),
-  extendSchedule: (id: number, periodNo: number, payload: { new_due_on: string; reason: string }) =>
+  extendSchedule: (id: number, periodNo: number, payload: { new_due_on: string; reason: string; form_extra?: Record<string, unknown> }) =>
     api.post<Schedule>(`/installments/${id}/schedules/${periodNo}/extend`, payload).then((r) => r.data),
   markOverdue: (asOf?: string) =>
     api.post<{ marked: number }>("/installments/mark-overdue", undefined, { params: asOf ? { as_of: asOf } : undefined }).then((r) => r.data),
-  deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string }) =>
+  deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/deliver`, payload).then((r) => r.data),
 };
 
@@ -942,11 +944,12 @@ export const rebatesApi = {
     collected_on: string;
     channel?: string;
     note?: string;
+    form_extra?: Record<string, unknown>;
   }) =>
     api.post<Rebate>("/rebates", payload).then((r) => r.data),
   settle: (
     id: number,
-    payload: { gross_amount: string; settled_on: string; pool_id: number; platform_fee?: string },
+    payload: { gross_amount: string; settled_on: string; pool_id: number; platform_fee?: string; form_extra?: Record<string, unknown> },
   ) => api.post<Settlement>(`/rebates/${id}/settlements`, payload).then((r) => r.data),
   /** 预计到账逾期清单（后端按 as_of 判定，返回逾期天数）。 */
   overdue: (asOf?: string) =>
@@ -956,14 +959,14 @@ export const rebatesApi = {
   reverseSettlement: (
     id: number,
     settlementId: number,
-    payload: { reversed_on: string; reason: string },
+    payload: { reversed_on: string; reason: string; form_extra?: Record<string, unknown> },
   ) =>
     api
       .post<Settlement>(`/rebates/${id}/settlements/${settlementId}/reverse`, payload)
       .then((r) => r.data),
   /** 作废返点记录：仅零结算（OPEN）可作废；已有结算须走结算冲销。 */
-  voidRecord: (id: number, reason: string) =>
-    api.post<Rebate>(`/rebates/${id}/void`, { reason }).then((r) => r.data),
+  voidRecord: (id: number, reason: string, form_extra?: Record<string, unknown>) =>
+    api.post<Rebate>(`/rebates/${id}/void`, { reason, form_extra }).then((r) => r.data),
 };
 
 export interface RequiredWhen {
@@ -1492,8 +1495,8 @@ export const attachmentsApi = {
 export const leadsApi = {
   list: () => api.get<Lead[]>("/leads").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
-  close: (id: number, reason: string) => api.post<Lead>(`/leads/${id}/close`, { reason }).then(r => r.data),
-  convert: (id: number, order_id: number) => api.post<Lead>(`/leads/${id}/convert`, { order_id }).then(r => r.data),
+  close: (id: number, reason: string, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values }).then(r => r.data),
+  convert: (id: number, order_id: number, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/convert`, { order_id, extra_values }).then(r => r.data),
 };
 export const qualityApi = {
   summary: () => api.get<QualitySummary>("/quality/exceptions").then(r => r.data),

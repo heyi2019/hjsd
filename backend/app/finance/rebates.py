@@ -32,6 +32,7 @@ from app.domain.trade import Cashflow, Order, OrderEvent, RebateRecord, RebateSe
 from app.foundation import service as foundation_service
 from app.notifications import service as notifications_service
 from app.orders import service as orders_service
+from app.orders.form_fields import validate_form_extra
 from app.orders.amounts import order_amounts
 from app.policy import service as policy_service
 
@@ -50,6 +51,7 @@ def create_rebate(
     rate: Any = None,
     channel: str | None = None,
     note: str | None = None,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
     """返点记录：来源订单必填且必须已成单（REB-01-02）。
@@ -145,6 +147,7 @@ def create_rebate(
         status=RebateStatus.OPEN.value,
         expected_on=expected_on,
         note=note,
+        form_extra=validate_form_extra(session, order_type_code="REBATE", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -218,6 +221,7 @@ def settle_rebate(
     actor: str,
     platform_fee: Any = 0,
     note: str | None = None,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateSettlement:
     record = session.get(RebateRecord, rebate_record_id)
@@ -304,6 +308,7 @@ def settle_rebate(
         cashflow_id=flow.id,
         fee_cashflow_id=fee_flow.id if fee_flow is not None else None,
         note=note,
+        form_extra=validate_form_extra(session, order_type_code="REBSETTLE", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -384,6 +389,7 @@ def reverse_rebate_settlement(
     reversed_on: date,
     actor: str,
     reason: str,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateSettlement:
     """以反向结算和反向流水更正一笔已发生的返点到账。"""
@@ -448,6 +454,7 @@ def reverse_rebate_settlement(
         reviewed_at=datetime.now(),
         reversal_reason=text_reason,
         note=f"返点冲销 {original.settlement_no}",
+        form_extra=validate_form_extra(session, order_type_code="REBREVERSE", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -625,6 +632,7 @@ def void_rebate(
     *,
     reason: str,
     actor: str,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
     """作废返点记录（VOID）。守卫：只有零结算（OPEN）可作废。
@@ -647,6 +655,8 @@ def void_rebate(
     text = _text(reason, field="reason", message="作废返点必须填写理由")
     before = {"status": record.status}
     record.status = RebateStatus.VOID.value
+    if form_extra:
+        record.form_extra = {**(record.form_extra or {}), **validate_form_extra(session, order_type_code="REBATEVOID", values=form_extra)}
     record.updated_by = actor
     session.flush()
     record_audit(

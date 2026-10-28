@@ -15,10 +15,10 @@ export type FormScopeCode =
   | "CUSTOMER" | "COUNTERPARTY"
   | "INSTPAY" | "INSTRECOVER" | "INSTRESALE" | "INSTDELIVER" | "INSTCANCEL"
   | "INSTSETTLE" | "INSTDEFAULT" | "INSTWAIVE" | "INSTEXTEND"
-  | "REBATE" | "REBSETTLE" | "REBREVERSE"
+  | "REBATE" | "REBSETTLE" | "REBREVERSE" | "REBATEVOID"
   | "FUNDDEPOSIT" | "FUNDFLOW" | "FUNDTRANSFER" | "FUNDRECON" | "FUNDCLEAR"
   | "FUNDREJECT" | "FUNDREVERSE" | "FUNDRELEASE" | "FUNDLOSS" | "FUNDREPAIR"
-  | "FUNDLOCK"
+  | "FUNDLOCK" | "FUNDCANCEL"
   | "STUDIOEXP" | "STUDIOREJ" | "STUDIOREV";
 
 import { useEffect, useState } from "react";
@@ -73,6 +73,7 @@ export const FORM_SCOPES_FALLBACK: { code: FormScopeCode; label: string; group: 
   { code: "REBATE", label: "新建返点", group: "REBATE" },
   { code: "REBSETTLE", label: "返点结算", group: "REBATE" },
   { code: "REBREVERSE", label: "返点冲销", group: "REBATE" },
+  { code: "REBATEVOID", label: "作废返点", group: "REBATE" },
   { code: "FUNDDEPOSIT", label: "押金占用", group: "FUND" },
   { code: "FUNDFLOW", label: "录入流水", group: "FUND" },
   { code: "FUNDTRANSFER", label: "资金划转", group: "FUND" },
@@ -84,6 +85,7 @@ export const FORM_SCOPES_FALLBACK: { code: FormScopeCode; label: string; group: 
   { code: "FUNDLOSS", label: "损失", group: "FUND" },
   { code: "FUNDREPAIR", label: "划转修复", group: "FUND" },
   { code: "FUNDLOCK", label: "月结锁定", group: "FUND" },
+  { code: "FUNDCANCEL", label: "取消押金", group: "FUND" },
   { code: "STUDIOEXP", label: "工作室收支登记", group: "STUDIO" },
   { code: "STUDIOREJ", label: "工作室拒绝", group: "STUDIO" },
   { code: "STUDIOREV", label: "工作室冲销", group: "STUDIO" },

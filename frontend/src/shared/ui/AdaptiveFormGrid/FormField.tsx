@@ -8,10 +8,12 @@ export function FormField(props: {
   className?: string;
   labelClassName?: string;
   colon?: boolean;
+  required?: boolean;
 }) {
   return (
     <div className={["form-field", props.className].filter(Boolean).join(" ")}>
       <span className={["form-field__label", props.labelClassName].filter(Boolean).join(" ")}>
+        {props.required && <span className="form-field__required-mark" aria-hidden="true">*</span>}
         {props.label}{props.colon === false ? null : "："}
       </span>
       {props.children}

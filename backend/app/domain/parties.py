@@ -199,6 +199,8 @@ class CustomerLead(Base, AuditMixin):
     )
     closed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # LEAD/LEADCLOSE/LEADCONVERT 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Counterparty(Base, AuditMixin):
@@ -232,6 +234,8 @@ class Counterparty(Base, AuditMixin):
         String(16), nullable=False, default=CounterpartyStatus.ACTIVE.value
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # COUNTERPARTY 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 # ------------------------------------------------------------------ 订单参与方

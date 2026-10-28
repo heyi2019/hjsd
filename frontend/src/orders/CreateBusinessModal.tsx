@@ -137,6 +137,18 @@ export function CreateBusinessModal(props: {
   const submit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
+      const formExtra = (values.form_extra as Record<string, unknown> | undefined) ?? {};
+      const accountExtraKeys = new Set(
+        Object.values(config)
+          .filter((field) => field.is_custom && field.is_active && field.section === "ACCOUNT_PRODUCT")
+          .map((field) => field.field_key),
+      );
+      const accountExtraValues = Object.fromEntries(
+        Object.entries(formExtra).filter(([key, value]) => accountExtraKeys.has(key) && value !== undefined && value !== ""),
+      );
+      const orderFormExtra = Object.fromEntries(
+        Object.entries(formExtra).filter(([key]) => !accountExtraKeys.has(key)),
+      );
       if (isDfq) {
         const customer = await customersApi.create({
           display_name: values.customer_nickname as string,
@@ -151,7 +163,7 @@ export function CreateBusinessModal(props: {
           order_type: "DFQ",
           trade_date: today(),
           note: values.note as string,
-          form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
+          form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,
           account_snapshot: {
             game_type: values.game_type as string,
             game_account: values.game_account as string,
@@ -162,6 +174,7 @@ export function CreateBusinessModal(props: {
             has_secondary: values.has_secondary ? values.has_secondary === "有" : undefined,
             purchase_price: values.recovery_price as string | undefined,
             note: values.game_account_note as string,
+            extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
           },
           customer_roles: [{ customer_id: customer.customer.id, role: "INSTALLMENT_CUSTOMER" }],
           initial_buy: {
@@ -191,7 +204,7 @@ export function CreateBusinessModal(props: {
         appMessage.success("代分期订单已创建");
         props.onClose();
         form.resetFields();
-        await props.onCreated();
+        void Promise.resolve(props.onCreated()).catch(() => undefined);
         return;
       }
       const customerPrefix = isDg ? "dg_" : "";
@@ -284,12 +297,10 @@ export function CreateBusinessModal(props: {
           bound_phone_owner: values.bound_phone_owner as string | undefined,
           has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
           note: values.game_account_note as string | undefined,
+          extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
         },
         account_id: undefined,
         note,
-        // 佣金口径仅 DG 生效，其余业务类型一律不带这两个字段。
-        commission_mode: isDg ? (values.commission_mode as string | undefined) : undefined,
-        commission_payer: isDg ? (values.commission_payer as string | undefined) : undefined,
         customer_roles: customerRoles,
         counterparty_roles: counterpartyId
           ? [
@@ -307,12 +318,12 @@ export function CreateBusinessModal(props: {
             : `提号｜付${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
         } : undefined,
         initial_costs: initialCosts,
-        form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
+        form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,
       });
       appMessage.success(isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建");
       props.onClose();
       form.resetFields();
-      await props.onCreated();
+      void Promise.resolve(props.onCreated()).catch(() => undefined);
     } catch (error) {
       setLoadError(normalizeError(error));
     } finally {
@@ -398,6 +409,7 @@ export function CreateBusinessModal(props: {
             <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
           </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
           {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
+          <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
         </FieldConfigContext.Provider>
       </Form>
     </Modal>

@@ -414,6 +414,7 @@ def create_order(
         ],
         extra_values=payload.extra_values,
         form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
         user=user,
     )
     if payload.installment is not None:
@@ -553,6 +554,7 @@ def cancel_order(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
         user=user,
     )
     return _order_output(db, order, user)

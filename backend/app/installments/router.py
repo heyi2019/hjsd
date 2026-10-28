@@ -123,6 +123,7 @@ def waive_schedule(
         waived_on=payload.waived_on,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.ScheduleOut.model_validate(item)
@@ -146,6 +147,7 @@ def extend_schedule(
         new_due_on=payload.new_due_on,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.ScheduleOut.model_validate(item)
@@ -169,6 +171,7 @@ def pay_installment(
         actor=_actor(user),
         pool_id=payload.pool_id,
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.PaymentResult(
@@ -221,6 +224,7 @@ def settle_early_installment(
         paid_on=payload.paid_on,
         pool_id=payload.pool_id,
         note=payload.note,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )
@@ -241,6 +245,7 @@ def default_installment(
         installment_id,
         actor=_actor(user),
         reason=payload.reason,
+        form_extra=payload.form_extra,
         user=user,
     )
     return _installment_output(db, item)
@@ -262,6 +267,7 @@ def recover_installment_account(
         occurred_on=payload.occurred_on,
         actor=_actor(user),
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.DispositionOut.model_validate(item)
@@ -299,6 +305,7 @@ def resale_installment_account(
         occurred_on=payload.occurred_on,
         actor=_actor(user),
         note=payload.note,
+        form_extra=payload.form_extra,
         user=user,
     )
     return schemas.DispositionOut.model_validate(item)
@@ -319,6 +326,7 @@ def deliver_installment(
         delivery_mode=payload.delivery_mode,
         delivered_on=payload.delivered_on,
         note=payload.note,
+        form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,
     )

@@ -167,10 +167,12 @@ class LeadUpdate(RequestModel):
 
 class LeadConvert(RequestModel):
     order_id: int = Field(gt=0)
+    extra_values: dict[str, Any] | None = None
 
 
 class LeadClose(RequestModel):
     reason: str = Field(min_length=1, max_length=500)
+    extra_values: dict[str, Any] | None = None
 
 
 class LeadOut(BaseModel):

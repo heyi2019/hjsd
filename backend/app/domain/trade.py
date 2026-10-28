@@ -441,6 +441,8 @@ class Reconciliation(Base, AuditMixin):
     resolved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # FUNDRECON 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class OrderProfitAllocation(Base, TimestampMixin):
@@ -657,6 +659,8 @@ class Deposit(Base, AuditMixin):
     released_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     lost_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # FUNDDEPOSIT/FUNDRELEASE/FUNDLOSS/FUNDCANCEL 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class RebateRecord(Base, AuditMixin):
@@ -714,6 +718,8 @@ class RebateRecord(Base, AuditMixin):
     collected_on: Mapped[date] = mapped_column(Date, nullable=False)
     expected_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # REBATE/REBATEVOID 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class RebateSettlement(Base, AuditMixin):
@@ -758,6 +764,8 @@ class RebateSettlement(Base, AuditMixin):
     reversal_of_id: Mapped[int | None] = mapped_column(
         ForeignKey("rebate_settlements.id", ondelete="RESTRICT"), nullable=True
     )
+    # REBSETTLE/REBREVERSE 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -770,7 +778,8 @@ class OrderFormField(Base, AuditMixin):
     （停用需业务侧自行承担过账风险，由前端提示）。
 
     field_key 与表单既有字段 name / 自定义字段键一一对应；自定义字段（is_custom=1）
-    即扩展字段，其值落在实体行内的 form_extra（Order.form_extra / Customer.form_extra）。
+    即扩展字段：建单账号/产品字段写入 Account.form_extra，订单级字段写入
+    Order.form_extra，客户建档字段写入 Customer.form_extra。
     """
 
     __tablename__ = "order_form_fields"

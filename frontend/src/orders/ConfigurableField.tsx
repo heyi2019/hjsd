@@ -24,6 +24,7 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
   EXTRA: "其他补充信息",
 };
 const DFQ_SHARED_FIELD_ALIASES: Record<string, string> = {
+  recovery_price: "dfq_purchase_price",
   game_type: "dfq_game_type",
   game_account: "dfq_game_account",
   game_password: "dfq_game_password",
@@ -39,6 +40,10 @@ const DFQ_SHARED_FIELD_ALIASES: Record<string, string> = {
   customer_qq: "dfq_customer_qq",
   note: "dfq_note",
 };
+
+function fieldConfigFor(config: FieldConfigMap, key: string): OrderFormField | undefined {
+  return config[key] ?? (DFQ_SHARED_FIELD_ALIASES[key] ? config[DFQ_SHARED_FIELD_ALIASES[key]] : undefined);
+}
 
 export function useOrderFormConfig(orderType: string | undefined): {
   config: FieldConfigMap;
@@ -99,12 +104,12 @@ export function FieldConfigScope(props: {
 }
 
 export function isFieldActive(config: FieldConfigMap, key: string): boolean {
-  const def = config[key];
+  const def = fieldConfigFor(config, key);
   return def ? def.is_active : true;
 }
 
 export function fieldLabel(config: FieldConfigMap, key: string, fallback: string): string {
-  return config[key]?.label ?? fallback;
+  return fieldConfigFor(config, key)?.label ?? fallback;
 }
 
 /** 判断条件必填是否命中：values 为当前表单值（至少含依赖字段）。
@@ -141,7 +146,7 @@ export function resolveRules(
   baseRules?: Rule[],
   values?: Record<string, unknown>,
 ): Rule[] {
-  const def = config[key];
+  const def = fieldConfigFor(config, key);
   const base = (baseRules ?? []).filter(Boolean) as Rule[];
   if (!def) return base;
   if (def.required) {
@@ -160,7 +165,7 @@ export function resolveRules(
 /** 订阅条件依赖字段的当前值；无条件时不订阅（用占位键，antd useWatch 对未知字段返回 undefined）。 */
 function useConditionValues(cfg: FieldConfigMap, key: string): Record<string, unknown> | undefined {
   const form = Form.useFormInstance();
-  const condField = cfg[key]?.required_when?.field;
+  const condField = fieldConfigFor(cfg, key)?.required_when?.field;
   const depValue = Form.useWatch(condField ?? "__no_required_when__", form);
   return condField ? { [condField]: depValue } : undefined;
 }
@@ -171,6 +176,8 @@ export function CfgItem(props: {
   label?: string;
   /** 卡片式标题字段（如「账号号价」由外部卡片 div 展示）不渲染 antd 自带 label。 */
   hideLabel?: boolean;
+  /** 核心业务字段即使被旧配置误停用也必须保留，避免表单出现只有标题没有输入控件。 */
+  alwaysActive?: boolean;
   rules?: Rule[];
   valuePropName?: string;
   tooltip?: ReactNode;
@@ -184,7 +191,7 @@ export function CfgItem(props: {
 }): ReactElement | null {
   const cfg = props.cfg ?? useFieldConfig();
   const condValues = useConditionValues(cfg, props.name);
-  if (!isFieldActive(cfg, props.name)) return null;
+  if (!props.alwaysActive && !isFieldActive(cfg, props.name)) return null;
   return (
     <Form.Item
       name={props.name}
@@ -197,7 +204,7 @@ export function CfgItem(props: {
       className={props.className}
       initialValue={props.initialValue}
     >
-      {injectOptionsIfMissing(props.children, cfg[props.name])}
+      {injectOptionsIfMissing(props.children, fieldConfigFor(cfg, props.name))}
     </Form.Item>
   );
 }
@@ -242,16 +249,17 @@ export function CfgNestedItem(props: {
 }): ReactElement | null {
   const cfg = props.cfg ?? useFieldConfig();
   const condValues = useConditionValues(cfg, props.name);
+  const resolvedRules = resolveRules(cfg, props.name, props.rules, condValues);
   if (!isFieldActive(cfg, props.name)) return null;
   return (
-    <NestedFormField className={props.className} label={fieldLabel(cfg, props.name, props.label)}>
+    <NestedFormField className={props.className} label={fieldLabel(cfg, props.name, props.label)} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
       <Form.Item
         noStyle={props.noStyle ?? true}
         name={props.name}
-        rules={resolveRules(cfg, props.name, props.rules, condValues)}
+        rules={resolvedRules}
         initialValue={props.initialValue}
       >
-        {injectOptionsIfMissing(props.children, cfg[props.name])}
+        {injectOptionsIfMissing(props.children, fieldConfigFor(cfg, props.name))}
       </Form.Item>
     </NestedFormField>
   );
@@ -266,7 +274,7 @@ export function CustomFieldSection(props: { testIdSuffix?: string; section?: Ord
     .sort((a, b) => a.sort_order - b.sort_order);
   if (defs.length === 0) return null;
   return (
-    <section className="ui-stack" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
+    <section className="ui-stack custom-field-section" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
       <Typography.Text type="secondary" strong>{CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"]}</Typography.Text>
       {defs.map((def) => (
         <CustomFormField key={def.id} def={def} />

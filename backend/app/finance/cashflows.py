@@ -28,6 +28,7 @@ from app.domain.foundation import PeriodLock
 from app.domain.trade import Cashflow, Deposit, Order
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
+from app.orders.form_fields import validate_form_extra
 from app.parties import service as parties_service
 from app.finance.attributes import (
     accounting_attributes_for_manual_cashflow,
@@ -54,7 +55,8 @@ def _get_cashflow(
 
 
 def create_period_lock(
-    session: Session, *, period: str, actor: str, note: str | None = None
+    session: Session, *, period: str, actor: str, note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
 ) -> PeriodLock:
     normalized = normalize_period(period)
     if session.scalar(select(PeriodLock).where(PeriodLock.period == normalized)) is not None:
@@ -67,6 +69,7 @@ def create_period_lock(
         period=normalized,
         locked_by=actor,
         note=note,
+        form_extra=validate_form_extra(session, order_type_code="FUNDLOCK", values=form_extra),
         created_by=actor,
         updated_by=actor,
     )
@@ -103,6 +106,7 @@ def create_cashflow(
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str = "FUNDFLOW",
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
@@ -169,7 +173,7 @@ def create_cashflow(
         order_id=order_id,
         status=CashflowStatus.PENDING.value,
         note=note,
-        form_extra=dict(form_extra) if form_extra else None,
+        form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -236,6 +240,7 @@ def reject_cashflow(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str = "FUNDREJECT",
     user: CurrentUser | None = None,
 ) -> Cashflow:
     text_reason = _text(
@@ -256,6 +261,7 @@ def reject_cashflow(
     flow.reviewed_at = datetime.now()
     flow.reversal_reason = text_reason
     if form_extra:
+        form_extra = validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra)
         # STUDIOREJ 作用域自定义字段值合并进流水 form_extra。
         flow.form_extra = {**(flow.form_extra or {}), **dict(form_extra)}
     flow.updated_by = actor
@@ -279,6 +285,7 @@ def reverse_cashflow(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str = "FUNDREVERSE",
     user: CurrentUser | None = None,
 ) -> Cashflow:
     text_reason = _text(
@@ -319,7 +326,7 @@ def reverse_cashflow(
         reversal_of_id=flow.id,
         reversal_reason=text_reason,
         note=f"冲销 {flow.flow_no}",
-        form_extra=dict(form_extra) if form_extra else None,
+        form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
         reviewed_by=actor,
         reviewed_at=datetime.now(),
         created_by=actor,
@@ -351,6 +358,7 @@ def create_deposit(
     source_order_id: int | None = None,
     expected_release_on: date | None = None,
     note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
     assert_period_open(session, paid_on, operation="创建押金流水")
@@ -379,6 +387,7 @@ def create_deposit(
         paid_on=paid_on,
         expected_release_on=expected_release_on,
         note=note,
+        form_extra=validate_form_extra(session, order_type_code="FUNDDEPOSIT", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -420,6 +429,7 @@ def return_deposit(
     *,
     amount: Any,
     released_on: date,
+    form_extra: Mapping[str, Any] | None = None,
     actor: str,
     user: CurrentUser | None = None,
 ) -> Deposit:
@@ -455,6 +465,8 @@ def return_deposit(
     else:
         deposit.status = DepositStatus.PARTIALLY_RETURNED.value
     deposit.updated_by = actor
+    if form_extra:
+        deposit.form_extra = {**(deposit.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDRELEASE", values=form_extra)}
     session.add(
         Cashflow(
             flow_no=allocate_flow_no(session, Direction.IN.value),
@@ -494,6 +506,7 @@ def cancel_deposit(
     *,
     cancelled_on: date,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     actor: str,
     user: CurrentUser | None = None,
 ) -> Deposit:
@@ -524,6 +537,8 @@ def cancel_deposit(
     deposit.status = DepositStatus.CANCELLED.value
     deposit.released_on = cancelled_on
     deposit.updated_by = actor
+    if form_extra:
+        deposit.form_extra = {**(deposit.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDCANCEL", values=form_extra)}
     session.add(
         Cashflow(
             flow_no=allocate_flow_no(session, Direction.IN.value),
@@ -564,6 +579,7 @@ def lose_deposit(
     lost_on: date,
     category: str,
     reason: str,
+    form_extra: Mapping[str, Any] | None = None,
     actor: str,
     user: CurrentUser | None = None,
 ) -> Cashflow:
@@ -623,6 +639,7 @@ def lose_deposit(
         reviewed_by=actor,
         reviewed_at=datetime.now(),
         note=text_reason,
+        form_extra=validate_form_extra(session, order_type_code="FUNDLOSS", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )

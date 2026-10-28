@@ -15,7 +15,7 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
-import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 /** 库存账号售出：按货源类型映射回收 / 代挂订单类型。 */
 const SALE_ORDER_TYPE: Record<string, string> = {
@@ -111,6 +111,8 @@ export function InventorySaleModal(props: {
         trade_date: today(),
         account_id: props.account.id,
         note: values.note as string | undefined,
+        form_extra: values.form_extra as Record<string, unknown> | undefined,
+        form_extra_scope: "SALE",
         customer_roles: [{
           customer_id: values.customer_id as number,
           role: props.account.inventory_type === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER",
@@ -236,6 +238,7 @@ export function InventorySaleModal(props: {
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="可选" />
           </CfgItem>
+          <CustomFieldSection testIdSuffix="inventory-sale" />
         </Form>
       </FieldConfigContext.Provider>
     </Modal>

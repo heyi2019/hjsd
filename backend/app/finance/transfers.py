@@ -16,6 +16,7 @@ from app.core.periods import assert_period_open
 from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
 from app.domain.trade import Cashflow
+from app.orders.form_fields import validate_form_extra
 from app.foundation import service as foundation_service
 
 from ._common import _positive, _text
@@ -29,6 +30,7 @@ def create_transfer(
     occurred_on: date,
     actor: str,
     note: str | None = None,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
@@ -54,6 +56,7 @@ def create_transfer(
         "amount": money,
         "created_by": actor,
         "updated_by": actor,
+        "form_extra": validate_form_extra(session, order_type_code="FUNDTRANSFER", values=form_extra) or None,
     }
     outgoing = Cashflow(
         flow_no=f"{transfer_id}-OUT",
@@ -100,6 +103,7 @@ def repair_transfer(
     counterpart_pool_id: int,
     actor: str,
     reason: str,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """只为单边内部划转补齐缺失的一边，禁止把异常静默当成正常新划转。"""
@@ -161,6 +165,7 @@ def repair_transfer(
         reviewed_by=source.reviewed_by,
         reviewed_at=source.reviewed_at,
         note=f"修复划转 {transfer}: {text_reason}",
+        form_extra=validate_form_extra(session, order_type_code="FUNDREPAIR", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )

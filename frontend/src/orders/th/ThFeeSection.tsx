@@ -23,17 +23,20 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
           <div id="th-fees-title" className="recovery-fees__title">费用明细</div>
           <div className="recovery-fees__hint">只填写实际发生的费用，系统自动汇总付款金额</div>
         </div>
-        <span className="recovery-fees__required">必填：账号号价</span>
       </div>
       <div className="recovery-fee-card recovery-fee-card--primary th-fee-primary">
-        <div className="recovery-fee-card__label">账号号价</div>
-        <CfgItem className="th-fee-primary__purchase" name="th_purchase_amount" hideLabel rules={[{ required: true, message: "账号号价必填" }]}>
-          <MoneyInput placeholder="请输入金额" />
-        </CfgItem>
-        <div className="recovery-fee-card__label">预计收买家</div>
-        <CfgItem className="th-fee-primary__expected" name="th_receive_amount" hideLabel rules={[{ required: true, message: "请输入预计收买家金额" }]}>
-          <MoneyInput placeholder="请输入金额" />
-        </CfgItem>
+        <div className="th-fee-primary__field">
+          <div className="recovery-fee-card__label"><span className="form-field__required-mark" aria-hidden="true">*</span>账号号价</div>
+          <CfgItem alwaysActive name="th_purchase_amount" hideLabel rules={[{ required: true, message: "账号号价必填" }]}>
+            <MoneyInput placeholder="请输入金额" />
+          </CfgItem>
+        </div>
+        <div className="th-fee-primary__field">
+          <div className="recovery-fee-card__label"><span className="form-field__required-mark" aria-hidden="true">*</span>预计收买家</div>
+          <CfgItem alwaysActive name="th_receive_amount" hideLabel rules={[{ required: true, message: "请输入预计收买家金额" }]}>
+            <MoneyInput placeholder="请输入金额" />
+          </CfgItem>
+        </div>
         <div className="recovery-fee-card__desc">实际支付给供货方的账号基础价格，不含附加费用</div>
       </div>
       <AdditionalFeeFields />

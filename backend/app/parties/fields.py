@@ -3,7 +3,7 @@
 扩展字段**不单独建表**：
 - 定义：就是「客户建档」表单里的**自定义字段**（``order_form_fields``，作用域 ``CUSTOMER``，
   ``is_custom=1``），由设置页「表单字段」维护；
-- 值：存在 `customers.form_extra`（JSON 列），与订单 `Order.form_extra` 同构。
+- 值：按实体存放在对应实体的 `form_extra`（JSON 列），账号与订单、客户各自独立。
 
 因此一个实体一行、一张表，不存在独立的字段定义表或值表。删除字段定义不会连带
 删除 `form_extra` 里的历史值（BAS-04-03：有历史值只能停用）。
@@ -19,25 +19,39 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound, Validation
 from app.domain.enums import EntityType
-from app.domain.parties import Customer
-from app.domain.trade import OrderFormField
+from app.domain.parties import Counterparty, Customer, CustomerLead
+from app.domain.trade import Account, OrderFormField
 
-# 扩展字段定义来源：实体 → 表单作用域码。目前只有客户建档纳入表单字段体系；
-# 其余实体的 extra_values 入参保留兼容但不再落库（传入非空即拒绝，与改造前口径一致）。
-_EXTRA_DEFINITION_SCOPE = "CUSTOMER"
+# 客户字段定义来自 CUSTOMER 作用域；建单账号字段由订单字段配置筛选后写入账号扩展 JSON。
+_EXTRA_DEFINITION_SCOPES: dict[str, tuple[str, ...]] = {
+    "customer": ("CUSTOMER",),
+    "lead": ("LEAD", "LEADCLOSE", "LEADCONVERT"),
+    "counterparty": ("COUNTERPARTY",),
+    # 账号/产品字段在四种建单表单中复用；只取账号/产品板块的自定义项。
+    "account": ("HS", "TH", "DG", "DFQ"),
+}
+_EXTRA_ENTITY_MODELS: dict[str, type] = {
+    "customer": Customer,
+    "lead": CustomerLead,
+    "counterparty": Counterparty,
+    "account": Account,
+}
 
 
 def _extra_definitions(
     session: Session, entity_type: str, *, required_only: bool = False
 ) -> list[OrderFormField]:
-    """客户扩展字段定义：取自「客户建档」表单的自定义字段。"""
-    if entity_type != EntityType.CUSTOMER.value:
+    """按实体取设置页对应作用域的自定义字段定义。"""
+    scopes = _EXTRA_DEFINITION_SCOPES.get(entity_type)
+    if not scopes:
         return []
     stmt = select(OrderFormField).where(
-        OrderFormField.order_type_code == _EXTRA_DEFINITION_SCOPE,
+        OrderFormField.order_type_code.in_(scopes),
         OrderFormField.is_custom.is_(True),
         OrderFormField.is_active.is_(True),
     )
+    if entity_type == "account":
+        stmt = stmt.where(OrderFormField.section == "ACCOUNT_PRODUCT")
     if required_only:
         stmt = stmt.where(OrderFormField.required.is_(True))
     return list(
@@ -207,46 +221,36 @@ def set_extra_values(
             details={"field": "entity_id", "entity_type": entity_type, "entity_id": entity_id},
         )
     values = list(values)
-    if entity_type != EntityType.CUSTOMER.value:
-        # 其余实体尚无扩展字段定义体系：保留入参兼容，非空即拒绝（与改造前一致）。
+    model = _EXTRA_ENTITY_MODELS.get(entity_type)
+    if model is None:
         if values:
-            raise Validation(
-                "该实体未启用扩展字段",
-                details={"entity_type": entity_type},
-            )
+            raise Validation("该实体未启用扩展字段", details={"entity_type": entity_type})
         return {}
-    customer = session.get(Customer, entity_id)
-    if customer is None:
-        raise NotFound(
-            f"客户 {entity_id} 不存在",
-            details={"entity_type": entity_type, "entity_id": entity_id},
-        )
-    if not values and not require_all:
-        return {}
+    entity = session.get(model, entity_id)
+    if entity is None:
+        label = {"account": "账号", "customer": "客户", "lead": "需求", "counterparty": "合作方"}.get(entity_type, "实体")
+        raise NotFound(f"{label} {entity_id} 不存在", details={"entity_type": entity_type, "entity_id": entity_id})
     values_map = {field_key: value for field_key, value in values}
     if len(values_map) != len(values):
         raise Validation("扩展字段不能重复提交", details={"field": "extra_values"})
     if require_all:
         _validate_required_extras(session, entity_type, values_map, partial=False)
     saved = _validate_extra_values(
-        session,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        values=values,
+        session, entity_type=entity_type, entity_id=entity_id, values=values
     )
-    # 并入式写入：只覆盖本次提交的键，未提交的键保留历史值（BAS-04-03）。
-    merged = dict(customer.form_extra or {})
+    merged = dict(entity.form_extra or {})
     merged.update(saved)
-    customer.form_extra = merged
+    entity.form_extra = merged
     session.flush()
     return saved
 
 
 def get_extra_values(session: Session, *, entity_type: str, entity_id: int) -> dict[str, Any]:
-    if entity_type != EntityType.CUSTOMER.value:
+    model = _EXTRA_ENTITY_MODELS.get(entity_type)
+    if model is None:
         return {}
-    customer = session.get(Customer, entity_id)
-    return dict(customer.form_extra or {}) if customer is not None else {}
+    entity = session.get(model, entity_id)
+    return dict(entity.form_extra or {}) if entity is not None else {}
 
 
 def get_extra_values_bulk(
@@ -255,11 +259,10 @@ def get_extra_values_bulk(
     """批量读取扩展值：列表页一次查询，避免逐行 N+1。"""
     ids = list(entity_ids)
     result: dict[int, dict[str, Any]] = {entity_id: {} for entity_id in ids}
-    if not ids or entity_type != EntityType.CUSTOMER.value:
+    if not ids or entity_type not in _EXTRA_ENTITY_MODELS:
         return result
-    rows = session.execute(
-        select(Customer.id, Customer.form_extra).where(Customer.id.in_(ids))
-    ).all()
+    model = _EXTRA_ENTITY_MODELS[entity_type]
+    rows = session.execute(select(model.id, model.form_extra).where(model.id.in_(ids))).all()
     for customer_id, form_extra in rows:
         result[customer_id] = dict(form_extra or {})
     return result

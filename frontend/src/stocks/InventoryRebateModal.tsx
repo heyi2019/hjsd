@@ -13,7 +13,7 @@ import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
 import { ErrorBanner, MoneyInput, PermissionButton } from "../shared/ui";
-import { CfgItem, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 type RebateKind = "BUY" | "SELL";
 
@@ -82,7 +82,7 @@ export function InventoryRebateModal(props: {
     [detail],
   );
 
-  const submit = async (values: { rebate_type?: RebateKind[]; base_amount?: string; rate?: string; collected_on?: string }) => {
+  const submit = async (values: { rebate_type?: RebateKind[]; base_amount?: string; rate?: string; collected_on?: string; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const kind = values.rebate_type?.[0];
     const order = kind ? sourceOrder(detail, kind) : undefined;
@@ -97,6 +97,7 @@ export function InventoryRebateModal(props: {
         collected_on: values.collected_on ?? today(),
         channel: kind === "BUY" ? "买号返点" : "卖号返点",
         note: REBATE_KIND_LABEL[kind],
+        form_extra: values.form_extra,
       });
       appMessage.success("返点已登记");
       form.resetFields();
@@ -161,6 +162,7 @@ export function InventoryRebateModal(props: {
             <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>
               <Input placeholder="YYYY-MM-DD" />
             </CfgItem>
+            <CustomFieldSection testIdSuffix="inventory-rebate" />
           </Form>
         </FieldConfigContext.Provider>
       )}

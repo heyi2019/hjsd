@@ -38,7 +38,8 @@ export function NestedFormField(props: {
   label: ReactNode;
   children: ReactNode;
   className?: string;
+  required?: boolean;
 }) {
-  return <FormField className={["nested-form-section__field", props.className].filter(Boolean).join(" ")} labelClassName="nested-form-section__field-label" label={props.label}>{props.children}</FormField>;
+  return <FormField className={["nested-form-section__field", props.className].filter(Boolean).join(" ")} labelClassName="nested-form-section__field-label" label={props.label} required={props.required}>{props.children}</FormField>;
 }
 

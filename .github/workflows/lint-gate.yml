@@ -1,0 +1,32 @@
+name: lint-gate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    # 与 coverage-gate 保持一致：python:3.12
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pyflakes (pinned to match local baseline)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          # 钉 4.0.3 确保 CI 与本地基线(lint_baseline.txt)生成版本一致，避免漂移误红
+          pip install pyflakes==4.0.3
+
+      - name: Run lint gate
+        # 阈值法：复用 dev 的 run_regression.py lint，与 lint_baseline.txt 单一事实源对齐。
+        # 仅当 pyflakes 出现「基线外的新增告警」才判红，存量 77 条全部放行，只拦净增。
+        working-directory: backend
+        run: python run_regression.py lint

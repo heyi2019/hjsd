@@ -36,6 +36,7 @@ from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposit
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.finance.attributes import accounting_attribute_for_order_event
+from app.orders.form_fields import validate_form_extra
 from ._common import _positive_money, _required_bool, _required_text
 
 # 事件 → 现金流方向 / 性质 / 分类
@@ -86,6 +87,7 @@ def post_event(
     flow_category: str | None = None,
     note: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
     allow_installment_payment: bool = False,
     allow_installment_delivery: bool = False,
@@ -190,6 +192,7 @@ def post_event(
             bound_phone=_buy_snapshot.get("bound_phone"),
             has_secondary=_buy_snapshot.get("has_secondary"),
             account_note=_buy_snapshot.get("note"),
+            extra_values=_buy_snapshot.get("extra_values"),
         )
         order.account_id = account.id
 
@@ -325,7 +328,7 @@ def post_event(
         reason=reason,
         refund_responsibility=refund_responsibility,
         note=note,
-        form_extra=dict(form_extra) if form_extra else None,
+        form_extra=validate_form_extra(session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra) or None,
         is_posted=True,
         posted_at=datetime.now(),
         created_by=actor,

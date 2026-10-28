@@ -193,6 +193,8 @@ class PeriodLock(Base, AuditMixin):
     )
     locked_by: Mapped[str] = mapped_column(String(64), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # FUNDLOCK 作用域自定义字段值。
+    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class AuditLog(Base):

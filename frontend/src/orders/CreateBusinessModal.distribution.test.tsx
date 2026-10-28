@@ -230,6 +230,6 @@ it("代分期表单展示金额、可自定义期次和付款信息", async () =
     expect(screen.queryByLabelText("关联订单编号")).toBeNull();
     expect(screen.getByText("第 1 期")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /添加期次/ })).toBeInTheDocument();
-    expect(container.querySelector('[id$="dfq_customer_nickname"]')).toBeInTheDocument();
+    expect(container.querySelector('[id$="customer_nickname"]')).toBeInTheDocument();
   });
 });

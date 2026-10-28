@@ -12,3 +12,8 @@
   font: var(--font-caption-2);
   white-space: nowrap;
 }
+
+.form-field__required-mark {
+  color: var(--color-error);
+  margin-right: 2px;
+}

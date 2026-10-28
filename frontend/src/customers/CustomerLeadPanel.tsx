@@ -7,7 +7,7 @@ import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/
 import { normalizeError } from "../shared/api/client";
 import { DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
-import { CfgItem, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
@@ -39,7 +39,7 @@ export function CustomerLeadPanel() {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string });
+      await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string, extra_values: values.form_extra });
       appMessage.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
     } catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -49,7 +49,7 @@ export function CustomerLeadPanel() {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.close(closeTarget.id, values.reason as string); appMessage.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
+      await leadsApi.close(closeTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined); appMessage.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
     }
     catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -59,7 +59,7 @@ export function CustomerLeadPanel() {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.convert(convertTarget.id, Number(values.order_id)); appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
+      await leadsApi.convert(convertTarget.id, Number(values.order_id), values.form_extra as Record<string, unknown> | undefined); appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
     }
     catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -89,6 +89,7 @@ export function CustomerLeadPanel() {
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
           <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
+          <CustomFieldSection testIdSuffix="lead-create" />
           <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>创建需求</PermissionButton>
         </Form>
       </FieldConfigContext.Provider>
@@ -97,6 +98,7 @@ export function CustomerLeadPanel() {
       <FieldConfigScope scope="LEADCLOSE" active={Boolean(closeTarget)}>
         <Form form={closeForm} layout="vertical" onFinish={closeLead}>
           <CfgItem name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
+          <CustomFieldSection testIdSuffix="lead-close" />
           <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
         </Form>
       </FieldConfigScope>
@@ -105,6 +107,7 @@ export function CustomerLeadPanel() {
       <FieldConfigScope scope="LEADCONVERT" active={Boolean(convertTarget)}>
         <Form form={convertForm} layout="vertical" onFinish={convertLead}>
           <CfgItem name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></CfgItem>
+          <CustomFieldSection testIdSuffix="lead-convert" />
           <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>
         </Form>
       </FieldConfigScope>

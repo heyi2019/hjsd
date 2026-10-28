@@ -200,7 +200,15 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0010 (head)"
+    stdout = result.stdout.strip()
+    # alembic heads 形如 "0025 (head)"；head 必须真实存在且被 alembic 识别。
+    # 不再硬编码 revision —— 迁移链推进后硬编码值会腐化（此前 0010 已落后于实际 head）。
+    assert "(head)" in stdout, f"alembic heads 未报告 head：\n{stdout}"
+    head_rev = stdout.split()[0]
+    version_files = [p.name for p in (BACKEND_DIR / "alembic" / "versions").glob("*.py")]
+    assert any(head_rev in name for name in version_files), (
+        f"head {head_rev} 在 alembic/versions 中找不到对应迁移文件：{version_files}"
+    )
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):

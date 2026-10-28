@@ -856,6 +856,7 @@ def convert_lead(
     order_id: int,
     actor: str,
     user: CurrentUser | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> CustomerLead:
     lead = _get_lead_for_user(session, lead_id, user)
     if lead.status != LeadStatus.OPEN.value:
@@ -871,6 +872,8 @@ def convert_lead(
     lead.status = LeadStatus.CONVERTED.value
     lead.converted_order_id = order.id
     lead.updated_by = actor
+    if extra_values:
+        set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id, values=extra_values.items())
     session.flush()
     record_audit(
         session,
@@ -890,6 +893,7 @@ def close_lead(
     reason: str,
     actor: str,
     user: CurrentUser | None = None,
+    extra_values: Mapping[str, Any] | None = None,
 ) -> CustomerLead:
     lead = _get_lead_for_user(session, lead_id, user)
     if lead.status != LeadStatus.OPEN.value:
@@ -898,6 +902,8 @@ def close_lead(
     lead.status = LeadStatus.CLOSED.value
     lead.closed_reason = normalized
     lead.updated_by = actor
+    if extra_values:
+        set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id, values=extra_values.items())
     session.flush()
     record_audit(
         session,

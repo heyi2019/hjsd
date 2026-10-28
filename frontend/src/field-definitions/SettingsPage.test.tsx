@@ -77,7 +77,9 @@ it("业务字典仅说明业务口径，不展示配置跳转按钮", async () =
 it("业务分类明确分期归自营、代分期归分销", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
   // 默认 Tab 是业务字典。
-  expect(await screen.findByText(/分期：本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
-  expect(screen.getByText(/代分期：客户向本方借款，按合约分期还款/)).toBeInTheDocument();
-  expect(screen.getAllByText(/生成 DFQ 业务订单号/)).toHaveLength(2);
+  expect(await screen.findByText("分期（自营增值服务）")).toBeInTheDocument();
+  expect(screen.getByText(/本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
+  expect(screen.getByText("代分期（分销增值服务）")).toBeInTheDocument();
+  expect(screen.getByText(/客户向本方借款，按合约分期还款/)).toBeInTheDocument();
+  expect(document.body.textContent).toContain("生成代分期业务订单号");
 });

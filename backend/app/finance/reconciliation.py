@@ -15,6 +15,7 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CashflowStatus, Direction, ReconciliationStatus
 from app.domain.trade import Cashflow, Reconciliation
+from app.orders.form_fields import validate_form_extra
 from app.foundation import service as foundation_service
 
 from ._common import _non_negative, _text
@@ -60,6 +61,7 @@ def create_reconciliation(
     unmatched_flow_ids: Iterable[int] | None = None,
     reason: str | None = None,
     note: str | None = None,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Reconciliation:
     if user is not None and not user.can_see_pool(pool_id):
@@ -143,6 +145,7 @@ def create_reconciliation(
         reason=text_reason or None,
         unmatched_flow_ids=raw_ids,
         note=note,
+        form_extra=validate_form_extra(session, order_type_code="FUNDRECON", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -201,6 +204,7 @@ def resolve_reconciliation(
     *,
     actor: str,
     reason: str,
+    form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Reconciliation:
     text_reason = _text(
@@ -216,6 +220,8 @@ def resolve_reconciliation(
     item.resolved_by = actor
     item.resolved_at = datetime.now()
     item.reason = f"{item.reason}; {text_reason}" if item.reason else text_reason
+    if form_extra:
+        item.form_extra = {**(item.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDCLEAR", values=form_extra)}
     item.updated_by = actor
     session.flush()
     record_audit(

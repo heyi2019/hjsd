@@ -12,6 +12,7 @@ import type { OrderFormField } from "../shared/api/catalog";
 import { renderLight } from "../test/render";
 import {
   CfgItem,
+  CfgNestedItem,
   CustomFormField,
   FieldConfigContext,
   fieldLabel,
@@ -22,6 +23,17 @@ import {
   buildFormExtraDisplay,
   type FieldConfigMap,
 } from "./ConfigurableField";
+
+it("嵌套表单的必填字段标签显示星号", () => {
+  renderLight(
+    <Form>
+      <CfgNestedItem name="required_field" label="必填字段" rules={[{ required: true }]}>
+        <Input />
+      </CfgNestedItem>
+    </Form>,
+  );
+  expect(screen.getByText("*", { selector: ".form-field__required-mark" })).toBeInTheDocument();
+});
 
 const makeField = (over: Partial<OrderFormField> = {}): OrderFormField => ({
   id: 1,

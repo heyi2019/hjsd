@@ -122,8 +122,23 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
         ).all()
     )
     events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
+    events_by_id: dict[int, OrderEvent] = {}
     event_ids = {event.id for event in events}
+    # 每个事件的现金流条数一次聚合取回。逐事件 COUNT 是 O(事件数) 条 SQL
+    # （真实库实测 740 条 / 单次请求 919 条），聚合后恒为 1 条。
+    cashflow_counts: dict[int, int] = {}
+    if event_ids:
+        cashflow_counts = {
+            event_id: count
+            for event_id, count in session.execute(
+                select(Cashflow.order_event_id, func.count(Cashflow.id))
+                .where(Cashflow.order_event_id.in_(event_ids))
+                .group_by(Cashflow.order_event_id)
+            ).all()
+            if event_id is not None
+        }
     for event in events:
+        events_by_id[event.id] = event
         events_by_order[event.order_id].append(event)
         if not event.is_posted or event.event_type not in MONEY_EVENT_TYPES:
             continue
@@ -139,9 +154,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                     details={"order_no": order_by_id[event.order_id].order_no},
                 )
             )
-        cashflow_count = session.scalar(
-            select(func.count(Cashflow.id)).where(Cashflow.order_event_id == event.id)
-        ) or 0
+        cashflow_count = cashflow_counts.get(event.id, 0)
         if cashflow_count != 1:
             issues.append(
                 _issue(
@@ -163,7 +176,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     ).all():
         if flow.order_event_id not in event_ids:
             continue
-        event = session.get(OrderEvent, flow.order_event_id)
+        event = events_by_id[flow.order_event_id]
         mismatches: dict[str, str] = {}
         if flow.order_id != event.order_id:
             mismatches["order_id"] = f"{flow.order_id}!={event.order_id}"
@@ -220,11 +233,20 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
             )
 
     # 资金池可用余额不能为负；只检查用户有权看到的池。
-    pools = foundation_service.list_pools(session)
+    # 余额改成一次批量聚合：逐池调用 pool_balance 会让 SQL 条数按「池数 × 3」放大
+    # （真实库 7 个池实测 21 条），批量后恒为 3 条。
+    pools = [
+        pool
+        for pool in foundation_service.list_pools(session)
+        if user is None or user.can_see_pool(pool.id)
+    ]
+    balances = (
+        orders_service.pool_balances(session, [pool.id for pool in pools], user=user)
+        if pools
+        else {}
+    )
     for pool in pools:
-        if user is not None and not user.can_see_pool(pool.id):
-            continue
-        balance = orders_service.pool_balance(session, pool.id)
+        balance = balances[pool.id]
         if balance["available"] < 0:
             issues.append(
                 _issue(
@@ -246,6 +268,9 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                 )
             )
 
+    # 代分期是否已建合约：一次取回全部命中订单。逐单 EXISTS 是 O(DFQ 订单数)
+    # 条 SQL（实测 124 条），改成集合判断后恒为 1 条。
+    orders_with_installment = set(session.scalars(select(Installment.order_id).distinct()).all())
     for order in orders:
         order_events = [event for event in events_by_order.get(order.id, []) if event.is_posted]
         if order.order_type == "DFQ" and order.account_id is not None:
@@ -273,9 +298,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                     )
                 )
 
-        if order.order_type == "DFQ" and not session.scalar(
-            select(Installment.id).where(Installment.order_id == order.id)
-        ):
+        if order.order_type == "DFQ" and order.id not in orders_with_installment:
             issues.append(
                 _issue(
                     code="INSTALLMENT_MISSING",
@@ -304,8 +327,19 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
             InstallmentSchedule.status != "PAID",
         )
     ).all()
+    # 逾期计划对应的合约一次批量取回：逐行 session.get 是 O(逾期计划数) 条 SQL
+    # （实测 28 条），且依赖 identity map 命中，一旦调用方 commit 就会退化成 N+1。
+    installments_by_id: dict[int, Installment] = {}
+    schedule_installment_ids = {row.installment_id for row in schedule_rows}
+    if schedule_installment_ids:
+        installments_by_id = {
+            item.id: item
+            for item in session.scalars(
+                select(Installment).where(Installment.id.in_(schedule_installment_ids))
+            ).all()
+        }
     for row in schedule_rows:
-        installment = session.get(Installment, row.installment_id)
+        installment = installments_by_id.get(row.installment_id)
         if installment is None or installment.order_id not in order_ids:
             continue
         issues.append(

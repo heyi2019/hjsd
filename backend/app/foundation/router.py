@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import Validation
-from app.core.numbering import MAX_SEQUENCE_VALUE, peek_number
+from app.core.numbering import MAX_SEQUENCE_VALUE, format_next_number
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_TYPE_MANAGE,
@@ -348,7 +348,14 @@ def list_sequences(
     for sequence in service.list_sequences(db):
         next_number = ""
         try:
-            next_number = peek_number(db, sequence.sequence_key)
+            # 序列行已随列表取出，直接按同一口径格式化；
+            # 逐行 peek_number 会把已加载的行再回查一遍（实测 16 条冗余 SELECT）。
+            next_number = format_next_number(
+                sequence_key=sequence.sequence_key,
+                prefix=sequence.prefix,
+                padding=sequence.padding,
+                current_value=sequence.current_value,
+            )
         except Validation:
             next_number = f"<已达上限 {MAX_SEQUENCE_VALUE}>"
         result.append(

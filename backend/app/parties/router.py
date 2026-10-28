@@ -184,6 +184,7 @@ def update_customer(
         customer_id,
         actor=_actor(user),
         user=user,
+        extra_values=payload.extra_values,
         **payload.model_dump(exclude_unset=True),
     )
     extras = service.get_extra_values(db, entity_type="customer", entity_id=customer.id)
@@ -203,6 +204,7 @@ def update_customer_status(
         payload.status.value,
         actor=_actor(user),
         user=user,
+        extra_values=payload.extra_values,
     )
     return service.to_customer_out(customer, reveal_contact=True)
 
@@ -308,6 +310,7 @@ def convert_lead(
         order_id=payload.order_id,
         actor=_actor(user),
         user=user,
+        extra_values=payload.extra_values,
     )
     return _lead_output(db, item)
 
@@ -325,6 +328,7 @@ def close_lead(
         reason=payload.reason,
         actor=_actor(user),
         user=user,
+        extra_values=payload.extra_values,
     )
     return _lead_output(db, item)
 

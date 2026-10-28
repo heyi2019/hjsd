@@ -32,12 +32,71 @@ from app.installments import service as installments_service
 from app.finance import service as finance_service
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderLink
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import service as order_service
 
 D = date(2026, 10, 4)
+
+
+def test_order_create_validates_active_custom_field_values(seeded_db):
+    field = OrderFormField(
+        order_type_code="HS",
+        field_key="idcard_check",
+        label="身份证",
+        field_type="NUMBER",
+        required=True,
+        is_active=True,
+        is_custom=True,
+        section="ACCOUNT_PRODUCT",
+        sort_order=1000,
+    )
+    seeded_db.add(field)
+    seeded_db.flush()
+
+    with pytest.raises(Validation, match="必须为数字"):
+        order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="pytest",
+            account_snapshot={"game_account": "invalid-extra-account"},
+            form_extra={"idcard_check": "not-a-number"},
+        )
+
+
+def test_account_product_custom_values_follow_inline_inventory_account(seeded_db):
+    field = OrderFormField(
+        order_type_code="HS",
+        field_key="idcard_store",
+        label="身份证",
+        field_type="TEXT",
+        required=False,
+        is_active=True,
+        is_custom=True,
+        section="ACCOUNT_PRODUCT",
+        sort_order=1001,
+    )
+    seeded_db.add(field)
+    seeded_db.flush()
+
+    order = order_service.create_order(
+        seeded_db,
+        order_type="HS",
+        trade_date=D,
+        actor="pytest",
+        account_snapshot={
+            "game_account": "account-extra-store",
+            "extra_values": {"idcard_store": "123456"},
+        },
+        form_extra={"idcard_store": "123456"},
+    )
+
+    account = seeded_db.get(Account, order.account_id)
+    assert account is not None
+    assert account.form_extra == {"idcard_store": "123456"}
+    assert order.form_extra is None
 
 
 @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP"), ("DG", "CONSIGNMENT")])

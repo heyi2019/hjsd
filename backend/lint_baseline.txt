@@ -1,6 +1,3 @@
-app/domain/__init__.py :: 'app.domain.options' imported but unused
-app/finance/service.py :: '.cashflows.create_period_lock' imported but unused
-app/finance/service.py :: '.cashflows.list_period_locks' imported but unused
 app/orders/router.py :: 'app.orders.form_fields as form_fields_service' imported but unused
 app/orders/service.py :: '._common._non_negative_money' imported but unused
 app/orders/service.py :: '._common._required_bool' imported but unused
@@ -29,7 +26,6 @@ app/parties/service.py :: 'app.domain.trade.Cashflow' imported but unused
 app/parties/service.py :: 'app.domain.users.User' imported but unused
 app/parties/service.py :: 'collections.abc.Iterable' imported but unused
 app/parties/service.py :: 're' imported but unused
-app/parties/service.py :: 'sqlalchemy.func' imported but unused
 app/parties/service.py :: 'sqlalchemy.inspect' imported but unused
 scripts/create_admin.py :: 'app.domain.foundation' imported but unused
 scripts/create_admin.py :: 'app.domain.imports' imported but unused

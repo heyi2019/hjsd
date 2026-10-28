@@ -475,6 +475,12 @@ def _assert_event_allowed(
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
+        # account_id 为空只可能是订单未内联填写游戏账号（有值时上方已自动建号）。
+        if not order.game_account:
+            raise Validation(
+                "回收订单买入必须填写游戏账号，系统将据此创建库存账号",
+                details={"field": "game_account"},
+            )
         raise Validation("回收订单 BUY 必须关联库存账号")
     if order.order_type == "DFQ" and event_type == EventType.BUY.value:
         contract_type = session.scalar(

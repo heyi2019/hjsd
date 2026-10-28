@@ -14,8 +14,7 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool, text, event
-from sqlalchemy import Engine
+from sqlalchemy import engine_from_config, pool, event
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:

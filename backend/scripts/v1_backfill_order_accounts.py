@@ -24,7 +24,6 @@ from app.core.audit import AuditAction, record_audit  # noqa: E402
 from app.core.database import get_session_factory  # noqa: E402
 from app.domain.trade import Account, Order, OrderEvent  # noqa: E402
 from app.orders.service import _create_inline_inventory_account  # noqa: E402
-from app.stocks import service as stocks_service  # noqa: E402
 
 ACTOR = "system-backfill"
 _INSTALLMENT_OPEN = {"PENDING", "ACTIVE", "OVERDUE"}

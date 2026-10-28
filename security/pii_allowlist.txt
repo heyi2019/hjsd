@@ -1,0 +1,39 @@
+# PII / 密钥扫描白名单（由 backend/scripts/scan_pii.py 读取）
+#
+# 用途：登记「业务上确属必要」或「确认为合成占位数据」的命中，
+#       使门禁只拦截**清单外新增**的 PII，不被历史数据永久卡死。
+#
+# 格式：<仓库相对路径> :: <规则名>
+#   - 不含行号（抗漂移）；同一文件新增同类命中不会再次触发（数据文件按文件登记）。
+#   - `#` 开头为注释。新增条目必须能用一句话说清理由。
+#
+# 复核节奏：数据文件更新（重新导出 rawdata）后跑 `--all` 看总量变化，不需要改本文件。
+
+# ── 一、v1 迁移源数据（真实 PII，业务必要） ─────────────────────────────
+# rawdata/原始数据/*.json 是 v1 迁移的可复现源数据：
+#   * backend/scripts/land_raw_import.py 直接以该目录为 SOURCE_DIR；
+#   * docs/ERP_迁移报告_v1.0.md 明确「重新导出 JSON 覆盖 rawdata 后重跑迁移脚本」；
+#   * README.md 将其列为「金山文档导出的 5 份只读 JSON」。
+# 其中含游戏账号绑定的手机号（sheet16）与分期记录中的手机号（sheet17）。
+# 处置口径：仓库必须保持 private；如需转公开或对外分享，必须先移出该目录并清理历史。
+rawdata/原始数据/sheet16_accounts.json :: phone
+rawdata/原始数据/sheet17_installments.json :: phone
+
+# ── 二、测试/文档中的合成占位号码（非真实 PII） ─────────────────────────
+# 已逐一核对：全部为 138****0000/0001/0002、138****1111、138****8888、
+# 138****9999、138****1234、139****0000、139****2222 一类占位值，非真实用户号码。
+# 注意：本文件自身也在扫描范围内，注释中不得出现完整号码（上面已刻意脱敏）。
+backend/scripts/seed_e2e_customers.py :: phone
+backend/tests/v1/test_auth_contract.py :: phone
+backend/tests/v1/test_bughunt.py :: phone
+backend/tests/v1/test_orders_contract.py :: phone
+backend/tests/v1/test_parties.py :: phone
+backend/tests/v1/test_parties_contract.py :: phone
+# 接口规范文档的号码为占位示例值；v1.0/v1.1 双登记是版本迁移期的过渡安排，
+# 待 v1.1 正式入库、v1.0 删除后，删除 v1.0 这一行（届时会提示为死条目）。
+docs/ERP_API接口规范_v1.0.md :: phone
+docs/ERP_API接口规范_v1.1.md :: phone
+frontend/e2e/business-write.spec.ts :: phone
+frontend/src/customers/CustomersPage.test.tsx :: phone
+frontend/src/stocks/InventoryProfileModal.deep.test.tsx :: phone
+tests/fixtures/v1_acceptance_seed.json :: phone

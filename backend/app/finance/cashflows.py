@@ -35,7 +35,7 @@ from app.finance.attributes import (
     validate_fund_accounting_attribute,
 )
 
-from ._common import _non_negative, _positive, _text
+from ._common import _positive, _text
 
 def _get_cashflow(
     session: Session, cashflow_id: int, user: CurrentUser | None = None

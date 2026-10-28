@@ -27,6 +27,24 @@ jobs:
 
       - name: Run lint gate
         # 阈值法：复用 dev 的 run_regression.py lint，与 lint_baseline.txt 单一事实源对齐。
-        # 仅当 pyflakes 出现「基线外的新增告警」才判红，存量 77 条全部放行，只拦净增。
+        # 仅当 pyflakes 出现「基线外的新增告警」才判红；存量告警按基线放行，只拦净增。
+        # 存量数字随清理收紧，此处不写死条数（避免文档漂移），以 lint_baseline.txt 为准。
         working-directory: backend
         run: python run_regression.py lint
+
+  pii:
+    name: PII 扫描
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scan text files for PII / secrets
+        # 只拦「security/pii_allowlist.txt 之外」的新增命中；输出已脱敏，不回显原始值。
+        # 处置口径见 security/PII_处置口径_V1.0.md。
+        working-directory: backend
+        run: python scripts/scan_pii.py

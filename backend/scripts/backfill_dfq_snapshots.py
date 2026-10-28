@@ -14,7 +14,6 @@ import argparse
 import csv
 import json
 import sqlite3
-import sys
 
 SNAPSHOT_FIELDS = [
     "game_account",   # 必填

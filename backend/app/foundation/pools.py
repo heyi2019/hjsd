@@ -9,7 +9,6 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, PoolOwnership, PoolStatus, PoolType
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow
 from app.parties import service as parties_service
 from ._common import _UNSET, _get_pool_or_404, _normalize_pool_code, _required_name, _required_pool_type, _snapshot
 # --------------------------------------------------------------------- 资金池

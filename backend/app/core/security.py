@@ -20,7 +20,6 @@ from typing import Any, Iterable, Sequence
 
 from fastapi import Depends, Header
 from sqlalchemy.sql.elements import ColumnElement
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AuthError, PermissionDenied, TokenExpired

@@ -25,14 +25,13 @@ from app.domain.enums import (
     EventType,
     InventoryType,
     InstallmentContractType,
-    InstallmentDispositionAction,
     Nature,
     OrderStatus,
     Portion,
     PoolStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposition, Order, OrderEvent, OrderProfitAllocation
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.finance.attributes import accounting_attribute_for_order_event

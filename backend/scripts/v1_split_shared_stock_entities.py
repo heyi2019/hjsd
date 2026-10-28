@@ -176,7 +176,7 @@ def main() -> int:
 
     if args.dry_run:
         session.rollback()
-        print(f"dry-run 完成")
+        print("dry-run 完成")
         return 0
     session.commit()
     print(f"完成：共拆出 {total_split} 个独立实体")

@@ -40,7 +40,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from sqlalchemy import func, select  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 
 from app.core.database import get_session_factory  # noqa: E402
 from app.domain.enums import PolicyType  # noqa: E402

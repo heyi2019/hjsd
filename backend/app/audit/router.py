@@ -12,7 +12,6 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_AUDIT_READ,
     CurrentUser,
-    get_current_user,
     require_permissions,
 )
 from app.domain.foundation import AuditLog

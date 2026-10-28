@@ -13,7 +13,6 @@ from app.core.security import (
     PERM_REPORT_EXPORT,
     PERM_REPORT_READ,
     CurrentUser,
-    get_current_user,
     require_permissions,
 )
 from app.reporting import service

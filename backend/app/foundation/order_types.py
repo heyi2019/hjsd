@@ -10,7 +10,7 @@ from app.domain.enums import AuditAction, CapitalType, FundNature, PoolStatus, P
 from app.domain.foundation import OrderTypeDef, OrderTypePool, Pool
 from app.domain.trade import Cashflow, Order, OrderEvent
 from ._common import SEQUENCE_PREFIX_PATTERN, _get_order_type_or_404, _non_negative_int, _normalize_code, _required_bool, _required_name, _snapshot
-from .pools import get_pool_by_code, require_pool_by_code
+from .pools import require_pool_by_code
 # ------------------------------------------------------------------ 业务类型
 def list_order_types(session: Session, *, include_inactive: bool = True) -> list[OrderTypeDef]:
     stmt = select(OrderTypeDef).order_by(OrderTypeDef.sort_order, OrderTypeDef.id)

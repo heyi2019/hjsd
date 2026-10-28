@@ -11,7 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas import RequestModel
-from app.domain.enums import CounterpartyType, CustomerStatus, LeadStatus, LeadType
+from app.domain.enums import CounterpartyType, CustomerStatus, LeadType
 
 
 class CustomerCreate(RequestModel):

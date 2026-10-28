@@ -96,8 +96,6 @@ class TestStockNoAtOrderCreation:
     """2026-10-28 口径：建单成功即生成库存编号（不等 BUY 事件）。"""
 
     def test_hs_order_creation_allocates_stock_no_immediately(self, seeded_db):
-        from app.domain.trade import Order
-
         order = service_create_order(
             seeded_db, game_account="hs-stockno-at-create", game_type="王者荣耀",
             game_password="pwd", channel_region="微信一区",

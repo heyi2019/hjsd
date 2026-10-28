@@ -28,7 +28,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.core.money import Amount
 from app.domain.base import AuditMixin, TimestampMixin
 from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
 

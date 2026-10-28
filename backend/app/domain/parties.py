@@ -15,7 +15,6 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -38,7 +37,6 @@ from app.domain.enums import (
     CustomerStatus,
     LeadStatus,
     LeadType,
-    EntityType,
     PolicyStatus,
     PolicyScopeType,
     CounterpartyRole,

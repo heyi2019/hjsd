@@ -18,7 +18,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import EntityType
 from app.domain.parties import Counterparty, Customer, CustomerLead
 from app.domain.trade import Account, OrderFormField
 

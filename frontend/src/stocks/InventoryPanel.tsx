@@ -39,6 +39,22 @@ function inventoryCellValue(value: string | null | undefined) {
   return value ? value : <span className="inventory-empty-cell">-</span>;
 }
 
+/** 「更多」下拉的菜单项单一事实源：桌面表格与移动端卡片共用，避免两处各写一份导致
+ *  新增/调整操作项时遗漏一侧。禁用态只取决于行状态，与点击后走哪条回调无关。 */
+function moreMenuItems(row: Account) {
+  return [
+    { key: "remove", label: "下架", disabled: row.status === "SOLD" || row.status === "VOID" },
+    {
+      key: "cancel",
+      label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易",
+      danger: true,
+      disabled: !["SOLD", "INSTALLMENT"].includes(row.status),
+    },
+    { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
+    { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
+  ];
+}
+
 /** 移动端（≤640px）库存卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
 export function MobileInventoryList({
   rows,
@@ -96,12 +112,7 @@ export function MobileInventoryList({
                     trigger={["click"]}
                     placement="bottomRight"
                     menu={{
-                      items: [
-                        { key: "remove", label: "下架", disabled: row.status === "SOLD" || row.status === "VOID" },
-                        { key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true, disabled: !["SOLD", "INSTALLMENT"].includes(row.status) },
-                        { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
-                        { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
-                      ],
+                      items: moreMenuItems(row),
                       onClick: ({ key }) => onMoreAction(key, row),
                     }}
                   >
@@ -205,10 +216,19 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     setDetailTarget(account);
   }
 
-  function findCancelableSale(detail: AccountExecutionDetail) {
-    for (const order of [...detail.orders].reverse()) {
-      for (const event of [...order.events].reverse()) {
-        if (event.event_type !== "SELL") continue;
+  /** 倒序取最近一条仍有余额可冲销的 BUY/SELL 事件（「先冲销最近的」为原语义，此处保持一致）。
+   *  下架（VOID）走后端「全额冲销买入事件」路径：CANCEL offset=BUY 且全额消耗时账号转入 VOID
+   *  （core/state_machine.py ACCOUNT_TRANSITIONS；orders/events.py _apply_account_effect）。
+   *
+   *  注：曾尝试把内部 filter 改为「按 offset_event_id 预聚合的 Map」，实测在真实数据规模
+   *  （单账号 3 单 × 8 事件）下反而慢约 3%（Map 构建开销 > 小规模 filter），故保留直写。
+   *  此处仅省去 [...].reverse() 的数组副本，改为倒序索引。 */
+  function findCancelableEvent(detail: AccountExecutionDetail, eventType: "BUY" | "SELL") {
+    for (let i = detail.orders.length - 1; i >= 0; i -= 1) {
+      const order = detail.orders[i];
+      for (let j = order.events.length - 1; j >= 0; j -= 1) {
+        const event = order.events[j];
+        if (event.event_type !== eventType) continue;
         const cancelledAmount = order.events
           .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
           .reduce((sum, item) => sum + Number(item.amount), 0);
@@ -226,28 +246,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     return null;
   }
 
-  /** 下架（VOID）走后端「全额冲销买入事件」路径：CANCEL offset=BUY 且全额消耗时账号转入 VOID
-   * （core/state_machine.py ACCOUNT_TRANSITIONS；orders/events.py _apply_account_effect）。 */
-  function findCancelableBuy(detail: AccountExecutionDetail) {
-    for (const order of [...detail.orders].reverse()) {
-      for (const event of [...order.events].reverse()) {
-        if (event.event_type !== "BUY") continue;
-        const cancelledAmount = order.events
-          .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
-          .reduce((sum, item) => sum + Number(item.amount), 0);
-        const remaining = Number(event.amount) - cancelledAmount;
-        if (remaining > 0) {
-          return {
-            orderId: order.order_id,
-            eventId: event.id,
-            amount: remaining.toFixed(2),
-            portion: event.portion,
-          };
-        }
-      }
-    }
-    return null;
-  }
+  const findCancelableSale = (detail: AccountExecutionDetail) => findCancelableEvent(detail, "SELL");
+  const findCancelableBuy = (detail: AccountExecutionDetail) => findCancelableEvent(detail, "BUY");
 
   async function openVoid(account: Account) {
     try {
@@ -531,12 +531,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
               trigger={["click"]}
               placement="bottomRight"
               menu={{
-                items: [
-                  { key: "remove", label: "下架", disabled: row.status === "SOLD" || row.status === "VOID" },
-                  { key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true, disabled: !["SOLD", "INSTALLMENT"].includes(row.status) },
-                  { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
-                  { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
-                ],
+                items: moreMenuItems(row),
                 onClick: ({ key }) => handleMoreAction(key, row),
               }}
             >

@@ -142,5 +142,6 @@ __all__ = [
     "allocate_number",
     "current_value",
     "ensure_sequence",
+    "format_next_number",
     "peek_number",
 ]

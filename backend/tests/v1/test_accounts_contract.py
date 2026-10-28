@@ -268,11 +268,13 @@ class TestCreateAccountGuards:
                 seeded_db, account.id, actor="pytest", game_account=123
             )
 
-    def test_duplicate_identifier_conflicts(self, seeded_db):
-        _account(seeded_db, "dup-acc")
-        with pytest.raises(Conflict) as exc:
-            service.create_account(seeded_db, game_account="dup-acc", actor="pytest")
-        assert "已在台账中" in str(exc.value)
+    def test_duplicate_identifier_allowed_as_repeat_purchase(self, seeded_db):
+        """2026-10-28 口径：game_account 不唯一——复购同号各建独立实体。"""
+        first = _account(seeded_db, "dup-acc")
+        second = service.create_account(seeded_db, game_account="dup-acc", actor="pytest")
+        assert second.id != first.id
+        assert second.stock_no != first.stock_no
+        assert second.game_account == first.game_account == "dup-acc"
 
     def test_consignments_enter_inventory_without_purchase_payment(self, seeded_db):
         account = _account(seeded_db, "consignment-acc", inventory_type="CONSIGNMENT")

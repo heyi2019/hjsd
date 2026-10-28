@@ -192,15 +192,19 @@ def test_materialize_dfq_recovery_account_requires_snapshot_account(seeded_db):
         )  # 85-88
 
 
-def test_materialize_dfq_recovery_account_rejects_duplicate(seeded_db):
+def test_materialize_dfq_recovery_account_allows_repeat_purchase(seeded_db):
+    """2026-10-28 口径：game_account 不唯一——同号已存在时物化新建独立实体。"""
     _account(seeded_db, "dup-recovery-account")
     order = _order(seeded_db, order_type="DFQ")
     order.account_snapshot = {"game_account": "dup-recovery-account"}
     seeded_db.flush()
-    with pytest.raises(Conflict, match="不能从 DFQ 快照重复建库存账号"):
-        installment_service._materialize_dfq_recovery_account(
-            seeded_db, order, actor="pytest"
-        )  # 89-95
+    account = installment_service._materialize_dfq_recovery_account(
+        seeded_db, order, actor="pytest"
+    )
+    assert order.account_id == account.id
+    assert account.business_mode == "SELF"
+    assert account.inventory_type == "RECOVERY"
+    assert account.game_account == "dup-recovery-account"
 
 
 # ------------------------------------------------------------- 取消：状态守卫

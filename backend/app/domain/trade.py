@@ -70,7 +70,6 @@ class Account(Base, AuditMixin):
             f"status IN {AccountStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="account_status_valid",
         ),
-        UniqueConstraint("game_account", name="uq_accounts_game_account"),
         UniqueConstraint("stock_no", name="uq_accounts_stock_no"),
         Index("ix_accounts_status", "status"),
         CheckConstraint("cost_amount >= 0", name="cost_nonneg"),

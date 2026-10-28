@@ -85,24 +85,23 @@ def _materialize_dfq_recovery_account(
     """DFQ 回收转自营：垫资账号（建单已入库）转为 SELF/RECOVERY 可售库存。
 
     迁移 0002 之前的旧订单未挂账号时，回退为从快照补建（历史兼容路径）。
+    2026-10-28 口径：game_account 不唯一（支持复购），实体归属一律以
+    order.account_id 为准，不再按 game_account 文本反查挂靠。
     """
+    if order.account_id is not None:
+        account = session.get(Account, order.account_id)
+        if account is None:
+            # 挂了账号但台账里查不到：数据异常，显式报错而非静默重建。
+            raise NotFound("分期合约关联账号不存在")
+        # 建单即入库的代分期账号：转自营回收，清增值服务标识。
+        account.business_mode = "SELF"
+        account.inventory_type = "RECOVERY"
+        account.value_added_service = None
+        return account
     snapshot = order.account_snapshot or {}
     game_account = snapshot.get("game_account")
     if not isinstance(game_account, str) or not game_account.strip():
         raise Validation("DFQ 分期缺少可回收的账号资料")
-    existing = session.scalar(
-        select(Account).where(Account.game_account == game_account.strip())
-    )
-    if existing is not None:
-        # 建单即入库的代分期账号：转自营回收，清增值服务标识。
-        order.account_id = existing.id
-        existing.business_mode = "SELF"
-        existing.inventory_type = "RECOVERY"
-        existing.value_added_service = None
-        return existing
-    if order.account_id is not None:
-        # 挂了账号但台账里查不到：数据异常，显式报错而非静默重建。
-        raise NotFound("分期合约关联账号不存在")
     account = stocks_service.create_account(
         session,
         game_account=game_account,

@@ -4,11 +4,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
-from app.core.errors import Conflict, ErrorCode, NotFound, Validation
+from app.core.errors import NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
@@ -46,13 +45,8 @@ def create_account(
     identifier = game_account.strip() if isinstance(game_account, str) else ""
     if not identifier:
         raise Validation("库存编号必填", details={"field": "game_account"})
-    exists = session.scalar(select(Account).where(Account.game_account == identifier))
-    if exists is not None:
-        raise Conflict(
-            f"账号 {identifier} 已在台账中",
-            code=ErrorCode.DUPLICATE_CODE,
-            details={"game_account": identifier},
-        )
+    # 2026-10-28 口径：game_account 不唯一——同一游戏账号可反复回购，
+    # 每次收购都是独立库存实体（各自成本与生命周期），不做查重限制。
     validate_inventory_context(business_mode, inventory_type)
     if value_added_service is not None and value_added_service not in {
         InstallmentContractType.STOCK_SALE.value,
@@ -159,13 +153,7 @@ def update_account_profile(
         identifier = game_account.strip() if isinstance(game_account, str) else ""
         if not identifier:
             raise Validation("库存编号必填", details={"field": "game_account"})
-        exists = session.scalar(select(Account).where(Account.game_account == identifier, Account.id != account_id))
-        if exists is not None:
-            raise Conflict(
-                f"账号 {identifier} 已在台账中（账号ID {exists.id}）",
-                code=ErrorCode.DUPLICATE_CODE,
-                details={"account_id": exists.id},
-            )
+        # 2026-10-28 口径：game_account 不唯一（支持复购），改名不做查重。
         next_game_account = identifier
     validated_images = validate_account_images(account_images) if account_images is not _UNSET else _UNSET
     validate_account_profile_scope(account.inventory_type, account_description, validated_images)

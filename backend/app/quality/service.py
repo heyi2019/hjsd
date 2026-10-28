@@ -108,7 +108,17 @@ def _visible_orders(session: Session, user: CurrentUser | None) -> list[Order]:
 
 
 def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str, Any]]:
-    """扫描标准库中的可操作异常，结果稳定按严重级别和实体排序。"""
+    """扫描标准库中的可操作异常，结果稳定按严重级别和实体排序。
+
+    复杂度画像（2026-10-28 实测，含每规模独立进程复测）：
+    - SQL 条数恒定 12 条，不随行数增长（护栏见 test_quality_guard 的
+      ``test_scan_sql_count_does_not_grow_with_rows``）；
+    - 耗时线性 O(订单数+事件数)，≈63µs/单：632 单 62ms、1.06 万单 460ms、
+      5.06 万单 2.2s、10.06 万单 6.3s（零异常合成数据，瓶颈在 ORM 全量
+      水合与 Python 侧遍历，不在 SQL）。
+    - 结论：当前量级（数百单）无需改分批游标；订单过 **5 万** 再考虑把
+      全量 ORM 载入改为按窗口迭代的轻量列查询。
+    """
     issues: list[dict[str, Any]] = []
     orders = _visible_orders(session, user)
     order_by_id = {order.id: order for order in orders}

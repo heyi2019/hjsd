@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import AuthError, PermissionDenied
+from app.core.errors import AuthError, PermissionDenied, RateLimited
+from app.core.ratelimit import login_limiter
 from app.core.schemas import RequestModel
 from app.core.security import (
     CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
 )
+from app.core.settings import get_settings
 from app.domain.users import Team, User
 from app.auth import service
 
@@ -134,8 +136,24 @@ def _admin(actor: CurrentUser) -> None:
         raise PermissionDenied("仅系统管理员可管理用户")
 
 
+def _client_ip(request: Request) -> str:
+    """取真实客户端 IP：优先 X-Forwarded-For（反向代理后），否则直连地址。"""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/login", response_model=LoginOut)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginOut:
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> LoginOut:
+    # 登录限流：仅在生产生效（app_env=production），避免打断开发与 k6 压测。
+    # PBKDF2 校验约 45ms/次，在 2 核服务器上暴力破解会显著挤占 CPU，故在 DB 查询前拦截。
+    settings = get_settings()
+    if settings.login_rate_limit_enabled and settings.app_env == "production":
+        if not login_limiter.is_allowed(
+            f"login:{_client_ip(request)}", settings.login_rate_limit_per_minute, 60
+        ):
+            raise RateLimited("登录尝试过于频繁，请稍后再试")
     user = db.scalar(select(User).where(User.username == payload.username.strip()))
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise AuthError("用户名或密码错误")

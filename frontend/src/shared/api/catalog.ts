@@ -669,8 +669,30 @@ export const counterpartiesApi = {
 };
 
 export const ordersApi = {
-  list: (params?: { order_type?: string; status?: string }) =>
-    api.get<Order[]>("/orders", { params }).then((r) => r.data),
+  // 自动翻页取全量：后端 GET /orders 默认 limit=100、max=500，调用方不传 limit 时
+  // 只会取到前 100 单，导致订单列表/聚合缺失数据（dev 库 627 单只取 100 的数据完整性缺口）。
+  // 仅在未显式传入 limit 时自动翻页（每页 500，最多 50 页=25k 上限防意外死循环）；
+  // 显式传入 limit 时原样透传（用于只需少量数据的场景）。
+  list: async (params?: {
+    order_type?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Order[]> => {
+    if (params?.limit != null) {
+      return api.get<Order[]>("/orders", { params }).then((r) => r.data);
+    }
+    const all: Order[] = [];
+    const PAGE = 500;
+    for (let i = 0; i < 50; i++) {
+      const page = await api.get<Order[]>("/orders", {
+        params: { ...params, limit: PAGE, offset: i * PAGE },
+      }).then((r) => r.data);
+      all.push(...page);
+      if (page.length < PAGE) break;
+    }
+    return all;
+  },
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
   links: (orderId: number) =>

@@ -22,6 +22,9 @@ class ErrorCode:
     # 405
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
 
+    # 429
+    RATE_LIMITED = "RATE_LIMITED"
+
     # 409
     ORDER_STATUS_CONFLICT = "ORDER_STATUS_CONFLICT"
     VERSION_CONFLICT = "VERSION_CONFLICT"
@@ -110,6 +113,13 @@ class Validation(AppError):
     code = ErrorCode.VALIDATION_ERROR
 
 
+class RateLimited(AppError):
+    """登录等高频接口被限流（429）。"""
+
+    http_status = 429
+    code = ErrorCode.RATE_LIMITED
+
+
 def require_condition(condition: bool, message: str, **kwargs: Any) -> None:
     """卫语句：条件不满足即按给定类型抛错，避免深层嵌套 if。"""
     if not condition:
@@ -124,6 +134,7 @@ __all__ = [
     "ErrorCode",
     "NotFound",
     "PermissionDenied",
+    "RateLimited",
     "TokenExpired",
     "Validation",
     "require_condition",

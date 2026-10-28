@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
 
+    # 登录限流（仅生产生效，防 PBKDF2 暴力破解挤占 2 核 CPU）
+    # 默认每客户端 IP 每分钟 10 次登录；开发/测试环境（app_env != production）自动绕过，
+    # 避免打断本地开发与 k6 压测。多 worker 下各进程独立计数（登录防暴破足够）。
+    login_rate_limit_enabled: bool = True
+    login_rate_limit_per_minute: int = 10
+
     # database（先 SQLite；生产换 PostgreSQL URL，业务代码零改动）
     database_url: str = f"sqlite:///./{DEFAULT_DEV_DB_RELPATH}"
 
@@ -143,7 +149,10 @@ class Settings(BaseSettings):
             raise ValueError("SQLITE_TEMP_STORE 只允许 MEMORY/FILE")
         return normalized
 
-    @field_validator("sqlite_cache_size_kb", "sqlite_mmap_size_mb", "sqlite_busy_timeout_ms")
+    @field_validator(
+        "sqlite_cache_size_kb", "sqlite_mmap_size_mb", "sqlite_busy_timeout_ms",
+        "login_rate_limit_per_minute",
+    )
     @classmethod
     def _validate_sqlite_sizes(cls, value: int) -> int:
         if value < 0:

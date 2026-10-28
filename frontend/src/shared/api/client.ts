@@ -24,15 +24,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ---- GET 轻量缓存：并发去重 + 短 TTL 陈旧重验（SWR） ----
+// ---- GET 轻量缓存：并发去重 + 陈旧重验（真 SWR） ----
 // 背景：性能压测发现页面/弹窗「换页慢」主要源于 useReloadOnActive 每次切页全量重拉、
 // 列表不分页全量拉取，以及多组件挂载并发打同一接口。本层在共享客户端统一收敛：
 //  1) 并发相同 GET 只发一次请求，其余复用（去重）；
-//  2) 命中新鲜缓存立即返回，并后台静默重验更新（stale-while-revalidate）；
+//  2) 命中缓存立即返回（即便已超 TTL，只要在 MAX_STALE 窗口内也先返回陈旧值），
+//     并后台静默重验更新（stale-while-revalidate）——切走再切回 tab 不再阻塞于网络往返；
 //  3) 任何写操作（POST/PUT/PATCH/DELETE）成功后清空全部 GET 缓存，
 //     保证建单/取消后再次读取立即可见最新数据。
-// 设计边界：TTL 仅 3s，避免长期服务陈旧数据；仅缓存成功响应（不缓存 5xx/网络错误）。
+// 设计边界：TTL 仅 3s（决定后台重验频率）；MAX_STALE 30s（决定「多陈旧的缓存仍敢先返回」）；
+// 仅缓存成功响应（不缓存 5xx/网络错误）。安全网：写操作清空缓存，停留期间若有写则下次必走网络。
 const GET_CACHE_TTL_MS = 3_000;
+// 陈旧容忍窗口：超过 TTL 但在该窗口内仍先返回缓存值并后台重验，避免「切走稍久再切回」也卡网络。
+const GET_CACHE_MAX_STALE_MS = 30_000;
 
 interface CacheEntry {
   data: unknown;
@@ -119,7 +123,7 @@ api.interceptors.request.use((config: any) => {
     return config;
   }
   const cached = responseCache.get(key);
-  if (cached && cached.expireAt > now) {
+  if (cached && cached.expireAt > now - GET_CACHE_MAX_STALE_MS) {
     config.adapter = swrAdapter(key, config);
     return config;
   }

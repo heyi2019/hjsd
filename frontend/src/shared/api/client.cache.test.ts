@@ -128,4 +128,44 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     expect(a.data).not.toBe(b.data);
     expect((axios as any).__getCallCount()).toBe(2);
   });
+
+  it("超 TTL 但在 MAX_STALE 窗口内：前台立即返回陈旧值，后台静默重验", async () => {
+    const api = apiInstance();
+    const nowSpy = vi.spyOn(Date, "now");
+    let fake = Date.now();
+    nowSpy.mockImplementation(() => fake);
+    try {
+      const first = await api.request({ method: "get", url: "/orders" });
+      expect(first.data).toBe("NET-1");
+      expect((axios as any).__getCallCount()).toBe(1);
+
+      fake += 10_000; // 超过 TTL(3s)，未超 MAX_STALE(30s)
+      const stale = await api.request({ method: "get", url: "/orders" });
+      // 前台仍返回陈旧值 NET-1：证明未被网络阻塞（否则会等待并拿到 NET-2）
+      expect(stale.data).toBe("NET-1");
+      await new Promise((r) => setTimeout(r, 0)); // 让后台重验 microtask 落地
+      // 后台重验已发起：切走再切回 tab 不再卡网络往返
+      expect((axios as any).__getCallCount()).toBe(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("远超 MAX_STALE：不再返回陈旧值，改为等待新鲜响应", async () => {
+    const api = apiInstance();
+    const nowSpy = vi.spyOn(Date, "now");
+    let fake = Date.now();
+    nowSpy.mockImplementation(() => fake);
+    try {
+      const first = await api.request({ method: "get", url: "/orders" });
+      expect(first.data).toBe("NET-1");
+      fake += 60_000; // 超过 MAX_STALE(30s)
+      const fresh = await api.request({ method: "get", url: "/orders" });
+      // 必须等待网络拿到新值 NET-2，而非陈旧 NET-1
+      expect(fresh.data).toBe("NET-2");
+      expect((axios as any).__getCallCount()).toBe(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });

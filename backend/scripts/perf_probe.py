@@ -114,7 +114,8 @@ def main() -> int:
         counter = {"sql": 0, "stmts": []}
 
         @event.listens_for(engine, "before_cursor_execute")
-        def _count(conn, cursor, statement, parameters, context, executemany):  # noqa: ANN001
+        # 事件回调签名由 SQLAlchemy 固定（位置传参），未使用的参数以下划线前缀标明。
+        def _count(_conn, _cursor, statement, _parameters, _context, _executemany):
             stripped = statement.lstrip()
             if not stripped or stripped.upper().startswith(NOISE_PREFIXES):
                 return

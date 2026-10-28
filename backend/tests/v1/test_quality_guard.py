@@ -387,7 +387,8 @@ def _count_selects(session, fn) -> int:
     engine = session.get_bind().engine
     seen: list[str] = []
 
-    def _record(conn, cursor, statement, parameters, context, executemany):  # noqa: ANN001
+    # 事件回调签名由 SQLAlchemy 固定（位置传参），未使用的参数以下划线前缀标明。
+    def _record(_conn, _cursor, statement, _parameters, _context, _executemany):
         if statement.lstrip().upper().startswith("SELECT"):
             seen.append(statement)
 

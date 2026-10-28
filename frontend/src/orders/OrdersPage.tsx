@@ -18,7 +18,7 @@ import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDE
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
-import { InventoryPanel } from "../accounts/InventoryPanel";
+import { InventoryPanel } from "../stocks/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import {

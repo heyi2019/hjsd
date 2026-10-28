@@ -39,7 +39,7 @@ const accounts = [
 beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets(catalog);
-  vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
@@ -47,7 +47,7 @@ beforeEach(() => {
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
-  resolveMock(vi.mocked(catalog.accountsApi.executionDetail), {
+  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -119,7 +119,7 @@ beforeEach(() => {
       }],
     }],
   });
-  resolveMock(vi.mocked(catalog.accountsApi.updateProfile), accounts[0]);
+  resolveMock(vi.mocked(catalog.stocksApi.updateProfile), accounts[0]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 
@@ -132,7 +132,7 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "updated-account" } });
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(vi.mocked(catalog.accountsApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
+    await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
       game_account: "updated-account",
     })));
   });

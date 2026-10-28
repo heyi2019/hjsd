@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.security import CurrentUser, build_access_token
 from app.orders import service as orders_service
 from app.parties import service as parties_service
@@ -22,7 +22,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
     counterparty = parties_service.create_counterparty(
         seeded_db, display_name="搜索平台", type="PLATFORM", actor="pytest"
     )
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account="search-game-account",
         game_type="王者",
@@ -54,7 +54,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
     account_result = seeded_client.get(
         "/api/v1/search", params={"q": account.game_account}, headers=headers
     ).json()["items"][0]
-    assert account_result["route"] == f"/accounts/{account.id}/execution-detail"
+    assert account_result["route"] == f"/stocks/{account.id}/execution-detail"
 
     counterparty_detail = seeded_client.get(
         f"/api/v1/counterparties/{counterparty.id}", headers=headers

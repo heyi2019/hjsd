@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
@@ -34,7 +34,7 @@ def _pool(seeded_db, code: str) -> Pool:
 
 
 def _active_order(seeded_db) -> int:
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account=f"finance-active-{uuid4().hex[:10]}",
         business_mode="SELF",
@@ -1049,7 +1049,7 @@ class TestFinanceApi:
         service.create_deposit(
             seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
         )
-        own_account = accounts_service.create_account(
+        own_account = stocks_service.create_account(
             seeded_db,
             game_account="finance-own-account",
             business_mode="SELF",
@@ -1064,7 +1064,7 @@ class TestFinanceApi:
             owner_id=9,
             account_id=own_account.id,
         )
-        other_account = accounts_service.create_account(
+        other_account = stocks_service.create_account(
             seeded_db,
             game_account="finance-other-account",
             business_mode="SELF",
@@ -1389,7 +1389,7 @@ class TestFinanceApi:
             pool_ids=frozenset({1}),
         )
         headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="finance-settlement-account",
             business_mode="SELF",

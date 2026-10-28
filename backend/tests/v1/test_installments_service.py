@@ -46,9 +46,9 @@ FUTURE = date(2026, 11, 30)
 
 
 def _account(seeded_db, game_account: str):
-    from app.accounts import service as accounts_service
+    from app.stocks import service as stocks_service
 
-    return accounts_service.create_account(
+    return stocks_service.create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",

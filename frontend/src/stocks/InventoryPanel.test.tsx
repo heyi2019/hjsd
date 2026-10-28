@@ -27,7 +27,7 @@ describe("InventoryPanel：账号台账", () => {
     const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
     await screen.findByText("acc-1");
     const newer = { ...accounts[0], id: 99, game_account: "new-account", source_order_no: "HS-NEW" };
-    vi.mocked(catalog.accountsApi.list).mockResolvedValue([...accounts, newer]);
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue([...accounts, newer]);
     rerender(<InventoryPanel refreshKey={1} />);
     await screen.findByText("new-account");
     const rows = screen.getAllByRole("row");
@@ -81,7 +81,7 @@ describe("InventoryPanel：账号台账", () => {
       inventory_type: null,
       value_added_service: "ADVANCE_PURCHASE",
     };
-    vi.mocked(catalog.accountsApi.list).mockResolvedValue([dfqAccount, ...accounts]);
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue([dfqAccount, ...accounts]);
     renderLight(<InventoryPanel />, { user: "admin" });
     const row = await screen.findByText("dfq-acc").then(() => {
       const rows = screen.getAllByRole("row");
@@ -197,7 +197,7 @@ describe("InventoryPanel：账号台账", () => {
       date.setDate(date.getDate() - days);
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     };
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
       { ...accounts[0], id: 11, game_account: "green-account", buy_date: daysAgo(6) },
       { ...accounts[0], id: 12, game_account: "yellow-account", buy_date: daysAgo(14) },
       { ...accounts[0], id: 13, game_account: "red-account", buy_date: daysAgo(31) },
@@ -213,7 +213,7 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("回收账号售出后描述与图片入口置灰不可点", async () => {
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([{ ...accounts[0], id: 33, status: "SOLD" }]);
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([{ ...accounts[0], id: 33, status: "SOLD" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     expect(screen.getByRole("button", { name: "寄售" })).toBeDisabled();
@@ -258,13 +258,13 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("后端不可达 → 错误条落地", async () => {
-    vi.mocked(catalog.accountsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(catalog.stocksApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<InventoryPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("回收账号未售出时不显示卖号返点", async () => {
-    resolveMockOnce(vi.mocked(catalog.accountsApi.executionDetail), {
+    resolveMockOnce(vi.mocked(catalog.stocksApi.executionDetail), {
       account: accounts[0],
       orders: [{
         order_id: 21,
@@ -292,7 +292,7 @@ describe("InventoryPanel：账号台账", () => {
   });
 
   it("无数据时显示「暂无账号」", async () => {
-    vi.mocked(catalog.accountsApi.list).mockResolvedValueOnce([]);
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByText("暂无账号")).toBeInTheDocument();
   });
@@ -375,7 +375,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financeTable).getByText("1,000.00")).toBeInTheDocument();
     expect(within(financeTable).getByText("5.00%")).toBeInTheDocument();
     expect(within(financeTable).getByText("2026-10-17 12:30")).toBeInTheDocument();
-    expect(vi.mocked(catalog.accountsApi.executionDetail)).toHaveBeenCalledWith(1);
+    expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });
 });

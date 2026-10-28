@@ -35,7 +35,7 @@ def test_operation_scope_seeds_match_registry():
 
     migration_path = (
         Path(__file__).resolve().parents[2]
-        / "alembic" / "versions" / "0019_form_extra_columns_and_op_scopes.py"
+        / "alembic" / "legacy_versions_pre_squash" / "0019_form_extra_columns_and_op_scopes.py"
     )
     spec = importlib.util.spec_from_file_location("migration_0019", migration_path)
     migration = importlib.util.module_from_spec(spec)
@@ -203,7 +203,7 @@ def test_account_profile_merges_form_extra(seeded_client, seeded_db, headers):
     account_id = order["account_id"]
     assert account_id is not None
     response = seeded_client.patch(
-        f"/api/v1/accounts/{account_id}",
+        f"/api/v1/stocks/{account_id}",
         json={"form_extra": {"supplier": "号商A"}},
         headers=headers,
     )

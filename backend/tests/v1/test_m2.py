@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.errors import ErrorCode
 from app.domain.enums import (
     AccountStatus,
@@ -34,7 +34,7 @@ def _pool(seeded_db, code: str) -> Pool:
 
 
 def _account(seeded_db, game_account: str):
-    return accounts_service.create_account(
+    return stocks_service.create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
@@ -239,7 +239,7 @@ class TestA05HsStockSale:
         assert seeded_db.get(type(account), account.id).updated_by == "delivery-operator"
 
     def test_stock_sale_requires_hs_order(self, seeded_db):
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="hs-acc-stock-sale",
             platform="王者",
@@ -402,7 +402,7 @@ class TestA06Rebate:
 
 class TestM2Api:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="api-acc",
             platform="王者",
@@ -473,7 +473,7 @@ class TestM2Api:
         assert returned.json()["status"] == "PARTIALLY_RETURNED"
 
     def test_inventory_endpoint(self, seeded_client, seeded_db, headers):
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="inv-acc",
             platform="王者",
@@ -491,5 +491,5 @@ class TestM2Api:
             headers=headers,
         )
         assert created.status_code == 201, created.text
-        inventory = seeded_client.get("/api/v1/accounts/inventory", headers=headers).json()
+        inventory = seeded_client.get("/api/v1/stocks/inventory", headers=headers).json()
         assert inventory["count"] == 1

@@ -50,9 +50,9 @@ def test_installment_action_routes_use_declared_response_types():
 
 
 def _account(seeded_db, game_account: str):
-    from app.accounts import service as accounts_service
+    from app.stocks import service as stocks_service
 
-    return accounts_service.create_account(
+    return stocks_service.create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
@@ -556,9 +556,9 @@ def test_cancel_dfq_refunds_customer_without_reversing_historical_buy(seeded_db)
 def test_cancel_distribution_installment_uses_business_specific_account_result(
     seeded_db, order_type, contract_type, business_mode, inventory_type, expected_status
 ):
-    from app.accounts import service as accounts_service
+    from app.stocks import service as stocks_service
 
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account=f"cancel-{order_type.lower()}-installment",
         business_mode=business_mode,
@@ -1550,9 +1550,9 @@ class TestInstallmentsApi:
     def test_recovered_account_installment_sale_auto_links_resale(
         self, seeded_db, order_type, contract_type, business_mode, inventory_type
     ):
-        from app.accounts import service as accounts_service
+        from app.stocks import service as stocks_service
 
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account=f"recovered-installment-{order_type.lower()}",
             business_mode=business_mode,

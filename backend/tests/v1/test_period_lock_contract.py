@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.orders import service as orders_service
 
 
@@ -39,7 +39,7 @@ def test_period_lock_blocks_cashflow_and_event_writes(seeded_client, seeded_db, 
     assert cashflow.status_code == 409, cashflow.text
     assert cashflow.json()["code"] == "PERIOD_LOCKED"
 
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account="period-lock-account",
         business_mode="SELF",

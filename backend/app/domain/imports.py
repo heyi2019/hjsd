@@ -101,7 +101,7 @@ class ImportRow(Base, TimestampMixin):
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
     )
     mapped_account_id: Mapped[int | None] = mapped_column(
-        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("stocks.id", ondelete="SET NULL"), nullable=True
     )
     mapped_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mapped_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

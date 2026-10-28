@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields(catalog);
   seedOptionSets(catalog);
-  vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
@@ -27,7 +27,7 @@ beforeEach(() => {
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
-  resolveMock(vi.mocked(catalog.accountsApi.executionDetail), {
+  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -99,7 +99,7 @@ beforeEach(() => {
       }],
     }],
   });
-  resolveMock(vi.mocked(catalog.accountsApi.updateProfile), accounts[0]);
+  resolveMock(vi.mocked(catalog.stocksApi.updateProfile), accounts[0]);
 });
 
 it("库存分期售出展示最后一期尾差", async () => {
@@ -146,7 +146,7 @@ it("自营在库账号可以售出并登记 HS 售出事件", async () => {
 
 it("代挂账号售出按货源类型生成 DG 订单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [
+    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
       { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -176,7 +176,7 @@ it("代挂账号售出按货源类型生成 DG 订单", async () => {
 
 it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 SELL", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [
+    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
       { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -204,7 +204,7 @@ it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 
 
 it("提号库存从库存中心售出时可选择分期", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [
+    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
       { id: 6, game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -233,7 +233,7 @@ it("提号库存从库存中心售出时可选择分期", async () => {
 
 it("取消交易按原售出流水原路冲销并退款", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.accountsApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
+    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-2");
 

@@ -156,10 +156,10 @@ TODAY = date(2026, 10, 17)
 
 
 def _make_rebate(seeded_db, *, code: str) -> RebateRecordModel:
-    from app.accounts import service as accounts_service
+    from app.stocks import service as stocks_service
     from app.orders import service as orders_service
 
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account=f"void-rebate-{code}",
         business_mode="SELF",

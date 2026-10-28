@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
@@ -647,7 +647,7 @@ class TestEventRules:
 
 class TestOrdersApi:
     def test_invalid_money_input_returns_business_422(self, seeded_client, seeded_db, headers):
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="api-invalid-money",
             business_mode="SELF",
@@ -679,7 +679,7 @@ class TestOrdersApi:
         assert response.json()["code"] == ErrorCode.VALIDATION_ERROR
 
     def test_create_order_and_post_event(self, seeded_client, seeded_db, headers):
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="api-sale-account",
             business_mode="SELF",

@@ -78,7 +78,7 @@ const installmentDetail = {
 const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INSTALLMENT", status: "ACTIVE" } as unknown as Installment;
 
 async function openPanel(rows: Account[]) {
-  resolveMock(vi.mocked(catalog.accountsApi.list), rows);
+  resolveMock(vi.mocked(catalog.stocksApi.list), rows);
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }
@@ -104,7 +104,7 @@ beforeEach(() => {
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([contract]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue({} as never);
   vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({} as never);
-  vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(sellDetail);
+  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(sellDetail);
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
@@ -125,7 +125,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("更多菜单 → 下架：找到可冲销买入流水时打开下架登记弹窗", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(noSaleDetail);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(noSaleDetail);
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "下架");
     await screen.findByText("下架登记");
@@ -133,7 +133,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("更多菜单 → 下架：填原因后按买入流水发起全额 CANCEL 冲销", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(noSaleDetail);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(noSaleDetail);
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "下架");
     await screen.findByText("下架登记");
@@ -196,14 +196,14 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("取消交易：无可用售出流水时提示", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(noSaleDetail);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(noSaleDetail);
     await openPanel([soldRow]);
     await clickMore(rowOf(2), "取消交易");
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到可退款的售出流水，请先检查交易明细"));
   });
 
   it("终止分期并退款（INSTALLMENT 行）：填原因后调用 installmentsApi.cancel", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(installmentDetail);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(installmentDetail);
     await openPanel([installmentRow]);
     await clickMore(rowOf(3), "终止分期并退款");
     await screen.findByText("退款登记");
@@ -215,7 +215,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("终止分期并退款：无进行中订单时提示", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue({
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
       account: installmentRow,
       orders: [{ order_id: 77, status: "COMPLETED", events: [] }],
     } as unknown as AccountExecutionDetail);
@@ -225,7 +225,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("终止分期并退款：无可终止合约时提示", async () => {
-    vi.mocked(catalog.accountsApi.executionDetail).mockResolvedValue(installmentDetail);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(installmentDetail);
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ ...contract, status: "CANCELLED" } as unknown as Installment]);
     await openPanel([installmentRow]);
     await clickMore(rowOf(3), "终止分期并退款");
@@ -234,11 +234,11 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
 
   it("导出：读取明细并提示失败条数", async () => {
     await openPanel([inStockRow, soldRow]);
-    vi.mocked(catalog.accountsApi.executionDetail)
+    vi.mocked(catalog.stocksApi.executionDetail)
       .mockResolvedValueOnce(sellDetail)
       .mockRejectedValueOnce(new Error("detail down"));
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(catalog.accountsApi.executionDetail).toHaveBeenCalled());
+    await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalled());
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
 });

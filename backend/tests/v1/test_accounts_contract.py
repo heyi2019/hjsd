@@ -18,7 +18,7 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account
-from app.accounts import service
+from app.stocks import service
 from app.finance import service as finance_service
 from app.orders import service as orders_service
 from app.parties import service as parties_service
@@ -341,7 +341,7 @@ class TestAccountQueries:
 
 class TestAccountsApi:
     def test_inventory_endpoint_publishes_typed_response_contract(self, app):
-        schema = app.openapi()["paths"]["/api/v1/accounts/inventory"]["get"]["responses"]["200"]
+        schema = app.openapi()["paths"]["/api/v1/stocks/inventory"]["get"]["responses"]["200"]
         response_schema = schema["content"]["application/json"]["schema"]
 
         assert response_schema["$ref"].endswith("/InventoryResponseOut")
@@ -382,24 +382,24 @@ class TestAccountsApi:
         )
         headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
-        listed = seeded_client.get("/api/v1/accounts", headers=headers)
+        listed = seeded_client.get("/api/v1/stocks", headers=headers)
         assert listed.status_code == 200, listed.text
         assert [row["game_account"] for row in listed.json()] == [mine.game_account]
         assert all("risk_level" not in row for row in listed.json())
 
         hidden_detail = seeded_client.get(
-            f"/api/v1/accounts/{other.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{other.id}/execution-detail", headers=headers
         )
         assert hidden_detail.status_code == 404
 
         hidden_update = seeded_client.patch(
-            f"/api/v1/accounts/{other.id}",
+            f"/api/v1/stocks/{other.id}",
             json={"note": "不应修改"},
             headers=headers,
         )
         assert hidden_update.status_code == 404
 
-        inventory = seeded_client.get("/api/v1/accounts/inventory", headers=headers)
+        inventory = seeded_client.get("/api/v1/stocks/inventory", headers=headers)
         assert inventory.status_code == 200, inventory.text
         assert [row["account_id"] for row in inventory.json()["items"]] == [mine.id]
 
@@ -437,7 +437,7 @@ class TestAccountsApi:
         headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -453,13 +453,13 @@ class TestAccountsApi:
         )
         viewer_headers = {"Authorization": f"Bearer {build_access_token(viewer)}"}
 
-        listed = seeded_client.get("/api/v1/accounts", headers=viewer_headers)
+        listed = seeded_client.get("/api/v1/stocks", headers=viewer_headers)
         assert listed.status_code == 200, listed.text
         item = next(row for row in listed.json() if row["id"] == account.id)
         assert item["game_password"] is None
 
         detail = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail",
+            f"/api/v1/stocks/{account.id}/execution-detail",
             headers=viewer_headers,
         )
         assert detail.status_code == 200, detail.text
@@ -467,7 +467,7 @@ class TestAccountsApi:
 
     def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
         response = seeded_client.post(
-            "/api/v1/accounts",
+            "/api/v1/stocks",
             json={
                 "game_account": "standalone-account",
                 "business_mode": "SELF",
@@ -511,14 +511,14 @@ class TestAccountsApi:
         account = _account(seeded_db, "api-acc")
         _buy(seeded_db, account, amount="300")
         response = seeded_client.get(
-            "/api/v1/accounts", params={"status": "VOID"},
+            "/api/v1/stocks", params={"status": "VOID"},
             headers=headers,
         )
         assert response.status_code == 200, response.text
         assert response.json() == []
 
         stocked = seeded_client.get(
-            "/api/v1/accounts", params={"status": AccountStatus.IN_STOCK.value},
+            "/api/v1/stocks", params={"status": AccountStatus.IN_STOCK.value},
             headers=headers,
         )
         assert [item["game_account"] for item in stocked.json()] == [account.game_account]
@@ -529,7 +529,7 @@ class TestAccountsApi:
         first_order = _buy(seeded_db, first, amount="300")
         second_order = _buy(seeded_db, second, amount="400")
 
-        response = seeded_client.get("/api/v1/accounts", headers=headers)
+        response = seeded_client.get("/api/v1/stocks", headers=headers)
 
         assert response.status_code == 200, response.text
         source_orders = {
@@ -553,7 +553,7 @@ class TestAccountsApi:
             account_id=account.id,
         )
 
-        response = seeded_client.get("/api/v1/accounts", headers=headers)
+        response = seeded_client.get("/api/v1/stocks", headers=headers)
 
         assert response.status_code == 200, response.text
         item = next(row for row in response.json() if row["game_account"] == account.game_account)
@@ -582,7 +582,7 @@ class TestAccountsApi:
             actor="pytest",
         )
 
-        response = seeded_client.get("/api/v1/accounts", headers=headers)
+        response = seeded_client.get("/api/v1/stocks", headers=headers)
 
         assert response.status_code == 200, response.text
         item = next(row for row in response.json() if row["game_account"] == account.game_account)
@@ -605,7 +605,7 @@ class TestAccountsApi:
         order = _buy(seeded_db, account, amount="300")
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -631,7 +631,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -674,7 +674,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -709,7 +709,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -743,7 +743,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -783,7 +783,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/accounts/{account.id}/execution-detail", headers=headers
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
         )
 
         assert response.json()["account"]["source_order_no"] == source_order.order_no

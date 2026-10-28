@@ -52,6 +52,15 @@ describe("InventoryDetail", () => {
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
 
+  it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
+    render(<InventoryDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
+    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    expect(panel.querySelector(".inventory-detail__meta")).toBeTruthy();
+    expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
+    expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
+    expect(panel.querySelector(".inventory-finance-summary__item--amount")).toBeTruthy();
+  });
+
   it("编辑执行明细时操作员选择器保持可读宽度", () => {
     const detail = {
       orders: [{

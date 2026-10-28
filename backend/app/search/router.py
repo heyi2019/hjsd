@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.database import get_db
 from app.core.errors import Validation
 from app.core.security import (
@@ -76,7 +76,7 @@ def global_search(
                 )
             )
 
-    for account in accounts_service.list_accounts(db, user=user):
+    for account in stocks_service.list_accounts(db, user=user):
         if any(
             _matches(value, query)
             for value in (
@@ -94,7 +94,7 @@ def global_search(
                     subtitle=" · ".join(
                         value for value in (account.game_type, account.platform) if value
                     ) or account.status,
-                    route=f"/accounts/{account.id}/execution-detail",
+                    route=f"/stocks/{account.id}/execution-detail",
                 )
             )
 

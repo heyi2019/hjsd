@@ -9,7 +9,7 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.domain.enums import ImportRowStatus
 from app.domain.imports import ImportBatch, ImportRow
 from app.imports import service as import_service
@@ -30,7 +30,7 @@ class TestReports:
         """账号 COST 只能进直接成本，不能进运营费用（R2 验收口径）。"""
         from datetime import date
 
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="m4-r2-account",
             business_mode="SELF",
@@ -303,7 +303,7 @@ class TestImportClosure:
         batch = import_service.create_batch(
             seeded_db, source_name="orders.xlsx", rows=[{"交易金额": 100}], actor="pytest"
         )
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="m4-unrelated-source-note",
             business_mode="SELF",

@@ -165,29 +165,31 @@ export function InventoryDetail({
   ];
 
   return <div className={`inventory-detail${editing ? " inventory-detail--editing" : ""}`}>
-    <Descriptions size="small" bordered column={3}>
+    <div className="inventory-detail__meta">
+      <Descriptions size="small" bordered column={{ xs: 1, sm: 2, md: 3, xl: 4 }}>
       <Descriptions.Item label="建档操作人">{row.created_by || "-"}</Descriptions.Item>
-      <Descriptions.Item label="登记时间">{dateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date ?? row.created_at)}</Descriptions.Item>
-      <Descriptions.Item label="出售时间">{eventDate(detail, "SELL")}</Descriptions.Item>
-      <Descriptions.Item label="下架时间">{eventDate(detail, "CANCEL")}</Descriptions.Item>
-      <Descriptions.Item label="寄售时间">{platformListingDate(detail)}</Descriptions.Item>
+      <Descriptions.Item className="inventory-detail__datetime" label="登记时间">{dateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date ?? row.created_at)}</Descriptions.Item>
+      <Descriptions.Item className="inventory-detail__datetime" label="出售时间">{eventDate(detail, "SELL")}</Descriptions.Item>
+      <Descriptions.Item className="inventory-detail__datetime" label="下架时间">{eventDate(detail, "CANCEL")}</Descriptions.Item>
+      <Descriptions.Item className="inventory-detail__datetime" label="寄售时间">{platformListingDate(detail)}</Descriptions.Item>
       <Descriptions.Item label="寄售平台">{consignmentPlatforms(detail)}</Descriptions.Item>
       {!editing ? <>
         <Descriptions.Item label="账号密码">{row.game_password ? <Typography.Text copyable>{row.game_password}</Typography.Text> : "-"}</Descriptions.Item>
         <Descriptions.Item label="渠道 / 区服">{row.channel_region || "-"}</Descriptions.Item>
         <Descriptions.Item label="绑定手机号">{row.bound_phone || "-"}</Descriptions.Item>
-        <Descriptions.Item label="有无二次" span={3}>{row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无"}</Descriptions.Item>
+        <Descriptions.Item label="有无二次">{row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无"}</Descriptions.Item>
       </> : null}
       {!editing && PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? "") ? <>
-        <Descriptions.Item label="账号描述" span={3}>{row.account_description || "-"}</Descriptions.Item>
-        <Descriptions.Item label="账号图片" span={3}>
+        <Descriptions.Item label="账号描述" span={{ xs: 1, sm: 2, md: 3, xl: 4 }}>{row.account_description || "-"}</Descriptions.Item>
+        <Descriptions.Item label="账号图片" span={{ xs: 1, sm: 2, md: 3, xl: 4 }}>
           {row.account_images?.length ? <Image.PreviewGroup><Space wrap>{row.account_images.slice(0, 9).map((src, index) => (
             <Image key={`${src}-${index}`} src={src} alt={`账号图片 ${index + 1}`} width={64} height={64} preview />
           ))}</Space></Image.PreviewGroup> : "-"}
         </Descriptions.Item>
       </> : null}
-      {!editing ? <Descriptions.Item label="备注">{row.note || "-"}</Descriptions.Item> : null}
-    </Descriptions>
+      {!editing ? <Descriptions.Item label="备注" span={{ xs: 1, sm: 2, md: 3, xl: 4 }}>{row.note || "-"}</Descriptions.Item> : null}
+      </Descriptions>
+    </div>
     {editing ? <details className="inventory-edit-more">
       <summary>更多账号资料</summary>
       <div className="inventory-edit-more__fields">
@@ -213,15 +215,15 @@ export function InventoryDetail({
         </label>
       </div>
     </details> : null}
-    <div className="inventory-execution-list">
-      <Typography.Text strong>执行明细</Typography.Text>
+    <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
+      <div className="inventory-detail__section-heading"><Typography.Text strong>执行明细</Typography.Text></div>
       {executionRows.length ? <DataTable className="inventory-execution-table" columns={executionColumns} rows={executionRows} page={1} pageSize={10} total={executionRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
     </div>
-    <div className="inventory-finance-list">
-      <div className="inventory-finance-heading"><Typography.Text strong>资金明细</Typography.Text><Typography.Text type="secondary">{financialFlows.length + rebateItems.length} 笔</Typography.Text></div>
+    <div className="inventory-detail__section inventory-detail__section--finance inventory-finance-list">
+      <div className="inventory-detail__section-heading inventory-finance-heading"><Typography.Text strong>资金明细</Typography.Text><Typography.Text type="secondary">{financialFlows.length + rebateItems.length} 笔</Typography.Text></div>
       <div className="inventory-finance-summary">
-        <div className="inventory-finance-summary__item"><span>支出</span><strong>{expenseFlows.length} 笔</strong></div>
-        <div className="inventory-finance-summary__item"><span>收入</span><strong>{incomeFlows.length} 笔</strong></div>
+        <div className="inventory-finance-summary__item inventory-finance-summary__item--expense"><span>支出</span><strong>{expenseFlows.length} 笔</strong></div>
+        <div className="inventory-finance-summary__item inventory-finance-summary__item--income"><span>收入</span><strong>{incomeFlows.length} 笔</strong></div>
         <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
         <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
       </div>

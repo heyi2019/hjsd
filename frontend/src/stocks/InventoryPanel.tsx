@@ -4,7 +4,7 @@ import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Dropdown, Form, Input, Modal, Segmented, Select, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
-import { accountsApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
+import { stocksApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
 import {
@@ -151,7 +151,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const valueAddedOptions = useOptionSet("VALUE_ADDED_SERVICE");
   const load = useCallback(async () => {
     try {
-      const list = await accountsApi.list(status ? { status } : undefined);
+      const list = await stocksApi.list(status ? { status } : undefined);
       setRows(list ?? []);
       setError(null);
     } catch (err) {
@@ -238,7 +238,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
 
   async function openVoid(account: Account) {
     try {
-      const detail = executionDetails[account.id] ?? await accountsApi.executionDetail(account.id);
+      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const buy = findCancelableBuy(detail);
       if (!buy) {
@@ -287,7 +287,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
 
   async function openCancellation(account: Account) {
     try {
-      const detail = executionDetails[account.id] ?? await accountsApi.executionDetail(account.id);
+      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const sale = findCancelableSale(detail);
       if (!sale) {
@@ -303,7 +303,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
 
   async function openInstallmentCancellation(account: Account) {
     try {
-      const detail = executionDetails[account.id] ?? await accountsApi.executionDetail(account.id);
+      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const order = [...detail.orders].reverse().find((item) => item.status === "ACTIVE");
       if (!order) {
@@ -443,7 +443,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
       title: "操作",
       key: "actions",
       render: (_value, row) => (
-        <Space size={2}>
+        <Space className="inventory-row-actions" size={4}>
           <PermissionButton
             permission="order.create"
             type="link"
@@ -549,11 +549,11 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
       if (events.length) {
-        await accountsApi.updateExecution(id, { profile, events });
+        await stocksApi.updateExecution(id, { profile, events });
         setEditingAccount(null);
         setEventDrafts({});
         try {
-          const detail = await accountsApi.executionDetail(id);
+          const detail = await stocksApi.executionDetail(id);
           setExecutionDetails((current) => ({ ...current, [id]: detail }));
           setRows((current) => current.map((row) => row.id === id ? { ...row, ...detail.account } : row));
         } catch (refreshError) {
@@ -562,7 +562,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
           appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
         }
       } else {
-        const updated = await accountsApi.updateProfile(id, profile);
+        const updated = await stocksApi.updateProfile(id, profile);
         setRows((current) => current.map((row) => row.id === id ? { ...row, ...updated } : row));
       }
       setEditingAccount(null);
@@ -593,7 +593,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     if (executionDetails[row.id] || executionLoading[row.id]) return;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
-      const detail = await accountsApi.executionDetail(row.id);
+      const detail = await stocksApi.executionDetail(row.id);
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
     } catch (err) {
       setError(normalizeError(err));
@@ -607,7 +607,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     try {
       const detailResults = await Promise.all(visibleRows.map(async (row) => {
         try {
-          return [row.id, await accountsApi.executionDetail(row.id)] as const;
+          return [row.id, await stocksApi.executionDetail(row.id)] as const;
         } catch {
           return [row.id, undefined] as const;
         }
@@ -688,6 +688,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
           />
         ) : (
           <DataTable<Account>
+            className="inventory-table"
             columns={columns}
             rows={orderedRows}
             page={page}

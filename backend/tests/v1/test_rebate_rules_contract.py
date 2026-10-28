@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from app.finance import service as finance_service
-from app.accounts import service as account_service
+from app.stocks import service as account_service
 from app.orders import service as order_service
 from app.policy import service as policy_service
 

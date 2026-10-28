@@ -12,7 +12,7 @@ setupInventoryPanelMocks();
 
 // 覆盖共享 mock：本文件使用含 DG 代挂 / DFQ 代分期衍生账号的 stockNoAccounts。
 beforeEach(() => {
-  vi.mocked(catalog.accountsApi.list).mockResolvedValue(stockNoAccounts as never);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue(stockNoAccounts as never);
 });
 
 describe("InventoryPanel：库存编号（KU 编码）", () => {

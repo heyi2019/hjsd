@@ -23,7 +23,7 @@ from app.core.security import (
     owner_scope_filter,
     require_permissions,
 )
-from app.accounts import service
+from app.stocks import service
 from app.parties import service as parties_service
 from app.domain.foundation import Pool
 from app.domain.parties import Counterparty, OrderCounterpartyRole
@@ -108,7 +108,7 @@ class ExecutionEditRequest(RequestModel):
     profile: AccountProfileUpdate | None = None
 
 
-@router.patch("/accounts/{account_id}/execution-edit")
+@router.patch("/stocks/{account_id}/execution-edit")
 def update_execution_detail(
     account_id: int, payload: ExecutionEditRequest,
     db: Session = Depends(get_db), user: CurrentUser = edit_execution,
@@ -387,7 +387,7 @@ def _account_outputs(
     ]
 
 
-@router.get("/accounts", response_model=list[AccountOut])
+@router.get("/stocks", response_model=list[AccountOut])
 def list_accounts(
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -402,7 +402,7 @@ def list_accounts(
     )
 
 
-@router.patch("/accounts/{account_id}", response_model=AccountOut)
+@router.patch("/stocks/{account_id}", response_model=AccountOut)
 def update_account_profile(
     account_id: int,
     payload: AccountProfileUpdate,
@@ -421,7 +421,7 @@ def update_account_profile(
     return _account_output(item, include_credentials=True, extra_values=extras)
 
 
-@router.get("/accounts/inventory", response_model=InventoryResponseOut)
+@router.get("/stocks/inventory", response_model=InventoryResponseOut)
 def inventory(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
@@ -432,7 +432,7 @@ def inventory(
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
 
 
-@router.get("/accounts/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)
+@router.get("/stocks/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)
 def execution_detail(
     account_id: int,
     db: Session = Depends(get_db),

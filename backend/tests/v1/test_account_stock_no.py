@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 from sqlalchemy import select, text
 
-from app.accounts import service
+from app.stocks import service
 from app.domain.trade import Account, OrderEvent
 from app.orders import events as order_events
 
@@ -72,7 +72,7 @@ class TestStockNoGeneration:
 
     def test_stock_no_visible_in_accounts_list_api(self, seeded_client, headers, seeded_db):
         _make(seeded_db, "api-acc-1")
-        resp = seeded_client.get("/api/v1/accounts", headers=headers)
+        resp = seeded_client.get("/api/v1/stocks", headers=headers)
         assert resp.status_code == 200
         payload = resp.json()
         items = payload if isinstance(payload, list) else payload.get("items") or payload.get("data")

@@ -48,7 +48,7 @@ from app.domain.trade import (
     OrderProfitAllocation,
 )
 from app.domain.users import User
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.orders.amounts import order_amounts
@@ -103,7 +103,7 @@ def _materialize_dfq_recovery_account(
     if order.account_id is not None:
         # 挂了账号但台账里查不到：数据异常，显式报错而非静默重建。
         raise NotFound("分期合约关联账号不存在")
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         session,
         game_account=game_account,
         game_type=snapshot.get("game_type"),

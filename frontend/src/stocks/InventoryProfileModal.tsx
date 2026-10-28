@@ -2,7 +2,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
 import { Input, Modal, Select, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
-import { accountsApi, type Account } from "../shared/api/catalog";
+import { stocksApi, type Account } from "../shared/api/catalog";
 
 export type InventoryProfileTarget = {
   account: Account;
@@ -90,7 +90,7 @@ export function InventoryProfileModal({
             account_images: await imageValues(),
             note: form.note,
           };
-      const updated = await accountsApi.updateProfile(target.account.id, payload);
+      const updated = await stocksApi.updateProfile(target.account.id, payload);
       onSaved(updated);
       onClose();
       appMessage.success("账号资料已保存");

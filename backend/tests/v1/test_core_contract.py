@@ -61,12 +61,24 @@ class TestNumberingGuards:
 
         seeded_db.add(
             DocumentSequence(
+                # 800faea 放宽 DB CHECK 至 999999/padding<=6（适配 KU_ 五位），
+                # 序列上限由服务层按 10^padding-1 拦截（SEQUENCE_EXHAUSTED）。
                 sequence_key="OVERFLOW_SEQUENCE", prefix="OF", padding=4,
-                current_value=MAX_SEQUENCE_VALUE + 1,
+                current_value=999999 + 1,
             )
         )
         with pytest.raises(IntegrityError):
             seeded_db.flush()
+        seeded_db.rollback()
+
+        # padding=4 时 current_value=10000 现在是 DB 层合法值（服务层拦截）
+        seeded_db.add(
+            DocumentSequence(
+                sequence_key="OVER_PADDING4", prefix="OF4", padding=4,
+                current_value=MAX_SEQUENCE_VALUE + 1,
+            )
+        )
+        seeded_db.flush()
         seeded_db.rollback()
 
         seeded_db.add(

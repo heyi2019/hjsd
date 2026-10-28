@@ -24,7 +24,7 @@ from app.core.money import to_money
 from app.core.numbering import allocate_number
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.policy import service as policy_service
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
@@ -208,7 +208,7 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         # 代分期（垫资买入）：业务类型留空，以增值服务维度（代分期/分销）标识。
         "DFQ": ("DISTRIBUTION", None),
     }[order_type]
-    return accounts_service.create_account(
+    return stocks_service.create_account(
         session, game_account=game_account, actor=actor, game_type=game_type,
         business_mode=mode, inventory_type=inventory_type, game_password=game_password,
         channel_region=channel_region, bound_phone=bound_phone,
@@ -331,7 +331,7 @@ def create_order(
                 details={"field": "commission_payer", "value": normalized_commission_payer},
             )
     if account_id is not None:
-        account = accounts_service.get_account(session, account_id, user)
+        account = stocks_service.get_account(session, account_id, user)
         _validate_existing_account_context(definition.code, account)
 
     _validate_participant_roles(

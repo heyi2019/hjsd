@@ -64,7 +64,7 @@ from app.domain.enums import (
 class Account(Base, AuditMixin):
     """游戏账号台账：成本由 BUY + COST 事件累计（ACC-01-04）。"""
 
-    __tablename__ = "accounts"
+    __tablename__ = "stocks"
     __table_args__ = (
         CheckConstraint(
             f"status IN {AccountStatus.values()!r}".replace("[", "(").replace("]", ")"),
@@ -177,7 +177,7 @@ class Order(Base, AuditMixin):
     # DFQ 建单时可只保留账号文本快照；逾期回收后会补建库存实体并写入 account_id。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
-        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("stocks.id", ondelete="SET NULL"), nullable=True
     )
     # 2026-10-28 去冗余：HS/TH/DG 账号资料统一存 account_snapshot（单一事实源），
     # 原平铺列（game_type/game_account/game_password/channel_region/bound_phone/
@@ -601,7 +601,7 @@ class InstallmentDisposition(Base, AuditMixin):
         ForeignKey("installments.id", ondelete="RESTRICT"), nullable=False
     )
     account_id: Mapped[int] = mapped_column(
-        ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("stocks.id", ondelete="RESTRICT"), nullable=False
     )
     action: Mapped[str] = mapped_column(String(16), nullable=False)
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)

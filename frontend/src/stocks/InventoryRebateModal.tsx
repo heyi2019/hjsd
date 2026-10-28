@@ -4,7 +4,7 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import { Checkbox, Form, Input, Modal, Spin } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
-  accountsApi,
+  stocksApi,
   rebatesApi,
   type Account,
   type AccountExecutionDetail,
@@ -54,7 +54,7 @@ export function InventoryRebateModal(props: {
     if (!open || !props.account) return;
     let cancelled = false;
     setLoading(true);
-    void accountsApi.executionDetail(props.account.id)
+    void stocksApi.executionDetail(props.account.id)
       .then((value) => {
         if (cancelled) return;
         setDetail(value);

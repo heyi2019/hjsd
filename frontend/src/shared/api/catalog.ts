@@ -816,14 +816,14 @@ export const employeesApi = {
   list: () => api.get<EmployeeOption[]>("/users").then((r) => r.data),
 };
 
-export const accountsApi = {
+export const stocksApi = {
   list: (params?: { status?: string }) =>
-    api.get<Account[]>("/accounts", { params }).then((r) => r.data),
+    api.get<Account[]>("/stocks", { params }).then((r) => r.data),
   updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
     api.patch<Account>(`/accounts/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api
-      .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/accounts/inventory")
+      .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/stocks/inventory")
       .then((r) => r.data),
   executionDetail: (id: number) =>
     api.get<AccountExecutionDetail>(`/accounts/${id}/execution-detail`).then((r) => r.data),

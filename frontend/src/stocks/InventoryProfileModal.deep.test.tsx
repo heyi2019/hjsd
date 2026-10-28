@@ -57,7 +57,7 @@ beforeEach(() => {
   onClose = vi.fn();
   onSaved = vi.fn();
   onError = vi.fn();
-  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue(updated);
+  vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValue(updated);
 });
 
 describe("InventoryProfileModal：三档模式与图片读取", () => {
@@ -68,8 +68,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await ui.clear(area);
     await ui.type(area, "满级账号");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.accountsApi.updateProfile).toHaveBeenCalled());
-    expect(vi.mocked(catalog.accountsApi.updateProfile).mock.calls[0]).toEqual([
+    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
+    expect(vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0]).toEqual([
       7,
       { account_description: "满级账号" },
     ]);
@@ -82,8 +82,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     renderModal({ account: withImages, mode: "images" });
     expect(await screen.findByText("账号图片")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.accountsApi.updateProfile).toHaveBeenCalled());
-    expect(vi.mocked(catalog.accountsApi.updateProfile).mock.calls[0][1]).toEqual({
+    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
+    expect(vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1]).toEqual({
       account_images: ["https://cdn/1.png"],
     });
   });
@@ -93,8 +93,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await screen.findByText("账号图片");
     await attachImage("image-bytes", "shot.png");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.accountsApi.updateProfile).toHaveBeenCalled());
-    const images = (vi.mocked(catalog.accountsApi.updateProfile).mock.calls[0][1] as { account_images: string[] })
+    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
+    const images = (vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1] as { account_images: string[] })
       .account_images;
     expect(images).toHaveLength(1);
     expect(images[0]).toMatch(/^data:/);
@@ -109,8 +109,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await ui.type(typeInput, "星穹铁道");
     await ui.type(screen.getByLabelText("绑定手机号"), "9");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.accountsApi.updateProfile).toHaveBeenCalled());
-    const [id, payload] = vi.mocked(catalog.accountsApi.updateProfile).mock.calls[0] as [
+    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0] as [
       number,
       Record<string, unknown>,
     ];
@@ -128,8 +128,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await ui.click(modalEl().querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("有二次", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.accountsApi.updateProfile).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.accountsApi.updateProfile).mock.calls[0][1] as Record<string, unknown>;
+    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
+    const payload = vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1] as Record<string, unknown>;
     expect(payload.has_secondary).toBe(true);
   });
 
@@ -145,7 +145,7 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
   });
 
   it("保存失败时回调 onError 而非 onSaved", async () => {
-    vi.mocked(catalog.accountsApi.updateProfile).mockRejectedValue(new Error("save boom"));
+    vi.mocked(catalog.stocksApi.updateProfile).mockRejectedValue(new Error("save boom"));
     renderModal({ account, mode: "description" });
     await screen.findByText("账号描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));

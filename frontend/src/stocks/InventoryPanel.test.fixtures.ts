@@ -20,7 +20,7 @@ export const stockNoAccounts = [
 
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
-  vi.mocked(catalog.accountsApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
   // T19/T20：建单表单字段与选项词典改为从配置读取，测试需默认种子，否则下拉无选项。
   seedOrderFormFields(catalog);
   seedOptionSets(catalog);
@@ -31,7 +31,7 @@ export const resetInventoryPanelMocks = () => {
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
-  resolveMock(vi.mocked(catalog.accountsApi.executionDetail), {
+  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -103,7 +103,7 @@ export const resetInventoryPanelMocks = () => {
       }],
     }],
   });
-  resolveMock(vi.mocked(catalog.accountsApi.updateProfile), accounts[0]);
+  resolveMock(vi.mocked(catalog.stocksApi.updateProfile), accounts[0]);
 };
 
 export const setupInventoryPanelMocks = () => {

@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.accountsApi.list), [
+  resolveMock(vi.mocked(catalog.stocksApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
     { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
@@ -80,7 +80,7 @@ it("回收入口内联填写游戏账号信息，不加载库存账号", async (
 
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(vi.mocked(catalog.accountsApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.orderTypesApi.list)).not.toHaveBeenCalled();
   });
@@ -90,7 +90,7 @@ it("打开回收入口后只加载订单所需的业务数据", async () => {
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
     expect(vi.mocked(catalog.orderTypesApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.accountsApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });

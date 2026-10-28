@@ -17,7 +17,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.accounts import service as accounts_service  # noqa: E402
+from app.stocks import service as stocks_service  # noqa: E402
 from app.core.database import Base, get_engine, get_session_factory  # noqa: E402
 
 # (inventory_type, business_mode) —— 与验收种子一致且经其验证合法。
@@ -39,7 +39,7 @@ def main() -> None:
             for i in range(1, FIXTURE_PER_TYPE + 1):
                 game_account = f"[E2E 夹具] {inventory_type}-IN_STOCK-{i}"
                 try:
-                    accounts_service.create_account(
+                    stocks_service.create_account(
                         session,
                         game_account=game_account,
                         game_type="王者荣耀",

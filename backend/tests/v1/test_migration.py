@@ -107,11 +107,11 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
             assert "LEGACY_ORDER" not in import_sql
             inventory_indexes = {
                 index["name"]
-                for index in inspect(connection).get_indexes("accounts")
+                for index in inspect(connection).get_indexes("stocks")
                 if index["unique"]
             }
-            assert "uq_accounts_inventory_no" not in inventory_indexes
-            account_columns = {column["name"] for column in inspect(connection).get_columns("accounts")}
+            assert "uq_stocks_inventory_no" not in inventory_indexes
+            account_columns = {column["name"] for column in inspect(connection).get_columns("stocks")}
             assert "inventory_no" not in account_columns
             assert "risk_level" not in account_columns
             assert "region" not in account_columns
@@ -200,7 +200,7 @@ def test_upgrade_is_repeatable(migration_env):
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0008 (head)"
+    assert result.stdout.strip() == "0009 (head)"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):
@@ -288,7 +288,7 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
     try:
         with engine.connect() as connection:
             create_sql = connection.execute(
-                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'")
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='stocks'")
             ).scalar_one()
             assert "'PENDING'" not in create_sql
             expected = "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')"

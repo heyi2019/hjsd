@@ -27,7 +27,7 @@ from app.domain.enums import (
     InstallmentContractType,
     OrderStatus,
 )
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.installments import service as installments_service
 from app.finance import service as finance_service
 from app.parties import service as parties_service
@@ -80,7 +80,7 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
 
 def _order(seeded_db, *, order_type="HS", account_id=None, owner_id=None, trade_date=D):
     if order_type == "HS" and account_id is None:
-        account_id = accounts_service.create_account(
+        account_id = stocks_service.create_account(
             seeded_db,
             game_account=f"orders-contract-{uuid4().hex[:10]}",
             business_mode="SELF",
@@ -101,7 +101,7 @@ def _scoped_user() -> CurrentUser:
 
 
 def test_database_allows_inventory_links_for_th_orders(seeded_db):
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account="th-inventory-link",
         business_mode="DISTRIBUTION",
@@ -138,7 +138,7 @@ def test_sell_completes_non_installment_orders(seeded_db, order_type):
         "TH": ("DISTRIBUTION", "PICKUP"),
         "DG": ("DISTRIBUTION", "CONSIGNMENT"),
     }[order_type]
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account=f"sell-completes-{order_type.lower()}-{uuid4().hex[:10]}",
         business_mode=inventory_context[0],
@@ -334,7 +334,7 @@ class TestCreateOrderValidation:
         finance_account.pool_ids = [1]
         seeded_db.flush()
 
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account=f"finance-event-{uuid4().hex[:10]}",
             business_mode="SELF",
@@ -778,7 +778,7 @@ class TestCreateOrderValidation:
         assert account.status == "IN_STOCK"
 
     def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
-        account = accounts_service.create_account(
+        account = stocks_service.create_account(
             seeded_db,
             game_account="th-pickup-account",
             business_mode="DISTRIBUTION",

@@ -26,7 +26,7 @@ const account = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(catalog.accountsApi.updateProfile).mockResolvedValue({ ...account, account_description: "新描述" });
+  vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValue({ ...account, account_description: "新描述" });
 });
 
 describe("InventoryProfileModal", () => {
@@ -47,7 +47,7 @@ describe("InventoryProfileModal", () => {
     await ui.type(description, "新描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.accountsApi.updateProfile)).toHaveBeenCalledWith(1, { account_description: "新描述" }));
+    await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, { account_description: "新描述" }));
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ account_description: "新描述" }));
   });
 });

@@ -40,7 +40,7 @@ describe("InventoryPanel：状态筛选", () => {
     });
     await ui.click(option);
     await waitFor(() =>
-      expect(vi.mocked(catalog.accountsApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "IN_STOCK")).toBe(
+      expect(vi.mocked(catalog.stocksApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "IN_STOCK")).toBe(
         true,
       ),
     );
@@ -55,7 +55,7 @@ describe("InventoryPanel：状态筛选", () => {
     });
     await ui.click(voidOption);
     await waitFor(() =>
-      expect(vi.mocked(catalog.accountsApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "VOID")).toBe(true),
+      expect(vi.mocked(catalog.stocksApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "VOID")).toBe(true),
     );
   });
 });

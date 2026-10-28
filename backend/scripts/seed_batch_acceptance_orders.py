@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.database import get_session_factory
 from app.domain.enums import EventType, InstallmentContractType, RebateType
 from app.domain.trade import Order
@@ -26,7 +26,7 @@ MARKER = "[批量验收]"
 
 
 def account(session, tag: str, *, mode: str, inventory_type: str):
-    return accounts_service.create_account(
+    return stocks_service.create_account(
         session,
         game_account=f"BATCH-{tag}-20261018",
         game_type="王者荣耀",

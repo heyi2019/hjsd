@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.accounts import service as account_service
+from app.stocks import service as account_service
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token

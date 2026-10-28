@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Order, RebateSettlement
@@ -49,7 +49,7 @@ _ACCOUNT_CONTEXT = {
 
 def _order_with_buy(seeded_db, order_type: str = "HS") -> int:
     business_mode, inventory_type = _ACCOUNT_CONTEXT[order_type]
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account=f"rebate-buy-{order_type.lower()}",
         business_mode=business_mode,
@@ -77,7 +77,7 @@ def _order_with_buy(seeded_db, order_type: str = "HS") -> int:
 
 def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
     business_mode, inventory_type = _ACCOUNT_CONTEXT[order_type]
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account=f"{order_type.lower()}-sell-rebate-account",
         business_mode=business_mode,

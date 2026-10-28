@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.accounts import service as accounts_service
+from app.stocks import service as stocks_service
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
 from app.finance import cashflows
@@ -59,7 +59,7 @@ def _make_pending_flow(seeded_db):
 
 
 def _order_with_buy(seeded_db) -> int:
-    account = accounts_service.create_account(
+    account = stocks_service.create_account(
         seeded_db,
         game_account="router-rebate-account",
         business_mode="SELF",

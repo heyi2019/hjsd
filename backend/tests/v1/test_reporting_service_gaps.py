@@ -18,7 +18,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.accounts.profile import create_account
+from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser

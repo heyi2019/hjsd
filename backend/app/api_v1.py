@@ -21,7 +21,7 @@ from app.core.settings import Settings, get_settings
 from app.core.request_context import reset_request_id, set_request_id
 from app.core.schemas import EngineInfoOut, HealthOut
 from app.foundation.router import router as foundation_router
-from app.accounts.router import router as accounts_router
+from app.stocks.router import router as stocks_router
 from app.audit.router import router as audit_router
 from app.imports.router import router as imports_router
 from app.policy.router import router as policy_router
@@ -151,7 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(orders_router, prefix=settings.api_prefix)
     app.include_router(installments_router, prefix=settings.api_prefix)
     app.include_router(finance_router, prefix=settings.api_prefix)
-    app.include_router(accounts_router, prefix=settings.api_prefix)
+    app.include_router(stocks_router, prefix=settings.api_prefix)
     app.include_router(reporting_router, prefix=settings.api_prefix)
     app.include_router(policy_router, prefix=settings.api_prefix)
     app.include_router(quality_router, prefix=settings.api_prefix)

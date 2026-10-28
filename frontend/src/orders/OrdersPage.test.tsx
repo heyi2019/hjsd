@@ -63,7 +63,7 @@ beforeEach(() => {
   seedOptionSets(catalog);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
-  vi.mocked(catalog.accountsApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
   // 子面板（库存中心 / 分期与回款）本套件不覆盖：让其同步抛错，与改造前「工厂未导出该 API」的行为一致
   // ——这样它们不会去消费 ordersApi.list 的一次性 mock，也不会拖慢渲染。
   vi.mocked(catalog.employeesApi.list).mockImplementation(() => {

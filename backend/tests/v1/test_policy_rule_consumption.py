@@ -19,7 +19,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.accounts import service as account_service
+from app.stocks import service as account_service
 from app.core.errors import Validation
 from app.finance import service as finance_service
 from app.installments import service as installment_service

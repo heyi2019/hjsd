@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
-from app.accounts import service as account_service
+from app.stocks import service as account_service
 import pytest
 
 from app.core.money import to_money
@@ -138,7 +138,7 @@ class TestOrderStateMachine:
 class TestInstallment:
     def _contract(self, seeded_db, contract_type: str = "STOCK_SALE"):
         """先买入使账号在库，STOCK_SALE 才有可用账号。"""
-        from app.accounts import service as account_service
+        from app.stocks import service as account_service
 
         account = account_service.create_account(
             seeded_db,

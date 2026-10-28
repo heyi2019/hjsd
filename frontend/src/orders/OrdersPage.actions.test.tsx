@@ -47,7 +47,7 @@ vi.mock("../shared/api/client", async (importOriginal) => {
   };
 });
 
-vi.mock("../../accounts/InventoryPanel", () => ({ InventoryPanel: () => null }));
+vi.mock("../../stocks/InventoryPanel", () => ({ InventoryPanel: () => null }));
 vi.mock("../../installments/InstallmentsPanel", () => ({ InstallmentsPanel: () => null }));
 
 // CreateBusinessModal 用桩替换：暴露 open/onClose/onCreated 三个口，用于覆盖回调分支。

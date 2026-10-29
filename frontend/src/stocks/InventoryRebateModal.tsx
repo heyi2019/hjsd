@@ -1,26 +1,30 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-/** 库存账号返点：创建业务订单后即可选择买号或卖号返点，实际流水只用于带出金额。 */
 import { configurableLabel } from "../shared/lib/optionSets";
-import { Form, Input, Modal, Radio, Spin } from "antd";
+import { Form, Input, Modal, Radio, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   stocksApi,
   rebatesApi,
+  employeesApi,
   type Account,
   type AccountExecutionDetail,
+  type EmployeeOption,
+  type Rebate,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
-import { ErrorBanner, MoneyInput, PermissionButton } from "../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, ResizableModal } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
+import { getRecoveryLayout } from "../orders/recovery/recoveryConfig";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import "./InventoryRebateModal.css";
 
 type RebateKind = "BUY" | "SELL";
 
 const REBATE_KIND_LABEL: Record<RebateKind, string> = {
-  BUY: "买号返点（对应回收）",
+  BUY: "买号返点（对应回收/提号/代分期）",
   SELL: "卖号返点（对应售出）",
 };
 
@@ -51,7 +55,11 @@ export function InventoryRebateModal(props: {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [rebates, setRebates] = useState<Rebate[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [editTarget, setEditTarget] = useState<Rebate | null>(null);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const open = Boolean(props.account);
   const { config } = useOrderFormConfig(open ? "INVREBATE" : undefined);
 
@@ -60,9 +68,14 @@ export function InventoryRebateModal(props: {
     let cancelled = false;
     setLoading(true);
     void stocksApi.executionDetail(props.account.id)
-      .then((value) => {
+      .then(async (value) => {
         if (cancelled) return;
         setDetail(value);
+        const orderIds = [...new Set(value.orders.map((order) => order.order_id))];
+        const rebateLists = await Promise.all(orderIds.map((orderId) => rebatesApi.list({ source_order_id: orderId })));
+        const uniqueRebates = new Map<number, Rebate>();
+        for (const rebate of rebateLists.flat()) uniqueRebates.set(rebate.id, rebate);
+        setRebates([...uniqueRebates.values()]);
         setError(null);
         const firstKind: RebateKind | undefined = sourceOrder(value, "BUY") ? "BUY" : sourceOrder(value, "SELL") ? "SELL" : undefined;
         form.setFieldsValue({
@@ -82,12 +95,17 @@ export function InventoryRebateModal(props: {
     };
   }, [form, open, props.account]);
 
+  useEffect(() => {
+    if (!open) return;
+    void employeesApi.list().then(setEmployees).catch(() => setEmployees([]));
+  }, [open]);
+
   const availableKinds = useMemo(
     () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, kind)),
     [detail],
   );
 
-  const submit = async (values: { rebate_type?: RebateKind; base_amount?: string; rate?: string; collected_on?: string; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { rebate_type?: RebateKind; base_amount?: string; rate?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const kind = values.rebate_type;
     const order = kind ? sourceOrder(detail, kind) : undefined;
@@ -102,6 +120,7 @@ export function InventoryRebateModal(props: {
         collected_on: values.collected_on ?? today(),
         channel: kind === "BUY" ? "买号返点" : "卖号返点",
         note: REBATE_KIND_LABEL[kind],
+        operator_user_ids: values.operator_user_ids,
         form_extra: values.form_extra,
       });
       appMessage.success("返点已登记");
@@ -115,12 +134,34 @@ export function InventoryRebateModal(props: {
     }
   };
 
+  const submitEdit = async (values: { base_amount?: string; rate?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
+    if (!editTarget) return;
+    try {
+      const updated = await rebatesApi.update(editTarget.id, {
+        base_amount: values.base_amount,
+        rate: values.rate,
+        collected_on: values.collected_on,
+        note: values.note || null,
+        operator_user_ids: values.operator_user_ids,
+      });
+      setRebates((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setEditTarget(null);
+      editForm.resetFields();
+      appMessage.success("返点明细已更新");
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  };
+
   return (
     <Modal
-      title="登记返点"
+      title={<span className="resizable-modal__drag-handle">登记返点</span>}
       open={open}
       destroyOnHidden
       onCancel={props.onClose}
+      width={1200}
+      wrapClassName="adaptive-business-modal recovery-order-modal"
+      modalRender={(modal) => <ResizableModal getLayout={getRecoveryLayout} layoutAttribute="data-recovery-layout">{modal}</ResizableModal>}
       footer={
         <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} onClick={() => form.submit()}>
           确认登记
@@ -133,14 +174,13 @@ export function InventoryRebateModal(props: {
         <FieldConfigContext.Provider value={config}>
           <Form
             form={form}
-            className="inventory-rebate-form"
+            className="inventory-rebate-form ui-form-spaced"
             layout="horizontal"
             labelAlign="left"
             labelCol={{ flex: "120px" }}
             wrapperCol={{ flex: "auto" }}
             onFinish={submit}
           >
-            <p className="muted">关联业务订单创建后即可登记返点；后续买入、卖出或收款用于记录实际业务流水。</p>
             <CfgItem
               name="rebate_type"
               label="返点类型"
@@ -159,24 +199,104 @@ export function InventoryRebateModal(props: {
               </Radio.Group>
             </CfgItem>
             {!availableKinds.length ? <p className="muted">当前账号没有可关联的业务订单</p> : null}
-            <CfgItem
-              name="base_amount"
-              label="返点金额"
-              extra="按此金额 × 返点比例计算预计返点"
-              rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
-            >
-              <MoneyInput placeholder="请输入返点金额" />
-            </CfgItem>
-            <CfgItem name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
-              <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
-            </CfgItem>
-            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>
-              <Input placeholder="YYYY-MM-DD" />
-            </CfgItem>
+            <div className="rebate-core-fields">
+              <CfgItem
+                name="base_amount"
+                label="返点金额"
+                rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
+              >
+                <MoneyInput placeholder="请输入返点金额" />
+              </CfgItem>
+              <CfgItem name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
+                <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
+              </CfgItem>
+              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>
+                <Input placeholder="YYYY-MM-DD" />
+              </CfgItem>
+              <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+            </div>
             <CustomFieldSection testIdSuffix="inventory-rebate" />
           </Form>
         </FieldConfigContext.Provider>
       )}
+      {!loading ? (
+        <section className="inventory-rebate-details ui-stack" aria-label="返点明细">
+          <Typography.Text strong>返点明细</Typography.Text>
+          <DataTable<Rebate>
+            rows={rebates}
+            columns={[
+              { title: "返点单号", dataIndex: "rebate_no" },
+              { title: "类型", render: (_value, row) => row.rebate_type === "BUY" ? "买号返点" : "卖号返点" },
+              { title: "金额", dataIndex: "base_amount", align: "right", render: (value: string) => <MoneyText value={value} /> },
+              { title: "比例", dataIndex: "rate", render: (value: string) => `${value}%` },
+              { title: "返点日期", dataIndex: "collected_on" },
+              {
+                title: "操作人",
+                render: (_value: unknown, row: Rebate) => row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-",
+              },
+              {
+                title: "操作",
+                render: (_value, row) => (
+                  <Space size={2}>
+                    <PermissionButton
+                      permission="order.event.post"
+                      size="small"
+                      onClick={() => {
+                        editForm.setFieldsValue({
+                          base_amount: row.base_amount,
+                          rate: row.rate,
+                          collected_on: row.collected_on,
+                          note: row.note ?? "",
+                          operator_user_ids: row.operator_user_ids ?? undefined,
+                        });
+                        setEditTarget(row);
+                      }}
+                    >编辑</PermissionButton>
+                    <ConfirmButton
+                      permission="order.event.post"
+                      size="small"
+                      danger
+                      title="删除返点明细"
+                      description="删除后该返点记录将不再保留，确定删除吗？"
+                      okText="删除"
+                      onConfirm={async () => {
+                        await rebatesApi.remove(row.id);
+                        setRebates((current) => current.filter((item) => item.id !== row.id));
+                        appMessage.success("返点明细已删除");
+                      }}
+                    >删除</ConfirmButton>
+                  </Space>
+                ),
+              },
+            ]}
+            page={1}
+            pageSize={Math.max(rebates.length, 5)}
+            total={rebates.length}
+            onPageChange={() => undefined}
+            pagination={false}
+            emptyText="暂无返点明细"
+          />
+        </section>
+      ) : null}
+      <Modal
+        title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"}
+        open={Boolean(editTarget)}
+        onCancel={() => setEditTarget(null)}
+        footer={null}
+      >
+        <FieldConfigContext.Provider value={config}>
+          <Form form={editForm} layout="vertical" className="ui-form-spaced" onFinish={submitEdit}>
+            <div className="rebate-core-fields">
+              <CfgItem name="base_amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
+              <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
+              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}><Input /></CfgItem>
+              <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+            </div>
+            <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
+            <PermissionButton permission="order.event.post" type="primary" htmlType="submit">保存</PermissionButton>
+          </Form>
+        </FieldConfigContext.Provider>
+      </Modal>
     </Modal>
   );
 }

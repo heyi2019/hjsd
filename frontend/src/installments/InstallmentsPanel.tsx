@@ -1,6 +1,6 @@
-/** 分期：按业务合约类型分列，支持 HS / DFQ / TH / DG 的收款与风险处理。
+/** 分期：按业务合约类型分列，展示库存分期出售与代分期的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
+import { Button, Card, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -18,6 +18,7 @@ import { orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
 import {
   DataTable,
+  BusinessActionModal,
   ErrorBanner,
   InlineError,
   MoneyInput,
@@ -34,12 +35,13 @@ import { useListViewColumns } from "../shared/lib/listColumns";
 import { useSession, type Permission } from "../shared/state/session";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
+// 分期操作弹窗统一复用建单弹窗外壳（拖拽、缩放、滚动和窄屏适配）。
+const Modal = BusinessActionModal;
+
 /** 合约类型页签与违约处置文案的回落值；词典加载后由选项词典接管（改造前即为这些文案）。 */
 const CONTRACT_TYPE_LABEL: Record<string, string> = {
   STOCK_SALE: "分期出售",
   ADVANCE_PURCHASE: "代分期",
-  PICKUP_SALE: "提号分期",
-  CONSIGNMENT_SALE: "代挂分期",
 };
 const DISPOSITION_LABEL: Record<string, string> = {
   RECOVER: "回收",
@@ -1024,16 +1026,6 @@ export function InstallmentsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           key: "advance",
           label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "ADVANCE_PURCHASE", CONTRACT_TYPE_LABEL),
           children: <ContractTable contractType="ADVANCE_PURCHASE" reloadKey={reloadKey + refreshKey} />,
-        },
-        {
-          key: "pickup",
-          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "PICKUP_SALE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="PICKUP_SALE" reloadKey={reloadKey + refreshKey} />,
-        },
-        {
-          key: "consignment",
-          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "CONSIGNMENT_SALE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="CONSIGNMENT_SALE" reloadKey={reloadKey + refreshKey} />,
         },
       ]}
     />

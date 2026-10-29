@@ -679,7 +679,6 @@ class RebateRecord(Base, AuditMixin):
         ),
         UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
         Index("ix_rebate_records_source_order", "source_order_id"),
-        Index("ix_rebate_records_expected_status", "expected_on", "status"),
         CheckConstraint(
             "rate >= 0 AND base_amount >= 0",
             name="amount_nonneg",
@@ -716,8 +715,9 @@ class RebateRecord(Base, AuditMixin):
         String(24), nullable=False, default=RebateStatus.OPEN.value
     )
     collected_on: Mapped[date] = mapped_column(Date, nullable=False)
-    expected_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 返点业务操作人：可多选；created_by 仍保留为审计操作者。
+    operator_user_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     # REBATE/REBATEVOID 作用域自定义字段值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
@@ -822,7 +822,7 @@ class OrderFormField(Base, AuditMixin):
     is_custom: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("0")
     )
-    # 字段归属板块：账号/产品、客户/供货方、费用资金、业务方案、其他补充。
+    # 字段归属板块：账号/产品、客户/供货方、费用资金、业务方案、交付、运营、其他补充。
     section: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="EXTRA"
     )

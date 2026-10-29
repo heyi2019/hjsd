@@ -77,11 +77,21 @@ it("业务字典仅说明业务口径，不展示配置跳转按钮", async () =
 it("业务分类明确分期归自营、代分期归分销", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
   // 默认 Tab 是业务字典。
-  expect(await screen.findByText("分期（自营增值服务）")).toBeInTheDocument();
-  expect(screen.getByText(/本方账号售出，买家分期支付售卖款/)).toBeInTheDocument();
-  expect(screen.getByText("代分期（分销增值服务）")).toBeInTheDocument();
-  expect(screen.getByText(/客户向本方借款，按合约分期还款/)).toBeInTheDocument();
-  expect(document.body.textContent).toContain("生成代分期业务订单号");
+  expect(await screen.findByText("分期（自营增值服务）", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText(/本方账号售出后，买家分期支付售卖款/)).toBeInTheDocument();
+  expect(screen.getByText("代分期（分销增值服务）", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText(/客户向本方借款并按合约分期还款/)).toBeInTheDocument();
+});
+
+it("库存管理下单独展示分期管理口径", async () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  expect(await screen.findByText("分期管理", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("自营分期", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("代分期", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText(/按期登记买家回款/)).toBeInTheDocument();
+  expect(screen.getByText(/分别登记付款、收款/)).toBeInTheDocument();
+  expect(screen.getByText("自营分期", { exact: true }).textContent).not.toContain("增值服务");
 });
 
 it("业务动作按账号生命周期、资金动作和账务动作分层", async () => {

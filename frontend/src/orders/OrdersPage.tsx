@@ -1,7 +1,8 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   installmentsApi,
@@ -16,7 +17,7 @@ import {
   type OrderType,
   type Pool,
 } from "../shared/api/catalog";
-import { normalizeError } from "../shared/api/client";
+import { currentDevUser, normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -37,6 +38,7 @@ import {
   ConfirmButton,
   AdaptiveFormGrid,
   ResizableModal,
+  BusinessActionModal,
 } from "../shared/ui";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
@@ -269,6 +271,8 @@ function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: Bus
 }
 
 export function OrdersPage({ initialTab, active = true, onNavigate }: { initialTab?: BusinessCenterEntryTab; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void } = {}) {
+  // 当前登录人仅作为历史数据没有指定操作人时的回退显示；新记录以勾选员工为准。
+  const currentOperator = currentDevUser();
   const [orders, setOrders] = useState<Order[]>([]);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -391,6 +395,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
+      const employeeList = await Promise.resolve()
+        .then(() => employeesApi.list())
+        .catch(() => [] as Array<{ id: number; username: string; display_name: string; is_active: boolean }>);
+      setUsers(employeeList.filter((employee) => employee.is_active));
       setActionOrder(order);
       refundForm.resetFields();
       setRefundOpen(true);
@@ -694,7 +702,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               menu={{
                 items: [
                   { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
-                  { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
+                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
                     label: order.order_type === "DG" ? "系统下架" : "取消交易",
@@ -840,7 +848,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   total={filteredOrders.length}
                   emptyText="暂无业务订单"
                   className="orders-ledger"
-                 
+
                   onPageChange={(nextPage, nextSize) => {
                     setPage(nextPage);
                     setPageSize(nextSize);
@@ -1016,6 +1024,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                 <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
                 <span><MoneyText value={flow.amount} /></span>
                 <span><StatusTag status={flow.status} optionSet="FUND_FLOW_STATUS" /></span>
+                <span>操作人：{flow.operator || currentOperator}</span>
               </div>
             ))}
           </div>
@@ -1027,8 +1036,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               <div key={rebate.id} className="orders-event-row">
                 <span>{rebate.rebate_no}</span>
                 <span>{rebate.rate}% · <MoneyText value={rebate.base_amount} /></span>
-                <span>{rebate.expected_on ? `预计 ${rebate.expected_on}` : rebate.collected_on}</span>
-                <span><StatusTag status={rebate.status} optionSet="REBATE_STATUS" /></span>
+                <span>{rebate.collected_on}</span>
+                <span>已登记</span>
               </div>
             ))}
           </div>
@@ -1090,7 +1099,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               menu={{
                 items: [
                   { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
-                  { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
+                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                   { key: "cancel", label: selectedOrder.order_type === "DG" ? "系统下架" : "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                 ],
                 onClick: ({ key }) => {
@@ -1119,7 +1128,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         ) : null}
       </Drawer>
 
-      <Modal
+      <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
         open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
         confirmLoading={cancelSubmitting}
@@ -1182,9 +1191,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           <CustomFieldSection testIdSuffix="order-cancel" />
           </FieldConfigScope>
         </Form>
-      </Modal>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={selectedOrder ? `编辑订单 · ${selectedOrder.order_no}` : "编辑订单"}
         open={editOpen}
         confirmLoading={editSubmitting}
@@ -1230,9 +1239,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           <CustomFieldSection testIdSuffix="order-edit" />
           </FieldConfigScope>
         </Form>
-      </Modal>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={selectedOrder ? `新建订单关联 · ${selectedOrder.order_no}` : "新建订单关联"}
         open={linkOpen}
         confirmLoading={linkSubmitting}
@@ -1277,7 +1286,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           <CustomFieldSection testIdSuffix="order-link" />
           </FieldConfigScope>
         </Form>
-      </Modal>
+      </BusinessActionModal>
 
       <Modal
         title={<span className="resizable-modal__drag-handle">{actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}</span>}
@@ -1405,8 +1414,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         </Form>
       </Modal>
 
-      <Modal
-        title={actionOrder ? `登记退款 · ${actionOrder.order_no}` : "登记退款"}
+      <BusinessActionModal
+        title={actionOrder ? `资金收支 · ${actionOrder.order_no}` : "资金收支"}
         open={refundOpen}
         confirmLoading={refundSubmitting}
         onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
@@ -1415,16 +1424,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         <Form
           form={refundForm}
           layout="vertical"
-          onFinish={async (values: { amount: string; reason: string; refund_responsibility: string; form_extra?: Record<string, unknown> }) => {
+          onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
               await ordersApi.postEvent(actionOrder.id, {
                 event_type: "REFUND",
                 amount: values.amount,
-                occurred_on: new Date().toISOString().slice(0, 10),
+                occurred_on: values.occurred_on?.format("YYYY-MM-DD") ?? today(),
                 reason: values.reason,
-                refund_responsibility: values.refund_responsibility as "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER",
+                operator_user_ids: values.operator_user_ids,
                 form_extra: values.form_extra,
               });
               appMessage.success("退款已登记");
@@ -1439,19 +1448,34 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           }}
         >
           <FieldConfigScope scope="REFUND" active={refundOpen}>
-          <CfgItem name="amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
+          <CfgItem name="occurred_on" label="发生日期" initialValue={dayjs(today())} rules={[{ required: true, message: "请选择发生日期" }]}>
+            <DatePicker format="YYYY-MM-DD" className="ui-control-full" />
+          </CfgItem>
+          <CfgItem name="direction" label="资金流向" initialValue="OUT" rules={[{ required: true, message: "请选择资金流向" }]}>
+            <Select disabled options={[{ value: "OUT", label: "支出" }]} />
+          </CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />
+          <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
             <MoneyInput placeholder="请输入退款金额" />
           </CfgItem>
-          <CfgItem name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
-            <Select options={refundResponsibilityOptions} />
-          </CfgItem>
-          <CfgItem name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
-            <Input.TextArea rows={3} placeholder="请输入退款原因" />
+          <CfgItem name="reason" label="收支备注" rules={[{ required: true, message: "请输入收支备注" }]}>
+            <Input.TextArea rows={3} placeholder="请输入收支备注" />
           </CfgItem>
             <CustomFieldSection testIdSuffix="order-refund" />
           </FieldConfigScope>
         </Form>
-      </Modal>
+        <div className="ui-form-spaced">
+          <Typography.Text strong>资金明细</Typography.Text>
+          {actionOrder?.cashflows?.length ? actionOrder.cashflows.map((flow) => (
+            <div key={flow.flow_no} className="orders-event-row">
+              <span>{flow.occurred_on}</span>
+              <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
+              <span><MoneyText value={flow.amount} /></span>
+              <span>操作人：{flow.operator || currentOperator}</span>
+            </div>
+          )) : <Typography.Text type="secondary">暂无资金明细</Typography.Text>}
+        </div>
+      </BusinessActionModal>
 
       <CreateBusinessModal
         open={Boolean(createType)}

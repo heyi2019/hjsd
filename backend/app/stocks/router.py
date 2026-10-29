@@ -36,7 +36,6 @@ from app.domain.trade import (
     OrderEvent,
     OrderFormField,
     RebateRecord,
-    RebateSettlement,
     Installment,
     Reconciliation,
 )
@@ -281,23 +280,7 @@ class ExecutionRebateOut(BaseModel):
     base_amount: Decimal
     status: str
     collected_on: date
-    expected_on: date | None = None
     collected_at: datetime
-    settlements: list["ExecutionRebateSettlementOut"] = Field(default_factory=list)
-
-
-class ExecutionRebateSettlementOut(BaseModel):
-    id: int
-    settlement_no: str
-    settled_on: date
-    settled_at: datetime
-    gross_amount: Decimal
-    platform_fee: Decimal
-    net_amount: Decimal
-    cashflow_id: int | None = None
-    reversal_of_id: int | None = None
-    note: str | None = None
-    operator: str
 
 
 class AccountExecutionOrderOut(BaseModel):
@@ -536,30 +519,6 @@ def execution_detail(
             .where(RebateRecord.source_order_id.in_(order_ids))
             .order_by(RebateRecord.id)
         ).all())
-        settlement_by_rebate: dict[int, list[ExecutionRebateSettlementOut]] = {}
-        rebate_ids = [rebate.id for rebate in rebates]
-        if rebate_ids:
-            settlements = db.scalars(
-                select(RebateSettlement)
-                .where(RebateSettlement.rebate_record_id.in_(rebate_ids))
-                .order_by(RebateSettlement.rebate_record_id, RebateSettlement.id)
-            ).all()
-            for settlement in settlements:
-                settlement_by_rebate.setdefault(settlement.rebate_record_id, []).append(
-                    ExecutionRebateSettlementOut(
-                        id=settlement.id,
-                        settlement_no=settlement.settlement_no,
-                        settled_on=settlement.settled_on,
-                        settled_at=settlement.created_at,
-                        gross_amount=settlement.gross_amount,
-                        platform_fee=settlement.platform_fee,
-                        net_amount=settlement.net_amount,
-                        cashflow_id=settlement.cashflow_id,
-                        reversal_of_id=settlement.reversal_of_id,
-                        note=settlement.note,
-                        operator=settlement.created_by,
-                    )
-                )
         for rebate in rebates:
             rebates_by_order.setdefault(rebate.source_order_id, []).append(
                 ExecutionRebateOut(
@@ -571,9 +530,7 @@ def execution_detail(
                     base_amount=rebate.base_amount,
                     status=rebate.status,
                     collected_on=rebate.collected_on,
-                    expected_on=rebate.expected_on,
                     collected_at=rebate.created_at,
-                    settlements=settlement_by_rebate.get(rebate.id, []),
                 )
             )
     events = list(

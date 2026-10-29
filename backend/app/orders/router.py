@@ -35,6 +35,7 @@ from app.domain.trade import (
     OrderEvent,
     RebateRecord,
 )
+from app.domain.users import User
 from app.installments import service as installments_service
 from app.orders import schemas, service
 from app.orders import form_fields as form_fields_service
@@ -67,8 +68,17 @@ def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
     return output
 
 
-def _event_output(event: OrderEvent) -> schemas.EventOut:
+def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
+    ids = {user_id for event in events for user_id in (event.operator_user_ids or [])}
+    if not ids:
+        return {}
+    users = db.scalars(select(User).where(User.id.in_(ids))).all()
+    return {user.id: user.display_name or user.username for user in users}
+
+
+def _event_output(event: OrderEvent, operator_names: dict[int, str] | None = None) -> schemas.EventOut:
     """把审计字段映射为事件响应字段，避免 ORM 属性名泄漏到 API。"""
+    selected_operators = _selected_operator_label(event, operator_names)
     return schemas.EventOut.model_validate(
         {
             "id": event.id,
@@ -89,8 +99,21 @@ def _event_output(event: OrderEvent) -> schemas.EventOut:
             "note": event.note,
             "form_extra": event.form_extra,
             "created_at": event.created_at,
-            "operator": event.created_by,
+            # created_by 是审计操作者；业务上的操作人以表单勾选员工为准。
+            "operator": selected_operators or event.created_by,
         }
+    )
+
+
+def _selected_operator_label(
+    event: OrderEvent | None, operator_names: dict[int, str] | None
+) -> str:
+    if event is None:
+        return ""
+    return "、".join(
+        operator_names[user_id]
+        for user_id in (event.operator_user_ids or [])
+        if operator_names and user_id in operator_names
     )
 
 
@@ -111,7 +134,9 @@ def _order_detail_output(
         .where(OrderEvent.order_id == order.id)
         .order_by(OrderEvent.occurred_on, OrderEvent.id)
     ).all()
-    output.events = [_event_output(event) for event in events]
+    operator_names = _operator_names(db, events)
+    event_by_id = {event.id: event for event in events}
+    output.events = [_event_output(event, operator_names) for event in events]
     output.links = [
         schemas.OrderLinkOut.model_validate(item)
         for item in service.list_order_links(db, order.id, user)
@@ -135,7 +160,8 @@ def _order_detail_output(
                     "status": item.status,
                     "order_event_id": item.order_event_id,
                     "note": item.note,
-                    "operator": item.created_by,
+                    "operator": _selected_operator_label(event_by_id.get(item.order_event_id), operator_names)
+                    or item.created_by,
                 }
             )
             for item in cashflows
@@ -157,7 +183,6 @@ def _order_detail_output(
                     "link_status": item.link_status,
                     "status": item.status,
                     "collected_on": item.collected_on,
-                    "expected_on": item.expected_on,
                     "note": item.note,
                     "created_at": item.created_at,
                     "operator": item.created_by,
@@ -610,7 +635,7 @@ def post_event(
         user=user,
     )
     return schemas.EventPostResult(
-        event=_event_output(event),
+        event=_event_output(event, _operator_names(db, [event])),
         cashflow_no=flow.flow_no if flow else None,
     )
 

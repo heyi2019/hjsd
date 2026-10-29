@@ -12,13 +12,11 @@ from app.domain.trade import Deposit
 from .rebates import (
     create_rebate,
     get_rebate,
-    list_overdue_rebates,
     list_rebate_settlements,
     list_rebates,
     reverse_rebate_settlement,
     settle_rebate,
     settled_net_total,
-    sync_overdue_rebate_notifications,
     void_rebate,
 )
 from .cashflows import (
@@ -74,8 +72,6 @@ __all__ = [
     "resolve_reconciliation",
     "list_deposits",
     "list_rebates",
-    "list_overdue_rebates",
-    "sync_overdue_rebate_notifications",
     "get_rebate",
     "create_transfer",
     "repair_transfer",

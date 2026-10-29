@@ -13,6 +13,7 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/v1/reports/{report_name}/export.csv"),
         ("GET", "/api/v1/attachments/{attachment_id}/download"),
         ("DELETE", "/api/v1/game-types/{game_type_id}"),
+        ("DELETE", "/api/v1/rebates/{rebate_id}"),
     }
 )
 
@@ -37,12 +38,12 @@ def test_every_json_api_route_declares_response_model(app):
             )
 
     # public_routes = 170（实测）。基线演变：160 → 161（GET /order-form-fields/scopes）
-    # → 166（状态收口五端点：policy supersede / expire-sweep、rebate void、
+    # → 166（状态收口五端点：policy supersede / expire-sweep、
     # deposit cancel、import batch reject）→ 167（补 game-types DELETE 豁免后复核：
     # 该路由此前因缺 response_model 在中途断言失败，掩盖了计数差异，实际总数已是 167）
     # → 170（168 为并行会话新增端点后的实测值；列表列配置再 +2：GET /list-columns、
     # PUT /list-columns/{scope}）→ 171（+DELETE /list-columns/{scope}：恢复默认）
     # → 174（自定义列 +3：GET /list-columns/custom-fields、POST /list-columns/{scope}/custom、
-    # DELETE /list-columns/{scope}/custom/{column_key}）。
+    # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/作废旧入口已移除。
     # 以当前应用实际路由数为准。
-    assert public_routes == 174
+    assert public_routes == 170

@@ -919,6 +919,17 @@ def cancel_order(
     if posted is not None:
         raise Validation("订单已有登记事件，不能直接作废，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+    # 代挂的“本系统下架”不是平台记录下架：它直接取消当前 DG 订单，
+    # 同步让对应账号退出库存中心。外部平台下架会带 PLATFORM 标记，仍保留在库。
+    if (
+        order.order_type == "DG"
+        and (form_extra or {}).get("platform_unlist_scope") == "SYSTEM"
+        and order.account_id is not None
+    ):
+        account = session.get(Account, order.account_id)
+        if account is not None and account.status == AccountStatus.IN_STOCK.value:
+            account.status = AccountStatus.VOID.value
+            account.updated_by = actor
     if form_extra:
         # 自定义字段值按作用域校验后合并进订单 form_extra（缺省取消单 ORDERCANC）。
         checked = validate_form_extra(

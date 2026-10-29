@@ -75,6 +75,25 @@ const installmentDetail = {
   orders: [{ order_id: 77, status: "ACTIVE", events: [] }],
 } as unknown as AccountExecutionDetail;
 
+const consignmentRow = {
+  ...inStockRow,
+  inventory_type: "CONSIGNMENT",
+} as unknown as Account;
+
+const consignmentDetail = {
+  account: consignmentRow,
+  orders: [{
+    order_id: 88,
+    order_no: "DG-88",
+    order_type: "DG",
+    status: "ACTIVE",
+    created_at: "2026-10-29T03:54:00",
+    trade_date: "2026-10-29",
+    extra_values: { consignment_platform: "千寻", listed_at: "2026-10-29T03:54" },
+    events: [],
+  }],
+} as unknown as AccountExecutionDetail;
+
 const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INSTALLMENT", status: "ACTIVE" } as unknown as Installment;
 
 async function openPanel(rows: Account[]) {
@@ -157,6 +176,38 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "下架");
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到可冲销的买入流水，无法下架"));
+  });
+
+  it("代挂下架平台选项包含本系统并显示入库时间", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
+    await openPanel([consignmentRow]);
+    await clickMore(rowOf(1), "下架");
+
+    expect(await screen.findByText("本系统")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-01 09:30")).toBeInTheDocument();
+  });
+
+  it("代挂选择本系统下架时直接取消代挂订单并退出库存中心", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
+    vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ status: "CANCELLED" } as never);
+    await openPanel([consignmentRow]);
+    await clickMore(rowOf(1), "下架");
+
+    const modal = await screen.findByRole("dialog");
+    await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText(/本系统（上架于 2026-10-01 09:30）/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "代挂结束");
+    await ui.click(screen.getByRole("button", { name: "确认出库" }));
+
+    await waitFor(() => expect(catalog.ordersApi.cancel).toHaveBeenCalledWith(
+      88,
+      expect.objectContaining({
+        reason: "代挂结束",
+        form_extra_scope: "INVOID",
+        form_extra: expect.objectContaining({ platform_unlist_scope: "SYSTEM" }),
+      }),
+    ));
+    expect(screen.queryByText("系统下架登记")).toBeNull();
   });
 
   it("取消交易（SOLD 行）：无金额时拒绝提交", async () => {

@@ -27,7 +27,15 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
     assert by_code["ORDERCANC"]["label"] == "售出取消交易"
     assert by_code["ORDERCANC"]["group"] == "ORDEROP"
     assert by_code["INVREFUND"]["label"] == "库存取消交易"
-    assert by_code["INVEDIT"]["label"] == "编辑账号及执行明细"
+    assert by_code["INVREFUND"]["group"] == "INVENTORY"
+    assert by_code["INVCANCEL"]["group"] == "INSTALLMENT"
+    assert by_code["INVEDIT"]["label"] == "编辑"
+    assert by_code["INVEDIT"]["group"] == "INVENTORY"
+    assert by_code["INVOID"]["label"] == "下架"
+    assert by_code["INVOID"]["group"] == "INVENTORY"
+    assert by_code["REFUND"]["label"] == "资金收支"
+    assert by_code["REFUND"]["group"] == "ORDEROP"
+    assert "INVPLATFORM" not in by_code
     assert by_code["STUDIOEXP"]["group"] == "STUDIO"
     # 既有作用域仍在清单中
     assert by_code["HS"]["label"] == "回收建单"

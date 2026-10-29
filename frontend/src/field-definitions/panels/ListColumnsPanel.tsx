@@ -419,15 +419,6 @@ export function ListColumnsPanel() {
 
   return (
     <section className="ui-stack">
-      <Typography.Paragraph type="secondary" className="ui-text-flush">
-        配置各列表显示哪些列、以什么顺序显示、列宽多少、是否固定，并可「新增列」把表单里的自定义字段
-        加进列表。行可直接**拖拽**调顺序（也可用上移/下移）；勾选多列后可「显示/隐藏所选」批量操作。
-        改动即时生效：已打开的列表页会按新配置重排，不需要刷新。带「锁定」的列是订单号/
-        编号/操作列，不可隐藏。列宽留空表示自适应（由内容决定），填 40–800 之间的像素值即固定该宽度；
-        固定列在横向滚动时保持可见。自定义列的值取自行数据的扩展字段，部分列表（报表/审计/质量等）
-        不带扩展字段，新增列会显示为空；「恢复默认」只重置显示配置，要删自定义列请点「删除」。
-      </Typography.Paragraph>
-
       <ErrorBanner error={error} onRetry={() => void load()} />
 
       <Space className="ui-toolbar-spaced" align="center" data-testid="list-columns-master">

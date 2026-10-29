@@ -59,7 +59,8 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
     expect(screen.queryByRole("menuitem", { name: "取消交易" })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "平台下架" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
     expect(document.querySelector(".inventory-more-menu")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
@@ -105,8 +106,8 @@ describe("InventoryPanel：账号台账", () => {
       return rows.find((item) => within(item).queryByText("acc-3") !== null)!;
     });
     await ui.click(within(row).getByRole("button", { name: "更多" }));
-    expect(await screen.findByRole("menuitem", { name: "平台下架" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "系统下架" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "下架" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
   });
 
   it("导出时接入库存详情字段", () => {
@@ -250,6 +251,33 @@ describe("InventoryPanel：账号台账", () => {
     await ui.click(screen.getByText("更多账号资料"));
     expect(screen.getByLabelText("编辑账号密码")).toBeVisible();
     expect(screen.getByLabelText("编辑绑定手机号")).toBeVisible();
+  });
+
+  it("库存编辑展示运营信息自定义字段", async () => {
+    vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+      {
+        id: 901,
+        order_type_code: "INVEDIT",
+        field_key: "consignment_note",
+        label: "寄售运营备注",
+        field_type: "TEXT",
+        options: null,
+        required: false,
+        is_active: true,
+        sort_order: 0,
+        locked: false,
+        is_custom: true,
+        section: "OPERATION",
+        note: null,
+      },
+    ]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    expect(await screen.findByText("运营信息")).toBeInTheDocument();
+    expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
   });
 
   it("统计卡：只统计在库账号与占用成本", async () => {

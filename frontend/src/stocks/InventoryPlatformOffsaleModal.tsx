@@ -1,10 +1,10 @@
-import { DatePicker, Form, Input, Modal, Table } from "antd";
+import { DatePicker, Form, Input, Table } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi, type Account, type AccountExecutionOrder } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
-import { ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 export type ActiveConsignment = {
@@ -13,6 +13,8 @@ export type ActiveConsignment = {
   platform: string;
   listedAt: string;
 };
+
+type DisplayConsignment = Omit<ActiveConsignment, "orderId"> & { orderId: number | "SYSTEM" };
 
 function minute(value: string | null | undefined) {
   if (!value) return "-";
@@ -35,21 +37,46 @@ export function InventoryPlatformOffsaleModal(props: {
   account: Account | null;
   records: ActiveConsignment[];
   onClose: () => void;
+  onSystemOffsale: (payload: { reason: string; form_extra?: Record<string, unknown> }) => void | Promise<void>;
   onChanged: () => void | Promise<void>;
 }) {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const open = Boolean(props.account);
+  const canSystemOffsale = props.account?.inventory_type === "CONSIGNMENT";
+  const systemRecord: DisplayConsignment | null = canSystemOffsale && props.account
+    ? {
+      orderId: "SYSTEM",
+      orderNo: "ERP",
+      platform: "本系统",
+      listedAt: minute(String(props.account.created_at ?? props.account.buy_date)),
+    }
+    : null;
+  const displayRecords: DisplayConsignment[] = systemRecord ? [...props.records, systemRecord] : props.records;
+  const [selectedMode, setSelectedMode] = useState<"PLATFORM" | "SYSTEM">("PLATFORM");
   const { config } = useOrderFormConfig(open ? "INVOID" : undefined);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setSelectedMode(props.records.length ? "PLATFORM" : canSystemOffsale ? "SYSTEM" : "PLATFORM");
     form.setFieldsValue({ unlisted_at: dayjs().second(0).millisecond(0) });
-  }, [form, open, props.account]);
+  }, [canSystemOffsale, form, open, props.account, props.records.length]);
 
-  const submit = async (values: { order_id: number; unlisted_at?: Dayjs; reason: string; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { order_id: number | "SYSTEM"; unlisted_at?: Dayjs; reason: string; form_extra?: Record<string, unknown> }) => {
+    if (values.order_id === "SYSTEM") {
+      setSubmitting(true);
+      try {
+        await props.onSystemOffsale({ reason: values.reason.trim(), form_extra: values.form_extra });
+        form.resetFields();
+      } catch (cause) {
+        setError(normalizeError(cause));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     const selected = props.records.find((record) => record.orderId === Number(values.order_id));
     if (!selected) return;
     setSubmitting(true);
@@ -75,26 +102,27 @@ export function InventoryPlatformOffsaleModal(props: {
   };
 
   return (
-    <Modal
-      title="平台下架"
+    <BusinessActionModal
+      title={selectedMode === "SYSTEM" ? "出库" : "下架"}
       open={open}
       destroyOnHidden
       onCancel={props.onClose}
       footer={
-        <PermissionButton permission="order.update" danger type="primary" aria-label="确认平台下架" loading={submitting} onClick={() => form.submit()}>
-          确认平台下架
+        <PermissionButton permission="order.update" danger type="primary" aria-label={selectedMode === "SYSTEM" ? "确认出库" : "确认下架"} loading={submitting} onClick={() => form.submit()}>
+          {selectedMode === "SYSTEM" ? "确认出库" : "确认下架"}
         </PermissionButton>
       }
     >
       <ErrorBanner error={error} />
-      <p className="muted">平台下架只取消对应寄售平台的上架记录，不改变账号在 ERP 的库存状态。</p>
+      <p className="muted">选择寄售平台时只取消对应平台的上架记录；选择本系统时按 ERP 出库处理，账号退出库存中心。</p>
       <FieldConfigContext.Provider value={config}>
         <Form form={form} layout="horizontal" labelAlign="left" labelCol={{ flex: "108px" }} wrapperCol={{ flex: "auto" }} onFinish={submit}>
-          <CfgItem name="order_id" label="寄售平台" rules={[{ required: true, message: "请选择寄售平台" }]}>
+          <CfgItem name="order_id" label="下架平台" rules={[{ required: true, message: "请选择下架平台" }]}>
             <Select
-              aria-label="寄售平台"
+              aria-label="下架平台"
               placeholder="请选择要下架的平台"
-              options={props.records.map((record) => ({ value: record.orderId, label: `${record.platform}（上架于 ${record.listedAt}）` }))}
+              onChange={(value) => setSelectedMode(value === "SYSTEM" ? "SYSTEM" : "PLATFORM")}
+              options={displayRecords.map((record) => ({ value: record.orderId, label: `${record.platform}（上架于 ${record.listedAt}）` }))}
             />
           </CfgItem>
           <CfgItem name="unlisted_at" label="下架时间" rules={[{ required: true, message: "请选择下架时间" }]}>
@@ -110,10 +138,10 @@ export function InventoryPlatformOffsaleModal(props: {
         size="small"
         pagination={false}
         rowKey="orderId"
-        dataSource={props.records}
+        dataSource={displayRecords}
         columns={[{ title: "上架平台", dataIndex: "platform" }, { title: "上架时间", dataIndex: "listedAt" }]}
         locale={{ emptyText: "暂无可下架的平台" }}
       />
-    </Modal>
+    </BusinessActionModal>
   );
 }

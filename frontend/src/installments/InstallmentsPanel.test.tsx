@@ -51,6 +51,15 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("只展示分期出售和代分期，不展示提号分期与代挂分期", async () => {
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "分期出售" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "代分期" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "提号分期" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "代挂分期" })).toBeNull();
+  });
+
   it("渲染合约号并把 order_id 映射成订单号", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();

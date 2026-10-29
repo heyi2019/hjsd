@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Space, Tabs, Tooltip, Typography } from "antd";
+import { Card, Form, Input, Modal as AntdModal, Space, Tabs, Tooltip, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +23,7 @@ import { RebatesPanel } from "../rebates/RebatesPanel";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import {
   ConfirmButton,
+  BusinessActionModal,
   DataTable,
   ErrorBanner,
   InlineError,
@@ -41,6 +42,9 @@ import { requiredMoneyRules } from "../shared/lib/validators";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { useListViewColumns } from "../shared/lib/listColumns";
+
+// 资金操作弹窗统一复用建单弹窗外壳（拖拽、缩放、滚动和窄屏适配）。
+const Modal = BusinessActionModal;
 
 // 与 backend/app/finance/attributes.py 的 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE 保持一致：
 // 资金性质决定可用核算属性，非法组合后端直接 422，此处事前收窄避免误选。
@@ -1043,7 +1047,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           },
           {
             key: "rebates",
-            label: "返点",
+            label: "返点明细",
             children: <RebatesPanel />,
           },
           {
@@ -1307,7 +1311,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         </FieldConfigScope>
       </Modal>
 
-      <Modal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>
+      <AntdModal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>
         <Typography.Paragraph type="secondary">
           对账记录标记的流水 ID：{unmatchedTarget?.unmatched_flow_ids?.join(", ") || "—"}
         </Typography.Paragraph>
@@ -1320,7 +1324,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           emptyText="当前列表未加载到对应流水"
           onPageChange={() => undefined}
        />
-      </Modal>
+      </AntdModal>
     </section>
   );
 }

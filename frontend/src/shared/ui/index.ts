@@ -17,4 +17,5 @@ export { AdaptiveFormGrid } from "./AdaptiveFormGrid/AdaptiveFormGrid";
 export { FormField } from "./AdaptiveFormGrid/FormField";
 export { MoneyInput } from "./AdaptiveFormGrid/MoneyInput";
 export { ResizableModal } from "./AdaptiveFormGrid/ResizableModal";
+export { BusinessActionModal } from "./BusinessActionModal";
 export { useCompactLayout } from "./useCompactLayout";

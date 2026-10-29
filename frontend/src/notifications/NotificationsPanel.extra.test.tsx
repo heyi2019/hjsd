@@ -19,7 +19,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items, unread_total: 1 });
   vi.mocked(catalog.notificationsApi.markRead).mockResolvedValue(items[0]);
-  vi.mocked(catalog.notificationsApi.syncOverdueRebates).mockResolvedValue({ created: 3 });
 });
 
 describe("NotificationsPanel.extra：失败路径 / 重试 / 轮询", () => {
@@ -29,14 +28,6 @@ describe("NotificationsPanel.extra：失败路径 / 重试 / 轮询", () => {
     await screen.findByText("N001");
     await ui.click(screen.getByRole("button", { name: /标记已读/ }));
     expect(await screen.findByText(/read-fail/)).toBeInTheDocument();
-  });
-
-  it("同步逾期提醒失败展示错误横幅", async () => {
-    vi.mocked(catalog.notificationsApi.syncOverdueRebates).mockRejectedValue(new Error("sync-fail"));
-    renderLight(<NotificationsPanel />, { user: "admin" });
-    await screen.findByText("N001");
-    await ui.click(screen.getByRole("button", { name: /同步返点逾期提醒/ }));
-    expect(await screen.findByText(/sync-fail/)).toBeInTheDocument();
   });
 
   it("加载失败点「重新加载」触发二次请求（onRetry）", async () => {

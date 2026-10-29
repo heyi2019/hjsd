@@ -228,7 +228,6 @@ export interface OrderRebate {
   link_status: string;
   status: string;
   collected_on: string;
-  expected_on?: string | null;
   note?: string | null;
   created_at?: string;
   operator: string;
@@ -430,21 +429,6 @@ export interface AccountExecutionRebate {
   status: string;
   collected_on: string;
   collected_at?: string | null;
-  settlements?: AccountExecutionRebateSettlement[];
-}
-
-export interface AccountExecutionRebateSettlement {
-  id: number;
-  settlement_no: string;
-  settled_on: string;
-  settled_at: string;
-  gross_amount: string;
-  platform_fee: string;
-  net_amount: string;
-  cashflow_id?: number | null;
-  reversal_of_id?: number | null;
-  note?: string | null;
-  operator: string;
 }
 
 export interface AccountExecutionOrder {
@@ -599,29 +583,10 @@ export interface Rebate {
   link_status?: string;
   status: string;
   collected_on: string;
-  /** 预计到账日：晚于该日仍未结清即逾期（后端 /rebates/overdue 判定）。 */
-  expected_on?: string | null;
   note?: string | null;
   created_at?: string;
   operator?: string;
-}
-
-export interface RebateOverdue extends Rebate {
-  overdue_days: number;
-}
-
-export interface Settlement {
-  id: number;
-  settlement_no: string;
-  rebate_record_id: number;
-  gross_amount: string;
-  platform_fee: string;
-  net_amount: string;
-  settled_on: string;
-  cashflow_id?: number | null;
-  /** 非空表示本笔结算已被冲销（指向原结算）。 */
-  reversal_of_id?: number | null;
-  note?: string | null;
+  operator_user_ids?: number[] | null;
 }
 
 export interface GameTypeOption {
@@ -1022,31 +987,15 @@ export const rebatesApi = {
     rebate_type: "BUY" | "SELL";
     base_amount: string;
     collected_on: string;
+    operator_user_ids?: number[];
     channel?: string;
     note?: string;
     form_extra?: Record<string, unknown>;
   }) =>
     api.post<Rebate>("/rebates", payload).then((r) => r.data),
-  settle: (
-    id: number,
-    payload: { gross_amount: string; settled_on: string; pool_id: number; platform_fee?: string; form_extra?: Record<string, unknown> },
-  ) => api.post<Settlement>(`/rebates/${id}/settlements`, payload).then((r) => r.data),
-  /** 预计到账逾期清单（后端按 as_of 判定，返回逾期天数）。 */
-  overdue: (asOf?: string) =>
-    api.get<RebateOverdue[]>("/rebates/overdue", { params: asOf ? { as_of: asOf } : undefined }).then((r) => r.data),
-  settlements: (id: number) =>
-    api.get<Settlement[]>(`/rebates/${id}/settlements`).then((r) => r.data),
-  reverseSettlement: (
-    id: number,
-    settlementId: number,
-    payload: { reversed_on: string; reason: string; form_extra?: Record<string, unknown> },
-  ) =>
-    api
-      .post<Settlement>(`/rebates/${id}/settlements/${settlementId}/reverse`, payload)
-      .then((r) => r.data),
-  /** 作废返点记录：仅零结算（OPEN）可作废；已有结算须走结算冲销。 */
-  voidRecord: (id: number, reason: string, form_extra?: Record<string, unknown>) =>
-    api.post<Rebate>(`/rebates/${id}/void`, { reason, form_extra }).then((r) => r.data),
+  update: (id: number, payload: { base_amount?: string; rate?: string; collected_on?: string; note?: string | null; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
+    api.patch<Rebate>(`/rebates/${id}`, payload).then((r) => r.data),
+  remove: (id: number) => api.delete<void>(`/rebates/${id}`).then(() => undefined),
 };
 
 export interface RequiredWhen {
@@ -1081,7 +1030,7 @@ export interface OrderFormField {
   locked: boolean;
   /** 用户自定义字段（区别于种子预置的系统字段）；自定义字段可增删停 */
   is_custom: boolean;
-  section?: "EXTRA" | "ACCOUNT_PRODUCT" | "PARTICIPANT" | "FINANCE" | "BUSINESS" | "DELIVER";
+  section?: string;
   note?: string | null;
 }
 
@@ -1676,6 +1625,5 @@ export const qualityApi = {
 export const notificationsApi = {
   list: (params: { limit: number; unread_only?: boolean }) => api.get<{ items: NotificationItem[]; unread_total: number }>("/notifications", { params }).then(r => r.data),
   markRead: (id: number) => api.post<NotificationItem>(`/notifications/${id}/read`).then(r => r.data),
-  syncOverdueRebates: () => api.post<{ created: number }>("/notifications/sync-overdue-rebates").then(r => r.data),
 };
 export const searchApi = { query: (q: string) => api.get<{ items: SearchResult[] }>("/search", { params: { q } }).then(r => r.data) };

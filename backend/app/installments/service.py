@@ -1,7 +1,7 @@
 """installments.service：分期合约、期次计划、收款与交付（ACC-01 / HS-01-06 / DFQ-01）。
 
 口径：
-    - `STOCK_SALE` 只允许已买入且在库的 HS 账号，**不新增 BUY**（A05）；
+    - `STOCK_SALE` 允许已入库且在库的 HS/TH/DG 账号，**不新增 BUY**（A05）；
     - `ADVANCE_PURCHASE` 只允许 DFQ（A04）；
     - `PICKUP_SALE` 只允许 TH，`CONSIGNMENT_SALE` 只允许 DG；
 - `PAYMENT` 是收入事实，产生现金流；`DELIVER` 无金额、无现金流；
@@ -315,11 +315,11 @@ def _service_fee_from_snapshot(
 
 
 #: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
-_CONTRACT_ALLOWED_ORDER_TYPE = {
-    InstallmentContractType.STOCK_SALE.value: "HS",
-    InstallmentContractType.ADVANCE_PURCHASE.value: "DFQ",
-    InstallmentContractType.PICKUP_SALE.value: "TH",
-    InstallmentContractType.CONSIGNMENT_SALE.value: "DG",
+_CONTRACT_ALLOWED_ORDER_TYPES = {
+    InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH", "DG"}),
+    InstallmentContractType.ADVANCE_PURCHASE.value: frozenset({"DFQ"}),
+    InstallmentContractType.PICKUP_SALE.value: frozenset({"TH"}),
+    InstallmentContractType.CONSIGNMENT_SALE.value: frozenset({"DG"}),
 }
 
 
@@ -366,10 +366,11 @@ def create_installment(
 
     # 合约类型 → 允许的订单类型。四个分支原本结构完全相同、只差这一个值，
     # 表驱动比复制四遍 if/elif 更难漏改、也更好审计（新增类型必须在此登记或显式例外）。
-    allowed_order_type = _CONTRACT_ALLOWED_ORDER_TYPE.get(contract_type)
-    if allowed_order_type is not None and order.order_type != allowed_order_type:
+    allowed_order_types = _CONTRACT_ALLOWED_ORDER_TYPES.get(contract_type)
+    if allowed_order_types is not None and order.order_type not in allowed_order_types:
+        allowed_order_label = "、".join(sorted(allowed_order_types))
         raise Validation(
-            f"{contract_type} 只能用于 {allowed_order_type} 订单",
+            f"{contract_type} 只能用于 {allowed_order_label} 订单",
             code=ErrorCode.INSTALLMENT_TYPE_INVALID,
             details={"order_no": order.order_no, "order_type": order.order_type},
         )
@@ -385,9 +386,11 @@ def create_installment(
                 OrderEvent.is_posted.is_(True),
             )
         ) is not None
-        if account is None or account.status != AccountStatus.IN_STOCK.value or not has_buy_event:
+        # DG 代挂订单创建即把账号纳入库存，没有 BUY 事件；HS/TH 仍要求可追溯买入流水。
+        requires_buy_event = account is not None and account.inventory_type != "CONSIGNMENT"
+        if account is None or account.status != AccountStatus.IN_STOCK.value or (requires_buy_event and not has_buy_event):
             raise Validation(
-                "STOCK_SALE 要求账号已在库（已买入 HS）",
+                "STOCK_SALE 要求账号已入库且已在库",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"account_status": account.status if account else None},
             )

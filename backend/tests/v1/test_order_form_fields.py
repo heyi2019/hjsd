@@ -43,6 +43,39 @@ def test_create_and_list_custom_field(seeded_db):
     assert rows[0].field_key == "extra_tag"
 
 
+def test_operation_section_is_supported_for_custom_field(seeded_db):
+    created = ff.create_order_form_field(
+        seeded_db,
+        order_type_code="INVEDIT",
+        field_key="consignment_note",
+        label="寄售运营备注",
+        actor="admin",
+        section="OPERATION",
+    )
+    seeded_db.commit()
+
+    assert created.section == "OPERATION"
+
+    updated = ff.update_order_form_field(
+        seeded_db, created.id, actor="admin", section="OPERATION"
+    )
+    assert updated.section == "OPERATION"
+
+
+def test_custom_section_key_is_supported_for_custom_field(seeded_db):
+    created = ff.create_order_form_field(
+        seeded_db,
+        order_type_code="INVEDIT",
+        field_key="custom_ops_note",
+        label="自定义运营备注",
+        actor="admin",
+        section="CUSTOM_OPS",
+    )
+    seeded_db.commit()
+
+    assert created.section == "CUSTOM_OPS"
+
+
 def test_list_filters_inactive(seeded_db):
     ff.create_order_form_field(
         seeded_db, order_type_code="TH", field_key="a", label="A", actor="admin"

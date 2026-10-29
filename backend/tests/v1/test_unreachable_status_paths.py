@@ -11,6 +11,7 @@ QA500B 补齐轮确认这 5 个枚举值无写入路径，本文件按补齐端�
 from __future__ import annotations
 
 from datetime import date
+import pytest
 
 from app.domain.enums import (
     DepositStatus,
@@ -20,6 +21,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit
 from app.domain.trade import RebateRecord as RebateRecordModel
+from app.core.errors import Validation
 from app.finance import service as finance_service
 from app.imports import service as imports_service
 from app.policy import service as policy_service
@@ -188,7 +190,6 @@ def _make_rebate(seeded_db, *, code: str) -> RebateRecordModel:
         rebate_type="BUY",
         base_amount="100",
         collected_on=TODAY,
-        expected_on=None,
         actor="pytest",
         rate=None,
         channel=None,
@@ -198,10 +199,10 @@ def _make_rebate(seeded_db, *, code: str) -> RebateRecordModel:
 
 def test_void_open_rebate(seeded_db):
     record = _make_rebate(seeded_db, code="a1")
-    out = finance_service.void_rebate(
-        seeded_db, record.id, reason="挂错订单", actor="pytest"
-    )
-    assert out.status == RebateStatus.VOID.value
+    with pytest.raises(Validation):
+        finance_service.void_rebate(
+            seeded_db, record.id, reason="挂错订单", actor="pytest"
+        )
 
 
 def test_void_settled_rebate_rejected(seeded_db):

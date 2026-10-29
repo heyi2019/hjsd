@@ -47,11 +47,9 @@ function inventoryCellValue(value: string | null | undefined) {
 function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   const canPlatformOffsale = row.status !== "SOLD" && row.status !== "VOID";
   const canSystemOffsale = row.inventory_type === "CONSIGNMENT" && canPlatformOffsale;
+  const hasActiveConsignment = Boolean(detail?.orders.some((order) => order.order_type === "DG" && order.status !== "CANCELLED"));
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
-  if (canPlatformOffsale && detail?.orders.some((order) => order.order_type === "DG" && order.status !== "CANCELLED")) {
-    items.push({ key: "platform-remove", label: "平台下架" });
-  }
-  if (canSystemOffsale) items.push({ key: "system-remove", label: "系统下架" });
+  if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
   if (row.status !== "SOLD") {
     items.push({ key: "description", label: "账号描述" }, { key: "images", label: "账号图片" });
   }
@@ -329,12 +327,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   }
 
   function handleMoreAction(key: string, row: Account) {
-    if (key === "platform-remove") {
+    if (key === "offsale") {
       void openPlatformOffsale(row);
-      return;
-    }
-    if (key === "system-remove") {
-      void openVoid(row);
       return;
     }
     if (key === "description") {
@@ -704,6 +698,28 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         account={platformOffsaleTarget?.account ?? null}
         records={platformOffsaleTarget?.records ?? []}
         onClose={() => setPlatformOffsaleTarget(null)}
+        onSystemOffsale={async ({ reason, form_extra }) => {
+          const target = platformOffsaleTarget;
+          setPlatformOffsaleTarget(null);
+          if (!target || target.records.length === 0) return;
+          try {
+            await Promise.all(target.records.map((record) => ordersApi.cancel(record.orderId, {
+              reason,
+              form_extra_scope: "INVOID",
+              form_extra: {
+                ...form_extra,
+                platform_unlist_scope: "SYSTEM",
+                platform_unlisted_at: new Date().toISOString().slice(0, 16),
+              },
+            })));
+            appMessage.success("代挂订单已取消，账号已出库");
+            await load();
+            onOrdersChanged?.();
+          } catch (cause) {
+            setError(normalizeError(cause));
+            await load();
+          }
+        }}
         onChanged={async () => {
           const accountId = platformOffsaleTarget?.account.id;
           setPlatformOffsaleTarget(null);
@@ -732,6 +748,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           </div>
           <Form form={invEditExtraForm} layout="vertical">
             <FieldConfigScope scope="INVEDIT" active={Boolean(editingAccount)}>
+              <CustomFieldSection section="OPERATION" testIdSuffix="inv-edit-operation" />
               <CustomFieldSection testIdSuffix="inv-edit" />
             </FieldConfigScope>
           </Form>

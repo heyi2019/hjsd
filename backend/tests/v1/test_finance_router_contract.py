@@ -201,10 +201,12 @@ def test_router_get_rebate_endpoint(seeded_db):
         base_amount=Decimal("1000"),
         rate=Decimal("5"),
         collected_on=TODAY,
+        operator_user_ids=[1],
         actor="pytest",
     )
     result = finance_router.get_rebate(record.id, db=seeded_db, user=_all_scope_user())
     assert result.rebate_no == record.rebate_no
+    assert result.operator_user_ids == [1]
 
 
 # ----------------------------------------------------- settle_rebate 记录不存在

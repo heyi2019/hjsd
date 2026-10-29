@@ -140,7 +140,7 @@ def global_search(
                         id=rebate.id,
                         code=rebate.rebate_no,
                         title=rebate.rebate_no,
-                        subtitle=rebate.channel or rebate.status,
+                        subtitle=rebate.channel or "返点明细",
                         route=f"/rebates/{rebate.id}",
                     )
                 )

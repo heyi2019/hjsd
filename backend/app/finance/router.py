@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -139,7 +139,7 @@ def _deposit_out(item: Deposit) -> schemas.DepositOut:
 
 def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
     return schemas.RebateOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+        {**vars(item), "created_at": item.created_at, "operator": item.created_by, "operator_user_ids": item.operator_user_ids}
     )
 
 
@@ -553,27 +553,6 @@ def list_rebates(
     return [_rebate_out(item) for item in items]
 
 
-@router.get("/rebates/overdue", response_model=list[schemas.RebateOverdueOut])
-def list_overdue_rebates(
-    as_of: date | None = Query(default=None),
-    db: Session = Depends(get_db),
-    user: CurrentUser = read_access,
-) -> list[schemas.RebateOverdueOut]:
-    """返点预计到账日逾期清单，供通知任务和跟进台账使用。"""
-    on = as_of or date.today()
-    return [
-        schemas.RebateOverdueOut.model_validate(
-            {
-                **vars(item),
-                "created_at": item.created_at,
-                "operator": item.created_by,
-                "overdue_days": overdue_days,
-            }
-        )
-        for item, overdue_days in service.list_overdue_rebates(db, as_of=on, user=user)
-    ]
-
-
 @router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)
 def get_rebate(
     rebate_id: int,
@@ -596,9 +575,9 @@ def create_rebate(
         rebate_type=payload.rebate_type,
         base_amount=payload.base_amount,
         collected_on=payload.collected_on,
-        expected_on=payload.expected_on,
         actor=_actor(user),
         rate=payload.rate,
+        operator_user_ids=payload.operator_user_ids,
         channel=payload.channel,
         note=payload.note,
         form_extra=payload.form_extra,
@@ -607,7 +586,27 @@ def create_rebate(
     return _rebate_out(item)
 
 
-@router.post("/rebates/{rebate_id}/void", response_model=schemas.RebateOut)
+@router.patch("/rebates/{rebate_id}", response_model=schemas.RebateOut)
+def update_rebate(
+    rebate_id: int,
+    payload: schemas.RebateUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_rebate,
+) -> schemas.RebateOut:
+    item = service.update_rebate(db, rebate_id, actor=_actor(user), user=user, **payload.model_dump(exclude_unset=True))
+    return _rebate_out(item)
+
+
+@router.delete("/rebates/{rebate_id}", status_code=204)
+def delete_rebate(
+    rebate_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_rebate,
+) -> Response:
+    service.delete_rebate(db, rebate_id, actor=_actor(user), user=user)
+    return Response(status_code=204)
+
+
 def void_rebate(
     rebate_id: int,
     payload: schemas.RebateVoid,
@@ -621,9 +620,6 @@ def void_rebate(
     return _rebate_out(item)
 
 
-@router.post(
-    "/rebates/{rebate_id}/settlements", response_model=schemas.SettlementOut, status_code=201
-)
 def settle_rebate(
     rebate_id: int,
     payload: schemas.SettlementCreate,
@@ -649,9 +645,6 @@ def settle_rebate(
     return _settlement_out(item)
 
 
-@router.get(
-    "/rebates/{rebate_id}/settlements", response_model=list[schemas.SettlementOut]
-)
 def list_rebate_settlements(
     rebate_id: int,
     db: Session = Depends(get_db),
@@ -661,10 +654,6 @@ def list_rebate_settlements(
     return [_settlement_out(item) for item in items]
 
 
-@router.post(
-    "/rebates/{rebate_id}/settlements/{settlement_id}/reverse",
-    response_model=schemas.SettlementOut,
-)
 def reverse_rebate_settlement(
     rebate_id: int,
     settlement_id: int,

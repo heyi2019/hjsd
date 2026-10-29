@@ -1018,6 +1018,30 @@ class TestGetAndListOrders:
                 seeded_db, posted.id, actor="operator", reason="不能直接作废"
             )
 
+    def test_system_offsale_cancels_dg_order_and_removes_account_from_inventory(self, seeded_db):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="DG",
+            trade_date=D,
+            actor="pytest",
+            account_snapshot={"game_account": "system-offsale-dg"},
+        )
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert account.status == AccountStatus.IN_STOCK.value
+
+        cancelled = order_service.cancel_order(
+            seeded_db,
+            order.id,
+            actor="operator",
+            reason="代挂结束",
+            form_extra_scope="INVOID",
+            form_extra={"platform_unlist_scope": "SYSTEM"},
+        )
+
+        assert cancelled.status == OrderStatus.CANCELLED.value
+        assert account.status == AccountStatus.VOID.value
+
     def test_get_order_owner_scope_forbidden(self, seeded_db):
         # 他人 owner 的订单对 SELF 作用域用户同样 404（不泄露存在性）
         order = _order(seeded_db, owner_id=1)
@@ -2107,6 +2131,25 @@ class TestOrdersApi:
 
         missing = seeded_client.get("/api/v1/orders/999999", headers=headers)
         assert missing.status_code == 404
+
+    def test_detail_operator_uses_selected_employee_not_audit_actor(
+        self, seeded_client, seeded_db, headers
+    ):
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount="100.00",
+            occurred_on=D,
+            actor="login-auditor",
+            operator_user_ids=[9],
+        )
+
+        fetched = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+        assert fetched.status_code == 200, fetched.text
+        assert fetched.json()["events"][0]["operator"] == "种子用户9"
+        assert fetched.json()["cashflows"][0]["operator"] == "种子用户9"
 
     def test_order_detail_aggregates_finance_installment_and_audit(
         self, seeded_client, seeded_db, headers

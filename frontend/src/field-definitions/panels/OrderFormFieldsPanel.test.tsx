@@ -1,5 +1,5 @@
 /** OrderFormFieldsPanel 交互测试：挂载拉取、新增、行内必填开关、停用、删除、预置字段禁用。 */
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "../../shared/ui/appFeedback";
@@ -42,6 +42,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
+  localStorage.clear();
   vi.clearAllMocks();
   vi.spyOn(message, "success").mockImplementation(() => ({}) as never);
   vi.spyOn(message, "error").mockImplementation(() => ({}) as never);
@@ -52,6 +53,69 @@ beforeEach(() => {
 });
 
 describe("OrderFormFieldsPanel", () => {
+  it("显示板块管理容器并列出运营信息板块", async () => {
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+
+    expect(await screen.findByText("板块管理")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "板块键" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "板块名称" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader", { name: "排序" }).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByRole("columnheader", { name: "操作" }).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("运营信息")).toBeInTheDocument();
+    expect(screen.getByText("账号 / 产品信息")).toBeInTheDocument();
+    expect(screen.getByText("交付信息")).toBeInTheDocument();
+    expect(screen.queryByText(/选择上方「表单」可配置任意业务表单的字段/)).toBeNull();
+    expect(screen.queryByText(/可调整板块在本页的展示顺序/)).toBeNull();
+    const createContainer = screen.getByText("新增自定义字段").closest(".order-form-fields__create-container");
+    const managementCard = screen.getByText("板块管理").closest(".ant-card");
+    expect(createContainer && managementCard && (createContainer.compareDocumentPosition(managementCard) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+    const managementTable = screen.getByTestId("form-section-management");
+    const addSectionButton = within(managementCard as HTMLElement).getByText("新增板块") as HTMLElement;
+    expect(managementTable.compareDocumentPosition(addSectionButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("板块管理可以调整板块顺序", async () => {
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("板块管理");
+
+    const management = screen.getByTestId("form-section-management");
+    const codes = () => Array.from(management.querySelectorAll<HTMLElement>("tbody tr.ant-table-row"))
+      .map((item) => item.dataset.rowKey);
+    expect(codes()[0]).toBe("ACCOUNT_PRODUCT");
+    const before = codes().indexOf("OPERATION");
+    await ui.click(screen.getByRole("button", { name: "运营信息下移" }));
+    expect(codes().indexOf("OPERATION")).toBe(before + 1);
+  });
+
+  it("板块管理显示编码并可编辑板块名称", async () => {
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("板块管理");
+
+    expect(screen.getByText("OPERATION")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "编辑运营信息" }));
+    expect(await screen.findByDisplayValue("运营信息")).toHaveValue("运营信息");
+  });
+
+  it("板块管理可以编辑板块键", async () => {
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("板块管理");
+
+    await ui.click(screen.getByRole("button", { name: "编辑运营信息" }));
+    expect(await screen.findByDisplayValue("OPERATION")).toHaveValue("OPERATION");
+  });
+
+  it("板块管理可以新增板块", async () => {
+    localStorage.setItem("heijin.form-field-section-order", JSON.stringify([
+      "ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "OPERATION", "FINANCE", "EXTRA", "PARTICIPANT", "CUSTOM_OPS",
+    ]));
+    localStorage.setItem("heijin.form-field-section-labels", JSON.stringify({ CUSTOM_OPS: "自定义运营" }));
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("板块管理");
+
+    expect(screen.getByText("CUSTOM_OPS")).toBeInTheDocument();
+    expect(screen.getByText("自定义运营")).toBeInTheDocument();
+  });
+
   it("不再提供已删除的资金池账户表单入口", () => {
     expect(FORM_SCOPES_FALLBACK.map((scope) => scope.code)).not.toContain("POOLACCOUNT");
   });
@@ -148,7 +212,9 @@ describe("OrderFormFieldsPanel", () => {
     await ui.clear(labelInput);
     await ui.type(labelInput, "编辑后标签");
     await ui.click(screen.getByRole("combobox", { name: "归属板块" }));
-    await ui.click(await screen.findByText("业务方案信息"));
+    const businessOption = (await screen.findAllByText("业务方案信息")).find((element) => element.classList.contains("ant-select-item-option-content"));
+    expect(businessOption).toBeDefined();
+    await ui.click(businessOption!);
     await ui.click(screen.getByLabelText("必填"));
     const sortInput = screen.getByLabelText("排序");
     await ui.clear(sortInput);
@@ -165,6 +231,26 @@ describe("OrderFormFieldsPanel", () => {
       }),
     ));
     expect(vi.mocked(catalog.orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+  });
+
+  it("归属板块支持运营信息", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 63, field_key: "operation_note", label: "运营备注" }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("运营备注");
+
+    await ui.click(screen.getByRole("button", { name: "编辑运营备注" }));
+    await ui.click(screen.getByRole("combobox", { name: "归属板块" }));
+    const operationOption = (await screen.findAllByText("运营信息")).find((element) => element.classList.contains("ant-select-item-option-content"));
+    expect(operationOption).toBeDefined();
+    await ui.click(operationOption!);
+    await ui.click(screen.getByRole("button", { name: /保存字段/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi.update)).toHaveBeenCalledWith(
+      63,
+      expect.objectContaining({ section: "OPERATION" }),
+    ));
   });
 
   it.each(["TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT"] as const)(

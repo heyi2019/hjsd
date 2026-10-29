@@ -336,28 +336,6 @@ def test_reverse_rebate_settlement_not_visible(seeded_db):
 # test_reverse_settlement_missing_cashflow_row / _missing_fee_cashflow_row）。
 
 
-# ----------------------------------------------------- list_overdue_rebates 作用域 (516-518)
-def test_list_overdue_rebates_scoped(seeded_db):
-    assert rebates.list_overdue_rebates(
-        seeded_db, as_of=TODAY, user=_restricted_user()
-    ) == []  # 516-518
-
-
-# ----------------------------------------------------- sync 跳过无负责人订单 (537-539)
-def test_sync_overdue_rebate_notifications_skips_ownerless(seeded_db):
-    order_id = _order_with_buy(seeded_db)
-    order = seeded_db.get(Order, order_id)
-    order.owner_id = None
-    seeded_db.flush()
-    rebates.create_rebate(
-        seeded_db, source_order_id=order_id, rebate_type="BUY",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
-        expected_on=date(2026, 10, 1), collected_on=TODAY, actor="pytest",
-    )
-    result = rebates.sync_overdue_rebate_notifications(seeded_db, as_of=TODAY, actor="pytest")
-    assert result["skipped"] == 1  # 537-539
-
-
 # ----------------------------------------------------- get_rebate 作用域 (571-586)
 def test_get_rebate_no_user(seeded_db):
     record = rebates.create_rebate(

@@ -731,7 +731,7 @@
 }
 .payment-info-fields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: center;
   row-gap: var(--recovery-grid-row-gap);
   column-gap: var(--space-6);
@@ -1113,10 +1113,51 @@
   width: 100%;
 }
 
+/* 返点核心字段：四组标签与输入框紧凑横排，避免操作人掉到下一行。 */
+.recovery-order-modal .rebate-core-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  width: 100%;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-label {
+  width: auto !important;
+  min-width: max-content;
+  padding: 0 !important;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-control {
+  min-width: 0;
+  width: auto !important;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-control-input-content > * {
+  width: 100%;
+  min-width: 0;
+}
+.recovery-order-modal .rebate-core-fields .ant-form-item-explain,
+.recovery-order-modal .rebate-core-fields .ant-form-item-extra {
+  grid-column: 2;
+}
+
 @media (max-width: 720px) {
   .recovery-order-modal .custom-field-section { grid-template-columns: 1fr; }
   .recovery-order-modal .custom-field-section > .ant-typography,
   .recovery-order-modal .custom-field-section > .ant-form-item { grid-column: 1; }
+  .recovery-order-modal .rebate-core-fields { grid-template-columns: 1fr; }
+  .recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
 }
 
 .settings-tabs.ant-tabs-left > .ant-tabs-nav {

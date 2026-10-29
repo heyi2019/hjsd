@@ -224,10 +224,19 @@ class RebateCreate(RequestModel):
     # 省略时按 REBATE 规则的 config.base 从订单事件派生；显式传入始终优先。
     base_amount: Decimal | None = None
     collected_on: date
-    expected_on: date | None = None
     rate: Decimal | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     channel: str | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
+
+
+class RebateUpdate(RequestModel):
+    base_amount: Decimal | None = None
+    rate: Decimal | None = None
+    collected_on: date | None = None
+    note: str | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
 
 
@@ -244,15 +253,11 @@ class RebateOut(BaseModel):
     link_status: str
     status: str
     collected_on: date
-    expected_on: date | None = None
     note: str | None = None
     created_at: datetime
     operator: str
+    operator_user_ids: list[int] | None = None
     form_extra: dict[str, Any] | None = None
-
-
-class RebateOverdueOut(RebateOut):
-    overdue_days: int
 
 
 class SettlementCreate(RequestModel):

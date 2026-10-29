@@ -181,11 +181,8 @@ export function InventorySaleModal(props: {
         await installmentsApi.create({
           order_id: order.id,
           adjust_final_period: true,
-          contract_type: props.account.inventory_type === "PICKUP"
-            ? "PICKUP_SALE"
-            : props.account.inventory_type === "CONSIGNMENT"
-              ? "CONSIGNMENT_SALE"
-              : "STOCK_SALE",
+          // 提号、代挂账号进入库存后，分期售出统一按库存分期出售处理。
+          contract_type: "STOCK_SALE",
           principal: String(values.amount ?? 0),
           down_payment: String(values.down_payment ?? 0),
           service_fee: String(values.service_fee ?? 0),

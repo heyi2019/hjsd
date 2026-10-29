@@ -57,17 +57,27 @@ export function BusinessDictionaryPanel() {
         <Descriptions.Item label="产品类型">
           游戏类型，是产品的分类，例如王者荣耀、原神。
         </Descriptions.Item>
-        <Descriptions.Item label="库存账号">
-          产品进入库存中心后的管理对象，记录账号的业务归属、业务类型、产品类型和账号状态，承接全款或分期付款售卖；代分期账号同样计入库存，业务类型留空，以增值服务「代分期」标识。
-        </Descriptions.Item>
         <Descriptions.Item label="增值服务">
           <EntryLine
             name="分期（自营增值服务）"
-            desc="本方账号售出，买家分期支付售卖款，归自营售出，不单独产生业务编号；售出金额属于本方销售收入，买家按期回款，收齐后完成交付，每笔回款都归集到原售出订单及其分期合约。"
+            desc="本方账号售出后，买家分期支付售卖款；归自营售出，不单独产生业务编号。"
           />
           <EntryLine
             name="代分期（分销增值服务）"
-            desc="客户向本方借款，按合约分期还款；本方登记付款和收款。账号计入本方库存或销售收入，创建时生成代分期业务订单号；付款与收款须分别记录，服务费、佣金或约定返点按实际业务确认收益。"
+            desc="客户向本方借款并按合约分期还款；归分销业务。"
+          />
+        </Descriptions.Item>
+        <Descriptions.Item label="库存管理">
+          入库：订单创建成功即入库，包含回收、提号、代挂；在库：账号处于库存中心，可继续承接全款或分期付款售卖；出库：账号完成售出或系统出库（代挂下架）后离开库存中心。
+        </Descriptions.Item>
+        <Descriptions.Item label="分期管理">
+          <EntryLine
+            name="自营分期"
+            desc="账号售出后建立自营分期合约，按期登记买家回款；收齐后完成账号交付，每笔回款归集到原售出订单及其分期合约。"
+          />
+          <EntryLine
+            name="代分期"
+            desc="创建代分期业务订单和分期合约，分别登记付款、收款；账号按实际业务计入库存或销售收入，服务费、佣金或约定返点按实际业务确认收益。"
           />
         </Descriptions.Item>
         <Descriptions.Item label="业务动作">

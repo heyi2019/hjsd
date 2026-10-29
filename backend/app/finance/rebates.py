@@ -29,8 +29,8 @@ from app.domain.enums import (
     RebateType,
 )
 from app.domain.trade import Cashflow, Order, OrderEvent, RebateRecord, RebateSettlement
+from app.domain.users import User
 from app.foundation import service as foundation_service
-from app.notifications import service as notifications_service
 from app.orders import service as orders_service
 from app.orders.form_fields import validate_form_extra
 from app.orders.amounts import order_amounts
@@ -46,11 +46,11 @@ def create_rebate(
     base_amount: Any = None,
     collected_on: date,
     actor: str,
-    expected_on: date | None = None,
     rebate_type: str | None = None,
     rate: Any = None,
     channel: str | None = None,
     note: str | None = None,
+    operator_user_ids: list[int] | None = None,
     form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
@@ -113,6 +113,7 @@ def create_rebate(
             "返点比例必须在 0% 到 100% 之间",
             details={"field": "rate", "value": str(rebate_rate)},
         )
+    operator_ids = _validate_operator_user_ids(session, operator_user_ids)
     record = RebateRecord(
         rebate_no=rebate_no,
         source_order_id=order.id,
@@ -123,9 +124,10 @@ def create_rebate(
         collected_on=collected_on,
         policy_version_id=policy_version_id,
         policy_snapshot=snapshot,
-        status=RebateStatus.OPEN.value,
-        expected_on=expected_on,
+        # 返点登记即完成收入确认，不再走后续结算/冲销状态机。
+        status=RebateStatus.SETTLED.value,
         note=note,
+        operator_user_ids=operator_ids,
         form_extra=validate_form_extra(session, order_type_code="REBATE", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
@@ -141,6 +143,17 @@ def create_rebate(
         after={"source_order": order.order_no, "base_amount": str(base)},
     )
     return record
+
+
+def _validate_operator_user_ids(session: Session, operator_user_ids: list[int] | None) -> list[int] | None:
+    if operator_user_ids is None:
+        return None
+    if len(set(operator_user_ids)) != len(operator_user_ids):
+        raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
+    active_ids = set(session.scalars(select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))))
+    if active_ids != set(operator_user_ids):
+        raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
+    return operator_user_ids
 
 
 def _rebate_base_from_snapshot(
@@ -512,71 +525,6 @@ def list_rebates(
     return list(session.scalars(stmt.order_by(RebateRecord.id)).all())
 
 
-def list_overdue_rebates(
-    session: Session,
-    *,
-    as_of: date,
-    user: CurrentUser | None = None,
-) -> list[tuple[RebateRecord, int]]:
-    """列出预计到账日已过且仍未结清的返点，返回逾期天数。"""
-    stmt = (
-        select(RebateRecord)
-        .join(Order, Order.id == RebateRecord.source_order_id)
-        .where(
-            RebateRecord.expected_on.is_not(None),
-            RebateRecord.expected_on < as_of,
-            RebateRecord.status != RebateStatus.SETTLED.value,
-        )
-    )
-    scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
-    if scope is not None:
-        stmt = stmt.where(scope)
-    rows = session.scalars(
-        stmt.order_by(RebateRecord.expected_on, RebateRecord.id)
-    ).all()
-    return [(row, (as_of - row.expected_on).days) for row in rows if row.expected_on is not None]
-
-
-def sync_overdue_rebate_notifications(
-    session: Session,
-    *,
-    as_of: date,
-    actor: str,
-) -> dict[str, int | str]:
-    """为逾期返点的订单负责人生成幂等跟进通知。"""
-    created = 0
-    existing = 0
-    skipped = 0
-    for rebate, overdue_days in list_overdue_rebates(session, as_of=as_of):
-        order = session.get(Order, rebate.source_order_id)
-        if order is None or order.owner_id is None:
-            skipped += 1
-            continue
-        _, is_created = notifications_service.ensure_notification(
-            session,
-            recipient_user_id=order.owner_id,
-            notification_type="REBATE_OVERDUE",
-            title="返点到账逾期",
-            message=(
-                f"{rebate.rebate_no}：预计 {rebate.expected_on.isoformat()} 到账，"
-                f"已逾期 {overdue_days} 天。"
-            ),
-            entity_type="rebate_record",
-            entity_id=rebate.rebate_no,
-            actor=actor,
-        )
-        if is_created:
-            created += 1
-        else:
-            existing += 1
-    return {
-        "as_of": as_of.isoformat(),
-        "created": created,
-        "existing": existing,
-        "skipped": skipped,
-    }
-
-
 def get_rebate(
     session: Session,
     rebate_id: int,
@@ -604,6 +552,55 @@ def get_rebate(
 def settled_net_total(session: Session, rebate_record_id: int) -> Decimal:
     _, _, net = _effective_rebate_totals(session, rebate_record_id)
     return net
+
+
+def update_rebate(
+    session: Session,
+    rebate_id: int,
+    *,
+    actor: str,
+    base_amount: Any = None,
+    rate: Any = None,
+    collected_on: date | None = None,
+    note: str | None = None,
+    operator_user_ids: list[int] | None = None,
+    form_extra: dict[str, Any] | None = None,
+    user: CurrentUser | None = None,
+) -> RebateRecord:
+    record = get_rebate(session, rebate_id, user=user)
+    if record.status == RebateStatus.VOID.value or settled_net_total(session, record.id) != Decimal("0"):
+        raise Validation("该返点记录已作废或已产生资金流水，不能编辑", details={"rebate_record_id": record.id})
+    before = {"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note}
+    if base_amount is not None:
+        record.base_amount = _positive(base_amount, field="base_amount")
+    if rate is not None:
+        record.rate = _non_negative(rate, field="rate")
+        if record.rate > Decimal("100.00"):
+            raise Validation("返点比例必须在 0% 到 100% 之间", details={"field": "rate"})
+    if collected_on is not None:
+        assert_period_open(session, collected_on, operation="编辑返点记录")
+        record.collected_on = collected_on
+    if note is not None:
+        record.note = note
+    if operator_user_ids is not None:
+        record.operator_user_ids = _validate_operator_user_ids(session, operator_user_ids)
+    if form_extra is not None:
+        record.form_extra = validate_form_extra(session, order_type_code="REBATE", values=form_extra) or None
+    record.updated_by = actor
+    session.flush()
+    record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note})
+    return record
+
+
+def delete_rebate(session: Session, rebate_id: int, *, actor: str, user: CurrentUser | None = None) -> None:
+    record = get_rebate(session, rebate_id, user=user)
+    if record.status == RebateStatus.VOID.value or settled_net_total(session, record.id) != Decimal("0"):
+        raise Validation("该返点记录已作废或已产生资金流水，不能删除", details={"rebate_record_id": record.id})
+    rebate_no = record.rebate_no
+    status = record.status
+    session.delete(record)
+    session.flush()
+    record_audit(session, action=AuditAction.REBATE_DELETE, entity_type="rebate_record", entity_id=rebate_no, actor=actor, before={"rebate_no": rebate_no, "status": status})
 
 def void_rebate(
     session: Session,
@@ -653,14 +650,14 @@ def void_rebate(
 
 __all__ = [
     "create_rebate",
+    "delete_rebate",
     "get_rebate",
-    "list_overdue_rebates",
     "list_rebate_settlements",
     "list_rebates",
     "reverse_rebate_settlement",
     "settle_rebate",
     "settled_net_total",
-    "sync_overdue_rebate_notifications",
+    "update_rebate",
     "void_rebate",
 ]
 

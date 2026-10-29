@@ -426,7 +426,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "CUSTOMER_SELF", label: "客户自行换绑" },
   ] },
   { code: "REBATE_TYPE", label: "返点类型", group: "FUND", editable: false, options: [
-    { value: "BUY", label: "买号返点（对应回收）" },
+    { value: "BUY", label: "买号返点（对应回收/提号/代分期）" },
     { value: "SELL", label: "卖号返点（对应售出）" },
   ] },
   { code: "SEQUENCE_KEY", label: "编号域", group: "SYSTEM", editable: false, options: [

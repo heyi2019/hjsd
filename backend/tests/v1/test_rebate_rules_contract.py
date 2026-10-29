@@ -1,7 +1,7 @@
-"""REB-01-07/08 返点规则快照与逾期提醒契约测试。"""
+"""返点规则快照契约测试。"""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from app.finance import service as finance_service
@@ -69,61 +69,15 @@ def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
 
     assert record.rate == Decimal("7.50")
     assert record.policy_snapshot["config"]["rates"]["BUY"] == "7.50"
+    assert record.status == "SETTLED"
 
 
-def test_overdue_rebate_endpoint_returns_expected_day_and_expected_date(
-    seeded_client, seeded_db, headers
-):
-    record = finance_service.create_rebate(
-        seeded_db,
-        source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY",
-        base_amount=Decimal("1000"),
-        collected_on=D,
-        expected_on=D - timedelta(days=7),
-        actor="pytest",
-        rate=Decimal("5"),
-    )
-
-    response = seeded_client.get(
-        "/api/v1/rebates/overdue",
-        params={"as_of": D.isoformat()},
-        headers=headers,
-    )
-
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert len(body) == 1
-    assert body[0]["id"] == record.id
-    assert body[0]["expected_on"] == "2026-10-10"
-    assert body[0]["overdue_days"] == 7
+def test_rebate_expected_arrival_route_removed(app):
+    assert "/api/v1/rebates/overdue" not in app.openapi()["paths"]
 
 
-def test_settled_rebate_is_not_overdue(seeded_client, seeded_db, headers):
-    record = finance_service.create_rebate(
-        seeded_db,
-        source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY",
-        base_amount=Decimal("1000"),
-        collected_on=D,
-        expected_on=D - timedelta(days=1),
-        actor="pytest",
-        rate=Decimal("5"),
-    )
-    finance_service.settle_rebate(
-        seeded_db,
-        record.id,
-        gross_amount=Decimal("1000"),
-        settled_on=D,
-        pool_id=1,
-        actor="pytest",
-    )
-
-    response = seeded_client.get(
-        "/api/v1/rebates/overdue",
-        params={"as_of": D.isoformat()},
-        headers=headers,
-    )
-
-    assert response.status_code == 200
-    assert response.json() == []
+def test_rebate_legacy_action_routes_removed(app):
+    paths = app.openapi()["paths"]
+    assert "/api/v1/rebates/{rebate_id}/void" not in paths
+    assert "/api/v1/rebates/{rebate_id}/settlements" not in paths
+    assert "/api/v1/rebates/{rebate_id}/settlements/{settlement_id}/reverse" not in paths

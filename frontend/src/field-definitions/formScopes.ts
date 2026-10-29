@@ -15,7 +15,6 @@ export type FormScopeCode =
   | "CUSTOMER" | "COUNTERPARTY"
   | "INSTPAY" | "INSTRECOVER" | "INSTRESALE" | "INSTDELIVER" | "INSTCANCEL"
   | "INSTSETTLE" | "INSTDEFAULT" | "INSTWAIVE" | "INSTEXTEND"
-  | "REBATE" | "REBSETTLE" | "REBREVERSE" | "REBATEVOID"
   | "FUNDDEPOSIT" | "FUNDFLOW" | "FUNDTRANSFER" | "FUNDRECON" | "FUNDCLEAR"
   | "FUNDREJECT" | "FUNDREVERSE" | "FUNDRELEASE" | "FUNDLOSS" | "FUNDREPAIR"
   | "FUNDLOCK" | "FUNDCANCEL"
@@ -28,12 +27,11 @@ import { orderFormFieldsApi } from "../shared/api/catalog";
 export const FORM_SCOPE_GROUP_LABEL: Record<string, string> = {
   ORDER: "建单表单",
   ORDEROP: "订单操作",
-  INVENTORY: "库存",
+  INVENTORY: "库存中心",
   INVOP: "库存操作",
   CUSTOMER: "客户",
   PARTY: "客户与合作方",
-  INSTALLMENT: "分期",
-  REBATE: "返点",
+  INSTALLMENT: "分期与回款",
   FUND: "资金",
   STUDIO: "工作室",
 };
@@ -48,14 +46,13 @@ export const FORM_SCOPES_FALLBACK: { code: FormScopeCode; label: string; group: 
   { code: "ORDEREDIT", label: "编辑订单", group: "ORDEROP" },
   { code: "ORDERLINK", label: "订单关联", group: "ORDEROP" },
   { code: "ALLOCATION", label: "订单分润", group: "ORDEROP" },
-  { code: "REFUND", label: "登记退款", group: "ORDEROP" },
-  { code: "SALE", label: "库存售出", group: "INVENTORY" },
+  { code: "REFUND", label: "资金收支", group: "ORDEROP" },
+  { code: "SALE", label: "售出", group: "INVENTORY" },
   { code: "CONSIGN", label: "寄售", group: "INVENTORY" },
-  { code: "INVREBATE", label: "库存返点", group: "INVENTORY" },
-  { code: "INVREFUND", label: "库存取消交易", group: "INVOP" },
-  { code: "INVOID", label: "下架登记", group: "INVOP" },
-  { code: "INVCANCEL", label: "分期取消交易", group: "INVOP" },
-  { code: "INVEDIT", label: "编辑账号及执行明细", group: "INVOP" },
+  { code: "INVREBATE", label: "返点", group: "INVENTORY" },
+  { code: "INVREFUND", label: "库存取消交易", group: "INVENTORY" },
+  { code: "INVEDIT", label: "编辑", group: "INVENTORY" },
+  { code: "INVOID", label: "下架", group: "INVENTORY" },
   { code: "LEAD", label: "客户需求池", group: "CUSTOMER" },
   { code: "LEADCLOSE", label: "关闭需求", group: "CUSTOMER" },
   { code: "LEADCONVERT", label: "需求转单", group: "CUSTOMER" },
@@ -65,15 +62,12 @@ export const FORM_SCOPES_FALLBACK: { code: FormScopeCode; label: string; group: 
   { code: "INSTRECOVER", label: "分期回收", group: "INSTALLMENT" },
   { code: "INSTRESALE", label: "分期出售登记", group: "INSTALLMENT" },
   { code: "INSTDELIVER", label: "交付换绑", group: "INSTALLMENT" },
+  { code: "INVCANCEL", label: "分期取消交易", group: "INSTALLMENT" },
   { code: "INSTCANCEL", label: "取消退款", group: "INSTALLMENT" },
   { code: "INSTSETTLE", label: "提前结清", group: "INSTALLMENT" },
   { code: "INSTDEFAULT", label: "违约登记", group: "INSTALLMENT" },
   { code: "INSTWAIVE", label: "减免", group: "INSTALLMENT" },
   { code: "INSTEXTEND", label: "展期", group: "INSTALLMENT" },
-  { code: "REBATE", label: "新建返点", group: "REBATE" },
-  { code: "REBSETTLE", label: "返点结算", group: "REBATE" },
-  { code: "REBREVERSE", label: "返点冲销", group: "REBATE" },
-  { code: "REBATEVOID", label: "作废返点", group: "REBATE" },
   { code: "FUNDDEPOSIT", label: "押金占用", group: "FUND" },
   { code: "FUNDFLOW", label: "录入流水", group: "FUND" },
   { code: "FUNDTRANSFER", label: "资金划转", group: "FUND" },
@@ -90,6 +84,9 @@ export const FORM_SCOPES_FALLBACK: { code: FormScopeCode; label: string; group: 
   { code: "STUDIOREJ", label: "工作室拒绝", group: "STUDIO" },
   { code: "STUDIOREV", label: "工作室冲销", group: "STUDIO" },
 ];
+
+/** 表单下拉的固定业务顺序；接口返回顺序变化时仍保持一致。 */
+const FORM_SCOPE_ORDER = new Map<string, number>(FORM_SCOPES_FALLBACK.map((scope, index) => [scope.code, index]));
 
 /** 兜底标签映射（表单内可能用到的静态回退）。 */
 export const FORM_SCOPE_LABEL: Record<string, string> = Object.fromEntries(
@@ -119,9 +116,17 @@ export function buildGroupedScopeOptions(
   scopes: { code: string; label: string; group: string }[] | null | undefined,
 ): { label: string; options: { value: string; label: string }[] }[] {
   const list = scopes && scopes.length > 0 ? scopes : FORM_SCOPES_FALLBACK;
+  const orderedList = list
+    .map((scope, index) => ({ scope, index }))
+    .sort((left, right) => (
+      (FORM_SCOPE_ORDER.get(left.scope.code) ?? Number.MAX_SAFE_INTEGER) -
+      (FORM_SCOPE_ORDER.get(right.scope.code) ?? Number.MAX_SAFE_INTEGER) ||
+      left.index - right.index
+    ))
+    .map(({ scope }) => scope);
   const groups: string[] = [];
   const byGroup = new Map<string, { value: string; label: string }[]>();
-  for (const scope of list) {
+  for (const scope of orderedList) {
     if (!byGroup.has(scope.group)) {
       byGroup.set(scope.group, []);
       groups.push(scope.group);

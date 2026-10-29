@@ -23,11 +23,26 @@ from app.domain.enums import AuditAction
 from app.domain.trade import OrderFormField
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
+FIELD_SECTIONS = (
+    "EXTRA",
+    "ACCOUNT_PRODUCT",
+    "PARTICIPANT",
+    "FINANCE",
+    "BUSINESS",
+    "DELIVER",
+    "OPERATION",
+)
 REQUIRED_WHEN_OPS = ("eq", "ne", "filled")
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
+SECTION_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
 
 _UNSET: Any = object()
+
+
+def _validate_section(section: str) -> None:
+    if not isinstance(section, str) or not SECTION_KEY_PATTERN.fullmatch(section.strip()):
+        raise Validation("字段归属板块键不合法", details={"field": "section", "value": section})
 
 
 def _normalize_required_when(
@@ -251,6 +266,7 @@ def create_order_form_field(
         )
     if not isinstance(label, str) or not label.strip():
         raise Validation("字段名称不能为空", details={"field": "label"})
+    _validate_section(section)
     normalized_options = _normalize_field_options(field_type, options)
     exists = session.scalar(
         select(OrderFormField).where(
@@ -372,8 +388,7 @@ def update_order_form_field(
     }
     definition.label = next_label
     if section is not None:
-        if section not in {"EXTRA", "ACCOUNT_PRODUCT", "PARTICIPANT", "FINANCE", "BUSINESS", "DELIVER"}:
-            raise Validation("字段归属板块不合法", details={"field": "section"})
+        _validate_section(section)
         definition.section = section
     definition.field_type = next_type
     definition.options = next_options or None

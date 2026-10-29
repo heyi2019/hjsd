@@ -31,8 +31,21 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
+  vi.mocked(catalog.rebatesApi.list).mockResolvedValue([{
+    id: 41,
+    rebate_no: "HS0001-RB01",
+    source_order_id: 21,
+    rebate_type: "BUY",
+    channel: "买号返点",
+    rate: "5.00",
+    base_amount: "1000.00",
+    status: "OPEN",
+    collected_on: "2026-10-17",
+    operator: "何一",
+  }]);
   resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
   resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[0],
@@ -125,14 +138,14 @@ it("返点按买入与售出订单区分类型并登记", async () => {
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
-    expect(screen.getByText(/关联业务订单创建后即可登记返点/)).toBeInTheDocument();
-    expect(screen.getByLabelText("买号返点（对应回收）")).toBeChecked();
+    expect(screen.queryByText(/关联业务订单创建后即可登记返点/)).toBeNull();
+    expect(screen.getByLabelText("买号返点（对应回收/提号/代分期）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeEnabled();
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
-    expect(screen.getByLabelText("买号返点（对应回收）")).not.toBeChecked();
+    expect(screen.getByLabelText("买号返点（对应回收/提号/代分期）")).not.toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeChecked();
-    await ui.click(screen.getByLabelText("买号返点（对应回收）"));
-    expect(screen.getByLabelText("买号返点（对应回收）")).toBeChecked();
+    await ui.click(screen.getByLabelText("买号返点（对应回收/提号/代分期）"));
+    expect(screen.getByLabelText("买号返点（对应回收/提号/代分期）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).not.toBeChecked();
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
@@ -146,6 +159,19 @@ it("返点按买入与售出订单区分类型并登记", async () => {
     });
   });
 
+it("登记返点弹窗展示关联订单的返点明细", async () => {
+  renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  expect(await screen.findByText("返点明细")).toBeInTheDocument();
+  expect(screen.getByText("HS0001-RB01")).toBeInTheDocument();
+  expect(screen.getByText("何一")).toBeInTheDocument();
+  expect(document.querySelector(".adaptive-business-modal.recovery-order-modal")).toBeTruthy();
+  expect(document.querySelectorAll(".rebate-core-fields > .ant-form-item")).toHaveLength(4);
+  expect(screen.getByLabelText("操作人")).toBeInTheDocument();
+  expect(document.querySelector(".inventory-rebate-details .ant-table-pagination")).toBeNull();
+  expect(screen.queryByText("已结算")).toBeNull();
+  expect(screen.queryByText("未结算")).toBeNull();
+});
+
 it("提号分销已登记 BUY 后可登记买号返点", async () => {
   resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[1],
@@ -155,6 +181,6 @@ it("提号分销已登记 BUY 后可登记买号返点", async () => {
     }],
   });
   renderLight(<InventoryRebateModal account={accounts[1]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-  expect(await screen.findByLabelText("买号返点（对应回收）")).toBeChecked();
+  expect(await screen.findByLabelText("买号返点（对应回收/提号/代分期）")).toBeChecked();
 });
 });

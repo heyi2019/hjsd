@@ -7,6 +7,7 @@ import { OrdersPage, validateAllocations } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
 import { seedOptionSets } from "../test/formFieldsSeed";
+import { today } from "../shared/lib/format";
 import * as client from "../shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "../shared/api/catalog";
 
@@ -520,26 +521,27 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("alloc fail")));
   });
 
-  it("登记退款：填写金额与原因后调用 postEvent(REFUND)", async () => {
+  it("资金收支：填写金额与备注后调用 postEvent(REFUND)", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "登记退款");
-    const modal = await modalOf(/登记退款 · HS-2026-0001/);
-    await ui.type(within(modal).getByLabelText("退款金额"), "500");
-    await ui.type(within(modal).getByLabelText("退款原因"), "客户取消");
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("金额"), "500");
+    await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
+    expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(1, expect.objectContaining({ event_type: "REFUND" }))
+      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(1, expect.objectContaining({ event_type: "REFUND", occurred_on: today() }))
     );
     expect(message.success).toHaveBeenCalledWith("退款已登记");
   });
 
-  it("登记退款：提交失败提示错误并关闭 loading", async () => {
+  it("资金收支：提交失败提示错误并关闭 loading", async () => {
     vi.mocked(catalog.ordersApi.postEvent).mockRejectedValue(new Error("refund fail"));
     await openLedger();
-    await openRowMenu("HS-2026-0001", "登记退款");
-    const modal = await modalOf(/登记退款 · HS-2026-0001/);
-    await ui.type(within(modal).getByLabelText("退款金额"), "500");
-    await ui.type(within(modal).getByLabelText("退款原因"), "客户取消");
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("金额"), "500");
+    await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     await clickModalOk(modal);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("refund fail")));
   });

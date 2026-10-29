@@ -1,5 +1,5 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-/** 系统提醒：查看未读通知、标记已读并同步返点逾期提醒（SYS-01-04）。 */
+/** 系统提醒：查看未读通知并标记已读（SYS-01-04）。 */
 import { Card, Checkbox, Space } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { notificationsApi, type NotificationItem } from "../shared/api/catalog";
@@ -28,10 +28,6 @@ export function NotificationsPanel() {
     try { await notificationsApi.markRead(row.id); appMessage.success("提醒已标记为已读"); await load(); }
     catch (err) { setError(normalizeError(err)); }
   };
-  const syncOverdue = async () => {
-    try { const result = await notificationsApi.syncOverdueRebates(); appMessage.success(`逾期返点提醒已同步，新增 ${result.created} 条`); await load(); }
-    catch (err) { setError(normalizeError(err)); }
-  };
   const columns: ColumnsType<NotificationItem> = [
     { title: "提醒编号", dataIndex: "notification_no" },
     { title: "标题", dataIndex: "title" },
@@ -46,7 +42,7 @@ export function NotificationsPanel() {
     <Card
       className="glass"
       title="系统提醒"
-      extra={<Space wrap><Checkbox checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)}>仅看未读</Checkbox><PermissionButton permission="order.exception.approve" onClick={() => void syncOverdue()}>同步返点逾期提醒</PermissionButton></Space>}
+      extra={<Space wrap><Checkbox checked={unreadOnly} onChange={(event) => setUnreadOnly(event.target.checked)}>仅看未读</Checkbox></Space>}
     >
       <DataTable<NotificationItem> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText={unreadOnly ? "暂无未读提醒" : "暂无系统提醒"} onPageChange={() => undefined}/>
     </Card>

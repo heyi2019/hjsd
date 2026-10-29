@@ -89,14 +89,16 @@ export function ResizableModal({
     const startX = event.clientX;
     const startY = event.clientY;
     const widthFloor = Math.min(minWidth, window.innerWidth - 32);
+    const widthCeiling = Math.max(widthFloor, window.innerWidth - 32);
+    const heightCeiling = Math.max(minHeight, window.innerHeight - 32);
     const move = (moveEvent: globalThis.PointerEvent) => {
       moveEvent.preventDefault();
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
       const fromWest = direction.includes("w");
       const fromNorth = direction.includes("n");
-      const width = Math.max(widthFloor, initial.width + (fromWest ? -deltaX : deltaX));
-      const height = Math.max(minHeight, initial.height + (fromNorth ? -deltaY : deltaY));
+      const width = Math.min(widthCeiling, Math.max(widthFloor, initial.width + (fromWest ? -deltaX : deltaX)));
+      const height = Math.min(heightCeiling, Math.max(minHeight, initial.height + (fromNorth ? -deltaY : deltaY)));
       const left = fromWest ? initial.left + initial.width - width : initial.left;
       const top = fromNorth ? initial.top + initial.height - height : initial.top;
 

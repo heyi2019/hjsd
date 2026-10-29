@@ -3,17 +3,17 @@ import { appMessage, appModal } from "../../shared/ui/appFeedback";
  *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
 import { Card, Form, Input, InputNumber, Popconfirm, Segmented, Space, Switch, Tooltip, Typography } from "antd";
+import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { gameTypesApi, optionSetsApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { FORM_SCOPE_LABEL, buildGroupedScopeOptions, useFormScopes } from "../formScopes";
-import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { buildGroupedScopeOptions, useFormScopes } from "../formScopes";
+import { BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 
-const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
 // 这些字段的选项来自业务主数据或运行时上下文，不允许在字段配置里手工维护。
 const MANAGED_OPTION_FIELD_KEYS = [
@@ -43,6 +43,7 @@ const FIELD_SECTION_OPTIONS = [
   { value: "ACCOUNT_PRODUCT", label: "账号 / 产品信息" },
   { value: "BUSINESS", label: "业务方案信息" },
   { value: "DELIVER", label: "交付信息" },
+  { value: "OPERATION", label: "运营信息" },
   { value: "FINANCE", label: "费用与资金" },
   { value: "EXTRA", label: "其他补充信息" },
   { value: "PARTICIPANT", label: "客户 / 供货方信息" },
@@ -54,6 +55,15 @@ const ORDER_SCOPE_OPTIONS = [
   { value: "DFQ", label: "代分期" },
 ];
 const ORDER_SCOPE_CODES = new Set(ORDER_SCOPE_OPTIONS.map((item) => item.value));
+const SECTION_ORDER_STORAGE_KEY = "heijin.form-field-section-order";
+const SECTION_LABEL_STORAGE_KEY = "heijin.form-field-section-labels";
+const DEFAULT_SECTION_ORDER = FIELD_SECTION_OPTIONS.map((item) => item.value);
+type SectionManagementRow = {
+  value: string;
+  label: string;
+  count: number;
+  index: number;
+};
 
 /** 条件描述文案：如「客户来源 等于 其他」。 */
 const describeCondition = (fieldLabel: string, cond: { op: string; values?: string[] | null }): string => {
@@ -81,13 +91,13 @@ export interface OrderFormFieldsPanelProps {
 
 export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onConfigureIntermediaryPlatforms, onConfigurePools, onConfigurePartySources }: OrderFormFieldsPanelProps = {}) {
   const editorFormId = "order-form-field-editor";
-  // 词典未加载时回落模块常量，保证与改造前完全一致。
-  const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
-  // 作用域清单以后端注册表为单一事实源；接口不可用时回落本地兜底。
+  // 字段类型必须来自后端词典。
+  const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? [];
+  // 作用域清单以后端注册表为唯一事实源。
   const { scopes } = useFormScopes();
   const groupedScopeOptions = useMemo(() => buildGroupedScopeOptions(scopes), [scopes]);
   const [activeType, setActiveType] = useState<string>(
-    initialScope && FORM_SCOPE_LABEL[initialScope] ? initialScope : "HS",
+    initialScope ?? "HS",
   );
   const [rows, setRows] = useState<OrderFormField[]>([]);
   const [gameTypeNames, setGameTypeNames] = useState<string[]>([]);
@@ -97,14 +107,28 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
   const [editingId, setEditingId] = useState<number | null>(null);
   const [sectionFilter, setSectionFilter] = useState<string>("ALL");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
+  const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
+  const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
+  const [editingSectionValue, setEditingSectionValue] = useState<string | null>(null);
+  const [addingSection, setAddingSection] = useState(false);
   const editingField = rows.find((row) => row.id === editingId) ?? null;
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const [sectionDraft, setSectionDraft] = useState({ value: "", label: "" });
+  const sectionKeyInputRef = useRef<InputRef>(null);
+  const sectionLabelInputRef = useRef<InputRef>(null);
   const fieldType = Form.useWatch("field_type", form);
   const editorSection = Form.useWatch("section", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
   const managedOptionField = MANAGED_OPTION_FIELD_KEYS.includes(editingField?.field_key ?? "");
+  const orderedSectionOptions = useMemo(() => {
+    const ordered = [...sectionOrder];
+    return ordered.map((value) => {
+      const option = FIELD_SECTION_OPTIONS.find((item) => item.value === value);
+      return { value, label: sectionLabels[value] ?? option?.label ?? value };
+    });
+  }, [sectionLabels, sectionOrder]);
   const editorFieldTypeOptions = editingField && MANAGED_OPTION_FIELD_KEYS.includes(editingField.field_key)
     ? [{ value: editingField.field_type, label: "联动选择（库内主数据）" }]
     : fieldTypeOptions;
@@ -124,6 +148,104 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     (sectionFilter === "ALL" || (row.section ?? "EXTRA") === sectionFilter) &&
     (activeFilter === "ALL" || (activeFilter === "ACTIVE" ? row.is_active : !row.is_active))
   ));
+  const sectionManagementRows = orderedSectionOptions.map((section, index) => ({
+    ...section,
+    count: rows.filter((row) => (row.section ?? "EXTRA") === section.value).length,
+    index,
+  }));
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SECTION_ORDER_STORAGE_KEY) ?? "null");
+      if (Array.isArray(saved)) setSectionOrder(saved.filter((value): value is string => typeof value === "string"));
+      const labels = JSON.parse(localStorage.getItem(SECTION_LABEL_STORAGE_KEY) ?? "null");
+      if (labels && typeof labels === "object" && !Array.isArray(labels)) {
+        const nextLabels: Record<string, string> = {};
+        for (const [key, label] of Object.entries(labels as Record<string, unknown>)) {
+          if (typeof label === "string") nextLabels[key] = label;
+        }
+        setSectionLabels(nextLabels);
+      }
+    } catch {
+      // 本地排序配置损坏时回退默认顺序，不影响字段配置。
+    }
+  }, []);
+
+  const moveSection = (value: string, offset: number) => {
+    setSectionOrder((current) => {
+      const next = [...current];
+      const index = next.indexOf(value);
+      const target = index + offset;
+      if (index < 0 || target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const editSection = (value: string) => {
+    const option = orderedSectionOptions.find((item) => item.value === value);
+    if (!option) return;
+    setAddingSection(false);
+    setEditingSectionValue(value);
+    setSectionDraft({ value, label: sectionLabels[value] ?? option.label });
+  };
+
+  const beginAddSection = () => {
+    setEditingSectionValue(null);
+    setAddingSection(true);
+    setSectionDraft({ value: "", label: "" });
+  };
+
+  const saveSection = async () => {
+    const rawValue = sectionKeyInputRef.current?.input?.value ?? sectionDraft.value;
+    const label = sectionLabelInputRef.current?.input?.value ?? sectionDraft.label;
+    const value = label.trim();
+    if (!value) return;
+    const key = (rawValue ?? editingSectionValue ?? "").trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9_]{0,31}$/.test(key)) {
+      appMessage.error("板块键需为大写字母、数字或下划线，且以字母开头");
+      return;
+    }
+    if (sectionOrder.includes(key) && key !== editingSectionValue) {
+      appMessage.error("板块键已存在");
+      return;
+    }
+    if (addingSection) {
+      const nextOrder = [...sectionOrder, key];
+      const nextLabels = { ...sectionLabels, [key]: value };
+      setSectionOrder(nextOrder);
+      setSectionLabels(nextLabels);
+      localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
+      localStorage.setItem(SECTION_LABEL_STORAGE_KEY, JSON.stringify(nextLabels));
+      setAddingSection(false);
+      setSectionDraft({ value: "", label: "" });
+      return;
+    }
+    if (!editingSectionValue) return;
+    if (key !== editingSectionValue) {
+      try {
+        const affectedRows = rows.filter((row) => (row.section ?? "EXTRA") === editingSectionValue);
+        await Promise.all(affectedRows.map((row) => orderFormFieldsApi.update(row.id, { section: key })));
+        setRows((current) => current.map((row) => (
+          (row.section ?? "EXTRA") === editingSectionValue ? { ...row, section: key } : row
+        )));
+      } catch (err) {
+        setError(normalizeError(err));
+        return;
+      }
+    }
+    const nextOrder = sectionOrder.map((item) => item === editingSectionValue ? key : item);
+    const nextLabels = { ...sectionLabels };
+    delete nextLabels[editingSectionValue];
+    nextLabels[key] = value;
+    setSectionOrder(nextOrder);
+    setSectionLabels(nextLabels);
+    localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
+    localStorage.setItem(SECTION_LABEL_STORAGE_KEY, JSON.stringify(nextLabels));
+    setEditingSectionValue(null);
+    setSectionDraft({ value: "", label: "" });
+  };
 
   const load = useCallback(async (code: string) => {
     try {
@@ -220,7 +342,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     {
       title: "归属板块",
       dataIndex: "section",
-      render: (value: OrderFormField["section"]) => FIELD_SECTION_OPTIONS.find((item) => item.value === value)?.label ?? "其他补充信息",
+      render: (value: OrderFormField["section"]) => orderedSectionOptions.find((item) => item.value === value)?.label ?? "其他补充信息",
     },
     { title: "排序", dataIndex: "sort_order", width: 72 },
     { title: "类型", dataIndex: "field_type", render: (v: string, row) => MANAGED_OPTION_FIELD_KEYS.includes(row.field_key) ? "联动选择" : configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
@@ -266,7 +388,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     {
       title: "选项",
       dataIndex: "options",
-      render: (value: Array<string | { value: string; label: string }> | null | undefined, row) =>
+      render: (value: Array<{ value: string; label: string }> | null | undefined, row) =>
         row.field_key === "game_type" ? `游戏类型主数据 · ${gameTypeNames.slice(0, 2).join("、") || "暂无"}等 ${gameTypeNames.length} 项` :
         row.field_key === "channel_region" ? "游戏类型渠道／区服主数据 · 随游戏类型联动" :
         row.field_key === "intermediary_platform" ? `经手平台主数据 · ${intermediaryPlatformNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryPlatformNames.length} 项` :
@@ -344,7 +466,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
 
   const editorForm = (
     <PermissionGate permission="field-definition.manage">
-      <Form
+      <BusinessForm
         form={form}
         id={editorFormId}
         layout="inline"
@@ -363,7 +485,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
         </Form.Item>
         <Form.Item name="section" label="归属板块">
           <Select
-            options={FIELD_SECTION_OPTIONS}
+            options={orderedSectionOptions}
             className="ui-control-width-160"
             popupClassName="order-form-section-filter-pop"
           />
@@ -480,22 +602,13 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
             <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
           </Form.Item>
         )}
-      </Form>
+      </BusinessForm>
     </PermissionGate>
   );
 
   return (
     <Card className="glass" title="表单字段配置">
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
-      <Typography.Paragraph type="secondary">
-        选择上方「表单」可配置任意业务表单的字段：建单（回收/提号/代挂/代分期）、库存（售出/寄售/返点）、
-        客户需求池、分期（收款/回收/出售/换绑/取消/结清/违约/减免/展期）、返点（新建/结算/冲销）、
-        资金（占用/流水/划转/对账/核销/拒绝/冲销/释放/损失/修复/月结）。
-        可新增自定义字段、删除自定义字段（仅自定义字段可删）、停用/启用；
-        「必填」列提供行内开关（必填/选填），需要「仅在某字段取某值时必填」时在编辑区设置
-        「条件必填」（如客户来源等于「其他」时其他来源必填）。改动即时反映到对应表单。
-        当前：{FORM_SCOPE_LABEL[activeType] ?? activeType}
-      </Typography.Paragraph>
       <div className="order-form-fields__container">
         <Space className="ui-toolbar-spaced" align="center">
           <Typography.Text strong>表单</Typography.Text>
@@ -533,7 +646,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
             value={sectionFilter}
             onChange={setSectionFilter}
             className="ui-control-width-180"
-            options={[{ value: "ALL", label: "全部板块" }, ...FIELD_SECTION_OPTIONS]}
+            options={[{ value: "ALL", label: "全部板块" }, ...orderedSectionOptions]}
             popupClassName="order-form-section-filter-pop"
           />
           <Typography.Text strong>状态筛选</Typography.Text>
@@ -572,6 +685,75 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
           {editorForm}
         </div>
       ) : null}
+      <Card className="glass order-form-section-management" title="板块管理">
+        <div data-testid="form-section-management">
+          <DataTable<SectionManagementRow>
+            className="order-form-section-management__table"
+            columns={[
+              { title: "板块键", dataIndex: "value", render: (value: string) => <Typography.Text code>{value}</Typography.Text>, width: 150 },
+              {
+                title: "板块名称",
+                dataIndex: "label",
+                render: (value: string) => value,
+              },
+              { title: "字段数量", dataIndex: "count", render: (value: number) => `${value} 个字段`, width: 110 },
+              { title: "排序", render: (_value, row) => row.index + 1, width: 72 },
+              {
+                title: "操作",
+                render: (_value, row) => (
+                  <PermissionGate permission="field-definition.manage">
+                    <Space size={2}>
+                      <PermissionButton permission="field-definition.manage" size="small" aria-label={`编辑${row.label}`} onClick={() => editSection(row.value)}>编辑</PermissionButton>
+                      <PermissionButton permission="field-definition.manage" size="small" disabled={row.index === 0} aria-label={`${row.label}上移`} onClick={() => moveSection(row.value, -1)}>上移</PermissionButton>
+                      <PermissionButton permission="field-definition.manage" size="small" disabled={row.index === sectionManagementRows.length - 1} aria-label={`${row.label}下移`} onClick={() => moveSection(row.value, 1)}>下移</PermissionButton>
+                      <PermissionButton permission="field-definition.manage" size="small" onClick={() => setSectionFilter(row.value)}>查看字段</PermissionButton>
+                    </Space>
+                  </PermissionGate>
+                ),
+              },
+            ]}
+            rows={sectionManagementRows}
+            page={1}
+            pageSize={sectionManagementRows.length}
+            total={sectionManagementRows.length}
+            onPageChange={() => undefined}
+            pagination={false}
+            rowKey="value"
+          />
+        </div>
+        <PermissionGate permission="field-definition.manage">
+          {editingSectionValue || addingSection ? (
+            <div className="ui-form-spaced order-form-section-management__editor">
+              <label>
+                板块键
+                <Input
+                  aria-label="板块键"
+                  key={`section-key-${editingSectionValue ?? "new"}`}
+                  ref={sectionKeyInputRef}
+                  defaultValue={sectionDraft.value}
+                  className="ui-control-width-180"
+                  placeholder="如 ACCOUNT_SERVICE"
+                />
+              </label>
+              <label>
+                板块名称
+                <Input
+                  aria-label="板块名称"
+                  key={`section-label-${editingSectionValue ?? "new"}`}
+                  ref={sectionLabelInputRef}
+                  defaultValue={sectionDraft.label}
+                  className="ui-control-width-220"
+                />
+              </label>
+              <PermissionButton permission="field-definition.manage" type="primary" htmlType="button" onClick={() => void saveSection()}>保存板块</PermissionButton>
+              <PermissionButton permission="field-definition.manage" htmlType="button" onClick={() => { setEditingSectionValue(null); setAddingSection(false); setSectionDraft({ value: "", label: "" }); }}>取消编辑</PermissionButton>
+            </div>
+          ) : null}
+        </PermissionGate>
+        <PermissionGate permission="field-definition.manage">
+          <PermissionButton permission="field-definition.manage" type="primary" htmlType="button" onClick={beginAddSection}>新增板块</PermissionButton>
+        </PermissionGate>
+      </Card>
     </Card>
   );
 }

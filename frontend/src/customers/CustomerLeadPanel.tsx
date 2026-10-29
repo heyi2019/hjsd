@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -81,9 +81,9 @@ export function CustomerLeadPanel() {
     <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" onClick={() => setCreateOpen(true)}>新增需求</PermissionButton>}>
       <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" onPageChange={() => undefined}/>
     </Card>
-    <Modal title="新增客户需求" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+    <BusinessActionModal title="新增客户需求" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
       <FieldConfigContext.Provider value={config}>
-        <Form form={createForm} layout="vertical" onFinish={createLead}>
+        <BusinessForm scope="LEAD" form={createForm} onFinish={createLead}>
           <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
           <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select /></CfgItem>
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
@@ -91,26 +91,26 @@ export function CustomerLeadPanel() {
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-create" />
           <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>创建需求</PermissionButton>
-        </Form>
+        </BusinessForm>
       </FieldConfigContext.Provider>
-    </Modal>
-    <Modal title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
+    </BusinessActionModal>
+    <BusinessActionModal title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
       <FieldConfigScope scope="LEADCLOSE" active={Boolean(closeTarget)}>
-        <Form form={closeForm} layout="vertical" onFinish={closeLead}>
+        <BusinessForm scope="LEADCLOSE" form={closeForm} onFinish={closeLead}>
           <CfgItem name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-close" />
           <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
-        </Form>
+        </BusinessForm>
       </FieldConfigScope>
-    </Modal>
-    <Modal title="需求转单" open={Boolean(convertTarget)} onCancel={() => setConvertTarget(null)} footer={null}>
+    </BusinessActionModal>
+    <BusinessActionModal title="需求转单" open={Boolean(convertTarget)} onCancel={() => setConvertTarget(null)} footer={null}>
       <FieldConfigScope scope="LEADCONVERT" active={Boolean(convertTarget)}>
-        <Form form={convertForm} layout="vertical" onFinish={convertLead}>
+        <BusinessForm scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
           <CfgItem name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-convert" />
           <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>
-        </Form>
+        </BusinessForm>
       </FieldConfigScope>
-    </Modal>
+    </BusinessActionModal>
   </section>;
 }

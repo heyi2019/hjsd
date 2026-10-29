@@ -340,47 +340,6 @@ class TestA08Deposit:
 
 
 class TestA06Rebate:
-    def test_two_settlements_and_net_amounts(self, seeded_db):
-        account = _account(seeded_db, "reb-acc")
-        seeded_db.commit()
-        order = orders_service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
-        )
-        seeded_db.commit()
-        orders_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
-            occurred_on=TODAY, actor="pytest",
-        )
-        seeded_db.commit()
-
-        record = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount=Decimal("300"),
-            rate=Decimal("0.10"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        seeded_db.commit()
-        assert record.rebate_no == f"{order.order_no}-RB01"
-
-        profit = _pool(seeded_db, "HJ_PROFIT")
-        first = finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("200"),
-            platform_fee=Decimal("20"), settled_on=TODAY, pool_id=profit.id, actor="pytest",
-        )
-        second = finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("100"),
-            platform_fee=Decimal("10"), settled_on=TODAY, pool_id=profit.id, actor="pytest",
-        )
-        seeded_db.commit()
-
-        assert first.settlement_no == f"{order.order_no}-RB01-CF-01"
-        assert second.settlement_no == f"{order.order_no}-RB01-CF-02"
-        assert first.net_amount == Decimal("180.00")
-        assert second.net_amount == Decimal("90.00")
-        assert finance_service.settled_net_total(seeded_db, record.id) == Decimal("270.00")
 
     def test_rebate_requires_active_source_order(self, seeded_db):
         order = orders_service.create_order(

@@ -69,7 +69,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
         rebateTypeLabel(rebate.rebate_type, rebate.channel),
         order.order_no,
         rebate.rebate_no,
-        rebate.status,
+        "已登记",
         rebate.base_amount,
         `${rebate.rate}%`,
         dateTimeMinute(rebate.collected_at ?? rebate.collected_on),

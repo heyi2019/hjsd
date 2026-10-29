@@ -106,6 +106,40 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
+    @pytest.mark.parametrize(("order_type", "inventory_type"), [("TH", "PICKUP"), ("DG", "CONSIGNMENT")])
+    def test_inventory_accounts_use_stock_sale_for_th_and_dg(self, seeded_db, order_type, inventory_type):
+        source = orders_service.create_order(
+            seeded_db,
+            order_type=order_type,
+            trade_date=TODAY,
+            actor="pytest",
+            account_snapshot={"game_account": f"{order_type.lower()}-stock-sale"},
+        )
+        account = seeded_db.get(Account, source.account_id)
+        assert account is not None
+        assert account.inventory_type == inventory_type
+        if order_type == "TH":
+            _buy(seeded_db, source.id)
+
+        sale = orders_service.create_order(
+            seeded_db,
+            order_type=order_type,
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+        )
+        contract = _contract(
+            seeded_db,
+            sale.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal="100",
+            down_payment="0",
+            periods=1,
+            per_period="100",
+        )
+
+        assert contract.contract_type == InstallmentContractType.STOCK_SALE.value
+
     @pytest.mark.parametrize(
         ("order_type", "contract_type"),
         [

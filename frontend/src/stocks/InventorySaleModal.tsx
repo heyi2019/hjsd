@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存账号售出：回收 / 代挂账号从库存中心售出，按货源类型映射订单类型。 */
-import { DatePicker, Form, Input, Modal, Radio } from "antd";
+import { DatePicker, Form, Input, Radio } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -14,13 +14,12 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { ErrorBanner, MoneyInput, PermissionButton, ResizableModal, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
 import { InstallmentScheduleFields, resizeInstallmentSchedule, serializeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSection";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
-import { getRecoveryLayout } from "../orders/recovery/recoveryConfig";
 import "./InventorySaleModal.css";
 
 /** 库存账号售出：按货源类型映射回收 / 代挂订单类型。 */
@@ -181,11 +180,8 @@ export function InventorySaleModal(props: {
         await installmentsApi.create({
           order_id: order.id,
           adjust_final_period: true,
-          contract_type: props.account.inventory_type === "PICKUP"
-            ? "PICKUP_SALE"
-            : props.account.inventory_type === "CONSIGNMENT"
-              ? "CONSIGNMENT_SALE"
-              : "STOCK_SALE",
+          // 提号、代挂账号进入库存后，分期售出统一按库存分期出售处理。
+          contract_type: "STOCK_SALE",
           principal: String(values.amount ?? 0),
           down_payment: String(values.down_payment ?? 0),
           service_fee: String(values.service_fee ?? 0),
@@ -221,12 +217,10 @@ export function InventorySaleModal(props: {
   };
 
   return (
-    <Modal
-      title={<span className="resizable-modal__drag-handle">售出账号</span>}
+    <BusinessActionModal
+      title="售出账号"
       open={open}
       className="inventory-sale-modal recovery-order-modal"
-      wrapClassName="adaptive-business-modal recovery-order-modal"
-      modalRender={(modal) => <ResizableModal getLayout={getRecoveryLayout} layoutAttribute="data-recovery-layout">{modal}</ResizableModal>}
       destroyOnHidden
       onCancel={props.onClose}
       footer={
@@ -238,7 +232,7 @@ export function InventorySaleModal(props: {
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
-        <Form form={form} layout="vertical" onFinish={submit}>
+        <BusinessForm scope="SALE" form={form} onFinish={submit}>
           <RecoveryCustomerSection title="买家信息" />
           <CfgItem name="bound_phone" label="换绑手机号">
             <Input placeholder="可选填" />
@@ -275,8 +269,8 @@ export function InventorySaleModal(props: {
             <AdditionalFeeFields pools={pools} />
           </section>
           <CustomFieldSection testIdSuffix="inventory-sale" />
-        </Form>
+        </BusinessForm>
       </FieldConfigContext.Provider>
-    </Modal>
+    </BusinessActionModal>
   );
 }

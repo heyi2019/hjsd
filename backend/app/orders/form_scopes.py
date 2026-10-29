@@ -1,7 +1,7 @@
 """orders.form_scopes：表单作用域注册表（全站单一事实源）。
 
 设置页「表单字段」的作用域清单由此定义，经 GET /order-form-fields/scopes 下发；
-前端 formScopes.ts 仅保留类型与降级兜底，不再维护第二份清单。
+前端只消费接口返回的作用域，不再维护第二份清单。
 每个作用域对应一个可配置字段的业务表单（弹窗/面板），种子字段见各迁移。
 """
 from __future__ import annotations
@@ -24,7 +24,6 @@ GROUP_INVENTORY_OP = "INVOP"
 GROUP_CUSTOMER = "CUSTOMER"
 GROUP_PARTY = "PARTY"
 GROUP_INSTALLMENT = "INSTALLMENT"
-GROUP_REBATE = "REBATE"
 GROUP_FUND = "FUND"
 GROUP_STUDIO = "STUDIO"
 
@@ -39,16 +38,14 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("ORDEREDIT", "编辑订单", GROUP_ORDER_OP),
     FormScope("ORDERLINK", "订单关联", GROUP_ORDER_OP),
     FormScope("ALLOCATION", "订单分润", GROUP_ORDER_OP),
-    FormScope("REFUND", "登记退款", GROUP_ORDER_OP),
-    # ---- 库存（迁移 0003）----
-    FormScope("SALE", "库存售出", GROUP_INVENTORY),
+    FormScope("REFUND", "资金收支", GROUP_ORDER_OP),
+    # ---- 库存中心（迁移 0003；按库存中心页面操作顺序）----
+    FormScope("SALE", "售出", GROUP_INVENTORY),
     FormScope("CONSIGN", "寄售", GROUP_INVENTORY),
-    FormScope("INVREBATE", "库存返点", GROUP_INVENTORY),
-    # ---- 库存操作（迁移 0019）----
-    FormScope("INVREFUND", "库存取消交易", GROUP_INVENTORY_OP),
-    FormScope("INVOID", "下架登记", GROUP_INVENTORY_OP),
-    FormScope("INVCANCEL", "分期退款终止", GROUP_INVENTORY_OP),
-    FormScope("INVEDIT", "编辑账号及执行明细", GROUP_INVENTORY_OP),
+    FormScope("INVREBATE", "返点", GROUP_INVENTORY),
+    FormScope("INVREFUND", "库存取消交易", GROUP_INVENTORY),
+    FormScope("INVEDIT", "编辑", GROUP_INVENTORY),
+    FormScope("INVOID", "下架", GROUP_INVENTORY),
     # ---- 客户（迁移 0003 / 0004）----
     FormScope("LEAD", "客户需求池", GROUP_CUSTOMER),
     FormScope("LEADCLOSE", "关闭需求", GROUP_CUSTOMER),
@@ -61,16 +58,12 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("INSTRECOVER", "分期回收", GROUP_INSTALLMENT),
     FormScope("INSTRESALE", "分期出售登记", GROUP_INSTALLMENT),
     FormScope("INSTDELIVER", "交付换绑", GROUP_INSTALLMENT),
+    FormScope("INVCANCEL", "分期取消交易", GROUP_INSTALLMENT),
     FormScope("INSTCANCEL", "取消退款", GROUP_INSTALLMENT),
     FormScope("INSTSETTLE", "提前结清", GROUP_INSTALLMENT),
     FormScope("INSTDEFAULT", "违约登记", GROUP_INSTALLMENT),
     FormScope("INSTWAIVE", "减免", GROUP_INSTALLMENT),
     FormScope("INSTEXTEND", "展期", GROUP_INSTALLMENT),
-    # ---- 返点（迁移 0003）----
-    FormScope("REBATE", "新建返点", GROUP_REBATE),
-    FormScope("REBSETTLE", "返点结算", GROUP_REBATE),
-    FormScope("REBREVERSE", "返点冲销", GROUP_REBATE),
-    FormScope("REBATEVOID", "作废返点", GROUP_REBATE),
     # ---- 资金（迁移 0003）----
     FormScope("FUNDDEPOSIT", "押金占用", GROUP_FUND),
     FormScope("FUNDFLOW", "录入流水", GROUP_FUND),

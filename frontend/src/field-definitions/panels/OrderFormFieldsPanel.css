@@ -26,6 +26,22 @@
   background: var(--glass-hi-tint);
 }
 
+.order-form-section-management {
+  margin-top: var(--space-4);
+}
+
+.order-form-section-management .ant-card-body {
+  padding-top: var(--space-3);
+}
+
+.order-form-section-management__table .ant-table-wrapper {
+  margin-top: var(--space-3);
+}
+
+.order-form-section-management__editor {
+  margin-top: var(--space-3);
+}
+
 /* 板块名称较长时，弹层按完整文案展开，不截断为省略号。 */
 .order-form-section-filter-pop.ant-select-dropdown {
   min-width: 190px !important;

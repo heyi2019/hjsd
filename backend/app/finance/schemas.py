@@ -62,11 +62,6 @@ class DepositCancel(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
-class RebateVoid(RequestModel):
-    reason: str = Field(min_length=1, max_length=2000)
-    form_extra: dict[str, Any] | None = None
-
-
 class DepositOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -224,10 +219,19 @@ class RebateCreate(RequestModel):
     # 省略时按 REBATE 规则的 config.base 从订单事件派生；显式传入始终优先。
     base_amount: Decimal | None = None
     collected_on: date
-    expected_on: date | None = None
     rate: Decimal | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     channel: str | None = None
     note: str | None = None
+    form_extra: dict[str, Any] | None = None
+
+
+class RebateUpdate(RequestModel):
+    base_amount: Decimal | None = None
+    rate: Decimal | None = None
+    collected_on: date | None = None
+    note: str | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
 
 
@@ -244,48 +248,10 @@ class RebateOut(BaseModel):
     link_status: str
     status: str
     collected_on: date
-    expected_on: date | None = None
     note: str | None = None
     created_at: datetime
     operator: str
-    form_extra: dict[str, Any] | None = None
-
-
-class RebateOverdueOut(RebateOut):
-    overdue_days: int
-
-
-class SettlementCreate(RequestModel):
-    gross_amount: Decimal
-    settled_on: date
-    pool_id: int
-    platform_fee: Decimal = Decimal("0")
-    note: str | None = None
-    form_extra: dict[str, Any] | None = None
-
-
-class SettlementOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    settlement_no: str
-    rebate_record_id: int
-    gross_amount: Decimal
-    platform_fee: Decimal
-    net_amount: Decimal
-    settled_on: date
-    cashflow_id: int | None = None
-    reversal_of_id: int | None = None
-    note: str | None = None
-    created_at: datetime
-    operator: str
-    form_extra: dict[str, Any] | None = None
-    form_extra: dict[str, Any] | None = None
-
-
-class SettlementReverse(RequestModel):
-    reversed_on: date
-    reason: str
+    operator_user_ids: list[int] | None = None
     form_extra: dict[str, Any] | None = None
 
 
@@ -309,7 +275,4 @@ __all__ = [
     "TransferOut",
     "RebateCreate",
     "RebateOut",
-    "SettlementCreate",
-    "SettlementOut",
-    "SettlementReverse",
 ]

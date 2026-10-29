@@ -141,10 +141,6 @@ def test_rebate_module_creates_record_directly(seeded_db):
     assert record.rate == Decimal("5.00")
 
 
-def test_finance_facade_re_exports_rebate_module_entries():
-    assert finance_service.create_rebate is rebates.create_rebate
-    assert finance_service.settle_rebate is rebates.settle_rebate
-    assert finance_service.get_rebate is rebates.get_rebate
 
 
 # ----------------------------------------------------- 费率快照解析分支
@@ -230,103 +226,20 @@ def test_create_rebate_sell_dfq_allows_created_order(seeded_db):
 
 
 # ----------------------------------------------------- settle_rebate 订单不可见 (201-202)
-def test_settle_rebate_order_hidden(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    with pytest.raises(NotFound):
-        rebates.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("10"),
-            settled_on=TODAY, pool_id=1, actor="pytest",
-            user=_restricted_user(),
-        )  # 199-205
 
 
 # ----------------------------------------------------- list_rebate_settlements 未知 (336)
-def test_list_rebate_settlements_unknown(seeded_db):
-    with pytest.raises(NotFound):
-        rebates.list_rebate_settlements(seeded_db, 999999)  # 334-339
 
 
 # ----------------------------------------------------- reverse_rebate_settlement 各类校验
-def test_reverse_rebate_settlement_unknown_record(seeded_db):
-    with pytest.raises(NotFound):
-        rebates.reverse_rebate_settlement(
-            seeded_db, 999999, 1, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 368-373
 
 
-def test_reverse_rebate_settlement_unknown_settlement(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    with pytest.raises(NotFound):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, 999999, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 381-385
 
 
-def test_reverse_rebate_settlement_already_reversed(seeded_db):
-    record, settle = _rebate_and_settlement(seeded_db)
-    reversal = rebates.reverse_rebate_settlement(
-        seeded_db, record.id, settle.id, reversed_on=TODAY, actor="pytest", reason="x"
-    )
-    with pytest.raises(Validation, match="冲销记录不能再次冲销"):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, reversal.id, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 387
 
 
-def test_reverse_rebate_settlement_missing_cashflow(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    settle = RebateSettlement(
-        rebate_record_id=record.id, settled_on=TODAY, settlement_no="X-MISSING",
-        gross_amount=Decimal("10"), platform_fee=Decimal("0"),
-        net_amount=Decimal("10"), cashflow_id=None,
-        created_by="pytest", updated_by="pytest",
-    )
-    seeded_db.add(settle)
-    seeded_db.flush()
-    with pytest.raises(Validation, match="返点结算缺少资金流水"):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, settle.id, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 394-395
 
 
-def test_reverse_rebate_settlement_not_visible(seeded_db):
-    from app.domain.trade import Order
-
-    # 受限用户用已存在的用户 id=2（满足 orders.owner_id 外键），
-    # 但池授权为空：能看订单、看不到现金流所在资金池 1，从而触发 400。
-    vis_user = CurrentUser(
-        id=2, username="vis", roles=(), owner_scope="SELF", pool_ids=frozenset()
-    )
-    order_id = _order_with_buy(seeded_db)
-    order = seeded_db.get(Order, order_id)
-    order.owner_id = 2
-    seeded_db.flush()
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=order_id, rebate_type="BUY",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    settle = rebates.settle_rebate(
-        seeded_db, record.id, gross_amount=Decimal("10"),
-        settled_on=TODAY, pool_id=1, actor="pytest",
-    )
-    with pytest.raises(NotFound):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, settle.id, reversed_on=TODAY, actor="pytest",
-            reason="x", user=vis_user,
-        )  # 399-400
 
 
 # 注：429 / 463 为外键保证的防御分支（cashflow_id / fee_cashflow_id 指向
@@ -334,28 +247,6 @@ def test_reverse_rebate_settlement_not_visible(seeded_db):
 # 与 reconciliation L153 纯逻辑死代码不同，此处是依赖 FK 的有效防御，保留不删；
 # 已由原生 sqlite3 连接绕过 FK 造脏态覆盖（见 test_finance_reporting_task5_tail.py 的
 # test_reverse_settlement_missing_cashflow_row / _missing_fee_cashflow_row）。
-
-
-# ----------------------------------------------------- list_overdue_rebates 作用域 (516-518)
-def test_list_overdue_rebates_scoped(seeded_db):
-    assert rebates.list_overdue_rebates(
-        seeded_db, as_of=TODAY, user=_restricted_user()
-    ) == []  # 516-518
-
-
-# ----------------------------------------------------- sync 跳过无负责人订单 (537-539)
-def test_sync_overdue_rebate_notifications_skips_ownerless(seeded_db):
-    order_id = _order_with_buy(seeded_db)
-    order = seeded_db.get(Order, order_id)
-    order.owner_id = None
-    seeded_db.flush()
-    rebates.create_rebate(
-        seeded_db, source_order_id=order_id, rebate_type="BUY",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
-        expected_on=date(2026, 10, 1), collected_on=TODAY, actor="pytest",
-    )
-    result = rebates.sync_overdue_rebate_notifications(seeded_db, as_of=TODAY, actor="pytest")
-    assert result["skipped"] == 1  # 537-539
 
 
 # ----------------------------------------------------- get_rebate 作用域 (571-586)

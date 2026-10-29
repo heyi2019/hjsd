@@ -104,7 +104,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
     ),
     ListScope(
         code="REBATE",
-        label="返点",
+        label="返点明细",
         columns=(
             ListColumn("rebate_no", "返点单号", locked=True),
             ListColumn("source_order", "来源订单"),
@@ -114,7 +114,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("party", "对方"),
             ListColumn("base_amount", "基数"),
             ListColumn("rate", "费率"),
-            ListColumn("expected_on", "预计到账"),
             ListColumn("status", "状态"),
             ListColumn("actions", "操作", locked=True),
         ),

@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
-import { DatePicker, Form, Modal, Table } from "antd";
+import { DatePicker, Form, Table } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import {
@@ -11,7 +11,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 
@@ -90,7 +90,7 @@ export function InventoryConsignmentModal(props: {
   };
 
   return (
-    <Modal
+    <BusinessActionModal
       title="登记寄售"
       open={open}
       destroyOnHidden
@@ -104,7 +104,8 @@ export function InventoryConsignmentModal(props: {
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
-        <Form
+        <BusinessForm
+          scope="CONSIGN"
           form={form}
           layout="horizontal"
           labelAlign="left"
@@ -141,9 +142,10 @@ export function InventoryConsignmentModal(props: {
               locale={{ emptyText: "暂无上架记录" }}
             />
           </section>
+          <CustomFieldSection section="OPERATION" testIdSuffix="inventory-consignment-operation" />
           <CustomFieldSection testIdSuffix="inventory-consignment" />
-        </Form>
+        </BusinessForm>
       </FieldConfigContext.Provider>
-    </Modal>
+    </BusinessActionModal>
   );
 }

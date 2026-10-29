@@ -313,7 +313,7 @@ class TestEventRules:
             order_type=order_type,
             trade_date=TODAY,
             actor="pytest",
-            game_account="inline-recovery-account",
+            account_snapshot={"game_account": "inline-recovery-account"},
         )
 
         assert order.account_id is not None
@@ -341,7 +341,7 @@ class TestEventRules:
     def test_inline_consignment_creates_inventory(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
-            game_account="inline-consignment-account",
+            account_snapshot={"game_account": "inline-consignment-account"},
         )
         account = seeded_db.get(Account, order.account_id)
         assert account is not None

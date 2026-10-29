@@ -19,6 +19,7 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
   ACCOUNT_PRODUCT: "账号 / 产品补充信息",
   BUSINESS: "业务方案补充信息",
   DELIVER: "交付补充信息",
+  OPERATION: "运营信息",
   FINANCE: "费用与资金补充信息",
   PARTICIPANT: "客户 / 供货方补充信息",
   EXTRA: "其他补充信息",
@@ -283,13 +284,16 @@ export function CustomFieldSection(props: { testIdSuffix?: string; section?: Ord
   );
 }
 
-/** 解析配置选项：兼容纯字符串数组（value=label）与 {value,label} 对象数组。 */
+/** 解析配置选项：后端只返回 {value,label} 对象。 */
 export function resolveOptionItems(
-  options: Array<string | { value: string; label: string }> | null | undefined,
+  options: Array<{ value: string; label: string }> | null | undefined,
 ): Array<{ value: string; label: string }> {
-  return (options ?? []).map((item) =>
-    typeof item === "string" ? { value: item, label: item } : { value: item.value, label: item.label },
-  );
+  return (options ?? []).map((item) => {
+    if (!item || typeof item !== "object" || typeof item.value !== "string" || typeof item.label !== "string") {
+      throw new Error("选项必须使用 value/label 对象");
+    }
+    return item;
+  });
 }
 
 export type FormExtraStatus = "active" | "inactive" | "deleted";

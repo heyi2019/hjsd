@@ -9,9 +9,9 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import NotFound
+from app.core.audit import record_audit
 from app.core.security import (
     PERM_DEPOSIT_POST,
     PERM_FINANCE_READ,
@@ -22,9 +22,9 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AuditAction
 from app.finance import schemas, service
-from app.domain.trade import Deposit, Order, RebateRecord
+from app.domain.enums import AuditAction
+from app.domain.trade import Deposit, Order
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.orders import service as orders_service
 from app.parties import service as parties_service
@@ -142,13 +142,7 @@ def _deposit_out(item: Deposit) -> schemas.DepositOut:
 
 def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
     return schemas.RebateOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
-    )
-
-
-def _settlement_out(item) -> schemas.SettlementOut:
-    return schemas.SettlementOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+        {**vars(item), "created_at": item.created_at, "operator": item.created_by, "operator_user_ids": item.operator_user_ids}
     )
 
 
@@ -263,7 +257,6 @@ def export_cashflows_csv(
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> Response:
-    """资金流水按可见列导出 CSV：直接复用 /cashflows 路由函数，池权限分支零漂移。"""
     result = list_cashflows(
         pool_id=pool_id,
         order_id=order_id,
@@ -609,7 +602,7 @@ def export_rebates_csv(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> Response:
-    """返点按可见列导出 CSV：同 /rebates 口径，天然全量。"""
+    """返点按可见列导出 CSV，沿用 /rebates 的权限口径。"""
     outputs = list_rebates(source_order_id=source_order_id, db=db, _user=_user)
     rows = [output.model_dump() for output in outputs]
     csv_text, meta = build_list_csv(db, "REBATE", rows)
@@ -622,27 +615,6 @@ def export_rebates_csv(
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
     return csv_file_response(csv_text, f"返点-{date.today().isoformat()}.csv")
-
-
-@router.get("/rebates/overdue", response_model=list[schemas.RebateOverdueOut])
-def list_overdue_rebates(
-    as_of: date | None = Query(default=None),
-    db: Session = Depends(get_db),
-    user: CurrentUser = read_access,
-) -> list[schemas.RebateOverdueOut]:
-    """返点预计到账日逾期清单，供通知任务和跟进台账使用。"""
-    on = as_of or date.today()
-    return [
-        schemas.RebateOverdueOut.model_validate(
-            {
-                **vars(item),
-                "created_at": item.created_at,
-                "operator": item.created_by,
-                "overdue_days": overdue_days,
-            }
-        )
-        for item, overdue_days in service.list_overdue_rebates(db, as_of=on, user=user)
-    ]
 
 
 @router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)
@@ -667,9 +639,9 @@ def create_rebate(
         rebate_type=payload.rebate_type,
         base_amount=payload.base_amount,
         collected_on=payload.collected_on,
-        expected_on=payload.expected_on,
         actor=_actor(user),
         rate=payload.rate,
+        operator_user_ids=payload.operator_user_ids,
         channel=payload.channel,
         note=payload.note,
         form_extra=payload.form_extra,
@@ -678,82 +650,25 @@ def create_rebate(
     return _rebate_out(item)
 
 
-@router.post("/rebates/{rebate_id}/void", response_model=schemas.RebateOut)
-def void_rebate(
+@router.patch("/rebates/{rebate_id}", response_model=schemas.RebateOut)
+def update_rebate(
     rebate_id: int,
-    payload: schemas.RebateVoid,
+    payload: schemas.RebateUpdate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
 ) -> schemas.RebateOut:
-    """作废返点记录：仅零结算（OPEN）可作废；已有结算走结算冲销。"""
-    item = service.void_rebate(
-        db, rebate_id, reason=payload.reason, form_extra=payload.form_extra, actor=_actor(user), user=user
-    )
+    item = service.update_rebate(db, rebate_id, actor=_actor(user), user=user, **payload.model_dump(exclude_unset=True))
     return _rebate_out(item)
 
 
-@router.post(
-    "/rebates/{rebate_id}/settlements", response_model=schemas.SettlementOut, status_code=201
-)
-def settle_rebate(
+@router.delete("/rebates/{rebate_id}", status_code=204)
+def delete_rebate(
     rebate_id: int,
-    payload: schemas.SettlementCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
-) -> schemas.SettlementOut:
-    rebate = db.get(RebateRecord, rebate_id)
-    if rebate is None:
-        raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
-    orders_service.get_order(db, rebate.source_order_id, user)
-    item = service.settle_rebate(
-        db,
-        rebate_id,
-        gross_amount=payload.gross_amount,
-        settled_on=payload.settled_on,
-        pool_id=payload.pool_id,
-        actor=_actor(user),
-        platform_fee=payload.platform_fee,
-        note=payload.note,
-        form_extra=payload.form_extra,
-        user=user,
-    )
-    return _settlement_out(item)
-
-
-@router.get(
-    "/rebates/{rebate_id}/settlements", response_model=list[schemas.SettlementOut]
-)
-def list_rebate_settlements(
-    rebate_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = read_access,
-) -> list[schemas.SettlementOut]:
-    items = service.list_rebate_settlements(db, rebate_id, user=user)
-    return [_settlement_out(item) for item in items]
-
-
-@router.post(
-    "/rebates/{rebate_id}/settlements/{settlement_id}/reverse",
-    response_model=schemas.SettlementOut,
-)
-def reverse_rebate_settlement(
-    rebate_id: int,
-    settlement_id: int,
-    payload: schemas.SettlementReverse,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> schemas.SettlementOut:
-    item = service.reverse_rebate_settlement(
-        db,
-        rebate_id,
-        settlement_id,
-        reversed_on=payload.reversed_on,
-        actor=_actor(user),
-        reason=payload.reason,
-        form_extra=payload.form_extra,
-        user=user,
-    )
-    return _settlement_out(item)
+) -> Response:
+    service.delete_rebate(db, rebate_id, actor=_actor(user), user=user)
+    return Response(status_code=204)
 
 
 __all__ = ["router"]

@@ -1,5 +1,5 @@
-import { Alert, Form, Input, InputNumber, Modal, Space, Typography } from "antd";
-import { Select } from "../shared/ui";
+import { Alert, Form, Input, InputNumber, Space, Typography } from "antd";
+import { BusinessActionModal, BusinessForm, Select } from "../shared/ui";
 import { useEffect, useState } from "react";
 import {
   configToFields,
@@ -123,7 +123,7 @@ export function PolicyVersionEditorModal({
   };
 
   return (
-    <Modal
+    <BusinessActionModal
       open={open}
       title="设置配置"
       okText="保存"
@@ -133,7 +133,7 @@ export function PolicyVersionEditorModal({
       onCancel={onCancel}
       onOk={() => void form.submit()}
     >
-      <Form form={form} layout="vertical" onFinish={onFinish}>
+      <BusinessForm form={form} onFinish={onFinish}>
         <Space direction="horizontal" size="middle" className="policy-version-date-row">
           <Form.Item
             name="effective_from"
@@ -190,7 +190,7 @@ export function PolicyVersionEditorModal({
           （仅在登记返点时未手填费率的情况下生效）；<strong>提成分配比例</strong>按动作留存口径，
           订单「分润」仍按单录入；分期、跌价、退款的参数仅作口径留痕，接入计算前不改变金额。
         </Typography.Paragraph>
-      </Form>
-    </Modal>
+      </BusinessForm>
+    </BusinessActionModal>
   );
 }

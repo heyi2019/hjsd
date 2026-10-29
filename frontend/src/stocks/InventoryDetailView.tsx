@@ -2,19 +2,17 @@ import { Descriptions, Image, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { ReactNode } from "react";
 import type { Account, AccountAuditEntry, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
-import { DataTable, MoneyInput, MoneyText, Select, StatusTag } from "../shared/ui";
+import { DataTable, MoneyInput, MoneyText, Select } from "../shared/ui";
 import "./InventoryDetail.css";
 
 export type InventoryFinanceRow = {
   key: string;
   type: string;
-  direction: "支出" | "收入" | "待结算";
+  direction: "支出" | "收入";
   amount: string;
   rate: string;
   occurredAt: string;
   poolName: string;
-  rebateStatus?: string;
-  expectedRebate?: string;
   event?: AccountExecutionEvent | null;
 };
 
@@ -142,16 +140,15 @@ export function InventoryDetailView({
       render: (value: string, financeRow) => (
         <div className="inventory-finance-table__amount">
           <MoneyText value={value} />
-          {financeRow.expectedRebate ? <Typography.Text type="secondary">预计返点 {financeRow.expectedRebate}</Typography.Text> : null}
         </div>
       ),
     },
     { title: "比例", dataIndex: "rate", key: "rate", align: "right" },
     { title: "时间", dataIndex: "occurredAt", key: "occurredAt" },
     {
-      title: "资金池 / 状态",
+      title: "资金池",
       key: "poolName",
-      render: (_value, financeRow) => financeRow.rebateStatus ? <StatusTag status={financeRow.rebateStatus} /> : financeRow.poolName,
+      render: (_value, financeRow) => financeRow.poolName,
     },
   ];
 

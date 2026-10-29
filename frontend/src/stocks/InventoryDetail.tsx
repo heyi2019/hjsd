@@ -126,11 +126,6 @@ function orderExtraValues(detail: AccountExecutionDetail | undefined): Array<{ k
   return values;
 }
 
-function estimatedRebateAmount(baseAmount: string, rate: string): string {
-  const amount = Number(baseAmount) * Number(rate) / 100;
-  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
-}
-
 export function InventoryDetail({
   row,
   detail,
@@ -177,13 +172,12 @@ export function InventoryDetail({
     ...rebateItems.map(({ rebate }) => ({
       key: `rebate-${rebate.id}`,
       type: rebateTypeLabel(rebate.rebate_type, rebate.channel),
-      direction: rebate.status === "SETTLED" ? "收入" as const : "待结算" as const,
+      // 返点登记即完成收入记录，不再区分待结算/已结算。
+      direction: "收入" as const,
       amount: rebate.base_amount,
       rate: `${rebate.rate}%`,
       occurredAt: dateTimeMinute(rebate.collected_at ?? rebate.collected_on),
       poolName: "-",
-      rebateStatus: rebate.status,
-      expectedRebate: estimatedRebateAmount(rebate.base_amount, rebate.rate),
     })),
   ];
 

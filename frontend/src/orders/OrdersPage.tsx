@@ -1,7 +1,8 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Button, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   installmentsApi,
@@ -16,7 +17,7 @@ import {
   type OrderType,
   type Pool,
 } from "../shared/api/catalog";
-import { normalizeError } from "../shared/api/client";
+import { currentDevUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
@@ -36,6 +37,10 @@ import {
   Select,
   StatusTag,
   ConfirmButton,
+  AdaptiveFormGrid,
+  ResizableModal,
+  BusinessActionModal,
+  BusinessForm,
 } from "../shared/ui";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
@@ -90,26 +95,6 @@ function MobileOrderList(props: {
 
 type BusinessFilterKey = "all" | "HS" | "TH" | "DG" | "DFQ";
 type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
-
-/** 建关联时关系下拉的回落值；措辞比词典 label 长，用于说明方向，词典加载后由词典接管。 */
-const RELATION_TYPE_FALLBACK: Array<{ value: string; label: string }> = [
-  { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" },
-  { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
-];
-
-const BUSINESS_FILTERS: Array<{ key: BusinessFilterKey; label: string }> = [
-  { key: "all", label: "全部" },
-  { key: "HS", label: "回收" },
-  { key: "TH", label: "提号" },
-  { key: "DG", label: "代挂" },
-  { key: "DFQ", label: "代分期" },
-];
-
-const BUSINESS_MODE_FILTERS: Array<{ key: BusinessModeFilterKey; label: string }> = [
-  { key: "all", label: "全部业务" },
-  { key: "SELF", label: "自营" },
-  { key: "DISTRIBUTION", label: "分销" },
-];
 
 const BUSINESS_CREATE_ITEMS = [
   { key: "HS", label: "新建回收订单" },
@@ -179,15 +164,6 @@ export function validateAllocations(
   }
   return { ok: true, items };
 }
-
-/** 分润角色兜底文案：词典 PROFIT_ROLE 未加载/未配置时使用。
- *  取值受 DB CHECK `allocation_role_valid` 约束，与 backend AllocationRole 一致。 */
-const PROFIT_ROLE_FALLBACK: Array<{ value: string; label: string }> = [
-  { value: "OWNER", label: "业绩归属人" },
-  { value: "BUYER", label: "买方" },
-  { value: "SALES", label: "销售" },
-  { value: "SERVICE", label: "服务" },
-];
 
 // 与 backend/app/domain/enums.py ScheduleStatus 一致（StatusTag 未内置 PARTIAL/WAIVED）
 const SCHEDULE_STATUS_LABEL: Record<string, string> = {
@@ -268,6 +244,8 @@ function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: Bus
 }
 
 export function OrdersPage({ initialTab, active = true, onNavigate }: { initialTab?: BusinessCenterEntryTab; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void } = {}) {
+  // 当前登录人仅作为历史数据没有指定操作人时的回退显示；新记录以勾选员工为准。
+  const currentOperator = currentDevUser();
   const [orders, setOrders] = useState<Order[]>([]);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -277,7 +255,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
   const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
   const [ledgerExporting, setLedgerExporting] = useState(false);
-  /** 业务台账按列配置导出 CSV：后端全量口径，页面筛选只作用于展示。 */
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
@@ -291,27 +268,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
-  // 关联状态 / 业务类型 / 业务模式：优先读选项词典（设置页可改 label），
-  // 未加载完时回落原硬编码常量，避免主筛选条出现空白（零行为变化）。
+  // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
-  const linkStatusOptions: Opt[] =
-    useOptionSet("ORDER_LINK_STATUS") ??
-    Object.entries(LINK_STATUS_LABEL).map(([value, label]) => ({ value, label }));
-  const orderBusinessOptions: Opt[] =
-    useOptionSet("ORDER_BUSINESS") ??
-    BUSINESS_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
+  const orderBusinessOptions: Opt[] = useOptionSet("ORDER_BUSINESS") ?? [];
   // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
-  const refundResponsibilityOptions: Opt[] =
-    useOptionSet("REFUND_RESPONSIBILITY") ??
-    Object.entries(REFUND_RESPONSIBILITY_LABEL).map(([value, label]) => ({ value, label }));
-  const orderBusinessModeOptions: Opt[] =
-    useOptionSet("ORDER_BUSINESS_MODE") ??
-    BUSINESS_MODE_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
+  const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
   // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
-  const relationTypeOptions: Opt[] =
-    useOptionSet("ORDER_RELATION_TYPE") ?? RELATION_TYPE_FALLBACK;
-  // 分润角色：此前每行写死 "OWNER"，导致编辑既有分润时把 BUYER/SALES/SERVICE 静默抹平。
-  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? PROFIT_ROLE_FALLBACK;
+  const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
+  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -339,9 +305,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [linkForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
-  const allocationRows = Form.useWatch("allocations", allocationForm) as
-    | AllocationFormRow[]
-    | undefined;
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
   const employeeOptions = [
     ...users.map((item) => ({
@@ -350,22 +313,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     })),
     { value: "COMPANY" as number | "COMPANY", label: "公司（不绑定人员）" },
   ];
-  const pickedEmployees = (allocationRows ?? [])
-    .map((row) => row?.employee)
-    .filter((value): value is number | "COMPANY" => value !== undefined && value !== null);
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
   const allocationIsLoss = Number(allocationProfit) < 0;
-  /** 顶部多选与行联动：勾选的人补成新行，取消勾选的人整行移除（已填的比例/金额随之丢弃）。 */
-  const syncPickedEmployees = (next: Array<number | "COMPANY">) => {
-    const current = allocationRows ?? [];
-    const kept = current.filter(
-      (row) => row?.employee !== undefined && next.includes(row.employee as number | "COMPANY"),
-    );
-    const added = next
-      .filter((value) => !kept.some((row) => row.employee === value))
-      .map((value) => ({ employee: value, allocation_rate: "", allocation_amount: "" }));
-    allocationForm.setFieldValue("allocations", [...kept, ...added]);
-  };
   const [editOpen, setEditOpen] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm();
@@ -419,6 +368,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
+      const employeeList = await employeesApi.list();
+      setUsers(employeeList.filter((employee) => employee.is_active));
       setActionOrder(order);
       refundForm.resetFields();
       setRefundOpen(true);
@@ -528,12 +479,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first ? first.remaining.toFixed(2) : undefined,
           pool_id: first?.event.pool_id ?? undefined,
         });
-        const [poolList, employeeList] = await Promise.all([
-          Promise.resolve().then(() => poolsApi.list()).catch(() => [] as Pool[]),
-          Promise.resolve().then(() => employeesApi.list()).catch(() => [] as Array<{ id: number; username: string; display_name: string; is_active: boolean }>),
-        ]);
-        setCancelPools(Array.isArray(poolList) ? poolList.filter((pool) => pool.status === "ACTIVE") : []);
-        setCancelEmployees(Array.isArray(employeeList) ? employeeList.filter((employee) => employee.is_active) : []);
+        const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
+        setCancelPools(poolList.filter((pool) => pool.status === "ACTIVE"));
+        setCancelEmployees(employeeList.filter((employee) => employee.is_active));
         if (first && cancelForm.getFieldValue("pool_id") == null) {
           cancelForm.setFieldValue("pool_id", poolList[0]?.id);
         }
@@ -722,7 +670,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               menu={{
                 items: [
                   { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
-                  { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
+                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
                     label: order.order_type === "DG" ? "系统下架" : "取消交易",
@@ -816,6 +764,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                       setPage(1);
                     }}
                   />
+                  <Button size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
+                    导出 CSV
+                  </Button>
                   <Typography.Text strong>业务筛选</Typography.Text>
                   <Segmented
                     value={businessModeFilter}
@@ -858,14 +809,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   <Typography.Text type="secondary">
                     状态由对应业务流程更新，点击订单后继续处理付款、入库、售出或回款
                   </Typography.Text>
-                  <Button
-                    size="small"
-                    aria-label="导出业务台账CSV"
-                    loading={ledgerExporting}
-                    onClick={() => void exportLedger()}
-                  >
-                    导出 CSV
-                  </Button>
                 </Space>
                 <DataTable<Order>
                   columns={arrangeLedgerColumns(ledgerColumns)}
@@ -876,7 +819,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   total={filteredOrders.length}
                   emptyText="暂无业务订单"
                   className="orders-ledger"
-                 
+
                   onPageChange={(nextPage, nextSize) => {
                     setPage(nextPage);
                     setPageSize(nextSize);
@@ -1052,6 +995,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                 <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
                 <span><MoneyText value={flow.amount} /></span>
                 <span><StatusTag status={flow.status} optionSet="FUND_FLOW_STATUS" /></span>
+                <span>操作人：{flow.operator || currentOperator}</span>
               </div>
             ))}
           </div>
@@ -1063,8 +1007,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               <div key={rebate.id} className="orders-event-row">
                 <span>{rebate.rebate_no}</span>
                 <span>{rebate.rate}% · <MoneyText value={rebate.base_amount} /></span>
-                <span>{rebate.expected_on ? `预计 ${rebate.expected_on}` : rebate.collected_on}</span>
-                <span><StatusTag status={rebate.status} optionSet="REBATE_STATUS" /></span>
+                <span>{rebate.collected_on}</span>
+                <span>已登记</span>
               </div>
             ))}
           </div>
@@ -1126,7 +1070,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               menu={{
                 items: [
                   { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
-                  { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
+                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                   { key: "cancel", label: selectedOrder.order_type === "DG" ? "系统下架" : "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                 ],
                 onClick: ({ key }) => {
@@ -1155,8 +1099,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         ) : null}
       </Drawer>
 
-      <Modal
-        title={cancelInstallmentTarget ? `分期退款终止 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+      <BusinessActionModal
+        title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
         open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
@@ -1164,7 +1108,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >
-        <Form form={cancelForm} layout="vertical" onFinish={submitCancelTransaction}>
+        <BusinessForm scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} form={cancelForm} onFinish={submitCancelTransaction}>
           <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
@@ -1179,7 +1123,12 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </Typography.Paragraph>
           {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
             <div className="order-cancel-meta">
-              <CfgItem name="offset_event_id" label={cancelScope === "INVREFUND" ? "入库流水" : "被冲销动作"} rules={[{ required: true, message: "请选择被冲销动作" }]}>
+              <CfgItem
+                name="offset_event_id"
+                label={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
+                fixedLabel={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
+                rules={[{ required: true, message: cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择售出流水" }]}
+              >
                 <Select
                   placeholder={cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择被冲销动作"}
                   options={cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }) => ({
@@ -1212,10 +1161,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={selectedOrder ? `编辑订单 · ${selectedOrder.order_no}` : "编辑订单"}
         open={editOpen}
         confirmLoading={editSubmitting}
@@ -1223,7 +1172,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         okText="保存修改"
         onOk={() => void editForm.submit()}
       >
-        <Form form={editForm} layout="vertical" onFinish={submitEditOrder}>
+        <BusinessForm scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
           <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
             订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
@@ -1260,10 +1209,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           ) : null}
           <CustomFieldSection testIdSuffix="order-edit" />
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={selectedOrder ? `新建订单关联 · ${selectedOrder.order_no}` : "新建订单关联"}
         open={linkOpen}
         confirmLoading={linkSubmitting}
@@ -1271,7 +1220,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         okText="建立关联"
         onOk={() => void linkForm.submit()}
       >
-        <Form form={linkForm} layout="vertical" onFinish={submitLink}>
+        <BusinessForm scope="ORDERLINK" form={linkForm} onFinish={submitLink}>
           <FieldConfigScope scope="ORDERLINK" active={linkOpen}>
           <Typography.Paragraph type="secondary">
             关联单用于把同一真实交易拆分的上下游订单串起来；分成口径作为关系快照保存，不会改写订单自身金额。
@@ -1307,10 +1256,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-link" />
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
         open={allocationOpen}
         width={720}
@@ -1318,7 +1267,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
       >
-        <Form
+        <BusinessForm
+          scope="ALLOCATION"
           form={allocationForm}
           layout="vertical"
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
@@ -1365,20 +1315,11 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             每行一位员工：填<strong>比例</strong>按订单利润占比分，填<strong>金额</strong>按固定额分，
             两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。
           </Typography.Paragraph>
-          <Form.Item label="姓名（可多选，勾选后自动加行）">
-            <Select
-              mode="multiple"
-              placeholder="从员工花名册选择"
-              value={pickedEmployees}
-              onChange={syncPickedEmployees}
-              options={employeeOptions}
-            />
-          </Form.Item>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
               <>
                 {fields.map((field) => (
-                  <Space key={field.key} align="baseline" className="orders-allocation-row" wrap>
+                  <AdaptiveFormGrid key={field.key} className="orders-allocation-row">
                     <Form.Item
                       name={[field.name, "employee"]}
                       label="姓名"
@@ -1424,7 +1365,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                     >
                       删除
                     </PermissionButton>
-                  </Space>
+                  </AdaptiveFormGrid>
                 ))}
                 <PermissionButton
                   permission="policy.manage"
@@ -1440,29 +1381,29 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>
             <CustomFieldSection testIdSuffix="order-allocation" />
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
-        title={actionOrder ? `登记退款 · ${actionOrder.order_no}` : "登记退款"}
+      <BusinessActionModal
+        title={actionOrder ? `资金收支 · ${actionOrder.order_no}` : "资金收支"}
         open={refundOpen}
         confirmLoading={refundSubmitting}
         onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
         onOk={() => void refundForm.submit()}
       >
-        <Form
+        <BusinessForm scope="REFUND"
           form={refundForm}
           layout="vertical"
-          onFinish={async (values: { amount: string; reason: string; refund_responsibility: string; form_extra?: Record<string, unknown> }) => {
+          onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
               await ordersApi.postEvent(actionOrder.id, {
                 event_type: "REFUND",
                 amount: values.amount,
-                occurred_on: new Date().toISOString().slice(0, 10),
+                occurred_on: values.occurred_on?.format("YYYY-MM-DD") ?? today(),
                 reason: values.reason,
-                refund_responsibility: values.refund_responsibility as "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER",
+                operator_user_ids: values.operator_user_ids,
                 form_extra: values.form_extra,
               });
               appMessage.success("退款已登记");
@@ -1477,19 +1418,34 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           }}
         >
           <FieldConfigScope scope="REFUND" active={refundOpen}>
-          <CfgItem name="amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
+          <CfgItem name="occurred_on" label="发生日期" initialValue={dayjs(today())} rules={[{ required: true, message: "请选择发生日期" }]}>
+            <DatePicker format="YYYY-MM-DD" className="ui-control-full" />
+          </CfgItem>
+          <CfgItem name="direction" label="资金流向" initialValue="OUT" rules={[{ required: true, message: "请选择资金流向" }]}>
+            <Select disabled options={[{ value: "OUT", label: "支出" }]} />
+          </CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />
+          <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
             <MoneyInput placeholder="请输入退款金额" />
           </CfgItem>
-          <CfgItem name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
-            <Select options={refundResponsibilityOptions} />
-          </CfgItem>
-          <CfgItem name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
-            <Input.TextArea rows={3} placeholder="请输入退款原因" />
+          <CfgItem name="reason" label="收支备注" rules={[{ required: true, message: "请输入收支备注" }]}>
+            <Input.TextArea rows={3} placeholder="请输入收支备注" />
           </CfgItem>
             <CustomFieldSection testIdSuffix="order-refund" />
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+        <div className="ui-form-spaced">
+          <Typography.Text strong>资金明细</Typography.Text>
+          {actionOrder?.cashflows?.length ? actionOrder.cashflows.map((flow) => (
+            <div key={flow.flow_no} className="orders-event-row">
+              <span>{flow.occurred_on}</span>
+              <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
+              <span><MoneyText value={flow.amount} /></span>
+              <span>操作人：{flow.operator || currentOperator}</span>
+            </div>
+          )) : <Typography.Text type="secondary">暂无资金明细</Typography.Text>}
+        </div>
+      </BusinessActionModal>
 
       <CreateBusinessModal
         open={Boolean(createType)}

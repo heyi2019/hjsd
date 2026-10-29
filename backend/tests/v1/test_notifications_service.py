@@ -12,7 +12,7 @@ def _make_unread(seeded_db, **kwargs):
     return notification_service.create_notification(
         seeded_db,
         recipient_user_id=kwargs.get("recipient_user_id", 2),
-        notification_type=kwargs.get("notification_type", "REBATE_OVERDUE"),
+        notification_type=kwargs.get("notification_type", "SYSTEM"),
         title=kwargs.get("title", "测试通知"),
         message=kwargs.get("message", "内容"),
         entity_type=kwargs.get("entity_type", "rebate"),

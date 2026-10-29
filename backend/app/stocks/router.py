@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -38,14 +38,13 @@ from app.domain.trade import (
     OrderEvent,
     OrderFormField,
     RebateRecord,
-    RebateSettlement,
     Installment,
     Reconciliation,
 )
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.periods import assert_period_open
-from app.core.schemas import PageOut, normalize_product_aliases
+from app.core.schemas import PageOut
 from app.orders import service as orders_service
 
 router = APIRouter(tags=["ACC-01 账号台账"])
@@ -88,11 +87,6 @@ class AccountListOut(PageOut[AccountOut]):
 
 class AccountProfileUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-
-    @model_validator(mode="before")
-    @classmethod
-    def accept_product_aliases(cls, value: object) -> object:
-        return normalize_product_aliases(value)
 
     game_account: str | None = Field(default=None, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
@@ -283,23 +277,7 @@ class ExecutionRebateOut(BaseModel):
     base_amount: Decimal
     status: str
     collected_on: date
-    expected_on: date | None = None
     collected_at: datetime
-    settlements: list["ExecutionRebateSettlementOut"] = Field(default_factory=list)
-
-
-class ExecutionRebateSettlementOut(BaseModel):
-    id: int
-    settlement_no: str
-    settled_on: date
-    settled_at: datetime
-    gross_amount: Decimal
-    platform_fee: Decimal
-    net_amount: Decimal
-    cashflow_id: int | None = None
-    reversal_of_id: int | None = None
-    note: str | None = None
-    operator: str
 
 
 class AccountExecutionOrderOut(BaseModel):
@@ -427,34 +405,6 @@ def _account_outputs(
     ]
 
 
-@router.get("/stocks/export.csv")
-def export_accounts_csv(
-    status: str | None = Query(default=None),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> Response:
-    """库存中心按可见列导出 CSV：同 /stocks 口径（凭证字段按列表页权限规则）。"""
-    accounts = service.list_accounts(db, status=status, user=_user, limit=None, offset=0)
-    outputs = _account_outputs(
-        db,
-        accounts,
-        _user,
-        include_credentials=_user.has(PERM_ORDER_CREATE),
-    )
-    csv_text, meta = build_list_csv(
-        db, "INVENTORY", [output.model_dump() for output in outputs]
-    )
-    record_audit(
-        db,
-        action=AuditAction.LIST_EXPORT,
-        entity_type="list_export",
-        entity_id="INVENTORY",
-        actor=_user.username,
-        after={"rows": len(outputs), "column_count": meta["column_count"]},
-    )
-    return csv_file_response(csv_text, f"库存中心-{date.today().isoformat()}.csv")
-
-
 @router.get("/stocks", response_model=AccountListOut)
 def list_accounts(
     status: str | None = Query(default=None),
@@ -475,6 +425,34 @@ def list_accounts(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/stocks/export.csv")
+def export_accounts_csv(
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> Response:
+    """库存中心按可见列导出 CSV，沿用 /stocks 的权限口径。"""
+    accounts = service.list_accounts(db, status=status, user=_user, limit=None, offset=0)
+    outputs = _account_outputs(
+        db,
+        accounts,
+        _user,
+        include_credentials=_user.has(PERM_ORDER_CREATE),
+    )
+    csv_text, meta = build_list_csv(
+        db, "INVENTORY", [output.model_dump() for output in outputs]
+    )
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="INVENTORY",
+        actor=_user.username,
+        after={"rows": len(outputs), "column_count": meta["column_count"]},
+    )
+    return csv_file_response(csv_text, f"库存中心-{date.today().isoformat()}.csv")
 
 
 @router.patch("/stocks/{account_id}", response_model=AccountOut)
@@ -566,30 +544,6 @@ def execution_detail(
             .where(RebateRecord.source_order_id.in_(order_ids))
             .order_by(RebateRecord.id)
         ).all())
-        settlement_by_rebate: dict[int, list[ExecutionRebateSettlementOut]] = {}
-        rebate_ids = [rebate.id for rebate in rebates]
-        if rebate_ids:
-            settlements = db.scalars(
-                select(RebateSettlement)
-                .where(RebateSettlement.rebate_record_id.in_(rebate_ids))
-                .order_by(RebateSettlement.rebate_record_id, RebateSettlement.id)
-            ).all()
-            for settlement in settlements:
-                settlement_by_rebate.setdefault(settlement.rebate_record_id, []).append(
-                    ExecutionRebateSettlementOut(
-                        id=settlement.id,
-                        settlement_no=settlement.settlement_no,
-                        settled_on=settlement.settled_on,
-                        settled_at=settlement.created_at,
-                        gross_amount=settlement.gross_amount,
-                        platform_fee=settlement.platform_fee,
-                        net_amount=settlement.net_amount,
-                        cashflow_id=settlement.cashflow_id,
-                        reversal_of_id=settlement.reversal_of_id,
-                        note=settlement.note,
-                        operator=settlement.created_by,
-                    )
-                )
         for rebate in rebates:
             rebates_by_order.setdefault(rebate.source_order_id, []).append(
                 ExecutionRebateOut(
@@ -601,9 +555,7 @@ def execution_detail(
                     base_amount=rebate.base_amount,
                     status=rebate.status,
                     collected_on=rebate.collected_on,
-                    expected_on=rebate.expected_on,
                     collected_at=rebate.created_at,
-                    settlements=settlement_by_rebate.get(rebate.id, []),
                 )
             )
     events = list(

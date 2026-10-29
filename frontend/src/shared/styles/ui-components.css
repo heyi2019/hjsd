@@ -473,6 +473,25 @@
   font-size: var(--fs-callout);
   font-weight: 600;
 }
+
+/* 分润弹窗复用建单弹窗的可拖动/缩放尺寸变量。 */
+.allocation-modal .ant-modal {
+  --resizable-modal-width: min(720px, calc(100vw - 48px));
+  --resizable-modal-height: min(760px, calc(100dvh - (var(--space-4) * 6)));
+  width: var(--resizable-modal-width) !important;
+  max-width: calc(100vw - 48px);
+  top: calc(var(--space-4) * 3);
+  padding-bottom: var(--space-4);
+}
+.allocation-modal .ant-modal-content {
+  max-height: var(--resizable-modal-height);
+  display: flex;
+  flex-direction: column;
+}
+.allocation-modal .ant-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
 .recovery-entry-fields > .ant-form-item,
 .recovery-order-modal__party-field {
   width: min(100%, 420px);
@@ -712,7 +731,7 @@
 }
 .payment-info-fields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: center;
   row-gap: var(--recovery-grid-row-gap);
   column-gap: var(--space-6);
@@ -1094,10 +1113,51 @@
   width: 100%;
 }
 
+/* 返点核心字段：四组标签与输入框紧凑横排，避免操作人掉到下一行。 */
+.recovery-order-modal .rebate-core-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  width: 100%;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-label {
+  width: auto !important;
+  min-width: max-content;
+  padding: 0 !important;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-control {
+  min-width: 0;
+  width: auto !important;
+}
+.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-control-input-content > * {
+  width: 100%;
+  min-width: 0;
+}
+.recovery-order-modal .rebate-core-fields .ant-form-item-explain,
+.recovery-order-modal .rebate-core-fields .ant-form-item-extra {
+  grid-column: 2;
+}
+
 @media (max-width: 720px) {
   .recovery-order-modal .custom-field-section { grid-template-columns: 1fr; }
   .recovery-order-modal .custom-field-section > .ant-typography,
   .recovery-order-modal .custom-field-section > .ant-form-item { grid-column: 1; }
+  .recovery-order-modal .rebate-core-fields { grid-template-columns: 1fr; }
+  .recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
 }
 
 .settings-tabs.ant-tabs-left > .ant-tabs-nav {
@@ -1165,6 +1225,18 @@
 .ui-control-width-inventory { width: var(--col-w-180); }
 .ui-control-width-import { width: var(--col-w-280); }
 .orders-ledger-search { width: var(--col-w-280); }
+
+/* 分润明细是一个完整的数据行，桌面端保持字段与操作同排，避免金额/删除按钮掉到下一行。 */
+.orders-allocation-row {
+  grid-template-columns: minmax(180px, 1.35fr) minmax(150px, 1fr) 120px 140px auto;
+  align-items: start;
+}
+.orders-allocation-row .ant-form-item { margin-bottom: 0; min-width: 0; }
+.orders-allocation-row .ant-form-item-control,
+.orders-allocation-row .ant-select,
+.orders-allocation-row .ant-input-affix-wrapper,
+.orders-allocation-row .ant-input { width: 100%; }
+.orders-allocation-row > .ant-btn { align-self: center; margin: 0; white-space: nowrap; }
 .ui-control-width-date { width: var(--control-date-width); }
 .ui-control-width-90 { width: var(--col-w-90); }
 .ui-control-width-100 { width: var(--col-w-100); }

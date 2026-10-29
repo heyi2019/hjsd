@@ -1,9 +1,9 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-import { Input, Modal, Space, Upload } from "antd";
+import { Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { stocksApi, type Account } from "../shared/api/catalog";
-import { Select } from "../shared/ui";
+import { BusinessActionModal, Select } from "../shared/ui";
 
 export type InventoryProfileTarget = {
   account: Account;
@@ -103,7 +103,7 @@ export function InventoryProfileModal({
   }
 
   return (
-    <Modal
+    <BusinessActionModal
       open={Boolean(target)}
       title={target?.mode === "images" ? "账号图片" : target?.mode === "description" ? "账号描述" : "编辑账号资料"}
       okText="保存"
@@ -150,6 +150,6 @@ export function InventoryProfileModal({
           <Input.TextArea rows={3} value={form.note} placeholder="账号备注" onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} />
         </Space>
       )}
-    </Modal>
+    </BusinessActionModal>
   );
 }

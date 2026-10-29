@@ -17,6 +17,7 @@ from .order_types import (
 )
 from .game_types import (
     create_game_type,
+    delete_game_type,
     list_game_types,
     set_game_type_active,
     set_game_type_default,
@@ -61,6 +62,7 @@ __all__ = [
     "update_order_type",
     "update_pool",
     "create_game_type",
+    "delete_game_type",
     "list_game_types",
     "set_game_type_active",
     "set_game_type_default",

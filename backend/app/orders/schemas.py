@@ -8,10 +8,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.attachments.schemas import AttachmentOut
-from app.core.schemas import normalize_product_aliases
 
 FlowDirection = Literal["BASE", "IN", "OUT"]
 
@@ -31,18 +30,9 @@ class CounterpartyRoleInput(BaseModel):
 
 
 class OrderAccountSnapshot(BaseModel):
-    """订单中的产品快照：游戏账号是单一交易实体，游戏类型是产品类型。
-
-    ``product`` / ``product_type`` 仅作为兼容输入别名，归一化后仍以
-    ``game_account`` / ``game_type`` 作为唯一存储口径。
-    """
+    """订单中的产品快照：游戏账号是单一交易实体，游戏类型是产品类型。"""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-
-    @model_validator(mode="before")
-    @classmethod
-    def accept_product_aliases(cls, value: object) -> object:
-        return normalize_product_aliases(value)
 
     game_account: str = Field(min_length=1, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
@@ -101,23 +91,10 @@ class OrderInstallmentCreate(BaseModel):
 class OrderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    @model_validator(mode="before")
-    @classmethod
-    def accept_product_aliases(cls, value: object) -> object:
-        return normalize_product_aliases(value)
-
     order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
     trade_date: date
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
-    # HS / TH / DG 内联游戏账号字段，DFQ 建单仍走 account_snapshot。
-    game_type: str | None = Field(default=None, max_length=64)
-    game_account: str | None = Field(default=None, max_length=128)
-    game_password: str | None = Field(default=None, max_length=256)
-    channel_region: str | None = Field(default=None, max_length=128)
-    bound_phone: str | None = Field(default=None, max_length=64)
-    has_secondary: bool | None = None
-    account_note: str | None = None
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
@@ -131,7 +108,6 @@ class OrderCreate(BaseModel):
     extra_values: dict[str, object] = Field(default_factory=dict)
     # 建单表单自定义字段值（由 OrderFormField 配置驱动），独立存储于订单 form_extra。
     form_extra: dict[str, object] | None = None
-    form_extra_scope: str | None = None
     # 库存售出/寄售等从库存发起的操作表单，值仍落订单，但按操作作用域校验。
     form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
@@ -313,7 +289,6 @@ class OrderRebateOut(BaseModel):
     link_status: str
     status: str
     collected_on: date
-    expected_on: date | None = None
     note: str | None = None
     created_at: datetime
     operator: str
@@ -492,7 +467,7 @@ class OrderFormFieldCreate(BaseModel):
     is_active: bool = True
     sort_order: int = 0
     is_custom: bool = True
-    section: str = Field(default="EXTRA", pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS|DELIVER)$")
+    section: str = Field(default="EXTRA", pattern="^[A-Z][A-Z0-9_]{0,31}$")
     note: str | None = None
 
 
@@ -511,7 +486,7 @@ class OrderFormFieldUpdate(BaseModel):
     required: bool | None = None
     required_when: RequiredWhen | None = None
     sort_order: int | None = None
-    section: str | None = Field(default=None, pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS|DELIVER)$")
+    section: str | None = Field(default=None, pattern="^[A-Z][A-Z0-9_]{0,31}$")
     note: str | None = None
 
 

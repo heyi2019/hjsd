@@ -14,6 +14,7 @@ import { renderLight } from "../test/render";
 import {
   CfgItem,
   CfgNestedItem,
+  CustomFieldSection,
   CustomFormField,
   FieldConfigContext,
   fieldLabel,
@@ -146,7 +147,7 @@ describe("CustomFormField", () => {
       field_key: "src",
       label: "来源",
       field_type: "SELECT",
-      options: ["微信", "支付宝"],
+      options: [{ value: "微信", label: "微信" }, { value: "支付宝", label: "支付宝" }],
     });
     renderLight(
       <Form>
@@ -165,6 +166,17 @@ describe("CustomFormField", () => {
     );
     expect(screen.getByRole("switch")).toBeInTheDocument();
   });
+});
+
+it("运营板块自定义字段显示运营信息分组", () => {
+  const def = makeField({ field_key: "consignment_note", label: "寄售运营备注", section: "OPERATION" });
+  renderLight(
+    <FieldConfigContext.Provider value={{ [def.field_key]: def }}>
+      <CustomFieldSection section="OPERATION" testIdSuffix="operation" />
+    </FieldConfigContext.Provider>,
+  );
+  expect(screen.getByText("运营信息")).toBeInTheDocument();
+  expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
 });
 
 describe("CfgItem 配置门控", () => {
@@ -202,11 +214,8 @@ describe("CfgItem 配置门控", () => {
 });
 
 describe("resolveOptionItems：选项归一化", () => {
-  it("字符串数组 → {value,label} 同值", () => {
-    expect(resolveOptionItems(["微信", "支付宝"])).toEqual([
-      { value: "微信", label: "微信" },
-      { value: "支付宝", label: "支付宝" },
-    ]);
+  it("只接受后端字段契约的对象选项", () => {
+    expect(() => resolveOptionItems(["微信"] as never)).toThrow("选项必须使用 value/label 对象");
   });
   it("{value,label} 对象原样保留", () => {
     expect(resolveOptionItems([{ value: "BUY", label: "买号返点" }])).toEqual([

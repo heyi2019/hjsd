@@ -6,7 +6,8 @@ import { renderLight } from "../test/render";
 import { OrdersPage, validateAllocations } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
-import { seedOptionSets } from "../test/formFieldsSeed";
+import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
+import { today } from "../shared/lib/format";
 import * as client from "../shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "../shared/api/catalog";
 
@@ -132,6 +133,7 @@ const installment: Installment = {
   per_period_service_fee: "0.00",
   per_period: "2000.00",
   paid_amount: "3000.00",
+  total_receivable: "12000.00",
   status: "ACTIVE",
 };
 const installmentCancelResult: InstallmentCancelResult = {
@@ -148,6 +150,7 @@ const allocationRows: ProfitAllocation[] = [
 
 beforeEach(() => {
   seedOptionSets(catalog);
+  seedOrderFormFields(catalog);
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
@@ -520,26 +523,27 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("alloc fail")));
   });
 
-  it("登记退款：填写金额与原因后调用 postEvent(REFUND)", async () => {
+  it("资金收支：填写金额与备注后调用 postEvent(REFUND)", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "登记退款");
-    const modal = await modalOf(/登记退款 · HS-2026-0001/);
-    await ui.type(within(modal).getByLabelText("退款金额"), "500");
-    await ui.type(within(modal).getByLabelText("退款原因"), "客户取消");
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("金额"), "500");
+    await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
+    expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(1, expect.objectContaining({ event_type: "REFUND" }))
+      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(1, expect.objectContaining({ event_type: "REFUND", occurred_on: today() }))
     );
     expect(message.success).toHaveBeenCalledWith("退款已登记");
   });
 
-  it("登记退款：提交失败提示错误并关闭 loading", async () => {
+  it("资金收支：提交失败提示错误并关闭 loading", async () => {
     vi.mocked(catalog.ordersApi.postEvent).mockRejectedValue(new Error("refund fail"));
     await openLedger();
-    await openRowMenu("HS-2026-0001", "登记退款");
-    const modal = await modalOf(/登记退款 · HS-2026-0001/);
-    await ui.type(within(modal).getByLabelText("退款金额"), "500");
-    await ui.type(within(modal).getByLabelText("退款原因"), "客户取消");
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("金额"), "500");
+    await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     await clickModalOk(modal);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("refund fail")));
   });
@@ -552,6 +556,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消交易");
     const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
+    expect(within(modal).getByLabelText("入库流水")).toBeInTheDocument();
     await ui.type(screen.getByLabelText("取消原因"), "重复登记");
     fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
     await waitFor(() =>
@@ -595,6 +600,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消交易");
     const modal = await modalOf(/售出取消交易 · HS-2026-0001/);
+    expect(within(modal).getByLabelText("售出流水")).toBeInTheDocument();
     // 售出取消只允许选择 SELL 流水（SELL EV-102，剩余 500）。
     expect(within(modal).getByText("售出 · EV-102 · ¥500.00（剩余可冲 ¥500.00）")).toBeInTheDocument();
     // 部分退款：300 < 售出流水剩余 500。
@@ -615,7 +621,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     await openLedger();
     await openRowMenu("DFQ-2026-0003", "取消交易");
-    const modal = await modalOf(/分期退款终止 · INS-1/);
+    const modal = await modalOf(/分期取消交易 · INS-1/);
     await ui.type(screen.getByLabelText("取消原因"), "提前结清");
     fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
     await waitFor(() => expect(catalog.installmentsApi.cancel).toHaveBeenCalledWith(11, expect.objectContaining({ reason: "提前结清" })));

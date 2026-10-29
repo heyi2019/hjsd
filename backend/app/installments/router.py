@@ -323,10 +323,10 @@ def resale_installment_account(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.DispositionOut:
-    item = service.record_resale(
+    item = service.record_sale(
         db,
         installment_id,
-        resale_order_id=payload.resale_order_id,
+        sale_order_id=payload.resale_order_id,
         occurred_on=payload.occurred_on,
         actor=_actor(user),
         note=payload.note,

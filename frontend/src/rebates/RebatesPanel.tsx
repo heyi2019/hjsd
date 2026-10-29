@@ -1,18 +1,17 @@
-/** 返点记录：分次到账与来源订单追踪（REB-01 / A06）。 */
-import { Button, Card, Form, Input, Modal, Space, Typography } from "antd";
+/** 返点明细：登记即完成一条业务事实，只支持编辑和删除（REB-01 / A06）。 */
+import { Button, Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import {
   ordersApi,
-  poolsApi,
   rebatesApi,
+  employeesApi,
   type Order,
-  type Pool,
+  type EmployeeOption,
   type Rebate,
-  type Settlement,
 } from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
+import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
@@ -22,14 +21,17 @@ import {
   InlineError,
   MoneyInput,
   MoneyText,
+  ConfirmButton,
+  BusinessActionModal,
+  BusinessForm,
   PermissionButton,
   Select,
   StatRow,
-  StatusTag,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 import { useListViewColumns } from "../shared/lib/listColumns";
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
@@ -47,24 +49,17 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
 export function RebatesPanel() {
   const [rows, setRows] = useState<Rebate[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [pools, setPools] = useState<Pool[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const [settleTarget, setSettleTarget] = useState<Rebate | null>(null);
-  const [reverseTarget, setReverseTarget] = useState<{ rebate: Rebate; settlement: Settlement } | null>(null);
-  const [voidTarget, setVoidTarget] = useState<Rebate | null>(null);
-  const [settlements, setSettlements] = useState<Record<number, Settlement[]>>({});
-  const [overdueDays, setOverdueDays] = useState<Record<number, number>>({});
+  const [editTarget, setEditTarget] = useState<Rebate | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [form] = Form.useForm();
-  const [settleForm] = Form.useForm();
-  const [reverseForm] = Form.useForm();
-  const [voidForm] = Form.useForm();
+  const [editForm] = Form.useForm();
 
   const [exporting, setExporting] = useState(false);
-  /** 返点按列配置导出 CSV：后端同 /rebates 口径，天然全量。 */
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -79,25 +74,14 @@ export function RebatesPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, orderList, poolList] = await Promise.all([
+      const [list, orderList, employeeList] = await Promise.all([
         rebatesApi.list(),
         ordersApi.list(),
-        poolsApi.list(),
+        employeesApi.list(),
       ]);
       setRows(list);
       setOrders(orderList);
-      setPools(poolList);
-      // 结算明细与逾期天数分开取：两者失败都不应阻断主列表渲染。
-      const [settlementEntries, overdueList] = await Promise.all([
-        Promise.all(
-          list.map(async (item) => [item.id, await rebatesApi.settlements(item.id)] as const),
-        ),
-        rebatesApi.overdue().catch(() => []),
-      ]);
-      setSettlements(Object.fromEntries(settlementEntries));
-      setOverdueDays(
-        Object.fromEntries(overdueList.map((item) => [item.id, item.overdue_days])),
-      );
+      setEmployees(employeeList);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -118,6 +102,7 @@ export function RebatesPanel() {
           base_amount: values.base_amount as string,
           rate: (values.rate as string) ?? "0",
           collected_on: values.collected_on as string,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("返点记录已创建");
@@ -127,50 +112,23 @@ export function RebatesPanel() {
     });
   };
 
-  const submitVoid = async (values: Record<string, unknown>) => {
-    if (!voidTarget) return;
+  const submitEdit = async (values: Record<string, unknown>) => {
+    if (!editTarget) return;
     await write.run(async () => {
-        await rebatesApi.voidRecord(voidTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined);
-        appMessage.success("返点记录已作废，未产生资金流水");
-        setVoidTarget(null);
-        voidForm.resetFields();
-        await load();
+      await rebatesApi.update(editTarget.id, {
+        base_amount: values.base_amount as string,
+        rate: values.rate as string,
+        collected_on: values.collected_on as string,
+        note: (values.note as string) || null,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
+        form_extra: values.form_extra as Record<string, unknown> | undefined,
+      });
+      appMessage.success("返点明细已更新");
+      setEditTarget(null);
+      editForm.resetFields();
+      await load();
     });
   };
-
-  const submitSettle = async (values: Record<string, unknown>) => {
-    if (!settleTarget) return;
-    await write.run(async () => {
-        await rebatesApi.settle(settleTarget.id, {
-          gross_amount: values.gross_amount as string,
-          platform_fee: (values.platform_fee as string) ?? "0",
-          settled_on: values.settled_on as string,
-          pool_id: Number(values.pool_id),
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
-        });
-        appMessage.success("返点结算已登记");
-        setSettleTarget(null);
-        settleForm.resetFields();
-        await load();
-    });
-  };
-
-  const submitReverse = async (values: Record<string, unknown>) => {
-    if (!reverseTarget) return;
-    await write.run(async () => {
-        await rebatesApi.reverseSettlement(reverseTarget.rebate.id, reverseTarget.settlement.id, {
-          reversed_on: values.reversed_on as string,
-          reason: values.reason as string,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
-        });
-        appMessage.success("结算已冲销，已生成反向流水");
-        setReverseTarget(null);
-        reverseForm.resetFields();
-        await load();
-    });
-  };
-
-  const pending = rows.filter((row) => row.status !== "SETTLED" && row.status !== "VOID").length;
 
   const { arrange: arrangeColumns } = useListViewColumns("REBATE");
   const columns: ColumnsType<Rebate> = [
@@ -216,105 +174,44 @@ export function RebatesPanel() {
     },
     { title: "费率", dataIndex: "rate", align: "right", render: (v: string) => `${v}%` },
     {
-      title: "预计到账",
-      dataIndex: "expected_on",
-      render: (v: string | null | undefined, row) => {
-        const days = overdueDays[row.id];
-        if (!v) return "-";
-        if (days != null) {
-          return (
-            <Typography.Text type="danger">
-              {v}（逾期 {days} 天）
-            </Typography.Text>
-          );
-        }
-        return v;
-      },
-    },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="REBATE_STATUS" /> },
-    {
       title: "操作",
       key: "actions",
-      width: 190,
+      width: 150,
       render: (_v, row) => (
         <Space size={2}>
           <PermissionButton
             permission="order.event.post"
             size="small"
-            disabled={row.status === "SETTLED" || row.status === "VOID"}
             onClick={() => {
-              settleForm.resetFields();
-              setSettleTarget(row);
-              settleForm.setFieldsValue({ settled_on: today() });
+              editForm.setFieldsValue({
+                base_amount: row.base_amount,
+                rate: row.rate,
+                collected_on: row.collected_on,
+                note: row.note ?? "",
+                operator_user_ids: row.operator_user_ids ?? undefined,
+              });
+              setEditTarget(row);
             }}
           >
-            登记结算
+            编辑
           </PermissionButton>
-          <PermissionButton
+          <ConfirmButton
             permission="order.event.post"
             size="small"
             danger
-            disabled={row.status !== "OPEN"}
-            onClick={() => {
-              voidForm.resetFields();
-              setVoidTarget(row);
+            title="删除返点明细"
+            description="删除后该返点明细将不再保留，确定删除吗？"
+            okText="删除"
+            onConfirm={async () => {
+              await rebatesApi.remove(row.id);
+              appMessage.success("返点明细已删除");
+              await load();
             }}
           >
-            作废
-          </PermissionButton>
+            删除
+          </ConfirmButton>
         </Space>
       ),
-    },
-  ];
-
-  /** 结算明细：分次到账可逐笔冲销，已冲销的结算不可重复冲销（后端强校验）。 */
-  const settlementColumns = (rebate: Rebate): ColumnsType<Settlement> => [
-    { title: "结算单号", dataIndex: "settlement_no" },
-    { title: "到账日", dataIndex: "settled_on" },
-    {
-      title: "到账金额",
-      dataIndex: "gross_amount",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
-    {
-      title: "手续费",
-      dataIndex: "platform_fee",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
-    {
-      title: "净额",
-      dataIndex: "net_amount",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
-    {
-      title: "状态",
-      render: (_v, settlement) =>
-        settlement.reversal_of_id ? (
-          <StatusTag status="VOID" label="已冲销" />
-        ) : (
-          <StatusTag status="SETTLED" label="已结算" />
-        ),
-    },
-    {
-      title: "操作",
-      render: (_v, settlement) =>
-        settlement.reversal_of_id ? null : (
-          <PermissionButton
-            permission="order.event.post"
-            size="small"
-            danger
-            onClick={() => {
-              reverseForm.resetFields();
-              setReverseTarget({ rebate, settlement });
-              reverseForm.setFieldsValue({ reversed_on: today() });
-            }}
-          >
-            冲销
-          </PermissionButton>
-        ),
     },
   ];
 
@@ -325,29 +222,15 @@ export function RebatesPanel() {
       <StatRow
         items={[
           { label: "返点记录数", kind: "count", amount: String(rows.length) },
-          { label: "待结算", kind: "count", amount: String(pending), tone: pending ? "warn" : "plain" },
-          {
-            label: "到账逾期",
-            kind: "count",
-            amount: String(Object.keys(overdueDays).length),
-            tone: Object.keys(overdueDays).length ? "warn" : "plain",
-          },
         ]}
       />
 
       <Card
         className="glass"
-        title="返点记录"
+        title="返点明细"
         extra={
-          <Space size={8}>
-            <Button
-              size="small"
-              aria-label="导出返点CSV"
-              loading={exporting}
-              onClick={() => void exportCsv()}
-            >
-              导出 CSV
-            </Button>
+          <Space>
+            <Button size="small" loading={exporting} onClick={() => void exportCsv()}>导出 CSV</Button>
             <PermissionButton
               permission="order.event.post"
               type="primary"
@@ -368,29 +251,30 @@ export function RebatesPanel() {
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-         
           emptyText="暂无返点记录"
           onPageChange={() => undefined}
-          expandable={{
-            expandedRowRender: (row) => (
-              <DataTable<Settlement>
-                rows={settlements[row.id] ?? []}
-                page={1}
-                pageSize={20}
-                total={(settlements[row.id] ?? []).length}
-                onPageChange={() => undefined}
-                emptyText="暂无结算明细"
-                columns={settlementColumns(row)}
-              />
-            ),
-          }}
-       />
+        />
       </Card>
 
-      <Modal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <BusinessActionModal title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"} open={Boolean(editTarget)} onCancel={() => setEditTarget(null)} footer={null}>
+        <InlineError error={write.error} />
+        <BusinessForm scope="INVREBATE" form={editForm} onFinish={submitEdit}>
+          <div className="rebate-core-fields">
+            <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}><MoneyInput /></CfgItem>
+            <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}><Input /></CfgItem>
+            <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+          </div>
+          <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
+          <CustomFieldSection testIdSuffix="rebate-edit" />
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>保存</PermissionButton>
+        </BusinessForm>
+      </BusinessActionModal>
+
+      <BusinessActionModal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="REBATE" active={createOpen}>
-        <Form form={form} layout="vertical"
+        <BusinessForm scope="INVREBATE" form={form}
           onFinish={submitCreate}
           initialValues={{ collected_on: today(), rebate_type: "BUY" }}
         >
@@ -404,15 +288,18 @@ export function RebatesPanel() {
           <CfgItem name="rebate_type" label="返点类型" rules={[{ required: true }]}>
             <Select />
           </CfgItem>
-          <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}>
-            <MoneyInput />
-          </CfgItem>
-          <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}>
-            <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
-          </CfgItem>
-          <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
-          </CfgItem>
+          <div className="rebate-core-fields">
+            <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}>
+              <MoneyInput />
+            </CfgItem>
+            <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}>
+              <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
+            </CfgItem>
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}>
+              <Input placeholder="YYYY-MM-DD" />
+            </CfgItem>
+            <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+          </div>
           <CustomFieldSection testIdSuffix="rebate-create" />
           <Typography.Paragraph type="secondary">
             新返点必须关联来源订单；返点不能独立创建为订单（REB-01-02）。
@@ -420,99 +307,9 @@ export function RebatesPanel() {
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             创建
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
-      </Modal>
-
-      <Modal
-        title={settleTarget ? `返点到账 · ${settleTarget.rebate_no}` : "返点到账"}
-        open={Boolean(settleTarget)}
-        onCancel={() => setSettleTarget(null)}
-        footer={null}
-      >
-        <InlineError error={write.error} />
-        <FieldConfigScope scope="REBSETTLE" active={Boolean(settleTarget)}>
-        <Form form={settleForm} layout="vertical" onFinish={submitSettle}>
-          <CfgItem name="gross_amount" label="到账金额" rules={requiredMoneyRules("到账金额")}>
-            <MoneyInput />
-          </CfgItem>
-          <CfgItem name="platform_fee" label="平台手续费（自动生成费用流水）" rules={requiredMoneyRules("平台手续费").slice(1)}>
-            <MoneyInput />
-          </CfgItem>
-          <CfgItem name="pool_id" label="回款池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
-          </CfgItem>
-          <CfgItem name="settled_on" label="到账日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="rebate-settle" />
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
-            确认结算
-          </PermissionButton>
-        </Form>
-        </FieldConfigScope>
-      </Modal>
-
-      <Modal
-        title={reverseTarget ? `冲销结算 · ${reverseTarget.settlement.settlement_no}` : "冲销结算"}
-        open={Boolean(reverseTarget)}
-        onCancel={() => setReverseTarget(null)}
-        footer={null}
-      >
-        <InlineError error={write.error} />
-        <FieldConfigScope scope="REBREVERSE" active={Boolean(reverseTarget)}>
-        <Form form={reverseForm} layout="vertical" onFinish={submitReverse}>
-          <Typography.Paragraph type="secondary">
-            冲销会生成反向结算与反向流水，原结算标记为已冲销；冲销不可撤销、不可重复。
-          </Typography.Paragraph>
-          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
-          </CfgItem>
-          <CfgItem name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
-            <Input.TextArea rows={3} />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="rebate-reverse" />
-          <PermissionButton
-            permission="order.event.post"
-            type="primary"
-            danger
-            htmlType="submit"
-            loading={write.pending}
-          >
-            确认冲销
-          </PermissionButton>
-        </Form>
-        </FieldConfigScope>
-      </Modal>
-      <Modal
-        title={voidTarget ? `作废返点 · ${voidTarget.rebate_no}` : "作废返点"}
-        open={Boolean(voidTarget)}
-        onCancel={() => setVoidTarget(null)}
-        footer={null}
-      >
-        <InlineError error={write.error} />
-        <Typography.Paragraph type="warning">
-          作废仅适用于<strong>尚未发生任何结算</strong>的返点记录；作废后该记录不再计入待结算，也不会产生资金流水。
-          若已有到账记录，请在结算明细里逐笔冲销。
-        </Typography.Paragraph>
-        <FieldConfigScope scope="REBATEVOID" active={Boolean(voidTarget)}>
-          <Form form={voidForm} layout="vertical" onFinish={submitVoid}>
-            <CfgItem name="reason" label="作废原因" rules={[{ required: true, message: "请填写作废原因" }]}>
-              <Input.TextArea rows={3} />
-            </CfgItem>
-            <CustomFieldSection testIdSuffix="rebate-void" />
-            <PermissionButton
-              permission="order.event.post"
-              type="primary"
-              danger
-              htmlType="submit"
-              loading={write.pending}
-            >
-              确认作废
-            </PermissionButton>
-          </Form>
-        </FieldConfigScope>
-      </Modal>
+      </BusinessActionModal>
     </section>
   );
 }

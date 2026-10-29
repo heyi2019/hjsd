@@ -21,13 +21,41 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.trade import OrderFormField
+from app.orders.form_scopes import SCOPE_CODES
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
+FIELD_SECTIONS = (
+    "EXTRA",
+    "ACCOUNT_PRODUCT",
+    "PARTICIPANT",
+    "FINANCE",
+    "BUSINESS",
+    "DELIVER",
+    "OPERATION",
+)
 REQUIRED_WHEN_OPS = ("eq", "ne", "filled")
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
+SECTION_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
 
 _UNSET: Any = object()
+
+
+def normalize_form_scope(value: str) -> str:
+    """把表单作用域归一化为注册表中的唯一编码。
+
+    表单值是跨订单、库存、分期和资金的共享契约；未知编码必须立即失败，
+    否则字段值会被静默存储或丢弃，导致前后端表单看似成功但无法回显。
+    """
+    code = str(value or "").strip().upper()
+    if code not in SCOPE_CODES:
+        raise Validation("表单作用域不存在", details={"field": "form_extra_scope", "value": value})
+    return code
+
+
+def _validate_section(section: str) -> None:
+    if not isinstance(section, str) or not SECTION_KEY_PATTERN.fullmatch(section.strip()):
+        raise Validation("字段归属板块键不合法", details={"field": "section", "value": section})
 
 
 def _normalize_required_when(
@@ -91,7 +119,7 @@ def _normalize_field_options(
     field_type: str,
     options: Sequence[Any] | None,
 ) -> list[dict[str, str]]:
-    """归一化为 [{value,label}] 对象数组；兼容纯字符串数组（value=label）。"""
+    """归一化为 [{value,label}] 对象数组。"""
     if options is None:
         raw: list[Any] = []
     elif isinstance(options, (str, bytes)):
@@ -105,23 +133,14 @@ def _normalize_field_options(
     normalized: list[dict[str, str]] = []
     seen: set[str] = set()
     for option in raw:
-        if isinstance(option, str):
-            item = {"value": option.strip(), "label": option.strip()}
-        elif isinstance(option, Mapping) and "value" in option:
+        if isinstance(option, Mapping) and "value" in option:
             v = str(option.get("value", "")).strip()
             l = str(option.get("label", v)).strip() or v
             if not v:
                 raise Validation("字段选项 value 不能为空", details={"field": "options"})
             item = {"value": v, "label": l}
-        elif hasattr(option, "value") and not isinstance(option, (int, float, bool)):
-            # 兼容 Pydantic FieldOption 等对象（路由层直接透传时）
-            v = str(getattr(option, "value", "") or "").strip()
-            l = str(getattr(option, "label", "") or v).strip() or v
-            if not v:
-                raise Validation("字段选项 value 不能为空", details={"field": "options"})
-            item = {"value": v, "label": l}
         else:
-            raise Validation("字段选项须为字符串或 {value,label}", details={"field": "options"})
+            raise Validation("字段选项须为对象", details={"field": "options"})
         if not item["value"]:
             raise Validation("字段选项不能为空", details={"field": "options"})
         if item["value"] in seen:
@@ -145,10 +164,11 @@ def validate_form_extra(
     库存操作、分期、资金、客户等全部作用域。值仍采用同一 JSON 约定；
     已删除/停用字段的历史键允许继续保留，以保证历史单据可读。
     """
+    scope = normalize_form_scope(order_type_code)
     normalized = dict(values or {})
     active_custom = list(session.scalars(
         select(OrderFormField).where(
-            OrderFormField.order_type_code == order_type_code.strip().upper(),
+            OrderFormField.order_type_code == scope,
             OrderFormField.is_custom.is_(True),
             OrderFormField.is_active.is_(True),
         )
@@ -201,16 +221,6 @@ def validate_form_extra(
     return normalized
 
 
-def validate_order_form_extra(
-    session: Session,
-    *,
-    order_type_code: str,
-    values: Mapping[str, Any] | None,
-) -> dict[str, Any]:
-    """兼容旧调用方：校验建单作用域扩展值。"""
-    return validate_form_extra(session, order_type_code=order_type_code, values=values)
-
-
 def create_order_form_field(
     session: Session,
     *,
@@ -251,6 +261,7 @@ def create_order_form_field(
         )
     if not isinstance(label, str) or not label.strip():
         raise Validation("字段名称不能为空", details={"field": "label"})
+    _validate_section(section)
     normalized_options = _normalize_field_options(field_type, options)
     exists = session.scalar(
         select(OrderFormField).where(
@@ -372,8 +383,7 @@ def update_order_form_field(
     }
     definition.label = next_label
     if section is not None:
-        if section not in {"EXTRA", "ACCOUNT_PRODUCT", "PARTICIPANT", "FINANCE", "BUSINESS", "DELIVER"}:
-            raise Validation("字段归属板块不合法", details={"field": "section"})
+        _validate_section(section)
         definition.section = section
     definition.field_type = next_type
     definition.options = next_options or None
@@ -552,5 +562,4 @@ __all__ = [
     "set_order_form_field_active",
     "update_order_form_field",
     "validate_form_extra",
-    "validate_order_form_extra",
 ]

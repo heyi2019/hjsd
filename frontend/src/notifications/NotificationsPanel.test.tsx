@@ -19,7 +19,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items, unread_total: 1 });
   vi.mocked(catalog.notificationsApi.markRead).mockResolvedValue(items[0]);
-  vi.mocked(catalog.notificationsApi.syncOverdueRebates).mockResolvedValue({ created: 3 });
 });
 
 describe("NotificationsPanel：系统提醒", () => {
@@ -43,13 +42,6 @@ describe("NotificationsPanel：系统提醒", () => {
     const btn = screen.getByRole("button", { name: /标记已读/ });
     await ui.click(btn);
     await waitFor(() => expect(catalog.notificationsApi.markRead).toHaveBeenCalledWith(1));
-  });
-
-  it("点击同步逾期提醒调用接口", async () => {
-    renderLight(<NotificationsPanel />, { user: "admin" });
-    await screen.findByText("N001");
-    await ui.click(screen.getByRole("button", { name: /同步返点逾期提醒/ }));
-    await waitFor(() => expect(catalog.notificationsApi.syncOverdueRebates).toHaveBeenCalled());
   });
 
   it("勾选仅看未读 → list 带 unread_only 重新拉取", async () => {

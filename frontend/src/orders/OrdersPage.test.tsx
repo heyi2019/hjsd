@@ -5,7 +5,7 @@ import { renderLight } from "../test/render";
 import { OrdersPage } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
-import { seedOptionSets } from "../test/formFieldsSeed";
+import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -61,17 +61,14 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets(catalog);
+  seedOrderFormFields(catalog);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
-  // 子面板（库存中心 / 分期与回款）本套件不覆盖：让其同步抛错，与改造前「工厂未导出该 API」的行为一致
-  // ——这样它们不会去消费 ordersApi.list 的一次性 mock，也不会拖慢渲染。
-  vi.mocked(catalog.employeesApi.list).mockImplementation(() => {
-    throw new Error("employeesApi 不在本套件覆盖范围");
-  });
-  vi.mocked(catalog.installmentsApi.list).mockImplementation(() => {
-    throw new Error("installmentsApi 不在本套件覆盖范围");
-  });
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "管理员", is_active: true },
+  ]);
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
 });
 
 async function openLedger(user?: string) {
@@ -98,7 +95,7 @@ describe("OrdersPage：四类业务台账", () => {
   });
 
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       ...orders,
       {
         id: 3,
@@ -135,17 +132,17 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.getAllByText("更多")).toHaveLength(2);
   });
 
-  it("行级更多菜单提供分润、登记退款和取消交易", async () => {
+  it("行级更多菜单提供分润、资金收支和取消交易", async () => {
     await openLedger("admin");
     fireEvent.click(screen.getAllByText("更多")[0]);
 
     expect(await screen.findByText("分润")).toBeInTheDocument();
-    expect(await screen.findByText("登记退款")).toBeInTheDocument();
+    expect(await screen.findByText("资金收支")).toBeInTheDocument();
     expect(await screen.findByText("取消交易")).toBeInTheDocument();
   });
 
   it("代挂订单的操作入口显示系统下架而不是取消交易", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       ...orders,
       {
         id: 3,
@@ -199,8 +196,8 @@ describe("OrdersPage：四类业务台账", () => {
   });
 
   it("订单操作通过更多菜单进入取消交易并提交原因", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValueOnce({ ...orders[0], events: [] });
-    vi.mocked(catalog.ordersApi.cancel).mockResolvedValueOnce({ ...orders[0], status: "CANCELLED" });
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...orders[0], events: [] });
+    vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...orders[0], status: "CANCELLED" });
 
     await openLedger("admin");
     fireEvent.click(screen.getAllByText("查看详情")[0]);
@@ -209,7 +206,7 @@ describe("OrdersPage：四类业务台账", () => {
     fireEvent.click(within(drawer).getByRole("button", { name: /更多/ }));
     fireEvent.click(await screen.findByText("取消交易"));
 
-    expect(await screen.findByText("取消交易 · HS-2026-0001")).toBeInTheDocument();
+    expect(await screen.findByText("售出取消交易 · HS-2026-0001")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("取消原因"), { target: { value: "客户取消" } });
     fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
 

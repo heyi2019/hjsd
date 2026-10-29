@@ -280,7 +280,9 @@ let wiredCount = 0;
 for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
   const rel = relative(process.cwd(), file).replaceAll("\\", "/");
   const text = readFileSync(file, "utf8");
-  if (!(/<Form[\s>]/.test(text) && /onFinish=/.test(text))) continue;
+  // 业务表单统一使用共享 BusinessForm；保留对原生 antd Form 的识别以覆盖
+  // 登录、查询等非业务表单和 Form.List/Form.Item 的宿主文件。
+  if (!(/<(?:Form|BusinessForm)[\s>]/.test(text) && /onFinish=/.test(text))) continue;
   if (WIRED_RE.test(text) && CONFIG_MODULE_RE.test(text)) {
     wiredCount++;
     continue;

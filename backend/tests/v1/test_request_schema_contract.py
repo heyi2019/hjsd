@@ -26,8 +26,6 @@ from app.finance.schemas import (
     RebateCreate,
     ReconciliationCreate,
     ReconciliationResolve,
-    SettlementCreate,
-    SettlementReverse,
     TransferCreate,
     TransferRepair,
 )
@@ -120,8 +118,6 @@ from app.parties.schemas import (
         ),
         (TransferRepair, {"counterpart_pool_id": 2, "reason": "补齐"}),
         (RebateCreate, {"source_order_id": 1, "base_amount": "1.00", "collected_on": date(2026, 10, 1)}),
-        (SettlementCreate, {"gross_amount": "1.00", "settled_on": date(2026, 10, 1), "pool_id": 1}),
-        (SettlementReverse, {"reversed_on": date(2026, 10, 1), "reason": "更正"}),
         (AccountProfileUpdate, {}),
         (PoolCreate, {"code": "POOL1", "name": "资金池"}),
         (PoolUpdate, {}),

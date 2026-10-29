@@ -9,11 +9,21 @@
 """
 from __future__ import annotations
 
+import pytest
+
+from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderLink
 from app.orders.form_scopes import FORM_SCOPES
+from app.orders.form_fields import validate_form_extra
 
 
 D = "2026-10-27"
+
+
+def test_form_values_must_use_registered_scope(seeded_db):
+    """后端表单值只能落入注册过的当前作用域，避免前端拼错 scope 后静默丢值。"""
+    with pytest.raises(Validation, match="表单作用域不存在"):
+        validate_form_extra(seeded_db, order_type_code="LEGACY_REBATE_FORM", values={"x": 1})
 
 
 def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
@@ -27,7 +37,15 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
     assert by_code["ORDERCANC"]["label"] == "售出取消交易"
     assert by_code["ORDERCANC"]["group"] == "ORDEROP"
     assert by_code["INVREFUND"]["label"] == "库存取消交易"
-    assert by_code["INVEDIT"]["label"] == "编辑账号及执行明细"
+    assert by_code["INVREFUND"]["group"] == "INVENTORY"
+    assert by_code["INVCANCEL"]["group"] == "INSTALLMENT"
+    assert by_code["INVEDIT"]["label"] == "编辑"
+    assert by_code["INVEDIT"]["group"] == "INVENTORY"
+    assert by_code["INVOID"]["label"] == "下架"
+    assert by_code["INVOID"]["group"] == "INVENTORY"
+    assert by_code["REFUND"]["label"] == "资金收支"
+    assert by_code["REFUND"]["group"] == "ORDEROP"
+    assert "INVPLATFORM" not in by_code
     assert by_code["STUDIOEXP"]["group"] == "STUDIO"
     # 既有作用域仍在清单中
     assert by_code["HS"]["label"] == "回收建单"
@@ -63,13 +81,29 @@ def test_operation_scope_seeds_match_registry():
     assert operation_codes | {"ALLOCATION", "INVEDIT"} <= registry_codes
 
 
+def test_allocation_scope_has_core_field_seeds():
+    """订单分润不能再是空配置，核心字段应由迁移预置。"""
+    import importlib.util
+    from pathlib import Path
+
+    migration_path = (
+        Path(__file__).resolve().parents[2]
+        / "alembic" / "versions" / "0054_seed_allocation_form_fields.py"
+    )
+    spec = importlib.util.spec_from_file_location("migration_0054", migration_path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    keys = {row[0] for row in migration.SEED}
+    assert keys == {"employee", "role", "allocation_rate", "allocation_amount"}
+
+
 def _create_order(seeded_client, headers) -> dict:
     response = seeded_client.post(
         "/api/v1/orders",
         json={
             "order_type": "HS",
             "trade_date": D,
-            "game_account": f"form-extra-{D}",
+            "account_snapshot": {"game_account": f"form-extra-{D}"},
             "initial_buy": {"amount": "100", "occurred_on": D},
         },
         headers=headers,
@@ -100,7 +134,7 @@ def test_post_event_persists_form_extra(seeded_client, seeded_db, headers):
 def test_cancel_order_merges_form_extra_into_order(seeded_client, seeded_db, headers):
     response = seeded_client.post(
         "/api/v1/orders",
-        json={"order_type": "HS", "trade_date": D, "game_account": f"cancel-extra-{D}"},
+        json={"order_type": "HS", "trade_date": D, "account_snapshot": {"game_account": f"cancel-extra-{D}"}},
         headers=headers,
     )
     assert response.status_code == 201, response.text
@@ -119,7 +153,7 @@ def test_create_order_link_persists_form_extra(seeded_client, seeded_db, headers
     first = _create_order(seeded_client, headers)
     second = seeded_client.post(
         "/api/v1/orders",
-        json={"order_type": "HS", "trade_date": D, "game_account": f"link-extra-{D}"},
+        json={"order_type": "HS", "trade_date": D, "account_snapshot": {"game_account": f"link-extra-{D}"}},
         headers=headers,
     )
     assert second.status_code == 201, second.text

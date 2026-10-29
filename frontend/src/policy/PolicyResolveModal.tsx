@@ -1,5 +1,5 @@
-import { Form, Input, Modal, Typography } from "antd";
-import { Select } from "../shared/ui";
+import { Form, Input, Typography } from "antd";
+import { BusinessActionModal, BusinessForm, Select } from "../shared/ui";
 import { useEffect } from "react";
 import { SCOPE_OPTIONS, today } from "./policyConstants";
 import { describeConfig } from "./policyConfigSchema";
@@ -53,7 +53,7 @@ export function PolicyResolveModal({
   }, [open, initialCode, form]);
 
   return (
-    <Modal
+    <BusinessActionModal
       open={open}
       title="规则生效期自查"
       okText="解析"
@@ -62,7 +62,7 @@ export function PolicyResolveModal({
       onCancel={onCancel}
       onOk={() => void form.submit()}
     >
-      <Form form={form} layout="vertical" onFinish={onOk}>
+      <BusinessForm form={form} onFinish={onOk}>
         <Typography.Paragraph type="secondary">
           解析某个日期实际命中的规则版本——发布只影响生效日之后的新单，历史订单按建单时固化的快照计算，不随改版变化。
         </Typography.Paragraph>
@@ -95,7 +95,7 @@ export function PolicyResolveModal({
             </Typography.Paragraph>
           )
         ) : null}
-      </Form>
-    </Modal>
+      </BusinessForm>
+    </BusinessActionModal>
   );
 }

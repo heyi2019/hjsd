@@ -28,13 +28,4 @@ class NotificationListOut(BaseModel):
     unread_total: int
 
 
-class NotificationSyncOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    as_of: str
-    created: int
-    existing: int
-    skipped: int
-
-
-__all__ = ["NotificationListOut", "NotificationOut", "NotificationSyncOut"]
+__all__ = ["NotificationListOut", "NotificationOut"]

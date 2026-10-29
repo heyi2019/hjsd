@@ -82,12 +82,21 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
             assert "CURRENT_TIMESTAMP" in str(disposition_columns["updated_at"])
             rebate_columns = {column["name"] for column in inspect(connection).get_columns("rebate_records")}
             assert "rebate_no" in rebate_columns
+            assert "operator_user_ids" in rebate_columns
+            assert "expected_on" not in rebate_columns
             assert "rebate_group_no" not in rebate_columns
             rebate_source = next(
                 column for column in inspect(connection).get_columns("rebate_records")
                 if column["name"] == "source_order_id"
             )
             assert rebate_source["nullable"] is False
+            legacy_rebate_action_fields = connection.execute(
+                text(
+                    "SELECT COUNT(*) FROM order_form_fields "
+                    "WHERE order_type_code IN ('REBSETTLE', 'REBREVERSE', 'REBATEVOID')"
+                )
+            ).scalar_one()
+            assert legacy_rebate_action_fields == 0
             import_source = next(
                 column for column in inspect(connection).get_columns("import_batches")
                 if column["name"] == "source_kind"
@@ -198,6 +207,53 @@ def test_order_cancel_amount_is_incoming_finance_flow(migration_env):
         assert row.flow_direction == "IN"
     finally:
         engine.dispose()
+
+
+def test_consignment_platform_field_is_operation_section(migration_env):
+    """寄售平台登记属于账号运营动作，不应归到交付板块。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            section = connection.execute(
+                text(
+                    "SELECT section FROM order_form_fields "
+                    "WHERE order_type_code = 'CONSIGN' AND field_key = 'platform_ids'"
+                )
+            ).scalar_one()
+        assert section == "OPERATION"
+    finally:
+        engine.dispose()
+
+
+def test_distribution_installment_types_are_merged_into_stock_sale():
+    """历史提号/代挂分期迁移后统一按库存分期出售处理。"""
+    import importlib.util
+
+    migration_path = BACKEND_DIR / "alembic" / "versions" / "0056_merge_distribution_installment_types.py"
+    spec = importlib.util.spec_from_file_location("migration_0056", migration_path)
+    migration = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(migration)
+
+    assert migration.LEGACY_CONTRACT_TYPES == ("PICKUP_SALE", "CONSIGNMENT_SALE")
+    source = migration_path.read_text(encoding="utf-8")
+    assert "SET contract_type = 'STOCK_SALE'" in source
+    assert "WHERE contract_type IN ('PICKUP_SALE', 'CONSIGNMENT_SALE')" in source
+
+
+def test_refund_form_is_reframed_as_cash_outflow():
+    """资金收支表单移除责任方，补齐日期和固定支出流向。"""
+    migration_path = BACKEND_DIR / "alembic" / "versions" / "0057_update_refund_cashflow_form_fields.py"
+    source = migration_path.read_text(encoding="utf-8")
+    assert "refund_responsibility" in source
+    assert "is_active = False" in source
+    assert 'field_key="occurred_on"' in source
+    assert 'field_key="direction"' in source
+    assert '"value": "OUT"' in source
 
 
 def test_upgrade_is_repeatable(migration_env):

@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
-import { Form, Modal } from "antd";
+import { Form } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, FieldConfigContext, CustomFieldSection } from "./ConfigurableField";
 import {
@@ -18,11 +18,10 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { ErrorBanner, PermissionButton, ResizableModal } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
-import { getRecoveryLayout } from "./recovery/recoveryConfig";
 import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
 import { resizeInstallmentSchedule, serializeInstallmentSchedule } from "./InstallmentScheduleFields";
@@ -78,22 +77,6 @@ export function CreateBusinessModal(props: {
   useEffect(() => {
     if (!props.open) form.resetFields();
   }, [props.open, form]);
-
-  const resetAdaptiveModalLayout = (open: boolean) => {
-    if (!open) return;
-    window.requestAnimationFrame(() => {
-      const modal = document.querySelector<HTMLElement>(".adaptive-business-modal .ant-modal");
-      if (!modal) return;
-      modal.dataset.recoveryLayout = getRecoveryLayout(modal.getBoundingClientRect().width);
-      modal.style.removeProperty("position");
-      modal.style.removeProperty("left");
-      modal.style.removeProperty("top");
-      modal.style.removeProperty("margin");
-      modal.style.removeProperty("transform");
-      modal.style.removeProperty("--resizable-modal-width");
-      modal.style.removeProperty("--resizable-modal-height");
-    });
-  };
 
   // 基础数据随页面挂载即预热并常驻内存：后续每次打开弹窗直接读 state，不再发网络请求。
   // 仅成功初始化一次；失败不置位，下次打开可重试。
@@ -340,7 +323,7 @@ export function CreateBusinessModal(props: {
   };
 
   return (
-    <Modal
+    <BusinessActionModal
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
       open={props.open}
       onCancel={() => {
@@ -358,18 +341,16 @@ export function CreateBusinessModal(props: {
           props.onClose();
         }
       }}
-      afterOpenChange={resetAdaptiveModalLayout}
       footer={(
         <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting}>
           创建订单
         </PermissionButton>
       )}
       width={1200}
-      wrapClassName="adaptive-business-modal recovery-order-modal"
-      modalRender={(modal) => <ResizableModal getLayout={getRecoveryLayout} layoutAttribute="data-recovery-layout">{modal}</ResizableModal>}
     >
       <ErrorBanner error={loadError} />
-      <Form
+      <BusinessForm
+        scope={orderType}
         form={form}
         id={formId}
         layout="horizontal"
@@ -410,7 +391,7 @@ export function CreateBusinessModal(props: {
           {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
           <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
         </FieldConfigContext.Provider>
-      </Form>
-    </Modal>
+      </BusinessForm>
+    </BusinessActionModal>
   );
 }

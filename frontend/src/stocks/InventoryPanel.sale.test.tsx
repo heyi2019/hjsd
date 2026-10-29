@@ -132,7 +132,6 @@ it("售出时用建单参与方填写新买家并将其关联到订单", async (
   expect(screen.getByText("游戏账号")).toBeInTheDocument();
   expect(await screen.findByText("买家信息")).toBeInTheDocument();
   expect(screen.getByText("资金流水")).toBeInTheDocument();
-  expect(screen.getByText(/中介类型/)).toBeInTheDocument();
   await ui.type(screen.getByLabelText("客户昵称"), "新买家");
   await ui.type(screen.getByLabelText("售出金额"), "350");
   await ui.click(screen.getByLabelText("收款资金账户"));
@@ -160,7 +159,7 @@ it("自营在库账号可以售出并登记 HS 售出事件", async () => {
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "350");
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await ui.click(screen.getByLabelText("收款资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
@@ -190,7 +189,7 @@ it("代挂账号售出按货源类型生成 DG 订单", async () => {
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "200");
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await ui.click(screen.getByLabelText("收款资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
@@ -207,7 +206,7 @@ it("代挂账号售出按货源类型生成 DG 订单", async () => {
     }));
   });
 
-it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 SELL", async () => {
+it("代挂账号出售时选择分期，建立库存分期出售合同而不是直接 SELL", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
       { id: 5, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
@@ -228,13 +227,13 @@ it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 
     await waitFor(() => expect(vi.mocked(catalog.installmentsApi.create)).toHaveBeenCalled());
     expect(vi.mocked(catalog.installmentsApi.create).mock.calls[0][0]).toMatchObject({
       order_id: 21,
-      contract_type: "CONSIGNMENT_SALE",
+      contract_type: "STOCK_SALE",
       principal: "200",
     });
     expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
   });
 
-it("提号库存从库存中心售出时可选择分期", async () => {
+it("提号库存从库存中心售出时统一按库存分期出售", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
       { id: 6, game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
@@ -255,7 +254,7 @@ it("提号库存从库存中心售出时可选择分期", async () => {
 
     await waitFor(() => expect(vi.mocked(catalog.installmentsApi.create)).toHaveBeenCalledWith(expect.objectContaining({
       order_id: 21,
-      contract_type: "PICKUP_SALE",
+      contract_type: "STOCK_SALE",
       principal: "1200",
     })));
     expect(vi.mocked(catalog.ordersApi.create).mock.calls[0][0]).toMatchObject({ order_type: "TH", account_id: 6 });

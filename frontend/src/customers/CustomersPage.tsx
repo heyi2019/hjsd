@@ -2,7 +2,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
  *  扩展字段（BAS-04）：定义即「客户建档」表单的自定义字段（设置 › 表单字段 › 客户建档），
  *  建档/编辑表单与详情抽屉按定义动态渲染，值随客户行存 form_extra。 */
-import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Space, Spin, Switch, Tabs, Typography } from "antd";
+import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Space, Spin, Switch, Tabs, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 // 搜索按钮是只读查询操作，不属于「写操作须用 PermissionButton 门控」的约束范围；
 // 用别名避免 ui_guards 的字面量误伤（SearchButton 与 Button 是同一组件引用）。
@@ -38,6 +38,8 @@ import {
 import "./CustomersPage.css";
 import {
   DataTable,
+  BusinessActionModal,
+  BusinessForm,
   ErrorBanner,
   ConfirmButton,
   PermissionButton,
@@ -556,9 +558,9 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
         }}
       />}
 
-      <Modal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <BusinessActionModal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <FieldConfigScope scope="CUSTOMER" active={createOpen}>
-        <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submitCreate}>
+        <BusinessForm scope="CUSTOMER" form={form} colon={false} className="form-no-colon" onFinish={submitCreate}>
           <CfgItem name="display_name" label="名字" rules={[{ required: true }]}>
             <Input />
           </CfgItem>
@@ -597,11 +599,11 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
           <PermissionButton permission="customer.create" type="primary" htmlType="submit">
             建档
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
-      </Modal>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={editTarget ? `编辑客户 · ${editTarget.customer_no}` : "编辑客户"}
         open={Boolean(editTarget)}
         onCancel={() => {
@@ -611,7 +613,8 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
         footer={null}
         destroyOnHidden
       >
-        <Form
+        <BusinessForm
+          scope="CUSTOMER"
           form={editForm}
           layout="vertical"
           colon={false}
@@ -668,8 +671,8 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
           <PermissionButton permission="customer.update" type="primary" htmlType="submit">
             保存
           </PermissionButton>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
       <Drawer
         title={detailTarget ? `客户档案 · ${detailTarget.customer_no}` : "客户档案"}
@@ -799,13 +802,13 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
         ) : null}
       </Drawer>
 
-      <Modal
+      <BusinessActionModal
         title={mergeTarget ? `合并客户 · ${mergeTarget.customer_no}` : "合并客户"}
         open={Boolean(mergeTarget)}
         onCancel={() => setMergeTarget(null)}
         footer={null}
       >
-        <Form form={mergeForm} layout="vertical" colon={false} className="form-no-colon" onFinish={submitMerge}>
+        <BusinessForm scope="CUSTOMER" form={mergeForm} colon={false} className="form-no-colon" onFinish={submitMerge}>
           <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
             <Select
               options={rows
@@ -819,8 +822,8 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
           <PermissionButton permission="customer.merge" type="primary" htmlType="submit">
             确认合并
           </PermissionButton>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
     </Card>
   );
 }
@@ -990,9 +993,9 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
           await load();
         }}
       />}
-      <Modal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
+      <BusinessActionModal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
-        <Form form={form} layout="vertical" colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
+        <BusinessForm scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
           <CfgItem name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
           </CfgItem>
@@ -1012,11 +1015,11 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             建档
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
-      </Modal>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title={editTarget ? `编辑合作方 · ${editTarget.counterparty_no}` : "编辑合作方"}
         open={Boolean(editTarget)}
         onCancel={() => {
@@ -1027,7 +1030,8 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
         destroyOnHidden
       >
         <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
-        <Form
+        <BusinessForm
+          scope="COUNTERPARTY"
           form={editForm}
           layout="vertical"
           colon={false}
@@ -1070,9 +1074,9 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             保存
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
-      </Modal>
+      </BusinessActionModal>
 
       <Drawer
         title={detailTarget ? `合作方档案 · ${detailTarget.counterparty_no}` : "合作方档案"}

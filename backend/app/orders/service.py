@@ -52,7 +52,7 @@ from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.parties import service as parties_service
 from app.orders.schemas import OrderAccountSnapshot
-from app.orders.form_fields import validate_form_extra, validate_order_form_extra
+from app.orders.form_fields import validate_form_extra
 
 _UNSET = object()
 
@@ -250,13 +250,6 @@ def create_order(
     account_snapshot: dict[str, Any] | None = None,
     actor: str,
     account_id: int | None = None,
-    game_type: str | None = None,
-    game_account: str | None = None,
-    game_password: str | None = None,
-    channel_region: str | None = None,
-    bound_phone: str | None = None,
-    has_secondary: bool | None = None,
-    account_note: str | None = None,
     owner_id: int | None = None,
     capital_type: str | None = None,
     note: str | None = None,
@@ -280,33 +273,12 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
-    # 2026-10-28 口径：account_snapshot 四类业务通用（HS/TH/DG/DFQ），
-    # 与平铺账号字段互斥——快照传了就不允许再单独传游戏账号字段。
+    # 账号资料的唯一输入是 account_snapshot；库存账号引用只传 account_id。
     if account_snapshot is not None and definition.code not in {"HS", "TH", "DG", "DFQ"}:
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
-    if (
-        account_snapshot is not None
-        and definition.code in {"HS", "TH", "DG"}
-        and any(v is not None for v in (game_account, game_type, game_password, channel_region))
-    ):
-        raise Validation("游戏账号资料请通过 account_snapshot 传递，不要与单独账号字段混用")
-    if definition.code == "DFQ" and any(
-        v is not None
-        for v in (
-            game_type,
-            game_account,
-            game_password,
-            channel_region,
-            bound_phone,
-            has_secondary,
-            account_note,
-        )
-    ):
-        raise Validation("DFQ 代分期订单的游戏账号资料应填写在 account_snapshot 内，不应单独传游戏账号字段")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
-    # 账号/产品扩展值以库存账号为事实来源；兼容旧调用方把它放在
-    # form_extra 的写法，但落订单前先拆出账号字段，避免订单与库存双写。
+    # 账号/产品扩展值以库存账号为事实来源；落订单前拆出账号字段，避免订单与库存双写。
     snapshot_extra = dict((account_snapshot or {}).get("extra_values") or {})
     submitted_extra = dict(form_extra or {})
     merged_extra = {**snapshot_extra, **submitted_extra}
@@ -402,8 +374,8 @@ def create_order(
 
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         owner_id = user.id
-    # 兜底：admin / ALL 建单未指定负责人时记为操作人本人。否则落 NULL 的单据在
-    # 数据权限按 owner_id 过滤（owner_scope_filter）后，对 SELF 用户永久不可见。
+    # 管理员或 ALL 范围建单未指定负责人时，负责人明确归属为操作人本人，
+    # 这样订单不会因 owner_id 为空而脱离 SELF 用户的数据范围。
     if owner_id is None and user is not None:
         owner_id = user.id
     if owner_id is not None:
@@ -441,26 +413,10 @@ def create_order(
         if primary_version_id is None:
             primary_version_id = version_id
 
-    # 2026-10-28 去冗余：账号资料单一事实源 = account_snapshot。
-    # 旧调用方传平铺字段时自动转为快照（API 契约保留，物理冗余列已删除）。
-    if (
-        account_snapshot is None
-        and definition.code in {"HS", "TH", "DG"}
-        and game_account
-    ):
-        account_snapshot = {
-            "game_account": game_account,
-            "game_type": game_type,
-            "game_password": game_password,
-            "channel_region": channel_region,
-            "bound_phone": bound_phone,
-            "has_secondary": has_secondary,
-            "note": account_note,
-        }
-        account_snapshot = _normalize_account_snapshot(account_snapshot)
-
-    # 2026-10-28 口径：HS/TH/DG 快照建单——快照值展开为局部变量，
-    # 供内联建号使用；订单行只落快照，不再写平铺列。
+    # 快照是建单和内联建库的单一事实源；订单行只落快照，不再写平铺列。
+    game_account = game_type = game_password = channel_region = None
+    bound_phone = account_note = None
+    has_secondary = None
     if account_snapshot is not None and definition.code in {"HS", "TH", "DG"}:
         snap = account_snapshot
         game_account = snap["game_account"]
@@ -472,7 +428,7 @@ def create_order(
         account_note = snap.get("note")
 
     # 内联建库存账号（2026-10-28 口径）：建单成功即生成库存编号，不再等 BUY 事件。
-    # HS/TH 表单的账号资料为必填，game_account 必有值；缺资料时退回 BUY 事件兜底建号。
+    # HS/TH/DG 内联建库必须有账号快照；已有 account_id 的订单直接引用库存账号。
     if definition.code in {"HS", "TH"} and account_id is None and game_account:
         account_id = _create_inline_inventory_account(
             session, order_type=definition.code, game_account=game_account, actor=actor,
@@ -919,6 +875,17 @@ def cancel_order(
     if posted is not None:
         raise Validation("订单已有登记事件，不能直接作废，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+    # 代挂的“本系统下架”不是平台记录下架：它直接取消当前 DG 订单，
+    # 同步让对应账号退出库存中心。外部平台下架会带 PLATFORM 标记，仍保留在库。
+    if (
+        order.order_type == "DG"
+        and (form_extra or {}).get("platform_unlist_scope") == "SYSTEM"
+        and order.account_id is not None
+    ):
+        account = session.get(Account, order.account_id)
+        if account is not None and account.status == AccountStatus.IN_STOCK.value:
+            account.status = AccountStatus.VOID.value
+            account.updated_by = actor
     if form_extra:
         # 自定义字段值按作用域校验后合并进订单 form_extra（缺省取消单 ORDERCANC）。
         checked = validate_form_extra(

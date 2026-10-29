@@ -9,7 +9,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
  * - **承载资金池可勾选**：配置落在选项词典 `STUDIO_EXPENSE_POOL`（value=池 code），
  *   科目字典落在 `STUDIO_EXPENSE_ITEM`；首次保存时自动补建词典，服务端存储 ⇒ 全员同步。
  */
-import { Card, Form, Input, Modal, Space, Typography } from "antd";
+import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,6 +27,8 @@ import { requiredMoneyRules } from "../shared/lib/validators";
 import {
   ConfirmButton,
   DataTable,
+  BusinessActionModal,
+  BusinessForm,
   ErrorBanner,
   InlineError,
   MoneyInput,
@@ -427,14 +429,14 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
        />
       </Card>
 
-      <Modal
+      <BusinessActionModal
         title="工作室收支登记"
         open={registerOpen}
         onCancel={() => setRegisterOpen(false)}
         footer={null}
       >
         <InlineError error={write.error} />
-        <Form form={registerForm} layout="vertical" onFinish={submitRegister}>
+        <BusinessForm scope="STUDIOEXP" form={registerForm} onFinish={submitRegister}>
           <FieldConfigScope scope="STUDIOEXP" active={registerOpen}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true, message: "请选择资金池" }]}>
             <Select
@@ -471,17 +473,17 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             登记入账
           </PermissionButton>
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title="配置工作室支出"
         open={configOpen}
         onCancel={() => setConfigOpen(false)}
         footer={null}
       >
         <InlineError error={write.error} />
-        <Form form={configForm} layout="vertical" onFinish={submitConfig}>
+        <BusinessForm scope="STUDIOEXP" form={configForm} onFinish={submitConfig}>
           <Form.Item
             name="pool_codes"
             label="承载资金池"
@@ -500,17 +502,17 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={write.pending}>
             保存配置
           </PermissionButton>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title="拒绝工作室支出"
         open={Boolean(rejectTarget)}
         onCancel={() => setRejectTarget(null)}
         footer={null}
       >
         <InlineError error={write.error} />
-        <Form form={rejectForm} layout="vertical" onFinish={(values) => review(rejectTarget!, "reject", values.reason as string, values.form_extra as Record<string, unknown> | undefined)}>
+        <BusinessForm scope="STUDIOREJ" form={rejectForm} onFinish={(values) => review(rejectTarget!, "reject", values.reason as string, values.form_extra as Record<string, unknown> | undefined)}>
           <FieldConfigScope scope="STUDIOREJ" active={Boolean(rejectTarget)}>
           <CfgItem name="reason" label="拒绝原因" rules={[{ required: true, message: "请填写拒绝原因" }]}>
             <Input.TextArea rows={3} />
@@ -520,17 +522,17 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             确认拒绝
           </PermissionButton>
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
-      <Modal
+      <BusinessActionModal
         title="冲销工作室支出"
         open={Boolean(reverseTarget)}
         onCancel={() => setReverseTarget(null)}
         footer={null}
       >
         <InlineError error={write.error} />
-        <Form form={reverseForm} layout="vertical" onFinish={submitReverse}>
+        <BusinessForm scope="STUDIOREV" form={reverseForm} onFinish={submitReverse}>
           <FieldConfigScope scope="STUDIOREV" active={Boolean(reverseTarget)}>
           <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true, message: "请输入冲销日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
@@ -543,8 +545,8 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             确认冲销
           </PermissionButton>
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
     </section>
   );
 }

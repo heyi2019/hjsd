@@ -1,11 +1,11 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
-import { Card, Form, Input, Modal, Space, Tooltip } from "antd";
+import { Card, Form, Input, Space, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualityMetricRow, type QualityMetricValue, type QualityMetrics, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 
@@ -242,9 +242,9 @@ export function QualityPanel() {
         <DataTable<QualityIssue> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
-      <Modal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <BusinessActionModal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={createOpen ? error : null} />
-        <Form form={createForm} layout="vertical" onFinish={createIssue}>
+        <BusinessForm form={createForm} onFinish={createIssue}>
           <Form.Item name="code" label="异常编码" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={severityOptions} /></Form.Item>
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
@@ -252,24 +252,24 @@ export function QualityPanel() {
           <Form.Item name="entity_id" label="对象编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="message" label="问题描述" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={creating}>创建工单</PermissionButton>
-        </Form>
-      </Modal>
-      <Modal title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
+        </BusinessForm>
+      </BusinessActionModal>
+      <BusinessActionModal title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
         <InlineError error={closeTarget ? error : null} />
-        <Form form={closeForm} layout="vertical" onFinish={closeIssue}>
+        <BusinessForm form={closeForm} onFinish={closeIssue}>
           <Form.Item name="resolution" label="处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
-        </Form>
-      </Modal>
-      <Modal title="批量关闭质量工单" open={batchCloseOpen} onCancel={() => setBatchCloseOpen(false)} footer={null}>
+        </BusinessForm>
+      </BusinessActionModal>
+      <BusinessActionModal title="批量关闭质量工单" open={batchCloseOpen} onCancel={() => setBatchCloseOpen(false)} footer={null}>
         <InlineError error={batchCloseOpen ? error : null} />
-        <Form form={batchCloseForm} layout="vertical" onFinish={batchCloseIssues}>
+        <BusinessForm form={batchCloseForm} onFinish={batchCloseIssues}>
           <Form.Item name="resolution" label="批量处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} placeholder="将应用到当前列表中最多 50 条未关闭工单" /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
     </section>
   );
 }

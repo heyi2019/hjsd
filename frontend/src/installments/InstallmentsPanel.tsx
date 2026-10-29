@@ -707,7 +707,8 @@ function ContractTable({
           <CfgItem name="note" label="换绑凭证" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </CfgItem>
-          <CustomFieldSection testIdSuffix="installment-deliver" />
+          <CustomFieldSection section="DELIVER" testIdSuffix="installment-deliver" />
+          <CustomFieldSection testIdSuffix="installment-deliver-extra" />
           <Typography.Paragraph type="secondary">
             仅已结清合约可交付；DELIVER 无金额、不生成现金流，不再确认收入。
           </Typography.Paragraph>

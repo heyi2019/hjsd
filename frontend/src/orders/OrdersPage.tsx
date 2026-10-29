@@ -44,11 +44,12 @@ import {
 const ORDER_FIELD_SECTION_LABEL: Record<string, string> = {
   ACCOUNT_PRODUCT: "账号 / 产品信息",
   BUSINESS: "业务方案信息",
+  DELIVER: "交付信息",
   FINANCE: "费用与资金",
   PARTICIPANT: "参与方信息",
   EXTRA: "其他补充信息",
 };
-const ORDER_FIELD_SECTION_ORDER = ["ACCOUNT_PRODUCT", "BUSINESS", "FINANCE", "EXTRA", "PARTICIPANT"];
+const ORDER_FIELD_SECTION_ORDER = ["ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "FINANCE", "EXTRA", "PARTICIPANT"];
 
 function MobileOrderList(props: {
   orders: Order[];

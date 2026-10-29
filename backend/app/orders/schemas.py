@@ -484,7 +484,7 @@ class OrderFormFieldCreate(BaseModel):
     is_active: bool = True
     sort_order: int = 0
     is_custom: bool = True
-    section: str = Field(default="EXTRA", pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS)$")
+    section: str = Field(default="EXTRA", pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS|DELIVER)$")
     note: str | None = None
 
 
@@ -502,7 +502,7 @@ class OrderFormFieldUpdate(BaseModel):
     required: bool | None = None
     required_when: RequiredWhen | None = None
     sort_order: int | None = None
-    section: str | None = Field(default=None, pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS)$")
+    section: str | None = Field(default=None, pattern="^(EXTRA|ACCOUNT_PRODUCT|PARTICIPANT|FINANCE|BUSINESS|DELIVER)$")
     note: str | None = None
 
 

@@ -25,6 +25,7 @@ const OP_TEXT: Record<string, string> = { eq: "等于", ne: "不等于", filled:
 const FIELD_SECTION_OPTIONS = [
   { value: "ACCOUNT_PRODUCT", label: "账号 / 产品信息" },
   { value: "BUSINESS", label: "业务方案信息" },
+  { value: "DELIVER", label: "交付信息" },
   { value: "FINANCE", label: "费用与资金" },
   { value: "EXTRA", label: "其他补充信息" },
   { value: "PARTICIPANT", label: "参与方信息" },

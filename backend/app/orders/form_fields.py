@@ -367,7 +367,7 @@ def update_order_form_field(
     }
     definition.label = next_label
     if section is not None:
-        if section not in {"EXTRA", "ACCOUNT_PRODUCT", "PARTICIPANT", "FINANCE", "BUSINESS"}:
+        if section not in {"EXTRA", "ACCOUNT_PRODUCT", "PARTICIPANT", "FINANCE", "BUSINESS", "DELIVER"}:
             raise Validation("字段归属板块不合法", details={"field": "section"})
         definition.section = section
     definition.field_type = next_type

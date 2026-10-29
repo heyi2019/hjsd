@@ -1075,7 +1075,7 @@ export interface OrderFormField {
   locked: boolean;
   /** 用户自定义字段（区别于种子预置的系统字段）；自定义字段可增删停 */
   is_custom: boolean;
-  section?: "EXTRA" | "ACCOUNT_PRODUCT" | "PARTICIPANT" | "FINANCE" | "BUSINESS";
+  section?: "EXTRA" | "ACCOUNT_PRODUCT" | "PARTICIPANT" | "FINANCE" | "BUSINESS" | "DELIVER";
   note?: string | null;
 }
 

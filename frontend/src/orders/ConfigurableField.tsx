@@ -19,6 +19,7 @@ export type FieldConfigMap = Record<string, OrderFormField>;
 const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, string> = {
   ACCOUNT_PRODUCT: "账号 / 产品补充信息",
   BUSINESS: "业务方案补充信息",
+  DELIVER: "交付补充信息",
   FINANCE: "费用与资金补充信息",
   PARTICIPANT: "参与方补充信息",
   EXTRA: "其他补充信息",

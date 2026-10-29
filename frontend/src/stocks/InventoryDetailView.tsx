@@ -79,6 +79,7 @@ type InventoryDetailField = { key: string; label: string; value: ReactNode; clas
 const ORDER_FIELD_SECTION_LABEL: Record<string, string> = {
   ACCOUNT_PRODUCT: "账号 / 产品补充信息",
   BUSINESS: "业务方案信息",
+  DELIVER: "交付信息",
   PARTICIPANT: "参与方信息",
   FINANCE: "费用与资金补充信息",
   EXTRA: "其他补充信息",

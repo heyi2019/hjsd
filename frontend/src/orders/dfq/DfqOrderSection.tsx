@@ -120,6 +120,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
         <InstallmentScheduleFields name="dfq_schedule" />
       </NestedFormSection>
       <NestedFormSection className="nested-form-section--card dfq-section" title="补充信息">
+        <CustomFieldSection section="DELIVER" testIdSuffix="deliver" />
         <CfgItem className="recovery-order-modal__note-field" name="note" label="分期备注"><Input.TextArea rows={2} placeholder="可选填" /></CfgItem>
       </NestedFormSection>
     </>

@@ -210,14 +210,3 @@ def test_router_get_rebate_endpoint(seeded_db):
 
 
 # ----------------------------------------------------- settle_rebate 记录不存在
-@pytest.mark.skip(reason="返点结算接口已删除")
-def test_router_settle_rebate_record_not_found(seeded_db):
-    with pytest.raises(NotFound):
-        finance_router.settle_rebate(
-            999999,
-            payload=schemas.SettlementCreate(
-                gross_amount=Decimal("1"), settled_on=TODAY, pool_id=1
-            ),
-            db=seeded_db,
-            user=_all_scope_user(),
-        )

@@ -230,78 +230,7 @@ class TestDepositAndRebate:
                 seeded_db, pool_id=1, amount="-100", paid_on=D, actor="hunt"
             )
 
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_rebate_settle_more_than_receivable_is_rejected(self, seeded_db):
-        """可结算上限 = 返点基数 1000；一次结 1200 必须被拒。"""
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="hunt",
-        )
-        order_service.post_event(
-            seeded_db,
-            order.id,
-            event_type="SELL",
-            amount="1000.00",
-            occurred_on=D,
-            actor="hunt",
-        )
-        rebate = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount="1000.00",
-            rate="5",
-            collected_on=D,
-            actor="hunt",
-        )
-        with pytest.raises(Exception):
-            finance_service.settle_rebate(
-                seeded_db,
-                rebate.id,
-                gross_amount="1200.00",
-                platform_fee="0",
-                settled_on=D,
-                pool_id=1,
-                actor="hunt",
-            )
 
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_rebate_partial_then_full_settles(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="hunt",
-        )
-        order_service.post_event(
-            seeded_db,
-            order.id,
-            event_type="SELL",
-            amount="1000.00",
-            occurred_on=D,
-            actor="hunt",
-        )
-        rebate = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount="1000.00",
-            rate="5",
-            collected_on=D,
-            actor="hunt",
-        )
-        finance_service.settle_rebate(
-            seeded_db, rebate.id, gross_amount="400.00", platform_fee="0",
-            settled_on=D, pool_id=1, actor="hunt",
-        )
-        seeded_db.refresh(rebate)
-        assert rebate.status == "PARTIALLY_SETTLED"
-        finance_service.settle_rebate(
-            seeded_db, rebate.id, gross_amount="600.00", platform_fee="0",
-            settled_on=D, pool_id=1, actor="hunt",
-        )
-        seeded_db.refresh(rebate)
-        assert rebate.status == "SETTLED"
 
 
 # ------------------------------------------------------------------ 主数据

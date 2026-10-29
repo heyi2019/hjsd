@@ -121,7 +121,7 @@ def create_rebate(
         status=RebateStatus.SETTLED.value,
         note=note,
         operator_user_ids=operator_ids,
-        form_extra=validate_form_extra(session, order_type_code="REBATE", values=form_extra) or None,
+        form_extra=validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -266,7 +266,7 @@ def update_rebate(
     if operator_user_ids is not None:
         record.operator_user_ids = _validate_operator_user_ids(session, operator_user_ids)
     if form_extra is not None:
-        record.form_extra = validate_form_extra(session, order_type_code="REBATE", values=form_extra) or None
+        record.form_extra = validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None
     record.updated_by = actor
     session.flush()
     record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note})

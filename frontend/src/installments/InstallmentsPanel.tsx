@@ -19,6 +19,7 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import {
   DataTable,
   BusinessActionModal,
+  BusinessForm,
   ErrorBanner,
   InlineError,
   MoneyInput,
@@ -605,7 +606,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTPAY" active={Boolean(payTarget)}>
-          <Form form={payForm} layout="vertical" onFinish={submitPay}>
+          <BusinessForm scope="INSTPAY" form={payForm} onFinish={submitPay}>
           <CfgItem name="period_no" label="期次（0=首付，留空按到期顺序）">
             <Select
               allowClear
@@ -625,7 +626,7 @@ function ContractTable({
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认收款
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -637,7 +638,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTRECOVER" active={Boolean(recoverTarget)}>
-          <Form form={recoverForm} layout="vertical" onFinish={submitRecover}>
+          <BusinessForm scope="INSTRECOVER" form={recoverForm} onFinish={submitRecover}>
           <CfgItem name="occurred_on" label="回收日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
@@ -648,7 +649,7 @@ function ContractTable({
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -660,7 +661,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTRESALE" active={Boolean(resaleTarget)}>
-          <Form form={resaleForm} layout="vertical" onFinish={submitResale}>
+          <BusinessForm scope="INSTRESALE" form={resaleForm} onFinish={submitResale}>
           <Typography.Paragraph type="secondary">
             回收账号转售登记：请先在库存中心售出该账号生成售出订单，再在此关联。
             出售订单必须已登记 SELL 事件且关联同一账号，每个合约只能登记一次。
@@ -688,7 +689,7 @@ function ContractTable({
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认登记
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -700,7 +701,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTDELIVER" active={Boolean(deliverTarget)}>
-          <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
+          <BusinessForm scope="INSTDELIVER" form={deliverForm} onFinish={submitDeliver}>
           <CfgItem name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
             <Select />
           </CfgItem>
@@ -724,7 +725,7 @@ function ContractTable({
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认交付
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -736,7 +737,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTCANCEL" active={Boolean(cancelTarget)}>
-          <Form form={cancelForm} layout="vertical" onFinish={submitCancel}>
+          <BusinessForm scope="INSTCANCEL" form={cancelForm} onFinish={submitCancel}>
           <Typography.Paragraph type="secondary">
             {cancelTarget?.contract_type === "PICKUP_SALE"
               ? "按已收款原资金池退款，提号取消后账号直接结束。"
@@ -752,7 +753,7 @@ function ContractTable({
           <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit" loading={write.pending}>
             确认退款并终止分期
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -764,7 +765,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTSETTLE" active={Boolean(settleTarget)}>
-        <Form form={settleForm} layout="vertical" onFinish={submitSettleEarly}>
+          <BusinessForm scope="INSTSETTLE" form={settleForm} onFinish={submitSettleEarly}>
           <Typography.Paragraph type="secondary">
             一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金池时按原收款资金池入账。
           </Typography.Paragraph>
@@ -778,7 +779,7 @@ function ContractTable({
           <PermissionButton permission={settlePermission} type="primary" htmlType="submit" loading={write.pending}>
             确认提前结清
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -790,7 +791,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTDEFAULT" active={Boolean(defaultTarget)}>
-        <Form form={defaultForm} layout="vertical" onFinish={submitDefault}>
+          <BusinessForm scope="INSTDEFAULT" form={defaultForm} onFinish={submitDefault}>
           <Typography.Paragraph type="secondary">
             登记后合约进入 DEFAULTED，仅可继续收款或关闭，不可再交付。
           </Typography.Paragraph>
@@ -801,7 +802,7 @@ function ContractTable({
           <PermissionButton permission="order.exception.approve" type="primary" danger htmlType="submit" loading={write.pending}>
             确认登记违约
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -813,7 +814,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTWAIVE" active={Boolean(waiveTarget)}>
-        <Form form={waiveForm} layout="vertical" onFinish={submitWaive}>
+          <BusinessForm scope="INSTWAIVE" form={waiveForm} onFinish={submitWaive}>
           <Typography.Paragraph type="secondary">
             已收款部分不可减免，减免额不得超过该期未收金额；减免后该期不再计入催收。
           </Typography.Paragraph>
@@ -830,7 +831,7 @@ function ContractTable({
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认减免
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
 
@@ -842,7 +843,7 @@ function ContractTable({
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTEXTEND" active={Boolean(extendTarget)}>
-        <Form form={extendForm} layout="vertical" onFinish={submitExtend}>
+          <BusinessForm scope="INSTEXTEND" form={extendForm} onFinish={submitExtend}>
           <Typography.Paragraph type="secondary">
             新到期日必须晚于原到期日；逾期期次展期后回到 PENDING。
           </Typography.Paragraph>
@@ -856,7 +857,7 @@ function ContractTable({
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
             确认展期
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </Modal>
     </section>

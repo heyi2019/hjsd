@@ -22,6 +22,7 @@ import {
   MoneyText,
   ConfirmButton,
   BusinessActionModal,
+  BusinessForm,
   PermissionButton,
   Select,
   StatRow,
@@ -241,7 +242,7 @@ export function RebatesPanel() {
 
       <BusinessActionModal title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"} open={Boolean(editTarget)} onCancel={() => setEditTarget(null)} footer={null}>
         <InlineError error={write.error} />
-        <Form form={editForm} layout="vertical" className="ui-form-spaced" onFinish={submitEdit}>
+        <BusinessForm scope="INVREBATE" form={editForm} onFinish={submitEdit}>
           <div className="rebate-core-fields">
             <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}><MoneyInput /></CfgItem>
             <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
@@ -251,13 +252,13 @@ export function RebatesPanel() {
           <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
           <CustomFieldSection testIdSuffix="rebate-edit" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>保存</PermissionButton>
-        </Form>
+        </BusinessForm>
       </BusinessActionModal>
 
       <BusinessActionModal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="REBATE" active={createOpen}>
-        <Form form={form} layout="vertical"
+        <BusinessForm scope="INVREBATE" form={form}
           onFinish={submitCreate}
           initialValues={{ collected_on: today(), rebate_type: "BUY" }}
         >
@@ -290,7 +291,7 @@ export function RebatesPanel() {
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             创建
           </PermissionButton>
-        </Form>
+        </BusinessForm>
         </FieldConfigScope>
       </BusinessActionModal>
     </section>

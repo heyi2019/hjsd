@@ -21,6 +21,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.trade import OrderFormField
+from app.orders.form_scopes import SCOPE_CODES
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
 FIELD_SECTIONS = (
@@ -38,6 +39,18 @@ ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 SECTION_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
 
 _UNSET: Any = object()
+
+
+def normalize_form_scope(value: str) -> str:
+    """把表单作用域归一化为注册表中的唯一编码。
+
+    表单值是跨订单、库存、分期和资金的共享契约；未知编码必须立即失败，
+    否则字段值会被静默存储或丢弃，导致前后端表单看似成功但无法回显。
+    """
+    code = str(value or "").strip().upper()
+    if code not in SCOPE_CODES:
+        raise Validation("表单作用域不存在", details={"field": "form_extra_scope", "value": value})
+    return code
 
 
 def _validate_section(section: str) -> None:
@@ -151,10 +164,11 @@ def validate_form_extra(
     库存操作、分期、资金、客户等全部作用域。值仍采用同一 JSON 约定；
     已删除/停用字段的历史键允许继续保留，以保证历史单据可读。
     """
+    scope = normalize_form_scope(order_type_code)
     normalized = dict(values or {})
     active_custom = list(session.scalars(
         select(OrderFormField).where(
-            OrderFormField.order_type_code == order_type_code.strip().upper(),
+            OrderFormField.order_type_code == scope,
             OrderFormField.is_custom.is_(True),
             OrderFormField.is_active.is_(True),
         )

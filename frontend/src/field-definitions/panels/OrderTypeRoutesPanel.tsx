@@ -24,7 +24,7 @@ import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { useSession } from "../../shared/state/session";
-import { DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessForm, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const PORTION_LABEL: Record<string, string> = {
   PRINCIPAL: "本金",
@@ -232,7 +232,7 @@ export function OrderTypeRoutesPanel() {
         }
       >
         <Card className="glass" title="覆盖资金路由">
-          <Form
+          <BusinessForm
             form={form}
             layout="vertical"
             onFinish={submitRoute}
@@ -261,7 +261,7 @@ export function OrderTypeRoutesPanel() {
                 影响预览
               </PermissionButton>
             </Space>
-          </Form>
+          </BusinessForm>
           {preview ? (
             <Typography.Paragraph className="ui-form-spaced">
               <strong>影响结果：</strong>

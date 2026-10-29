@@ -11,7 +11,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { BusinessActionModal, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 
@@ -104,7 +104,8 @@ export function InventoryConsignmentModal(props: {
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
-        <Form
+        <BusinessForm
+          scope="CONSIGN"
           form={form}
           layout="horizontal"
           labelAlign="left"
@@ -143,7 +144,7 @@ export function InventoryConsignmentModal(props: {
           </section>
           <CustomFieldSection section="OPERATION" testIdSuffix="inventory-consignment-operation" />
           <CustomFieldSection testIdSuffix="inventory-consignment" />
-        </Form>
+        </BusinessForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>
   );

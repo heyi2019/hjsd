@@ -6,13 +6,13 @@ import { appMessage, appModal } from "../../shared/ui/appFeedback";
  * 风险大于收益；因此这里按同一端点（/period-locks）另写一份设置页视角的面板，两端数据同源。
  * 表单标签走与资金中心**同一个作用域 FUNDLOCK**：一处改标签/必填，两边同时生效，不会分叉。
  */
-import { Form, Input, Modal, Typography } from "antd";
+import { Form, Input, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { periodLocksApi, type PeriodLock } from "../../shared/api/catalog";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { normalizeError } from "../../shared/api/client";
 import { CfgItem, FieldConfigScope } from "../../orders/ConfigurableField";
-import { DataTable, ErrorBanner, InlineError, PermissionButton } from "../../shared/ui";
+import { BusinessActionModal, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton } from "../../shared/ui";
 
 function currentPeriod(): string {
   return new Date().toISOString().slice(0, 7);
@@ -96,10 +96,10 @@ export function PeriodLocksPanel() {
         onPageChange={() => undefined}
      />
 
-      <Modal title="锁定账期" open={open} onCancel={() => setOpen(false)} footer={null}>
+      <BusinessActionModal title="锁定账期" open={open} onCancel={() => setOpen(false)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="FUNDLOCK" active={open}>
-          <Form form={form} layout="vertical" onFinish={submit}>
+          <BusinessForm scope="FUNDLOCK" form={form} onFinish={submit}>
             <CfgItem
               name="period"
               label="会计账期"
@@ -118,9 +118,9 @@ export function PeriodLocksPanel() {
             >
               确认锁定
             </PermissionButton>
-          </Form>
+          </BusinessForm>
         </FieldConfigScope>
-      </Modal>
+      </BusinessActionModal>
     </section>
   );
 }

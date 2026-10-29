@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { Form, Input, Modal, Radio, Space, Spin, Typography } from "antd";
+import { Form, Input, Radio, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   stocksApi,
@@ -14,10 +14,9 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
-import { ConfirmButton, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, ResizableModal } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
-import { getRecoveryLayout } from "../orders/recovery/recoveryConfig";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import "./InventoryRebateModal.css";
 
@@ -156,14 +155,12 @@ export function InventoryRebateModal(props: {
   };
 
   return (
-    <Modal
-      title={<span className="resizable-modal__drag-handle">登记返点</span>}
+    <BusinessActionModal
+      title="登记返点"
       open={open}
       destroyOnHidden
       onCancel={props.onClose}
       width={1200}
-      wrapClassName="adaptive-business-modal recovery-order-modal"
-      modalRender={(modal) => <ResizableModal getLayout={getRecoveryLayout} layoutAttribute="data-recovery-layout">{modal}</ResizableModal>}
       footer={
         <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} onClick={() => form.submit()}>
           确认登记
@@ -174,7 +171,8 @@ export function InventoryRebateModal(props: {
       <InventoryAccountSummary account={props.account} />
       {loading ? <Spin size="small" /> : (
         <FieldConfigContext.Provider value={config}>
-          <Form
+          <BusinessForm
+            scope="INVREBATE"
             form={form}
             className="inventory-rebate-form ui-form-spaced"
             layout="horizontal"
@@ -218,7 +216,7 @@ export function InventoryRebateModal(props: {
               <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
             </div>
             <CustomFieldSection testIdSuffix="inventory-rebate" />
-          </Form>
+          </BusinessForm>
         </FieldConfigContext.Provider>
       )}
       {!loading ? (
@@ -280,14 +278,14 @@ export function InventoryRebateModal(props: {
           />
         </section>
       ) : null}
-      <Modal
+      <BusinessActionModal
         title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"}
         open={Boolean(editTarget)}
         onCancel={() => setEditTarget(null)}
         footer={null}
       >
         <FieldConfigContext.Provider value={config}>
-          <Form form={editForm} layout="vertical" className="ui-form-spaced" onFinish={submitEdit}>
+          <BusinessForm scope="INVREBATE" form={editForm} onFinish={submitEdit}>
             <div className="rebate-core-fields">
               <CfgItem name="base_amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
               <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
@@ -296,9 +294,9 @@ export function InventoryRebateModal(props: {
             </div>
             <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
             <PermissionButton permission="order.event.post" type="primary" htmlType="submit">保存</PermissionButton>
-          </Form>
+          </BusinessForm>
         </FieldConfigContext.Provider>
-      </Modal>
-    </Modal>
+      </BusinessActionModal>
+    </BusinessActionModal>
   );
 }

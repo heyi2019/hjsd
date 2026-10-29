@@ -1,12 +1,12 @@
 import { appMessage, appModal } from "../../shared/ui/appFeedback";
-import { Card, Form, Input, Modal, Space, Typography } from "antd";
+import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { poolsApi, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { Select } from "../../shared/ui";
+import { BusinessActionModal, BusinessForm, Select } from "../../shared/ui";
 
 /** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
 const POOL_TYPE_FALLBACK = [
@@ -135,7 +135,7 @@ export function PoolsPanel() {
         permission="pool.manage"
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限。</Typography.Paragraph>}
       >
-        <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced">
+        <BusinessForm form={form} layout="inline" onFinish={submit}>
           <Form.Item name="code" rules={[{ required: true }]}>
             <Input placeholder="池代码，如 HJ_CUSTODY" />
           </Form.Item>
@@ -147,17 +147,17 @@ export function PoolsPanel() {
               新增资金池
             </PermissionButton>
           </Form.Item>
-        </Form>
+        </BusinessForm>
       </PermissionGate>
-      <Modal title={editing ? `编辑资金池 · ${editing.code}` : "编辑资金池"} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
-        <Form layout="vertical" form={editForm} onFinish={update}>
+      <BusinessActionModal title={editing ? `编辑资金池 · ${editing.code}` : "编辑资金池"} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
+        <BusinessForm form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editing?.code} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={poolTypeOptions} /></Form.Item>
           <Form.Item name="ownership" label="资金归属" rules={[{ required: true }]}><Select options={ownershipOptions} /></Form.Item>
           <Form.Item name="note" label="备注"><Input.TextArea rows={3} /></Form.Item>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
     </Card>
   );
 }

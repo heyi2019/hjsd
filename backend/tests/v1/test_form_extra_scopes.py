@@ -9,11 +9,21 @@
 """
 from __future__ import annotations
 
+import pytest
+
+from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderLink
 from app.orders.form_scopes import FORM_SCOPES
+from app.orders.form_fields import validate_form_extra
 
 
 D = "2026-10-27"
+
+
+def test_form_values_must_use_registered_scope(seeded_db):
+    """后端表单值只能落入注册过的当前作用域，避免前端拼错 scope 后静默丢值。"""
+    with pytest.raises(Validation, match="表单作用域不存在"):
+        validate_form_extra(seeded_db, order_type_code="LEGACY_REBATE_FORM", values={"x": 1})
 
 
 def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):

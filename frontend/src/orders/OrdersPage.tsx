@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -39,6 +39,7 @@ import {
   AdaptiveFormGrid,
   ResizableModal,
   BusinessActionModal,
+  BusinessForm,
 } from "../shared/ui";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
@@ -1092,7 +1093,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >
-        <Form form={cancelForm} layout="vertical" onFinish={submitCancelTransaction}>
+        <BusinessForm scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} form={cancelForm} onFinish={submitCancelTransaction}>
           <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
@@ -1145,7 +1146,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />
           </FieldConfigScope>
-        </Form>
+        </BusinessForm>
       </BusinessActionModal>
 
       <BusinessActionModal
@@ -1156,7 +1157,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         okText="保存修改"
         onOk={() => void editForm.submit()}
       >
-        <Form form={editForm} layout="vertical" onFinish={submitEditOrder}>
+        <BusinessForm scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
           <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
             订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
@@ -1193,7 +1194,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           ) : null}
           <CustomFieldSection testIdSuffix="order-edit" />
           </FieldConfigScope>
-        </Form>
+        </BusinessForm>
       </BusinessActionModal>
 
       <BusinessActionModal
@@ -1204,7 +1205,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         okText="建立关联"
         onOk={() => void linkForm.submit()}
       >
-        <Form form={linkForm} layout="vertical" onFinish={submitLink}>
+        <BusinessForm scope="ORDERLINK" form={linkForm} onFinish={submitLink}>
           <FieldConfigScope scope="ORDERLINK" active={linkOpen}>
           <Typography.Paragraph type="secondary">
             关联单用于把同一真实交易拆分的上下游订单串起来；分成口径作为关系快照保存，不会改写订单自身金额。
@@ -1240,20 +1241,19 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-link" />
           </FieldConfigScope>
-        </Form>
+        </BusinessForm>
       </BusinessActionModal>
 
-      <Modal
-        title={<span className="resizable-modal__drag-handle">{actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}</span>}
+      <BusinessActionModal
+        title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
         open={allocationOpen}
         width={720}
-        wrapClassName="adaptive-business-modal allocation-modal"
         confirmLoading={allocationSubmitting}
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
-        modalRender={(modal) => <ResizableModal>{modal}</ResizableModal>}
       >
-        <Form
+        <BusinessForm
+          scope="ALLOCATION"
           form={allocationForm}
           layout="vertical"
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
@@ -1366,8 +1366,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>
             <CustomFieldSection testIdSuffix="order-allocation" />
           </FieldConfigScope>
-        </Form>
-      </Modal>
+        </BusinessForm>
+      </BusinessActionModal>
 
       <BusinessActionModal
         title={actionOrder ? `资金收支 · ${actionOrder.order_no}` : "资金收支"}
@@ -1376,7 +1376,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
         onOk={() => void refundForm.submit()}
       >
-        <Form
+        <BusinessForm scope="REFUND"
           form={refundForm}
           layout="vertical"
           onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
@@ -1418,7 +1418,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </CfgItem>
             <CustomFieldSection testIdSuffix="order-refund" />
           </FieldConfigScope>
-        </Form>
+        </BusinessForm>
         <div className="ui-form-spaced">
           <Typography.Text strong>资金明细</Typography.Text>
           {actionOrder?.cashflows?.length ? actionOrder.cashflows.map((flow) => (

@@ -11,7 +11,7 @@ import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { buildGroupedScopeOptions, useFormScopes } from "../formScopes";
-import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
@@ -466,7 +466,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
 
   const editorForm = (
     <PermissionGate permission="field-definition.manage">
-      <Form
+      <BusinessForm
         form={form}
         id={editorFormId}
         layout="inline"
@@ -602,7 +602,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
             <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
           </Form.Item>
         )}
-      </Form>
+      </BusinessForm>
     </PermissionGate>
   );
 

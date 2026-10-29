@@ -1,7 +1,7 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Dropdown, Form, Input, Modal, Segmented, Space, Typography } from "antd";
+import { Card, Dropdown, Form, Input, Segmented, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
 import { stocksApi, employeesApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
@@ -9,6 +9,8 @@ import { normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
 import {
   DataTable,
+  BusinessActionModal,
+  BusinessForm,
   ErrorBanner,
   MoneyText,
   PermissionButton,
@@ -671,7 +673,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           onOrdersChanged?.();
         }}
       />
-      <Modal
+      <BusinessActionModal
         title="系统下架登记"
         open={Boolean(voidTarget)}
         okText="确认下架"
@@ -681,7 +683,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         onOk={() => voidForm.submit()}
         onCancel={() => { if (!voiding) { setVoidTarget(null); voidForm.resetFields(); } }}
       >
-        {voidTarget ? <Form form={voidForm} layout="vertical" onFinish={(values) => void submitVoid(values as { reason: string; form_extra?: Record<string, unknown> })}>
+        {voidTarget ? <BusinessForm scope="INVOID" form={voidForm} onFinish={(values) => void submitVoid(values as { reason: string; form_extra?: Record<string, unknown> })}>
           <p className="muted">
             将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
             这是 ERP 系统下架，不影响已登记的寄售平台历史记录。下架不可撤销，历史轨迹保留。
@@ -692,8 +694,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           </CfgItem>
           <CustomFieldSection testIdSuffix="inv-void" />
           </FieldConfigScope>
-        </Form> : null}
-      </Modal>
+        </BusinessForm> : null}
+      </BusinessActionModal>
       <InventoryPlatformOffsaleModal
         account={platformOffsaleTarget?.account ?? null}
         records={platformOffsaleTarget?.records ?? []}
@@ -730,7 +732,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           onOrdersChanged?.();
         }}
       />
-      <Modal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); invEditExtraForm.resetFields(); } }}>
+      <BusinessActionModal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); invEditExtraForm.resetFields(); } }}>
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">
             <label>
@@ -746,16 +748,16 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
               <Input aria-label="编辑平台" value={editingAccount.platform ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, platform: e.target.value })} />
             </label>
           </div>
-          <Form form={invEditExtraForm} layout="vertical">
+          <BusinessForm scope="INVEDIT" form={invEditExtraForm}>
             <FieldConfigScope scope="INVEDIT" active={Boolean(editingAccount)}>
               <CustomFieldSection section="OPERATION" testIdSuffix="inv-edit-operation" />
               <CustomFieldSection testIdSuffix="inv-edit" />
             </FieldConfigScope>
-          </Form>
+          </BusinessForm>
           <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} onPartyClick={openPartyCard} />
         </> : null}
-      </Modal>
-      <Modal
+      </BusinessActionModal>
+      <BusinessActionModal
         className="inventory-detail-modal"
         title="库存详情"
         open={Boolean(detailTarget)}
@@ -764,7 +766,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         onCancel={() => setDetailTarget(null)}
       >
         {detailTarget ? <InventoryDetail row={detailTarget} detail={executionDetails[detailTarget.id]} loading={Boolean(executionLoading[detailTarget.id])} onPartyClick={openPartyCard} /> : null}
-      </Modal>
+      </BusinessActionModal>
       <InventoryProfileModal
         target={profileTarget}
         onClose={() => setProfileTarget(null)}

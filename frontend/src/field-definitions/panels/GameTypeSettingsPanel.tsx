@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessForm, ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./GameTypeSettingsPanel.css";
 
 export function GameTypeSettingsPanel() {
@@ -143,7 +143,7 @@ export function GameTypeSettingsPanel() {
       <PermissionGate permission="order-type.manage">
         <div className="game-type-settings__container">
           <Typography.Title level={5}>{editingId === null ? "新增游戏类型" : "编辑游戏类型"}</Typography.Title>
-          <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced" initialValues={{ sort_order: 0 }}>
+          <BusinessForm form={form} layout="inline" onFinish={submit} initialValues={{ sort_order: 0 }}>
             <Form.Item name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}> 
               <Input name="game_type_name" autoComplete="off" placeholder="如：王者荣耀" />
             </Form.Item>
@@ -175,7 +175,7 @@ export function GameTypeSettingsPanel() {
                 <PermissionButton permission="order-type.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
               </Form.Item>
             )}
-          </Form>
+          </BusinessForm>
         </div>
       </PermissionGate>
     </Card>

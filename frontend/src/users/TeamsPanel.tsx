@@ -3,7 +3,7 @@ import { Card, Form, Input } from "antd";
 import { useEffect, useState } from "react";
 import { errorMessage } from "../shared/api/client";
 import { teamsApi, type Team } from "../shared/api/catalog";
-import { ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
+import { BusinessForm, ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
 
 export function TeamsPanel() {
   const [rows, setRows] = useState<Team[]>([]);
@@ -38,11 +38,11 @@ export function TeamsPanel() {
             </ConfirmButton> },
       ]}
     />
-    <Form form={form} layout="inline" onFinish={submit} className="ui-form-spaced">
+    <BusinessForm form={form} layout="inline" onFinish={submit}>
       <Form.Item name="code" rules={[{ required: true, min: 2 }]}><Input placeholder="团队编码" /></Form.Item>
       <Form.Item name="name" rules={[{ required: true }]}><Input placeholder="团队名称" /></Form.Item>
       <Form.Item name="description"><Input placeholder="说明（可选）" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit">新增团队</PermissionButton>
-    </Form>
+    </BusinessForm>
   </Card>;
 }

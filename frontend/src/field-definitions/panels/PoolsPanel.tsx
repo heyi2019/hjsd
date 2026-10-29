@@ -62,6 +62,16 @@ export function PoolsPanel() {
     catch (err) { setError(normalizeError(err)); }
   };
 
+  const remove = async (row: Pool) => {
+    try {
+      await poolsApi.remove(row.id);
+      appMessage.success("资金池已删除");
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
   const update = async (values: Record<string, unknown>) => {
     if (!editing) return;
     try {
@@ -96,6 +106,16 @@ export function PoolsPanel() {
               onConfirm={() => toggleStatus(row)}
             >
               {row.status === "ACTIVE" ? "停用" : "启用"}
+            </ConfirmButton><ConfirmButton
+              permission="pool.manage"
+              size="small"
+              danger
+              title="删除该资金池"
+              description="仅可删除从未产生流水的资金池；已产生流水的池只能停用。删除后不可恢复，请确认。"
+              okText="删除"
+              onConfirm={() => remove(row)}
+            >
+              删除
             </ConfirmButton></Space> },
   ];
   return (

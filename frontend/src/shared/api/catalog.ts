@@ -636,6 +636,7 @@ export const poolsApi = {
   setStatus: (id: number, status: string) => api.patch<Pool>(`/pools/${id}/status`, {status}).then(r => r.data),
   list: () => api.get<Pool[]>("/pools").then((r) => r.data),
   create: (payload: Partial<Pool>) => api.post<Pool>("/pools", payload).then((r) => r.data),
+  remove: (id: number) => api.delete<void>(`/pools/${id}`).then(r => r.data),
   balance: (poolId: number) =>
     api.get<PoolBalance>(`/pools/${poolId}/balance`).then((r) => r.data),
 };

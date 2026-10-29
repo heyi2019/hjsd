@@ -307,6 +307,8 @@ export interface OrderEvent {
   offset_event_id?: number | null;
   reason?: string | null;
   refund_responsibility?: string | null;
+  note?: string | null;
+  form_extra?: Record<string, unknown> | null;
   is_posted: boolean;
   posted_at?: string | null;
   operator?: string;
@@ -410,6 +412,12 @@ export interface AccountExecutionCounterparty {
   role: string;
 }
 
+export interface AccountExecutionCustomer {
+  id: number;
+  display_name: string;
+  role: string;
+}
+
 export interface AccountExecutionRebate {
   id: number;
   rebate_no: string;
@@ -449,6 +457,7 @@ export interface AccountExecutionOrder {
   extra_values?: Record<string, unknown>;
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
   cashflows?: AccountExecutionCashflow[];
+  customers?: AccountExecutionCustomer[];
   counterparties?: AccountExecutionCounterparty[];
   rebates?: AccountExecutionRebate[];
   events: AccountExecutionEvent[];
@@ -748,7 +757,7 @@ export const ordersApi = {
   ) => api.post<OrderLink>(`/orders/${orderId}/links`, payload).then((r) => r.data),
   deleteLink: (orderId: number, linkId: number) =>
     api.delete<void>(`/orders/${orderId}/links/${linkId}`).then((r) => r.data),
-  cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown> }) =>
+  cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown>; form_extra_scope?: string }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
   create: (payload: {
     order_type: string;
@@ -828,6 +837,8 @@ export const ordersApi = {
       refund_responsibility?: "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER";
       flow_category?: string;
       note?: string;
+      bound_phone?: string;
+      bound_phone_owner?: string;
       form_extra?: Record<string, unknown>;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
@@ -855,7 +866,7 @@ export const ordersApi = {
 
 export interface EmployeeOption { id: number; username: string; display_name: string; is_active: boolean }
 export const employeesApi = {
-  list: () => api.get<EmployeeOption[]>("/users").then((r) => r.data),
+  list: () => api.get<EmployeeOption[]>("/users/options").then((r) => r.data),
 };
 
 export interface ManagedUser extends EmployeeOption {
@@ -950,7 +961,7 @@ export const installmentsApi = {
     api.post<Schedule>(`/installments/${id}/schedules/${periodNo}/extend`, payload).then((r) => r.data),
   markOverdue: (asOf?: string) =>
     api.post<{ marked: number }>("/installments/mark-overdue", undefined, { params: asOf ? { as_of: asOf } : undefined }).then((r) => r.data),
-  deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string; form_extra?: Record<string, unknown> }) =>
+  deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string; bound_phone?: string; bound_phone_owner?: string; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/deliver`, payload).then((r) => r.data),
 };
 

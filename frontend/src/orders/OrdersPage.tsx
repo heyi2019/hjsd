@@ -258,7 +258,7 @@ function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: Bus
   )).length;
 }
 
-export function OrdersPage({ initialTab, active = true }: { initialTab?: BusinessCenterEntryTab; active?: boolean } = {}) {
+export function OrdersPage({ initialTab, active = true, onNavigate }: { initialTab?: BusinessCenterEntryTab; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void } = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -724,7 +724,7 @@ export function OrdersPage({ initialTab, active = true }: { initialTab?: Busines
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} />,
+            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} onNavigate={onNavigate} />,
           },
           {
             key: "ledger",

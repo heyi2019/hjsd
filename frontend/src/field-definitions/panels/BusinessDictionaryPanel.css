@@ -1,0 +1,108 @@
+.business-dictionary .ant-descriptions-item-label,
+.business-dictionary .ant-descriptions-item-content {
+  vertical-align: top !important;
+}
+
+.business-dictionary__entry {
+  display: block;
+  padding: 3px 0;
+  line-height: 1.6;
+}
+
+.business-dictionary__action-table {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: var(--border-w) solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 74%, transparent);
+}
+
+.business-dictionary__group {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+}
+
+.business-dictionary__group-label {
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  background: transparent;
+  border-right: var(--border-w) solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  line-height: 1.35;
+}
+
+.business-dictionary__group + .business-dictionary__group {
+  border-top: var(--border-w) solid color-mix(in srgb, var(--color-border) 78%, transparent);
+}
+
+.business-dictionary__group-body {
+  width: 100%;
+  min-width: 0;
+}
+
+.business-dictionary__action-line {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  column-gap: var(--space-2);
+  padding: var(--space-1) 0;
+  line-height: 1.5;
+}
+
+.business-dictionary__action-line--category-start {
+  padding-top: var(--space-3);
+}
+
+.business-dictionary__action-line--category-start:not(:first-child) {
+  border-top: var(--border-w) solid color-mix(in srgb, var(--color-border) 78%, transparent);
+}
+
+.business-dictionary__tertiary {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.business-dictionary__action-detail {
+  width: 100%;
+  min-width: 0;
+  padding-left: 0;
+}
+
+.business-dictionary__tertiary--empty {
+  visibility: hidden;
+}
+
+.business-dictionary__group-body .business-dictionary__entry {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--space-3);
+}
+
+.business-dictionary__group--stacked .business-dictionary__entry {
+  padding: 9px 0;
+}
+
+.business-dictionary__group--stacked .business-dictionary__entry:first-child {
+  padding-top: 4px;
+}
+
+.business-dictionary__group--stacked .business-dictionary__entry:last-child {
+  padding-bottom: 4px;
+}
+
+.business-dictionary__entry-name {
+  white-space: nowrap;
+}
+
+.business-dictionary__entry-desc {
+  color: var(--color-text-secondary);
+}
+

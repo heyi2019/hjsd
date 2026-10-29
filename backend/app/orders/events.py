@@ -85,6 +85,8 @@ def post_event(
     refund_responsibility: str | None = None,
     flow_category: str | None = None,
     note: str | None = None,
+    bound_phone: str | None = None,
+    bound_phone_owner: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
@@ -213,6 +215,9 @@ def post_event(
             actor=actor,
             delivery_mode=delivery_mode,
             note=note,
+            bound_phone=bound_phone,
+            bound_phone_owner=bound_phone_owner,
+            form_extra=form_extra,
             allow_installment_delivery=allow_installment_delivery,
         )
 
@@ -313,6 +318,40 @@ def post_event(
     if event_type == EventType.CANCEL.value:
         cancel_direction = _opposite_direction(offset_event_id, session, order_id=order.id)
 
+    normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
+    normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
+    event_form_extra = validate_form_extra(
+        session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra
+    )
+    if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
+        account = session.get(Account, order.account_id) if order.account_id is not None else None
+        snapshot = dict(order.account_snapshot or {})
+        if not snapshot.get("game_account") and account is not None and account.game_account:
+            snapshot.update({
+                "game_account": account.game_account,
+                "game_type": account.game_type,
+                "game_password": account.game_password,
+                "channel_region": account.channel_region,
+                "has_secondary": account.has_secondary,
+                "platform": account.platform,
+                "note": account.note,
+            })
+        if normalized_bound_phone is not None:
+            snapshot["bound_phone"] = normalized_bound_phone
+        if normalized_bound_phone_owner is not None:
+            snapshot["bound_phone_owner"] = normalized_bound_phone_owner
+        if snapshot.get("game_account"):
+            order.account_snapshot = snapshot
+        if account is not None and normalized_bound_phone is not None:
+            account.bound_phone = normalized_bound_phone
+            account.updated_by = actor
+        event_form_extra.update(
+            {"bound_phone": normalized_bound_phone} if normalized_bound_phone is not None else {}
+        )
+        event_form_extra.update(
+            {"bound_phone_owner": normalized_bound_phone_owner} if normalized_bound_phone_owner is not None else {}
+        )
+
     event = OrderEvent(
         event_no=next_event_no(
             session, order_no=order.order_no, order_id=order.id, event_type=event_type
@@ -327,7 +366,7 @@ def post_event(
         reason=reason,
         refund_responsibility=refund_responsibility,
         note=note,
-        form_extra=validate_form_extra(session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra) or None,
+        form_extra=event_form_extra or None,
         is_posted=True,
         posted_at=datetime.now(),
         created_by=actor,
@@ -630,6 +669,9 @@ def _post_deliver(
     actor: str,
     delivery_mode: str | None,
     note: str | None,
+    bound_phone: str | None,
+    bound_phone_owner: str | None,
+    form_extra: Mapping[str, Any] | None,
     allow_installment_delivery: bool,
 ) -> tuple[OrderEvent, None]:
     """`DELIVER`：无金额、无现金流，必须记录交付方式与凭证（DFQ-01-07 / A04 / A05）。"""
@@ -647,6 +689,8 @@ def _post_deliver(
             details={"field": "note"},
         )
     note = note.strip()
+    normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
+    normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
     installment = session.scalar(
         select(Installment).where(Installment.order_id == order.id)
     )
@@ -680,13 +724,40 @@ def _post_deliver(
         is_posted=True,
         posted_at=datetime.now(),
         note=note,
+        form_extra={
+            **(dict(form_extra) if form_extra else {}),
+            **({"bound_phone": normalized_bound_phone} if normalized_bound_phone is not None else {}),
+            **({"bound_phone_owner": normalized_bound_phone_owner} if normalized_bound_phone_owner is not None else {}),
+        } or None,
         created_by=actor,
         updated_by=actor,
     )
     session.add(event)
+    if normalized_bound_phone is not None or normalized_bound_phone_owner is not None:
+        account = session.get(Account, order.account_id) if order.account_id is not None else None
+        snapshot = dict(order.account_snapshot or {})
+        if not snapshot.get("game_account") and account is not None and account.game_account:
+            snapshot.update({
+                "game_account": account.game_account,
+                "game_type": account.game_type,
+                "game_password": account.game_password,
+                "channel_region": account.channel_region,
+                "has_secondary": account.has_secondary,
+                "platform": account.platform,
+                "note": account.note,
+            })
+        if normalized_bound_phone is not None:
+            snapshot["bound_phone"] = normalized_bound_phone
+        if normalized_bound_phone_owner is not None:
+            snapshot["bound_phone_owner"] = normalized_bound_phone_owner
+        if snapshot.get("game_account"):
+            order.account_snapshot = snapshot
     if order.account_id is not None:
         account = session.get(Account, order.account_id)
         if account is not None:
+            if normalized_bound_phone is not None:
+                account.bound_phone = normalized_bound_phone
+                account.updated_by = actor
             account.status = AccountStatus.SOLD.value
             account.updated_by = actor
     order.status = transition(

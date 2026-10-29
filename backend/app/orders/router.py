@@ -86,6 +86,7 @@ def _event_output(event: OrderEvent) -> schemas.EventOut:
             "reason": event.reason,
             "refund_responsibility": event.refund_responsibility,
             "note": event.note,
+            "form_extra": event.form_extra,
             "created_at": event.created_at,
             "operator": event.created_by,
         }
@@ -600,6 +601,8 @@ def post_event(
         refund_responsibility=payload.refund_responsibility,
         flow_category=payload.flow_category,
         note=payload.note,
+        bound_phone=payload.bound_phone,
+        bound_phone_owner=payload.bound_phone_owner,
         form_extra=payload.form_extra,
         user=user,
     )

@@ -4,7 +4,7 @@
   row-gap: var(--space-4);
 }
 .dfq-installment-grid .nested-form-section__field {
-  align-items: start;
+  align-items: center;
 }
 .dfq-installment-grid .ant-form-item {
   margin-bottom: 0;

@@ -1,0 +1,8 @@
+/* 非必填字段也预留必填星号的位置，保证所有标签文字从同一纵线开始。 */
+.inventory-rebate-form .ant-form-item-label > label:not(.ant-form-item-required)::before {
+  content: "*";
+  display: inline-block;
+  width: 0.5em;
+  margin-inline-end: 4px;
+  visibility: hidden;
+}

@@ -7,6 +7,7 @@ import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
 import {
   accounts,
+  stockNoAccounts,
   setupInventoryPanelMocks,
 } from "./InventoryPanel.test.fixtures";
 import { buildInventoryCsv } from "./inventory-export";
@@ -56,9 +57,12 @@ describe("InventoryPanel：账号台账", () => {
     for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
+    expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
     expect(await screen.findByRole("menuitem", { name: "取消交易" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
+    expect(document.querySelector(".inventory-more-menu")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
   });
 
@@ -66,9 +70,10 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
-    await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
+    const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
 
-    for (const label of ["下架", "取消交易", "账号描述", "账号图片"]) {
+    for (const label of ["账号描述", "账号图片"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
   });
@@ -91,6 +96,18 @@ describe("InventoryPanel：账号台账", () => {
     for (const label of ["编辑", "更多"]) {
       expect(within(row).getByRole("button", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("系统下架只对代挂账号开放，平台下架对在库账号开放", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue([stockNoAccounts[2], accounts[0]]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    const row = await screen.findByText("acc-3").then(() => {
+      const rows = screen.getAllByRole("row");
+      return rows.find((item) => within(item).queryByText("acc-3") !== null)!;
+    });
+    await ui.click(within(row).getByRole("button", { name: "更多" }));
+    expect(await screen.findByRole("menuitem", { name: "平台下架" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "系统下架" })).toBeInTheDocument();
   });
 
   it("导出时接入库存详情字段", () => {
@@ -219,9 +236,10 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByRole("button", { name: "寄售" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "编辑" })).not.toBeDisabled();
     await ui.click(screen.getByRole("button", { name: "更多" }));
-    expect(screen.getByRole("menuitem", { name: "下架" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: "账号描述" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: "账号图片" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "账号描述" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "账号图片" })).toBeNull();
   });
 
   it("编辑账号时默认只展示核心资料输入，低频资料收纳到更多资料", async () => {
@@ -263,7 +281,7 @@ describe("InventoryPanel：账号台账", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
-  it("回收账号未售出时不显示卖号返点", async () => {
+  it("回收账号可以打开返点登记", async () => {
     resolveMockOnce(vi.mocked(catalog.stocksApi.executionDetail), {
       account: accounts[0],
       orders: [{
@@ -287,8 +305,6 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
     await ui.click(screen.getAllByRole("button", { name: "返点" })[0]);
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
-    expect(screen.getByLabelText("买号返点（对应回收）")).toBeEnabled();
-    expect(screen.getByLabelText("卖号返点（对应售出）")).toBeDisabled();
   });
 
   it("无数据时显示「暂无账号」", async () => {
@@ -313,8 +329,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(accountSummary).getByText("登记时间")).toBeInTheDocument();
     expect(within(accountSummary).getByText("出售时间")).toBeInTheDocument();
     expect(within(accountSummary).getByText("下架时间")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("寄售时间")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("寄售平台")).toBeInTheDocument();
+    expect(within(accountSummary).getByText("寄售平台 / 寄售时间")).toBeInTheDocument();
     expect(within(accountSummary).getByText("账号描述")).toBeInTheDocument();
     expect(within(accountSummary).getByText("高段位账号")).toBeInTheDocument();
     expect(within(accountSummary).getByText("账号图片")).toBeInTheDocument();
@@ -324,7 +339,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(accountSummary).queryByText("2026-10-01 09:30", { exact: true })).toBeNull();
     expect(within(accountSummary).getByText("2026-10-16 16:45")).toBeInTheDocument();
     expect(within(accountSummary).getByText("2026-10-17 11:35")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("2026-10-12 09:10")).toBeInTheDocument();
+    expect(within(accountSummary).getByText("寄售平台A / 2026-10-12 09:10")).toBeInTheDocument();
     expect(within(accountSummary).getAllByText("寄售平台A").length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);

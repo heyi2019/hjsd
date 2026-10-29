@@ -27,6 +27,9 @@ beforeEach(() => {
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
   ]);
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
+  ]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
@@ -74,12 +77,14 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("客户来源改为可输入的选填文本框，不再有「其他来源」遗留子字段", async () => {
+  it("客户来源只能从预置选项选择，选择其他后填写具体来源", async () => {
     await openTypedModal("HS");
-    const source = screen.getByLabelText("客户来源") as HTMLInputElement;
-    await ui.type(source, "朋友介绍");
-    expect(source.value).toBe("朋友介绍");
-    // 砍掉「其他来源」遗留分支后，建单弹窗内不应再出现该子字段
-    expect(screen.queryByLabelText("其他来源")).toBeNull();
+    const source = screen.getByLabelText("客户来源");
+    await ui.click(source.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    expect(await screen.findByText("微博", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.getByText("小红书", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.getByLabelText("其他来源")).toBeDisabled();
+    await ui.click(screen.getByText("其他", { selector: ".ant-select-item-option-content" }));
+    expect(screen.getByLabelText("其他来源")).toBeEnabled();
   });
 });

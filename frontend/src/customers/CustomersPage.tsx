@@ -167,14 +167,30 @@ function ExtraFieldControl({ def, ...controlProps }: { def: OrderFormField; [key
   }
 }
 
-export function CustomersPage({ active = true }: { active?: boolean } = {}) {
+export function CustomersPage({
+  active = true,
+  focusCustomerId,
+  focusCounterpartyId,
+}: {
+  active?: boolean;
+  focusCustomerId?: number;
+  focusCounterpartyId?: number;
+} = {}) {
+  const focusedCustomerId = focusCustomerId;
+  const focusedCounterpartyId = focusCounterpartyId;
+  const [activeTab, setActiveTab] = useState(focusedCounterpartyId ? "counterparties" : "customers");
+  useEffect(() => {
+    if (focusedCounterpartyId) setActiveTab("counterparties");
+    else if (focusedCustomerId) setActiveTab("customers");
+  }, [focusedCounterpartyId, focusedCustomerId]);
   return (
     <section className="ui-stack">
       <Tabs
-        defaultActiveKey="customers"
+        activeKey={activeTab}
+        onChange={setActiveTab}
         items={[
-          { key: "customers", label: "客户档案", children: <CustomerPanel active={active} /> },
-          { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active} /> },
+          { key: "customers", label: "客户档案", children: <CustomerPanel active={active} focusId={focusedCustomerId} /> },
+          { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active} focusId={focusedCounterpartyId} /> },
           { key: "leads", label: "客户需求池", children: <CustomerLeadPanel /> },
         ]}
       />
@@ -182,7 +198,7 @@ export function CustomersPage({ active = true }: { active?: boolean } = {}) {
   );
 }
 
-function CustomerPanel({ active = true }: { active?: boolean }) {
+function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
   const [rows, setRows] = useState<Customer[]>([]);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
@@ -256,6 +272,15 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
       setDetailLoading(false);
     }
   };
+
+  const handledFocusRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusId == null || handledFocusRef.current === focusId) return;
+    const row = rows.find((item) => item.id === focusId);
+    if (!row) return;
+    handledFocusRef.current = focusId;
+    void openDetail(row);
+  }, [focusId, rows]);
 
   /** 后端默认脱敏；点「查看」才取明文，后端同时写一条 CONTACT_READ 审计。 */
   const revealContact = async (id: number) => {
@@ -766,7 +791,7 @@ function CustomerPanel({ active = true }: { active?: boolean }) {
   );
 }
 
-function CounterpartyPanel({ active = true }: { active?: boolean }) {
+function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
@@ -811,6 +836,15 @@ function CounterpartyPanel({ active = true }: { active?: boolean }) {
       setDetailLoading(false);
     }
   };
+
+  const handledFocusRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusId == null || handledFocusRef.current === focusId) return;
+    const row = rows.find((item) => item.id === focusId);
+    if (!row) return;
+    handledFocusRef.current = focusId;
+    void openDetail(row);
+  }, [focusId, rows]);
 
   const submit = async (values: Record<string, unknown>) => {
     try {

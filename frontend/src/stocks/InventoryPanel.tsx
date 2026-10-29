@@ -19,8 +19,10 @@ import {
 } from "../shared/ui";
 import { InventorySaleModal } from "./InventorySaleModal";
 import { InventoryConsignmentModal } from "./InventoryConsignmentModal";
+import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "./InventoryPlatformOffsaleModal";
 import { InventoryRebateModal } from "./InventoryRebateModal";
 import { InventoryDetail } from "./InventoryDetail";
+import type { InventoryPartyLink } from "./InventoryDetailView";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
 import {
   BUSINESS_MODE_LABEL,
@@ -34,25 +36,28 @@ import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
 function inventoryCellValue(value: string | null | undefined) {
   return value ? value : <span className="inventory-empty-cell">-</span>;
 }
 
-/** 「更多」下拉的菜单项单一事实源：桌面表格与移动端卡片共用，避免两处各写一份导致
- *  新增/调整操作项时遗漏一侧。禁用态只取决于行状态，与点击后走哪条回调无关。 */
-function moreMenuItems(row: Account) {
-  return [
-    { key: "remove", label: "下架", disabled: row.status === "SOLD" || row.status === "VOID" },
-    {
-      key: "cancel",
-      label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易",
-      danger: true,
-      disabled: !["SOLD", "INSTALLMENT"].includes(row.status),
-    },
-    { key: "description", label: "账号描述", disabled: row.status === "SOLD" },
-    { key: "images", label: "账号图片", disabled: row.status === "SOLD" },
-  ];
+/** 「更多」下拉的菜单项单一事实源：只返回当前可执行的操作，灰色禁用项直接隐藏。 */
+function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
+  const canPlatformOffsale = row.status !== "SOLD" && row.status !== "VOID";
+  const canSystemOffsale = row.inventory_type === "CONSIGNMENT" && canPlatformOffsale;
+  const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
+  if (canPlatformOffsale && detail?.orders.some((order) => order.order_type === "DG" && order.status !== "CANCELLED")) {
+    items.push({ key: "platform-remove", label: "平台下架" });
+  }
+  if (canSystemOffsale) items.push({ key: "system-remove", label: "系统下架" });
+  if (["SOLD", "INSTALLMENT"].includes(row.status)) {
+    items.push({ key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true });
+  }
+  if (row.status !== "SOLD") {
+    items.push({ key: "description", label: "账号描述" }, { key: "images", label: "账号图片" });
+  }
+  return items;
 }
 
 /** 倒序取最近一条仍有余额可冲销的 BUY/SELL 事件（「先冲销最近的」为原语义，此处保持一致）。
@@ -98,6 +103,8 @@ export function MobileInventoryList({
   onRebate,
   onEdit,
   onMoreAction,
+  executionDetails = {},
+  onLoadExecution = () => undefined,
   editingAccount,
 }: {
   rows: Account[];
@@ -108,6 +115,8 @@ export function MobileInventoryList({
   onRebate: (row: Account) => void;
   onEdit: (row: Account) => void;
   onMoreAction: (key: string, row: Account) => void;
+  executionDetails?: Record<number, AccountExecutionDetail>;
+  onLoadExecution?: (row: Account) => void | Promise<void>;
   editingAccount: number | null;
 }) {
   if (rows.length === 0) return <div className="data-mobile-empty">暂无账号</div>;
@@ -136,7 +145,6 @@ export function MobileInventoryList({
               <PermissionButton permission="order.create" type="link" size="small" onClick={() => onDetail(row)}>详情</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "IN_STOCK"} onClick={() => onSale(row)}>售出</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
-              <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>下架</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" onClick={() => onRebate(row)}>返点</PermissionButton>
               {isEditableAccountType(row.inventory_type) ? (
                 <>
@@ -144,8 +152,10 @@ export function MobileInventoryList({
                   <Dropdown
                     trigger={["click"]}
                     placement="bottomRight"
+                    onOpenChange={(open) => { if (open) void onLoadExecution(row); }}
                     menu={{
-                      items: moreMenuItems(row),
+                      className: "inventory-more-menu",
+                      items: moreMenuItems(row, executionDetails[row.id]),
                       onClick: ({ key }) => onMoreAction(key, row),
                     }}
                   >
@@ -161,7 +171,7 @@ export function MobileInventoryList({
   );
 }
 
-export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey?: number; onOrdersChanged?: () => void }) {
+export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: { refreshKey?: number; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [rows, setRows] = useState<Account[]>([]);
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
@@ -186,6 +196,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   const [savingAccount, setSavingAccount] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
+  const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [installmentCancelTarget, setInstallmentCancelTarget] = useState<{ account: Account; installmentId: number; contractType: string } | null>(null);
   const [refundForm] = Form.useForm();
@@ -265,10 +276,37 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     }
   }
 
+  async function openPlatformOffsale(account: Account) {
+    try {
+      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const records = consignmentRecords(detail.orders);
+      if (!records.length) {
+        appMessage.warning("当前账号没有仍在平台上的寄售记录");
+        return;
+      }
+      setPlatformOffsaleTarget({ account, records });
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
   async function submitVoid(values: { reason: string; form_extra?: Record<string, unknown> }) {
     if (!voidTarget) return;
     setVoiding(true);
     try {
+      // 系统下架会同步取消该账号所有仍在寄售平台上的 DG 上架单；
+      // 先完成平台记录取消，再冲销买入，避免出现 ERP 已下架但平台记录仍有效的中间结果。
+      const detail = executionDetails[voidTarget.account.id] ?? await stocksApi.executionDetail(voidTarget.account.id);
+      await Promise.all(
+        detail.orders
+          .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+          .map((order) => ordersApi.cancel(order.order_id, {
+            reason: "系统下架同步取消寄售平台上架",
+            form_extra_scope: "INVOID",
+            form_extra: { platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+          })),
+      );
       await ordersApi.postEvent(voidTarget.orderId, {
         event_type: "CANCEL",
         amount: voidTarget.amount,
@@ -407,7 +445,11 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
   }
 
   function handleMoreAction(key: string, row: Account) {
-    if (key === "remove") {
+    if (key === "platform-remove") {
+      void openPlatformOffsale(row);
+      return;
+    }
+    if (key === "system-remove") {
       void openVoid(row);
       return;
     }
@@ -492,19 +534,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
             permission="order.event.post"
             type="link"
             size="small"
-            aria-label="下架"
-            disabled={row.status === "SOLD" || row.status === "VOID"}
-            onClick={(event) => {
-              event.stopPropagation();
-              void openVoid(row);
-            }}
-          >
-            下架
-          </PermissionButton>
-          <PermissionButton
-            permission="order.event.post"
-            type="link"
-            size="small"
             aria-label="返点"
             onClick={(event) => {
               event.stopPropagation();
@@ -530,8 +559,10 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
             <Dropdown
               trigger={["click"]}
               placement="bottomRight"
+              onOpenChange={(open) => { if (open) void loadExecution(row); }}
               menu={{
-                items: moreMenuItems(row),
+                className: "inventory-more-menu",
+                items: moreMenuItems(row, executionDetails[row.id]),
                 onClick: ({ key }) => handleMoreAction(key, row),
               }}
             >
@@ -613,6 +644,11 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
     } finally {
       setExecutionLoading((current) => ({ ...current, [row.id]: false }));
     }
+  }
+
+  function openPartyCard(party: InventoryPartyLink) {
+    const param = party.entityType === "customer" ? `customer_id=${party.id}` : `counterparty_id=${party.id}`;
+    onNavigate?.(`customers?${param}`);
   }
 
   async function handleExport() {
@@ -698,6 +734,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
             onRebate={setRebateTarget}
             onEdit={openEditor}
             onMoreAction={handleMoreAction}
+            executionDetails={executionDetails}
+            onLoadExecution={loadExecution}
             editingAccount={editingAccount ? editingAccount.id : null}
           />
         ) : (
@@ -713,7 +751,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
             expandable={{
               expandedRowKeys: expandedAccountIds,
               expandedRowRender: (row) => (
-              <InventoryDetail row={row} detail={executionDetails[row.id]} loading={Boolean(executionLoading[row.id])} />
+                <InventoryDetail row={row} detail={executionDetails[row.id]} loading={Boolean(executionLoading[row.id])} onPartyClick={openPartyCard} />
             ),
               expandRowByClick: true,
               onExpand: (expanded, row) => void handleExpand(expanded, row),
@@ -741,8 +779,13 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         account={consignmentTarget}
         onClose={() => setConsignmentTarget(null)}
         onCreated={async () => {
+          const accountId = consignmentTarget?.id;
           setConsignmentTarget(null);
           await load();
+          if (accountId != null) {
+            const detail = await stocksApi.executionDetail(accountId);
+            setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
+          }
           onOrdersChanged?.();
         }}
       />
@@ -781,7 +824,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         </Form> : null}
       </Modal>
       <Modal
-        title="下架登记"
+        title="系统下架登记"
         open={Boolean(voidTarget)}
         okText="确认下架"
         cancelText="返回"
@@ -793,7 +836,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         {voidTarget ? <Form form={voidForm} layout="vertical" onFinish={(values) => void submitVoid(values as { reason: string; form_extra?: Record<string, unknown> })}>
           <p className="muted">
             将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
-            下架不可撤销，历史轨迹保留。
+            这是 ERP 系统下架，不影响已登记的寄售平台历史记录。下架不可撤销，历史轨迹保留。
           </p>
           <FieldConfigScope scope="INVOID" active={Boolean(voidTarget)}>
           <CfgItem name="reason" label="下架原因" rules={[{ required: true, message: "请填写下架原因" }]}>
@@ -803,6 +846,20 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
           </FieldConfigScope>
         </Form> : null}
       </Modal>
+      <InventoryPlatformOffsaleModal
+        account={platformOffsaleTarget?.account ?? null}
+        records={platformOffsaleTarget?.records ?? []}
+        onClose={() => setPlatformOffsaleTarget(null)}
+        onChanged={async () => {
+          const accountId = platformOffsaleTarget?.account.id;
+          setPlatformOffsaleTarget(null);
+          if (!accountId) return;
+          await load();
+          const detail = await stocksApi.executionDetail(accountId);
+          setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
+          onOrdersChanged?.();
+        }}
+      />
       <Modal
         title="退款登记"
         open={Boolean(installmentCancelTarget)}
@@ -846,7 +903,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
               <CustomFieldSection testIdSuffix="inv-edit" />
             </FieldConfigScope>
           </Form>
-          <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} />
+          <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} onPartyClick={openPartyCard} />
         </> : null}
       </Modal>
       <Modal
@@ -857,7 +914,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged }: { refreshKey
         width="min(1200px, calc(100vw - 24px))"
         onCancel={() => setDetailTarget(null)}
       >
-        {detailTarget ? <InventoryDetail row={detailTarget} detail={executionDetails[detailTarget.id]} loading={Boolean(executionLoading[detailTarget.id])} /> : null}
+        {detailTarget ? <InventoryDetail row={detailTarget} detail={executionDetails[detailTarget.id]} loading={Boolean(executionLoading[detailTarget.id])} onPartyClick={openPartyCard} /> : null}
       </Modal>
       <InventoryProfileModal
         target={profileTarget}

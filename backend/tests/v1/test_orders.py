@@ -721,6 +721,8 @@ class TestOrdersApi:
                 "portion": "PROFIT",
                 "reason": "买家确认收款",
                 "note": "售出动作备注",
+                "bound_phone": "13900000000",
+                "bound_phone_owner": "李四",
             },
             headers=headers,
         )
@@ -730,6 +732,10 @@ class TestOrdersApi:
         assert body["event"]["event_type"] == "SELL"
         assert body["event"]["reason"] == "买家确认收款"
         assert body["event"]["note"] == "售出动作备注"
+        assert body["event"]["form_extra"] == {
+            "bound_phone": "13900000000",
+            "bound_phone_owner": "李四",
+        }
         assert body["event"]["offset_event_id"] is None
         assert body["event"]["created_at"]
         assert body["event"]["posted_at"]

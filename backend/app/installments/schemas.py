@@ -160,6 +160,8 @@ class DeliverIn(RequestModel):
     delivery_mode: str
     delivered_on: date
     note: str = Field(min_length=1, description="换绑凭证说明")
+    bound_phone: str | None = Field(default=None, max_length=64)
+    bound_phone_owner: str | None = Field(default=None, max_length=128)
     form_extra: dict[str, Any] | None = None
 
 

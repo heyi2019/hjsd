@@ -1,0 +1,60 @@
+.recovery-entry-fields > .delivery-info-section {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.delivery-info-section > .adaptive-form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+@container (max-width: 1040px) {
+  .delivery-info-section > .adaptive-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.delivery-info-section .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+
+.delivery-info-section .ant-form-item-row {
+  flex-wrap: nowrap;
+}
+
+.delivery-info-section .ant-form-item-control {
+  min-width: 0;
+}
+
+/* 负责人标签按选择顺序向右延展，不能折成上下两行。 */
+.responsible-employee-select .ant-form-item-row {
+  align-items: center;
+}
+
+.responsible-employee-select .ant-select-selector {
+  min-height: 32px;
+  min-width: 180px;
+}
+
+.responsible-employee-select .ant-select,
+.responsible-employee-select .ant-form-item-control-input {
+  width: max-content !important;
+  max-width: none;
+}
+
+.responsible-employee-select .ant-select-selection-overflow {
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+
+.responsible-employee-select .ant-form-item-control {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+@container (max-width: 640px) {
+  .delivery-info-section > .adaptive-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

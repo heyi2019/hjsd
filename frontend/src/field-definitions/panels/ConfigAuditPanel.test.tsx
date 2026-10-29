@@ -76,4 +76,22 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     expect(screen.queryByRole("button", { name: /保存|新建|删除|提交/ })).toBeNull();
     expect(screen.getByText("只读")).toBeInTheDocument();
   });
+
+  it("展示新增审计动作的中文名称", async () => {
+    vi.mocked(catalog.auditApi).list.mockResolvedValue({
+      items: [
+        { ...ROWS[0], id: 3, action: "DEPOSIT_CANCEL" },
+        { ...ROWS[0], id: 4, action: "REBATE_VOID" },
+        { ...ROWS[0], id: 5, action: "IMPORT_REJECT" },
+      ],
+      total: 3,
+    });
+    vi.mocked(catalog.auditApi).actions.mockResolvedValue(["DEPOSIT_CANCEL", "REBATE_VOID", "IMPORT_REJECT"]);
+    const { ConfigAuditPanel } = await import("./ConfigAuditPanel");
+    renderLight(<ConfigAuditPanel />, { user: "admin" });
+
+    expect(await screen.findByText("取消押金")).toBeInTheDocument();
+    expect(screen.getByText("作废返点")).toBeInTheDocument();
+    expect(screen.getByText("驳回导入批次")).toBeInTheDocument();
+  });
 });

@@ -9,10 +9,12 @@ import {
   gameTypesApi,
   ordersApi,
   poolsApi,
+  employeesApi,
   type Counterparty,
   type Customer,
   type GameTypeOption,
   type Pool,
+  type EmployeeOption,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
@@ -23,6 +25,7 @@ import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { getRecoveryLayout } from "./recovery/recoveryConfig";
 import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
+import { resizeInstallmentSchedule, serializeInstallmentSchedule } from "./InstallmentScheduleFields";
 import { DgOrderSection } from "./dg/DgOrderSection";
 import { DfqOrderSection } from "./dfq/DfqOrderSection";
 
@@ -61,6 +64,7 @@ export function CreateBusinessModal(props: {
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [gameTypes, setGameTypes] = useState<GameTypeOption[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
@@ -98,16 +102,18 @@ export function CreateBusinessModal(props: {
     if (didInitLookup.current) return;
     void (async () => {
       try {
-        const [customerList, cpList, poolList, gameTypeList] = await Promise.all([
+        const [customerList, cpList, poolList, gameTypeList, employeeList] = await Promise.all([
           customersApi.list(),
           counterpartiesApi.list(),
           poolsApi.list(),
           gameTypesApi.list({ include_inactive: false }),
+          employeesApi.list(),
         ]);
         setCustomers(customerList);
         setCounterparties(cpList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
         setGameTypes(gameTypeList);
+        setEmployees(employeeList.filter((employee) => employee.is_active));
         setLoadError(null);
         didInitLookup.current = true;
       } catch (error) {
@@ -149,6 +155,12 @@ export function CreateBusinessModal(props: {
       const orderFormExtra = Object.fromEntries(
         Object.entries(formExtra).filter(([key]) => !accountExtraKeys.has(key)),
       );
+      for (const key of ["business_responsible_ids", "delivery_responsible_ids"]) {
+        const responsibleIds = Array.isArray(values[key])
+          ? values[key].filter((id): id is number => typeof id === "number")
+          : [];
+        if (responsibleIds.length > 0) orderFormExtra[key] = responsibleIds;
+      }
       if (isDfq) {
         const customer = await customersApi.create({
           display_name: values.customer_nickname as string,
@@ -194,10 +206,7 @@ export function CreateBusinessModal(props: {
             per_period_service_fee: String(values.dfq_period_service_fee ?? 0),
             per_period: String(values.dfq_period_amount ?? 0),
             first_due_on: toDateString((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined)?.[0]?.due_on),
-            schedule: ((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined) ?? []).map((item, index) => ({
-              period_no: index + 1,
-              due_on: toDateString(item.due_on),
-            })),
+            schedule: serializeInstallmentSchedule(values.dfq_schedule as Array<{ due_on?: unknown }> | undefined, toDateString),
             note: values.note as string,
           },
         });
@@ -209,7 +218,11 @@ export function CreateBusinessModal(props: {
       }
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
-      const resolvedCustomerSource = values[customerSourceField] as string;
+      const selectedCustomerSource = values[customerSourceField] as string | undefined;
+      const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
+      const resolvedCustomerSource = selectedCustomerSource === "其他"
+        ? values[customerSourceOtherField] as string
+        : selectedCustomerSource;
       const customerNickname = values[`${customerPrefix}customer_nickname`];
       if ((isRecovery || isDg) && customerNickname) {
         const existingCustomer = customers.find((customer) =>
@@ -269,19 +282,16 @@ export function CreateBusinessModal(props: {
       const initialCosts = (isRecovery || isTh) ? [
         ...(Number(values.intermediary_fee) > 0 ? [{
           amount: String(values.intermediary_fee), occurred_on: today(), portion: "PRINCIPAL",
-          pool_id: values.payment_pool_id as number, flow_category: "FEE",
+          pool_id: (values.intermediary_pool_id ?? values.payment_pool_id) as number, flow_category: "FEE",
           note: `${isTh ? "提号中介费" : "中介费"}｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
         }] : []),
-        ...(Number(values.other_fee_amount) > 0 ? [{
-          amount: String(values.other_fee_amount), occurred_on: today(), portion: "PRINCIPAL",
-          pool_id: values.payment_pool_id as number, flow_category: "OTHER",
-          note: `${String(values.other_fee_name || (isTh ? "其他" : "其他费用"))}｜收款对象：${String(values.other_fee_recipient ?? "")}`,
-        }] : []),
-        ...(Number(values.design_fee) > 0 ? [{
-          amount: String(values.design_fee), occurred_on: today(), portion: "PRINCIPAL",
-          pool_id: values.payment_pool_id as number, flow_category: "DESIGN",
-          note: "设计费",
-        }] : []),
+        ...((values.expense_items as Array<{ name?: unknown; amount?: unknown; pool_id?: unknown; note?: unknown }> | undefined) ?? [])
+          .filter((item) => Number(item.amount) > 0)
+          .map((item) => ({
+            amount: String(item.amount), occurred_on: today(), portion: "PRINCIPAL",
+            pool_id: (item.pool_id ?? values.payment_pool_id) as number, flow_category: "OTHER",
+            note: [String(item.name || "其他支出"), item.note ? String(item.note) : ""].filter(Boolean).join("｜"),
+          })),
       ] : [];
       await ordersApi.create({
         order_type: props.initialOrderType,
@@ -313,9 +323,7 @@ export function CreateBusinessModal(props: {
         initial_buy: (isRecovery || isTh) ? {
           amount: String((isRecovery ? values.recovery_price : values.th_purchase_amount) ?? 0),
           occurred_on: today(), portion: "PRINCIPAL", pool_id: values.payment_pool_id as number,
-          note: isRecovery
-            ? `回收价｜付款对象：${String(values.payment_recipient || "卖家")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`
-            : `提号｜付${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
+          note: isRecovery ? "回收价" : "提号",
         } : undefined,
         initial_costs: initialCosts,
         form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,
@@ -374,23 +382,14 @@ export function CreateBusinessModal(props: {
             const count = Number(changed.dfq_periods);
             const schedule = (form.getFieldValue("dfq_schedule") ?? []) as Array<{ due_on?: unknown }>;
             if (Number.isInteger(count) && count > 0 && count <= 120 && count !== schedule.length) {
-              const apply = () => form.setFieldValue("dfq_schedule", count > schedule.length
-                ? [...schedule, ...Array.from({ length: count - schedule.length }, () => ({}))]
-                : schedule.slice(0, count));
-              if (count < schedule.length && schedule.slice(count).some((item) => item?.due_on)) {
-                appModal.confirm({ title: "减少期数会删除已填写的到期日", okText: "确认删除", cancelText: "保留期次", content: "确认删除超出期数的计划吗？", onOk: apply, onCancel: () => form.setFieldValue("dfq_periods", schedule.length) });
-              } else apply();
+              form.setFieldValue("dfq_schedule", resizeInstallmentSchedule(schedule, count));
             }
           }
           const clear: Record<string, undefined> = {};
           for (const [source, other] of [["supplier_source", "supplier_source_other"]]) {
             if (source in changed && changed[source] !== "其他") clear[other] = undefined;
           }
-          if ("intermediary_fee" in changed && !(Number(changed.intermediary_fee) > 0)) {
-            clear.intermediary_platform = undefined;
-            clear.intermediary_type = undefined;
-            clear.compensation_type = undefined;
-          } else if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
+          if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
             clear.compensation_type = undefined;
           }
           if (Object.keys(clear).length) form.setFieldsValue(clear);
@@ -405,9 +404,9 @@ export function CreateBusinessModal(props: {
         }}
       >
         <FieldConfigContext.Provider value={config}>
-          {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
+          {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
             <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
-          </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} /> : isDg ? <DgOrderSection gameTypes={gameTypes} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} />}
+          </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : isDg ? <DgOrderSection gameTypes={gameTypes} employees={employees} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} employees={employees} />}
           {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
           <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
         </FieldConfigContext.Provider>

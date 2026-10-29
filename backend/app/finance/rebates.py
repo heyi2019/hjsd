@@ -85,29 +85,8 @@ def create_rebate(
             "买号返点只能关联回收、提号或代分期订单",
             details={"rebate_type": rebate_type, "order_type": order.order_type},
         )
-    required_event = {
-        RebateType.BUY.value: EventType.BUY.value,
-        RebateType.SELL.value: EventType.SELL.value,
-    }[rebate_type]
-    if rebate_type == RebateType.SELL.value and order.order_type == "DFQ":
-        # 代分期没有 SELL 事件（只能走 PAYMENT 收款），其卖动作凭证为 PAYMENT。
-        required_event = EventType.PAYMENT.value
-    if session.scalar(
-        select(OrderEvent.id).where(
-            OrderEvent.order_id == order.id,
-            OrderEvent.event_type == required_event,
-            OrderEvent.is_posted.is_(True),
-        )
-    ) is None:
-        label = "买号返点" if rebate_type == RebateType.BUY.value else "卖号返点"
-        raise Validation(
-            f"{label}必须关联已登记的 {required_event} 事件",
-            details={
-                "rebate_type": rebate_type,
-                "order_id": order.id,
-                "required_event": required_event,
-            },
-        )
+    # 返点资格由业务订单是否已创建决定；BUY/SELL/PAYMENT 仅作为后续业务流水，
+    # 不能阻止在订单创建后先登记预计返点。
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录

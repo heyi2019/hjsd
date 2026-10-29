@@ -402,7 +402,7 @@ class TestRebateGuards:
                 actor="pytest",
             )
 
-    def test_rebate_type_must_match_source_order_event(self, seeded_db):
+    def test_rebate_type_uses_created_source_order(self, seeded_db):
         order = orders_service.create_order(
             seeded_db,
             order_type="DG",
@@ -410,15 +410,15 @@ class TestRebateGuards:
             actor="pytest",
         )
 
-        with pytest.raises(Validation, match="卖号返点必须关联已登记的 SELL"):
-            service.create_rebate(
-                seeded_db,
-                source_order_id=order.id,
-                rebate_type="SELL",
-                base_amount=Decimal("100"),
-                collected_on=TODAY,
-                actor="pytest",
-            )
+        record = service.create_rebate(
+            seeded_db,
+            source_order_id=order.id,
+            rebate_type="SELL",
+            base_amount=Decimal("100"),
+            collected_on=TODAY,
+            actor="pytest",
+        )
+        assert record.rebate_type == "SELL"
 
     def test_sell_rebate_accepts_recovery_order(self, seeded_db):
         """2026-10-28 口径：卖号返点不再限 DG，回收单有 SELL 事件即可登记。"""

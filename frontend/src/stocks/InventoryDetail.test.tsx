@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
 import { InventoryDetail } from "./InventoryDetail";
 
@@ -55,6 +55,32 @@ describe("InventoryDetail", () => {
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
 
+  it("参与方按角色与名称展示，并可打开客户中心卡片", () => {
+    const onPartyClick = vi.fn();
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        customers: [
+          { id: 7, display_name: "买家A", role: "BUYER" },
+          { id: 8, display_name: "卖家B", role: "SELLER" },
+        ],
+        counterparties: [{ id: 11, display_name: "平台A", role: "PLATFORM" }],
+        events: [],
+      }],
+    } as unknown as AccountExecutionDetail;
+
+    render(<InventoryDetail row={account} detail={detail} loading={false} onPartyClick={onPartyClick} />);
+
+    const buyer = screen.getByRole("link", { name: "客户_买家：买家A" });
+    expect(screen.getByRole("link", { name: "客户_卖家：卖家B" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "合作方_平台：平台A" })).toBeInTheDocument();
+    fireEvent.click(buyer);
+    expect(onPartyClick).toHaveBeenCalledWith({ id: 7, display_name: "买家A", role: "BUYER", entityType: "customer" });
+  });
+
   it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
     render(<InventoryDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
@@ -67,6 +93,30 @@ describe("InventoryDetail", () => {
     expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
     expect(panel.querySelector(".inventory-finance-summary__item--amount")).toBeTruthy();
+  });
+
+  it("给展开表格中的信息表保留独立留白", () => {
+    render(<InventoryDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
+    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
+  });
+
+  it("其他补充信息按左标签右内容单列展示", () => {
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        note: "订单备注内容",
+        extra_values: { source_note: "来源说明" },
+        events: [],
+      }],
+    } as unknown as AccountExecutionDetail;
+    render(<InventoryDetail row={account} detail={detail} loading={false} />);
+    const table = document.querySelector(".inventory-detail__order-supplement");
+    expect(table).toBeTruthy();
+    expect(table?.querySelectorAll("tbody > tr")).toHaveLength(2);
   });
 
   it("在桌面详情中让描述、图片、备注各占整行", () => {

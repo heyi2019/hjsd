@@ -137,7 +137,16 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
     ) is None
 
 
-def _order(seeded_db, *, order_type="HS", account_id=None, owner_id=None, trade_date=D):
+def _order(
+    seeded_db,
+    *,
+    order_type="HS",
+    account_id=None,
+    owner_id=None,
+    trade_date=D,
+    form_extra=None,
+    form_extra_scope=None,
+):
     if order_type == "HS" and account_id is None:
         account_id = stocks_service.create_account(
             seeded_db,
@@ -149,6 +158,7 @@ def _order(seeded_db, *, order_type="HS", account_id=None, owner_id=None, trade_
     return order_service.create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
+        form_extra=form_extra, form_extra_scope=form_extra_scope,
     )
 
 
@@ -701,6 +711,28 @@ class TestCreateOrderValidation:
 
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="HS", account_id=account.id)
+
+    def test_consign_listing_can_link_an_existing_business_account(self, seeded_db):
+        account = Account(
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            status=AccountStatus.IN_STOCK.value,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+
+        order = _order(
+            seeded_db,
+            order_type="DG",
+            account_id=account.id,
+            form_extra_scope="CONSIGN",
+            form_extra={"consignment_platform": "盼之", "listed_at": "2026-10-29T03:52"},
+        )
+
+        assert order.account_id == account.id
 
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(

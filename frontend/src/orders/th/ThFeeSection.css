@@ -1,6 +1,6 @@
 .th-fee-primary {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(0, 1.4fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
   gap: var(--space-2) var(--space-3);
   row-gap: var(--space-4);
@@ -25,24 +25,8 @@
 }
 .th-fee-primary__field .recovery-fee-card__label { white-space: nowrap; }
 .th-fee-primary__field .ant-form-item { flex: 1 1 auto; min-width: 0; }
-.th-fee-primary .recovery-fee-card__desc {
-  grid-column: 5;
-  grid-row: 1;
-  justify-self: end;
-  text-align: right;
-  white-space: nowrap;
-}
-
 @media (max-width: 720px) {
   .th-fee-primary { grid-template-columns: minmax(0, 1fr); }
-
-  .th-fee-primary .recovery-fee-card__desc {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    justify-self: start;
-    text-align: left;
-    white-space: normal;
-  }
 
   .th-fee-primary .ant-form-item-control-input-content > * { width: 100%; }
   .th-fee-primary__field { width: 100%; }

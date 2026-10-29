@@ -94,6 +94,18 @@ beforeEach(() => {
   });
 });
 describe("CustomersPage：客户档案", () => {
+  it("从客户中心深链参数打开指定客户卡片", async () => {
+    renderLight(<CustomersPage focusCustomerId={1} />);
+    expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
+  });
+
+  it("从客户中心深链参数打开指定合作方卡片", async () => {
+    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
+    vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0]);
+    renderLight(<CustomersPage focusCounterpartyId={11} />);
+    expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
+  });
+
   it("加载成功后渲染客户编号与状态标签", async () => {
     renderLight(<CustomersPage />);
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();

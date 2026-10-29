@@ -236,6 +236,8 @@ class EventCreate(BaseModel):
         default=None, description="COST 时可填 FEE / DESIGN / OTHER"
     )
     note: str | None = None
+    bound_phone: str | None = Field(default=None, max_length=64)
+    bound_phone_owner: str | None = Field(default=None, max_length=128)
     # 表单字段配置体系：操作类作用域自定义字段值，落 OrderEvent.form_extra。
     form_extra: dict[str, object] | None = None
 

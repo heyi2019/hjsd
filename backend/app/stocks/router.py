@@ -27,7 +27,7 @@ from app.core.security import (
 from app.stocks import service
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog, Pool
-from app.domain.parties import Counterparty, OrderCounterpartyRole
+from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.users import User
 from app.domain.trade import (
     Account,
@@ -265,6 +265,12 @@ class ExecutionCounterpartyOut(BaseModel):
     role: str
 
 
+class ExecutionCustomerOut(BaseModel):
+    id: int
+    display_name: str
+    role: str
+
+
 class ExecutionRebateOut(BaseModel):
     id: int
     rebate_no: str
@@ -305,6 +311,7 @@ class AccountExecutionOrderOut(BaseModel):
     extra_values: dict[str, object] = Field(default_factory=dict)
     extra_fields: list[dict[str, object]] = Field(default_factory=list)
     cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)
+    customers: list[ExecutionCustomerOut] = Field(default_factory=list)
     counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
     rebates: list[ExecutionRebateOut] = Field(default_factory=list)
     events: list[ExecutionEventOut]
@@ -493,7 +500,21 @@ def execution_detail(
     for definition in field_defs:
         field_defs_by_type.setdefault(definition.order_type_code, {})[definition.field_key] = definition
     counterparties_by_order: dict[int, list[ExecutionCounterpartyOut]] = {}
+    customers_by_order: dict[int, list[ExecutionCustomerOut]] = {}
     if order_ids:
+        for role, customer in db.execute(
+            select(OrderCustomerRole, Customer)
+            .join(Customer, Customer.id == OrderCustomerRole.customer_id)
+            .where(OrderCustomerRole.order_id.in_(order_ids))
+            .order_by(OrderCustomerRole.id)
+        ).all():
+            customers_by_order.setdefault(role.order_id, []).append(
+                ExecutionCustomerOut(
+                    id=customer.id,
+                    display_name=customer.display_name,
+                    role=role.role,
+                )
+            )
         for role, counterparty in db.execute(
             select(OrderCounterpartyRole, Counterparty)
             .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
@@ -679,6 +700,7 @@ def execution_detail(
                     if value not in (None, "", [])
                 ],
                 cashflows=cashflows_by_order.get(order.id, []),
+                customers=customers_by_order.get(order.id, []),
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
                 events=events_by_order.get(order.id, []),

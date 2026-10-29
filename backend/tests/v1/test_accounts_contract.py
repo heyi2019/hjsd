@@ -755,6 +755,29 @@ class TestAccountsApi:
             {"id": platform.id, "display_name": "寄售平台A", "role": "PLATFORM"}
         ]
 
+    def test_execution_detail_includes_customer_participants(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "detail-customer-party-acc")
+        customer = parties_service.create_customer(seeded_db, display_name="买家A", actor="pytest")
+        seller = parties_service.create_customer(seeded_db, display_name="卖家B", actor="pytest")
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=TODAY,
+            actor="pytest",
+            account_id=account.id,
+            customer_roles=[(customer.id, "BUYER"), (seller.id, "SELLER")],
+        )
+
+        response = seeded_client.get(
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["orders"][0]["customers"] == [
+            {"id": customer.id, "display_name": "买家A", "role": "BUYER"},
+            {"id": seller.id, "display_name": "卖家B", "role": "SELLER"},
+        ]
+
     def test_execution_detail_includes_rebate_amount(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-rebate-acc")
         order = _buy(seeded_db, account, amount="300")

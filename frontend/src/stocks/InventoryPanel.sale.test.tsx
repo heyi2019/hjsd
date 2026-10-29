@@ -110,6 +110,40 @@ it("库存分期售出展示最后一期尾差", async () => {
   await ui.clear(screen.getByLabelText("分期期数"));
   await ui.type(screen.getByLabelText("分期期数"), "3");
   expect(await screen.findByText("最后一期：333.32 元")).toBeInTheDocument();
+  expect(screen.getByLabelText("第 1 期到期日")).toBeInTheDocument();
+  expect(screen.getByLabelText("第 2 期到期日")).toBeInTheDocument();
+  expect(screen.getByLabelText("第 3 期到期日")).toBeInTheDocument();
+});
+
+it("售出时用建单参与方填写新买家并将其关联到订单", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  resolveMock(vi.mocked(catalog.customersApi.list), []);
+  resolveMock(vi.mocked(catalog.customersApi.create), {
+    customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
+    duplicate_candidates: [],
+  });
+  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  expect(document.querySelector(".recovery-order-modal")).toBeTruthy();
+  expect(await screen.findByText("订单编号")).toBeInTheDocument();
+  expect(screen.getByText("HS-2026-0001")).toBeInTheDocument();
+  expect(screen.getByText("游戏类型")).toBeInTheDocument();
+  expect(screen.getByText("游戏账号")).toBeInTheDocument();
+  expect(await screen.findByText("买家信息")).toBeInTheDocument();
+  expect(screen.getByText("资金流水")).toBeInTheDocument();
+  expect(screen.getByText(/中介类型/)).toBeInTheDocument();
+  await ui.type(screen.getByLabelText("客户昵称"), "新买家");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("收款资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+    display_name: "新买家",
+  })));
+  expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+    customer_roles: [{ customer_id: 8, role: "BUYER" }],
+  }));
 });
 
 describe("InventoryPanel：写入与长路径", () => {
@@ -123,10 +157,9 @@ it("自营在库账号可以售出并登记 HS 售出事件", async () => {
     expect(await screen.findByText("售出账号")).toBeInTheDocument();
 
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
-    await ui.click(await screen.findByText("买家A"));
+    await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "350");
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[1] as Element);
+    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
@@ -154,10 +187,9 @@ it("代挂账号售出按货源类型生成 DG 订单", async () => {
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));
     expect(await screen.findByText("售出账号")).toBeInTheDocument();
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
-    await ui.click(await screen.findByText("买家A"));
+    await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "200");
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[1] as Element);
+    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
@@ -183,8 +215,7 @@ it("代挂账号出售时选择分期，建立代挂分期合同而不是直接 
     await screen.findByText("acc-5");
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
-    await ui.click(await screen.findByText("买家A"));
+    await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "200");
     fireEvent.click(screen.getByText("分期付款"));
     await ui.clear(screen.getByLabelText("分期期数"));
@@ -212,8 +243,7 @@ it("提号库存从库存中心售出时可选择分期", async () => {
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));
     expect(await screen.findByText("售出账号")).toBeInTheDocument();
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
-    await ui.click(await screen.findByText("买家A"));
+    await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1200");
     fireEvent.click(screen.getByText("分期付款"));
     await ui.clear(screen.getByLabelText("分期期数"));

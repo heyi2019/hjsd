@@ -37,7 +37,7 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   HS: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: SRC },
-    { key: "intermediary_platform", label: "经手平台", type: "SELECT", options: PLAT },
+    { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: PLAT },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
     { key: "compensation_type", label: "包赔类型", type: "SELECT", options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }] },
   ],
@@ -48,7 +48,7 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   DFQ: [
     { key: "dfq_has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "dfq_customer_source", label: "客户来源", type: "SELECT", options: SRC },
-    { key: "intermediary_platform", label: "经手平台", type: "SELECT", options: PLAT },
+    { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: PLAT },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
     { key: "compensation_type", label: "包赔类型", type: "SELECT", options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }] },
   ],
@@ -56,7 +56,7 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: SRC },
     { key: "supplier_source", label: "供货方来源", type: "SELECT", options: [{ value: "氪金联盟", label: "氪金联盟" }, { value: "同行", label: "同行" }, { value: "其他", label: "其他" }] },
-    { key: "intermediary_platform", label: "经手平台", type: "SELECT", options: PLAT },
+    { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: PLAT },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
     { key: "compensation_type", label: "包赔类型", type: "SELECT", options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }] },
   ],
@@ -157,6 +157,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "INVENTORY_TYPE", label: "库存类型", group: "INVENTORY", editable: false, options: [
     { value: "RECOVERY", label: "回收" }, { value: "PICKUP", label: "提号" }, { value: "CONSIGNMENT", label: "代挂" },
   ] },
+  { code: "INTERMEDIARY_PLATFORM", label: "经手平台", group: "BUSINESS", editable: true, options: PLAT },
   { code: "FUND_FLOW_DIRECTION", label: "流水方向", group: "FUND", editable: false, options: [
     { value: "IN", label: "收入" }, { value: "OUT", label: "支出" },
   ] },
@@ -349,6 +350,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "DEPOSIT_CREATE", label: "登记押金占用" },
     { value: "DEPOSIT_RELEASE", label: "释放押金" },
     { value: "DEPOSIT_LOSS", label: "登记押金损失" },
+    { value: "DEPOSIT_CANCEL", label: "取消押金" },
     { value: "INSTALLMENT_CREATE", label: "新建分期合约" },
     { value: "INSTALLMENT_CANCEL", label: "取消分期合约" },
     { value: "INSTALLMENT_PAYMENT", label: "分期收款" },
@@ -363,6 +365,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "REBATE_CREATE", label: "登记返点" },
     { value: "REBATE_SETTLE", label: "返点结算" },
     { value: "REBATE_REVERSE", label: "冲销返点" },
+    { value: "REBATE_VOID", label: "作废返点" },
     { value: "RECONCILIATION_CREATE", label: "登记对账" },
     { value: "RECONCILIATION_RESOLVE", label: "处置对账差异" },
     { value: "PERIOD_LOCK", label: "锁定账期" },
@@ -393,6 +396,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "ATTACHMENT_DELETE", label: "删除附件" },
     { value: "IMPORT_LAND", label: "导入落库" },
     { value: "IMPORT_COMMIT", label: "确认导入批次" },
+    { value: "IMPORT_REJECT", label: "驳回导入批次" },
     { value: "IMPORT_MAP", label: "映射导入行" },
     { value: "IMPORT_SKIP", label: "跳过导入行" },
     { value: "IMPORT_MARK_UNLINKED", label: "标记单边划转" },

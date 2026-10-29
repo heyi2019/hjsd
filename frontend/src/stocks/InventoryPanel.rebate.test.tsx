@@ -3,14 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
+import { InventoryRebateModal } from "./InventoryRebateModal";
 
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
 import { seedOptionSets } from "../test/formFieldsSeed";
+import { clearOptionSetsCache } from "../shared/lib/optionSets";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
+  clearOptionSetsCache();
 });
 
 vi.mock("../shared/api/catalog")
@@ -107,24 +110,14 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：写入与长路径", () => {
-it("寄售可以勾选寄售平台并登记 DG 业务", async () => {
-    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValueOnce([
-      { id: 11, counterparty_no: "CP0011", display_name: "寄售平台A", type: "PLATFORM", status: "ACTIVE" },
-      { id: 12, counterparty_no: "CP0012", display_name: "寄售平台B", type: "PLATFORM", status: "ACTIVE" },
-    ]);
+it("寄售展示中介平台配置和精确到分钟的上架时间", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "寄售" }));
     expect(await screen.findByText("登记寄售")).toBeInTheDocument();
-    await ui.click(screen.getByLabelText("寄售平台A"));
-    await ui.click(screen.getByRole("button", { name: "确认寄售" }));
-
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
-    expect(vi.mocked(catalog.ordersApi.create).mock.calls[0][0]).toMatchObject({
-      order_type: "DG",
-      account_id: 1,
-      counterparty_roles: [{ counterparty_id: 11, role: "PLATFORM" }],
-    });
+    expect(screen.getByLabelText("上架时间").getAttribute("value")).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(screen.getByText(/每次确认只登记一个平台/)).toBeInTheDocument();
+    expect(await screen.findByText("已上架记录")).toBeInTheDocument();
   });
 
 it("返点按买入与售出订单区分类型并登记", async () => {
@@ -132,8 +125,15 @@ it("返点按买入与售出订单区分类型并登记", async () => {
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
+    expect(screen.getByText(/关联业务订单创建后即可登记返点/)).toBeInTheDocument();
     expect(screen.getByLabelText("买号返点（对应回收）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeEnabled();
+    await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
+    expect(screen.getByLabelText("买号返点（对应回收）")).not.toBeChecked();
+    expect(screen.getByLabelText("卖号返点（对应售出）")).toBeChecked();
+    await ui.click(screen.getByLabelText("买号返点（对应回收）"));
+    expect(screen.getByLabelText("买号返点（对应回收）")).toBeChecked();
+    expect(screen.getByLabelText("卖号返点（对应售出）")).not.toBeChecked();
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
@@ -145,4 +145,16 @@ it("返点按买入与售出订单区分类型并登记", async () => {
       channel: "卖号返点",
     });
   });
+
+it("提号分销已登记 BUY 后可登记买号返点", async () => {
+  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
+    account: accounts[1],
+    orders: [{
+      order_id: 22, order_no: "TH0002", order_type: "TH", trade_date: "2026-10-15", created_at: "2026-10-15T10:19:00", status: "ACTIVE",
+      events: [{ id: 32, event_no: "EV0002", event_type: "BUY", amount: "200.00", occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00", portion: "PRINCIPAL", is_posted: true, operator: "admin" }],
+    }],
+  });
+  renderLight(<InventoryRebateModal account={accounts[1]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  expect(await screen.findByLabelText("买号返点（对应回收）")).toBeChecked();
+});
 });

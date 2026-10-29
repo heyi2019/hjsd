@@ -1,9 +1,10 @@
-import { Spin } from "antd";
+import { Spin, Typography } from "antd";
 import type { Account, AccountAuditEntry, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
 import { executionActionLabel } from "../shared/lib/format";
 import { accountFinancialFlows, financeTypeLabel, rebateTypeLabel, PROFILE_ACCOUNT_TYPES } from "./inventory-logic";
 import {
   InventoryDetailView,
+  type InventoryPartyLink,
   type InventoryExecutionRow,
   type InventoryFinanceRow,
 } from "./InventoryDetailView";
@@ -19,18 +20,22 @@ function eventDate(detail: AccountExecutionDetail | undefined, eventType: string
   return dateTimeMinute(event?.occurred_at ?? event?.occurred_on);
 }
 
-function platformListingDate(detail: AccountExecutionDetail | undefined): string {
-  const order = detail?.orders.find((item) => item.order_type === "DG");
-  return dateTimeMinute(order?.created_at ?? order?.trade_date);
-}
-
-function consignmentPlatforms(detail: AccountExecutionDetail | undefined): string {
-  const names = detail?.orders
-    .filter((order) => order.order_type === "DG")
-    .flatMap((order) => (order.counterparties ?? [])
-      .filter((counterparty) => counterparty.role === "PLATFORM")
-      .map((counterparty) => counterparty.display_name));
-  return names?.length ? names.join("、") : "-";
+function consignmentSummary(detail: AccountExecutionDetail | undefined, accountStatus?: string): string {
+  if (accountStatus === "VOID") return "-";
+  const records = detail?.orders
+    .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+    .map((order) => {
+      const configuredPlatform = order.extra_values?.consignment_platform;
+      const platform = configuredPlatform
+        ? String(configuredPlatform)
+        : (order.counterparties ?? [])
+          .filter((counterparty) => counterparty.role === "PLATFORM")
+          .map((counterparty) => counterparty.display_name)
+          .join("、") || "-";
+      const listedAt = dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""));
+      return `${platform} / ${listedAt}`;
+    }) ?? [];
+  return records.length ? records.join("\n") : "-";
 }
 
 function orderPlatformValues(order: AccountExecutionDetail["orders"][number]): string[] {
@@ -49,17 +54,64 @@ function transactionPlatforms(detail: AccountExecutionDetail | undefined, kinds:
   return platforms?.length ? [...new Set(platforms)].join("、") : "-";
 }
 
-function orderParties(detail: AccountExecutionDetail | undefined): string {
-  const parties = detail?.orders.flatMap((order) => (order.counterparties ?? []).map((party) => party.display_name));
-  return parties?.length ? [...new Set(parties)].join("、") : "-";
+const PARTY_ROLE_LABEL: Record<string, string> = {
+  SELLER: "卖家",
+  BUYER: "买家",
+  CONSIGNOR: "寄售方",
+  PEER: "同行",
+  SUPPLIER: "供货方",
+  PLATFORM: "平台",
+  INSTALLMENT_CUSTOMER: "分期客户",
+};
+
+function orderParties(detail: AccountExecutionDetail | undefined): InventoryPartyLink[] {
+  const parties = detail?.orders.flatMap((order) => [
+    ...(order.customers ?? []).map((party) => ({ ...party, entityType: "customer" as const })),
+    ...(order.counterparties ?? []).map((party) => ({ ...party, entityType: "counterparty" as const })),
+  ]) ?? [];
+  const seen = new Set<string>();
+  return parties.filter((party) => {
+    const key = `${party.entityType}:${party.id}:${party.role}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderOrderParties(
+  parties: InventoryPartyLink[],
+  onPartyClick?: (party: InventoryPartyLink) => void,
+): React.ReactNode {
+  if (!parties.length) return "-";
+  return <span>{parties.map((party, index) => (
+    <span key={`${party.entityType}:${party.id}:${party.role}`}>
+      <Typography.Link
+        href="#"
+        onClick={(event) => {
+          event.preventDefault();
+          onPartyClick?.(party);
+        }}
+      >
+        {party.entityType === "customer" ? "客户" : "合作方"}_{PARTY_ROLE_LABEL[party.role] ?? party.role}：{party.display_name}
+      </Typography.Link>
+      {index < parties.length - 1 ? "、" : null}
+    </span>
+  ))}</span>;
 }
 
 function orderNotes(detail: AccountExecutionDetail | undefined): string {
-  const notes = detail?.orders
-    .filter((order) => order.note)
-    .map((order) => `${order.order_no}：${order.note}`);
-  return notes?.length ? notes.join("；") : "-";
+  // 详情只展示主订单备注；关联 DG 寄售单的系统备注已单独展示在寄售信息中。
+  const order = detail?.orders.find((item) => item.order_type !== "DG" && item.note)
+    ?? detail?.orders.find((item) => item.note && !item.note.startsWith("寄售平台："));
+  return order?.note?.trim() || "-";
 }
+
+const INTERNAL_CONSIGNMENT_EXTRA_KEYS = new Set([
+  "consignment_platform",
+  "listed_at",
+  "platform_unlisted_at",
+  "platform_unlist_scope",
+]);
 
 function orderExtraValues(detail: AccountExecutionDetail | undefined): Array<{ key: string; label: string; value: string; section: string }> {
   const values = detail?.orders.flatMap((order) => {
@@ -67,6 +119,7 @@ function orderExtraValues(detail: AccountExecutionDetail | undefined): Array<{ k
       ? order.extra_fields.map((field) => ({ key: `${order.order_no}-${field.key}`, label: field.label, value: field.value, section: field.section }))
       : Object.entries(order.extra_values ?? {}).map(([key, value]) => ({ key: `${order.order_no}-${key}`, label: key, value, section: "EXTRA" }));
     return fields
+      .filter((field) => ![...INTERNAL_CONSIGNMENT_EXTRA_KEYS].some((key) => field.key === key || field.key.endsWith(`-${key}`)))
       .filter((field) => field.value !== null && field.value !== undefined && String(field.value).trim() !== "")
       .map((field) => ({ ...field, value: String(field.value) }));
   }) ?? [];
@@ -86,6 +139,7 @@ export function InventoryDetail({
   onEdit,
   eventDrafts,
   onEventEdit,
+  onPartyClick,
   employees = [],
 }: {
   row: Account;
@@ -96,6 +150,7 @@ export function InventoryDetail({
   eventDrafts?: Record<number, { amount: string; note: string | null; operator_user_ids?: number[] }>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
   employees?: EmployeeOption[];
+  onPartyClick?: (party: InventoryPartyLink) => void;
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
@@ -151,15 +206,14 @@ export function InventoryDetail({
         orderNo: detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
         recoveryPlatform: transactionPlatforms(detail, new Set(["HS", "TH"])),
         salePlatform: transactionPlatforms(detail, new Set(["DG", "DFQ"]), true),
-        orderParties: orderParties(detail),
+        orderParties: renderOrderParties(orderParties(detail), onPartyClick),
         orderNotes: orderNotes(detail),
         orderExtras: orderExtraValues(detail),
         createdBy: row.created_by || "-",
         registeredAt: dateTimeMinute(detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
         soldAt: eventDate(detail, "SELL"),
         removedAt: eventDate(detail, "CANCEL"),
-        consignmentAt: platformListingDate(detail),
-        consignmentPlatform: consignmentPlatforms(detail),
+        consignmentSummary: consignmentSummary(detail, row.status),
         password: row.game_password || "-",
         channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
         boundPhone: row.bound_phone || "-",

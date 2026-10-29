@@ -326,6 +326,8 @@ def deliver_installment(
         delivery_mode=payload.delivery_mode,
         delivered_on=payload.delivered_on,
         note=payload.note,
+        bound_phone=payload.bound_phone,
+        bound_phone_owner=payload.bound_phone_owner,
         form_extra=payload.form_extra,
         actor=_actor(user),
         user=user,

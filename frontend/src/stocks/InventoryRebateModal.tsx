@@ -1,7 +1,7 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-/** 库存账号返点：买号返点关联买入订单，卖号返点关联实际售出订单。 */
+/** 库存账号返点：创建业务订单后即可选择买号或卖号返点，实际流水只用于带出金额。 */
 import { configurableLabel } from "../shared/lib/optionSets";
-import { Checkbox, Form, Input, Modal, Spin } from "antd";
+import { Form, Input, Modal, Radio, Spin } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   stocksApi,
@@ -14,6 +14,8 @@ import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
 import { ErrorBanner, MoneyInput, PermissionButton } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { InventoryAccountSummary } from "./InventoryAccountSummary";
+import "./InventoryRebateModal.css";
 
 type RebateKind = "BUY" | "SELL";
 
@@ -25,15 +27,18 @@ const REBATE_KIND_LABEL: Record<RebateKind, string> = {
 function sourceOrder(detail: AccountExecutionDetail | null, kind: RebateKind) {
   if (kind === "BUY") {
     return detail?.orders.find((order) =>
-      order.order_type === "HS" && order.events.some((event) => event.event_type === "BUY"),
+      ["HS", "TH", "DFQ"].includes(order.order_type),
     );
   }
-  return detail?.orders.find((order) => order.events.some((event) => event.event_type === "SELL"));
+  const sellOrder = detail?.orders.find((order) => order.events.some((event) =>
+    event.event_type === "SELL" || (order.order_type === "DFQ" && event.event_type === "PAYMENT"),
+  ));
+  return sellOrder ?? detail?.orders.find((order) => ["HS", "TH", "DG", "DFQ"].includes(order.order_type));
 }
 
 function defaultBaseAmount(detail: AccountExecutionDetail | null, kind: RebateKind): string {
   const order = sourceOrder(detail, kind);
-  const eventType = kind === "BUY" ? "BUY" : "SELL";
+  const eventType = kind === "BUY" ? "BUY" : order?.order_type === "DFQ" ? "PAYMENT" : "SELL";
   return order?.events.find((event) => event.event_type === eventType)?.amount ?? "0";
 }
 
@@ -61,7 +66,7 @@ export function InventoryRebateModal(props: {
         setError(null);
         const firstKind: RebateKind | undefined = sourceOrder(value, "BUY") ? "BUY" : sourceOrder(value, "SELL") ? "SELL" : undefined;
         form.setFieldsValue({
-          rebate_type: firstKind ? [firstKind] : [],
+          rebate_type: firstKind,
           base_amount: firstKind ? defaultBaseAmount(value, firstKind) : "0",
           collected_on: today(),
         });
@@ -82,9 +87,9 @@ export function InventoryRebateModal(props: {
     [detail],
   );
 
-  const submit = async (values: { rebate_type?: RebateKind[]; base_amount?: string; rate?: string; collected_on?: string; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { rebate_type?: RebateKind; base_amount?: string; rate?: string; collected_on?: string; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
-    const kind = values.rebate_type?.[0];
+    const kind = values.rebate_type;
     const order = kind ? sourceOrder(detail, kind) : undefined;
     if (!kind || !order) return;
     setSubmitting(true);
@@ -123,31 +128,37 @@ export function InventoryRebateModal(props: {
       }
     >
       <ErrorBanner error={error} />
-      <p className="muted">{props.account?.game_account ?? "未填写账号"}</p>
+      <InventoryAccountSummary account={props.account} />
       {loading ? <Spin size="small" /> : (
         <FieldConfigContext.Provider value={config}>
-          <Form form={form} layout="vertical" onFinish={submit}>
+          <Form
+            form={form}
+            className="inventory-rebate-form"
+            layout="horizontal"
+            labelAlign="left"
+            labelCol={{ flex: "120px" }}
+            wrapperCol={{ flex: "auto" }}
+            onFinish={submit}
+          >
+            <p className="muted">关联业务订单创建后即可登记返点；后续买入、卖出或收款用于记录实际业务流水。</p>
             <CfgItem
               name="rebate_type"
               label="返点类型"
-              rules={[{ required: true, type: "array", min: 1, max: 1, message: "请选择一种返点类型" }]}
+              rules={[{ required: true, message: "请选择一种返点类型" }]}
             >
-              <Checkbox.Group
-                onChange={(values) => {
-                  const kind = values.slice(-1)[0] as RebateKind | undefined;
+              <Radio.Group
+                onChange={(event) => {
+                  const kind = event.target.value as RebateKind;
                   form.setFieldsValue({
-                    rebate_type: kind ? [kind] : [],
-                    base_amount: kind ? defaultBaseAmount(detail, kind) : "0",
+                    rebate_type: kind,
+                    base_amount: defaultBaseAmount(detail, kind),
                   });
                 }}
-                options={(["BUY", "SELL"] as RebateKind[]).map((kind) => ({
-                  value: kind,
-                  label: configurableLabel("REBATE_TYPE", kind, REBATE_KIND_LABEL),
-                  disabled: !availableKinds.includes(kind),
-                }))}
-              />
+              >
+                {(["BUY", "SELL"] as RebateKind[]).map((kind) => <Radio key={kind} value={kind} disabled={!availableKinds.includes(kind)}>{configurableLabel("REBATE_TYPE", kind, REBATE_KIND_LABEL)}</Radio>)}
+              </Radio.Group>
             </CfgItem>
-            {!availableKinds.length ? <p className="muted">当前账号没有可关联的回收或分销来源订单</p> : null}
+            {!availableKinds.length ? <p className="muted">当前账号没有可关联的业务订单</p> : null}
             <CfgItem
               name="base_amount"
               label="返点金额"

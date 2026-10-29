@@ -142,7 +142,7 @@ export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
   RESOLVED: "已核销",
 };
 
-/** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 全量对齐（79 项）。 */
+/** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 全量对齐（88 项）。 */
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
   POOL_CREATE: "新建资金池",
   POOL_UPDATE: "编辑资金池",
@@ -176,6 +176,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   DEPOSIT_CREATE: "登记押金占用",
   DEPOSIT_RELEASE: "释放押金",
   DEPOSIT_LOSS: "登记押金损失",
+  DEPOSIT_CANCEL: "取消押金",
   INSTALLMENT_CREATE: "新建分期合约",
   INSTALLMENT_CANCEL: "取消分期合约",
   INSTALLMENT_PAYMENT: "分期收款",
@@ -190,6 +191,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   REBATE_CREATE: "登记返点",
   REBATE_SETTLE: "返点结算",
   REBATE_REVERSE: "冲销返点",
+  REBATE_VOID: "作废返点",
   RECONCILIATION_CREATE: "登记对账",
   RECONCILIATION_RESOLVE: "处置对账差异",
   PERIOD_LOCK: "锁定账期",
@@ -219,6 +221,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   ATTACHMENT_DELETE: "删除附件",
   IMPORT_LAND: "导入落库",
   IMPORT_COMMIT: "确认导入批次",
+  IMPORT_REJECT: "驳回导入批次",
   IMPORT_MAP: "映射导入行",
   IMPORT_SKIP: "跳过导入行",
   IMPORT_MARK_UNLINKED: "标记单边划转",

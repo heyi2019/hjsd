@@ -1342,6 +1342,8 @@ def deliver(
     delivery_mode: str,
     delivered_on: date,
     note: str,
+    bound_phone: str | None = None,
+    bound_phone_owner: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     actor: str,
     user: CurrentUser | None = None,
@@ -1377,6 +1379,9 @@ def deliver(
         actor=actor,
         delivery_mode=delivery_mode,
         note=note,
+        bound_phone=bound_phone,
+        bound_phone_owner=bound_phone_owner,
+        form_extra=form_extra,
         user=user,
         allow_installment_delivery=True,
     )

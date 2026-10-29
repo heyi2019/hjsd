@@ -74,8 +74,15 @@ def _audit_value(value: Any) -> Any:
     return value
 
 
-def _validate_existing_account_context(order_type: str, account: Account) -> None:
-    """已建档账号必须带完整业务上下文，并只能挂到对应业务。"""
+def _validate_existing_account_context(
+    order_type: str,
+    account: Account,
+    *,
+    allow_consign_listing: bool = False,
+) -> None:
+    """普通业务订单必须匹配账号类型；库存寄售上架是已建单账号的独立操作。"""
+    if allow_consign_listing and order_type == "DG":
+        return
     expected = {
         "HS": (BusinessMode.SELF.value, InventoryType.RECOVERY.value),
         "TH": (BusinessMode.DISTRIBUTION.value, InventoryType.PICKUP.value),
@@ -365,7 +372,11 @@ def create_order(
             )
     if account_id is not None:
         account = stocks_service.get_account(session, account_id, user)
-        _validate_existing_account_context(definition.code, account)
+        _validate_existing_account_context(
+            definition.code,
+            account,
+            allow_consign_listing=(form_extra_scope or "").strip().upper() == "CONSIGN",
+        )
 
     _validate_participant_roles(
         definition.code, customer_roles, counterparty_roles

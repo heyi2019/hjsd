@@ -45,6 +45,9 @@ type PageProps = {
   initialTab?: BusinessCenterEntryTab;
   /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
   active?: boolean;
+  /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
+  focusCustomerId?: number;
+  focusCounterpartyId?: number;
 };
 const PAGES: Record<string, ComponentType<PageProps>> = {
   business: OrdersPage,
@@ -66,6 +69,11 @@ export function AppShell() {
   const segments = location.pathname.split("/").filter(Boolean);
   const rawActive = segments[0] ?? "dashboard";
   const active = navigation.some((e) => e.key === rawActive) ? rawActive : "dashboard";
+  const customerFocusParams = active === "customers" ? new URLSearchParams(location.search) : null;
+  const parsedCustomerFocusId = Number(customerFocusParams?.get("customer_id"));
+  const parsedCounterpartyFocusId = Number(customerFocusParams?.get("counterparty_id"));
+  const focusCustomerId = Number.isInteger(parsedCustomerFocusId) && parsedCustomerFocusId > 0 ? parsedCustomerFocusId : undefined;
+  const focusCounterpartyId = Number.isInteger(parsedCounterpartyFocusId) && parsedCounterpartyFocusId > 0 ? parsedCounterpartyFocusId : undefined;
   const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
   // 业务中心子页：URL 显式带子页则用它（并记忆）；否则恢复上次记忆，首次默认库存中心。
   const businessTab = active === "business" ? (rawBizTab ?? getStoredBizTab() ?? "inventory") : undefined;
@@ -265,6 +273,8 @@ export function AppShell() {
                         onNavigate={navigateTo}
                         initialTab={key === "business" ? businessTab : undefined}
                         active={isActive}
+                        focusCustomerId={key === "customers" ? focusCustomerId : undefined}
+                        focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}
                   </div>

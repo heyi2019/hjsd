@@ -1,9 +1,10 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CreateBusinessModal } from "./CreateBusinessModal";
 import { DfqOrderSection } from "./dfq/DfqOrderSection";
+import { DgOrderSection } from "./dg/DgOrderSection";
 import { FieldConfigContext } from "./ConfigurableField";
 import { Form } from "antd";
 import * as catalog from "../shared/api/catalog";
@@ -35,6 +36,10 @@ beforeEach(() => {
     { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
   ]);
   resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
+    { id: 2, username: "operator", display_name: "业务员", is_active: true },
+  ]);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
@@ -57,11 +62,91 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
+it.each(["HS", "TH", "DG", "DFQ"])("%s 建单提供换绑手机号字段", async (orderType) => {
+  await openTypedModal(orderType);
+  expect(screen.getByLabelText("换绑手机号")).toBeInTheDocument();
+});
+
+it.each([
+  ["HS", "回收负责人"],
+  ["TH", "提号负责人"],
+  ["DG", "代挂负责人"],
+  ["DFQ", "代分期负责人"],
+])("%s 在游戏账号信息登记%s", async (orderType, label) => {
+  await openTypedModal(orderType);
+  expect(screen.getByLabelText(label)).toBeInTheDocument();
+});
+
 it("回收和代分期均提供手机号绑定人这一核心账号字段", async () => {
   await openTypedModal("HS");
   expect(screen.getByLabelText("手机号绑定人")).toBeInTheDocument();
   await openTypedModal("DFQ");
   expect((await screen.findAllByLabelText("手机号绑定人")).length).toBeGreaterThan(0);
+});
+
+it("回收建单将平台与交付条件集中展示在交付信息", async () => {
+  await openTypedModal("HS");
+
+  const deliverySection = (await screen.findByText("交付信息")).closest("section");
+  expect(deliverySection).not.toBeNull();
+  expect(within(deliverySection as HTMLElement).getByLabelText("交易平台")).toBeInTheDocument();
+  expect(within(deliverySection as HTMLElement).getByLabelText("中介类型")).toBeInTheDocument();
+  expect(within(deliverySection as HTMLElement).getByLabelText("包赔类型")).toBeInTheDocument();
+});
+
+it("交付信息默认勾选当前员工，并允许追加多位交付负责人", async () => {
+  await openTypedModal("HS");
+
+  const deliverySection = (await screen.findByText("交付信息")).closest("section") as HTMLElement;
+  const responsible = within(deliverySection).getByLabelText("交付负责人");
+  expect(responsible).toBeInTheDocument();
+  await waitFor(() => expect(within(deliverySection).getByText(/系统管理员/)).toBeInTheDocument());
+  await ui.click(responsible.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+  await ui.click(await screen.findByText(/业务员（operator）/, { selector: ".ant-select-item-option-content" }));
+  expect(within(deliverySection).getByText(/业务员（operator）/)).toBeInTheDocument();
+});
+
+it("回收建单在资金信息后展示交付信息", async () => {
+  const { container } = await openTypedModal("HS");
+  const content = container.textContent ?? "";
+
+  expect(content.indexOf("游戏账号信息")).toBeLessThan(content.indexOf("资金明细"));
+  expect(content.indexOf("资金明细")).toBeLessThan(content.indexOf("交付信息"));
+  expect(content.indexOf("交付信息")).toBeLessThan(content.indexOf("客户信息"));
+});
+
+it("回收建单将支出账户紧跟账号号价，不再展示独立资金流水", async () => {
+  const { container } = await openTypedModal("HS");
+  const content = container.textContent ?? "";
+  expect(screen.getByText("资金明细", { exact: true })).toBeInTheDocument();
+  expect(screen.queryByText("资金流水", { exact: true })).toBeNull();
+  expect(screen.getByLabelText("支出账户")).toBeInTheDocument();
+  expect(content.indexOf("资金明细")).toBeLessThan(content.indexOf("交付信息"));
+});
+
+it("代分期将分期计划放在参与方信息之后", async () => {
+  const { container } = await openTypedModal("DFQ");
+  const content = container.textContent ?? "";
+
+  expect(content.indexOf("借款与分期信息")).toBeLessThan(content.indexOf("付款信息"));
+  expect(content.indexOf("付款信息")).toBeLessThan(content.indexOf("交付信息"));
+  expect(content.indexOf("交付信息")).toBeLessThan(content.indexOf("分期客户"));
+  expect(content.indexOf("分期客户")).toBeLessThan(content.indexOf("分期计划"));
+  expect(content.indexOf("分期计划")).toBeLessThan(content.indexOf("补充信息"));
+});
+
+it("代挂建单在交付信息前展示业务信息", () => {
+  renderLight(
+    <Form>
+      <FieldConfigContext.Provider value={{
+        dg_business_note: { id: 401, order_type_code: "DG", field_key: "dg_business_note", label: "代挂方案", field_type: "TEXT", options: null, required: false, is_active: true, sort_order: 1, locked: false, is_custom: true, note: null, section: "BUSINESS" },
+      }}>
+        <DgOrderSection />
+      </FieldConfigContext.Provider>
+    </Form>,
+  );
+  const content = document.body.textContent ?? "";
+  expect(content.indexOf("代挂方案")).toBeLessThan(content.indexOf("交付信息"));
 });
 
 it("代分期的金额字段与账号备注读取表单字段配置", async () => {
@@ -151,7 +236,7 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(container.querySelector(".payment-info-fields .ant-select-selector") as Element);
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
@@ -177,7 +262,7 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(screen.getByLabelText("付款资金账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
@@ -187,26 +272,14 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     resolveRefresh();
   });
 
-it("设计费走 DESIGN 资金分类（不再落到 OTHER）", async () => {
-    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 11, order_no: "HS-2026-0011", status: "ACTIVE" });
+it("附加费用只保留中介费", async () => {
     await openModal();
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
-    await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
-    await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
-    await ui.type(screen.getByLabelText("手机号绑定人"), "张三");
-    await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
-    await ui.type(screen.getByLabelText("设计费"), "50");
-    await ui.type(screen.getByLabelText("客户昵称"), "张三");
-    await ui.type(screen.getByLabelText("客户来源"), "闲鱼");
-    await ui.click(screen.getByLabelText("付款资金账户").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
-    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
-    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
-    const costs = payload.initial_costs as Array<Record<string, unknown>>;
-    expect(costs).toEqual([expect.objectContaining({ amount: "50", flow_category: "DESIGN", note: "设计费" })]);
-    expect(payload.account_snapshot).toMatchObject({ bound_phone_owner: "张三" });
+    expect(screen.queryByLabelText("设计费")).toBeNull();
+  expect(screen.queryByLabelText("收款对象")).toBeNull();
+  expect(screen.queryByLabelText("其他")).toBeNull();
+  expect(screen.getByRole("button", { name: /增加支出/ })).toBeInTheDocument();
+  await ui.click(screen.getByRole("button", { name: /增加支出/ }));
+  expect(screen.getByLabelText("支出备注")).toBeInTheDocument();
   });
 
 it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 PermissionGate 决定）", async () => {

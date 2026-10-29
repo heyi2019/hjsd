@@ -62,6 +62,16 @@
   background: color-mix(in srgb, var(--color-primary) 5%, var(--glass)) !important;
 }
 
+/* 库存操作“更多”菜单与表格内的“更多”链接保持同一字号和品牌色。 */
+:where(.inventory-more-menu .ant-dropdown-menu-item, .inventory-more-menu .ant-dropdown-menu-title-content) {
+  font-size: var(--fs-14) !important;
+  color: var(--primary-ink) !important;
+}
+:where(.inventory-more-menu .ant-dropdown-menu-item-disabled) {
+  color: var(--primary-ink) !important;
+  opacity: 0.56;
+}
+
 /* 表头不折行（2026-09-20 用户裁决 A）。
    背景：antd 表头默认可折行（实测 computed 为 normal，且全仓无任何规则声明 th 的
    white-space），窄列（如「状态」「操作」）会被压成两行；而项目既有的

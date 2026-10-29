@@ -181,6 +181,8 @@ export function CfgItem(props: {
   rules?: Rule[];
   valuePropName?: string;
   tooltip?: ReactNode;
+  /** 固定展示名称：字段键与配置仍保留，避免历史配置的旧文案影响统一业务术语。 */
+  fixedLabel?: string;
   /** 字段下方的补充说明文案（antd Form.Item.extra）。 */
   extra?: ReactNode;
   /** 字段下方的校验/提示信息（antd Form.Item.help）。 */
@@ -195,7 +197,7 @@ export function CfgItem(props: {
   return (
     <Form.Item
       name={props.name}
-      label={props.hideLabel ? undefined : fieldLabel(cfg, props.name, props.label ?? "")}
+      label={props.hideLabel ? undefined : props.fixedLabel ?? fieldLabel(cfg, props.name, props.label ?? "")}
       rules={resolveRules(cfg, props.name, props.rules, condValues)}
       valuePropName={props.valuePropName}
       tooltip={props.tooltip}

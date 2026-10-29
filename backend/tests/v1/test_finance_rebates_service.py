@@ -195,14 +195,14 @@ def test_create_rebate_buy_allows_th(seeded_db):
     assert record.rebate_type == "BUY"
 
 
-def test_create_rebate_sell_requires_sell_event(seeded_db):
+def test_create_rebate_sell_allows_created_order_without_sell_event(seeded_db):
     order_id = _order_with_buy(seeded_db)  # HS 订单只有 BUY 事件
-    with pytest.raises(Validation, match="卖号返点必须关联已登记的 SELL"):
-        rebates.create_rebate(
-            seeded_db, source_order_id=order_id, rebate_type="SELL",
-            base_amount=Decimal("1000"), rate=Decimal("5"),
-            collected_on=TODAY, actor="pytest",
-        )
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="SELL",
+        base_amount=Decimal("1000"), rate=Decimal("5"),
+        collected_on=TODAY, actor="pytest",
+    )
+    assert record.rebate_type == "SELL"
 
 
 def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
@@ -216,17 +216,17 @@ def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
     assert record.rebate_type == "SELL"
 
 
-def test_create_rebate_sell_dfq_requires_payment_event(seeded_db):
-    """DFQ 代分期没有 SELL 事件，其卖动作凭证为 PAYMENT。"""
+def test_create_rebate_sell_dfq_allows_created_order(seeded_db):
+    """DFQ 创建订单后即可登记卖号返点。"""
     order = orders_service.create_order(
         seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest",
     )
-    with pytest.raises(Validation, match="卖号返点必须关联已登记的 PAYMENT"):
-        rebates.create_rebate(
-            seeded_db, source_order_id=order.id, rebate_type="SELL",
-            base_amount=Decimal("1000"), rate=Decimal("5"),
-            collected_on=TODAY, actor="pytest",
-        )
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order.id, rebate_type="SELL",
+        base_amount=Decimal("1000"), rate=Decimal("5"),
+        collected_on=TODAY, actor="pytest",
+    )
+    assert record.rebate_type == "SELL"
 
 
 # ----------------------------------------------------- settle_rebate 订单不可见 (201-202)

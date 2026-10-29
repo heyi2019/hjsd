@@ -1,0 +1,22 @@
+.inventory-sale-cashflow,
+.inventory-sale-installment-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+.inventory-sale-cashflow__title,
+.inventory-sale-installment-fields > .muted { grid-column: 1 / -1; }
+/* 建单里的附加费用卡片是独立整行；售出弹窗也必须占满资金流水网格，
+   由卡片内部 AdaptiveFormGrid 决定 1/2/3/4 列，不能挤在外层的第一列。 */
+.inventory-sale-cashflow > .nested-form-section--card { grid-column: 1 / -1; }
+.inventory-sale-cashflow { margin-top: var(--space-4); padding: var(--space-4); border: var(--border-w) solid var(--glass-border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--glass) 66%, transparent); }
+.inventory-sale-cashflow__title { padding-bottom: var(--space-2); border-bottom: var(--border-w) solid var(--glass-border); color: var(--color-text-primary); font: var(--font-section); }
+.inventory-sale-cashflow .ant-form-item { margin-bottom: 0; min-width: 0; }
+.inventory-sale-installment-fields { grid-column: 1 / -1; }
+.inventory-sale-installment-fields .installment-schedule-list { grid-column: 1 / -1; }
+.ant-modal[data-recovery-layout="double"] .inventory-sale-cashflow,
+.ant-modal[data-recovery-layout="double"] .inventory-sale-installment-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ant-modal[data-recovery-layout="three"] .inventory-sale-cashflow,
+.ant-modal[data-recovery-layout="three"] .inventory-sale-installment-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ant-modal[data-recovery-layout="four"] .inventory-sale-cashflow,
+.ant-modal[data-recovery-layout="four"] .inventory-sale-installment-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }

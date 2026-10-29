@@ -83,3 +83,43 @@ it("业务分类明确分期归自营、代分期归分销", async () => {
   expect(screen.getByText(/客户向本方借款，按合约分期还款/)).toBeInTheDocument();
   expect(document.body.textContent).toContain("生成代分期业务订单号");
 });
+
+it("业务动作按账号生命周期、资金动作和账务动作分层", async () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  expect((await screen.findAllByText("创建订单", { exact: true })).length).toBe(2);
+  expect(await screen.findByText("买号入库", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("回收入库")).toBeInTheDocument();
+  expect(screen.getByText("提号入库")).toBeInTheDocument();
+  expect(screen.getByText("代挂入库")).toBeInTheDocument();
+  expect(screen.getByText("代分期入库")).toBeInTheDocument();
+  expect(screen.getByText("买号交付", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("卖号出库", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("卖号交付", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("资金动作", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("账务动作", { exact: true })).toBeInTheDocument();
+  expect(screen.queryByText("二级分类", { exact: true })).toBeNull();
+  expect(screen.queryByText("三级分类", { exact: true })).toBeNull();
+  expect(screen.queryByText("动作说明", { exact: true })).toBeNull();
+  expect(screen.getByText("自营", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("收入", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("支出", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("售出收款", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("退款收入", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("过账", { exact: true })).toBeInTheDocument();
+  expect(screen.getByText("冲销", { exact: true })).toBeInTheDocument();
+  expect(document.querySelectorAll(".business-dictionary__action-line").length).toBeGreaterThan(20);
+  expect(document.body.textContent).toContain("换绑手机号、手机号绑定人、交易平台或中介信息");
+  expect(screen.getAllByText("账号交付", { exact: true })).toHaveLength(2);
+  expect(document.body.textContent).toContain("全款、分期结清和代挂售出统一记录");
+  expect(document.body.textContent).toContain("记录订单创建审计事件");
+  expect(document.body.textContent).toContain("记录售出过账审计事件");
+  expect(document.body.textContent).toContain("每期收款归集到原售出订单及其分期合约");
+  expect(document.body.textContent).toContain("退款、押金等按实际方向登记");
+  expect(document.body.textContent).toContain("手续费另记支出");
+  expect(document.body.textContent).toContain("登记平台费、中介费等附加费用");
+  expect(document.body.textContent).toContain("登记退给客户或其他收款方的退款");
+  expect(document.body.textContent).toContain("记录交付登记审计事件");
+  expect(document.body.textContent).toContain("记录取消订单审计事件");
+  expect(document.body.textContent).toContain("退款支出");
+});

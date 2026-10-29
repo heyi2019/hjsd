@@ -157,12 +157,25 @@ function ContractTable({
           delivery_mode: values.delivery_mode as string,
           delivered_on: values.delivered_on as string,
           note: values.note as string,
+          bound_phone: values.bound_phone ? String(values.bound_phone) : undefined,
+          bound_phone_owner: values.bound_phone_owner ? String(values.bound_phone_owner) : undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("已完成交付，不新增现金流");
         setDeliverTarget(null);
         deliverForm.resetFields();
         await load();
+    });
+  };
+
+  const openDeliver = (row: Installment) => {
+    const order = orders.find((item) => item.id === row.order_id);
+    deliverForm.resetFields();
+    setDeliverTarget(row);
+    deliverForm.setFieldsValue({
+      delivered_on: today(),
+      bound_phone: order?.account_snapshot?.bound_phone ?? undefined,
+      bound_phone_owner: order?.account_snapshot?.bound_phone_owner ?? undefined,
     });
   };
 
@@ -372,7 +385,7 @@ function ContractTable({
             size="small"
             type="primary"
             disabled={row.status !== "SETTLED"}
-            onClick={() => { deliverForm.resetFields(); setDeliverTarget(row); deliverForm.setFieldsValue({ delivered_on: today() }); }}
+            onClick={() => openDeliver(row)}
           >
             换绑交付
           </PermissionButton>
@@ -531,7 +544,7 @@ function ContractTable({
             dispositions={dispositions}
             settlePermission={settlePermission}
             onPay={(row) => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
-            onDeliver={(row) => { deliverForm.resetFields(); setDeliverTarget(row); deliverForm.setFieldsValue({ delivered_on: today() }); }}
+            onDeliver={openDeliver}
             onRecover={(row) => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
             onRefund={(row) => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
             onSettle={(row) => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
@@ -681,6 +694,12 @@ function ContractTable({
           <Form form={deliverForm} layout="vertical" onFinish={submitDeliver}>
           <CfgItem name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
             <Select />
+          </CfgItem>
+          <CfgItem name="bound_phone" label="换绑手机号">
+            <Input placeholder="可选填，默认带出建单信息" />
+          </CfgItem>
+          <CfgItem name="bound_phone_owner" label="手机号绑定人">
+            <Input placeholder="可选填，默认带出建单信息" />
           </CfgItem>
           <CfgItem name="delivered_on" label="换绑日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />

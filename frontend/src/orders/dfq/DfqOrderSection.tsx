@@ -1,10 +1,12 @@
-import { appMessage, appModal } from "../../shared/ui/appFeedback";
-import { DatePicker, Form, Input, Modal } from "antd";
+import { appMessage } from "../../shared/ui/appFeedback";
+import { Form, Input, Modal } from "antd";
 import { useEffect, useRef } from "react";
-import type { GameTypeOption, Pool } from "../../shared/api/catalog";
+import type { EmployeeOption, GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CfgItem, CfgNestedItem, CustomFieldSection } from "../ConfigurableField";
+import { InstallmentScheduleFields } from "../InstallmentScheduleFields";
+import { CustomerSourceFields } from "../CustomerSourceInput";
 import "./DfqOrderSection.css";
 
 function DfqInstallmentInfo() {
@@ -81,34 +83,15 @@ function DfqInstallmentInfo() {
   );
 }
 
-export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[] }) {
+export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {
   const form = Form.useFormInstance();
 
   return (
     <>
-      <RecoveryAccountSection accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />} gameTypes={props.gameTypes}>
+      <RecoveryAccountSection accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />} gameTypes={props.gameTypes} employees={props.employees} businessResponsibleLabel="代分期负责人">
         <NestedFormSection className="nested-form-section--card dfq-section" title="借款与分期信息" description="登记客户首付款、借款本金及后续分期还款">
           <DfqInstallmentInfo />
           <CustomFieldSection section="BUSINESS" testIdSuffix="business" />
-        </NestedFormSection>
-        <NestedFormSection className="nested-form-section--card dfq-section" title="分期计划" description="每期到期日可单独自定义">
-          <Form.List name="dfq_schedule" initialValue={[{}]}>
-            {(fields, { add, remove }) => (
-              <div className="dfq-schedule-list">
-                {fields.map((field, index) => (
-                  <div className="dfq-schedule-row" key={field.key}>
-                    <span className="dfq-schedule-row__period">第 {index + 1} 期</span>
-                    <Form.Item name={[field.name, "due_on"]} label="到期日" rules={[{ required: true, message: "请选择到期日" }]}><DatePicker placeholder="请选择日期" /></Form.Item>
-                    {fields.length > 1 && <button type="button" className="dfq-schedule-row__remove" onClick={() => {
-                      if (form.getFieldValue(["dfq_schedule", field.name, "due_on"])) appModal.confirm({ title: "删除已填写的期次？", okText: "删除", cancelText: "取消", onOk: () => remove(field.name) });
-                      else remove(field.name);
-                    }}>删除</button>}
-                  </div>
-                ))}
-                <button type="button" className="dfq-schedule-list__add" onClick={() => add({})}>+ 添加期次</button>
-              </div>
-            )}
-          </Form.List>
         </NestedFormSection>
         <NestedFormSection className="nested-form-section--card dfq-section" title="付款信息">
           <AdaptiveFormGrid>
@@ -123,7 +106,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
       <section className="dfq-customer-section recovery-customer-fields" aria-labelledby="dfq-customer-info-title">
         <div id="dfq-customer-info-title" className="recovery-customer-fields__title">分期客户</div>
         <CfgItem className="recovery-order-modal__party-field" name="customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
-        <CfgItem className="recovery-order-modal__party-field" name="customer_source" label="客户来源"><Input placeholder="可选填，如：转介绍 / 抖音 / 老客户" /></CfgItem>
+        <CustomerSourceFields name="customer_source" otherName="customer_source_other" />
         <div className="recovery-customer-contacts">
           <div className="recovery-customer-contacts__title">联系方式</div>
           <CfgNestedItem className="recovery-fee-field" name="customer_contact_name" label="姓名"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
@@ -131,9 +114,14 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
           <CfgNestedItem className="recovery-fee-field" name="customer_wechat" label="微信号"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
           <CfgNestedItem className="recovery-fee-field" name="customer_qq" label="QQ"><Input className="recovery-fee-control" placeholder="可选填" /></CfgNestedItem>
         </div>
-        <CfgItem className="recovery-order-modal__note-field" name="note" label="分期备注"><Input.TextArea rows={2} placeholder="可选填" /></CfgItem>
         <CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />
       </section>
+      <NestedFormSection className="nested-form-section--card dfq-section" title="分期计划" description="每期到期日可单独自定义">
+        <InstallmentScheduleFields name="dfq_schedule" />
+      </NestedFormSection>
+      <NestedFormSection className="nested-form-section--card dfq-section" title="补充信息">
+        <CfgItem className="recovery-order-modal__note-field" name="note" label="分期备注"><Input.TextArea rows={2} placeholder="可选填" /></CfgItem>
+      </NestedFormSection>
     </>
   );
 }

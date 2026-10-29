@@ -3,7 +3,10 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
+import type { EmployeeOption } from "../../shared/api/catalog";
 import { CfgItem } from "../ConfigurableField";
+import { DeliveryInfoSection } from "../DeliveryInfoSection";
+import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import "./RecoveryAccountSection.css";
 
 /** 新建业务（回收/提号/代挂/代分期）的游戏账号资料区。只负责字段，不处理提交和接口。
@@ -22,6 +25,9 @@ export function RecoveryAccountSection(props: {
   }>;
   accountExtras?: ReactNode;
   gameTypes?: GameTypeOption[];
+  employees?: EmployeeOption[];
+  businessResponsibleLabel?: string;
+  showIntermediaryDelivery?: boolean;
 }) {
   const fieldNames = {
     gameType: "game_type",
@@ -86,20 +92,16 @@ export function RecoveryAccountSection(props: {
           <Input placeholder="例如：安卓一区／微信" />
         )}
       </CfgItem>
-      <CfgItem name={fieldNames.boundPhone} label="绑定手机号">
-        <Input placeholder="可选填" />
-      </CfgItem>
-      <CfgItem name={fieldNames.boundPhoneOwner} label="手机号绑定人" alwaysActive>
-        <Input placeholder="可选填" />
-      </CfgItem>
       <CfgItem name={fieldNames.hasSecondary} label="有无二次">
         <Select />
       </CfgItem>
+      {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} /> : null}
       <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">
         <Input placeholder="可选填" />
       </CfgItem>
       {props.accountExtras}
       {props.children}
+      <DeliveryInfoSection showIntermediary={props.showIntermediaryDelivery} employees={props.employees} />
     </section>
   );
 }

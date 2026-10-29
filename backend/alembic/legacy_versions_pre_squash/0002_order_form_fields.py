@@ -30,7 +30,7 @@ _ACCOUNT_FIELDS = [
     ("game_account", "游戏账号", "TEXT", True, True, 20),
     ("game_password", "账号密码", "TEXT", True, True, 30),
     ("channel_region", "渠道／区服", "TEXT", True, True, 40),
-    ("bound_phone", "绑定手机号", "TEXT", False, False, 50),
+    ("bound_phone", "换绑手机号", "TEXT", False, False, 50),
     ("has_secondary", "有无二次", "SELECT", False, False, 60),
     ("game_account_note", "账号备注", "TEXT", False, False, 70),
 ]
@@ -89,7 +89,7 @@ SEED: dict[str, list[tuple[str, str, str, bool, bool, int]]] = {
         ("dfq_game_account", "游戏账号", "TEXT", True, True, 20),
         ("dfq_game_password", "账号密码", "TEXT", True, True, 30),
         ("dfq_channel_region", "渠道／区服", "TEXT", True, True, 40),
-        ("dfq_bound_phone", "绑定手机号", "TEXT", False, False, 50),
+        ("dfq_bound_phone", "换绑手机号", "TEXT", False, False, 50),
         ("dfq_has_secondary", "有无二次", "SELECT", False, False, 60),
         ("dfq_account_note", "账号备注", "TEXT", False, False, 70),
         ("dfq_purchase_price", "账号号价", "NUMBER", True, True, 110),

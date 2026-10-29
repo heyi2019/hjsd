@@ -150,17 +150,24 @@ function eventDate(detail: AccountExecutionDetail | undefined, eventType: string
 }
 
 function platformListingDate(detail: AccountExecutionDetail | undefined): string {
-  const order = detail?.orders.find((item) => item.order_type === "DG");
-  return dateTimeMinute(order?.created_at ?? order?.trade_date);
+  const dates = detail?.orders
+    .filter((item) => item.order_type === "DG")
+    .map((order) => dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""))) ?? [];
+  return dates.length ? dates.join("\n") : "-";
 }
 
 function consignmentPlatforms(detail: AccountExecutionDetail | undefined): string {
   const names = detail?.orders
     .filter((order) => order.order_type === "DG")
-    .flatMap((order) => (order.counterparties ?? [])
-      .filter((counterparty) => counterparty.role === "PLATFORM")
-      .map((counterparty) => counterparty.display_name));
-  return names?.length ? names.join("、") : "-";
+    .flatMap((order) => {
+      const configuredPlatform = order.extra_values?.consignment_platform;
+      return configuredPlatform
+        ? [String(configuredPlatform)]
+        : (order.counterparties ?? [])
+          .filter((counterparty) => counterparty.role === "PLATFORM")
+          .map((counterparty) => counterparty.display_name);
+    });
+  return names?.length ? names.join("\n") : "-";
 }
 
 function estimatedRebateAmount(baseAmount: string, rate: string): string {

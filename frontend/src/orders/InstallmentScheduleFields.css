@@ -1,0 +1,5 @@
+.installment-schedule-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-3); width: 100%; }
+.installment-schedule-row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.installment-schedule-row .form-field { flex: 1 1 auto; align-items: center; }
+.installment-schedule-row .form-field__label { align-self: center; display: flex; align-items: center; }
+@media (max-width: 640px) { .installment-schedule-list { grid-template-columns: 1fr; } }

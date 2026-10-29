@@ -32,15 +32,14 @@ type InventoryDetailMeta = {
   orderNo: string;
   recoveryPlatform: string;
   salePlatform: string;
-  orderParties: string;
+  orderParties: ReactNode;
   orderNotes: string;
   orderExtras: Array<{ key: string; label: string; value: string; section: string }>;
   createdBy: string;
   registeredAt: string;
   soldAt: string;
   removedAt: string;
-  consignmentAt: string;
-  consignmentPlatform: string;
+  consignmentSummary: string;
   password: string;
   channelRegion: string;
   boundPhone: string;
@@ -49,6 +48,13 @@ type InventoryDetailMeta = {
   accountDescription: string;
   accountImages: string[];
   note: string;
+};
+
+export type InventoryPartyLink = {
+  id: number;
+  display_name: string;
+  role: string;
+  entityType: "customer" | "counterparty";
 };
 
 type InventoryDetailViewProps = {
@@ -206,11 +212,10 @@ export function InventoryDetailView({
     { key: "createdBy", label: "建档操作人", value: meta.createdBy },
     { key: "registeredAt", label: "登记时间", value: meta.registeredAt, className: "inventory-detail__datetime" },
     { key: "recoveryPlatform", label: "回收平台", value: meta.recoveryPlatform },
+    { key: "consignmentSummary", label: "寄售平台 / 寄售时间", value: meta.consignmentSummary, className: "inventory-detail__datetime inventory-detail__multiline" },
+    { key: "removedAt", label: "下架时间", value: meta.removedAt, className: "inventory-detail__datetime" },
     { key: "soldAt", label: "出售时间", value: meta.soldAt, className: "inventory-detail__datetime" },
     { key: "salePlatform", label: "售出平台", value: meta.salePlatform },
-    { key: "removedAt", label: "下架时间", value: meta.removedAt, className: "inventory-detail__datetime" },
-    { key: "consignmentAt", label: "寄售时间", value: meta.consignmentAt, className: "inventory-detail__datetime" },
-    { key: "consignmentPlatform", label: "寄售平台", value: meta.consignmentPlatform },
   ];
   const supplementalFields: InventoryDetailField[] = [
     { key: "password", label: "账号密码", value: meta.password === "-" ? meta.password : <Typography.Text copyable>{meta.password}</Typography.Text> },
@@ -228,7 +233,7 @@ export function InventoryDetailView({
     { key: "note", label: "备注", value: meta.note },
   ];
   const orderSupplementFields: InventoryDetailField[] = [
-    ...(meta.orderNotes !== "-" ? [{ key: "orderNotes", label: "订单备注", value: meta.orderNotes }] : []),
+    ...(meta.orderNotes !== "-" ? [{ key: "orderNotes", label: "订单备注", value: meta.orderNotes, className: "inventory-detail__multiline" }] : []),
     ...meta.orderExtras
       .filter((field) => field.section === "EXTRA")
       .map((field) => ({ key: `order-extra-${field.key}`, label: field.label, value: field.value })),
@@ -241,12 +246,12 @@ export function InventoryDetailView({
   const financeExtraFields = extraFieldsBySection("FINANCE");
   const participantExtraFields = [
     ...extraFieldsBySection("PARTICIPANT"),
-    ...(meta.orderParties !== "-" ? [{ key: "orderParties", label: "参与方", value: meta.orderParties }] : []),
+    ...(meta.orderParties !== "-" ? [{ key: "orderParties", label: "参与方", value: meta.orderParties, className: "inventory-detail__multiline" }] : []),
   ];
   const renderExtraGroup = (section: string, fields: InventoryDetailField[]) => fields.length ? (
     <div className="inventory-detail__meta-group" key={section}>
       <div className="inventory-detail__meta-group-title">{ORDER_FIELD_SECTION_LABEL[section] ?? section}</div>
-      <Descriptions size="small" bordered column={4}>
+      <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
         {fields.map((field) => <Descriptions.Item key={field.key} label={field.label}>{field.value}</Descriptions.Item>)}
       </Descriptions>
     </div>
@@ -259,14 +264,14 @@ export function InventoryDetailView({
         <div className="inventory-detail__meta">
           <div className="inventory-detail__meta-group">
             <div className="inventory-detail__meta-group-title">登记与流转信息</div>
-            <Descriptions size="small" bordered column={4}>
+            <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
               {registrationFields.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>{field.value}</Descriptions.Item>)}
             </Descriptions>
           </div>
           {orderSupplementFields.length ? <div className="inventory-detail__meta-group">
             <div className="inventory-detail__meta-group-title">其他补充信息</div>
-            <Descriptions size="small" bordered column={4}>
-              {orderSupplementFields.map((field) => <Descriptions.Item key={field.key} label={field.label}>{field.value}</Descriptions.Item>)}
+            <Descriptions className="inventory-detail__meta-table inventory-detail__order-supplement" size="small" bordered column={1}>
+              {orderSupplementFields.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>{field.value}</Descriptions.Item>)}
             </Descriptions>
           </div> : null}
           {renderExtraGroup("ACCOUNT_PRODUCT", accountProductExtraFields)}
@@ -274,7 +279,7 @@ export function InventoryDetailView({
           {renderExtraGroup("PARTICIPANT", participantExtraFields)}
       {!editing ? <div className="inventory-detail__meta-group">
             <div className="inventory-detail__meta-group-title">账号补充资料</div>
-            <Descriptions className="inventory-detail__long-meta" size="small" bordered column={4}>
+            <Descriptions className="inventory-detail__meta-table inventory-detail__long-meta" size="small" bordered column={4}>
               {supplementalFields.map((field) => {
                 const fullRow = ["description", "images", "note"].includes(field.key);
                 return <Descriptions.Item key={field.key} label={field.label} span={fullRow ? 4 : 1}>{field.value}</Descriptions.Item>;

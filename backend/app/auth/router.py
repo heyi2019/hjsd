@@ -10,7 +10,7 @@ from app.core.errors import AuthError, PermissionDenied, RateLimited
 from app.core.ratelimit import login_limiter
 from app.core.schemas import RequestModel
 from app.core.security import (
-    CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
+    PERM_ORDER_CREATE, CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
 )
 from app.core.settings import get_settings
 from app.domain.users import Team, User
@@ -204,6 +204,14 @@ def logout(authorization: str | None = Header(default=None, alias="Authorization
 def list_users(actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[PublicUserOut]:
     _admin(actor)
     return [_public(item) for item in db.scalars(select(User).order_by(User.id)).all()]
+
+
+@admin_router.get("/options", response_model=list[PublicUserOut])
+def list_employee_options(actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[PublicUserOut]:
+    """建单交付负责人选择器：允许可建单员工读取在职员工花名册。"""
+    if not actor.has(PERM_ORDER_CREATE):
+        raise PermissionDenied("无权选择交付负责人")
+    return [_public(item) for item in db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all()]
 
 
 @admin_router.post("", response_model=PublicUserOut, status_code=201)

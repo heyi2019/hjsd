@@ -1,10 +1,9 @@
 import { Form } from "antd";
 import type { Pool } from "../../shared/api/catalog";
 import type { ReactNode } from "react";
-import { MoneyInput } from "../../shared/ui";
+import { MoneyInput, Select } from "../../shared/ui";
 import { CfgItem } from "../ConfigurableField";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
-import { PaymentInfoSection } from "../PaymentInfoSection";
 import "../recovery/RecoveryFeeSection.css";
 import "./ThFeeSection.css";
 
@@ -12,16 +11,16 @@ import "./ThFeeSection.css";
 export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }) {
   const purchaseAmount = Form.useWatch("th_purchase_amount");
   const intermediaryFee = Form.useWatch("intermediary_fee");
-  const otherFeeAmount = Form.useWatch("other_fee_amount");
-  const totalCost = [purchaseAmount, intermediaryFee, otherFeeAmount]
+  const expenseItems = Form.useWatch("expense_items") as Array<{ amount?: number }> | undefined;
+  const totalCost = [purchaseAmount, intermediaryFee, ...(expenseItems ?? []).map((item) => item.amount)]
     .reduce((total, value) => total + (Number(value) || 0), 0);
 
   return (
     <section className="recovery-fee-section recovery-fees th-fees" aria-labelledby="th-fees-title">
       <div className="recovery-fees__heading">
         <div>
-          <div id="th-fees-title" className="recovery-fees__title">费用明细</div>
-          <div className="recovery-fees__hint">只填写实际发生的费用，系统自动汇总付款金额</div>
+          <div id="th-fees-title" className="recovery-fees__title">资金明细</div>
+          <div className="recovery-fees__hint">填写账号价格、预计收款与实际发生的附加费用</div>
         </div>
       </div>
       <div className="recovery-fee-card recovery-fee-card--primary th-fee-primary">
@@ -32,15 +31,19 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
           </CfgItem>
         </div>
         <div className="th-fee-primary__field">
+          <label className="recovery-fee-card__label" htmlFor="payment_pool_id"><span className="form-field__required-mark" aria-hidden="true">*</span>支出账户</label>
+          <CfgItem alwaysActive name="payment_pool_id" hideLabel rules={[{ required: true, message: "请选择支出账户" }]}>
+            <Select placeholder="请选择支出账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
+          </CfgItem>
+        </div>
+        <div className="th-fee-primary__field">
           <div className="recovery-fee-card__label"><span className="form-field__required-mark" aria-hidden="true">*</span>预计收买家</div>
           <CfgItem alwaysActive name="th_receive_amount" hideLabel rules={[{ required: true, message: "请输入预计收买家金额" }]}>
             <MoneyInput placeholder="请输入金额" />
           </CfgItem>
         </div>
-        <div className="recovery-fee-card__desc">实际支付给供货方的账号基础价格，不含附加费用</div>
       </div>
-      <AdditionalFeeFields />
-      <PaymentInfoSection pools={props.pools} recipientDefault="供货方" recipientPlaceholder="供货方" />
+      <AdditionalFeeFields pools={props.pools} />
       {props.financeExtras}
       <div className="recovery-fees__total">
         <span>总成本（含全部附加费用）</span>

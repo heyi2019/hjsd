@@ -35,6 +35,7 @@
 .inventory-detail__meta .ant-descriptions-view { overflow: hidden; }
 .inventory-detail__meta-group + .inventory-detail__meta-group { margin-top: var(--space-3); }
 .inventory-detail__meta-group-title { padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); background: var(--soft); font: var(--font-caption-2); font-weight: 650; }
+.inventory-detail__meta-table { margin: var(--space-3); }
 .inventory-detail .ui-table-wrap,
 .inventory-detail .ant-table-wrapper {
   width: 100%;
@@ -70,6 +71,8 @@
 .inventory-detail .ant-descriptions-view > table col { width: auto !important; }
 .inventory-detail .ant-descriptions-item-label.inventory-detail__datetime,
 .inventory-detail .ant-descriptions-item-content.inventory-detail__datetime { width: auto; max-width: none; }
+.inventory-detail .ant-descriptions-item-label.inventory-detail__multiline,
+.inventory-detail .ant-descriptions-item-content.inventory-detail__multiline { white-space: pre-line; }
 .inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label { background: var(--soft); }
 .inventory-detail .ant-descriptions-bordered .ant-descriptions-row { border-color: var(--color-border); }
 .inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label,

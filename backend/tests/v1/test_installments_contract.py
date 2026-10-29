@@ -1189,11 +1189,27 @@ class TestInstallmentsApi:
                 "delivery_mode": "PLATFORM_OPERATOR",
                 "delivered_on": TODAY.isoformat(),
                 "note": "平台操作换绑凭证",
+                "bound_phone": "13800000000",
+                "bound_phone_owner": "张三",
             },
             headers=headers,
         )
         assert response.status_code == 200, response.text
         assert response.json()["status"] == InstallmentStatus.DELIVERED.value
+        seeded_db.refresh(order)
+        # 该测试订单没有账号快照；换绑字段仍以交付事件关联保存。
+        assert order.account_snapshot is None
+        event = seeded_db.scalar(
+            select(OrderEvent).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.DELIVER.value,
+            )
+        )
+        assert event is not None
+        assert event.form_extra == {
+            "bound_phone": "13800000000",
+            "bound_phone_owner": "张三",
+        }
 
     def test_settle_early_and_default_endpoints(
         self, seeded_client, seeded_db, headers

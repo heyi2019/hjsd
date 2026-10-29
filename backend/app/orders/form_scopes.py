@@ -1,7 +1,7 @@
 """orders.form_scopes：表单作用域注册表（全站单一事实源）。
 
 设置页「表单字段」的作用域清单由此定义，经 GET /order-form-fields/scopes 下发；
-前端 formScopes.ts 仅保留类型与降级兜底，不再维护第二份清单。
+前端只消费接口返回的作用域，不再维护第二份清单。
 每个作用域对应一个可配置字段的业务表单（弹窗/面板），种子字段见各迁移。
 """
 from __future__ import annotations

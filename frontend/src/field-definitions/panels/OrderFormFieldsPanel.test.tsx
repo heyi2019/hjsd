@@ -8,7 +8,6 @@ vi.mock("../../shared/api/catalog");
 import * as client from "../../shared/api/client";
 import { renderLight } from "../../test/render";
 import { OrderFormFieldsPanel } from "./OrderFormFieldsPanel";
-import { FORM_SCOPES_FALLBACK } from "../formScopes";
 
 vi.mock("../../shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/api/client")>()),
@@ -114,10 +113,6 @@ describe("OrderFormFieldsPanel", () => {
 
     expect(screen.getByText("CUSTOM_OPS")).toBeInTheDocument();
     expect(screen.getByText("自定义运营")).toBeInTheDocument();
-  });
-
-  it("不再提供已删除的资金池账户表单入口", () => {
-    expect(FORM_SCOPES_FALLBACK.map((scope) => scope.code)).not.toContain("POOLACCOUNT");
   });
 
   it("挂载时按当前业务类型拉取字段列表", async () => {
@@ -261,7 +256,9 @@ describe("OrderFormFieldsPanel", () => {
         field_key: `${fieldType.toLowerCase()}_field`,
         label: `${fieldType}编辑前`,
         field_type: fieldType,
-        options: fieldType === "SELECT" || fieldType === "MULTI_SELECT" ? ["A", "B"] : null,
+        options: fieldType === "SELECT" || fieldType === "MULTI_SELECT"
+          ? [{ value: "A", label: "A" }, { value: "B", label: "B" }]
+          : null,
       });
       vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([field]);
       renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -341,7 +338,7 @@ describe("OrderFormFieldsPanel", () => {
 describe("OrderFormFieldsPanel 条件必填", () => {
   it("列表展示条件必填描述", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
-      makeField({ id: 70, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: ["其他", "微信"] }),
+      makeField({ id: 70, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: [{ value: "其他", label: "其他" }, { value: "微信", label: "微信" }] }),
       makeField({
         id: 71,
         field_key: "customer_source_other",
@@ -359,7 +356,7 @@ describe("OrderFormFieldsPanel 条件必填", () => {
 
   it("保存条件必填时提交 required_when 并把 required 置为 false", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
-      makeField({ id: 80, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: ["其他", "微信"] }),
+      makeField({ id: 80, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: [{ value: "其他", label: "其他" }, { value: "微信", label: "微信" }] }),
       makeField({ id: 81, field_key: "other_source", label: "其他来源", required: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });

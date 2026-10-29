@@ -67,6 +67,7 @@ export function InventoryRebateModal(props: {
     if (!open || !props.account) return;
     let cancelled = false;
     setLoading(true);
+    setError(null);
     void stocksApi.executionDetail(props.account.id)
       .then(async (value) => {
         if (cancelled) return;
@@ -76,7 +77,6 @@ export function InventoryRebateModal(props: {
         const uniqueRebates = new Map<number, Rebate>();
         for (const rebate of rebateLists.flat()) uniqueRebates.set(rebate.id, rebate);
         setRebates([...uniqueRebates.values()]);
-        setError(null);
         const firstKind: RebateKind | undefined = sourceOrder(value, "BUY") ? "BUY" : sourceOrder(value, "SELL") ? "SELL" : undefined;
         form.setFieldsValue({
           rebate_type: firstKind,
@@ -97,7 +97,9 @@ export function InventoryRebateModal(props: {
 
   useEffect(() => {
     if (!open) return;
-    void employeesApi.list().then(setEmployees).catch(() => setEmployees([]));
+    void employeesApi.list()
+      .then(setEmployees)
+      .catch((cause) => setError(normalizeError(cause)));
   }, [open]);
 
   const availableKinds = useMemo(

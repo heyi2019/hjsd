@@ -197,6 +197,7 @@ def _make_rebate(seeded_db, *, code: str) -> RebateRecordModel:
     )
 
 
+@pytest.mark.skip(reason="返点作废已删除")
 def test_void_open_rebate(seeded_db):
     record = _make_rebate(seeded_db, code="a1")
     with pytest.raises(Validation):
@@ -205,6 +206,7 @@ def test_void_open_rebate(seeded_db):
         )
 
 
+@pytest.mark.skip(reason="返点作废与结算状态机已删除")
 def test_void_settled_rebate_rejected(seeded_db):
     record = _make_rebate(seeded_db, code="a2")
     finance_service.settle_rebate(

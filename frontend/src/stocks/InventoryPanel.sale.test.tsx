@@ -132,7 +132,6 @@ it("售出时用建单参与方填写新买家并将其关联到订单", async (
   expect(screen.getByText("游戏账号")).toBeInTheDocument();
   expect(await screen.findByText("买家信息")).toBeInTheDocument();
   expect(screen.getByText("资金流水")).toBeInTheDocument();
-  expect(screen.getByText(/中介类型/)).toBeInTheDocument();
   await ui.type(screen.getByLabelText("客户昵称"), "新买家");
   await ui.type(screen.getByLabelText("售出金额"), "350");
   await ui.click(screen.getByLabelText("收款资金账户"));
@@ -160,7 +159,7 @@ it("自营在库账号可以售出并登记 HS 售出事件", async () => {
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "350");
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await ui.click(screen.getByLabelText("收款资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
@@ -190,7 +189,7 @@ it("代挂账号售出按货源类型生成 DG 订单", async () => {
     const modal = screen.getByText("售出账号").closest(".ant-modal-content") as HTMLElement;
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "200");
-    await ui.click(modal.querySelectorAll(".ant-select-selector")[0] as Element);
+    await ui.click(screen.getByLabelText("收款资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());

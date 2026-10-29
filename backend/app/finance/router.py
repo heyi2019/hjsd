@@ -22,7 +22,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.finance import schemas, service
-from app.domain.trade import Deposit, Order, RebateRecord
+from app.domain.trade import Deposit, Order
 from app.orders import service as orders_service
 from app.parties import service as parties_service
 
@@ -140,12 +140,6 @@ def _deposit_out(item: Deposit) -> schemas.DepositOut:
 def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
     return schemas.RebateOut.model_validate(
         {**vars(item), "created_at": item.created_at, "operator": item.created_by, "operator_user_ids": item.operator_user_ids}
-    )
-
-
-def _settlement_out(item) -> schemas.SettlementOut:
-    return schemas.SettlementOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
     )
 
 
@@ -605,73 +599,6 @@ def delete_rebate(
 ) -> Response:
     service.delete_rebate(db, rebate_id, actor=_actor(user), user=user)
     return Response(status_code=204)
-
-
-def void_rebate(
-    rebate_id: int,
-    payload: schemas.RebateVoid,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> schemas.RebateOut:
-    """作废返点记录：仅零结算（OPEN）可作废；已有结算走结算冲销。"""
-    item = service.void_rebate(
-        db, rebate_id, reason=payload.reason, form_extra=payload.form_extra, actor=_actor(user), user=user
-    )
-    return _rebate_out(item)
-
-
-def settle_rebate(
-    rebate_id: int,
-    payload: schemas.SettlementCreate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> schemas.SettlementOut:
-    rebate = db.get(RebateRecord, rebate_id)
-    if rebate is None:
-        raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
-    orders_service.get_order(db, rebate.source_order_id, user)
-    item = service.settle_rebate(
-        db,
-        rebate_id,
-        gross_amount=payload.gross_amount,
-        settled_on=payload.settled_on,
-        pool_id=payload.pool_id,
-        actor=_actor(user),
-        platform_fee=payload.platform_fee,
-        note=payload.note,
-        form_extra=payload.form_extra,
-        user=user,
-    )
-    return _settlement_out(item)
-
-
-def list_rebate_settlements(
-    rebate_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = read_access,
-) -> list[schemas.SettlementOut]:
-    items = service.list_rebate_settlements(db, rebate_id, user=user)
-    return [_settlement_out(item) for item in items]
-
-
-def reverse_rebate_settlement(
-    rebate_id: int,
-    settlement_id: int,
-    payload: schemas.SettlementReverse,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> schemas.SettlementOut:
-    item = service.reverse_rebate_settlement(
-        db,
-        rebate_id,
-        settlement_id,
-        reversed_on=payload.reversed_on,
-        actor=_actor(user),
-        reason=payload.reason,
-        form_extra=payload.form_extra,
-        user=user,
-    )
-    return _settlement_out(item)
 
 
 __all__ = ["router"]

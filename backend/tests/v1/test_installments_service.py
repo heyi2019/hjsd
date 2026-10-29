@@ -123,10 +123,9 @@ def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, off
 
 
 def _dfq_overdue(seeded_db, game_account: str, **kwargs):
-    """DFQ 订单 + 逾期分期合约（账号先只存快照，回收时才物化库存账号）。"""
-    order = _order(seeded_db, order_type="DFQ")
-    order.account_snapshot = {"game_account": game_account, "game_type": "王者"}
-    seeded_db.flush()
+    """DFQ 订单 + 逾期分期合约（订单创建时即关联库存账号）。"""
+    account = _account(seeded_db, game_account)
+    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
     contract = _contract(seeded_db, order.id, **kwargs)
     contract.status = InstallmentStatus.OVERDUE.value
     seeded_db.flush()
@@ -184,19 +183,18 @@ def test_create_rejects_negative_final_period(seeded_db):
 
 
 # --------------------------------------------- DFQ 快照账号物化（回收前置）
-def test_materialize_dfq_recovery_account_requires_snapshot_account(seeded_db):
+def test_materialize_dfq_recovery_account_requires_inventory_account(seeded_db):
     order = _order(seeded_db, order_type="DFQ")
-    with pytest.raises(Validation, match="DFQ 分期缺少可回收的账号资料"):
+    with pytest.raises(Validation, match="DFQ 分期没有关联库存账号"):
         installment_service._materialize_dfq_recovery_account(
             seeded_db, order, actor="pytest"
         )  # 85-88
 
 
-def test_materialize_dfq_recovery_account_allows_repeat_purchase(seeded_db):
-    """2026-10-28 口径：game_account 不唯一——同号已存在时物化新建独立实体。"""
-    _account(seeded_db, "dup-recovery-account")
+def test_materialize_dfq_recovery_account_uses_order_inventory_account(seeded_db):
+    account = _account(seeded_db, "dfq-recovery-account")
     order = _order(seeded_db, order_type="DFQ")
-    order.account_snapshot = {"game_account": "dup-recovery-account"}
+    order.account_id = account.id
     seeded_db.flush()
     account = installment_service._materialize_dfq_recovery_account(
         seeded_db, order, actor="pytest"
@@ -204,7 +202,7 @@ def test_materialize_dfq_recovery_account_allows_repeat_purchase(seeded_db):
     assert order.account_id == account.id
     assert account.business_mode == "SELF"
     assert account.inventory_type == "RECOVERY"
-    assert account.game_account == "dup-recovery-account"
+    assert account.game_account == "dfq-recovery-account"
 
 
 # ------------------------------------------------------------- 取消：状态守卫
@@ -667,11 +665,11 @@ def test_record_sale_rejects_different_account(seeded_db):
 
 
 def test_record_sale_requires_prior_recovery(seeded_db):
-    """有账号但从未登记回收 → 不能出售（直接物化快照，跳过 RECOVER）。"""
+    """有库存账号但从未登记回收 → 不能出售。"""
+    account = _account(seeded_db, "resale-no-recover")
     order = _order(seeded_db, order_type="DFQ")
-    order.account_snapshot = {"game_account": "resale-no-recover"}
+    order.account_id = account.id
     seeded_db.flush()
-    installment_service._materialize_dfq_recovery_account(seeded_db, order, actor="pytest")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
@@ -868,16 +866,5 @@ def test_recover_rejects_dangling_account(seeded_db):
         )
 
 
-def test_record_resale_delegates_to_record_sale(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-legacy-alias")
-    sale = _sale_order(seeded_db, order.account_id)
-    disposition = installment_service.record_resale(
-        seeded_db,
-        contract.id,
-        resale_order_id=sale.id,
-        occurred_on=TODAY,
-        actor="pytest",
-        note="旧接口登记出售",
-    )
-    assert disposition.action == InstallmentDispositionAction.RESELL.value  # 1204
-    assert disposition.related_order_id == sale.id
+def test_record_sale_is_the_only_installment_resale_entrypoint():
+    assert not hasattr(installment_service, "record_resale")

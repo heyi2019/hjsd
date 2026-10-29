@@ -93,7 +93,7 @@ def _create_order(seeded_client, headers) -> dict:
         json={
             "order_type": "HS",
             "trade_date": D,
-            "game_account": f"form-extra-{D}",
+            "account_snapshot": {"game_account": f"form-extra-{D}"},
             "initial_buy": {"amount": "100", "occurred_on": D},
         },
         headers=headers,
@@ -124,7 +124,7 @@ def test_post_event_persists_form_extra(seeded_client, seeded_db, headers):
 def test_cancel_order_merges_form_extra_into_order(seeded_client, seeded_db, headers):
     response = seeded_client.post(
         "/api/v1/orders",
-        json={"order_type": "HS", "trade_date": D, "game_account": f"cancel-extra-{D}"},
+        json={"order_type": "HS", "trade_date": D, "account_snapshot": {"game_account": f"cancel-extra-{D}"}},
         headers=headers,
     )
     assert response.status_code == 201, response.text
@@ -143,7 +143,7 @@ def test_create_order_link_persists_form_extra(seeded_client, seeded_db, headers
     first = _create_order(seeded_client, headers)
     second = seeded_client.post(
         "/api/v1/orders",
-        json={"order_type": "HS", "trade_date": D, "game_account": f"link-extra-{D}"},
+        json={"order_type": "HS", "trade_date": D, "account_snapshot": {"game_account": f"link-extra-{D}"}},
         headers=headers,
     )
     assert second.status_code == 201, second.text

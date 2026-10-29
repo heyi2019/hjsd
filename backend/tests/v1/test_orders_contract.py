@@ -12,6 +12,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -35,9 +36,18 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
-from app.orders import service as order_service
+from app.orders import schemas, service as order_service
 
 D = date(2026, 10, 4)
+
+
+def test_order_create_uses_account_snapshot_as_the_only_account_input():
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        schemas.OrderCreate(
+            order_type="HS",
+            trade_date=D,
+            game_account="legacy-flat-account",
+        )
 
 
 def test_order_create_validates_active_custom_field_values(seeded_db):
@@ -103,7 +113,7 @@ def test_account_product_custom_values_follow_inline_inventory_account(seeded_db
 def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db, headers, order_type, inventory_type):
     payload = {
         "order_type": order_type, "trade_date": D.isoformat(),
-        "game_account": f"inline-api-{order_type}",
+        "account_snapshot": {"game_account": f"inline-api-{order_type}"},
     }
     if order_type != "DG":
         payload["initial_buy"] = {"amount": "100", "occurred_on": D.isoformat()}
@@ -124,7 +134,8 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
     monkeypatch.setattr(database, "get_session_factory", lambda: sessionmaker(bind=v1_engine))
     with TestClient(app) as client:
         response = client.post("/api/v1/orders", headers=headers, json={
-            "order_type": "HS", "trade_date": D.isoformat(), "game_account": "rollback-inline",
+            "order_type": "HS", "trade_date": D.isoformat(),
+            "account_snapshot": {"game_account": "rollback-inline"},
             "initial_buy": {"amount": "100", "occurred_on": D.isoformat()},
             "initial_costs": [{"amount": "0", "occurred_on": D.isoformat()}],
         })
@@ -906,17 +917,6 @@ class TestCreateOrderValidation:
         assert account.game_account == "th-snapshot-account"
         assert account.stock_no is not None
         assert order.account_snapshot == {"game_account": "th-snapshot-account"}
-
-    def test_th_rejects_snapshot_with_flat_fields(self, seeded_db):
-        with pytest.raises(Validation, match="不要与单独账号字段混用"):
-            order_service.create_order(
-                seeded_db,
-                order_type="TH",
-                trade_date=D,
-                actor="pytest",
-                account_snapshot={"game_account": "th-text-account"},
-                game_account="th-flat-account",
-            )
 
     def test_dfq_account_snapshot_rejects_unknown_fields(self, seeded_db):
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
@@ -1848,7 +1848,10 @@ class TestOrdersApi:
             headers=headers,
         )
         assert created.status_code == 422, created.text
-        assert "不要与单独账号字段混用" in created.json()["message"]
+        assert any(
+            error["field"] == "game_account"
+            for error in created.json()["details"]["errors"]
+        )
 
     def test_update_and_cancel_order_api(self, seeded_client, headers):
         created = seeded_client.post(

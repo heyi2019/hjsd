@@ -172,6 +172,13 @@ it("登记返点弹窗展示关联订单的返点明细", async () => {
   expect(screen.queryByText("未结算")).toBeNull();
 });
 
+it("操作人接口失败时显示错误，不伪造空操作人列表", async () => {
+  vi.mocked(catalog.employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
+  renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
+  expect(screen.getByLabelText("操作人")).toBeInTheDocument();
+});
+
 it("提号分销已登记 BUY 后可登记买号返点", async () => {
   resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[1],

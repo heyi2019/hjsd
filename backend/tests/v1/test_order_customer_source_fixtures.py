@@ -34,19 +34,19 @@ def _base_payload(order_type: str) -> dict:
     if order_type == "HS":
         return {
             **base,
-            "game_account": "r9-hs-account",
+            "account_snapshot": {"game_account": "r9-hs-account"},
             "initial_buy": {"amount": "100", "occurred_on": D.isoformat()},
             "initial_costs": [{"amount": "10", "occurred_on": D.isoformat(), "flow_category": "FEE"}],
         }
     if order_type == "TH":
         return {
             **base,
-            "game_account": "r9-th-account",
+            "account_snapshot": {"game_account": "r9-th-account"},
             "initial_buy": {"amount": "100", "occurred_on": D.isoformat()},
             "initial_costs": [{"amount": "10", "occurred_on": D.isoformat(), "flow_category": "FEE"}],
         }
     if order_type == "DG":
-        return {**base, "game_account": "r9-dg-account"}
+        return {**base, "account_snapshot": {"game_account": "r9-dg-account"}}
     # DFQ：代分期需 account_snapshot + 初始买入 + 分期合约
     return {
         **base,

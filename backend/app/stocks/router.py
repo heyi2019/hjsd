@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -42,7 +42,7 @@ from app.domain.trade import (
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.periods import assert_period_open
-from app.core.schemas import PageOut, normalize_product_aliases
+from app.core.schemas import PageOut
 from app.orders import service as orders_service
 
 router = APIRouter(tags=["ACC-01 账号台账"])
@@ -85,11 +85,6 @@ class AccountListOut(PageOut[AccountOut]):
 
 class AccountProfileUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-
-    @model_validator(mode="before")
-    @classmethod
-    def accept_product_aliases(cls, value: object) -> object:
-        return normalize_product_aliases(value)
 
     game_account: str | None = Field(default=None, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)

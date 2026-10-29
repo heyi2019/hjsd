@@ -60,12 +60,11 @@ export function RebatesPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, orderList] = await Promise.all([
+      const [list, orderList, employeeList] = await Promise.all([
         rebatesApi.list(),
         ordersApi.list(),
+        employeesApi.list(),
       ]);
-      // 操作人是录入辅助数据，加载失败不能阻断返点主列表。
-      const employeeList = await employeesApi.list().catch(() => [] as EmployeeOption[]);
       setRows(list);
       setOrders(orderList);
       setEmployees(employeeList);

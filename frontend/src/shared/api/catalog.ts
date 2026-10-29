@@ -482,7 +482,7 @@ export interface Installment {
   waived_amount?: string;
   final_period_adjustment?: string;
   /** 总应收：首付 + 每期 × 期数 + 末期调整 − 减免，由后端下发，前端不自行推导。 */
-  total_receivable?: string;
+  total_receivable: string;
   status: string;
   delivery_mode?: string | null;
   delivered_on?: string | null;
@@ -745,14 +745,6 @@ export const ordersApi = {
     account_id?: number;
     owner_id?: number;
     capital_type?: string;
-    game_type?: string;
-    game_account?: string;
-    game_password?: string;
-    channel_region?: string;
-    bound_phone?: string;
-    bound_phone_owner?: string;
-    has_secondary?: boolean;
-    account_note?: string;
     note?: string;
     /** 佣金口径：仅 DG 代挂单可用，两者必须同时填写或同时留空。 */
     commission_mode?: string;
@@ -969,14 +961,7 @@ export const cashflowsApi = {
     limit?: number;
     offset?: number;
   }) =>
-    // 兼容两种后端契约：分页对象 {items,total}（当前 main）与旧版裸数组，
-    // 避免任一形态下 result.items 为 undefined 引发 `.filter is not a function` 类整页崩溃。
-    api.get<{ items: Cashflow[]; total: number } | Cashflow[]>("/cashflows", { params }).then((r) => {
-      const data = r.data as unknown;
-      if (Array.isArray(data)) return { items: data as Cashflow[], total: (data as Cashflow[]).length };
-      const obj = data as { items?: Cashflow[]; total?: number };
-      return { items: obj.items ?? [], total: obj.total ?? 0 };
-    }),
+    api.get<{ items: Cashflow[]; total: number }>("/cashflows", { params }).then((r) => r.data),
 };
 
 export const rebatesApi = {
@@ -1019,7 +1004,7 @@ export interface OrderFormField {
   field_key: string;
   label: string;
   field_type: string;
-  options?: Array<string | { value: string; label: string }> | null;
+  options?: Array<{ value: string; label: string }> | null;
   flow_direction?: "IN" | "OUT" | null;
   required: boolean;
   /** 条件必填：与 required 互斥；为空即纯选填 */
@@ -1036,7 +1021,7 @@ export interface OrderFormField {
 
 /** 表单字段配置（按表单作用域码维度）；自定义字段即客户/订单的扩展字段定义。 */
 export const orderFormFieldsApi = {
-  /** 表单作用域注册表（后端单一事实源；前端仅作降级兜底）。 */
+  /** 表单作用域注册表（后端单一事实源）。 */
   scopes: () => api.get<FormScope[]>("/order-form-fields/scopes").then((r) => r.data),
   list: (orderTypeCode: string, includeInactive = true) =>
     api

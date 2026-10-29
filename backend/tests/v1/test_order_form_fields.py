@@ -123,7 +123,7 @@ def test_update_field_label_required_options(seeded_db):
         label="来源",
         actor="admin",
         field_type="SELECT",
-        options=["微信", "支付宝"],
+        options=[{"value": "微信", "label": "微信"}, {"value": "支付宝", "label": "支付宝"}],
     )
     seeded_db.commit()
 
@@ -199,7 +199,7 @@ def test_update_static_select_field_empty_options_still_rejected(seeded_db):
     """有静态选项的 SELECT 字段，清空选项提交仍被护栏拦截。"""
     created = ff.create_order_form_field(
         seeded_db, order_type_code="HS", field_key="static_sel", label="静态选择",
-        actor="admin", field_type="SELECT", options=["a", "b"],
+        actor="admin", field_type="SELECT", options=[{"value": "a", "label": "a"}, {"value": "b", "label": "b"}],
     )
     seeded_db.commit()
     with pytest.raises(Validation):
@@ -274,6 +274,14 @@ def test_field_type_validation(seeded_db):
         ff.create_order_form_field(
             seeded_db, order_type_code="HS", field_key="k3", label="K3", actor="admin",
             field_type="SELECT", options=["a", "a"],
+        )
+
+
+def test_select_options_require_value_label_objects(seeded_db):
+    with pytest.raises(Validation, match="字段选项须为对象"):
+        ff.create_order_form_field(
+            seeded_db, order_type_code="HS", field_key="object_options", label="对象选项",
+            actor="admin", field_type="SELECT", options=["微信"],
         )
 
 
@@ -548,7 +556,7 @@ def _seed_dependency(seeded_db, *, code: str = "HS", key: str = "src_pick") -> O
         label="来源选择",
         actor="admin",
         field_type="SELECT",
-        options=["其他", "微信"],
+        options=[{"value": "其他", "label": "其他"}, {"value": "微信", "label": "微信"}],
     )
     seeded_db.commit()
     return row
@@ -715,7 +723,7 @@ def _seed_conditional_pair(seeded_db) -> tuple[OrderFormField, OrderFormField]:
         label="来源X",
         actor="admin",
         field_type="SELECT",
-        options=["其他", "微信"],
+        options=[{"value": "其他", "label": "其他"}, {"value": "微信", "label": "微信"}],
     )
     cond = ff.create_order_form_field(
         seeded_db,
@@ -846,7 +854,8 @@ def test_rename_every_configurable_field_updates_references(seeded_db):
         required=False, is_custom=False,
     ))
     ff.create_order_form_field(seeded_db, order_type_code="HS", field_key="pay_method",
-        label="支付方式", actor="admin", field_type="SELECT", options=["微信", "支付宝"])
+        label="支付方式", actor="admin", field_type="SELECT",
+        options=[{"value": "微信", "label": "微信"}, {"value": "支付宝", "label": "支付宝"}])
     # 动态 MULTI_SELECT（options 为空，运行时由主数据填充）同样以 ORM 直接建
     seeded_db.add(OrderFormField(
         order_type_code="HS", field_key="custom_tag", label="自定义标签",

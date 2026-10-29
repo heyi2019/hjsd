@@ -62,11 +62,6 @@ class DepositCancel(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
-class RebateVoid(RequestModel):
-    reason: str = Field(min_length=1, max_length=2000)
-    form_extra: dict[str, Any] | None = None
-
-
 class DepositOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -260,40 +255,6 @@ class RebateOut(BaseModel):
     form_extra: dict[str, Any] | None = None
 
 
-class SettlementCreate(RequestModel):
-    gross_amount: Decimal
-    settled_on: date
-    pool_id: int
-    platform_fee: Decimal = Decimal("0")
-    note: str | None = None
-    form_extra: dict[str, Any] | None = None
-
-
-class SettlementOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    settlement_no: str
-    rebate_record_id: int
-    gross_amount: Decimal
-    platform_fee: Decimal
-    net_amount: Decimal
-    settled_on: date
-    cashflow_id: int | None = None
-    reversal_of_id: int | None = None
-    note: str | None = None
-    created_at: datetime
-    operator: str
-    form_extra: dict[str, Any] | None = None
-    form_extra: dict[str, Any] | None = None
-
-
-class SettlementReverse(RequestModel):
-    reversed_on: date
-    reason: str
-    form_extra: dict[str, Any] | None = None
-
-
 __all__ = [
     "DepositCreate",
     "DepositOut",
@@ -314,7 +275,4 @@ __all__ = [
     "TransferOut",
     "RebateCreate",
     "RebateOut",
-    "SettlementCreate",
-    "SettlementOut",
-    "SettlementReverse",
 ]

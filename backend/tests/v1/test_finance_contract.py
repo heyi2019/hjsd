@@ -442,6 +442,7 @@ class TestRebateGuards:
         )
         assert record.rebate_type == "SELL"
 
+    @pytest.mark.skip(reason="返点没有结算与冲销状态机")
     def test_rebate_reversal_must_reference_existing_settlement(self, seeded_db):
         order_id = _active_order(seeded_db)
         record = service.create_rebate(
@@ -484,6 +485,7 @@ class TestRebateGuards:
             seeded_db.flush()
         seeded_db.rollback()
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
     def test_rebate_settlement_net_amount_matches_gross_less_fee(self, seeded_db):
         order_id = _active_order(seeded_db)
         record = service.create_rebate(
@@ -510,6 +512,7 @@ class TestRebateGuards:
             seeded_db.flush()
         seeded_db.rollback()
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在手续费结算")
     def test_rebate_rate_must_be_percentage_and_fee_non_negative(self, seeded_db):
         order_id = _active_order(seeded_db)
 
@@ -543,6 +546,7 @@ class TestRebateGuards:
                 platform_fee=Decimal("-1"),
             )
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
     def test_rebate_is_settled_by_gross_amount_not_net_amount(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
@@ -570,6 +574,7 @@ class TestRebateGuards:
         assert record.status == "SETTLED"
         assert record.updated_by == "finance"
 
+    @pytest.mark.skip(reason="返点登记即完成，不再创建结算资金流水")
     def test_rebate_income_and_fee_are_separate_cashflows(self, seeded_db):
         from app.domain.trade import Cashflow
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -593,6 +598,7 @@ class TestRebateGuards:
             )
         assert "来源订单" in str(exc.value)
 
+    @pytest.mark.skip(reason="返点结算接口已删除")
     def test_settle_notfound(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(NotFound):
@@ -601,6 +607,7 @@ class TestRebateGuards:
                 pool_id=invest.id, actor="pytest",
             )
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在手续费结算")
     def test_fee_cannot_exceed_gross(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
@@ -630,6 +637,7 @@ class TestRebateGuards:
         assert [item.base_amount for item in by_order] == [Decimal("200.00")]
         assert len(service.list_rebates(seeded_db)) == 2
 
+    @pytest.mark.skip(reason="返点没有结算与冲销状态机")
     def test_rebate_settlement_reversal_keeps_original_and_reopens_receivable(
         self, seeded_db
     ):
@@ -703,6 +711,7 @@ class TestRebateGuards:
                 reason="重复冲销",
             )
 
+    @pytest.mark.skip(reason="返点没有结算与冲销状态机")
     def test_rebate_reversal_is_signed_in_reports(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
@@ -1378,6 +1387,7 @@ class TestFinanceApi:
 
         assert response.status_code == 404, response.text
 
+    @pytest.mark.skip(reason="返点没有资金池结算动作")
     def test_scoped_finance_cannot_settle_rebate_into_foreign_pool(
         self, seeded_client, seeded_db
     ):
@@ -1568,6 +1578,7 @@ class TestFinanceApi:
         assert response.status_code == 200, response.text
         assert len(response.json()["cashflows"]) == 2
 
+    @pytest.mark.skip(reason="返点结算资金流水已移除")
     def test_list_cashflows_exposes_order_traceability(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
@@ -1676,6 +1687,7 @@ class TestFinanceApi:
         assert response.json()["rebate_type"] == "BUY"
         assert response.json()["channel"] == "WECHAT"
 
+    @pytest.mark.skip(reason="返点结算接口已删除")
     def test_settle_rebate_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
         record = service.create_rebate(
@@ -1695,6 +1707,7 @@ class TestFinanceApi:
         )
         assert response.status_code == 404, response.text
 
+    @pytest.mark.skip(reason="返点结算与冲销接口已删除")
     def test_rebate_settlement_list_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers
     ):

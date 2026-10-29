@@ -143,39 +143,13 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     expect((await screen.findAllByText("账号图片")).length).toBeGreaterThan(0);
   });
 
-  it("更多菜单 → 下架：找到可冲销买入流水时打开下架登记弹窗", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(noSaleDetail);
+  it("非代挂在库账号不展示下架入口", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "下架");
-    await screen.findByText("下架登记");
-    expect(screen.getByLabelText("下架原因")).toBeInTheDocument();
-  });
-
-  it("更多菜单 → 下架：填原因后按买入流水发起全额 CANCEL 冲销", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(noSaleDetail);
-    await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "下架");
-    await screen.findByText("下架登记");
-    await ui.type(screen.getByLabelText("下架原因"), "账号被封");
-    await ui.click(screen.getByRole("button", { name: /确认下架/ }));
-    await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
-        55,
-        expect.objectContaining({
-          event_type: "CANCEL",
-          amount: "500.00",
-          offset_event_id: 900,
-          portion: "PRINCIPAL",
-          reason: "账号被封",
-        }),
-      ),
-    );
-  });
-
-  it("更多菜单 → 下架：没有可冲销买入流水时提示无法下架", async () => {
-    await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "下架");
-    await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到可冲销的买入流水，无法下架"));
+    fireEvent.click(within(rowOf(1)).getByRole("button", { name: /更多/ }));
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).queryByText("下架")).toBeNull();
+    expect(within(menu).getByText("账号描述")).toBeInTheDocument();
+    expect(within(menu).getByText("账号图片")).toBeInTheDocument();
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {
@@ -210,81 +184,9 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     expect(screen.queryByText("系统下架登记")).toBeNull();
   });
 
-  it("取消交易（SOLD 行）：无金额时拒绝提交", async () => {
-    await openPanel([soldRow]);
-    await clickMore(rowOf(2), "取消交易");
-    await screen.findByText("退款登记");
-    await ui.clear(screen.getByLabelText("退款金额"));
-    await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));
-    // 表单必填校验拦截：不发请求
-    await waitFor(() => expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled());
-  });
-
-  it("取消交易（SOLD 行）：未填原因时拒绝提交", async () => {
-    await openPanel([soldRow]);
-    await clickMore(rowOf(2), "取消交易");
-    await screen.findByText("退款登记");
-    await ui.clear(screen.getByLabelText("退款金额"));
-    await ui.type(screen.getByLabelText("退款金额"), "500");
-    await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));
-    await waitFor(() => expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled());
-  });
-
-  it("取消交易（SOLD 行）：填全后按原售出流水发起 CANCEL 冲销", async () => {
-    await openPanel([soldRow]);
-    await clickMore(rowOf(2), "取消交易");
-    await screen.findByText("退款登记");
-    await ui.clear(screen.getByLabelText("退款金额"));
-    await ui.type(screen.getByLabelText("退款金额"), "500");
-    await ui.type(screen.getByLabelText("取消原因"), "客户反悔");
-    await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));
-    await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
-        55,
-        expect.objectContaining({ event_type: "CANCEL", offset_event_id: 901, reason: "客户反悔" }),
-      )
-    );
-  });
-
-  it("取消交易：无可用售出流水时提示", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(noSaleDetail);
-    await openPanel([soldRow]);
-    await clickMore(rowOf(2), "取消交易");
-    await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到可退款的售出流水，请先检查交易明细"));
-  });
-
-  it("终止分期并退款（INSTALLMENT 行）：填原因后调用 installmentsApi.cancel", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(installmentDetail);
-    await openPanel([installmentRow]);
-    await clickMore(rowOf(3), "终止分期并退款");
-    await screen.findByText("退款登记");
-    await ui.type(screen.getByLabelText("分期取消原因"), "提前结清");
-    await ui.click(screen.getByRole("button", { name: /确认退款并终止分期/ }));
-    await waitFor(() =>
-      expect(catalog.installmentsApi.cancel).toHaveBeenCalledWith(21, expect.objectContaining({ reason: "提前结清" }))
-    );
-  });
-
-  it("终止分期并退款：无进行中订单时提示", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
-      account: installmentRow,
-      orders: [{ order_id: 77, status: "COMPLETED", events: [] }],
-    } as unknown as AccountExecutionDetail);
-    await openPanel([installmentRow]);
-    await clickMore(rowOf(3), "终止分期并退款");
-    await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到进行中的分期订单"));
-  });
-
-  it("终止分期并退款：无可终止合约时提示", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(installmentDetail);
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ ...contract, status: "CANCELLED" } as unknown as Installment]);
-    await openPanel([installmentRow]);
-    await clickMore(rowOf(3), "终止分期并退款");
-    await waitFor(() => expect(message.warning).toHaveBeenCalledWith("未找到可终止的分期合约"));
-  });
-
   it("导出：读取明细并提示失败条数", async () => {
-    await openPanel([inStockRow, soldRow]);
+    const secondInStockRow = { ...inStockRow, id: 4, game_account: "acc-4" } as unknown as Account;
+    await openPanel([inStockRow, secondInStockRow]);
     vi.mocked(catalog.stocksApi.executionDetail)
       .mockResolvedValueOnce(sellDetail)
       .mockRejectedValueOnce(new Error("detail down"));

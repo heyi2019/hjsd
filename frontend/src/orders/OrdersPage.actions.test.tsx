@@ -6,7 +6,7 @@ import { renderLight } from "../test/render";
 import { OrdersPage, validateAllocations } from "./OrdersPage";
 
 import * as catalog from "../shared/api/catalog";
-import { seedOptionSets } from "../test/formFieldsSeed";
+import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
 import { today } from "../shared/lib/format";
 import * as client from "../shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "../shared/api/catalog";
@@ -133,6 +133,7 @@ const installment: Installment = {
   per_period_service_fee: "0.00",
   per_period: "2000.00",
   paid_amount: "3000.00",
+  total_receivable: "12000.00",
   status: "ACTIVE",
 };
 const installmentCancelResult: InstallmentCancelResult = {
@@ -149,6 +150,7 @@ const allocationRows: ProfitAllocation[] = [
 
 beforeEach(() => {
   seedOptionSets(catalog);
+  seedOrderFormFields(catalog);
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);

@@ -147,7 +147,7 @@ describe("CustomFormField", () => {
       field_key: "src",
       label: "来源",
       field_type: "SELECT",
-      options: ["微信", "支付宝"],
+      options: [{ value: "微信", label: "微信" }, { value: "支付宝", label: "支付宝" }],
     });
     renderLight(
       <Form>
@@ -214,11 +214,8 @@ describe("CfgItem 配置门控", () => {
 });
 
 describe("resolveOptionItems：选项归一化", () => {
-  it("字符串数组 → {value,label} 同值", () => {
-    expect(resolveOptionItems(["微信", "支付宝"])).toEqual([
-      { value: "微信", label: "微信" },
-      { value: "支付宝", label: "支付宝" },
-    ]);
+  it("只接受后端字段契约的对象选项", () => {
+    expect(() => resolveOptionItems(["微信"] as never)).toThrow("选项必须使用 value/label 对象");
   });
   it("{value,label} 对象原样保留", () => {
     expect(resolveOptionItems([{ value: "BUY", label: "买号返点" }])).toEqual([

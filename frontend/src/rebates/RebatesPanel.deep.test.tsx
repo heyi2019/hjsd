@@ -69,6 +69,13 @@ describe("RebatesPanel：返点明细 / 空态 / 错误重试", () => {
     expect(await screen.findByText("HS0001-RB01")).toBeInTheDocument();
   });
 
+  it("操作人接口失败时按主列表错误处理，不伪造空操作人", async () => {
+    vi.mocked(catalog.employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
+    renderLight(<RebatesPanel />, { user: "admin" });
+    await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
+    expect(screen.queryByText("HS0001-RB01")).toBeNull();
+  });
+
   it("返点列表只提供编辑和删除，不提供结算、冲销或作废", async () => {
     renderLight(<RebatesPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-RB01")).toBeInTheDocument();

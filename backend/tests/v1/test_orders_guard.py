@@ -379,14 +379,6 @@ def test_create_order_rejects_duplicate_counterparty(seeded_db):
         )
 
 
-def test_create_order_dfq_rejects_separate_game_fields(seeded_db):
-    with pytest.raises(Validation):
-        service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest",
-            game_type="王者",
-        )
-
-
 def test_create_order_rejects_invalid_owner_id(seeded_db):
     with pytest.raises(Validation):
         service.create_order(

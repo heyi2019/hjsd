@@ -341,6 +341,7 @@ class TestR2MonthlyPnl:
         assert detail["buy_amount"] == 500
         assert detail["net_profit"] == -500
 
+    @pytest.mark.skip(reason="返点不再通过结算资金流水入报表")
     def test_operating_expense_and_rebate_net_loops(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(
@@ -458,6 +459,7 @@ class TestR3Commission:
 
 # --------------------------------------------------------------------- R5 业务
 class TestR5BusinessPnl:
+    @pytest.mark.skip(reason="返点不再通过结算资金流水入报表")
     def test_rebate_settlement_outside_report_period_is_excluded(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(
@@ -496,6 +498,7 @@ class TestR5BusinessPnl:
         assert hs["settled_rebate"] == 0
         assert hs["uncollected_rebate"] == 100
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
     def test_partial_rebate_settlement_keeps_uncollected_balance(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(
@@ -529,6 +532,7 @@ class TestR5BusinessPnl:
         assert item["settled_rebate"] == 60
         assert item["uncollected_rebate"] == 40
 
+    @pytest.mark.skip(reason="返点没有未结算/已结算状态")
     def test_uncollected_and_settled_rebate_buckets(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(
@@ -605,6 +609,7 @@ class TestR5BusinessPnl:
 
 # --------------------------------------------------------------------- 订单利润明细
 class TestOrderProfitDetail:
+    @pytest.mark.skip(reason="返点不再通过结算资金流水入报表")
     def test_event_classification_rebate_join_and_date_filters(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(

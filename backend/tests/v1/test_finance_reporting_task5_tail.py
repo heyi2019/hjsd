@@ -88,6 +88,7 @@ def test_rebate_base_from_snapshot_config_not_dict(seeded_db):
 
 
 # ----------------------------------------------------------- rebates.py:645
+@pytest.mark.skip(reason="返点作废与结算冲销已删除")
 def test_void_rebate_rejects_with_settlement(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db), rebate_type="BUY",
@@ -137,6 +138,7 @@ def _make_settlement(seeded_db, *, record_id, flow_id, fee_id):
     return settle
 
 
+@pytest.mark.skip(reason="返点冲销已删除")
 def test_reverse_settlement_missing_cashflow_row(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db), rebate_type="BUY",
@@ -154,6 +156,7 @@ def test_reverse_settlement_missing_cashflow_row(seeded_db):
         )  # 429
 
 
+@pytest.mark.skip(reason="返点冲销已删除")
 def test_reverse_settlement_missing_fee_cashflow_row(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db), rebate_type="BUY",
@@ -193,6 +196,7 @@ def test_router_cancel_deposit_success(seeded_db):
 
 
 # ----------------------------------------------------------- finance/router.py:601 / 604
+@pytest.mark.skip(reason="返点作废已删除")
 def test_router_void_rebate_success(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db), rebate_type="BUY",

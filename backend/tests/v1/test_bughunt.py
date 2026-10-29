@@ -230,6 +230,7 @@ class TestDepositAndRebate:
                 seeded_db, pool_id=1, amount="-100", paid_on=D, actor="hunt"
             )
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
     def test_rebate_settle_more_than_receivable_is_rejected(self, seeded_db):
         """可结算上限 = 返点基数 1000；一次结 1200 必须被拒。"""
         order = _order(seeded_db)
@@ -265,6 +266,7 @@ class TestDepositAndRebate:
                 actor="hunt",
             )
 
+    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
     def test_rebate_partial_then_full_settles(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(

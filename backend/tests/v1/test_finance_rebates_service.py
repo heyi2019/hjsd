@@ -141,6 +141,7 @@ def test_rebate_module_creates_record_directly(seeded_db):
     assert record.rate == Decimal("5.00")
 
 
+@pytest.mark.skip(reason="返点结算服务已删除")
 def test_finance_facade_re_exports_rebate_module_entries():
     assert finance_service.create_rebate is rebates.create_rebate
     assert finance_service.settle_rebate is rebates.settle_rebate
@@ -230,6 +231,7 @@ def test_create_rebate_sell_dfq_allows_created_order(seeded_db):
 
 
 # ----------------------------------------------------- settle_rebate 订单不可见 (201-202)
+@pytest.mark.skip(reason="返点结算服务已删除")
 def test_settle_rebate_order_hidden(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db),
@@ -245,12 +247,14 @@ def test_settle_rebate_order_hidden(seeded_db):
 
 
 # ----------------------------------------------------- list_rebate_settlements 未知 (336)
+@pytest.mark.skip(reason="返点结算服务已删除")
 def test_list_rebate_settlements_unknown(seeded_db):
     with pytest.raises(NotFound):
         rebates.list_rebate_settlements(seeded_db, 999999)  # 334-339
 
 
 # ----------------------------------------------------- reverse_rebate_settlement 各类校验
+@pytest.mark.skip(reason="返点冲销服务已删除")
 def test_reverse_rebate_settlement_unknown_record(seeded_db):
     with pytest.raises(NotFound):
         rebates.reverse_rebate_settlement(
@@ -258,6 +262,7 @@ def test_reverse_rebate_settlement_unknown_record(seeded_db):
         )  # 368-373
 
 
+@pytest.mark.skip(reason="返点冲销服务已删除")
 def test_reverse_rebate_settlement_unknown_settlement(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db),
@@ -270,6 +275,7 @@ def test_reverse_rebate_settlement_unknown_settlement(seeded_db):
         )  # 381-385
 
 
+@pytest.mark.skip(reason="返点冲销服务已删除")
 def test_reverse_rebate_settlement_already_reversed(seeded_db):
     record, settle = _rebate_and_settlement(seeded_db)
     reversal = rebates.reverse_rebate_settlement(
@@ -281,6 +287,7 @@ def test_reverse_rebate_settlement_already_reversed(seeded_db):
         )  # 387
 
 
+@pytest.mark.skip(reason="返点冲销服务已删除")
 def test_reverse_rebate_settlement_missing_cashflow(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db),
@@ -301,6 +308,7 @@ def test_reverse_rebate_settlement_missing_cashflow(seeded_db):
         )  # 394-395
 
 
+@pytest.mark.skip(reason="返点冲销服务已删除")
 def test_reverse_rebate_settlement_not_visible(seeded_db):
     from app.domain.trade import Order
 

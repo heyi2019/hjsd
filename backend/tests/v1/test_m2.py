@@ -340,6 +340,7 @@ class TestA08Deposit:
 
 
 class TestA06Rebate:
+    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
     def test_two_settlements_and_net_amounts(self, seeded_db):
         account = _account(seeded_db, "reb-acc")
         seeded_db.commit()

@@ -10,11 +10,10 @@ import { gameTypesApi, optionSetsApi, orderFormFieldsApi, type OrderFormField } 
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { FORM_SCOPE_LABEL, buildGroupedScopeOptions, useFormScopes } from "../formScopes";
+import { buildGroupedScopeOptions, useFormScopes } from "../formScopes";
 import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 
-const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
 // 这些字段的选项来自业务主数据或运行时上下文，不允许在字段配置里手工维护。
 const MANAGED_OPTION_FIELD_KEYS = [
@@ -92,13 +91,13 @@ export interface OrderFormFieldsPanelProps {
 
 export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onConfigureIntermediaryPlatforms, onConfigurePools, onConfigurePartySources }: OrderFormFieldsPanelProps = {}) {
   const editorFormId = "order-form-field-editor";
-  // 词典未加载时回落模块常量，保证与改造前完全一致。
-  const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
-  // 作用域清单以后端注册表为单一事实源；接口不可用时回落本地兜底。
+  // 字段类型必须来自后端词典。
+  const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? [];
+  // 作用域清单以后端注册表为唯一事实源。
   const { scopes } = useFormScopes();
   const groupedScopeOptions = useMemo(() => buildGroupedScopeOptions(scopes), [scopes]);
   const [activeType, setActiveType] = useState<string>(
-    initialScope && FORM_SCOPE_LABEL[initialScope] ? initialScope : "HS",
+    initialScope ?? "HS",
   );
   const [rows, setRows] = useState<OrderFormField[]>([]);
   const [gameTypeNames, setGameTypeNames] = useState<string[]>([]);
@@ -389,7 +388,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     {
       title: "选项",
       dataIndex: "options",
-      render: (value: Array<string | { value: string; label: string }> | null | undefined, row) =>
+      render: (value: Array<{ value: string; label: string }> | null | undefined, row) =>
         row.field_key === "game_type" ? `游戏类型主数据 · ${gameTypeNames.slice(0, 2).join("、") || "暂无"}等 ${gameTypeNames.length} 项` :
         row.field_key === "channel_region" ? "游戏类型渠道／区服主数据 · 随游戏类型联动" :
         row.field_key === "intermediary_platform" ? `经手平台主数据 · ${intermediaryPlatformNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryPlatformNames.length} 项` :

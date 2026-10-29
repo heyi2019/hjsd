@@ -97,8 +97,13 @@ class TestStockNoAtOrderCreation:
 
     def test_hs_order_creation_allocates_stock_no_immediately(self, seeded_db):
         order = service_create_order(
-            seeded_db, game_account="hs-stockno-at-create", game_type="王者荣耀",
-            game_password="pwd", channel_region="微信一区",
+            seeded_db,
+            account_snapshot={
+                "game_account": "hs-stockno-at-create",
+                "game_type": "王者荣耀",
+                "game_password": "pwd",
+                "channel_region": "微信一区",
+            },
         )
         assert order.account_id is not None
         account = seeded_db.get(Account, order.account_id)

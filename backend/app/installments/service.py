@@ -50,7 +50,6 @@ from app.domain.trade import (
     OrderProfitAllocation,
 )
 from app.domain.users import User
-from app.stocks import service as stocks_service
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.orders.form_fields import validate_form_extra
@@ -98,60 +97,15 @@ def _materialize_dfq_recovery_account(
     *,
     actor: str,
 ) -> Account:
-    """DFQ 回收转自营：垫资账号（建单已入库）转为 SELF/RECOVERY 可售库存。
-
-    迁移 0002 之前的旧订单未挂账号时，回退为从快照补建（历史兼容路径）。
-    2026-10-28 口径：game_account 不唯一（支持复购），实体归属一律以
-    order.account_id 为准，不再按 game_account 文本反查挂靠。
-    """
-    if order.account_id is not None:
-        account = session.get(Account, order.account_id)
-        if account is None:
-            # 挂了账号但台账里查不到：数据异常，显式报错而非静默重建。
-            raise NotFound("分期合约关联账号不存在")
-        # 建单即入库的代分期账号：转自营回收，清增值服务标识。
-        account.business_mode = "SELF"
-        account.inventory_type = "RECOVERY"
-        account.value_added_service = None
-        return account
-    snapshot = order.account_snapshot or {}
-    game_account = snapshot.get("game_account")
-    if not isinstance(game_account, str) or not game_account.strip():
-        raise Validation("DFQ 分期缺少可回收的账号资料")
-    account = stocks_service.create_account(
-        session,
-        game_account=game_account,
-        game_type=snapshot.get("game_type"),
-        business_mode="SELF",
-        inventory_type="RECOVERY",
-        game_password=snapshot.get("game_password"),
-        channel_region=snapshot.get("channel_region"),
-        bound_phone=snapshot.get("bound_phone"),
-        has_secondary=snapshot.get("has_secondary"),
-        platform=snapshot.get("platform"),
-        note=snapshot.get("note"),
-        actor=actor,
-    )
-    historical_cost = sum(
-        (
-            event.amount
-            for event in session.scalars(
-                select(OrderEvent).where(
-                    OrderEvent.order_id == order.id,
-                    OrderEvent.event_type.in_({EventType.BUY.value, EventType.COST.value}),
-                    OrderEvent.is_posted.is_(True),
-                )
-            ).all()
-        ),
-        Decimal("0"),
-    )
-    account.cost_amount = to_money(historical_cost)
-    account.buy_date = order.trade_date if historical_cost > 0 else None
-    account.status = AccountStatus.INSTALLMENT.value
-    account.updated_by = actor
-    order.account_id = account.id
-    order.updated_by = actor
-    session.flush()
+    """DFQ 回收转自营：使用建单时已入库的账号转为可售库存。"""
+    if order.account_id is None:
+        raise Validation("DFQ 分期没有关联库存账号")
+    account = session.get(Account, order.account_id)
+    if account is None:
+        raise NotFound("分期合约关联账号不存在")
+    account.business_mode = "SELF"
+    account.inventory_type = "RECOVERY"
+    account.value_added_service = None
     return account
 
 
@@ -1165,7 +1119,7 @@ def recover_account(
     if order is None:
         raise Validation("分期合约没有所属订单")
     if order.order_type == "DFQ":
-        # 建单即入库（迁移 0002 后）或旧快照单（回退补建）：统一转自营可售。
+        # 建单即入库的代分期账号统一转自营可售。
         _materialize_dfq_recovery_account(session, order, actor=actor)
     if order.account_id is None:
         raise Validation("分期合约没有可回收的账号")
@@ -1296,30 +1250,6 @@ def record_sale(
         reason=text_note,
     )
     return disposition
-
-
-def record_resale(
-    session: Session,
-    installment_id: int,
-    *,
-    resale_order_id: int,
-    occurred_on: date,
-    actor: str,
-    note: str,
-    form_extra: Mapping[str, Any] | None = None,
-    user: CurrentUser | None = None,
-) -> InstallmentDisposition:
-    """兼容旧调用；新流程统一使用 record_sale。"""
-    return record_sale(
-        session,
-        installment_id,
-        sale_order_id=resale_order_id,
-        occurred_on=occurred_on,
-        actor=actor,
-        note=note,
-        form_extra=form_extra,
-        user=user,
-    )
 
 
 def list_dispositions(

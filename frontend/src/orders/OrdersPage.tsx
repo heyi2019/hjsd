@@ -94,26 +94,6 @@ function MobileOrderList(props: {
 type BusinessFilterKey = "all" | "HS" | "TH" | "DG" | "DFQ";
 type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
 
-/** 建关联时关系下拉的回落值；措辞比词典 label 长，用于说明方向，词典加载后由词典接管。 */
-const RELATION_TYPE_FALLBACK: Array<{ value: string; label: string }> = [
-  { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" },
-  { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
-];
-
-const BUSINESS_FILTERS: Array<{ key: BusinessFilterKey; label: string }> = [
-  { key: "all", label: "全部" },
-  { key: "HS", label: "回收" },
-  { key: "TH", label: "提号" },
-  { key: "DG", label: "代挂" },
-  { key: "DFQ", label: "代分期" },
-];
-
-const BUSINESS_MODE_FILTERS: Array<{ key: BusinessModeFilterKey; label: string }> = [
-  { key: "all", label: "全部业务" },
-  { key: "SELF", label: "自营" },
-  { key: "DISTRIBUTION", label: "分销" },
-];
-
 const BUSINESS_CREATE_ITEMS = [
   { key: "HS", label: "新建回收订单" },
   { key: "TH", label: "新建提号订单" },
@@ -182,15 +162,6 @@ export function validateAllocations(
   }
   return { ok: true, items };
 }
-
-/** 分润角色兜底文案：词典 PROFIT_ROLE 未加载/未配置时使用。
- *  取值受 DB CHECK `allocation_role_valid` 约束，与 backend AllocationRole 一致。 */
-const PROFIT_ROLE_FALLBACK: Array<{ value: string; label: string }> = [
-  { value: "OWNER", label: "业绩归属人" },
-  { value: "BUYER", label: "买方" },
-  { value: "SALES", label: "销售" },
-  { value: "SERVICE", label: "服务" },
-];
 
 // 与 backend/app/domain/enums.py ScheduleStatus 一致（StatusTag 未内置 PARTIAL/WAIVED）
 const SCHEDULE_STATUS_LABEL: Record<string, string> = {
@@ -284,27 +255,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
-  // 关联状态 / 业务类型 / 业务模式：优先读选项词典（设置页可改 label），
-  // 未加载完时回落原硬编码常量，避免主筛选条出现空白（零行为变化）。
+  // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
-  const linkStatusOptions: Opt[] =
-    useOptionSet("ORDER_LINK_STATUS") ??
-    Object.entries(LINK_STATUS_LABEL).map(([value, label]) => ({ value, label }));
-  const orderBusinessOptions: Opt[] =
-    useOptionSet("ORDER_BUSINESS") ??
-    BUSINESS_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
+  const orderBusinessOptions: Opt[] = useOptionSet("ORDER_BUSINESS") ?? [];
   // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
-  const refundResponsibilityOptions: Opt[] =
-    useOptionSet("REFUND_RESPONSIBILITY") ??
-    Object.entries(REFUND_RESPONSIBILITY_LABEL).map(([value, label]) => ({ value, label }));
-  const orderBusinessModeOptions: Opt[] =
-    useOptionSet("ORDER_BUSINESS_MODE") ??
-    BUSINESS_MODE_FILTERS.filter((item) => item.key !== "all").map((item) => ({ value: item.key, label: item.label }));
+  const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
+  const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
   // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
-  const relationTypeOptions: Opt[] =
-    useOptionSet("ORDER_RELATION_TYPE") ?? RELATION_TYPE_FALLBACK;
-  // 分润角色：此前每行写死 "OWNER"，导致编辑既有分润时把 BUYER/SALES/SERVICE 静默抹平。
-  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? PROFIT_ROLE_FALLBACK;
+  const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
+  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -395,9 +355,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
-      const employeeList = await Promise.resolve()
-        .then(() => employeesApi.list())
-        .catch(() => [] as Array<{ id: number; username: string; display_name: string; is_active: boolean }>);
+      const employeeList = await employeesApi.list();
       setUsers(employeeList.filter((employee) => employee.is_active));
       setActionOrder(order);
       refundForm.resetFields();
@@ -508,12 +466,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first ? first.remaining.toFixed(2) : undefined,
           pool_id: first?.event.pool_id ?? undefined,
         });
-        const [poolList, employeeList] = await Promise.all([
-          Promise.resolve().then(() => poolsApi.list()).catch(() => [] as Pool[]),
-          Promise.resolve().then(() => employeesApi.list()).catch(() => [] as Array<{ id: number; username: string; display_name: string; is_active: boolean }>),
-        ]);
-        setCancelPools(Array.isArray(poolList) ? poolList.filter((pool) => pool.status === "ACTIVE") : []);
-        setCancelEmployees(Array.isArray(employeeList) ? employeeList.filter((employee) => employee.is_active) : []);
+        const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
+        setCancelPools(poolList.filter((pool) => pool.status === "ACTIVE"));
+        setCancelEmployees(employeeList.filter((employee) => employee.is_active));
         if (first && cancelForm.getFieldValue("pool_id") == null) {
           cancelForm.setFieldValue("pool_id", poolList[0]?.id);
         }

@@ -9,7 +9,7 @@ import { appMessage, appModal } from "../../shared/ui/appFeedback";
  * 份额与资金性质的选项来自选项词典（ROUTE_PORTION / ROUTE_FUND_NATURE），设置页改文案后
  * 本页同步变化。
  */
-import { Card, Form, InputNumber, Select as AntSelect, Space, Typography } from "antd";
+import { Card, Form, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -24,7 +24,7 @@ import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { useSession } from "../../shared/state/session";
-import { DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const PORTION_LABEL: Record<string, string> = {
   PRINCIPAL: "本金",
@@ -203,7 +203,7 @@ export function OrderTypeRoutesPanel() {
           {types.length} 个业务类型。
         </Typography.Paragraph>
         <Space className="ui-filter-bar" wrap>
-          <AntSelect
+          <Select
             value={filterType === "all" ? undefined : filterType}
             placeholder="全部业务类型"
             allowClear
@@ -239,16 +239,16 @@ export function OrderTypeRoutesPanel() {
             initialValues={{ portion: "PRINCIPAL", priority: 0 }}
           >
             <Form.Item name="order_type_code" label="业务类型" rules={[{ required: true, message: "请选择业务类型" }]}>
-              <AntSelect placeholder="请选择业务类型" options={typeOptions} />
+              <Select placeholder="请选择业务类型" options={typeOptions} />
             </Form.Item>
             <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}>
-              <AntSelect options={portionOptions} />
+              <Select options={portionOptions} />
             </Form.Item>
             <Form.Item name="fund_nature" label="资金性质" extra="选填；不填表示不限性质">
-              <AntSelect allowClear placeholder="不限" options={fundNatureOptions} />
+              <Select allowClear placeholder="不限" options={fundNatureOptions} />
             </Form.Item>
             <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true, message: "请选择目标资金池" }]}>
-              <AntSelect placeholder="请选择资金池" options={poolOptions} />
+              <Select placeholder="请选择资金池" options={poolOptions} />
             </Form.Item>
             <Form.Item name="priority" label="优先级" extra="同一类型内数字大者优先">
               <InputNumber min={0} precision={0} />

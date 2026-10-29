@@ -142,7 +142,8 @@ export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
   RESOLVED: "已核销",
 };
 
-/** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 全量对齐（88 项）。 */
+/** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 对齐（随枚举增补）。
+ *  后端 option_sets 的 AUDIT_ACTION 为只读死字典，未覆盖的新动作由本表兜底翻译。 */
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
   POOL_CREATE: "新建资金池",
   POOL_UPDATE: "编辑资金池",
@@ -156,6 +157,10 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   GAME_TYPE_DISABLE: "停用游戏类型",
   GAME_TYPE_DEFAULT: "设置默认游戏类型",
   ROUTE_UPDATE: "更新资金路由",
+  LIST_COLUMNS_UPDATE: "列表列显示配置变更",
+  LIST_COLUMNS_RESET: "列表列配置恢复默认",
+  LIST_COLUMN_ADD: "列表新增自定义列",
+  LIST_COLUMN_REMOVE: "列表删除自定义列",
   CUSTOMER_CREATE: "新建客户",
   CUSTOMER_UPDATE: "编辑客户",
   CONTACT_READ: "查看联系人",

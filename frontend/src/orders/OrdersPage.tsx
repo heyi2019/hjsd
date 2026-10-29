@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Select as AntSelect, Space, Tabs, Typography } from "antd";
+import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -9,16 +9,19 @@ import {
   orderTypesApi,
   policyApi,
   employeesApi,
+  poolsApi,
   type Installment,
   type Order,
   type OrderLink,
   type OrderType,
+  type Pool,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
@@ -29,12 +32,14 @@ import {
   MoneyText,
   PermissionButton,
   PermissionGate,
+  Select,
   StatusTag,
   ConfirmButton,
 } from "../shared/ui";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
+import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
 import {
   DEFAULT_BUSINESS_CENTER_TAB,
   type BusinessCenterEntryTab,
@@ -204,6 +209,8 @@ const DELIVERY_MODE_LABEL: Record<string, string> = {
   CUSTOMER_SELF: "客户自行换绑",
 };
 
+type CancelFormScope = "ORDERCANC" | "INVREFUND";
+
 const REFUND_RESPONSIBILITY_LABEL: Record<string, string> = {
   COMPANY: "公司",
   CUSTOMER: "客户",
@@ -300,7 +307,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const { config: orderFieldConfig } = useOrderFormConfig(selectedOrder?.order_type);
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
+  const [cancelScope, setCancelScope] = useState<CancelFormScope>("ORDERCANC");
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelPools, setCancelPools] = useState<Pool[]>([]);
+  const [cancelEmployees, setCancelEmployees] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   const [cancelForm] = Form.useForm();
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundSubmitting, setRefundSubmitting] = useState(false);
@@ -443,6 +453,11 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       .reverse();
   };
 
+  const cancelableEventsForScope = (order: Order | null, scope: CancelFormScope) => reversibleEvents(order)
+    .filter(({ event }) => scope === "INVREFUND"
+      ? ["BUY", "COST"].includes(event.event_type)
+      : event.event_type === "SELL");
+
   const submitLink = async (values: Record<string, unknown>) => {
     if (!selectedOrder) return;
     setLinkSubmitting(true);
@@ -489,15 +504,28 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       } else {
         setCancelOrderTarget(order);
         setCancelInstallmentTarget(null);
-        // 默认冲销最后一笔可冲销动作（与历史行为一致），用户可在弹窗内改选其他动作或部分冲销。
+        // 先把基础日期和默认冲销动作写入表单，账户/操作人异步加载时弹窗仍可正常提交。
         const reversible = reversibleEvents(order);
         const first = reversible[0];
+        const nextScope: CancelFormScope = first && ["BUY", "COST"].includes(first.event.event_type) ? "INVREFUND" : "ORDERCANC";
+        setCancelScope(nextScope);
         cancelForm.setFieldsValue({
+          cancelled_on: today(),
           offset_event_id: first?.event.id,
-          cancel_amount: first ? first.remaining.toFixed(2) : undefined,
+          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first ? first.remaining.toFixed(2) : undefined,
+          pool_id: first?.event.pool_id ?? undefined,
         });
+        const [poolList, employeeList] = await Promise.all([
+          Promise.resolve().then(() => poolsApi.list()).catch(() => [] as Pool[]),
+          Promise.resolve().then(() => employeesApi.list()).catch(() => [] as Array<{ id: number; username: string; display_name: string; is_active: boolean }>),
+        ]);
+        setCancelPools(Array.isArray(poolList) ? poolList.filter((pool) => pool.status === "ACTIVE") : []);
+        setCancelEmployees(Array.isArray(employeeList) ? employeeList.filter((employee) => employee.is_active) : []);
+        if (first && cancelForm.getFieldValue("pool_id") == null) {
+          cancelForm.setFieldValue("pool_id", poolList[0]?.id);
+        }
       }
-      cancelForm.setFieldsValue({ cancelled_on: today() });
+      if (order.installment_principal) cancelForm.setFieldsValue({ cancelled_on: today() });
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -506,10 +534,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const closeCancelTransaction = () => {
     setCancelOrderTarget(null);
     setCancelInstallmentTarget(null);
+    setCancelScope("ORDERCANC");
     cancelForm.resetFields();
   };
 
-  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; cancel_amount?: string; form_extra?: Record<string, unknown> }) => {
+  const openSystemOffsale = () => {
+    setActiveTab("inventory");
+    setSelectedOrder(null);
+  };
+
+  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; cancel_amount?: string; refund_amount?: string; pool_id?: number; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const installment = cancelInstallmentTarget;
     const order = cancelOrderTarget;
     if (!installment && !order) return;
@@ -528,10 +562,11 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         if (result.order_status === "CANCELLED") await load();
       } else {
         if (!order) return;
-        const reversible = reversibleEvents(order);
+        const reversible = cancelableEventsForScope(order, cancelScope);
         const selected = reversible.find((item) => item.event.id === Number(values.offset_event_id)) ?? reversible[0];
         if (selected) {
-          const amount = (values.cancel_amount ?? "").trim() || selected.remaining.toFixed(2);
+          const amountValue = cancelScope === "INVREFUND" ? values.refund_amount : values.cancel_amount;
+          const amount = (amountValue ?? "").trim() || selected.remaining.toFixed(2);
           if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
             appMessage.error("请输入有效的冲销金额");
             return;
@@ -545,11 +580,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             amount,
             occurred_on: values.cancelled_on,
             offset_event_id: selected.event.id,
+            pool_id: Number(values.pool_id),
+            operator_user_ids: values.operator_user_ids,
             reason: values.reason,
-            note: "取消交易原路退款",
-          form_extra: values.form_extra,
+            note: cancelScope === "INVREFUND" ? "库存取消交易，冲销入库并入账" : "售出取消交易，原路退款",
+            form_extra_scope: cancelScope,
+            form_extra: values.form_extra,
           });
-          appMessage.success(`取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退款`);
+          appMessage.success(cancelScope === "INVREFUND"
+            ? `库存取消交易已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
+            : `售出取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退还客户`);
         } else {
           await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
           appMessage.success("交易已取消，无已登记款项需要退款");
@@ -638,6 +678,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);
 
+  const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
   const ledgerColumns: ColumnsType<Order> = [
     { title: "订单号", dataIndex: "order_no" },
     { title: "对方 / 来源", key: "party", render: (_, order) => [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
@@ -671,7 +712,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
-                    label: "取消交易",
+                    label: order.order_type === "DG" ? "系统下架" : "取消交易",
                     danger: true,
                     disabled: !["ACTIVE", "COMPLETED"].includes(order.status),
                   },
@@ -679,7 +720,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                 onClick: ({ key }) => {
                   if (key === "allocation") void openAllocations(order);
                   if (key === "refund") void openRefund(order);
-                  if (key === "cancel") void openCancelTransaction(order);
+                  if (key === "cancel") {
+                    if (order.order_type === "DG") openSystemOffsale();
+                    else void openCancelTransaction(order);
+                  }
                 },
               }}
             >
@@ -772,7 +816,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                     }}
                   />
                   <Typography.Text strong>关联筛选</Typography.Text>
-                  <AntSelect
+                  <Select
                     aria-label="关联状态筛选"
                     className="ui-filter-select"
                     value={linkStatusFilter}
@@ -803,7 +847,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   </Typography.Text>
                 </Space>
                 <DataTable<Order>
-                  columns={ledgerColumns}
+                  columns={arrangeLedgerColumns(ledgerColumns)}
                   rows={filteredOrders}
                   loading={loading}
                   page={page}
@@ -1062,12 +1106,15 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                 items: [
                   { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                   { key: "refund", label: "登记退款", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
-                  { key: "cancel", label: "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
+                  { key: "cancel", label: selectedOrder.order_type === "DG" ? "系统下架" : "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
                 ],
                 onClick: ({ key }) => {
                   if (key === "allocation") void openAllocations();
                   if (key === "refund") void openRefund();
-                  if (key === "cancel") void openCancelTransaction();
+                  if (key === "cancel") {
+                    if (selectedOrder.order_type === "DG") openSystemOffsale();
+                    else void openCancelTransaction();
+                  }
                 },
               }}
             >
@@ -1088,7 +1135,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       </Drawer>
 
       <Modal
-        title={cancelInstallmentTarget ? `取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `取消交易 · ${cancelOrderTarget.order_no}` : "取消交易"}
+        title={cancelInstallmentTarget ? `分期退款终止 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
         open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
@@ -1097,7 +1144,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         onOk={() => void cancelForm.submit()}
       >
         <Form form={cancelForm} layout="vertical" onFinish={submitCancelTransaction}>
-          <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : "ORDERCANC"} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
+          <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
               ? cancelInstallmentTarget.contract_type === "PICKUP_SALE"
@@ -1105,27 +1152,36 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                 : cancelInstallmentTarget.contract_type === "ADVANCE_PURCHASE"
                   ? "按已收款原资金池退款，取消后终止代分期交易。"
                   : "按已收款原资金池退款，取消后账号回到库存。"
-              : "默认冲销最后一笔可冲销动作并按原资金池退款；也可指定其他动作，或填写小于剩余可冲金额做部分冲销。没有登记款项时仅取消交易。"}
+              : cancelScope === "INVREFUND"
+                ? "冲销入库流水，金额进入公司钱包；可按原资金池入账，也可做部分冲销。"
+                : "冲销售出流水，金额退还客户；可按原资金池退款，也可做部分冲销。"}
           </Typography.Paragraph>
-          {cancelOrderTarget && reversibleEvents(cancelOrderTarget).length > 0 ? (
-            <>
-              <CfgItem name="offset_event_id" label="被冲销动作" rules={[{ required: true, message: "请选择被冲销动作" }]}>
-                <AntSelect
-                  placeholder="请选择被冲销动作"
-                  options={reversibleEvents(cancelOrderTarget).map(({ event, remaining }) => ({
+          {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
+            <div className="order-cancel-meta">
+              <CfgItem name="offset_event_id" label={cancelScope === "INVREFUND" ? "入库流水" : "被冲销动作"} rules={[{ required: true, message: "请选择被冲销动作" }]}>
+                <Select
+                  placeholder={cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择被冲销动作"}
+                  options={cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }) => ({
                     value: event.id,
                     label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining.toFixed(2))}）`,
                   }))}
                   onChange={(value: number) => {
-                    const target = reversibleEvents(cancelOrderTarget).find((item) => item.event.id === value);
-                    if (target) cancelForm.setFieldsValue({ cancel_amount: target.remaining.toFixed(2) });
+                    const target = cancelableEventsForScope(cancelOrderTarget, cancelScope).find((item) => item.event.id === value);
+                    if (target) cancelForm.setFieldsValue({
+                      [cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: target.remaining.toFixed(2),
+                      pool_id: target.event.pool_id ?? cancelPools[0]?.id,
+                    });
                   }}
                 />
               </CfgItem>
-              <CfgItem name="cancel_amount" label="冲销金额" rules={requiredMoneyRules("冲销金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
-                <MoneyInput placeholder="请输入冲销金额" />
+              <CfgItem name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
+                <MoneyInput aria-label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} placeholder={cancelScope === "INVREFUND" ? "请输入入账金额" : "请输入退款金额"} />
               </CfgItem>
-            </>
+              <CfgItem alwaysActive name="pool_id" label={cancelScope === "INVREFUND" ? "入账账户" : "收款账户"} rules={[{ required: true, message: cancelScope === "INVREFUND" ? "请选择入账账户" : "请选择收款账户" }]}>
+                <Select placeholder={cancelScope === "INVREFUND" ? "请选择入账账户" : "请选择收款账户"} options={cancelPools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+              </CfgItem>
+              <ResponsibleEmployeeSelect name="operator_user_ids" label={cancelScope === "INVREFUND" ? "入账操作人" : "退款操作人"} employees={cancelEmployees} className="order-cancel-employee" />
+            </div>
           ) : null}
           <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
@@ -1204,7 +1260,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             label="关联订单"
             rules={[{ required: true, message: "请选择关联订单" }]}
           >
-            <AntSelect
+            <Select
               showSearch
               placeholder="请选择订单"
               optionFilterProp="label"
@@ -1217,7 +1273,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             />
           </CfgItem>
           <CfgItem name="relation_type" label="关系" rules={[{ required: true, message: "请选择关系" }]}>
-            <AntSelect placeholder="请选择关系" options={relationTypeOptions} />
+            <Select placeholder="请选择关系" options={relationTypeOptions} />
           </CfgItem>
           <CfgItem name="split_ratio" label="分成比例（%）" tooltip="与分成金额二选一，按交易拆分口径填写">
             <Input placeholder="例如 60" />
@@ -1289,7 +1345,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。
           </Typography.Paragraph>
           <Form.Item label="姓名（可多选，勾选后自动加行）">
-            <AntSelect
+            <Select
               mode="multiple"
               placeholder="从员工花名册选择"
               value={pickedEmployees}
@@ -1307,7 +1363,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                       label="姓名"
                       rules={[{ required: true, message: "请选择姓名" }]}
                     >
-                      <AntSelect
+                      <Select
                         placeholder="选择员工"
                         options={employeeOptions}
                         className="ui-control-width-200"
@@ -1318,7 +1374,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                       label="角色"
                       initialValue="OWNER"
                     >
-                      <AntSelect
+                      <Select
                         placeholder="选择角色"
                         options={profitRoleOptions}
                         className="ui-control-width-120"
@@ -1404,7 +1460,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             <MoneyInput placeholder="请输入退款金额" />
           </CfgItem>
           <CfgItem name="refund_responsibility" label="责任方" initialValue="COMPANY" rules={[{ required: true, message: "请选择责任方" }]}>
-            <AntSelect options={refundResponsibilityOptions} />
+            <Select options={refundResponsibilityOptions} />
           </CfgItem>
           <CfgItem name="reason" label="退款原因" rules={[{ required: true, message: "请输入退款原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款原因" />

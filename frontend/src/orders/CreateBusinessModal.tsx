@@ -109,11 +109,11 @@ export function CreateBusinessModal(props: {
           gameTypesApi.list({ include_inactive: false }),
           employeesApi.list(),
         ]);
-        setCustomers(customerList);
-        setCounterparties(cpList);
-        setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-        setGameTypes(gameTypeList);
-        setEmployees(employeeList.filter((employee) => employee.is_active));
+        setCustomers(Array.isArray(customerList) ? customerList : []);
+        setCounterparties(Array.isArray(cpList) ? cpList : []);
+        setPools((Array.isArray(poolList) ? poolList : []).filter((pool) => pool.status === "ACTIVE"));
+        setGameTypes(Array.isArray(gameTypeList) ? gameTypeList : []);
+        setEmployees((Array.isArray(employeeList) ? employeeList : []).filter((employee) => employee.is_active));
         setLoadError(null);
         didInitLookup.current = true;
       } catch (error) {
@@ -194,7 +194,7 @@ export function CreateBusinessModal(props: {
             occurred_on: today(),
             portion: "PRINCIPAL",
             pool_id: values.payment_pool_id as number,
-            note: `付款：剩余号款｜付款对象：${String(values.payment_recipient || "供货方")}${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
+            note: `付款：剩余号款${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
           },
           installment: {
             contract_type: "ADVANCE_PURCHASE",

@@ -5,6 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import {
   DataTable,
   EntryCard,
@@ -68,9 +69,11 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   // 业务计数口径：ACTIVE 表示进行中。
   const activeCount = orders.filter((o) => o.status === "ACTIVE").length;
 
+  const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
   const columns: ColumnsType<PoolRow> = [
     {
       title: "资金池",
+      key: "pool_code",
       className: "ui-col-wrap",
       onCell: () => ({ className: "ui-col-wrap" }),
       dataIndex: ["pool", "code"],
@@ -78,6 +81,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     },
     {
       title: "状态",
+      key: "status",
 
       dataIndex: ["pool", "status"],
       width: 110,
@@ -85,22 +89,26 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     },
     {
       title: "收入",
+      key: "income",
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.income} />,
     },
     {
       title: "支出",
+      key: "expense",
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.expense} />,
     },
     {
       title: "押金",
+      key: "deposit_held",
 
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.deposit_held} />,
     },
     {
       title: "可用余额",
+      key: "available",
       align: "right",
       render: (_value, row) => <MoneyText value={row.balance?.available} strong />,
     },
@@ -145,7 +153,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       <PermissionGate permission="finance.read">
         <Card className="glass" title="资金池概览">
           <DataTable<PoolRow>
-            columns={columns}
+            columns={arrangeColumns(columns)}
             rows={rows}
             loading={loading}
             page={1}

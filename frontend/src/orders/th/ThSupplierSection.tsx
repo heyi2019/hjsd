@@ -1,11 +1,15 @@
 import { Form, Input } from "antd";
 import type { ReactNode } from "react";
 import { Select } from "../../shared/ui";
+import { useOptionSet } from "../../shared/lib/optionSets";
+import { SUPPLIER_SOURCE_FALLBACK_OPTIONS } from "../CustomerSourceInput";
 import { CfgItem, CfgNestedItem } from "../ConfigurableField";
 
 /** 提号复用回收页客户信息的结构，只将业务主体替换为供货方。 */
 export function ThSupplierSection(props: { participantExtras?: ReactNode } = {}) {
   const supplierSource = Form.useWatch("supplier_source");
+  const configuredOptions = useOptionSet("SUPPLIER_SOURCE");
+  const sourceOptions = configuredOptions?.length ? configuredOptions : SUPPLIER_SOURCE_FALLBACK_OPTIONS;
   return (
     <section className="th-supplier-section recovery-customer-fields" aria-labelledby="supplier-info-title">
       <div id="supplier-info-title" className="recovery-customer-fields__title">供货方信息</div>
@@ -13,7 +17,7 @@ export function ThSupplierSection(props: { participantExtras?: ReactNode } = {})
         <Input placeholder="请输入供货方昵称" />
       </CfgItem>
       <CfgItem className="recovery-order-modal__party-field" name="supplier_source" label="供货方来源" rules={[{ required: true, message: "请选择供货方来源" }]}>
-        <Select placeholder="请选择供货方来源" />
+        <Select placeholder="请选择供货方来源" options={sourceOptions} />
       </CfgItem>
       <CfgItem className="recovery-order-modal__party-field recovery-customer-source-other" name="supplier_source_other" label="其他来源" rules={supplierSource === "其他" ? [{ required: true, whitespace: true, message: "请输入供货方来源" }] : []}>
         <Input disabled={supplierSource !== "其他"} placeholder={supplierSource === "其他" ? "请输入来源名称" : "选择其他后可填写"} />

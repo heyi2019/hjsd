@@ -24,8 +24,9 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
     assert {item["code"] for item in scopes} == expected
     assert len(scopes) == len(expected)
     by_code = {item["code"]: item for item in scopes}
-    assert by_code["ORDERCANC"]["label"] == "取消交易"
+    assert by_code["ORDERCANC"]["label"] == "售出取消交易"
     assert by_code["ORDERCANC"]["group"] == "ORDEROP"
+    assert by_code["INVREFUND"]["label"] == "库存取消交易"
     assert by_code["INVEDIT"]["label"] == "编辑账号及执行明细"
     assert by_code["STUDIOEXP"]["group"] == "STUDIO"
     # 既有作用域仍在清单中

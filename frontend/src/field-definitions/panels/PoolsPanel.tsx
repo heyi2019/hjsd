@@ -1,11 +1,12 @@
 import { appMessage, appModal } from "../../shared/ui/appFeedback";
-import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
+import { Card, Form, Input, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { poolsApi, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
+import { Select } from "../../shared/ui";
 
 /** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
 const POOL_TYPE_FALLBACK = [

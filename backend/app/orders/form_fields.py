@@ -220,6 +220,7 @@ def create_order_form_field(
     actor: str,
     field_type: str = "TEXT",
     options: Sequence[str] | None = None,
+    flow_direction: str | None = None,
     required: bool = False,
     required_when: Any = None,
     is_active: bool = True,
@@ -240,6 +241,8 @@ def create_order_form_field(
         )
     if isinstance(sort_order, bool) or not isinstance(sort_order, int) or sort_order < 0:
         raise Validation("排序值必须为非负整数", details={"field": "sort_order"})
+    if flow_direction is not None and flow_direction not in {"BASE", "IN", "OUT"}:
+        raise Validation("资金流向性质不合法", details={"field": "flow_direction"})
     key = (field_key or "").strip()
     if not FIELD_KEY_PATTERN.match(key):
         raise Validation(
@@ -276,6 +279,7 @@ def create_order_form_field(
         label=label.strip(),
         field_type=field_type,
         options=normalized_options or None,
+        flow_direction=flow_direction,
         required=required,
         required_when=normalized_condition,
         is_active=is_active,
@@ -317,6 +321,7 @@ def update_order_form_field(
     sort_order: int | None = None,
     section: str | None = None,
     note: str | None = None,
+    flow_direction: str | None | object = _UNSET,
 ) -> OrderFormField:
     """编辑字段：label/类型/选项/必填态/排序/备注可改；field_key 与 code 固定。"""
     definition = session.get(OrderFormField, definition_id)
@@ -400,6 +405,10 @@ def update_order_form_field(
             raise Validation("排序值必须为非负整数", details={"field": "sort_order"})
         definition.sort_order = sort_order
     definition.note = note
+    if flow_direction is not _UNSET:
+        if flow_direction is not None and flow_direction not in {"BASE", "IN", "OUT"}:
+            raise Validation("资金流向性质不合法", details={"field": "flow_direction"})
+        definition.flow_direction = flow_direction
     definition.updated_by = actor
     session.flush()
     record_audit(

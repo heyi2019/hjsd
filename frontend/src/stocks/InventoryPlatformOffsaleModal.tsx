@@ -1,10 +1,10 @@
-import { DatePicker, Form, Input, Modal, Select, Table } from "antd";
+import { DatePicker, Form, Input, Modal, Table } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi, type Account, type AccountExecutionOrder } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
-import { ErrorBanner, PermissionButton } from "../shared/ui";
+import { ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 export type ActiveConsignment = {

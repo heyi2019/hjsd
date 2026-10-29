@@ -100,7 +100,8 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
         "/api/v1/reports/finance-dimensions/export.csv", headers=headers
     )
     assert exported.status_code == 200, exported.text
-    assert "fund_nature" in exported.content.decode("utf-8-sig").splitlines()[0]
+    # 2026-10-29 起导出表头用「列表字段」里的中文列名，不再是英文键
+    assert "资金性质" in exported.content.decode("utf-8-sig").splitlines()[0]
 
 D = date(2026, 10, 4)        # 主测试日（与 m4 一致）
 EARLY = date(2026, 9, 15)    # 月初侧样本（用于 from 过滤）
@@ -731,7 +732,12 @@ class TestReportsApiDateParams:
         assert exported.status_code == 200, exported.text
         assert exported.headers["content-type"].startswith("text/csv")
         assert "attachment" in exported.headers["content-disposition"]
-        assert "row_type" in exported.content.decode("utf-8-sig").splitlines()[0]
+        header = exported.content.decode("utf-8-sig").splitlines()[0].split(",")
+        assert header[0] == "row_type"
+        # 2026-10-29 起表头用「列表字段」的中文列名：已登记列不再出现英文键。
+        # 该用例的时间窗内无订单明细，表头由合计行字段构成，故只断言中文口径。
+        assert "收入" in header
+        assert "income" not in header
 
         denied = seeded_client.get(
             "/api/v1/reports/order-profit/export.csv", headers=viewer_headers

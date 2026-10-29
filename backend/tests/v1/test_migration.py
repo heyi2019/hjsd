@@ -179,6 +179,27 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
         engine.dispose()
 
 
+def test_order_cancel_amount_is_incoming_finance_flow(migration_env):
+    """取消交易的冲销金额应记录为退款入账，而非原始支出。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT section, flow_direction FROM order_form_fields "
+                    "WHERE order_type_code = 'ORDERCANC' AND field_key = 'cancel_amount'"
+                )
+            ).one()
+        assert row.section == "FINANCE"
+        assert row.flow_direction == "IN"
+    finally:
+        engine.dispose()
+
+
 def test_upgrade_is_repeatable(migration_env):
     """验收要求：迁移可重复执行，且第二次不重复插种子。"""
     env, db_file = migration_env

@@ -24,6 +24,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(catalog.employeesApi.list), [{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
@@ -261,31 +262,11 @@ it("提号库存从库存中心售出时可选择分期", async () => {
     expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
   });
 
-it("取消交易按原售出流水原路冲销并退款", async () => {
-    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+it("售出取消交易不在库存中心提供入口", async () => {
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("acc-2");
-
-    await ui.click(screen.getByRole("button", { name: "更多" }));
-    const cancelItem = await screen.findByRole("menuitem", { name: "取消交易" });
-    expect(cancelItem).not.toBeDisabled();
-    await ui.click(cancelItem);
-
-    expect(await screen.findByText("退款登记")).toBeInTheDocument();
-    expect(screen.getByText(/提号取消后直接结束，不回库存/)).toBeInTheDocument();
-    expect(screen.getByLabelText("退款金额")).toHaveValue("350.00");
-    await ui.clear(screen.getByLabelText("退款金额"));
-    await ui.type(screen.getByLabelText("退款金额"), "350.00");
-    await ui.type(screen.getByLabelText("取消原因"), "买家退款");
-    await ui.click(screen.getByRole("button", { name: /确认退款并取消交易/ }));
-
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledWith(23, expect.objectContaining({
-      event_type: "CANCEL",
-      amount: "350.00",
-      portion: "PROFIT",
-      offset_event_id: 34,
-      reason: "买家退款",
-    })));
+    await waitFor(() => expect(screen.queryByText("acc-2")).toBeNull());
+    expect(screen.getByText("暂无账号")).toBeInTheDocument();
+    expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
   });
 });

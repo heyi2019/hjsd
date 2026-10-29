@@ -327,6 +327,26 @@ def test_router_update_required_and_active(seeded_client, headers):
     assert dis.json()["is_active"] is False
 
 
+def test_router_update_flow_direction_accepts_literal_string(seeded_client, headers):
+    """编辑器保存资金流向性质时，Literal 值应按字符串传给领域层。"""
+    created = seeded_client.post(
+        "/api/v1/order-form-fields",
+        headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS", field_key="rt_flow", label="流向字段", field_type="NUMBER"
+        ).model_dump(mode="json"),
+    ).json()
+
+    upd = seeded_client.patch(
+        f"/api/v1/order-form-fields/{created['id']}",
+        headers=headers,
+        json=OrderFormFieldUpdate(flow_direction="OUT").model_dump(mode="json", exclude_none=True),
+    )
+
+    assert upd.status_code == 200
+    assert upd.json()["flow_direction"] == "OUT"
+
+
 def test_router_dynamic_field_rename_with_empty_options(seeded_client, seeded_db, headers):
     """路由层回归：动态字典字段编辑改名时前端回传 options=[]，应 200 而非 422。"""
     dynamic = OrderFormField(

@@ -2,7 +2,7 @@ import { appMessage, appModal } from "../../shared/ui/appFeedback";
 /** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
  *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
-import { Card, Form, Input, InputNumber, Popconfirm, Segmented, Select, Space, Switch, Tooltip, Typography } from "antd";
+import { Card, Form, Input, InputNumber, Popconfirm, Segmented, Space, Switch, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { gameTypesApi, optionSetsApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
@@ -10,25 +10,42 @@ import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { FORM_SCOPE_LABEL, buildGroupedScopeOptions, useFormScopes } from "../formScopes";
-import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 
 const FIELD_TYPE_OPTIONS = Object.entries(FIELD_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const OPTION_FIELD_TYPES = ["SELECT", "MULTI_SELECT"];
-const MANAGED_OPTION_FIELD_KEYS = ["game_type", "channel_region", "intermediary_platform", "intermediary_type", "compensation_type"];
+// 这些字段的选项来自业务主数据或运行时上下文，不允许在字段配置里手工维护。
+const MANAGED_OPTION_FIELD_KEYS = [
+  "game_type",
+  "channel_region",
+  "intermediary_platform",
+  "intermediary_type",
+  "compensation_type",
+  "payment_pool_id",
+  "customer_source",
+  "supplier_source",
+  "dg_customer_source",
+  "dfq_customer_source",
+];
 const CONDITION_OP_OPTIONS = [
   { value: "eq", label: "等于" },
   { value: "ne", label: "不等于" },
   { value: "filled", label: "有值" },
 ];
 const OP_TEXT: Record<string, string> = { eq: "等于", ne: "不等于", filled: "有值" };
+const FLOW_DIRECTION_OPTIONS = [
+  { value: "BASE", label: "基础信息" },
+  { value: "OUT", label: "支出" },
+  { value: "IN", label: "收入" },
+] as const;
 const FIELD_SECTION_OPTIONS = [
   { value: "ACCOUNT_PRODUCT", label: "账号 / 产品信息" },
   { value: "BUSINESS", label: "业务方案信息" },
   { value: "DELIVER", label: "交付信息" },
   { value: "FINANCE", label: "费用与资金" },
   { value: "EXTRA", label: "其他补充信息" },
-  { value: "PARTICIPANT", label: "参与方信息" },
+  { value: "PARTICIPANT", label: "客户 / 供货方信息" },
 ];
 const ORDER_SCOPE_OPTIONS = [
   { value: "HS", label: "回收" },
@@ -58,9 +75,12 @@ export interface OrderFormFieldsPanelProps {
   initialScope?: string;
   onConfigureGameTypes?: () => void;
   onConfigureIntermediaryPlatforms?: () => void;
+  onConfigurePools?: () => void;
+  onConfigurePartySources?: () => void;
 }
 
-export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onConfigureIntermediaryPlatforms }: OrderFormFieldsPanelProps = {}) {
+export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onConfigureIntermediaryPlatforms, onConfigurePools, onConfigurePartySources }: OrderFormFieldsPanelProps = {}) {
+  const editorFormId = "order-form-field-editor";
   // 词典未加载时回落模块常量，保证与改造前完全一致。
   const fieldTypeOptions = useOptionSet("FIELD_TYPE") ?? FIELD_TYPE_OPTIONS;
   // 作用域清单以后端注册表为单一事实源；接口不可用时回落本地兜底。
@@ -82,6 +102,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const fieldType = Form.useWatch("field_type", form);
+  const editorSection = Form.useWatch("section", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
   const managedOptionField = MANAGED_OPTION_FIELD_KEYS.includes(editingField?.field_key ?? "");
   const editorFieldTypeOptions = editingField && MANAGED_OPTION_FIELD_KEYS.includes(editingField.field_key)
@@ -144,6 +165,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
           label: values.label as string,
           field_type: (values.field_type as string) ?? "TEXT",
           options,
+          flow_direction: values.flow_direction as OrderFormField["flow_direction"],
           required,
           required_when: requiredWhen,
           sort_order: sortOrder,
@@ -158,6 +180,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
           required_when: requiredWhen,
           sort_order: sortOrder,
           section: values.section as OrderFormField["section"],
+          flow_direction: values.flow_direction as OrderFormField["flow_direction"],
         });
         appMessage.success("字段已更新");
       }
@@ -182,6 +205,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
       cond_values: row.required_when?.values ?? [],
       sort_order: row.sort_order,
       section: row.section ?? "EXTRA",
+      flow_direction: row.flow_direction ?? undefined,
     });
   };
 
@@ -200,6 +224,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     },
     { title: "排序", dataIndex: "sort_order", width: 72 },
     { title: "类型", dataIndex: "field_type", render: (v: string, row) => MANAGED_OPTION_FIELD_KEYS.includes(row.field_key) ? "联动选择" : configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
+    { title: "资金流向性质", dataIndex: "flow_direction", render: (value: OrderFormField["flow_direction"]) => FLOW_DIRECTION_OPTIONS.find((item) => item.value === value)?.label ?? "-" },
     {
       title: "必填",
       dataIndex: "required",
@@ -247,6 +272,9 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
         row.field_key === "intermediary_platform" ? `经手平台主数据 · ${intermediaryPlatformNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryPlatformNames.length} 项` :
         row.field_key === "intermediary_type" ? `中介类型主数据 · ${intermediaryTypeNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryTypeNames.length} 项` :
         row.field_key === "compensation_type" ? `包赔类型主数据 · ${compensationTypeNames.slice(0, 2).join("、") || "暂无"}等 ${compensationTypeNames.length} 项` :
+        row.field_key === "payment_pool_id" ? "资金账户主数据 · 随资金账户配置联动" :
+        ["customer_source", "dg_customer_source", "dfq_customer_source"].includes(row.field_key) ? "客户来源主数据 · 回收/代挂/代分期共用" :
+        row.field_key === "supplier_source" ? "供货方来源主数据 · 随供货方来源配置联动" :
         value && value.length
           ? value.map((o) => (typeof o === "string" ? o : o.label)).join("、")
           : "-",
@@ -318,6 +346,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     <PermissionGate permission="field-definition.manage">
       <Form
         form={form}
+        id={editorFormId}
         layout="inline"
         onFinish={submit}
         className="ui-form-spaced"
@@ -333,8 +362,17 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
           <Select options={editorFieldTypeOptions} className="ui-control-width-180" disabled={editingId !== null} />
         </Form.Item>
         <Form.Item name="section" label="归属板块">
-          <Select options={FIELD_SECTION_OPTIONS} className="ui-control-width-160" />
+          <Select
+            options={FIELD_SECTION_OPTIONS}
+            className="ui-control-width-160"
+            popupClassName="order-form-section-filter-pop"
+          />
         </Form.Item>
+        {editorSection === "FINANCE" ? (
+          <Form.Item name="flow_direction" label="资金流向性质">
+            <Select allowClear placeholder="请选择资金流向性质" options={[...FLOW_DIRECTION_OPTIONS]} className="ui-control-width-160" popupClassName="order-form-field-option-pop" />
+          </Form.Item>
+        ) : null}
         {needsOptions && !managedOptionField && (
           <Form.Item label="选项（值 / 展示名）">
             <Form.List name="options">
@@ -381,6 +419,18 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
             <PermissionButton permission="field-definition.manage" onClick={onConfigureIntermediaryPlatforms}>配置中介业务</PermissionButton>
           </Form.Item>
         ) : null}
+        {editingField?.field_key === "payment_pool_id" && onConfigurePools ? (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={onConfigurePools}>配置资金账户</PermissionButton>
+          </Form.Item>
+        ) : null}
+        {editingField && ["customer_source", "dg_customer_source", "dfq_customer_source", "supplier_source"].includes(editingField.field_key) && onConfigurePartySources ? (
+          <Form.Item>
+            <PermissionButton permission="field-definition.manage" onClick={onConfigurePartySources}>
+              {editingField.field_key === "supplier_source" ? "配置供货方来源" : "配置客户来源"}
+            </PermissionButton>
+          </Form.Item>
+        ) : null}
         <Form.Item
           name="required"
           label="必填"
@@ -397,6 +447,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
             placeholder="不启用"
             options={dependencyOptions}
             className="ui-control-width-180"
+            popupClassName="order-form-field-option-pop"
             onChange={(value: string | undefined) => {
               if (value) form.setFieldsValue({ required: false, cond_op: form.getFieldValue("cond_op") ?? "eq" });
             }}
@@ -404,7 +455,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
         </Form.Item>
         {condFieldKey ? (
           <Form.Item name="cond_op" label="条件" initialValue="eq">
-            <Select options={CONDITION_OP_OPTIONS} className="ui-control-width-110" />
+            <Select options={CONDITION_OP_OPTIONS} className="ui-control-width-110" popupClassName="order-form-field-option-pop" />
           </Form.Item>
         ) : null}
         {condFieldKey && condOp !== "filled" ? (
@@ -414,12 +465,13 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
               options={triggerOptions}
               placeholder="选值或输入后回车"
               className="ui-control-width-200"
+              popupClassName="order-form-field-option-pop"
             />
           </Form.Item>
         ) : null}
         <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
         <Form.Item>
-          <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit">
+          <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit" form={editorFormId}>
             {editingId === null ? "新增字段" : "保存字段"}
           </PermissionButton>
         </Form.Item>
@@ -482,6 +534,7 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
             onChange={setSectionFilter}
             className="ui-control-width-180"
             options={[{ value: "ALL", label: "全部板块" }, ...FIELD_SECTION_OPTIONS]}
+            popupClassName="order-form-section-filter-pop"
           />
           <Typography.Text strong>状态筛选</Typography.Text>
           <Select

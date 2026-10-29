@@ -1,7 +1,8 @@
 /** 资金操作抽屉：金额类动作必须走抽屉/弹窗提交，禁止列表内直接登记。 */
-import { Button, Drawer, Form, Input, InputNumber, Select, Space } from "antd";
+import { Button, Drawer, Form, Input, InputNumber, Space } from "antd";
 import type { ReactNode } from "react";
 import { InlineError } from "./InlineError";
+import { Select } from "./Select";
 
 export interface DrawerField {
   name: string;

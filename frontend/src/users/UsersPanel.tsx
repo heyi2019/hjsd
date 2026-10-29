@@ -1,9 +1,9 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-import { Card, Form, Input, Modal, Select, Space } from "antd";
+import { Card, Form, Input, Modal, Space } from "antd";
 import { useEffect, useState } from "react";
 import { errorMessage } from "../shared/api/client";
 import { poolsApi, teamsApi, usersApi, type ManagedUser, type Pool, type Team } from "../shared/api/catalog";
-import { ConfirmButton, DataTable, PermissionButton } from "../shared/ui";
+import { ConfirmButton, DataTable, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 

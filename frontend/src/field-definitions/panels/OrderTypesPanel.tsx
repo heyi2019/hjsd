@@ -1,5 +1,5 @@
 import { appMessage, appModal } from "../../shared/ui/appFeedback";
-import { Card, Form, Input, Modal, Select, Space, Typography, InputNumber } from "antd";
+import { Card, Form, Input, Modal, Space, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { orderTypesApi, type OrderType, type OrderTypeRoute } from "../../shared/api/catalog";
@@ -7,7 +7,7 @@ import { poolsApi, type Pool, type RouteImpactPreview } from "../../shared/api/c
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
   BUSINESS: "本方经营",

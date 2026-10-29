@@ -1190,3 +1190,43 @@
 
 /* 容器内错误提示（Modal / Drawer 内部）下边距：原用内联 style 控制，迁移到此处（ui_guards 规则 11）。 */
 .inline-error { margin-block-end: var(--space-3); }
+.order-cancel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.order-cancel-meta .ant-form-item,
+.order-cancel-meta .ant-form-item-control,
+.order-cancel-meta .ant-form-item-control-input,
+.order-cancel-meta .ant-form-item-control-input-content {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.order-cancel-meta .ant-form-item {
+  margin-bottom: 0;
+}
+
+.order-cancel-meta .responsible-employee-select .ant-form-item-control {
+  flex: 1 1 auto !important;
+  overflow: hidden;
+}
+
+.order-cancel-meta .responsible-employee-select .ant-select,
+.order-cancel-meta .responsible-employee-select .ant-select-selector {
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.order-cancel-meta .responsible-employee-select .ant-select-selection-overflow {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}

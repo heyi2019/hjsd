@@ -1,15 +1,16 @@
 /** 审计查询：按对象、动作、操作人、时间追溯操作记录，数据范围由后端权限控制。 */
-import { Card, Input, Select } from "antd";
+import { Card, Input } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { auditApi, type AuditLogRow } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { useListViewColumns } from "../shared/lib/listColumns";
 
 /** 词典未加载时的回落值，与改造前硬编码一致。 */
 const ENTITY_TYPE_FALLBACK = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
-import { DataTable, ErrorBanner } from "../shared/ui";
+import { DataTable, ErrorBanner, Select } from "../shared/ui";
 
 export function AuditPanel() {
   const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_FALLBACK;
@@ -43,6 +44,7 @@ export function AuditPanel() {
   useEffect(() => {
     auditApi.actions().then(setActionOptions).catch(() => setActionOptions([]));
   }, []);
+  const { arrange: arrangeColumns } = useListViewColumns("AUDIT_LOG");
   const columns: ColumnsType<AuditLogRow> = [
     { title: "时间", dataIndex: "occurred_at" },
     { title: "操作人", dataIndex: "actor" },
@@ -77,7 +79,7 @@ export function AuditPanel() {
           <Input aria-label="审计开始日期" placeholder="开始日期" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
           <Input aria-label="审计结束日期" placeholder="结束日期" value={toDate} onChange={(event) => setToDate(event.target.value)} />
         </div>
-        <DataTable<AuditLogRow> columns={columns} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无审计记录" onPageChange={() => undefined}/>
+        <DataTable<AuditLogRow> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无审计记录" onPageChange={() => undefined}/>
       </Card>
     </section>
   );

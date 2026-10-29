@@ -723,6 +723,7 @@ class TestOrdersApi:
                 "note": "售出动作备注",
                 "bound_phone": "13900000000",
                 "bound_phone_owner": "李四",
+                "operator_user_ids": [1],
             },
             headers=headers,
         )
@@ -739,6 +740,7 @@ class TestOrdersApi:
         assert body["event"]["offset_event_id"] is None
         assert body["event"]["created_at"]
         assert body["event"]["posted_at"]
+        assert seeded_db.get(OrderEvent, body["event"]["id"]).operator_user_ids == [1]
 
     def test_viewer_cannot_post_event(self, seeded_client, headers, viewer_headers):
         order = seeded_client.post(

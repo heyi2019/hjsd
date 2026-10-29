@@ -41,11 +41,11 @@ describe("InventoryPanel：库存编号（KU 编码）", () => {
   it("不同业务类型的库存账号均显示各自 stock_no（含 DG/DFQ 衍生）", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("KU_00004");
-    // HS 回收 / TH 提号 / DG 代挂 / DFQ 代分期 各自的库存编号
+    // 库存中心只展示仍在库的 HS 回收 / DG 代挂 / DFQ 代分期账号
     expect(screen.getByText("KU_00001")).toBeInTheDocument();
-    expect(screen.getByText("KU_00002")).toBeInTheDocument();
     expect(screen.getByText("KU_00003")).toBeInTheDocument();
     expect(screen.getByText("KU_00004")).toBeInTheDocument();
+    expect(screen.queryByText("KU_00002")).toBeNull();
   });
 
   it("导出 CSV 的库存编号列取自 stock_no（含 DG/DFQ 衍生）", () => {

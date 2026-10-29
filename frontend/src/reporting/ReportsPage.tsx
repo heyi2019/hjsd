@@ -1,5 +1,5 @@
 /** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。 */
-import { Card, Input, Select, Space, Tabs, Typography } from "antd";
+import { Card, Input, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
@@ -36,9 +36,11 @@ import {
   StatRow,
   StatusTag,
   PermissionButton,
+  Select,
   useCompactLayout,
 } from "../shared/ui";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
+import { useListViewColumns } from "../shared/lib/listColumns";
 
 const REPORT_NAMES = [
   "inventory-health",
@@ -195,6 +197,9 @@ export function ReportsPage({ onNavigate, active = true }: { onNavigate?: (key: 
             导出
           </PermissionButton>
         </div>
+        <Typography.Text type="secondary">
+          导出列与「设置 → 列表字段」一致：被隐藏的列不导出，表头与枚举值均为中文（取自选项词典）；合计行独有字段仍保留在末尾。
+        </Typography.Text>
         {exportError ? <Typography.Text type="danger">{exportError}</Typography.Text> : null}
       </Card>
       <Tabs
@@ -249,6 +254,7 @@ function InventoryReport() {
     () => reportsApi.inventoryHealth(),
     [],
   );
+  const { arrange: arrangeInventoryHealth } = useListViewColumns("RPT_INVENTORY_HEALTH");
   const columns: ColumnsType<InventoryHealthRow> = [
     { title: "游戏账号/产品", dataIndex: "game_account" },
     { title: "平台", dataIndex: "platform", width: 110 },
@@ -286,10 +292,10 @@ function InventoryReport() {
         ]}
       />
       {compact ? (
-            <MobileReportCards<InventoryHealthRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<InventoryHealthRow>[]} />
+            <MobileReportCards<InventoryHealthRow> rows={data?.items ?? []} columns={arrangeInventoryHealth(columns) as unknown as ReportCardColumn<InventoryHealthRow>[]} />
           ) : (
             <DataTable<InventoryHealthRow>
-        columns={columns}
+        columns={arrangeInventoryHealth(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}
@@ -310,6 +316,7 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
     () => reportsApi.monthlyPnl(params),
     [params.from, params.to],
   );
+  const { arrange: arrangeMonthlyPnl } = useListViewColumns("RPT_MONTHLY_PNL");
   const columns: ColumnsType<MonthlyPnlRow> = [
     { title: "月份", dataIndex: "month", width: 110 },
     { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -335,10 +342,10 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
         ]}
       />
       {compact ? (
-            <MobileReportCards<MonthlyPnlRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<MonthlyPnlRow>[]} />
+            <MobileReportCards<MonthlyPnlRow> rows={data?.items ?? []} columns={arrangeMonthlyPnl(columns) as unknown as ReportCardColumn<MonthlyPnlRow>[]} />
           ) : (
             <DataTable<MonthlyPnlRow>
-        columns={columns}
+        columns={arrangeMonthlyPnl(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}
@@ -359,6 +366,7 @@ function Commission({ range }: { range: ReportRange }) {
     () => reportsApi.commission(params),
     [params.from, params.to],
   );
+  const { arrange: arrangeCommission } = useListViewColumns("RPT_COMMISSION");
   const columns: ColumnsType<CommissionRow> = [
     { title: "人员 ID", dataIndex: "user_id", width: 100 },
     { title: "订单号", dataIndex: "order_no", width: 160 },
@@ -387,10 +395,10 @@ function Commission({ range }: { range: ReportRange }) {
         ]}
       />
       {compact ? (
-            <MobileReportCards<CommissionRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<CommissionRow>[]} />
+            <MobileReportCards<CommissionRow> rows={data?.items ?? []} columns={arrangeCommission(columns) as unknown as ReportCardColumn<CommissionRow>[]} />
           ) : (
             <DataTable<CommissionRow>
-        columns={columns}
+        columns={arrangeCommission(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}
@@ -411,9 +419,10 @@ function DailyFunds() {
     () => reportsApi.dailyFunds({ on: reportOn }),
     [reportOn],
   );
+  const { arrange: arrangeDailyFunds } = useListViewColumns("RPT_DAILY_FUNDS");
   const columns: ColumnsType<DailyFundsRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 150 },
-    { title: "名称", dataIndex: "pool_name"},
+    { title: "名称", key: "pool_label", dataIndex: "pool_name"},
     { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -442,10 +451,10 @@ function DailyFunds() {
         ]}
       />
       {compact ? (
-            <MobileReportCards<DailyFundsRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<DailyFundsRow>[]} />
+            <MobileReportCards<DailyFundsRow> rows={data?.items ?? []} columns={arrangeDailyFunds(columns) as unknown as ReportCardColumn<DailyFundsRow>[]} />
           ) : (
             <DataTable<DailyFundsRow>
-        columns={columns}
+        columns={arrangeDailyFunds(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}
@@ -466,6 +475,7 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
     () => reportsApi.financeDimensions(params),
     [params.from, params.to],
   );
+  const { arrange: arrangeFinanceDim } = useListViewColumns("RPT_FINANCE_DIM");
   const columns: ColumnsType<FinanceDimensionRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 130 },
     { title: "资金性质", dataIndex: "fund_nature", width: 120, render: (v: string) => FUND_NATURE_LABEL[v] ?? v },
@@ -487,10 +497,10 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
         ]}
       />
       {compact ? (
-            <MobileReportCards<FinanceDimensionRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<FinanceDimensionRow>[]} />
+            <MobileReportCards<FinanceDimensionRow> rows={data?.items ?? []} columns={arrangeFinanceDim(columns) as unknown as ReportCardColumn<FinanceDimensionRow>[]} />
           ) : (
             <DataTable<FinanceDimensionRow>
-        columns={columns}
+        columns={arrangeFinanceDim(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}
@@ -511,6 +521,7 @@ function BusinessPnl({ range }: { range: ReportRange }) {
     () => reportsApi.businessPnl(params),
     [params.from, params.to],
   );
+  const { arrange: arrangeBusinessPnl } = useListViewColumns("RPT_BUSINESS_PNL");
   const columns: ColumnsType<BusinessPnlRow> = [
     {
       title: "业务",
@@ -551,10 +562,10 @@ function BusinessPnl({ range }: { range: ReportRange }) {
         ]}
       />
       {compact ? (
-            <MobileReportCards<BusinessPnlRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<BusinessPnlRow>[]} />
+            <MobileReportCards<BusinessPnlRow> rows={data?.items ?? []} columns={arrangeBusinessPnl(columns) as unknown as ReportCardColumn<BusinessPnlRow>[]} />
           ) : (
             <DataTable<BusinessPnlRow>
-        columns={columns}
+        columns={arrangeBusinessPnl(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}
@@ -575,6 +586,7 @@ function OrderProfit({ range }: { range: ReportRange }) {
     () => reportsApi.orderProfit(params),
     [params.from, params.to],
   );
+  const { arrange: arrangeOrderProfit } = useListViewColumns("RPT_ORDER_PROFIT");
   const columns: ColumnsType<OrderProfitRow> = [
     { title: "订单号", dataIndex: "order_no", width: 160 },
     { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）`},
@@ -603,10 +615,10 @@ function OrderProfit({ range }: { range: ReportRange }) {
         ]}
       />
       {compact ? (
-            <MobileReportCards<OrderProfitRow> rows={data?.items ?? []} columns={columns as unknown as ReportCardColumn<OrderProfitRow>[]} />
+            <MobileReportCards<OrderProfitRow> rows={data?.items ?? []} columns={arrangeOrderProfit(columns) as unknown as ReportCardColumn<OrderProfitRow>[]} />
           ) : (
             <DataTable<OrderProfitRow>
-        columns={columns}
+        columns={arrangeOrderProfit(columns)}
         rows={data?.items ?? []}
         loading={loading}
         page={1}

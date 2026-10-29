@@ -29,6 +29,10 @@ export function DataTable<T>(props: {
   scroll?: TableProps<T>["scroll"];
   /** 需要隐藏或自定义分页时透传给 antd；未传时保持统一默认分页。 */
   pagination?: TableProps<T>["pagination"];
+  /** 需要行选择（批量操作）时透传给 antd；未传时不渲染选择框。 */
+  rowSelection?: TableProps<T>["rowSelection"];
+  /** 需要给行挂事件/属性（如拖拽排序）时透传给 antd；未传时用默认渲染。 */
+  onRow?: TableProps<T>["onRow"];
   className?: string;
   size?: TableProps<T>["size"];
 }) {
@@ -103,6 +107,8 @@ export function DataTable<T>(props: {
         dataSource={props.rows}
         rowKey={props.rowKey ?? defaultRowKey}
         expandable={props.expandable}
+        rowSelection={props.rowSelection}
+        onRow={props.onRow}
         // 横向滚动为表格默认标准：内容超出容器（“看不到了”）时自动可滑动；
         // 调用方传 scroll 则覆盖默认值（如 InventoryDetail 的固定宽度）。
         scroll={props.scroll ?? { x: "max-content" }}

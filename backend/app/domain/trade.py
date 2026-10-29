@@ -802,6 +802,8 @@ class OrderFormField(Base, AuditMixin):
         String(16), nullable=False, server_default="TEXT"
     )
     options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # 资金字段的流向属性：IN=收入，OUT=支出；非资金字段为空。
+    flow_direction: Mapped[str | None] = mapped_column(String(8), nullable=True)
     required: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("0")
     )
@@ -820,7 +822,7 @@ class OrderFormField(Base, AuditMixin):
     is_custom: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=sa.text("0")
     )
-    # 字段归属板块：账号/产品、参与方、费用资金、业务方案、其他补充。
+    # 字段归属板块：账号/产品、客户/供货方、费用资金、业务方案、其他补充。
     section: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="EXTRA"
     )

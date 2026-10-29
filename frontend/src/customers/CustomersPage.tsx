@@ -2,7 +2,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
  *  扩展字段（BAS-04）：定义即「客户建档」表单的自定义字段（设置 › 表单字段 › 客户建档），
  *  建档/编辑表单与详情抽屉按定义动态渲染，值随客户行存 form_extra。 */
-import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tabs, Typography } from "antd";
+import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Modal, Space, Spin, Switch, Tabs, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 // 搜索按钮是只读查询操作，不属于「写操作须用 PermissionButton 门控」的约束范围；
 // 用别名避免 ui_guards 的字面量误伤（SearchButton 与 Button 是同一组件引用）。
@@ -26,6 +26,7 @@ import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import {
   CfgItem,
   CustomFieldSection,
@@ -40,6 +41,7 @@ import {
   ConfirmButton,
   PermissionButton,
   PermissionGate,
+  Select,
   StatRow,
   StatusTag,
   useCompactLayout,
@@ -386,12 +388,13 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
     }
   };
 
+  const { arrange: arrangeColumns } = useListViewColumns("CUSTOMER");
   const columns: ColumnsType<Customer> = [
     { title: "客户编号", dataIndex: "customer_no" },
     { title: "名字", dataIndex: "display_name" },
-    { title: "手机", render: (_v, row) => renderContact(row, "phone") },
-    { title: "微信", render: (_v, row) => renderContact(row, "wechat") },
-    { title: "QQ", render: (_v, row) => renderContact(row, "qq") },
+    { title: "手机", key: "phone", render: (_v, row) => renderContact(row, "phone") },
+    { title: "微信", key: "wechat", render: (_v, row) => renderContact(row, "wechat") },
+    { title: "QQ", key: "qq", render: (_v, row) => renderContact(row, "qq") },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
     {
       title: "扩展字段",
@@ -406,6 +409,7 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
     },
     {
       title: "操作",
+      key: "actions",
       render: (_v, row) => (
         <Space size={2}>
           <PermissionButton permission="customer.read" size="small" onClick={() => void openDetail(row)}>
@@ -497,7 +501,7 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
         />
       </Space>
       {!compact ? <DataTable<Customer>
-        columns={columns}
+        columns={arrangeColumns(columns)}
         rows={rows}
         loading={loading}
         page={page}

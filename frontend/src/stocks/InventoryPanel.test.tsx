@@ -53,14 +53,13 @@ describe("InventoryPanel：账号台账", () => {
 
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
-    expect(screen.getByText("提号")).toBeInTheDocument();
     for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
-    expect(await screen.findByRole("menuitem", { name: "取消交易" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "取消交易" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "平台下架" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
     expect(document.querySelector(".inventory-more-menu")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
@@ -198,13 +197,12 @@ describe("InventoryPanel：账号台账", () => {
     expect(csv).not.toContain("返点资金");
   });
 
-  it("渲染账号编号、标识与状态标签", async () => {
+  it("渲染在库账号编号、标识与状态标签", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("columnheader", { name: "订单号" })).toBeInTheDocument();
     expect(await screen.findByText("HS-2026-0001")).toBeInTheDocument();
-    expect(screen.getByText("TH-2026-0002")).toBeInTheDocument();
     expect(screen.getAllByText("在库").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("已售").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("TH-2026-0002")).toBeNull();
   });
 
   it("按未售出时长显示绿色、黄色和红色提醒", async () => {
@@ -229,17 +227,11 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getAllByText("31天")).toHaveLength(1);
   });
 
-  it("回收账号售出后描述与图片入口置灰不可点", async () => {
+  it("售出账号不进入库存中心", async () => {
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([{ ...accounts[0], id: 33, status: "SOLD" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("acc-1");
-    expect(screen.getByRole("button", { name: "寄售" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "编辑" })).not.toBeDisabled();
-    await ui.click(screen.getByRole("button", { name: "更多" }));
-    expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: "账号描述" })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: "账号图片" })).toBeNull();
+    await waitFor(() => expect(screen.queryByText("acc-1")).toBeNull());
+    expect(screen.getByText("暂无账号")).toBeInTheDocument();
   });
 
   it("编辑账号时默认只展示核心资料输入，低频资料收纳到更多资料", async () => {
@@ -260,19 +252,14 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByLabelText("编辑绑定手机号")).toBeVisible();
   });
 
-  it("统计卡：在库/分期中为计数，占用成本为金额（只统计在库+分期中）", async () => {
+  it("统计卡：只统计在库账号与占用成本", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("在库 / 分期中");
-    const occupied = screen.getByText("在库 / 分期中").closest(".ui-stat");
+    await screen.findByText("在库账号");
+    const occupied = screen.getByText("在库账号").closest(".ui-stat");
     expect(occupied?.textContent).toContain("1");
     const cost = screen.getByText("占用成本合计").closest(".ui-stat");
-    expect(cost?.textContent).toContain("100.00"); // 只算 IN_STOCK 的 100，SOLD 的 200 不计
-    // 「已售」同时是统计卡 label 与状态标签 → 只在统计卡容器里找
-    const sold = screen
-      .getAllByText("已售")
-      .map((el) => el.closest(".ui-stat"))
-      .find(Boolean);
-    expect(sold?.textContent).toContain("1");
+    expect(cost?.textContent).toContain("100.00");
+    expect(screen.queryByText("已售")).toBeNull();
   });
 
   it("后端不可达 → 错误条落地", async () => {

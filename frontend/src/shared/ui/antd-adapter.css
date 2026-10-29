@@ -268,11 +268,6 @@
   color: var(--color-error) !important;
 }
 
-:where(.ant-select-item-option-selected:not(.ant-select-item-option-disabled), .ant-select-item-option-active:not(.ant-select-item-option-disabled)) {
-  background: var(--brand-soft) !important;
-  color: var(--primary-ink) !important;
-}
-
 :where(.ant-empty .ant-empty-img-simple-ellipse) {
   fill: var(--brand-soft) !important;
 }
@@ -326,11 +321,6 @@
          .ant-dropdown .ant-dropdown-menu,
          .ant-picker-dropdown .ant-picker-panel) {
     animation: ui-spring-in var(--dur-spring) var(--ease-spring) both !important;
-  }
-  /* 业务下拉（Select 封装 ui-select-pop）入场收敛为极短淡入、无位移缩放（设计裁决）。
-     不再强制覆盖 animation-name：离场必须交还给 antd，才能正常触发卸载。 */
-  :where(.ant-select-dropdown.ui-select-pop) {
-    transition: opacity 0.12s linear !important;
   }
 }
 

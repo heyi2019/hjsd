@@ -6,7 +6,7 @@ import { optionSetsApi, type OptionItem } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
-function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
+export function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
   const [rows, setRows] = useState<OptionItem[]>([]);
   const [editingValue, setEditingValue] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);

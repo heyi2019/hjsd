@@ -1,10 +1,10 @@
 import { appMessage, appModal } from "../../shared/ui/appFeedback";
-import { Card, Checkbox, Form, Input, InputNumber, Popconfirm, Select, Space, Table, Typography } from "antd";
+import { Card, Checkbox, Form, Input, InputNumber, Popconfirm, Space, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./GameTypeSettingsPanel.css";
 
 export function GameTypeSettingsPanel() {

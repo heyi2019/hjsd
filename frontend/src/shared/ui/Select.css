@@ -1,0 +1,18 @@
+/* 统一业务下拉的选项节奏与选中态；只作用于 Select 封装注入的 ui-select-pop。 */
+:where(.ui-select-pop .ant-select-item-option-selected:not(.ant-select-item-option-disabled),
+        .ui-select-pop .ant-select-item-option-active:not(.ant-select-item-option-disabled)) {
+  background: var(--brand-soft) !important;
+  color: var(--primary-ink) !important;
+}
+
+:where(.ui-select-pop .ant-select-item-option) {
+  margin: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* 只收敛入场透明度；离场交还 antd，保证弹层能正常卸载。 */
+@media (prefers-reduced-motion: no-preference) {
+  :where(.ant-select-dropdown.ui-select-pop) {
+    transition: opacity 0.12s linear !important;
+  }
+}

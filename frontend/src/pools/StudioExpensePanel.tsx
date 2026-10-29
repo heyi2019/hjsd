@@ -9,7 +9,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
  * - **承载资金池可勾选**：配置落在选项词典 `STUDIO_EXPENSE_POOL`（value=池 code），
  *   科目字典落在 `STUDIO_EXPENSE_ITEM`；首次保存时自动补建词典，服务端存储 ⇒ 全员同步。
  */
-import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
+import { Card, Form, Input, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -32,6 +32,7 @@ import {
   MoneyInput,
   MoneyText,
   PermissionButton,
+  Select,
   StatRow,
   StatusTag,
 } from "../shared/ui";

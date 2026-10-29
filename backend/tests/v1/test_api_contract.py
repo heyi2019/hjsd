@@ -36,9 +36,13 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    # public_routes = 167（实测）。基线演变：160 → 161（GET /order-form-fields/scopes）
+    # public_routes = 170（实测）。基线演变：160 → 161（GET /order-form-fields/scopes）
     # → 166（状态收口五端点：policy supersede / expire-sweep、rebate void、
     # deposit cancel、import batch reject）→ 167（补 game-types DELETE 豁免后复核：
-    # 该路由此前因缺 response_model 在中途断言失败，掩盖了计数差异，实际总数已是 167）。
+    # 该路由此前因缺 response_model 在中途断言失败，掩盖了计数差异，实际总数已是 167）
+    # → 170（168 为并行会话新增端点后的实测值；列表列配置再 +2：GET /list-columns、
+    # PUT /list-columns/{scope}）→ 171（+DELETE /list-columns/{scope}：恢复默认）
+    # → 174（自定义列 +3：GET /list-columns/custom-fields、POST /list-columns/{scope}/custom、
+    # DELETE /list-columns/{scope}/custom/{column_key}）。
     # 以当前应用实际路由数为准。
-    assert public_routes == 167
+    assert public_routes == 174

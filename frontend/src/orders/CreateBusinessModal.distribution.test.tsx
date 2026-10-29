@@ -55,7 +55,7 @@ async function openTypedModal(orderType: string, user = "admin") {
 describe("CreateBusinessModal：新建业务写路径", () => {
 it("提号建单：复用回收费用与付款结构，并登记供货方", async () => {
     resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 8, order_no: "TH-2026-0008", status: "ACTIVE" });
-    const { container, onCreated } = await openTypedModal("TH");
+    const { onCreated } = await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
@@ -66,7 +66,7 @@ it("提号建单：复用回收费用与付款结构，并登记供货方", asyn
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(container.querySelector(".payment-info-fields .ant-select-selector") as Element);
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
@@ -181,10 +181,10 @@ it("增加代分期期数时自动补充分期计划", async () => {
     const periods = screen.getByPlaceholderText("请输入期数");
     await ui.clear(periods);
     await ui.type(periods, "3");
-    expect(screen.getByText("第 3 期")).toBeInTheDocument();
+    expect(screen.getByLabelText("第 3 期到期日")).toBeInTheDocument();
   });
 
-it("减少期数前确认删除已填写的到期日", async () => {
+it("减少期数时同步移除多余到期日", async () => {
     await openTypedModal("DFQ");
     const periods = screen.getByPlaceholderText("请输入期数");
     await ui.clear(periods);
@@ -192,10 +192,9 @@ it("减少期数前确认删除已填写的到期日", async () => {
     await ui.type(screen.getAllByPlaceholderText("请选择日期")[1], "2026-11-01{enter}");
     await ui.clear(periods);
     await ui.type(periods, "1");
-    expect((await screen.findAllByText("减少期数会删除已填写的到期日")).length).toBeGreaterThan(0);
-    await ui.click(screen.getByRole("button", { name: /保留期次/ }));
-    expect(periods).toHaveValue("2");
-    expect(screen.getByText("第 2 期")).toBeInTheDocument();
+    expect(periods).toHaveValue("1");
+    expect(screen.getByLabelText("第 1 期到期日")).toBeInTheDocument();
+    expect(screen.queryByLabelText("第 2 期到期日")).toBeNull();
   });
 
 it("代分期不接受负手续费", async () => {
@@ -205,14 +204,12 @@ it("代分期不接受负手续费", async () => {
     expect(await screen.findByText("手续费必须为非负金额")).toBeInTheDocument();
   });
 
-it("代分期期数必须为正整数且与计划数量一致", async () => {
+it("代分期期数同步计划并校验正整数", async () => {
     await openTypedModal("DFQ");
     const periods = screen.getByPlaceholderText("请输入期数");
     await ui.clear(periods);
     await ui.type(periods, "2");
-    await ui.click(screen.getByRole("button", { name: /添加期次/ }));
-    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    expect(await screen.findByText("分期计划数量须与期数一致")).toBeInTheDocument();
+    expect(screen.getByLabelText("第 2 期到期日")).toBeInTheDocument();
     await ui.clear(periods);
     await ui.type(periods, "1.5");
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
@@ -228,8 +225,7 @@ it("代分期表单展示金额、可自定义期次和付款信息", async () =
     expect(screen.getByText("分期计划")).toBeInTheDocument();
     expect(screen.getByText("付款信息")).toBeInTheDocument();
     expect(screen.queryByLabelText("关联订单编号")).toBeNull();
-    expect(screen.getByText("第 1 期")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /添加期次/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("第 1 期到期日")).toBeInTheDocument();
     expect(container.querySelector('[id$="customer_nickname"]')).toBeInTheDocument();
   });
 });

@@ -6,11 +6,14 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.attachments.schemas import AttachmentOut
 from app.core.schemas import normalize_product_aliases
+
+FlowDirection = Literal["BASE", "IN", "OUT"]
 
 
 class CustomerRoleInput(BaseModel):
@@ -232,12 +235,14 @@ class EventCreate(BaseModel):
     offset_event_id: int | None = None
     reason: str | None = None
     refund_responsibility: str | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     flow_category: str | None = Field(
         default=None, description="COST 时可填 FEE / DESIGN / OTHER"
     )
     note: str | None = None
     bound_phone: str | None = Field(default=None, max_length=64)
     bound_phone_owner: str | None = Field(default=None, max_length=128)
+    form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
     # 表单字段配置体系：操作类作用域自定义字段值，落 OrderEvent.form_extra。
     form_extra: dict[str, object] | None = None
 
@@ -259,6 +264,7 @@ class EventOut(BaseModel):
     posted_at: datetime | None = None
     reason: str | None = None
     refund_responsibility: str | None = None
+    operator_user_ids: list[int] | None = None
     note: str | None = None
     form_extra: dict[str, object] | None = None
     created_at: datetime
@@ -451,6 +457,7 @@ class OrderFormFieldOut(BaseModel):
     label: str
     field_type: str
     options: list[FieldOption] | None = None
+    flow_direction: FlowDirection | None = None
     required: bool
     required_when: RequiredWhen | None = None
     is_active: bool
@@ -479,6 +486,7 @@ class OrderFormFieldCreate(BaseModel):
     label: str = Field(min_length=1, max_length=128)
     field_type: str = "TEXT"
     options: list[FieldOption] | None = None
+    flow_direction: FlowDirection | None = None
     required: bool = False
     required_when: RequiredWhen | None = None
     is_active: bool = True
@@ -499,6 +507,7 @@ class OrderFormFieldUpdate(BaseModel):
     label: str | None = None
     field_type: str | None = None
     options: list[FieldOption] | None = None
+    flow_direction: FlowDirection | None = None
     required: bool | None = None
     required_when: RequiredWhen | None = None
     sort_order: int | None = None

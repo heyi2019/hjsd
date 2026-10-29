@@ -1,4 +1,5 @@
-import { Form, Input, Modal, Select, Typography } from "antd";
+import { Form, Input, Modal, Typography } from "antd";
+import { Select } from "../shared/ui";
 import { useEffect } from "react";
 import { SCOPE_OPTIONS, today } from "./policyConstants";
 import { describeConfig } from "./policyConfigSchema";

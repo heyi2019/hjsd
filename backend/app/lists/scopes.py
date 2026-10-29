@@ -1,0 +1,318 @@
+"""lists.scopes：列表列清单注册表（全站单一事实源）。
+
+与 `orders.form_scopes` 同构：设置页「列表字段」的作用域与列中文名只在这里定义，
+经 GET /list-columns 下发；前端不再维护第二份列名清单，避免三处文案漂移。
+
+`locked=True` 的列是「身份列/操作列」，不允许隐藏 —— 否则表格会失去主键或失去
+操作入口，用户只能靠重新配置救回来。
+
+`value_set` 声明「这一列的取值是 option_sets 里哪组字典的代码值」（如 ORDER_STATUS）。
+列注册表只声明归属，不复制字典文案：导出时由 lists.get_value_labels() 现查 option_sets
+表组装「代码值 → 中文」，因此管理员改了可编辑字典，导出口径会跟着变。
+没有 value_set 的列（金额/日期/文本）不做值翻译。
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ListColumn:
+    key: str
+    label: str
+    locked: bool = False
+    value_set: str | None = None
+
+
+@dataclass(frozen=True)
+class ListScope:
+    code: str
+    label: str
+    columns: tuple[ListColumn, ...]
+
+
+LIST_SCOPES: tuple[ListScope, ...] = (
+    ListScope(
+        code="LEDGER",
+        label="业务台账",
+        columns=(
+            ListColumn("order_no", "订单号", locked=True),
+            ListColumn("party", "对方 / 来源"),
+            ListColumn("account_game_type", "游戏/产品类型"),
+            ListColumn("account_game_account", "游戏账号/产品"),
+            ListColumn("account_platform", "平台"),
+            ListColumn("event_total", "金额"),
+            ListColumn("account_status", "库存状态"),
+            ListColumn("last_event_type", "最新动作"),
+            ListColumn("status", "状态"),
+            ListColumn("link_status", "关联"),
+            ListColumn("trade_date", "日期"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+    ListScope(
+        code="INVENTORY",
+        label="库存中心",
+        columns=(
+            ListColumn("stock_no", "库存编号", locked=True),
+            ListColumn("game_type", "游戏/产品类型"),
+            ListColumn("game_account", "游戏账号/产品"),
+            ListColumn("source_order_no", "订单号"),
+            ListColumn("business_mode", "业务"),
+            ListColumn("inventory_type", "业务类型"),
+            ListColumn("value_added_service", "增值服务"),
+            ListColumn("platform", "平台"),
+            ListColumn("inventory_age", "未售时长"),
+            ListColumn("status", "状态"),
+            ListColumn("cost_amount", "成本"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+    ListScope(
+        code="INSTALLMENT",
+        label="分期与回款",
+        columns=(
+            ListColumn("inst_no", "合约号", locked=True),
+            ListColumn("order", "订单"),
+            ListColumn("business", "业务"),
+            ListColumn("order_type", "类型"),
+            ListColumn("product", "产品"),
+            ListColumn("party", "对方"),
+            ListColumn("receivable", "总应收"),
+            ListColumn("service_fee", "服务费"),
+            ListColumn("per_period_service_fee", "每期服务费"),
+            ListColumn("paid_amount", "已收"),
+            ListColumn("bad_debt", "坏账"),
+            ListColumn("remaining", "剩余"),
+            ListColumn("status", "状态"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+    ListScope(
+        code="CUSTOMER",
+        label="客户",
+        columns=(
+            ListColumn("customer_no", "客户编号", locked=True),
+            ListColumn("display_name", "名字"),
+            ListColumn("phone", "手机"),
+            ListColumn("wechat", "微信"),
+            ListColumn("qq", "QQ"),
+            ListColumn("status", "状态"),
+            ListColumn("extra_values", "扩展字段"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+    ListScope(
+        code="REBATE",
+        label="返点",
+        columns=(
+            ListColumn("rebate_no", "返点单号", locked=True),
+            ListColumn("source_order", "来源订单"),
+            ListColumn("business", "业务"),
+            ListColumn("order_type", "类型"),
+            ListColumn("game", "游戏/产品类型"),
+            ListColumn("party", "对方"),
+            ListColumn("base_amount", "基数"),
+            ListColumn("rate", "费率"),
+            ListColumn("expected_on", "预计到账"),
+            ListColumn("status", "状态"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+    ListScope(
+        code="CASHFLOW",
+        label="资金流水",
+        columns=(
+            ListColumn("flow_no", "流水号", locked=True),
+            ListColumn("order_no", "订单号"),
+            ListColumn("occurred_on", "日期"),
+            ListColumn("category", "类别"),
+            ListColumn("fund_nature", "资金性质"),
+            ListColumn("accounting_attribute", "核算属性"),
+            ListColumn("direction", "收支"),
+            ListColumn("nature", "流向"),
+            ListColumn("amount", "金额"),
+            ListColumn("source", "来源"),
+            ListColumn("status", "状态"),
+            ListColumn("audit", "审核追溯"),
+            ListColumn("note", "备注"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+    ListScope(
+        code="RPT_INVENTORY_HEALTH",
+        label="报表·库存健康",
+        columns=(
+            ListColumn("game_account", "游戏账号/产品", locked=True),
+            ListColumn("platform", "平台"),
+            ListColumn("status", "状态", value_set="INVENTORY_STATUS"),
+            ListColumn("buy_amount", "买入"),
+            ListColumn("extra_cost", "附加成本"),
+            ListColumn("total_cost", "占用成本"),
+            ListColumn("holding_days", "持有天数"),
+        ),
+    ),
+    ListScope(
+        code="RPT_MONTHLY_PNL",
+        label="报表·月度损益",
+        columns=(
+            ListColumn("month", "月份", locked=True),
+            ListColumn("sales_income", "销售收入"),
+            ListColumn("account_direct_cost", "账号直接成本"),
+            ListColumn("operating_expense", "运营费用"),
+            ListColumn("rebate_income", "返点收益"),
+            ListColumn("operating_profit", "经营利润"),
+        ),
+    ),
+    ListScope(
+        code="RPT_COMMISSION",
+        label="报表·提成对账",
+        columns=(
+            ListColumn("user_id", "人员 ID", locked=True),
+            ListColumn("order_no", "订单号"),
+            ListColumn("profit_base", "利润基数"),
+            ListColumn("rate", "费率"),
+            ListColumn("payable", "应付"),
+            ListColumn("paid", "已付"),
+            ListColumn("difference", "差异"),
+        ),
+    ),
+    ListScope(
+        code="RPT_DAILY_FUNDS",
+        label="报表·资金日报",
+        columns=(
+            ListColumn("pool_name", "资金池", locked=True),
+            # 同一行 pool_name 被页面重复渲染成「名称」列，这里用独立 key 以免两列联动
+            ListColumn("pool_label", "名称"),
+            ListColumn("opening", "期初"),
+            ListColumn("income", "收入"),
+            ListColumn("expense", "支出"),
+            ListColumn("deposit_held", "押金占用"),
+            ListColumn("cash_balance", "现金余额"),
+            ListColumn("available", "可用余额"),
+        ),
+    ),
+    ListScope(
+        code="RPT_FINANCE_DIM",
+        label="报表·资金属性分析",
+        columns=(
+            ListColumn("pool_name", "资金池", locked=True),
+            ListColumn("fund_nature", "资金性质", value_set="FUND_FLOW_FUND_NATURE"),
+            ListColumn("accounting_attribute", "核算属性", value_set="FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
+            ListColumn("direction", "现金方向", value_set="FUND_FLOW_DIRECTION"),
+            ListColumn("flow_count", "笔数"),
+            ListColumn("amount", "发生额"),
+            ListColumn("signed_amount", "净方向金额"),
+        ),
+    ),
+    ListScope(
+        code="RPT_BUSINESS_PNL",
+        label="报表·业务损益",
+        columns=(
+            ListColumn("order_type", "业务", locked=True, value_set="ORDER_BUSINESS"),
+            ListColumn("main_income", "主营收入"),
+            ListColumn("main_cost", "主营成本"),
+            ListColumn("main_profit", "主营毛利"),
+            ListColumn("settled_rebate", "已结算返点"),
+            ListColumn("uncollected_rebate", "未归集返点"),
+            ListColumn("full_income", "完整收益"),
+        ),
+    ),
+    ListScope(
+        code="RPT_ORDER_PROFIT",
+        label="报表·订单利润明细",
+        columns=(
+            ListColumn("order_no", "订单号", locked=True),
+            ListColumn("order_type", "业务", value_set="ORDER_BUSINESS"),
+            ListColumn("trade_date", "成交日"),
+            ListColumn("status", "状态", value_set="ORDER_STATUS"),
+            ListColumn("income", "收入"),
+            ListColumn("direct_cost", "直接成本"),
+            ListColumn("rebate", "返点"),
+            ListColumn("net_profit", "净利"),
+        ),
+    ),
+    ListScope(
+        code="POOL_BALANCE",
+        label="数据中心·资金池概览",
+        columns=(
+            ListColumn("pool_code", "资金池", locked=True),
+            ListColumn("status", "状态"),
+            ListColumn("income", "收入"),
+            ListColumn("expense", "支出"),
+            ListColumn("deposit_held", "押金"),
+            ListColumn("available", "可用余额"),
+        ),
+    ),
+    ListScope(
+        code="AUDIT_LOG",
+        label="审计记录",
+        columns=(
+            ListColumn("occurred_at", "时间", locked=True),
+            ListColumn("actor", "操作人"),
+            ListColumn("action", "动作"),
+            ListColumn("entity_type", "对象类型"),
+            ListColumn("entity_id", "对象编号"),
+            ListColumn("reason", "原因"),
+        ),
+    ),
+    ListScope(
+        code="QUALITY_METRIC",
+        label="质量·月度指标",
+        columns=(
+            ListColumn("month", "月份", locked=True),
+            ListColumn("reconciliation_completion_rate", "对账完成率"),
+            ListColumn("overdue_rate", "分期逾期率"),
+            ListColumn("missing_attachment_rate", "缺附件率"),
+        ),
+    ),
+    ListScope(
+        code="QUALITY_ISSUE",
+        label="质量·问题工单",
+        columns=(
+            ListColumn("issue_no", "工单号", locked=True),
+            ListColumn("severity", "级别"),
+            ListColumn("title", "标题"),
+            ListColumn("target", "对象"),
+            ListColumn("status", "状态"),
+            ListColumn("message", "问题"),
+            ListColumn("actions", "操作", locked=True),
+        ),
+    ),
+)
+
+SCOPE_MAP: dict[str, ListScope] = {scope.code: scope for scope in LIST_SCOPES}
+
+
+def get_scope(code: str) -> ListScope | None:
+    return SCOPE_MAP.get(code)
+
+
+# 报表导出（GET /reports/{name}/export.csv）与列配置的桥：报表名 → 列作用域。
+# 导出据此只导「当前可见列」，并沿用注册表里的中文表头与顺序，
+# 使「界面看到的列」与「导出的列」是同一份口径。
+REPORT_COLUMN_SCOPES: dict[str, str] = {
+    "inventory-health": "RPT_INVENTORY_HEALTH",
+    "monthly-pnl": "RPT_MONTHLY_PNL",
+    "commission": "RPT_COMMISSION",
+    "daily-funds": "RPT_DAILY_FUNDS",
+    "finance-dimensions": "RPT_FINANCE_DIM",
+    "business-pnl": "RPT_BUSINESS_PNL",
+    "order-profit": "RPT_ORDER_PROFIT",
+}
+
+
+def report_scope(report_name: str) -> ListScope | None:
+    """报表名对应的列作用域（大小写/空白不敏感）；未登记返回 None。"""
+    return get_scope(REPORT_COLUMN_SCOPES.get(report_name.strip().lower(), ""))
+
+
+__all__ = [
+    "LIST_SCOPES",
+    "REPORT_COLUMN_SCOPES",
+    "SCOPE_MAP",
+    "ListColumn",
+    "ListScope",
+    "get_scope",
+    "report_scope",
+]

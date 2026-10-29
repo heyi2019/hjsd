@@ -85,6 +85,7 @@ def _event_output(event: OrderEvent) -> schemas.EventOut:
             "posted_at": event.posted_at,
             "reason": event.reason,
             "refund_responsibility": event.refund_responsibility,
+            "operator_user_ids": event.operator_user_ids,
             "note": event.note,
             "form_extra": event.form_extra,
             "created_at": event.created_at,
@@ -599,10 +600,12 @@ def post_event(
         offset_event_id=payload.offset_event_id,
         reason=payload.reason,
         refund_responsibility=payload.refund_responsibility,
+        operator_user_ids=payload.operator_user_ids,
         flow_category=payload.flow_category,
         note=payload.note,
         bound_phone=payload.bound_phone,
         bound_phone_owner=payload.bound_phone_owner,
+        form_extra_scope=payload.form_extra_scope,
         form_extra=payload.form_extra,
         user=user,
     )
@@ -685,6 +688,7 @@ def create_order_form_field(
             actor=_user.username,
             field_type=payload.field_type,
             options=payload.options,
+            flow_direction=payload.flow_direction if payload.flow_direction else None,
             required=payload.required,
             required_when=(
                 payload.required_when.model_dump() if payload.required_when is not None else None
@@ -716,6 +720,8 @@ def update_order_form_field(
         extra["required_when"] = (
             payload.required_when.model_dump() if payload.required_when is not None else None
         )
+    if "flow_direction" in payload.model_fields_set:
+        extra["flow_direction"] = payload.flow_direction if payload.flow_direction else None
 
     return schemas.OrderFormFieldOut.model_validate(
         ff.update_order_form_field(

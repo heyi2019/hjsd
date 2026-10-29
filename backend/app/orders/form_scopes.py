@@ -35,7 +35,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("DG", "代挂建单", GROUP_ORDER),
     FormScope("DFQ", "代分期建单", GROUP_ORDER),
     # ---- 订单操作（迁移 0019）----
-    FormScope("ORDERCANC", "取消交易", GROUP_ORDER_OP),
+    FormScope("ORDERCANC", "售出取消交易", GROUP_ORDER_OP),
     FormScope("ORDEREDIT", "编辑订单", GROUP_ORDER_OP),
     FormScope("ORDERLINK", "订单关联", GROUP_ORDER_OP),
     FormScope("ALLOCATION", "订单分润", GROUP_ORDER_OP),
@@ -45,7 +45,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("CONSIGN", "寄售", GROUP_INVENTORY),
     FormScope("INVREBATE", "库存返点", GROUP_INVENTORY),
     # ---- 库存操作（迁移 0019）----
-    FormScope("INVREFUND", "库存退款登记", GROUP_INVENTORY_OP),
+    FormScope("INVREFUND", "库存取消交易", GROUP_INVENTORY_OP),
     FormScope("INVOID", "下架登记", GROUP_INVENTORY_OP),
     FormScope("INVCANCEL", "分期退款终止", GROUP_INVENTORY_OP),
     FormScope("INVEDIT", "编辑账号及执行明细", GROUP_INVENTORY_OP),

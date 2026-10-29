@@ -5,8 +5,8 @@
  *    此前在根容器上用 `animation: ui-spring-in ... both !important` 钉死所有状态，
  *    关闭时动画名不变、浏览器不重播、rc-motion 收不到 animationend → 弹层永远不 hidden
  *    → 下拉关不掉（点开第二个时第一个仍残留展开，2026-10-13 复现）。
- *  - 本组件给弹层注入 classNames.popup.root="ui-select-pop"，由 antd-adapter.css 在该类上
- *    仅覆盖「入场态」*-enter-active（极短 0.12s 淡入，无位移缩放，解决「下拉出现太久」），
+ *  - 本组件给弹层注入 classNames.popup.root="ui-select-pop"；Select.css 统一处理选项间距、选中态
+ *    与极短淡入（无位移缩放，解决「下拉出现太久」），
  *    离场交还 antd 原生，关闭流程恢复正常。弹簧入场此前曾钉死根容器导致关不掉，
  *    故 Select 下拉不走弹簧、改极短淡入（2026-10-13 用户裁决 B）。
  *
@@ -15,6 +15,7 @@
 import { Select as AntdSelect } from "antd";
 import type { SelectProps } from "antd";
 import { forwardRef } from "react";
+import "./Select.css";
 
 type SelectRef = React.ElementRef<typeof AntdSelect>;
 

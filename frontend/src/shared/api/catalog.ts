@@ -307,6 +307,7 @@ export interface OrderEvent {
   offset_event_id?: number | null;
   reason?: string | null;
   refund_responsibility?: string | null;
+  operator_user_ids?: number[] | null;
   note?: string | null;
   form_extra?: Record<string, unknown> | null;
   is_posted: boolean;
@@ -395,6 +396,7 @@ export interface AccountExecutionEvent {
   amount: string;
   occurred_on: string;
   occurred_at?: string | null;
+  pool_id?: number | null;
   offset_event_id?: number | null;
   portion: string;
   delivery_mode?: string | null;
@@ -836,10 +838,12 @@ export const ordersApi = {
       offset_event_id?: number;
       reason?: string;
       refund_responsibility?: "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER";
+      operator_user_ids?: number[];
       flow_category?: string;
       note?: string;
       bound_phone?: string;
       bound_phone_owner?: string;
+      form_extra_scope?: string;
       form_extra?: Record<string, unknown>;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
@@ -1067,6 +1071,7 @@ export interface OrderFormField {
   label: string;
   field_type: string;
   options?: Array<string | { value: string; label: string }> | null;
+  flow_direction?: "IN" | "OUT" | null;
   required: boolean;
   /** 条件必填：与 required 互斥；为空即纯选填 */
   required_when?: RequiredWhen | null;
@@ -1099,6 +1104,88 @@ export const orderFormFieldsApi = {
       .patch<OrderFormField>(`/order-form-fields/${id}/active?active=${active}`)
       .then((r) => r.data),
   remove: (id: number) => api.delete(`/order-form-fields/${id}`),
+};
+
+/* ── 列表列显示配置（业务台账 / 库存中心 / 分期与回款） ────────── */
+
+export interface ListColumnConfig {
+  key: string;
+  label: string;
+  /** 锁定列（身份列/操作列）不可隐藏，后端二次校验 */
+  locked: boolean;
+  is_visible: boolean;
+  sort_order: number;
+  /** 列宽覆盖值（px）；null/undefined = 沿用列定义自身宽度 */
+  width?: number | null;
+  /** 固定列；null/undefined = 不固定 */
+  fixed?: "left" | "right" | null;
+  /** 管理员新增的自定义列（绑定表单自定义字段） */
+  custom?: boolean;
+  /** 取值键：行数据 form_extra / extra_values 里的字段键 */
+  source_key?: string | null;
+  /** 选项码 → 中文展示名（SELECT / MULTI_SELECT） */
+  value_labels?: Record<string, string> | null;
+}
+
+export interface ListScopeConfig {
+  code: string;
+  label: string;
+  columns: ListColumnConfig[];
+}
+
+/** 可新增为自定义列的表单字段候选（全部启用中的自定义字段）。 */
+export interface ListCustomFieldOption {
+  scope: string;
+  scope_label: string;
+  field_key: string;
+  label: string;
+  field_type: string;
+  options: Array<{ value: string; label: string }>;
+  /** 数据中已有值的键（无字段定义，按原值展示，标注来源与行数） */
+  data_only?: boolean;
+  source_label?: string | null;
+  row_count?: number | null;
+}
+
+/** 列表列配置：读全量（含隐藏列），写整表覆盖某列表；自定义列可新增/删除。 */
+export const listColumnsApi = {
+  all: () => api.get<ListScopeConfig[]>("/list-columns").then((r) => r.data),
+  save: (
+    scope: string,
+    items: Array<Pick<ListColumnConfig, "key" | "is_visible" | "sort_order" | "width" | "fixed">>,
+  ) =>
+    api
+      .put<ListScopeConfig>(`/list-columns/${scope}`, {
+        items: items.map((item) => ({
+          column_key: item.key,
+          is_visible: item.is_visible,
+          sort_order: item.sort_order,
+          width: item.width ?? null,
+          fixed: item.fixed ?? null,
+        })),
+      })
+      .then((r) => r.data),
+  /** 恢复默认：清空该列表的显示配置；自定义列定义保留，需单独删除。 */
+  reset: (scope: string) =>
+    api.delete<ListScopeConfig>(`/list-columns/${scope}`).then((r) => r.data),
+  /** 可新增为自定义列的表单自定义字段（按作用域标注）。 */
+  customFields: () =>
+    api.get<ListCustomFieldOption[]>("/list-columns/custom-fields").then((r) => r.data),
+  /** 新增一列；label 省略则沿用字段标签。 */
+  addCustom: (scope: string, fieldKey: string, label?: string) =>
+    api
+      .post<ListScopeConfig>(`/list-columns/${scope}/custom`, {
+        field_key: fieldKey,
+        label: label?.trim() || null,
+      })
+      .then((r) => r.data),
+  /** 删除自定义列定义及其显示配置。 */
+  removeCustom: (scope: string, columnKey: string) =>
+    api
+      .delete<ListScopeConfig>(
+        `/list-columns/${scope}/custom/${encodeURIComponent(columnKey)}`,
+      )
+      .then((r) => r.data),
 };
 
 /* ── T20：选项词典（D 类筛选器 / 业务字典） ────────────── */

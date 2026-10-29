@@ -144,6 +144,30 @@ describe("OrdersPage：四类业务台账", () => {
     expect(await screen.findByText("取消交易")).toBeInTheDocument();
   });
 
+  it("代挂订单的操作入口显示系统下架而不是取消交易", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+      ...orders,
+      {
+        id: 3,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        capital_type: "ZERO",
+        trade_date: "2026-10-03",
+        status: "ACTIVE",
+        account_id: 9,
+      },
+    ]);
+    await openLedger("admin");
+
+    const row = screen.getAllByText("DG-2026-0003").find((element) => element.closest("tr"))?.closest("tr");
+    expect(row).not.toBeNull();
+    fireEvent.click(within(row as HTMLElement).getByText("更多"));
+
+    fireEvent.click(await screen.findByText("系统下架"));
+    expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("取消交易")).toBeNull();
+  });
+
   it("加载失败时展示错误条", async () => {
     vi.mocked(catalog.ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);

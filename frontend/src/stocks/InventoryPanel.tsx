@@ -1,18 +1,18 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Dropdown, Form, Input, Modal, Segmented, Select, Space, Typography } from "antd";
+import { Card, Dropdown, Form, Input, Modal, Segmented, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState, type Key } from "react";
-import { stocksApi, employeesApi, installmentsApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
+import { stocksApi, employeesApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
 import {
   DataTable,
   ErrorBanner,
-  MoneyInput,
   MoneyText,
   PermissionButton,
+  Select,
   StatRow,
   StatusTag,
   useCompactLayout,
@@ -24,6 +24,7 @@ import { InventoryRebateModal } from "./InventoryRebateModal";
 import { InventoryDetail } from "./InventoryDetail";
 import type { InventoryPartyLink } from "./InventoryDetailView";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
+import "./InventoryPanel.css";
 import {
   BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
@@ -34,7 +35,7 @@ import {
 } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { requiredMoneyRules } from "../shared/lib/validators";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
@@ -51,9 +52,6 @@ function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
     items.push({ key: "platform-remove", label: "平台下架" });
   }
   if (canSystemOffsale) items.push({ key: "system-remove", label: "系统下架" });
-  if (["SOLD", "INSTALLMENT"].includes(row.status)) {
-    items.push({ key: "cancel", label: row.status === "INSTALLMENT" ? "终止分期并退款" : "取消交易", danger: true });
-  }
   if (row.status !== "SOLD") {
     items.push({ key: "description", label: "账号描述" }, { key: "images", label: "账号图片" });
   }
@@ -83,6 +81,7 @@ export function findCancelableEvent(detail: AccountExecutionDetail, eventType: "
           eventId: event.id,
           amount: remaining.toFixed(2),
           portion: event.portion,
+          poolId: event.pool_id ?? undefined,
         };
       }
     }
@@ -173,7 +172,6 @@ export function MobileInventoryList({
 
 export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: { refreshKey?: number; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [rows, setRows] = useState<Account[]>([]);
-  const [status, setStatus] = useState<string | undefined>(undefined);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
   const [valueAddedService, setValueAddedService] = useState<string | undefined>(undefined);
@@ -194,33 +192,26 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const compact = useCompactLayout();
   const [savingAccount, setSavingAccount] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   const [voiding, setVoiding] = useState(false);
-  const [installmentCancelTarget, setInstallmentCancelTarget] = useState<{ account: Account; installmentId: number; contractType: string } | null>(null);
-  const [refundForm] = Form.useForm();
   const [voidForm] = Form.useForm();
-  const [instCancelForm] = Form.useForm();
   const [invEditExtraForm] = Form.useForm();
-  const [cancelling, setCancelling] = useState(false);
-  const [cancellingInstallment, setCancellingInstallment] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型 / 增值服务）。
-  const statusOptions = useOptionSet("INVENTORY_STATUS");
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
   const valueAddedOptions = useOptionSet("VALUE_ADDED_SERVICE");
   const load = useCallback(async () => {
     try {
-      const list = await stocksApi.list(status ? { status } : undefined);
+      const list = await stocksApi.list({ status: "IN_STOCK" });
       setRows(list ?? []);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, [status]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -231,17 +222,18 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   }, [refreshKey]);
 
   const visibleRows = (rows ?? []).filter((row) => {
+    const matchesStatus = row.status === "IN_STOCK";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
     const matchesType = !inventoryType || row.inventory_type === inventoryType;
     const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
     const text = [row.game_account, row.game_type, row.channel_region, row.platform]
       .filter(Boolean).join(" ").toLowerCase();
     const matchesKeyword = !keyword.trim() || text.includes(keyword.trim().toLowerCase());
-    return matchesBusiness && matchesType && matchesKeyword;
+    return matchesStatus && matchesBusiness && matchesType && matchesValueAdded && matchesKeyword;
   });
   // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
   const orderedRows = [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id));
-  const visibleOccupied = visibleRows.filter((row) => ["IN_STOCK", "INSTALLMENT"].includes(row.status));
+  const visibleOccupied = visibleRows;
   const totalCost = visibleOccupied.reduce((sum, row) => sum + Number(row.cost_amount), 0).toFixed(2);
 
   function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
@@ -336,114 +328,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     }
   }
 
-  async function openCancellation(account: Account) {
-    try {
-      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
-      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
-      const sale = findCancelableSale(detail);
-      if (!sale) {
-        appMessage.warning("未找到可退款的售出流水，请先检查交易明细");
-        return;
-      }
-      setCancelTarget({ account, ...sale });
-      refundForm.setFieldsValue({ refund_amount: sale.amount, reason: undefined });
-    } catch (cause) {
-      setError(normalizeError(cause));
-    }
-  }
-
-  async function openInstallmentCancellation(account: Account) {
-    try {
-      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
-      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
-      const order = [...detail.orders].reverse().find((item) => item.status === "ACTIVE");
-      if (!order) {
-        appMessage.warning("未找到进行中的分期订单");
-        return;
-      }
-      const contracts = await installmentsApi.list({ order_id: order.order_id });
-      const contract = contracts.find((item) => ["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(item.status));
-      if (!contract) {
-        appMessage.warning("未找到可终止的分期合约");
-        return;
-      }
-      setInstallmentCancelTarget({ account, installmentId: contract.id, contractType: contract.contract_type });
-      instCancelForm.setFieldsValue({ reason: undefined });
-    } catch (cause) {
-      setError(normalizeError(cause));
-    }
-  }
-
-  async function submitCancellation(values: { refund_amount: string; reason: string; form_extra?: Record<string, unknown> }) {
-    if (!cancelTarget) return;
-    if (!values.refund_amount?.trim() || Number.isNaN(Number(values.refund_amount)) || Number(values.refund_amount) <= 0) {
-      appMessage.error("请输入有效的退款金额");
-      return;
-    }
-    setCancelling(true);
-    try {
-      await ordersApi.postEvent(cancelTarget.orderId, {
-        event_type: "CANCEL",
-        amount: values.refund_amount.trim(),
-        occurred_on: new Date().toISOString().slice(0, 10),
-        portion: cancelTarget.portion,
-        offset_event_id: cancelTarget.eventId,
-        reason: values.reason.trim(),
-        form_extra: values.form_extra,
-        note: "取消交易，原路退款",
-      });
-      appMessage.success(cancelTarget.account.inventory_type === "PICKUP"
-        ? "退款已登记，提号交易已结束"
-        : "退款已登记，账号已回到在库");
-      const accountId = cancelTarget.account.id;
-      setCancelTarget(null);
-      refundForm.resetFields();
-      setExecutionDetails((current) => {
-        const next = { ...current };
-        delete next[accountId];
-        return next;
-      });
-      await load();
-      // 取消交易产生 CANCEL 流水并可能回库，同步通知上层重拉台账与分期列表。
-      onOrdersChanged?.();
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      setCancelling(false);
-    }
-  }
-
-  async function submitInstallmentCancellation(values: { reason: string; form_extra?: Record<string, unknown> }) {
-    if (!installmentCancelTarget || !values.reason?.trim()) {
-      appMessage.error("请填写退款原因");
-      return;
-    }
-    setCancellingInstallment(true);
-    try {
-      await installmentsApi.cancel(installmentCancelTarget.installmentId, {
-        cancelled_on: new Date().toISOString().slice(0, 10),
-        reason: values.reason.trim(),
-        form_extra: values.form_extra,
-      });
-      appMessage.success(installmentCancelTarget.contractType === "PICKUP_SALE" ? "退款已登记，提号交易已结束" : "退款已登记，账号已回到库存");
-      const accountId = installmentCancelTarget.account.id;
-      setInstallmentCancelTarget(null);
-      instCancelForm.resetFields();
-      setExecutionDetails((current) => {
-        const next = { ...current };
-        delete next[accountId];
-        return next;
-      });
-      await load();
-      // 分期终止会改订单与合约状态，同步通知上层重拉台账与分期列表。
-      onOrdersChanged?.();
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      setCancellingInstallment(false);
-    }
-  }
-
   function handleMoreAction(key: string, row: Account) {
     if (key === "platform-remove") {
       void openPlatformOffsale(row);
@@ -453,10 +337,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       void openVoid(row);
       return;
     }
-    if (key === "cancel") {
-      void (row.status === "INSTALLMENT" ? openInstallmentCancellation(row) : openCancellation(row));
-      return;
-    }
     if (key === "description") {
       openProfile(row, "description");
       return;
@@ -464,6 +344,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     if (key === "images") openProfile(row, "images");
   }
 
+  const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
   const columns: ColumnsType<Account> = [
     { title: "库存编号", dataIndex: "stock_no", width: 86, ellipsis: true },
     { title: "游戏/产品类型", dataIndex: "game_type", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
@@ -678,9 +559,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
 
       <StatRow
         items={[
-          { label: "在库 / 分期中", kind: "count", amount: String(visibleOccupied.length) },
+          { label: "在库账号", kind: "count", amount: String(visibleOccupied.length) },
           { label: "占用成本合计", amount: totalCost },
-          { label: "已售", kind: "count", amount: String(visibleRows.filter((r) => r.status === "SOLD").length) },
         ]}
       />
 
@@ -689,7 +569,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         title="账号台账"
         extra={
           <Space wrap>
-            <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={status} options={statusOptions ?? []} onChange={(value) => { setStatus(value); setPage(1); }} />
             <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
             <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
             <Input
@@ -741,7 +620,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         ) : (
           <DataTable<Account>
             className="inventory-table"
-            columns={columns}
+            columns={arrangeColumns(columns)}
             rows={orderedRows}
             page={page}
             pageSize={pageSize}
@@ -799,31 +678,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         }}
       />
       <Modal
-        title="退款登记"
-        open={Boolean(cancelTarget)}
-        okText="确认退款并取消交易"
-        cancelText="返回"
-        confirmLoading={cancelling}
-        onOk={() => refundForm.submit()}
-        onCancel={() => { if (!cancelling) { setCancelTarget(null); refundForm.resetFields(); } }}
-      >
-        {cancelTarget ? <Form form={refundForm} layout="vertical" onFinish={(values) => void submitCancellation(values as { refund_amount: string; reason: string; form_extra?: Record<string, unknown> })}>
-          <p className="muted">
-            交易 {cancelTarget.account.source_order_no || "-"} 将按原售出流水和原资金池原路退款。
-            {cancelTarget.account.inventory_type === "PICKUP" ? "提号取消后直接结束，不回库存。" : "取消后账号回到库存。"}
-          </p>
-          <FieldConfigScope scope="INVREFUND" active={Boolean(cancelTarget)}>
-          <CfgItem name="refund_amount" label="退款金额" rules={requiredMoneyRules("退款金额")}>
-            <MoneyInput aria-label="退款金额" inputMode="decimal" />
-          </CfgItem>
-          <CfgItem name="reason" label="退款原因" rules={[{ required: true, message: "请填写退款原因" }]}>
-            <Input.TextArea aria-label="取消原因" rows={3} placeholder="请输入退款原因" />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="inv-refund" />
-          </FieldConfigScope>
-        </Form> : null}
-      </Modal>
-      <Modal
         title="系统下架登记"
         open={Boolean(voidTarget)}
         okText="确认下架"
@@ -860,28 +714,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           onOrdersChanged?.();
         }}
       />
-      <Modal
-        title="退款登记"
-        open={Boolean(installmentCancelTarget)}
-        okText="确认退款并终止分期"
-        cancelText="返回"
-        confirmLoading={cancellingInstallment}
-        onOk={() => instCancelForm.submit()}
-        onCancel={() => { if (!cancellingInstallment) { setInstallmentCancelTarget(null); instCancelForm.resetFields(); } }}
-      >
-        {installmentCancelTarget ? <Form form={instCancelForm} layout="vertical" onFinish={(values) => void submitInstallmentCancellation(values as { reason: string; form_extra?: Record<string, unknown> })}>
-          <p className="muted">
-            分期收款将按原资金池原路退款。
-            {installmentCancelTarget.contractType === "PICKUP_SALE" ? "提号取消后账号直接结束。" : installmentCancelTarget.contractType === "ADVANCE_PURCHASE" ? "取消后终止分期合约。" : "取消后账号回到库存。"}
-          </p>
-          <FieldConfigScope scope="INVCANCEL" active={Boolean(installmentCancelTarget)}>
-          <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请填写退款原因" }]}>
-            <Input.TextArea aria-label="分期取消原因" rows={3} placeholder="请输入退款及取消原因" />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="inv-cancel" />
-          </FieldConfigScope>
-        </Form> : null}
-      </Modal>
       <Modal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); invEditExtraForm.resetFields(); } }}>
         {editingAccount ? <>
           <div className="inventory-edit-core" aria-label="核心账号资料">

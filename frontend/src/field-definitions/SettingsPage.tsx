@@ -13,6 +13,8 @@ import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
 import { IntermediaryPlatformSettingsPanel } from "./panels/IntermediaryPlatformSettingsPanel";
 import { OrderTypesPanel } from "./panels/OrderTypesPanel";
 import { OrderFormFieldsPanel } from "./panels/OrderFormFieldsPanel";
+import { ListColumnsPanel } from "./panels/ListColumnsPanel";
+import { PartySourceSettingsPanel } from "./panels/PartySourceSettingsPanel";
 import { PeriodLocksPanel } from "./panels/PeriodLocksPanel";
 import { PoolsAndRoutesPanel } from "./panels/PoolsAndRoutesPanel";
 import { SequencesPanel } from "./panels/SequencesPanel";
@@ -56,13 +58,16 @@ export function SettingsPage() {
   const items: TabItem[] = [
     { key: "business-dictionary", label: "业务字典", render: () => <BusinessDictionaryPanel /> },
     { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
-    { key: "form-fields", label: "表单字段", render: (nav) => <OrderFormFieldsPanel initialScope={pendingScope ?? undefined} onConfigureGameTypes={() => nav("game-types")} onConfigureIntermediaryPlatforms={() => nav("intermediary-platforms")} /> },
+    { key: "form-fields", label: "表单字段", render: (nav) => <OrderFormFieldsPanel initialScope={pendingScope ?? undefined} onConfigureGameTypes={() => nav("game-types")} onConfigureIntermediaryPlatforms={() => nav("intermediary-platforms")} onConfigurePools={() => nav("pools")} onConfigurePartySources={() => nav("party-sources")} /> },
+    // 列表字段：哪些列显示 + 列的先后顺序（业务台账 / 库存中心 / 分期与回款）。
+    { key: "list-columns", label: "列表字段", render: () => <ListColumnsPanel /> },
     // 编号序列与业务类型同源（sequence_prefix），读取门控与后端 manage_order_types 一致。
     ...(can("order-type.manage") ? [{ key: "sequences", label: "编号序列", render: () => <SequencesPanel /> }] : []),
     // 资金池与资金路由合并为一个页签：池是主体、路由是去向，页内用视图切换。
     { key: "pools", label: "资金池", render: () => <PoolsAndRoutesPanel /> },
     { key: "game-types", label: "游戏与渠道配置", render: () => <GameTypeSettingsPanel /> },
     { key: "intermediary-platforms", label: "中介业务配置", render: () => <IntermediaryPlatformSettingsPanel /> },
+    { key: "party-sources", label: "参与方来源", render: () => <PartySourceSettingsPanel /> },
     { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
     ...(can("finance.period.lock")
       ? [{ key: "period-locks", label: "月结账期锁", render: () => <PeriodLocksPanel /> }]

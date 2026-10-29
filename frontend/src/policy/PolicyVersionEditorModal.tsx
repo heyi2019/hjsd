@@ -1,4 +1,5 @@
-import { Alert, Form, Input, InputNumber, Modal, Select, Space, Typography } from "antd";
+import { Alert, Form, Input, InputNumber, Modal, Space, Typography } from "antd";
+import { Select } from "../shared/ui";
 import { useEffect, useState } from "react";
 import {
   configToFields,

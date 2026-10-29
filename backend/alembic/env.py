@@ -22,7 +22,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.core.database import Base  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
-from app.domain import attachments, foundation, imports, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 模型
+from app.domain import attachments, foundation, imports, lists, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 模型
 
 config = context.config
 if config.config_file_name is not None:

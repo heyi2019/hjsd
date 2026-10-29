@@ -7,7 +7,7 @@ import { AdditionalFeeFields } from "../AdditionalFeeFields";
 import "../recovery/RecoveryFeeSection.css";
 import "./ThFeeSection.css";
 
-/** 提号沿用回收页费用明细，仅将付款对象切换为供货方。 */
+/** 提号沿用回收页费用明细。 */
 export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }) {
   const purchaseAmount = Form.useWatch("th_purchase_amount");
   const intermediaryFee = Form.useWatch("intermediary_fee");

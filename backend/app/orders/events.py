@@ -83,6 +83,7 @@ def post_event(
     offset_event_id: int | None = None,
     reason: str | None = None,
     refund_responsibility: str | None = None,
+    operator_user_ids: list[int] | None = None,
     flow_category: str | None = None,
     note: str | None = None,
     bound_phone: str | None = None,
@@ -128,6 +129,16 @@ def post_event(
         ) from exc
 
     order = get_order(session, order_id, user)
+    if operator_user_ids is not None:
+        if len(set(operator_user_ids)) != len(operator_user_ids):
+            raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
+        active_ids = set(
+            session.scalars(
+                select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))
+            ).all()
+        )
+        if active_ids != set(operator_user_ids):
+            raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
     assert_period_open(session, occurred_on, operation="登记业务事件")
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
@@ -365,6 +376,7 @@ def post_event(
         offset_event_id=offset_event_id,
         reason=reason,
         refund_responsibility=refund_responsibility,
+        operator_user_ids=operator_user_ids,
         note=note,
         form_extra=event_form_extra or None,
         is_posted=True,

@@ -6,7 +6,7 @@
  *
  * 只读：不提供任何写入口，写入一律回各配置项自己的页面。
  */
-import { Card, DatePicker, Input, Select, Space, Typography } from "antd";
+import { Card, DatePicker, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -14,7 +14,7 @@ import { auditApi, type AuditLogRow } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel } from "../../shared/lib/optionSets";
-import { DataTable, ErrorBanner, StatusTag } from "../../shared/ui";
+import { DataTable, ErrorBanner, Select, StatusTag } from "../../shared/ui";
 import { ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../configCatalog";
 
 /** 一次最多取回的条数：配置类改动量级有限，前端分页足够，不做服务端翻页。 */

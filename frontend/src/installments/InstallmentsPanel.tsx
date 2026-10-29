@@ -1,6 +1,6 @@
 /** 分期：按业务合约类型分列，支持 HS / DFQ / TH / DG 的收款与风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, Form, Input, Modal, Segmented, Select, Space, Tabs, Typography } from "antd";
+import { Button, Card, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -23,12 +23,14 @@ import {
   MoneyInput,
   MoneyText,
   PermissionButton,
+  Select,
   StatRow,
   StatusTag,
   useCompactLayout,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { useSession, type Permission } from "../shared/state/session";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 
@@ -299,18 +301,22 @@ function ContractTable({
   const totalReceivable = rows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
   const totalPaid = rows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);
 
+  const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const columns: ColumnsType<Installment> = [
     { title: "合约号", dataIndex: "inst_no" },
     {
       title: "订单",
+      key: "order",
       render: (_v, row) => orders.find((order) => order.id === row.order_id)?.order_no ?? row.order_id,
     },
     {
       title: "业务",
+      key: "business",
       render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.order_id)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
+      key: "order_type",
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.order_id);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
@@ -318,6 +324,7 @@ function ContractTable({
     },
     {
       title: "产品",
+      key: "product",
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
@@ -325,10 +332,12 @@ function ContractTable({
     },
     {
       title: "对方",
+      key: "party",
       render: (_v, row) => orders.find((order) => order.id === row.order_id)?.party_name || "-",
     },
     {
       title: "总应收",
+      key: "receivable",
       align: "right",
       render: (_v, row) => <MoneyText value={receivable(row).toFixed(2)} />,
     },
@@ -358,6 +367,7 @@ function ContractTable({
     },
     {
       title: "剩余",
+      key: "remaining",
       align: "right",
       render: (_v, row) => (
         <MoneyText
@@ -370,6 +380,7 @@ function ContractTable({
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("INSTALLMENT_STATUS", v, INSTALLMENT_STATUS_LABEL)} /> },
     {
       title: "操作",
+      key: "actions",
       render: (_v, row) => (
         <Space size={2}>
           <PermissionButton
@@ -553,7 +564,7 @@ function ContractTable({
           />
         ) : (
           <DataTable<Installment>
-            columns={columns}
+            columns={arrangeColumns(columns)}
             rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
             loading={loading}
             page={1}

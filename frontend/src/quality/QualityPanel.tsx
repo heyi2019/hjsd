@@ -1,12 +1,13 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
-import { Card, Form, Input, Modal, Select, Space, Tooltip } from "antd";
+import { Card, Form, Input, Modal, Space, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualityMetricRow, type QualityMetricValue, type QualityMetrics, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { DataTable, ErrorBanner, InlineError, PermissionButton, StatRow, StatusTag } from "../shared/ui";
+import { DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { useListViewColumns } from "../shared/lib/listColumns";
 
 const QUALITY_STATUS_LABEL: Record<string, string> = { OPEN: "待处理", IN_PROGRESS: "处理中", CLOSED: "已关闭" };
 
@@ -165,33 +166,39 @@ export function QualityPanel() {
   };
 
   const metricDefinitions = metrics?.definitions ?? {};
+  const { arrange: arrangeMetricColumns } = useListViewColumns("QUALITY_METRIC");
   const metricColumns: ColumnsType<QualityMetricRow> = [
     { title: "月份", dataIndex: "month" },
     {
       title: metricDefinitions.reconciliation_completion_rate?.label ?? "对账完成率",
+      key: "reconciliation_completion_rate",
       render: (_v, row) =>
         renderMetric(row.reconciliation_completion_rate, metricDefinitions.reconciliation_completion_rate?.formula),
     },
     {
       title: metricDefinitions.overdue_rate?.label ?? "分期逾期率",
+      key: "overdue_rate",
       render: (_v, row) => renderMetric(row.overdue_rate, metricDefinitions.overdue_rate?.formula),
     },
     {
       title: metricDefinitions.missing_attachment_rate?.label ?? "缺附件率",
+      key: "missing_attachment_rate",
       render: (_v, row) =>
         renderMetric(row.missing_attachment_rate, metricDefinitions.missing_attachment_rate?.formula),
     },
   ];
 
+  const { arrange: arrangeColumns } = useListViewColumns("QUALITY_ISSUE");
   const columns: ColumnsType<QualityIssue> = [
     { title: "工单号", dataIndex: "issue_no" },
     { title: "级别", dataIndex: "severity", render: (v: string) => <StatusTag status={v} optionSet="QUALITY_SEVERITY" /> },
     { title: "标题", dataIndex: "title" },
-    { title: "对象", render: (_v, row) => `${row.entity_type}:${row.entity_id}` },
+    { title: "对象", key: "target", render: (_v, row) => `${row.entity_type}:${row.entity_id}` },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("QUALITY_STATUS", v, QUALITY_STATUS_LABEL)} /> },
     { title: "问题", dataIndex: "message" },
     {
       title: "操作",
+      key: "actions",
       render: (_v, row) => row.status === "OPEN" ? (
         <Space size={2}>
           <PermissionButton permission="order.exception.approve" size="small" loading={updating} onClick={() => void updateIssueStatus(row, "IN_PROGRESS")}>开始处理</PermissionButton>
@@ -221,7 +228,7 @@ export function QualityPanel() {
         }
       >
         <DataTable<QualityMetricRow>
-          columns={metricColumns}
+          columns={arrangeMetricColumns(metricColumns)}
           rows={metrics?.items ?? []}
           loading={metricsLoading}
           page={1}
@@ -232,7 +239,7 @@ export function QualityPanel() {
         />
       </Card>
       <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.exception.approve" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
-        <DataTable<QualityIssue> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
+        <DataTable<QualityIssue> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
         <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <Modal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>

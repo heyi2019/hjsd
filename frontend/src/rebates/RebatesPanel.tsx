@@ -1,5 +1,5 @@
 /** 返点记录：分次到账与来源订单追踪（REB-01 / A06）。 */
-import { Card, Form, Input, Modal, Select, Space, Typography } from "antd";
+import { Card, Form, Input, Modal, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -22,12 +22,14 @@ import {
   MoneyInput,
   MoneyText,
   PermissionButton,
+  Select,
   StatRow,
   StatusTag,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+import { useListViewColumns } from "../shared/lib/listColumns";
 
 const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
@@ -156,18 +158,22 @@ export function RebatesPanel() {
 
   const pending = rows.filter((row) => row.status !== "SETTLED" && row.status !== "VOID").length;
 
+  const { arrange: arrangeColumns } = useListViewColumns("REBATE");
   const columns: ColumnsType<Rebate> = [
     { title: "返点单号", dataIndex: "rebate_no" },
     {
       title: "来源订单",
+      key: "source_order",
       render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.order_no ?? "-",
     },
     {
       title: "业务",
+      key: "business",
       render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.source_order_id)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
+      key: "order_type",
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.source_order_id);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
@@ -175,6 +181,7 @@ export function RebatesPanel() {
     },
     {
       title: "游戏/产品类型",
+      key: "game",
       render: (_v, row) => {
         const order = orders.find((item) => item.id === row.source_order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
@@ -182,6 +189,7 @@ export function RebatesPanel() {
     },
     {
       title: "对方",
+      key: "party",
       className: "ui-col-wrap",
       onCell: () => ({ className: "ui-col-wrap" }),
       render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.party_name || "-",
@@ -212,6 +220,7 @@ export function RebatesPanel() {
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="REBATE_STATUS" /> },
     {
       title: "操作",
+      key: "actions",
       width: 190,
       render: (_v, row) => (
         <Space size={2}>
@@ -329,7 +338,7 @@ export function RebatesPanel() {
         }
       >
         <DataTable<Rebate>
-          columns={columns}
+          columns={arrangeColumns(columns)}
           rows={rows}
           loading={loading}
           page={1}

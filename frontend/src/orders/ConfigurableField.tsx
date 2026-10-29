@@ -6,12 +6,11 @@
  *  降级策略：配置未加载或某字段无配置时，视为「启用 + 使用原硬编码必填/标签」，
  *  保证既有表单在无配置或接口异常时与现状一致。
  */
-import { DatePicker, Form, Input, InputNumber, Radio, Select, Switch, Typography } from "antd";
-import { Select as UiSelect } from "../shared/ui";
+import { DatePicker, Form, Input, InputNumber, Radio, Switch, Typography } from "antd";
+import { NestedFormField, Select } from "../shared/ui";
 import type { ReactElement, ReactNode } from "react";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
 import type { Rule } from "antd/es/form";
-import { NestedFormField } from "../shared/ui";
 import { orderFormFieldsApi, type OrderFormField, type RequiredWhen } from "../shared/api/catalog";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
@@ -21,7 +20,7 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
   BUSINESS: "业务方案补充信息",
   DELIVER: "交付补充信息",
   FINANCE: "费用与资金补充信息",
-  PARTICIPANT: "参与方补充信息",
+  PARTICIPANT: "客户 / 供货方补充信息",
   EXTRA: "其他补充信息",
 };
 const DFQ_SHARED_FIELD_ALIASES: Record<string, string> = {
@@ -224,10 +223,8 @@ export function injectOptionsIfMissing(
   const mapped = Children.map(children, (child) => {
     if (!isValidElement(child)) return child;
     const childProps = child.props as { options?: unknown };
-    // 同时兼容 antd Select、shared/ui 的 Select 封装（forwardRef 封装组件，类型与裸 antd Select 不同）、
-    // 以及 Radio.Group（三者均接受 options 数组）；动态数据源因显式传 options 不被覆盖。
-    const isOptionControl =
-      child.type === Select || child.type === UiSelect || child.type === Radio.Group;
+    // 共享 Select 与 Radio.Group 均接受 options 数组；动态数据源因显式传 options 不被覆盖。
+    const isOptionControl = child.type === Select || child.type === Radio.Group;
     if (isOptionControl && childProps.options === undefined) {
       return cloneElement(child as ReactElement, { options: items } as never);
     }

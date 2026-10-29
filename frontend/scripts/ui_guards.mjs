@@ -296,11 +296,23 @@ if (wiredCount === 0) {
   fail("form-scope", "全项目未找到任何已接线表单，规则 13 的判定正则可能已失效");
 }
 
+// 规则 14：业务代码统一使用共享 Select，禁止重新直接引入 Ant Design Select。
+// 共享组件本体是唯一允许接触底层 antd Select 的位置；测试夹具可按测试自身需要使用原生组件。
+const sharedSelectFile = join(SRC, "shared", "ui", "Select.tsx");
+const rawAntdSelectRe = /import\s*\{[\s\S]*?\bSelect(?:\s+as\s+\w+)?\s*[,}][\s\S]*?\}\s*from\s+"antd"/;
+for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+  if (file === sharedSelectFile) continue;
+  const text = readFileSync(file, "utf8");
+  if (rawAntdSelectRe.test(text)) {
+    fail("no-raw-select", `${relative(process.cwd(), file)} → 请从 shared/ui 引用 Select，不要直接引用 antd Select`);
+  }
+}
+
 if (failures.length) {
   console.error(`UI 守卫未通过（${failures.length} 项）：`);
   console.error(failures.join("\n"));
   process.exit(1);
 }
 console.log(
-  `UI 守卫通过：${pages().length} 个页面文件，13 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧 + 无内联样式/原生表格 + 录入表单配置接线）。`,
+  `UI 守卫通过：${pages().length} 个页面文件，14 条规则全过（含 StatusTag 状态覆盖 + normalizeError 去重 + 纵向节奏单一机制 + 令牌/关键帧 + 无内联样式/原生表格 + 录入表单配置接线 + 共享 Select 引用）。`,
 );

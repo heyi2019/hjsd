@@ -1,8 +1,9 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-import { Input, Modal, Select, Space, Upload } from "antd";
+import { Input, Modal, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { stocksApi, type Account } from "../shared/api/catalog";
+import { Select } from "../shared/ui";
 
 export type InventoryProfileTarget = {
   account: Account;

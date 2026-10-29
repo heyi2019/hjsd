@@ -136,6 +136,73 @@ describe("OrderFormFieldsPanel", () => {
     expect(screen.getByLabelText("标签").closest(".ant-table-expanded-row")).not.toBeNull();
   });
 
+  it("编辑区修改标签、归属板块、必填和排序后可成功保存", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 62, field_key: "tag", label: "编辑前标签", is_custom: true }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("编辑前标签");
+
+    await ui.click(screen.getByRole("button", { name: "编辑编辑前标签" }));
+    const labelInput = screen.getByLabelText("标签");
+    await ui.clear(labelInput);
+    await ui.type(labelInput, "编辑后标签");
+    await ui.click(screen.getByRole("combobox", { name: "归属板块" }));
+    await ui.click(await screen.findByText("业务方案信息"));
+    await ui.click(screen.getByLabelText("必填"));
+    const sortInput = screen.getByLabelText("排序");
+    await ui.clear(sortInput);
+    await ui.type(sortInput, "20");
+    await ui.click(screen.getByRole("button", { name: /保存字段/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(
+      62,
+      expect.objectContaining({
+        label: "编辑后标签",
+        required: true,
+        section: "BUSINESS",
+        sort_order: 20,
+      }),
+    ));
+    expect(vi.mocked(catalog.orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT"] as const)(
+    "逐一验证 %s 类型字段进入编辑态后可保存",
+    async (fieldType) => {
+      const field = makeField({
+        id: 100 + ["TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT"].indexOf(fieldType),
+        field_key: `${fieldType.toLowerCase()}_field`,
+        label: `${fieldType}编辑前`,
+        field_type: fieldType,
+        options: fieldType === "SELECT" || fieldType === "MULTI_SELECT" ? ["A", "B"] : null,
+      });
+      vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([field]);
+      renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+      await screen.findByText(`${fieldType}编辑前`);
+
+      await ui.click(screen.getByRole("button", { name: `编辑${field.label}` }));
+      const labelInput = screen.getByLabelText("标签");
+      await ui.clear(labelInput);
+      await ui.type(labelInput, `${fieldType}编辑后`);
+      await ui.click(screen.getByRole("button", { name: /保存字段/ }));
+
+      await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(
+        field.id,
+        expect.objectContaining({ label: `${fieldType}编辑后` }),
+      ));
+      const payload = vi.mocked(catalog.orderFormFieldsApi).update.mock.calls[0][1] as Partial<Field>;
+      if (fieldType === "SELECT" || fieldType === "MULTI_SELECT") {
+        expect(payload.options).toEqual([
+          { value: "A", label: "A" },
+          { value: "B", label: "B" },
+        ]);
+      } else {
+        expect(payload.options).toBeUndefined();
+      }
+    },
+  );
+
   it("行内必填开关切换调用 update 并刷新", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 50, field_key: "vip", label: "VIP字段", required: false, is_custom: true }),

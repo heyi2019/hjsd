@@ -95,8 +95,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
         </NestedFormSection>
         <NestedFormSection className="nested-form-section--card dfq-section" title="付款信息">
           <AdaptiveFormGrid>
-            <CfgNestedItem name="payment_pool_id" label="付款资金账户" rules={[{ required: true, message: "请选择资金账户" }]}><Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
-            <CfgNestedItem name="payment_recipient" label="付款对象" initialValue="供货方"><Input /></CfgNestedItem>
+            <CfgNestedItem name="payment_pool_id" label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}><Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
             <CfgNestedItem name="payment_note" label="资金流水备注"><Input placeholder="可选填" /></CfgNestedItem>
           </AdaptiveFormGrid>
           <CustomFieldSection section="FINANCE" testIdSuffix="finance" />

@@ -247,6 +247,7 @@ class ExecutionEventOut(BaseModel):
     occurred_at: datetime
     created_at: datetime
     posted_at: datetime | None = None
+    pool_id: int | None = None
     offset_event_id: int | None = None
     portion: str
     delivery_mode: str | None = None
@@ -641,6 +642,7 @@ def execution_detail(
                 occurred_at=event.posted_at or event.created_at,
                 created_at=event.created_at,
                 posted_at=event.posted_at,
+                pool_id=event.pool_id,
                 offset_event_id=event.offset_event_id,
                 portion=event.portion,
                 delivery_mode=event.delivery_mode,

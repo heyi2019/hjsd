@@ -6,7 +6,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
  * - 系统**不做自动匹配**，映射必须人工指派且留依据
  * - **不补造单边划转**，未裁决的只打 UNLINKED_TRANSFER 标记
  */
-import { Card, Form, Input, Modal, Select, Space, Tabs, Typography, Upload } from "antd";
+import { Card, Form, Input, Modal, Space, Tabs, Typography, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -27,6 +27,7 @@ import {
   MoneyText,
   PageHeader,
   PermissionButton,
+  Select,
   StatCard,
   StatRow,
   StatusTag,

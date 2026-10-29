@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Select, Space, Tabs, Tooltip, Typography } from "antd";
+import { Card, Form, Input, Modal, Space, Tabs, Tooltip, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +29,7 @@ import {
   MoneyInput,
   MoneyText,
   PermissionButton,
+  Select,
   StatRow,
   StatusTag,
   useCompactLayout,
@@ -39,6 +40,7 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, RECONCILIATION_STATUS_LABEL } from "../shared/lib/labels";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
+import { useListViewColumns } from "../shared/lib/listColumns";
 
 // 与 backend/app/finance/attributes.py 的 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE 保持一致：
 // 资金性质决定可用核算属性，非法组合后端直接 422，此处事前收窄避免误选。
@@ -695,6 +697,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     },
   ];
 
+  const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
@@ -731,6 +734,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" })} /> },
     {
       title: "审核追溯",
+      key: "audit",
       width: 190,
       render: (_v, row) => (
         <span className="muted">
@@ -744,6 +748,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
+      key: "actions",
       width: 170,
       render: (_v, row) => (
         <Space size={2}>
@@ -930,7 +935,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
                   />
                 ) : (
                   <DataTable<Cashflow>
-                    columns={cashflowColumns}
+                    columns={arrangeCashflowColumns(cashflowColumns)}
                     rows={visibleCashflows}
                     page={1}
                     pageSize={10}

@@ -25,3 +25,26 @@
   border-radius: var(--radius-md);
   background: var(--glass-hi-tint);
 }
+
+/* 板块名称较长时，弹层按完整文案展开，不截断为省略号。 */
+.order-form-section-filter-pop.ant-select-dropdown {
+  min-width: 190px !important;
+}
+
+.order-form-section-filter-pop .ant-select-item-option-content {
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.order-form-field-option-pop.ant-select-dropdown {
+  /* 用 min-width 撑开内容，避免 rc-virtual-list 在 width:max-content 下测量为 0，
+     导致依赖字段下拉出现空白窄条。 */
+  width: auto !important;
+  min-width: max-content !important;
+  padding-right: 6px;
+}
+
+.order-form-field-option-pop .ant-select-item-option-content {
+  white-space: nowrap;
+  overflow: visible !important;
+}

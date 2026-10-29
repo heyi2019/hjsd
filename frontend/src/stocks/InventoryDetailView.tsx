@@ -1,8 +1,8 @@
-import { Descriptions, Image, Input, Select, Space, Typography } from "antd";
+import { Descriptions, Image, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { ReactNode } from "react";
 import type { Account, AccountAuditEntry, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
-import { DataTable, MoneyInput, MoneyText, StatusTag } from "../shared/ui";
+import { DataTable, MoneyInput, MoneyText, Select, StatusTag } from "../shared/ui";
 import "./InventoryDetail.css";
 
 export type InventoryFinanceRow = {

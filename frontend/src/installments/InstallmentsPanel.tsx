@@ -13,6 +13,7 @@ import {
   type Schedule,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { INSTALLMENT_STATUS_LABEL, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -135,6 +136,19 @@ function ContractTable({
   useEffect(() => {
     void load();
   }, [load, reloadKey]);
+
+  const [exporting, setExporting] = useState(false);
+  /** 分期与回款按列配置导出 CSV：导出全部分期合约（含其他业务类型的合约表）。 */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(await installmentsApi.exportCsv(), `分期与回款-${today()}.csv`);
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const submitPay = async (values: Record<string, unknown>) => {
     if (!payTarget) return;
@@ -545,6 +559,14 @@ function ContractTable({
               ]}
               onChange={(value) => setSortDesc(value === "desc")}
             />
+            <Button
+              size="small"
+              aria-label="导出分期与回款CSV"
+              loading={exporting}
+              onClick={() => void exportCsv()}
+            >
+              导出 CSV
+            </Button>
           </Space>
         }
       >

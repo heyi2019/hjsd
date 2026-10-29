@@ -1,5 +1,5 @@
 /** 返点记录：分次到账与来源订单追踪（REB-01 / A06）。 */
-import { Card, Form, Input, Modal, Space, Typography } from "antd";
+import { Button, Card, Form, Input, Modal, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -13,6 +13,7 @@ import {
   type Settlement,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import {
@@ -61,6 +62,19 @@ export function RebatesPanel() {
   const [settleForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
   const [voidForm] = Form.useForm();
+
+  const [exporting, setExporting] = useState(false);
+  /** 返点按列配置导出 CSV：后端同 /rebates 口径，天然全量。 */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(await rebatesApi.exportCsv(), `返点-${today()}.csv`);
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -325,16 +339,26 @@ export function RebatesPanel() {
         className="glass"
         title="返点记录"
         extra={
-          <PermissionButton
-            permission="order.event.post"
-            type="primary"
-            onClick={() => {
-              form.resetFields();
-              setCreateOpen(true);
-            }}
-          >
-            新增返点记录
-          </PermissionButton>
+          <Space size={8}>
+            <Button
+              size="small"
+              aria-label="导出返点CSV"
+              loading={exporting}
+              onClick={() => void exportCsv()}
+            >
+              导出 CSV
+            </Button>
+            <PermissionButton
+              permission="order.event.post"
+              type="primary"
+              onClick={() => {
+                form.resetFields();
+                setCreateOpen(true);
+              }}
+            >
+              新增返点记录
+            </PermissionButton>
+          </Space>
         }
       >
         <DataTable<Rebate>

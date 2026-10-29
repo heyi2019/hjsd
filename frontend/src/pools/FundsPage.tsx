@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Card, Form, Input, Modal, Space, Tabs, Tooltip, Typography } from "antd";
+import { Button, Card, Form, Input, Modal, Space, Tabs, Tooltip, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +17,7 @@ import {
   type PoolBalance,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
 import { NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
@@ -310,6 +311,31 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     setCashflows(result.items);
     setCashflowTotal(result.total);
   }, []);
+
+  const [cashflowExporting, setCashflowExporting] = useState(false);
+  /** 资金流水按列配置导出 CSV：沿用当前筛选（服务端口径），后端拉全量。 */
+  const exportCashflows = async () => {
+    setCashflowExporting(true);
+    try {
+      downloadBlob(
+        await cashflowsApi.exportCsv({
+          occurred_from: cashflowFromRef.current || undefined,
+          occurred_to: cashflowToRef.current || undefined,
+          pool_id: cashflowPoolIdRef.current ?? undefined,
+          direction: cashflowDirectionRef.current || undefined,
+          status: cashflowStatusRef.current || undefined,
+          fund_nature: cashflowFundNatureRef.current || undefined,
+          accounting_attribute: cashflowAttributeRef.current || undefined,
+          category: cashflowCategoryRef.current.trim() || undefined,
+        }),
+        `资金流水-${today()}.csv`,
+      );
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    } finally {
+      setCashflowExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -908,6 +934,14 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
                   <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
                   <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
                   <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
+                  <Button
+                    size="small"
+                    aria-label="导出资金流水CSV"
+                    loading={cashflowExporting}
+                    onClick={() => void exportCashflows()}
+                  >
+                    导出 CSV
+                  </Button>
                 </div>
                 <Typography.Paragraph type="secondary" className="ui-drawer-hint">
                   状态口径：订单事件过账生成的流水直接为「已审核」；本页手工登记的独立流水需审核通过后才计入系统余额。

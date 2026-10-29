@@ -6,10 +6,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import PermissionDenied, Validation
 from app.core.schemas import PageOut
@@ -26,6 +27,7 @@ from app.core.security import (
 )
 from app.domain.foundation import AuditLog
 from app.domain.attachments import Attachment
+from app.domain.enums import AuditAction
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import (
     Account,
@@ -36,6 +38,7 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.installments import service as installments_service
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.orders import schemas, service
 from app.orders import form_fields as form_fields_service
 
@@ -352,6 +355,50 @@ def list_orders(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/orders/export.csv")
+def export_orders_csv(
+    order_type: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
+    owner_id: int | None = Query(default=None, gt=0),
+    pool_id: int | None = Query(default=None, gt=0),
+    keyword: str | None = Query(default=None, max_length=128),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_orders,
+) -> Response:
+    """业务台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。"""
+    orders = service.list_orders(
+        db,
+        order_type=order_type,
+        status=status,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        owner_id=owner_id,
+        pool_id=pool_id,
+        keyword=keyword,
+        limit=EXPORT_ROW_LIMIT,
+        offset=0,
+        user=_user,
+    )
+    rows = _order_list_payload(db, orders)
+    # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
+    for row in rows:
+        row["party"] = " · ".join(
+            part for part in (row.get("party_name"), row.get("party_source")) if part
+        )
+    csv_text, meta = build_list_csv(db, "LEDGER", rows)
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="LEDGER",
+        actor=_user.username,
+        after={"rows": len(rows), "column_count": meta["column_count"]},
+    )
+    return csv_file_response(csv_text, f"业务台账-{date.today().isoformat()}.csv")
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)

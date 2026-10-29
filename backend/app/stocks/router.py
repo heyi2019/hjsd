@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -24,6 +24,8 @@ from app.core.security import (
     owner_scope_filter,
     require_permissions,
 )
+from app.domain.enums import AuditAction
+from app.lists.export import build_list_csv, csv_file_response
 from app.stocks import service
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog, Pool
@@ -423,6 +425,34 @@ def _account_outputs(
         )
         for account in accounts
     ]
+
+
+@router.get("/stocks/export.csv")
+def export_accounts_csv(
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> Response:
+    """库存中心按可见列导出 CSV：同 /stocks 口径（凭证字段按列表页权限规则）。"""
+    accounts = service.list_accounts(db, status=status, user=_user, limit=None, offset=0)
+    outputs = _account_outputs(
+        db,
+        accounts,
+        _user,
+        include_credentials=_user.has(PERM_ORDER_CREATE),
+    )
+    csv_text, meta = build_list_csv(
+        db, "INVENTORY", [output.model_dump() for output in outputs]
+    )
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="INVENTORY",
+        actor=_user.username,
+        after={"rows": len(outputs), "column_count": meta["column_count"]},
+    )
+    return csv_file_response(csv_text, f"库存中心-{date.today().isoformat()}.csv")
 
 
 @router.get("/stocks", response_model=AccountListOut)

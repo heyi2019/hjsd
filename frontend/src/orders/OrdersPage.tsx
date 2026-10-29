@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Button, Card, Descriptions, Drawer, Dropdown, Form, Input, Modal, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -17,6 +17,7 @@ import {
   type Pool,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -275,6 +276,18 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [pageSize, setPageSize] = useState(10);
   // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
   const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
+  const [ledgerExporting, setLedgerExporting] = useState(false);
+  /** 业务台账按列配置导出 CSV：后端全量口径，页面筛选只作用于展示。 */
+  const exportLedger = async () => {
+    setLedgerExporting(true);
+    try {
+      downloadBlob(await ordersApi.exportCsv(), `业务台账-${today()}.csv`);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setLedgerExporting(false);
+    }
+  };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
@@ -845,6 +858,14 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   <Typography.Text type="secondary">
                     状态由对应业务流程更新，点击订单后继续处理付款、入库、售出或回款
                   </Typography.Text>
+                  <Button
+                    size="small"
+                    aria-label="导出业务台账CSV"
+                    loading={ledgerExporting}
+                    onClick={() => void exportLedger()}
+                  >
+                    导出 CSV
+                  </Button>
                 </Space>
                 <DataTable<Order>
                   columns={arrangeLedgerColumns(ledgerColumns)}

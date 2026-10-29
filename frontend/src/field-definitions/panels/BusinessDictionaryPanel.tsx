@@ -82,12 +82,18 @@ export function BusinessDictionaryPanel() {
             <ActionLine category="" action="代挂入库" desc="代挂订单创建后，将受托账号纳入代挂库存。" mergeCategory />
             <ActionLine category="" action="代分期入库" desc="代分期订单创建后，将对应账号纳入分期业务库存。" mergeCategory />
             <ActionLine category="买号交付" action="账号交付" desc="采购方把账号交给本方；按实际记录换绑手机号、手机号绑定人、交易平台或中介信息，并记录交付登记审计事件。" />
+            <ActionLine category="账号运营" action="寄售上架" desc="买号交付后，将代挂账号登记到指定寄售平台，记录实际上架时间与平台信息；不改变账号库存状态。" />
+            <ActionLine category="" action="寄售下架" desc="只取消指定寄售平台的上架记录；账号仍保留在 ERP 库存，不改变库存状态。" mergeCategory />
+            <ActionLine category="" action="账号描述维护" desc="维护库存账号的等级、资源、限制等说明，不改变账号业务状态或资金事实。" mergeCategory />
+            <ActionLine category="" action="账号图片维护" desc="维护库存账号图片资料，不改变账号业务状态或资金事实。" mergeCategory />
             <ActionLine category="卖号出库" action="全款售出出库" desc="全款售出后直接完成售出出库。" />
             <ActionLine category="" action="自营分期售出" desc="本方账号分期售出，建立自营分期合约，账号进入“分期中”。" />
             <ActionLine category="" action="分销分期建单" desc="分销分期建立业务订单和分期合约，后续按收款计划完成销售闭环。" />
             <ActionLine category="" action="代挂账号售出" desc="受托代挂账号成交后登记售出，按实际业务完成后续交付，并记录售出过账审计事件。" />
             <ActionLine category="卖号交付" action="账号交付" desc="售出完成后登记账号交接；全款、分期结清和代挂售出统一记录，换绑手机号及手机号绑定人作为交付字段。" />
-            <ActionLine category="取消订单" action="取消订单" desc="未产生业务事实时取消未完成订单，并记录取消订单审计事件。" />
+            <ActionLine category="取消订单" action="库存取消交易" desc="适用于回收取消、提号取消、代挂取消（系统下架）：回收对应资金并冲销入库买入流水；代挂还会同步取消寄售平台上架记录，账号退出库存中心。" />
+            <ActionLine category="" action="售出取消交易" desc="适用于回收、提号、代分期、代挂四类售出订单：退回售出款项并冲销售出流水，取消后账号回到库存中心，保留订单审计轨迹。" mergeCategory />
+            <ActionLine category="" action="分期取消交易" desc="适用于代分期取消：终止分期合约，按已收款原路退款并完成对应订单的取消闭环。" mergeCategory />
           </EntryGroup>
           <EntryGroup title="资金动作">
             <ActionLine category="收入" action="售出收款" desc="登记全款售出或售出订单的实际资金流入。" />

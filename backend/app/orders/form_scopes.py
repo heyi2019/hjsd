@@ -47,7 +47,7 @@ FORM_SCOPES: list[FormScope] = [
     # ---- 库存操作（迁移 0019）----
     FormScope("INVREFUND", "库存取消交易", GROUP_INVENTORY_OP),
     FormScope("INVOID", "下架登记", GROUP_INVENTORY_OP),
-    FormScope("INVCANCEL", "分期退款终止", GROUP_INVENTORY_OP),
+    FormScope("INVCANCEL", "分期取消交易", GROUP_INVENTORY_OP),
     FormScope("INVEDIT", "编辑账号及执行明细", GROUP_INVENTORY_OP),
     # ---- 客户（迁移 0003 / 0004）----
     FormScope("LEAD", "客户需求池", GROUP_CUSTOMER),

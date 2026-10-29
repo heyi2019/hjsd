@@ -119,6 +119,17 @@ class TestGameTypeApi:
         assert resp.status_code == 200, resp.text
         assert resp.json()["is_default"] is True
 
+    def test_delete_game_type_endpoint(self, seeded_client, headers):
+        gid = self._non_default_id(seeded_client, headers)
+        resp = seeded_client.delete(f"/api/v1/game-types/{gid}", headers=headers)
+        assert resp.status_code == 204, resp.text
+
+        remaining = seeded_client.get(
+            "/api/v1/game-types", params={"include_inactive": "true"}, headers=headers
+        )
+        assert remaining.status_code == 200, remaining.text
+        assert gid not in {item["id"] for item in remaining.json()}
+
     def test_game_type_404_returns_not_found(self, seeded_client, headers):
         resp = seeded_client.patch(
             "/api/v1/game-types/999999/active",

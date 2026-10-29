@@ -35,6 +35,8 @@ import {
   Select,
   StatusTag,
   ConfirmButton,
+  AdaptiveFormGrid,
+  ResizableModal,
 } from "../shared/ui";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
@@ -326,9 +328,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [linkSubmitting, setLinkSubmitting] = useState(false);
   const [linkForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
-  const allocationRows = Form.useWatch("allocations", allocationForm) as
-    | AllocationFormRow[]
-    | undefined;
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
   const employeeOptions = [
     ...users.map((item) => ({
@@ -337,22 +336,8 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     })),
     { value: "COMPANY" as number | "COMPANY", label: "公司（不绑定人员）" },
   ];
-  const pickedEmployees = (allocationRows ?? [])
-    .map((row) => row?.employee)
-    .filter((value): value is number | "COMPANY" => value !== undefined && value !== null);
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
   const allocationIsLoss = Number(allocationProfit) < 0;
-  /** 顶部多选与行联动：勾选的人补成新行，取消勾选的人整行移除（已填的比例/金额随之丢弃）。 */
-  const syncPickedEmployees = (next: Array<number | "COMPANY">) => {
-    const current = allocationRows ?? [];
-    const kept = current.filter(
-      (row) => row?.employee !== undefined && next.includes(row.employee as number | "COMPANY"),
-    );
-    const added = next
-      .filter((value) => !kept.some((row) => row.employee === value))
-      .map((value) => ({ employee: value, allocation_rate: "", allocation_amount: "" }));
-    allocationForm.setFieldValue("allocations", [...kept, ...added]);
-  };
   const [editOpen, setEditOpen] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm();
@@ -1135,7 +1120,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       </Drawer>
 
       <Modal
-        title={cancelInstallmentTarget ? `分期退款终止 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+        title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
         open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
@@ -1158,7 +1143,12 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </Typography.Paragraph>
           {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
             <div className="order-cancel-meta">
-              <CfgItem name="offset_event_id" label={cancelScope === "INVREFUND" ? "入库流水" : "被冲销动作"} rules={[{ required: true, message: "请选择被冲销动作" }]}>
+              <CfgItem
+                name="offset_event_id"
+                label={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
+                fixedLabel={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
+                rules={[{ required: true, message: cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择售出流水" }]}
+              >
                 <Select
                   placeholder={cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择被冲销动作"}
                   options={cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }) => ({
@@ -1290,12 +1280,14 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       </Modal>
 
       <Modal
-        title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
+        title={<span className="resizable-modal__drag-handle">{actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}</span>}
         open={allocationOpen}
         width={720}
+        wrapClassName="adaptive-business-modal allocation-modal"
         confirmLoading={allocationSubmitting}
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
+        modalRender={(modal) => <ResizableModal>{modal}</ResizableModal>}
       >
         <Form
           form={allocationForm}
@@ -1344,20 +1336,11 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             每行一位员工：填<strong>比例</strong>按订单利润占比分，填<strong>金额</strong>按固定额分，
             两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。
           </Typography.Paragraph>
-          <Form.Item label="姓名（可多选，勾选后自动加行）">
-            <Select
-              mode="multiple"
-              placeholder="从员工花名册选择"
-              value={pickedEmployees}
-              onChange={syncPickedEmployees}
-              options={employeeOptions}
-            />
-          </Form.Item>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
               <>
                 {fields.map((field) => (
-                  <Space key={field.key} align="baseline" className="orders-allocation-row" wrap>
+                  <AdaptiveFormGrid key={field.key} className="orders-allocation-row">
                     <Form.Item
                       name={[field.name, "employee"]}
                       label="姓名"
@@ -1403,7 +1386,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                     >
                       删除
                     </PermissionButton>
-                  </Space>
+                  </AdaptiveFormGrid>
                 ))}
                 <PermissionButton
                   permission="policy.manage"

@@ -54,7 +54,7 @@ export const FORM_SCOPES_FALLBACK: { code: FormScopeCode; label: string; group: 
   { code: "INVREBATE", label: "库存返点", group: "INVENTORY" },
   { code: "INVREFUND", label: "库存取消交易", group: "INVOP" },
   { code: "INVOID", label: "下架登记", group: "INVOP" },
-  { code: "INVCANCEL", label: "分期退款终止", group: "INVOP" },
+  { code: "INVCANCEL", label: "分期取消交易", group: "INVOP" },
   { code: "INVEDIT", label: "编辑账号及执行明细", group: "INVOP" },
   { code: "LEAD", label: "客户需求池", group: "CUSTOMER" },
   { code: "LEADCLOSE", label: "关闭需求", group: "CUSTOMER" },

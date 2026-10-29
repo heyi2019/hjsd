@@ -63,6 +63,22 @@ def test_operation_scope_seeds_match_registry():
     assert operation_codes | {"ALLOCATION", "INVEDIT"} <= registry_codes
 
 
+def test_allocation_scope_has_core_field_seeds():
+    """订单分润不能再是空配置，核心字段应由迁移预置。"""
+    import importlib.util
+    from pathlib import Path
+
+    migration_path = (
+        Path(__file__).resolve().parents[2]
+        / "alembic" / "versions" / "0054_seed_allocation_form_fields.py"
+    )
+    spec = importlib.util.spec_from_file_location("migration_0054", migration_path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    keys = {row[0] for row in migration.SEED}
+    assert keys == {"employee", "role", "allocation_rate", "allocation_amount"}
+
+
 def _create_order(seeded_client, headers) -> dict:
     response = seeded_client.post(
         "/api/v1/orders",

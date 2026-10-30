@@ -9,3 +9,6 @@ pyflakes>=3.2.0
 httpx==0.27.2
 # 只在批量导入 Excel 场景才需要；当前代码库零引用，按需再开
 openpyxl==3.1.5
+# 依赖锁定工具链：由 requirements.txt 生成 requirements.lock.txt
+# 用法：pip-compile requirements.txt -o requirements.lock.txt --strip-extras
+pip-tools==7.6.2

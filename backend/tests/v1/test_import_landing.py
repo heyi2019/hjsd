@@ -173,15 +173,21 @@ class TestIdempotency:
 
 
 class TestRealSourceData:
-    """针对仓库内真实 5 份 JSON 的回归（仅在文件存在时运行）。"""
+    """覆盖声明的 5 类源数据结构，不依赖本地私有原始文件。"""
 
-    def test_real_sources_land_without_credentials(self, lander):
+    def test_all_declared_sources_land_without_credentials(self, lander, monkeypatch, tmp_path):
+        for stem in lander.SOURCE_FILES:
+            (tmp_path / f"{stem}.json").write_text(
+                json.dumps(
+                    {"records": [{"id": stem, "日期": "2026-01-01", "密码": "secret"}]},
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+        monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
         total = 0
         redacted = 0
         for stem in lander.SOURCE_FILES:
-            path = lander.SOURCE_DIR / f"{stem}.json"
-            if not path.is_file():
-                pytest.skip(f"真实源文件缺失：{stem}")
             rows, stats = lander._load(stem)
             total += stats["rows"]
             redacted += stats["redacted_cells"]
@@ -190,13 +196,18 @@ class TestRealSourceData:
                 for key, value in row.items():
                     if key in lander.SENSITIVE_FIELDS:
                         assert value == lander.REDACTED, f"{stem} 的 {key} 未脱敏"
-        assert total == 340, f"源数据应 340 行，实得 {total}"
-        assert redacted == 111, f"脱敏格数应 111，实得 {redacted}"
+        assert total == len(lander.SOURCE_FILES)
+        assert redacted == len(lander.SOURCE_FILES)
 
-    def test_real_cashflow_keeps_operating_expense_verbatim(self, lander):
-        path = lander.SOURCE_DIR / "sheet3_cashflow.json"
-        if not path.is_file():
-            pytest.skip("真实源文件缺失")
+    def test_cashflow_keeps_operating_expense_verbatim(self, lander, monkeypatch, tmp_path):
+        (tmp_path / "sheet3_cashflow.json").write_text(
+            json.dumps(
+                {"records": [{"类别": "房租/日用"}, {"类别": "销售收入"}]},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
         rows, _ = lander._load("sheet3_cashflow")
         categories = {r.get("类别") for r in rows}
         assert "房租/日用" in categories

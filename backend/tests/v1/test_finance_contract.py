@@ -442,33 +442,6 @@ class TestRebateGuards:
         )
         assert record.rebate_type == "SELL"
 
-    @pytest.mark.skip(reason="返点没有结算与冲销状态机")
-    def test_rebate_reversal_must_reference_existing_settlement(self, seeded_db):
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        seeded_db.add(
-            RebateSettlement(
-                settlement_no="REB-INVALID-REVERSAL",
-                rebate_record_id=record.id,
-                settled_on=TODAY,
-                gross_amount=Decimal("0"),
-                platform_fee=Decimal("0"),
-                net_amount=Decimal("0"),
-                reversal_of_id=999999,
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
 
     def test_rebate_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
         order_id = _active_order(seeded_db)
@@ -485,110 +458,9 @@ class TestRebateGuards:
             seeded_db.flush()
         seeded_db.rollback()
 
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_rebate_settlement_net_amount_matches_gross_less_fee(self, seeded_db):
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        seeded_db.add(
-            RebateSettlement(
-                settlement_no="REB-INVALID-NET",
-                rebate_record_id=record.id,
-                settled_on=TODAY,
-                gross_amount=Decimal("100"),
-                platform_fee=Decimal("10"),
-                net_amount=Decimal("95"),
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
 
-    @pytest.mark.skip(reason="返点登记即完成，不再存在手续费结算")
-    def test_rebate_rate_must_be_percentage_and_fee_non_negative(self, seeded_db):
-        order_id = _active_order(seeded_db)
 
-        with pytest.raises(Validation, match="返点比例"):
-            service.create_rebate(
-                seeded_db,
-                source_order_id=order_id,
-                rebate_type="BUY",
-                base_amount=Decimal("100"),
-                collected_on=TODAY,
-                actor="pytest",
-                rate=Decimal("100.01"),
-            )
 
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        with pytest.raises(Validation, match="不能为负数"):
-            service.settle_rebate(
-                seeded_db,
-                record.id,
-                gross_amount=Decimal("10"),
-                settled_on=TODAY,
-                pool_id=_pool(seeded_db, "HJ_INVEST").id,
-                actor="pytest",
-                platform_fee=Decimal("-1"),
-            )
-
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_rebate_is_settled_by_gross_amount_not_net_amount(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-
-        settlement = service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount=Decimal("100"),
-            settled_on=TODAY,
-            pool_id=invest.id,
-            actor="finance",
-            platform_fee=Decimal("10"),
-        )
-
-        seeded_db.refresh(record)
-        assert settlement.net_amount == Decimal("90.00")
-        assert record.status == "SETTLED"
-        assert record.updated_by == "finance"
-
-    @pytest.mark.skip(reason="返点登记即完成，不再创建结算资金流水")
-    def test_rebate_income_and_fee_are_separate_cashflows(self, seeded_db):
-        from app.domain.trade import Cashflow
-        invest = _pool(seeded_db, "HJ_INVEST")
-        record = service.create_rebate(seeded_db, source_order_id=_active_order(seeded_db), rebate_type="BUY", base_amount=Decimal("100"), collected_on=TODAY, actor="pytest")
-        settlement = service.settle_rebate(seeded_db, record.id, gross_amount="100", platform_fee="10", settled_on=TODAY, pool_id=invest.id, actor="finance")
-        income = seeded_db.get(Cashflow, settlement.cashflow_id)
-        fee = seeded_db.get(Cashflow, settlement.fee_cashflow_id)
-        assert (income.amount, income.direction, income.accounting_attribute) == (Decimal("100"), "IN", "REBATE_INCOME")
-        assert (fee.amount, fee.direction, fee.accounting_attribute) == (Decimal("10"), "OUT", "OPERATING_EXPENSE")
-        reversal = service.reverse_rebate_settlement(seeded_db, record.id, settlement.id, reversed_on=TODAY, actor="finance", reason="录入错误")
-        income_reversal = seeded_db.get(Cashflow, reversal.cashflow_id)
-        fee_reversal = seeded_db.get(Cashflow, reversal.fee_cashflow_id)
-        assert (income_reversal.amount, income_reversal.direction, income_reversal.reversal_of_id) == (Decimal("100"), "OUT", income.id)
-        assert (fee_reversal.amount, fee_reversal.direction, fee_reversal.reversal_of_id) == (Decimal("10"), "IN", fee.id)
 
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
@@ -598,29 +470,7 @@ class TestRebateGuards:
             )
         assert "来源订单" in str(exc.value)
 
-    @pytest.mark.skip(reason="返点结算接口已删除")
-    def test_settle_notfound(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        with pytest.raises(NotFound):
-            service.settle_rebate(
-                seeded_db, 999999, gross_amount=Decimal("100"), settled_on=TODAY,
-                pool_id=invest.id, actor="pytest",
-            )
 
-    @pytest.mark.skip(reason="返点登记即完成，不再存在手续费结算")
-    def test_fee_cannot_exceed_gross(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("200"),
-            collected_on=TODAY, actor="pytest", rate=Decimal("10"),
-        )
-        with pytest.raises(Validation) as exc:
-            service.settle_rebate(
-                seeded_db, record.id, gross_amount=Decimal("100"), settled_on=TODAY,
-                pool_id=invest.id, actor="pytest", platform_fee=Decimal("150"),
-            )
-        assert "手续费不得大于到账金额" in str(exc.value)
 
     def test_list_rebates_filters_by_source_order(self, seeded_db):
         first = _active_order(seeded_db)
@@ -637,127 +487,7 @@ class TestRebateGuards:
         assert [item.base_amount for item in by_order] == [Decimal("200.00")]
         assert len(service.list_rebates(seeded_db)) == 2
 
-    @pytest.mark.skip(reason="返点没有结算与冲销状态机")
-    def test_rebate_settlement_reversal_keeps_original_and_reopens_receivable(
-        self, seeded_db
-    ):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        original = service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount=Decimal("100"),
-            settled_on=TODAY,
-            pool_id=invest.id,
-            actor="pytest",
-            platform_fee=Decimal("10"),
-        )
 
-        reversal = service.reverse_rebate_settlement(
-            seeded_db,
-            record.id,
-            original.id,
-            reversed_on=TODAY,
-            actor="finance",
-            reason="手续费录入错误",
-        )
-
-        seeded_db.refresh(record)
-        assert reversal.reversal_of_id == original.id
-        assert original.gross_amount == Decimal("100.00")
-        assert record.status == "OPEN"
-        assert record.updated_by == "finance"
-        assert service.settled_net_total(seeded_db, record.id) == Decimal("0.00")
-        assert seeded_db.scalar(
-            select(Cashflow).where(Cashflow.id == reversal.cashflow_id)
-        ).direction == "OUT"
-        assert len(
-            seeded_db.scalars(
-                select(RebateSettlement).where(
-                    RebateSettlement.rebate_record_id == record.id
-                )
-            ).all()
-        ) == 2
-
-        corrected = service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount=Decimal("100"),
-            settled_on=TODAY,
-            pool_id=invest.id,
-            actor="pytest",
-            platform_fee=Decimal("5"),
-        )
-        seeded_db.refresh(record)
-        assert corrected.net_amount == Decimal("95.00")
-        assert record.status == "SETTLED"
-        assert service.settled_net_total(seeded_db, record.id) == Decimal("95.00")
-
-        with pytest.raises(Validation, match="已冲销"):
-            service.reverse_rebate_settlement(
-                seeded_db,
-                record.id,
-                original.id,
-                reversed_on=TODAY,
-                actor="finance",
-                reason="重复冲销",
-            )
-
-    @pytest.mark.skip(reason="返点没有结算与冲销状态机")
-    def test_rebate_reversal_is_signed_in_reports(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-            rate=Decimal("100"),
-        )
-        original = service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount=Decimal("100"),
-            settled_on=TODAY,
-            pool_id=invest.id,
-            actor="pytest",
-            platform_fee=Decimal("10"),
-        )
-        service.reverse_rebate_settlement(
-            seeded_db,
-            record.id,
-            original.id,
-            reversed_on=TODAY,
-            actor="finance",
-            reason="更正手续费",
-        )
-        service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount=Decimal("100"),
-            settled_on=TODAY,
-            pool_id=invest.id,
-            actor="pytest",
-            platform_fee=Decimal("5"),
-        )
-
-        r5 = reporting_service.r5_business_pnl(seeded_db)
-        hs = next(item for item in r5["items"] if item["order_type"] == "HS")
-        assert hs["settled_rebate"] == Decimal("100.00")
-        assert hs["uncollected_rebate"] == Decimal("0.00")
-
-        detail = reporting_service.order_profit_detail(seeded_db)
-        assert detail["items"][0]["rebate"] == Decimal("100.00")
 
 
 class TestCashflowLifecycle:
@@ -1386,55 +1116,6 @@ class TestFinanceApi:
 
         assert response.status_code == 404, response.text
 
-    @pytest.mark.skip(reason="返点没有资金池结算动作")
-    def test_scoped_finance_cannot_settle_rebate_into_foreign_pool(
-        self, seeded_client, seeded_db
-    ):
-        scoped = CurrentUser.build(
-            id=9,
-            username="scoped-finance",
-            roles=["OPERATOR"],
-            owner_scope="SELF",
-            pool_ids=frozenset({1}),
-        )
-        headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
-        account = stocks_service.create_account(
-            seeded_db,
-            game_account="finance-settlement-account",
-            business_mode="SELF",
-            inventory_type="RECOVERY",
-            actor="scoped-finance",
-        )
-        order = orders_service.create_order(
-            seeded_db,
-            order_type="HS",
-            trade_date=TODAY,
-            actor="scoped-finance",
-            owner_id=9,
-            account_id=account.id,
-        )
-        orders_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
-            occurred_on=TODAY, actor="scoped-finance",
-        )
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="scoped-finance",
-        )
-        response = seeded_client.post(
-            f"/api/v1/rebates/{record.id}/settlements",
-            json={
-                "gross_amount": "50",
-                "settled_on": TODAY.isoformat(),
-                "pool_id": 2,
-            },
-            headers=headers,
-        )
-        assert response.status_code == 404, response.text
 
     def test_create_transfer_posts_symmetric_internal_cashflows(
         self, seeded_client, seeded_db, headers
@@ -1577,38 +1258,6 @@ class TestFinanceApi:
         assert response.status_code == 200, response.text
         assert len(response.json()["cashflows"]) == 2
 
-    @pytest.mark.skip(reason="返点结算资金流水已移除")
-    def test_list_cashflows_exposes_order_traceability(self, seeded_client, seeded_db, headers):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("200"),
-            collected_on=TODAY, actor="pytest",
-        )
-        service.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("120"), settled_on=TODAY,
-            pool_id=invest.id, actor="pytest", platform_fee=Decimal("20"),
-        )
-        deposit = service.create_deposit(
-            seeded_db, pool_id=invest.id, amount=Decimal("80"), paid_on=TODAY,
-            actor="pytest", source_order_id=order_id,
-        )
-        service.return_deposit(
-            seeded_db, deposit.id, amount=Decimal("30"), released_on=TODAY, actor="pytest"
-        )
-
-        response = seeded_client.get("/api/v1/cashflows", headers=headers)
-
-        assert response.status_code == 200, response.text
-        rows = response.json()["items"]
-        assert {row["category"] for row in rows} >= {"BUY", "REBATE", "DEPOSIT_HOLD"}
-        assert all("order_no" in row for row in rows)
-        assert all(row["order_no"] is not None for row in rows)
-        assert all("occurred_at" in row and row["occurred_at"] for row in rows)
-        assert all("operator" in row and row["operator"] for row in rows)
-        assert {row["source"] for row in rows} >= {"ORDER_EVENT", "REBATE_SETTLEMENT", "DEPOSIT"}
-        deposit_rows = [row for row in rows if row["source"] == "DEPOSIT"]
-        assert {row["deposit_id"] for row in deposit_rows} == {deposit.id}
 
     def test_list_deposits_endpoint(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -1686,50 +1335,4 @@ class TestFinanceApi:
         assert response.json()["rebate_type"] == "BUY"
         assert response.json()["channel"] == "WECHAT"
 
-    @pytest.mark.skip(reason="返点结算接口已删除")
-    def test_settle_rebate_endpoint(self, seeded_client, seeded_db, headers):
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("200"),
-            collected_on=TODAY, actor="pytest",
-        )
-        response = seeded_client.post(
-            f"/api/v1/rebates/{record.id}/settlements",
-            json={
-                "gross_amount": "120",
-                "settled_on": TODAY.isoformat(),
-                "pool_id": 1,
-                "platform_fee": "20",
-                "note": "返点到账",
-            },
-            headers=headers,
-        )
-        assert response.status_code == 404, response.text
-
-    @pytest.mark.skip(reason="返点结算与冲销接口已删除")
-    def test_rebate_settlement_list_and_reverse_endpoints(
-        self, seeded_client, seeded_db, headers
-    ):
-        order_id = _active_order(seeded_db)
-        record = service.create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        reversed_response = seeded_client.post(
-            f"/api/v1/rebates/{record.id}/settlements/1/reverse",
-            json={
-                "reversed_on": TODAY.isoformat(),
-                "reason": "接口更正手续费",
-            },
-            headers=headers,
-        )
-        assert reversed_response.status_code == 404, reversed_response.text
-
-        listed = seeded_client.get(
-            f"/api/v1/rebates/{record.id}/settlements", headers=headers
-        )
-        assert listed.status_code == 404, listed.text
+# 返点登记即完成；结算、冲销、作废等旧状态机不再属于当前合约。

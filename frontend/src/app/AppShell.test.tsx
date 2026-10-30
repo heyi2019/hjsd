@@ -112,7 +112,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     const nav = screen.getByRole("navigation", { name: "主导航" });
     await ui.click(within(nav).getByRole("button", { name: "业务中心" }));
 
-    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
+    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" }, { timeout: 10_000 });
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "业务台账" })).toHaveAttribute("aria-selected", "false");
   });
@@ -127,6 +127,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
       await ui.click(target);
       await waitFor(() =>
         expect(document.querySelector(".topbar__page")?.textContent).toBe(item.label),
+        { timeout: 10_000 },
       );
       // 页面自身标题（h2）也要对上：顶栏与页头同名，故用 All 变体
       expect(screen.getAllByRole("heading", { name: item.label }).length).toBeGreaterThanOrEqual(1);

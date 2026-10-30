@@ -110,7 +110,12 @@ describe("AppShell：⌘/Ctrl+K 快捷键", () => {
   it("⌘K（或 Ctrl+K）跳业务中心并定位到库存中心子页", async () => {
     await renderShell({ user: "admin" });
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
+    // AppShell loads the business page through React.lazy.  Under the full CI
+    // suite the deep and regular React projects run concurrently, so the
+    // initial module transform can legitimately take longer than Testing
+    // Library's 1s default query timeout.  Keep the assertion bounded while
+    // allowing the real lazy page to finish loading.
+    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" }, { timeout: 10_000 });
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
 
     // 再回到工作台，验证 Ctrl+K 同样生效（keep-alive 下「工作台」文本多处，用顶栏页名断言）
@@ -119,7 +124,7 @@ describe("AppShell：⌘/Ctrl+K 快捷键", () => {
       expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台"),
     );
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    const inventoryTab2 = await screen.findByRole("tab", { name: "库存中心" });
+    const inventoryTab2 = await screen.findByRole("tab", { name: "库存中心" }, { timeout: 10_000 });
     expect(inventoryTab2).toHaveAttribute("aria-selected", "true");
   });
 });

@@ -1,9 +1,9 @@
-"""列表列显示配置（迁移 0051）：作用域清单、可见性与顺序保存、锁定列保护。
+"""列表列显示配置（迁移 0051）：作用域清单、可见性与顺序保存。
 
 口径：
 - 列清单/中文名以 `app.lists.scopes` 注册表为准，库只存 is_visible + sort_order；
 - 缺行即默认可见（新增列无需数据迁移）；
-- 锁定列（订单号/操作列等）后端拒绝隐藏，未知列拒绝写入。
+- 所有列均可隐藏与调序（无锁定约束）；未知列仍拒绝写入。
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_list_scopes_match_registry(seeded_client, headers):
     assert [column["key"] for column in ledger["columns"][:2]] == ["order_no", "party"]
     # 缺行默认可见（不播种也能用）
     assert all(column["is_visible"] for column in ledger["columns"])
-    assert ledger["columns"][0]["locked"] is True
+    assert ledger["columns"][0]["locked"] is False
 
 
 def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
@@ -81,7 +81,8 @@ def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     assert AuditAction.LIST_COLUMNS_UPDATE.value in actions
 
 
-def test_locked_column_cannot_be_hidden(seeded_client, headers):
+def test_actions_column_can_be_hidden(seeded_client, headers):
+    """操作列现在也可隐藏（无锁定约束），保存返回 200。"""
     ledger = _scope(seeded_client, headers, "LEDGER")
     items = [
         {
@@ -92,8 +93,7 @@ def test_locked_column_cannot_be_hidden(seeded_client, headers):
         for index, column in enumerate(ledger["columns"])
     ]
     response = _save(seeded_client, headers, "LEDGER", items)
-    assert response.status_code == 422, response.text
-    assert "锁定列不可隐藏" in response.text
+    assert response.status_code == 200, response.text
 
 
 def test_unknown_column_rejected(seeded_client, headers):

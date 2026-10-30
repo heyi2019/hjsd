@@ -80,7 +80,7 @@ def save_column_config(
     db: Session = Depends(get_db),
     _user: CurrentUser = manage_list_columns,
 ) -> schemas.ListScopeOut:
-    """整表保存某列表的列显示与顺序；锁定列不可隐藏，越界或未知列返回 422。"""
+    """整表保存某列表的列显示与顺序；所有列均可隐藏与调序，越界或未知列返回 422。"""
     result = service.save_config(
         db,
         scope,

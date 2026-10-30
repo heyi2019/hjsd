@@ -3,8 +3,8 @@
 与 `orders.form_scopes` 同构：设置页「列表字段」的作用域与列中文名只在这里定义，
 经 GET /list-columns 下发；前端不再维护第二份列名清单，避免三处文案漂移。
 
-`locked=True` 的列是「身份列/操作列」，不允许隐藏 —— 否则表格会失去主键或失去
-操作入口，用户只能靠重新配置救回来。
+`locked` 字段保留备用，但**当前所有列均可隐藏与调序**（含身份列/操作列）；
+隐藏操作列会失去行内操作入口，可通过「恢复默认」一键找回，属用户自主配置。
 
 `value_set` 声明「这一列的取值是 option_sets 里哪组字典的代码值」（如 ORDER_STATUS）。
 列注册表只声明归属，不复制字典文案：导出时由 lists.get_value_labels() 现查 option_sets
@@ -36,7 +36,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="LEDGER",
         label="业务台账",
         columns=(
-            ListColumn("order_no", "订单号", locked=True),
+            ListColumn("order_no", "订单号"),
             ListColumn("party", "对方 / 来源"),
             ListColumn("account_game_type", "游戏/产品类型"),
             ListColumn("account_game_account", "游戏账号/产品"),
@@ -47,14 +47,14 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("status", "状态"),
             ListColumn("link_status", "关联"),
             ListColumn("trade_date", "日期"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(
         code="INVENTORY",
         label="库存中心",
         columns=(
-            ListColumn("stock_no", "库存编号", locked=True),
+            ListColumn("stock_no", "库存编号"),
             ListColumn("game_type", "游戏/产品类型"),
             ListColumn("game_account", "游戏账号/产品"),
             ListColumn("source_order_no", "订单号"),
@@ -65,14 +65,14 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("inventory_age", "未售时长"),
             ListColumn("status", "状态"),
             ListColumn("cost_amount", "成本"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(
         code="INSTALLMENT",
         label="分期与回款",
         columns=(
-            ListColumn("inst_no", "合约号", locked=True),
+            ListColumn("inst_no", "合约号"),
             ListColumn("order", "订单"),
             ListColumn("business", "业务"),
             ListColumn("order_type", "类型"),
@@ -85,28 +85,28 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("bad_debt", "坏账"),
             ListColumn("remaining", "剩余"),
             ListColumn("status", "状态"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(
         code="CUSTOMER",
         label="客户",
         columns=(
-            ListColumn("customer_no", "客户编号", locked=True),
+            ListColumn("customer_no", "客户编号"),
             ListColumn("display_name", "名字"),
             ListColumn("phone", "手机"),
             ListColumn("wechat", "微信"),
             ListColumn("qq", "QQ"),
             ListColumn("status", "状态"),
             ListColumn("extra_values", "扩展字段"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(
         code="REBATE",
         label="返点明细",
         columns=(
-            ListColumn("rebate_no", "返点单号", locked=True),
+            ListColumn("rebate_no", "返点单号"),
             ListColumn("source_order", "来源订单"),
             ListColumn("business", "业务"),
             ListColumn("order_type", "类型"),
@@ -115,14 +115,14 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("base_amount", "基数"),
             ListColumn("rate", "费率"),
             ListColumn("status", "状态"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(
         code="CASHFLOW",
         label="资金流水",
         columns=(
-            ListColumn("flow_no", "流水号", locked=True),
+            ListColumn("flow_no", "流水号"),
             ListColumn("order_no", "订单号"),
             ListColumn("occurred_on", "日期"),
             ListColumn("category", "类别"),
@@ -134,14 +134,14 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("source", "来源"),
             ListColumn("status", "状态"),
             ListColumn("note", "备注"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(
         code="RPT_INVENTORY_HEALTH",
         label="报表·库存健康",
         columns=(
-            ListColumn("game_account", "游戏账号/产品", locked=True),
+            ListColumn("game_account", "游戏账号/产品"),
             ListColumn("platform", "平台"),
             ListColumn("status", "状态", value_set="INVENTORY_STATUS"),
             ListColumn("buy_amount", "买入"),
@@ -154,7 +154,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RPT_MONTHLY_PNL",
         label="报表·月度损益",
         columns=(
-            ListColumn("month", "月份", locked=True),
+            ListColumn("month", "月份"),
             ListColumn("sales_income", "销售收入"),
             ListColumn("account_direct_cost", "账号直接成本"),
             ListColumn("operating_expense", "运营费用"),
@@ -166,7 +166,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RPT_COMMISSION",
         label="报表·提成对账",
         columns=(
-            ListColumn("user_id", "人员 ID", locked=True),
+            ListColumn("user_id", "人员 ID"),
             ListColumn("order_no", "订单号"),
             ListColumn("profit_base", "利润基数"),
             ListColumn("rate", "费率"),
@@ -179,7 +179,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RPT_DAILY_FUNDS",
         label="报表·资金日报",
         columns=(
-            ListColumn("pool_name", "资金池", locked=True),
+            ListColumn("pool_name", "资金池"),
             # 同一行 pool_name 被页面重复渲染成「名称」列，这里用独立 key 以免两列联动
             ListColumn("pool_label", "名称"),
             ListColumn("opening", "期初"),
@@ -194,7 +194,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RPT_FINANCE_DIM",
         label="报表·资金属性分析",
         columns=(
-            ListColumn("pool_name", "资金池", locked=True),
+            ListColumn("pool_name", "资金池"),
             ListColumn("fund_nature", "资金性质", value_set="FUND_FLOW_FUND_NATURE"),
             ListColumn("accounting_attribute", "核算属性", value_set="FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
             ListColumn("direction", "现金方向", value_set="FUND_FLOW_DIRECTION"),
@@ -207,7 +207,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RPT_BUSINESS_PNL",
         label="报表·业务损益",
         columns=(
-            ListColumn("order_type", "业务", locked=True, value_set="ORDER_BUSINESS"),
+            ListColumn("order_type", "业务", value_set="ORDER_BUSINESS"),
             ListColumn("main_income", "主营收入"),
             ListColumn("main_cost", "主营成本"),
             ListColumn("main_profit", "主营毛利"),
@@ -220,7 +220,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RPT_ORDER_PROFIT",
         label="报表·订单利润明细",
         columns=(
-            ListColumn("order_no", "订单号", locked=True),
+            ListColumn("order_no", "订单号"),
             ListColumn("order_type", "业务", value_set="ORDER_BUSINESS"),
             ListColumn("trade_date", "成交日"),
             ListColumn("status", "状态", value_set="ORDER_STATUS"),
@@ -234,7 +234,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="POOL_BALANCE",
         label="数据中心·资金池概览",
         columns=(
-            ListColumn("pool_code", "资金池", locked=True),
+            ListColumn("pool_code", "资金池"),
             ListColumn("status", "状态"),
             ListColumn("income", "收入"),
             ListColumn("expense", "支出"),
@@ -246,7 +246,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="AUDIT_LOG",
         label="审计记录",
         columns=(
-            ListColumn("occurred_at", "时间", locked=True),
+            ListColumn("occurred_at", "时间"),
             ListColumn("actor", "操作人"),
             ListColumn("action", "动作"),
             ListColumn("entity_type", "对象类型"),
@@ -258,7 +258,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="QUALITY_METRIC",
         label="质量·月度指标",
         columns=(
-            ListColumn("month", "月份", locked=True),
+            ListColumn("month", "月份"),
             ListColumn("reconciliation_completion_rate", "对账完成率"),
             ListColumn("overdue_rate", "分期逾期率"),
             ListColumn("missing_attachment_rate", "缺附件率"),
@@ -268,13 +268,13 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="QUALITY_ISSUE",
         label="质量·问题工单",
         columns=(
-            ListColumn("issue_no", "工单号", locked=True),
+            ListColumn("issue_no", "工单号"),
             ListColumn("severity", "级别"),
             ListColumn("title", "标题"),
             ListColumn("target", "对象"),
             ListColumn("status", "状态"),
             ListColumn("message", "问题"),
-            ListColumn("actions", "操作", locked=True),
+            ListColumn("actions", "操作"),
         ),
     ),
 )

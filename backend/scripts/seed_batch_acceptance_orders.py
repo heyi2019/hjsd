@@ -284,8 +284,8 @@ def main() -> None:
         contract(session, f4_resale, InstallmentContractType.STOCK_SALE.value, first_due_on=TODAY)
         created.append(f4_resale)
 
-        # 买入返点 + 卖出返点，并完成一笔结算，验证返点资金流。
-        buy_rebate = rebates_service.create_rebate(
+        # 买入返点 + 卖出返点：返点登记即完成，不再拆分结算/冲销状态机。
+        rebates_service.create_rebate(
             session,
             source_order_id=h1_buy.id,
             rebate_type=RebateType.BUY.value,
@@ -296,16 +296,7 @@ def main() -> None:
             actor=ACTOR,
             note=f"{MARKER} 买入返点",
         )
-        rebates_service.settle_rebate(
-            session,
-            buy_rebate.id,
-            gross_amount=Decimal("100"),
-            settled_on=TODAY,
-            pool_id=2,
-            actor=ACTOR,
-            note=f"{MARKER} 买入返点到账",
-        )
-        sell_rebate = rebates_service.create_rebate(
+        rebates_service.create_rebate(
             session,
             source_order_id=d1_sale.id,
             rebate_type=RebateType.SELL.value,
@@ -316,16 +307,6 @@ def main() -> None:
             actor=ACTOR,
             note=f"{MARKER} 卖出返点",
         )
-        rebates_service.settle_rebate(
-            session,
-            sell_rebate.id,
-            gross_amount=Decimal("120"),
-            settled_on=TODAY,
-            pool_id=2,
-            actor=ACTOR,
-            note=f"{MARKER} 卖出返点到账",
-        )
-
         if len(created) != 30:
             raise RuntimeError(f"批量验收订单数量错误：期望 30，实际 {len(created)}")
         session.commit()

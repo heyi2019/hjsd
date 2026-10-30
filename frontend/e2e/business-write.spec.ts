@@ -261,7 +261,7 @@ test("系统提醒：逾期返点生成提醒并标记已读", async ({ request 
   const order = await created.json();
   const buy = await request.post(`${apiBase}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
   expect(buy.status()).toBe(201);
-  const rebateResponse = await request.post(`${apiBase}/rebates`, { headers, data: { source_order_id: order.id, rebate_type: "BUY", base_amount: "10", rate: "0", collected_on: "2026-10-17", expected_on: "2026-10-16" } });
+  const rebateResponse = await request.post(`${apiBase}/rebates`, { headers, data: { source_order_id: order.id, rebate_type: "BUY", base_amount: "10", rate: "0", collected_on: "2026-10-17" } });
   expect(rebateResponse.status()).toBe(201);
   const rebate = await rebateResponse.json();
   const synced = await request.post(`${apiBase}/notifications/sync-overdue-rebates?as_of=2026-10-17`, { headers });

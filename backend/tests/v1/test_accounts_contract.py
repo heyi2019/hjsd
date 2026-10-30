@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.errors import Conflict, NotFound, Validation
+from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
@@ -759,7 +759,7 @@ class TestAccountsApi:
         account = _account(seeded_db, "detail-customer-party-acc")
         customer = parties_service.create_customer(seeded_db, display_name="买家A", actor="pytest")
         seller = parties_service.create_customer(seeded_db, display_name="卖家B", actor="pytest")
-        order = orders_service.create_order(
+        orders_service.create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,

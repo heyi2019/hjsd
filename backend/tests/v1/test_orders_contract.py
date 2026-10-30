@@ -590,7 +590,7 @@ class TestCreateOrderValidation:
             order_service.post_event(
                 seeded_db,
                 order.id,
-                event_type="BUY",
+                event_type="COST",
                 amount=Decimal("0"),
                 occurred_on=D,
                 actor="pytest",

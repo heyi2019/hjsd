@@ -55,4 +55,7 @@ def test_every_json_api_route_declares_response_model(app):
     # → 174（删除资金流水审核/驳回端点：POST /cashflows/{id}/approve、POST /cashflows/{id}/reject，
     # 资金流水改为创建即入账；下游 reporting/orders/quality 仍按 ==APPROVED 过滤，不受影响）。
     # 以当前应用实际路由数为准。
-    assert public_routes == 174
+    # 176 = 174 基线 + 2（order-types 路由配置功能新增：
+    # GET /order-types/{order_type_id}/routes、GET /order-types/{code}/routes/impact-preview，
+    # 两者均合法声明 response_model，经 list_routes 脚本复核）。
+    assert public_routes == 176

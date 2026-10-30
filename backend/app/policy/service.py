@@ -302,8 +302,9 @@ def create_version(
         effective_from=effective_from,
         effective_to=effective_to,
         config=normalized_config,
-        status=PolicyStatus.DRAFT.value,
+        status=PolicyStatus.ACTIVE.value,
         note=note,
+        approved_by=actor,
         created_by=actor,
         updated_by=actor,
     )
@@ -320,39 +321,6 @@ def create_version(
     return _ver_out(item)
 
 
-def approve_version(
-    session: Session, version_id: int, *, approver: str, note: str | None = None
-) -> dict[str, Any]:
-    """发布版本：生效后只影响新建业务，不回算历史（BAS-06-02 验收）。"""
-    item = session.get(PolicyVersion, version_id)
-    if item is None:
-        raise NotFound(f"规则版本 {version_id} 不存在", details={"version_id": version_id})
-    if item.status != PolicyStatus.DRAFT.value:
-        raise Validation(
-            "只能发布草稿版本，已发布/已失效版本不可重复发布",
-            details={"version_id": version_id, "status": item.status},
-        )
-    approver = _required_text(
-        approver, field="approver", message="必须记录审批人"
-    )
-
-    before = {"status": item.status}
-    item.status = PolicyStatus.ACTIVE.value
-    item.approved_by = approver
-    item.approved_at = datetime.now()
-    if note:
-        item.note = note
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.POLICY_CHANGE,
-        entity_type="policy_version",
-        entity_id=item.id,
-        actor=approver,
-        before=before,
-        after={"status": item.status, "approved_by": approver},
-    )
-    return _ver_out(item)
 
 
 def update_version_draft(
@@ -958,7 +926,6 @@ def list_allocations(
 
 
 __all__ = [
-    "approve_version",
     "create_definition",
     "create_version",
     "get_definition",

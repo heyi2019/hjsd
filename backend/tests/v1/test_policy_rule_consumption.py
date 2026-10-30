@@ -44,7 +44,6 @@ def _publish(seeded_db, policy_code: str, config: dict) -> None:
         config=config,
         actor="pytest",
     )
-    policy_service.approve_version(seeded_db, version["id"], approver="pytest")
 
 
 def _order_with_buy(seeded_db, *, game_account: str) -> int:

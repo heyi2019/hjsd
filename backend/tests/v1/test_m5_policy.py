@@ -38,10 +38,6 @@ def _publish(seeded_db, definition, *, frm, to=None, config, approve=True):
         config=config,
         actor="pytest",
     )
-    if approve:
-        version = policy_service.approve_version(
-            seeded_db, version["id"], approver="pytest"
-        )
     return version
 
 
@@ -215,41 +211,28 @@ class TestPolicyVersion:
                 seeded_db, version["id"], config={"rate": "99"}, actor="pytest"
             )
 
-    def test_draft_version_is_editable(self, seeded_db):
+    def test_published_version_not_editable(self, seeded_db):
         definition = _make_policy(seeded_db)
         version = policy_service.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
-        updated = policy_service.update_version_draft(
-            seeded_db, version["id"], config={"rate": "6"}, actor="pytest"
-        )
-        assert updated["config"] == {"rate": "6"}
-
-    def test_publish_twice_rejected(self, seeded_db):
-        definition = _make_policy(seeded_db)
-        version = _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
+        # 创建即发布（ACTIVE）：已发布版本不可改，只能新建版本封口
         with pytest.raises(Exception):
-            policy_service.approve_version(
-                seeded_db, version["id"], approver="pytest"
+            policy_service.update_version_draft(
+                seeded_db, version["id"], config={"rate": "6"}, actor="pytest"
             )
 
-    def test_draft_not_resolvable(self, seeded_db):
-        """未发布版本不参与生效期解析。"""
+    def test_published_version_resolvable(self, seeded_db):
+        """创建即发布：版本直接为 ACTIVE，参与生效期解析。"""
         definition = _make_policy(seeded_db)
         policy_service.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
-        assert policy_service.resolve_version(
+        resolved = policy_service.resolve_version(
             seeded_db, policy_code="REBATE", on=date(2026, 6, 1)
-        ) is None
-
-    def test_approve_requires_approver(self, seeded_db):
-        definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
-            seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
-        with pytest.raises(Exception):
-            policy_service.approve_version(seeded_db, version["id"], approver="  ")
+        assert resolved is not None
+        assert resolved.config == {"rate": "5"}
 
 
 class TestVersionResolution:
@@ -679,15 +662,9 @@ class TestPolicyApi:
             json={"effective_from": "2026-01-01", "config": {"rate": "5"}},
         )
         assert version.status_code == 200
+        # 保存即发布：新建版本直接为 ACTIVE，无独立审批环节
+        assert version.json()["status"] == PolicyStatus.ACTIVE.value
         version_id = version.json()["id"]
-
-        approved = seeded_client.post(
-            f"/api/v1/policy-versions/{version_id}/approve",
-            headers=json_headers,
-            json={"approver": "pytest"},
-        )
-        assert approved.status_code == 200
-        assert approved.json()["status"] == PolicyStatus.ACTIVE.value
 
         listed = seeded_client.get(f"/api/v1/policies/{definition_id}/versions", headers=json_headers)
         assert listed.status_code == 200

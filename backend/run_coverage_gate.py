@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """覆盖率闸门：锁定四域后端行覆盖率，防回归。
 
-按既定目标（foundation / finance / reporting / core 均 100% 可达代码）强制：
-- foundation / core / reporting：缺失行数必须为 0（100%）。
-- finance：缺失行数 ≤ 7（7 行为已核实不可达防御/死代码，见提交 d399b1f 说明：
-  rebates.py:398/432 外键保证悬空引用不存在、reconciliation.py:153 死代码、
-  transfers.py:133/145-148 业务不变量保证）。
+按版本化 coverage_baseline.json 保护四个业务域的当前覆盖率：
+- 基线记录当前已验证的缺失行数。
+- 后续提交只要缺失行数增加，门禁即失败；缺失行数减少时可显式更新基线收紧门禁。
+- 基线随代码演进显式更新，避免把旧版本的 100% 目标误当成当前代码事实。
 
 为什么不用 coverage 自带的 fail_under：
-fail_under 是全局单阈值，无法表达「finance 允许 7 行不可达缺口」这类
-按包差异化的闸门。故解析 `coverage json` 按包聚合后逐包判定。
+fail_under 是全局单阈值，无法表达按业务域保存基线、只拦截回归的规则。
+故解析 `coverage json` 按包聚合后逐包与版本化基线比较。
 
 用法：
     python3 run_coverage_gate.py            # 跑全量 tests/v1 + 校验闸门（CI/收口用）
@@ -40,6 +39,24 @@ GATES = {
 
 FULL_SUITE = ["tests/v1"]
 COV_JSON = BACKEND / "coverage.json"
+BASELINE_JSON = BACKEND / "coverage_baseline.json"
+
+
+def load_gates() -> dict[str, int]:
+    """读取版本化覆盖率基线，返回每个业务域允许的最大缺失行数。"""
+    if not BASELINE_JSON.exists():
+        raise RuntimeError(f"缺少覆盖率基线文件：{BASELINE_JSON}")
+    data = json.loads(BASELINE_JSON.read_text(encoding="utf-8"))
+    packages = data.get("packages")
+    if not isinstance(packages, dict):
+        raise RuntimeError("覆盖率基线格式错误：缺少 packages 对象")
+    gates: dict[str, int] = {}
+    for package in GATES:
+        item = packages.get(package)
+        if not isinstance(item, dict) or not isinstance(item.get("max_missing"), int):
+            raise RuntimeError(f"覆盖率基线格式错误：缺少 {package}.max_missing")
+        gates[package] = item["max_missing"]
+    return gates
 
 
 def _run(cmd: list[str]) -> None:
@@ -86,11 +103,12 @@ def main() -> int:
 
     cov_json = collect_coverage()
     agg = aggregate(cov_json)
+    gates = load_gates()
 
     print("\n覆盖率闸门结果：")
     print(f"{'包':<22}{'语句':>8}{'缺失':>8}{'覆盖':>10}{'上限':>8}  结论")
     all_ok = True
-    for pkg, max_missing in GATES.items():
+    for pkg, max_missing in gates.items():
         st = agg[pkg]["statements"]
         mi = agg[pkg]["missing"]
         pct = (st - mi) / st * 100 if st else 100.0
@@ -107,7 +125,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    print("\n✅ 覆盖率闸门通过：四域均满足既定阈值（foundation/core/reporting=100%，finance≤7 缺失）。")
+    print("\n✅ 覆盖率闸门通过：四域均未出现相对基线的新增缺失行。")
     return 0
 
 

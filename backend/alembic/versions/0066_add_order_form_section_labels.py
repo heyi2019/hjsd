@@ -4,8 +4,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0065_add_order_form_section_labels"
-down_revision = "0064_expand_buy_rebate_scope"
+revision = "0066_add_order_form_section_labels"
+down_revision = "0065_allow_split_cashflow_per_event"
 branch_labels = None
 depends_on = None
 

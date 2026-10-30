@@ -171,18 +171,6 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     }
   }, []);
 
-  const moveSection = (value: string, offset: number) => {
-    setSectionOrder((current) => {
-      const next = [...current];
-      const index = next.indexOf(value);
-      const target = index + offset;
-      if (index < 0 || target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
-
   const editSection = (value: string) => {
     const option = orderedSectionOptions.find((item) => item.value === value);
     if (!option) return;
@@ -704,8 +692,6 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
                   <PermissionGate permission="field-definition.manage">
                     <Space size={2}>
                       <PermissionButton permission="field-definition.manage" size="small" aria-label={`编辑${row.label}`} onClick={() => editSection(row.value)}>编辑</PermissionButton>
-                      <PermissionButton permission="field-definition.manage" size="small" disabled={row.index === 0} aria-label={`${row.label}上移`} onClick={() => moveSection(row.value, -1)}>上移</PermissionButton>
-                      <PermissionButton permission="field-definition.manage" size="small" disabled={row.index === sectionManagementRows.length - 1} aria-label={`${row.label}下移`} onClick={() => moveSection(row.value, 1)}>下移</PermissionButton>
                       <PermissionButton permission="field-definition.manage" size="small" onClick={() => setSectionFilter(row.value)}>查看字段</PermissionButton>
                     </Space>
                   </PermissionGate>

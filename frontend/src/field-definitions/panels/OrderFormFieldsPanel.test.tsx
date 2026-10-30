@@ -73,17 +73,16 @@ describe("OrderFormFieldsPanel", () => {
     expect(managementTable.compareDocumentPosition(addSectionButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("板块管理可以调整板块顺序", async () => {
+  it("板块管理不再提供上下移动（顺序由字段所属板块驱动）", async () => {
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("板块管理");
 
-    const management = screen.getByTestId("form-section-management");
-    const codes = () => Array.from(management.querySelectorAll<HTMLElement>("tbody tr.ant-table-row"))
-      .map((item) => item.dataset.rowKey);
-    expect(codes()[0]).toBe("ACCOUNT_PRODUCT");
-    const before = codes().indexOf("OPERATION");
-    await ui.click(screen.getByRole("button", { name: "运营信息下移" }));
-    expect(codes().indexOf("OPERATION")).toBe(before + 1);
+    // 板块顺序现在由字段所属板块（section）驱动，设置面板不再提供误导性的上下移动按钮
+    expect(screen.queryByRole("button", { name: "运营信息上移" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "运营信息下移" })).not.toBeInTheDocument();
+    // 编辑 / 查看字段 入口保留
+    expect(screen.getByRole("button", { name: "编辑运营信息" })).toBeInTheDocument();
+    expect(screen.getAllByText("查看字段").length).toBeGreaterThan(0);
   });
 
   it("板块管理显示编码并可编辑板块名称", async () => {

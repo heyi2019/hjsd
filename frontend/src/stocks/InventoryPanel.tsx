@@ -673,7 +673,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           onOrdersChanged?.();
         }}
       />
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="系统下架登记"
         open={Boolean(voidTarget)}
         okText="确认下架"

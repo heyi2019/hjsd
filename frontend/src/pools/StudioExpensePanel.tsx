@@ -37,6 +37,7 @@ import {
   Select,
   StatRow,
   StatusTag,
+  CompactActions,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 
@@ -476,7 +477,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         </BusinessForm>
       </BusinessActionModal>
 
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="配置工作室支出"
         open={configOpen}
         onCancel={() => setConfigOpen(false)}
@@ -499,13 +500,15 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           <Form.Item name="items" label="费用科目" extra="可直接输入新增科目后回车">
             <Select mode="tags" placeholder="房租 / 日用 / 水电 …" />
           </Form.Item>
-          <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={write.pending}>
-            保存配置
-          </PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={write.pending}>
+              保存配置
+            </PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </BusinessActionModal>
 
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="拒绝工作室支出"
         open={Boolean(rejectTarget)}
         onCancel={() => setRejectTarget(null)}
@@ -518,14 +521,16 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             <Input.TextArea rows={3} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="studio-reject" />
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
-            确认拒绝
-          </PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
+              确认拒绝
+            </PermissionButton>
+          </CompactActions>
           </FieldConfigScope>
         </BusinessForm>
       </BusinessActionModal>
 
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="冲销工作室支出"
         open={Boolean(reverseTarget)}
         onCancel={() => setReverseTarget(null)}
@@ -541,9 +546,11 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             <Input.TextArea rows={3} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="studio-reverse" />
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
-            确认冲销
-          </PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
+              确认冲销
+            </PermissionButton>
+          </CompactActions>
           </FieldConfigScope>
         </BusinessForm>
       </BusinessActionModal>

@@ -7,7 +7,7 @@ import { poolsApi, type Pool, type RouteImpactPreview } from "../../shared/api/c
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
   BUSINESS: "本方经营",
@@ -226,11 +226,13 @@ export function OrderTypesPanel() {
           </Form.Item>
         </BusinessForm>
       </BusinessActionModal>
-      <BusinessActionModal title={previewTarget ? `${previewTarget.code} 路由影响预览` : "路由影响预览"} open={Boolean(previewTarget)} onCancel={() => setPreviewTarget(null)} footer={null}>
+      <BusinessActionModal size="compact" title={previewTarget ? `${previewTarget.code} 路由影响预览` : "路由影响预览"} open={Boolean(previewTarget)} onCancel={() => setPreviewTarget(null)} footer={null}>
         <BusinessForm form={previewForm} onFinish={runPreview}>
           <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}><Select options={portionOptions} /></Form.Item>
           <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">生成预览</PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">生成预览</PermissionButton>
+          </CompactActions>
         </BusinessForm>
         {preview ? <Typography.Paragraph><strong>影响结果：</strong>{preview.changed ? "将发生变化" : "无变化"}<br />历史影响：{JSON.stringify(preview.historical_impact)}<br />未来影响：{preview.future_effect}</Typography.Paragraph> : null}
       </BusinessActionModal>

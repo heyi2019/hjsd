@@ -11,7 +11,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 
@@ -90,15 +90,17 @@ export function InventoryConsignmentModal(props: {
   };
 
   return (
-    <BusinessActionModal
+    <BusinessActionModal size="compact"
       title="登记寄售"
       open={open}
       destroyOnHidden
       onCancel={props.onClose}
       footer={
-        <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} onClick={() => form.submit()}>
-          确认上架
-        </PermissionButton>
+        <CompactActions onCancel={props.onClose} divider={false}>
+          <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} onClick={() => form.submit()}>
+            确认上架
+          </PermissionButton>
+        </CompactActions>
       }
     >
       <ErrorBanner error={error} />

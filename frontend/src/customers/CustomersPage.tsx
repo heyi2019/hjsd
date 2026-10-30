@@ -48,6 +48,7 @@ import {
   StatRow,
   StatusTag,
   useCompactLayout,
+  CompactActions,
 } from "../shared/ui";
 
 /** 订单客户角色兜底文案：词典 ORDER_CUSTOMER_ROLE 未加载/未配置时兜底。
@@ -802,7 +803,7 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
         ) : null}
       </Drawer>
 
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title={mergeTarget ? `合并客户 · ${mergeTarget.customer_no}` : "合并客户"}
         open={Boolean(mergeTarget)}
         onCancel={() => setMergeTarget(null)}
@@ -819,9 +820,11 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
           <Form.Item name="reason" label="合并原因" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </Form.Item>
-          <PermissionButton permission="customer.merge" type="primary" htmlType="submit">
-            确认合并
-          </PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="customer.merge" type="primary" htmlType="submit">
+              确认合并
+            </PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </BusinessActionModal>
     </Card>

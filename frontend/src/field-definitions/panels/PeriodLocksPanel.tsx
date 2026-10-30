@@ -12,7 +12,7 @@ import { periodLocksApi, type PeriodLock } from "../../shared/api/catalog";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { normalizeError } from "../../shared/api/client";
 import { CfgItem, FieldConfigScope } from "../../orders/ConfigurableField";
-import { BusinessActionModal, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton } from "../../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton } from "../../shared/ui";
 
 function currentPeriod(): string {
   return new Date().toISOString().slice(0, 7);
@@ -96,7 +96,7 @@ export function PeriodLocksPanel() {
         onPageChange={() => undefined}
      />
 
-      <BusinessActionModal title="锁定账期" open={open} onCancel={() => setOpen(false)} footer={null}>
+      <BusinessActionModal size="compact" title="锁定账期" open={open} onCancel={() => setOpen(false)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="FUNDLOCK" active={open}>
           <BusinessForm scope="FUNDLOCK" form={form} onFinish={submit}>
@@ -105,19 +105,21 @@ export function PeriodLocksPanel() {
               label="会计账期"
               rules={[{ required: true }, { pattern: /^\d{4}-\d{2}$/, message: "请输入 YYYY-MM" }]}
             >
-              <Input placeholder="YYYY-MM" />
+              <input type="month" className="ant-input" aria-label="会计账期" />
             </CfgItem>
             <CfgItem name="note" label="说明">
               <Input.TextArea rows={3} />
             </CfgItem>
-            <PermissionButton
-              permission="finance.period.lock"
-              type="primary"
-              htmlType="submit"
-              loading={write.pending}
-            >
-              确认锁定
-            </PermissionButton>
+            <CompactActions>
+              <PermissionButton
+                permission="finance.period.lock"
+                type="primary"
+                htmlType="submit"
+                loading={write.pending}
+              >
+                确认锁定
+              </PermissionButton>
+            </CompactActions>
           </BusinessForm>
         </FieldConfigScope>
       </BusinessActionModal>

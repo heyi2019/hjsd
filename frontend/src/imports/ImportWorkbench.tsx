@@ -530,7 +530,7 @@ export function ImportWorkbench({
         }}
       />
 
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         open={importOpen}
         title="导入导入数据"
         okText="开始导入"

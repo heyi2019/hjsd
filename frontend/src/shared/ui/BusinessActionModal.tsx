@@ -75,6 +75,7 @@ export function BusinessActionModal({
     <ConfigProvider button={{ autoInsertSpace: false }}>
       <Modal
         {...restProps}
+        onCancel={onCancel}
         title={titleNode}
         width={resolvedWidth}
         wrapClassName={mergedWrapClassName}

@@ -127,6 +127,8 @@ export function InventorySaleModal(props: {
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
     setSubmitting(true);
+    // 订单先建、事件后登记：登记失败会留下无事件的孤儿单，catch 中据此自动作废。
+    let createdOrderId: number | undefined;
     try {
       const customerNickname = String(values.customer_nickname ?? "").trim();
       const customerPhone = values.customer_phone as string | undefined;
@@ -168,6 +170,7 @@ export function InventorySaleModal(props: {
           role: props.account.inventory_type === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER",
         }],
       });
+      createdOrderId = order.id;
 
       if (values.payment_method === "INSTALLMENT") {
         const schedule = serializeInstallmentSchedule(
@@ -210,7 +213,22 @@ export function InventorySaleModal(props: {
       props.onClose();
       await props.onCreated();
     } catch (cause) {
-      setError(normalizeError(cause));
+      const failure = normalizeError(cause);
+      if (createdOrderId === undefined) {
+        setError(failure);
+      } else {
+        // 订单已落库但事件未登记：直接作废，避免污染订单台账与库存来源订单号。
+        // 作废失败不吞掉原始错误，附带订单号提示人工兜底。
+        try {
+          await ordersApi.cancel(createdOrderId, { reason: "售出登记失败，自动作废本次建单" });
+          setError({ ...failure, message: `${failure.message}（已自动作废本次创建的订单）` });
+        } catch {
+          setError({
+            ...failure,
+            message: `${failure.message}（订单 ${createdOrderId} 未自动作废，请到订单页手工作废）`,
+          });
+        }
+      }
     } finally {
       setSubmitting(false);
     }

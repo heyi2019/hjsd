@@ -146,6 +146,29 @@ it("售出时用建单参与方填写新买家并将其关联到订单", async (
   }));
 });
 
+it("售出事件登记失败时自动作废已建订单，不留孤儿单", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  vi.mocked(catalog.ordersApi.postEvent).mockRejectedValueOnce({
+    isAxiosError: true,
+    response: { data: { code: "VALIDATION_ERROR", message: "TH 售出前必须存在已过账 BUY 事件" } },
+    message: "Request failed",
+  });
+  resolveMock(vi.mocked(catalog.ordersApi.cancel), { id: 21 });
+  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  await ui.type(screen.getByLabelText("客户昵称"), "买家A");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("收款资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.ordersApi.cancel)).toHaveBeenCalledWith(
+    21,
+    expect.objectContaining({ reason: expect.stringContaining("自动作废") }),
+  ));
+  expect(await screen.findByText(/已自动作废/)).toBeInTheDocument();
+});
+
 describe("InventoryPanel：写入与长路径", () => {
 it("自营在库账号可以售出并登记 HS 售出事件", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });

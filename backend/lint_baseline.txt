@@ -6,12 +6,10 @@ app/orders/service.py :: '.events._opposite_direction' imported but unused
 app/orders/service.py :: 'app.core.errors.Conflict' imported but unused
 app/orders/service.py :: 'app.core.numbering.allocate_number' imported but unused
 app/orders/service.py :: 'app.core.state_machine.ACCOUNT_TRANSITIONS' imported but unused
-app/orders/service.py :: 'app.domain.enums.AccountStatus' imported but unused
 app/orders/service.py :: 'app.domain.enums.PoolStatus' imported but unused
 app/orders/service.py :: 'app.domain.enums.Portion' imported but unused
 app/orders/service.py :: 'app.domain.enums.SequenceKey' imported but unused
 app/orders/service.py :: 'app.domain.trade.Installment' imported but unused
-app/orders/service.py :: 'app.orders.form_fields.validate_order_form_extra' imported but unused
 app/orders/service.py :: 'datetime.datetime' imported but unused
 app/parties/service.py :: '._common.FIELD_KEY_PATTERN' imported but unused
 app/parties/service.py :: '._common.ORDER_TYPE_CODE_PATTERN' imported but unused
@@ -48,7 +46,6 @@ tests/v1/conftest.py :: 'app.domain.options' imported but unused
 tests/v1/conftest.py :: 'app.domain.parties' imported but unused
 tests/v1/conftest.py :: 'app.domain.quality' imported but unused
 tests/v1/conftest.py :: 'app.domain.trade' imported but unused
-tests/v1/test_accounts_contract.py :: 'app.core.errors.Conflict' imported but unused
 tests/v1/test_backup_restore.py :: 'app.domain.foundation' imported but unused
 tests/v1/test_backup_restore.py :: 'app.domain.parties' imported but unused
 tests/v1/test_backup_restore.py :: 'app.domain.trade' imported but unused

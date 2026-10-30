@@ -9,7 +9,7 @@ import pytest
 from app.stocks import service as stocks_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.trade import Order, RebateSettlement
+from app.domain.trade import RebateSettlement
 from app.finance import rebates
 from app.finance import service as finance_service
 from app.finance.rebates import _rebate_rate_from_snapshot

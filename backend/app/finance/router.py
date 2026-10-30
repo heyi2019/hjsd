@@ -22,7 +22,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.finance import schemas, service
-from app.domain.trade import Deposit, Order
+from app.domain.trade import Deposit, Order, RebateRecord
 from app.orders import service as orders_service
 from app.parties import service as parties_service
 

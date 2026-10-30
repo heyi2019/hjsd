@@ -17,7 +17,6 @@ from app.domain.enums import (
     DepositStatus,
     ImportBatchStatus,
     PolicyStatus,
-    RebateStatus,
 )
 from app.domain.trade import Cashflow, Deposit
 from app.domain.trade import RebateRecord as RebateRecordModel

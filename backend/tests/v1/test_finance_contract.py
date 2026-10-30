@@ -977,7 +977,6 @@ class TestFinanceApi:
     def test_manual_cashflow_review_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
         created = seeded_client.post(
             "/api/v1/cashflows",
             json={

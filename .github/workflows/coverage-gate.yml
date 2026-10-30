@@ -2,7 +2,7 @@ name: coverage-gate
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, test]
   pull_request:
   workflow_dispatch:
 
@@ -23,6 +23,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+
+      - name: Prepare isolated CI environment
+        run: |
+          rm -f .env
+          cp .env.example .env
+          python - <<'PY'
+          from pathlib import Path
+
+          env_file = Path(".env")
+          content = env_file.read_text(encoding="utf-8")
+          content = content.replace(
+              "JWT_SECRET_KEY=replace-with-a-random-secret-at-least-32-characters",
+              "JWT_SECRET_KEY=ci-test-secret-0123456789-abcdef",
+          )
+          content = content.replace(
+              "DATABASE_URL=sqlite:///./data/heijin_erp_v1.db",
+              "DATABASE_URL=sqlite:///./data/ci_heijin_erp_v1.db",
+          )
+          env_file.write_text(content, encoding="utf-8")
+          PY
 
       - name: Run coverage gate
         working-directory: backend

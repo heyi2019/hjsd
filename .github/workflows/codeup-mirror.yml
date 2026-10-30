@@ -41,6 +41,12 @@ jobs:
     if: needs.check-configuration.outputs.configured == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout GitHub main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
       - name: Push GitHub main commit to Codeup main
         env:
           CODEUP_USERNAME: ${{ secrets.CODEUP_USERNAME }}
@@ -49,14 +55,6 @@ jobs:
         run: |
           set -euo pipefail
           # The credentials are supplied only to this process and never written to the repository.
-          git init --quiet
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --quiet --depth=1 origin "${GITHUB_SHA}"
-          git checkout --quiet --detach FETCH_HEAD
           git remote add codeup "https://${CODEUP_USERNAME}:${CODEUP_TOKEN}@${CODEUP_REPOSITORY#https://}"
-          codeup_main_sha="$(git ls-remote codeup refs/heads/main | awk '{print $1}')"
-          test -n "$codeup_main_sha"
-          git push codeup \
-            "--force-with-lease=refs/heads/main:${codeup_main_sha}" \
-            "HEAD:refs/heads/main"
+          git push codeup "HEAD:refs/heads/main"
 

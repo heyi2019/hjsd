@@ -368,7 +368,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "REBATE_VOID", label: "作废返点" },
     { value: "RECONCILIATION_CREATE", label: "登记对账" },
     { value: "RECONCILIATION_RESOLVE", label: "处置对账差异" },
-    { value: "PERIOD_LOCK", label: "锁定账期" },
     { value: "QUALITY_ISSUE_CREATE", label: "新建质量工单" },
     { value: "QUALITY_ISSUE_UPDATE", label: "更新质量工单" },
     { value: "QUALITY_ISSUE_CLOSE", label: "关闭质量工单" },

@@ -29,7 +29,7 @@ const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
   },
   {
     nav: "资金中心",
-    tabs: ["总览", "流水", "押金", "对账", "异常与月结", "返点"],
+    tabs: ["总览", "流水", "押金", "对账", "异常", "返点"],
   },
   {
     nav: "经营中心",
@@ -113,7 +113,7 @@ async function enterApp(page: Page) {
 /**
  * 动态读取「设置」页真实渲染的 Tab 清单：可见 Tab + 溢出收纳到「更多 ⌄」下拉的 Tab，
  * 一并返回。避免硬编码 10 Tab 过时（如「表单字段/导入」曾错写成旧字段/标准导入，
- * 且漏掉权限门控的 编号序列/月结账期锁/改动追溯）。
+ * 且漏掉权限门控的 编号序列/改动追溯）。
  *
  * 选标签用 textContent 并压平空白——antd 会给中文 Tab 插空格（与「退 出」同源）；
  * textContent 不受滚动/可见性影响，竖向（tabPosition=left）或横向溢出都读到全量。

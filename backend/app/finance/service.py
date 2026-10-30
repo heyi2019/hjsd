@@ -18,10 +18,8 @@ from .cashflows import (
     cancel_deposit,
     create_cashflow,
     create_deposit,
-    create_period_lock,
     list_cashflows,
     list_deposits,
-    list_period_locks,
     lose_deposit,
     return_deposit,
     reverse_cashflow,
@@ -54,8 +52,6 @@ __all__ = [
     "create_deposit",
     # 以下两项为路由层门面再导出：app/finance/router.py 通过 service.<name> 访问，
     # 不可删除（否则 500）；列在 __all__ 中既保留门面，又让静态检查认账。
-    "create_period_lock",
-    "list_period_locks",
     "create_rebate",
     "deposit_held_total",
     "list_cashflows",

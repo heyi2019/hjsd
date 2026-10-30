@@ -71,8 +71,8 @@ describe("normalizeError：只认 v1 统一错误结构", () => {
   });
 
   it("4xx 业务中文文案原样透出，不被 5xx 兜底误伤", () => {
-    const err = axiosError({ status: 422, responseData: { code: "PERIOD_LOCKED", message: "期间已锁定" } });
-    expect(normalizeError(err)).toEqual({ message: "期间已锁定", code: "PERIOD_LOCKED" });
+    const err = axiosError({ status: 422, responseData: { code: "BUSINESS_ERROR", message: "业务校验未通过" } });
+    expect(normalizeError(err)).toEqual({ message: "业务校验未通过", code: "BUSINESS_ERROR" });
   });
 
   it("非 axios 错误也能安全转文案（不抛错即为达标）", () => {

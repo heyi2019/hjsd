@@ -21,26 +21,6 @@ class DepositCreate(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
-class PeriodLockCreate(RequestModel):
-    period: str = Field(min_length=7, max_length=7)
-    note: str | None = Field(default=None, max_length=500)
-    form_extra: dict[str, Any] | None = None
-
-
-class PeriodLockOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    period: str
-    locked_at: datetime
-    locked_by: str
-    note: str | None = None
-    created_at: datetime
-    updated_at: datetime
-    created_by: str
-    updated_by: str
-    form_extra: dict[str, Any] | None = None
-
 
 class DepositReturn(RequestModel):
     amount: Decimal
@@ -253,8 +233,6 @@ __all__ = [
     "DepositOut",
     "DepositReturn",
     "DepositLoss",
-    "PeriodLockCreate",
-    "PeriodLockOut",
     "CashflowOut",
     "CashflowListOut",
     "CashflowCreate",

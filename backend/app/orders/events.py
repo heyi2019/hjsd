@@ -14,7 +14,6 @@ from app.core.business_numbering import cashflow_no as next_cashflow_no
 from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.periods import assert_period_open
 from app.core.security import CurrentUser
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.domain.enums import (
@@ -146,7 +145,6 @@ def post_event(
         )
         if active_ids != set(operator_user_ids):
             raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
-    assert_period_open(session, occurred_on, operation="登记业务事件")
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     can_refund_completed = (

@@ -43,7 +43,6 @@ from app.domain.trade import (
 )
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
-from app.core.periods import assert_period_open
 from app.core.schemas import PageOut
 from app.orders import service as orders_service
 
@@ -154,8 +153,6 @@ def update_execution_detail(
             raise NotFound("关联资金流水不存在")
         if Decimal(str(flow.amount)) != Decimal(str(event.amount)):
             raise Validation("执行记录与关联流水金额不一致，请先核对")
-        assert_period_open(db, event.occurred_on, operation="修改执行记录")
-        assert_period_open(db, flow.occurred_on, operation="修改资金流水")
         if (event.offset_event_id is not None or flow.reversal_of_id is not None
             or db.scalar(select(OrderEvent.id).where(OrderEvent.offset_event_id == event.id)) is not None
             or db.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)) is not None):

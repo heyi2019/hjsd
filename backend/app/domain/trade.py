@@ -829,9 +829,32 @@ class OrderFormField(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class OrderFormSectionLabel(Base, AuditMixin):
+    """表单板块标题配置：按业务类型与作用域板块键描述板块显示标题。
+
+    设置面板「板块管理」可编辑板块显示名；订单建单表单的区块标题从此读取，
+    实现「设置里改板块名 → 建单同步显示」与字段标签一致的配置驱动体验。
+    板块键复用 order_form_fields.section 的值域（ACCOUNT_PRODUCT / FINANCE /
+    PARTICIPANT / DELIVER / BUSINESS / OPERATION / EXTRA）。
+    """
+
+    __tablename__ = "order_form_section_labels"
+    __table_args__ = (
+        UniqueConstraint(
+            "order_type_code", "section_key", name="uq_order_form_section_labels_code_key"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_type_code: Mapped[str] = mapped_column(String(16), nullable=False)
+    section_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
 __all__ = [
     "Order",
     "OrderFormField",
+    "OrderFormSectionLabel",
     "Account",
     "Cashflow",
     "Deposit",

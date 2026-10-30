@@ -41,7 +41,6 @@ from app.domain.users import User
 from app.installments import service as installments_service
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.orders import schemas, service
-from app.orders import form_fields as form_fields_service
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
 
@@ -745,6 +744,38 @@ def list_order_form_fields(
             db, order_type_code=order_type_code, include_inactive=include_inactive
         )
     ]
+
+
+@router.get(
+    "/order-form-fields/section-labels",
+    response_model=dict[str, str],
+)
+def list_section_labels(
+    order_type_code: str,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> dict[str, str]:
+    """按业务类型返回板块键→显示标题映射（设置面板与建单表单共用的板块标题来源）。"""
+    from app.orders import form_fields as ff
+
+    return ff.get_section_labels(db, order_type_code=order_type_code)
+
+
+@router.put(
+    "/order-form-fields/section-labels",
+    response_model=dict[str, str],
+)
+def save_section_labels(
+    payload: schemas.SectionLabelsSaveIn,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> dict[str, str]:
+    """覆盖保存某业务类型的板块标题（按板块键 upsert）。板块键须合法、作用域须已注册。"""
+    from app.orders import form_fields as ff
+
+    return ff.save_section_labels(
+        db, order_type_code=payload.order_type_code, labels=payload.labels, actor=_user.username
+    )
 
 
 @router.post(

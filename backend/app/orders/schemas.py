@@ -471,6 +471,15 @@ class OrderFormFieldCreate(BaseModel):
     note: str | None = None
 
 
+class SectionLabelsSaveIn(BaseModel):
+    """保存某业务类型的板块标题：order_type_code 须为已注册作用域，labels 为板块键→标题。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    order_type_code: str = Field(min_length=2, max_length=16)
+    labels: dict[str, str]
+
+
 class OrderFormFieldUpdate(BaseModel):
     """编辑建单表单字段：label/类型/选项/必填态（含条件必填）/排序/备注均可改；field_key 与 code 固定。
 

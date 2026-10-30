@@ -141,6 +141,13 @@ def test_cashflows_export_chinese_header(seeded_client, headers, seeded_db):
     assert header[0] == "row_type"
 
 
+def test_rebates_export_chinese_header(seeded_client, headers, seeded_db):
+    response = seeded_client.get("/api/v1/rebates/export.csv", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/csv")
+    assert _headers(response.text)[0] == "row_type"
+
+
 def test_export_writes_list_export_audit(seeded_client, headers, seeded_db):
     seeded_client.get("/api/v1/orders/export.csv", headers=headers)
     actions = [

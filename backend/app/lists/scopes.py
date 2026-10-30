@@ -133,7 +133,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("amount", "金额"),
             ListColumn("source", "来源"),
             ListColumn("status", "状态"),
-            ListColumn("audit", "审核追溯"),
             ListColumn("note", "备注"),
             ListColumn("actions", "操作", locked=True),
         ),

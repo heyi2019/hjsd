@@ -135,13 +135,6 @@ class CashflowCreate(RequestModel):
     form_extra_scope: str = "FUNDFLOW"
 
 
-class CashflowReject(RequestModel):
-    reason: str
-    # 表单字段配置体系（STUDIOREJ 作用域）：合并进流水 form_extra。
-    form_extra: dict[str, Any] | None = None
-    form_extra_scope: str = "FUNDREJECT"
-
-
 class CashflowReverse(RequestModel):
     reversed_on: date
     reason: str
@@ -265,7 +258,6 @@ __all__ = [
     "CashflowOut",
     "CashflowListOut",
     "CashflowCreate",
-    "CashflowReject",
     "CashflowReverse",
     "ReconciliationCreate",
     "ReconciliationResolve",

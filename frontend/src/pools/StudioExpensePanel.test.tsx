@@ -107,7 +107,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(screen.queryByText("日用")).not.toBeInTheDocument();
   });
 
-  it("登记支出：提交即自动审核入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {
+  it("登记支出：提交即入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {
     mockOptionSets(["POOL-A"]);
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 61 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
@@ -130,8 +130,6 @@ describe("StudioExpensePanel：工作室支出", () => {
       category: "房租",
       amount: "3000.00",
     });
-    // 关闭审核态：create 成功后立即自动补审核
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.approve)).toHaveBeenCalledWith(61));
   });
 
   it("登记收入：IN / BUSINESS_IN / SELF_REVENUE，同样自动入账", async () => {
@@ -157,7 +155,6 @@ describe("StudioExpensePanel：工作室支出", () => {
       category: "货款",
       amount: "800.00",
     });
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.approve)).toHaveBeenCalledWith(62));
   });
 
   it("配置承载池保存到选项词典（按池 code 存储）", async () => {

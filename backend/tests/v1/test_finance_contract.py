@@ -761,7 +761,7 @@ class TestRebateGuards:
 
 
 class TestCashflowLifecycle:
-    def test_manual_cashflow_is_pending_until_approved(self, seeded_db):
+    def test_manual_cashflow_counts_into_balance_immediately(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         before = orders_service.pool_balance(seeded_db, invest.id)
 
@@ -776,31 +776,10 @@ class TestCashflowLifecycle:
             actor="pytest",
             note="平台运营费",
         )
-        assert flow.status == "PENDING"
-        assert orders_service.pool_balance(seeded_db, invest.id) == before
-
-        service.approve_cashflow(seeded_db, flow.id, actor="finance")
+        assert flow.status == "APPROVED"
         after = orders_service.pool_balance(seeded_db, invest.id)
         assert after["expense"] == before["expense"] + Decimal("120.00")
         assert after["cash_balance"] == before["cash_balance"] - Decimal("120.00")
-
-    def test_rejected_cashflow_does_not_change_balance(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        flow = service.create_cashflow(
-            seeded_db,
-            pool_id=invest.id,
-            occurred_on=TODAY,
-            direction="IN",
-            nature="EXTERNAL_IN",
-            category="OTHER",
-            amount=Decimal("80.00"),
-            actor="pytest",
-            note="待核实收款",
-        )
-        service.reject_cashflow(seeded_db, flow.id, actor="finance", reason="凭证不足")
-        seeded_db.refresh(flow)
-        assert flow.status == "REJECTED"
-        assert orders_service.pool_balance(seeded_db, invest.id)["cash_balance"] == 0
 
     def test_approved_manual_cashflow_can_be_reversed_once(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -815,7 +794,6 @@ class TestCashflowLifecycle:
             actor="pytest",
             note="可冲销费用",
         )
-        service.approve_cashflow(seeded_db, flow.id, actor="finance")
         reversal = service.reverse_cashflow(
             seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="重复付款"
         )
@@ -992,13 +970,7 @@ class TestFinanceApi:
         )
         assert created.status_code == 201, created.text
         flow = created.json()
-        assert flow["status"] == "PENDING"
-
-        approved = seeded_client.post(
-            f"/api/v1/cashflows/{flow['id']}/approve", headers=headers
-        )
-        assert approved.status_code == 200, approved.text
-        assert approved.json()["status"] == "APPROVED"
+        assert flow["status"] == "APPROVED"
 
         reversed_flow = seeded_client.post(
             f"/api/v1/cashflows/{flow['id']}/reverse",

@@ -56,7 +56,6 @@ def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
         config={"rates": {"BUY": "7.50", "SELL": "3.00"}},
         actor="pytest",
     )
-    policy_service.approve_version(seeded_db, version["id"], approver="pytest")
 
     record = finance_service.create_rebate(
         seeded_db,

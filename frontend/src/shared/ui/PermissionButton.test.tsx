@@ -40,17 +40,19 @@ describe("PermissionButton：无权限默认隐藏", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("operator 建单可见、审批不可见（权限矩阵落地）", () => {
+  it("operator 建单与处理异常可见、用户管理不可见（权限矩阵落地）", () => {
     const { container } = renderLight(
       <>
         <PermissionButton permission="order.create">建单</PermissionButton>
-        <PermissionButton permission="order.exception.approve">审批</PermissionButton>
+        <PermissionButton permission="order.update">处理异常</PermissionButton>
+        <PermissionButton permission="user.manage">用户管理</PermissionButton>
       </>,
       { user: "operator" },
     );
     const labels = [...container.querySelectorAll("button")].map((b) => b.textContent);
     expect(labels).toContain("建单");
-    expect(labels).not.toContain("审批");
+    expect(labels).toContain("处理异常");
+    expect(labels).not.toContain("用户管理");
   });
 });
 

@@ -54,10 +54,6 @@ def _publish(seeded_db, definition, *, frm, to=None, config=None, approve=True):
         seeded_db, definition["id"], effective_from=frm, effective_to=to,
         config=config or {"rate": "5"}, actor="pytest",
     )
-    if approve:
-        version = policy_service.approve_version(
-            seeded_db, version["id"], approver="pytest"
-        )
     return version
 
 
@@ -159,13 +155,6 @@ class TestPolicyDefinitions:
                 actor="pytest",
             )
 
-        definition = _make_policy(seeded_db, code="TEXT_APPROVER")
-        version = policy_service.create_version(
-            seeded_db, definition["id"], effective_from=D,
-            config={"rate": "5"}, actor="pytest",
-        )
-        with pytest.raises(Validation, match="必须记录审批人"):
-            policy_service.approve_version(seeded_db, version["id"], approver=123)
 
     def test_create_definition_requires_positive_scoped_id(self, seeded_db):
         with pytest.raises(Validation) as exc:
@@ -216,25 +205,26 @@ class TestPolicyVersions:
             policy_service.list_versions(seeded_db, 999999)
 
         definition = _make_policy(seeded_db)
-        # 草稿限定 2026 年内，避免与后续发布版本生效期重叠
-        draft = policy_service.create_version(
+        # 创建即发布：版本均为 ACTIVE（已删除 DRAFT 草稿态）
+        v1 = policy_service.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1),
             effective_to=date(2026, 12, 31), config={"rate": "5"}, actor="pytest",
         )
-        active = _publish(
-            seeded_db, definition, frm=date(2027, 1, 1), config={"rate": "6"}
+        v2 = policy_service.create_version(
+            seeded_db, definition["id"], effective_from=date(2027, 1, 1),
+            config={"rate": "6"}, actor="pytest",
         )
-        assert draft["status"] == PolicyStatus.DRAFT.value
-        assert active["status"] == PolicyStatus.ACTIVE.value
+        assert v1["status"] == PolicyStatus.ACTIVE.value
+        assert v2["status"] == PolicyStatus.ACTIVE.value
 
         only_active = policy_service.list_versions(
             seeded_db, definition["id"], status=PolicyStatus.ACTIVE.value
         )
-        assert [v["id"] for v in only_active] == [active["id"]]
+        assert {v["id"] for v in only_active} == {v1["id"], v2["id"]}
         only_draft = policy_service.list_versions(
             seeded_db, definition["id"], status=PolicyStatus.DRAFT.value
         )
-        assert [v["id"] for v in only_draft] == [draft["id"]]
+        assert only_draft == []
 
     def test_create_version_notfound_and_empty_config(self, seeded_db):
         with pytest.raises(NotFound):
@@ -256,45 +246,7 @@ class TestPolicyVersions:
             )
         assert "对象" in str(exc.value)
 
-    def test_approve_version_notfound_and_empty_approver(self, seeded_db):
-        with pytest.raises(NotFound):
-            policy_service.approve_version(
-                seeded_db, 999999, approver="pytest"
-            )
-        definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
-            seeded_db, definition["id"], effective_from=D,
-            config={"rate": "5"}, actor="pytest",
-        )
-        with pytest.raises(Validation) as exc:
-            policy_service.approve_version(seeded_db, version["id"], approver="  ")
-        assert "审批人" in str(exc.value)
-        # 带 note 审批：note 落库（覆盖 approve 的 note 分支）
-        approved = policy_service.approve_version(
-            seeded_db, version["id"], approver="pytest", note="同意发布"
-        )
-        assert approved["status"] == PolicyStatus.ACTIVE.value
-        assert approved["note"] == "同意发布"
-
-    @pytest.mark.parametrize("status", [PolicyStatus.EXPIRED.value, PolicyStatus.SUPERSEDED.value])
-    def test_non_draft_version_cannot_be_reapproved(self, seeded_db, status):
-        definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
-            seeded_db,
-            definition["id"],
-            effective_from=D,
-            config={"rate": "5"},
-            actor="pytest",
-        )
-        item = seeded_db.get(PolicyVersion, version["id"])
-        item.status = status
-
-        with pytest.raises(Validation, match="只能发布草稿版本"):
-            policy_service.approve_version(
-                seeded_db, version["id"], approver="pytest"
-            )
-
-    def test_update_version_draft_notfound_and_empty_config(self, seeded_db):
+    def test_update_version_draft_rejects_published_version(self, seeded_db):
         with pytest.raises(NotFound):
             policy_service.update_version_draft(
                 seeded_db, 999999, config={"rate": "5"}
@@ -304,14 +256,10 @@ class TestPolicyVersions:
             seeded_db, definition["id"], effective_from=D,
             config={"rate": "5"}, actor="pytest",
         )
+        # 创建即发布（ACTIVE）：已发布版本不可改，只能新建版本封口
         with pytest.raises(Validation) as exc:
-            policy_service.update_version_draft(seeded_db, version["id"], config={})
-        assert "参数不能为空" in str(exc.value)
-        with pytest.raises(Validation) as exc:
-            policy_service.update_version_draft(
-                seeded_db, version["id"], config=["rate"]
-            )
-        assert "对象" in str(exc.value)
+            policy_service.update_version_draft(seeded_db, version["id"], config={"rate": "6"})
+        assert "不可修改" in str(exc.value)
 
 
 # ------------------------------------------------------------------ 快照与分配
@@ -377,7 +325,7 @@ class TestPolicyApi:
         missing = seeded_client.get("/api/v1/policies/999999", headers=json_headers)
         assert missing.status_code == 404
 
-    def test_patch_version_endpoint(self, seeded_client, seeded_db, json_headers):
+    def test_patch_version_endpoint_rejects_published(self, seeded_client, seeded_db, json_headers):
         definition = _make_policy(seeded_db)
         version = policy_service.create_version(
             seeded_db, definition["id"], effective_from=D,
@@ -388,8 +336,8 @@ class TestPolicyApi:
             headers=json_headers,
             json={"config": {"rate": "7"}},
         )
-        assert patched.status_code == 200, patched.text
-        assert patched.json()["config"] == {"rate": "7"}
+        # 创建即发布（ACTIVE）：已发布版本不可改，PATCH 被拒
+        assert patched.status_code in (400, 422), patched.text
 
     def test_profit_allocations_endpoints(self, seeded_client, seeded_db, json_headers):
         order = order_service.create_order(

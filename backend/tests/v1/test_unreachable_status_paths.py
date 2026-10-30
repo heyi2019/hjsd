@@ -40,7 +40,7 @@ def _make_def(seeded_db, code: str) -> dict:
     )
 
 
-def test_supersede_draft_version(seeded_db):
+def test_supersede_rejects_published_version(seeded_db):
     definition = _make_def(seeded_db, "SUP-TEST")
     version = policy_service.create_version(
         seeded_db,
@@ -50,13 +50,17 @@ def test_supersede_draft_version(seeded_db):
         config={"rate": "10"},
         actor="pytest",
     )
-    out = policy_service.supersede_draft_version(
-        seeded_db,
-        version["id"],
-        actor="pytest",
-        reason="被新规划取代",
-    )
-    assert out["status"] == PolicyStatus.SUPERSEDED.value
+    # 创建即发布（ACTIVE）：已发布版本是历史解析口径，不可作废
+    import pytest
+    from app.core.errors import Validation
+
+    with pytest.raises(Validation):
+        policy_service.supersede_draft_version(
+            seeded_db,
+            version["id"],
+            actor="pytest",
+            reason="已发布版本不可作废",
+        )
 
 
 def test_supersede_rejects_active_version(seeded_db):
@@ -69,7 +73,6 @@ def test_supersede_rejects_active_version(seeded_db):
         config={"rate": "10"},
         actor="pytest",
     )
-    policy_service.approve_version(seeded_db, version["id"], approver="pytest")
     import pytest
     from app.core.errors import Validation
 
@@ -119,8 +122,6 @@ def test_expire_sweep_marks_lapsed_versions(seeded_db):
         config={"rate": "12"},
         actor="pytest",
     )
-    policy_service.approve_version(seeded_db, lapsed["id"], approver="pytest")
-    policy_service.approve_version(seeded_db, live["id"], approver="pytest")
 
     out = policy_service.expire_lapsed_versions(seeded_db, on=date(2027, 1, 1), actor="pytest")
     assert out["swept"] == 1
@@ -144,7 +145,6 @@ def test_expire_sweep_idempotent(seeded_db):
         config={"rate": "10"},
         actor="pytest",
     )
-    policy_service.approve_version(seeded_db, version["id"], approver="pytest")
     first = policy_service.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
     second = policy_service.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
     assert first["swept"] == 1

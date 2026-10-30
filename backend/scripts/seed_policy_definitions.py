@@ -19,7 +19,7 @@
 - 版本：定义下已有任意版本则跳过，避免重复预置。
 
 注意：定义状态 `status` 不参与解析（`resolve_version` 只看版本 status=ACTIVE），
-脚本沿用服务默认 DRAFT 创建定义，但版本创建后立即 `approve_version` 置为 ACTIVE。
+脚本沿用服务默认：create_version 直接创建 ACTIVE 版本（无独立审批环节）。
 版本参数为占位口径，业务方在页面「设置配置」按实际调整（每次设置生成新版本并发布）。
 
 用法（必须 cd 到 backend 目录，默认库为 data/heijin_erp_v1.db）
@@ -147,12 +147,6 @@ def main() -> int:
                             config=target_config,
                             note="系统预置默认版本",
                             actor="system:seed_policy_definitions",
-                        )
-                        policy_service.approve_version(
-                            session,
-                            version["id"],
-                            approver="system:seed_policy_definitions",
-                            note="系统预置默认版本",
                         )
                 elif latest.config != target_config:
                     # 已发布版本不可改写（只能新建版本）；脚本不越权覆盖线上口径。

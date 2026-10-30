@@ -171,7 +171,7 @@ def create_cashflow(
         direction=direction,
         amount=money,
         order_id=order_id,
-        status=CashflowStatus.PENDING.value,
+        status=CashflowStatus.APPROVED.value,
         note=note,
         form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
         created_by=actor,
@@ -199,80 +199,6 @@ def create_cashflow(
             "nature": nature,
             "amount": str(money),
         },
-    )
-    return flow
-
-
-def approve_cashflow(
-    session: Session,
-    cashflow_id: int,
-    *,
-    actor: str,
-    user: CurrentUser | None = None,
-) -> Cashflow:
-    flow = _get_cashflow(session, cashflow_id, user)
-    assert_period_open(session, flow.occurred_on, operation="审核历史流水")
-    if flow.status != CashflowStatus.PENDING.value:
-        raise Validation(
-            "只有待审核流水可以审核",
-            details={"cashflow_id": cashflow_id, "status": flow.status},
-        )
-    flow.status = CashflowStatus.APPROVED.value
-    flow.reviewed_by = actor
-    flow.reviewed_at = datetime.now()
-    flow.updated_by = actor
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.CASHFLOW_APPROVE,
-        entity_type="cashflow",
-        entity_id=flow.flow_no,
-        actor=actor,
-        after={"status": flow.status},
-    )
-    return flow
-
-
-def reject_cashflow(
-    session: Session,
-    cashflow_id: int,
-    *,
-    actor: str,
-    reason: str,
-    form_extra: Mapping[str, Any] | None = None,
-    form_extra_scope: str = "FUNDREJECT",
-    user: CurrentUser | None = None,
-) -> Cashflow:
-    text_reason = _text(
-        reason,
-        field="reason",
-        message="驳回流水必须填写原因",
-        type_message="驳回流水必须填写原因",
-    )
-    flow = _get_cashflow(session, cashflow_id, user)
-    assert_period_open(session, flow.occurred_on, operation="驳回历史流水")
-    if flow.status != CashflowStatus.PENDING.value:
-        raise Validation(
-            "只有待审核流水可以驳回",
-            details={"cashflow_id": cashflow_id, "status": flow.status},
-        )
-    flow.status = CashflowStatus.REJECTED.value
-    flow.reviewed_by = actor
-    flow.reviewed_at = datetime.now()
-    flow.reversal_reason = text_reason
-    if form_extra:
-        form_extra = validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra)
-        # STUDIOREJ 作用域自定义字段值合并进流水 form_extra。
-        flow.form_extra = {**(flow.form_extra or {}), **dict(form_extra)}
-    flow.updated_by = actor
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.CASHFLOW_REJECT,
-        entity_type="cashflow",
-        entity_id=flow.flow_no,
-        actor=actor,
-        after={"status": flow.status, "reason": text_reason},
     )
     return flow
 
@@ -810,7 +736,6 @@ def list_cashflows(
     return rows, total
 
 __all__ = [
-    "approve_cashflow",
     "create_cashflow",
     "create_deposit",
     "create_period_lock",
@@ -819,7 +744,6 @@ __all__ = [
     "list_period_locks",
     "cancel_deposit",
     "lose_deposit",
-    "reject_cashflow",
     "return_deposit",
     "reverse_cashflow",
 ]

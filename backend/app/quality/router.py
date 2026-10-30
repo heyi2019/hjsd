@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import (
-    PERM_ORDER_EXCEPTION_APPROVE,
+    PERM_ORDER_UPDATE,
     PERM_REPORT_READ,
     CurrentUser,
     require_permissions,
@@ -17,7 +17,7 @@ from app.quality import schemas, service
 
 router = APIRouter(tags=["QLT-01 质量与异常"])
 read_quality = require_permissions(PERM_REPORT_READ)
-manage_quality = require_permissions(PERM_ORDER_EXCEPTION_APPROVE)
+manage_quality = require_permissions(PERM_ORDER_UPDATE)
 
 
 def _actor(user: CurrentUser) -> str:

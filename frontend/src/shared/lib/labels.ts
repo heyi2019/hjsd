@@ -204,8 +204,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   QUALITY_ISSUE_UPDATE: "更新质量工单",
   QUALITY_ISSUE_CLOSE: "关闭质量工单",
   CASHFLOW_CREATE: "登记资金流水",
-  CASHFLOW_APPROVE: "审核通过流水",
-  CASHFLOW_REJECT: "驳回流水",
   CASHFLOW_REVERSE: "冲销流水",
   TRANSFER_CREATE: "发起资金划转",
   TRANSFER_REPAIR: "修复单边划转",

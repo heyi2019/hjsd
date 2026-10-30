@@ -101,7 +101,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#category") ?? modal, "SELL");
     await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
     await ui.type(modal.querySelector("#note") ?? modal, "测试收入");
-    await ui.click(screen.getByRole("button", { name: /提交审核/ }));
+    await ui.click(screen.getByRole("button", { name: /提交/ }));
     await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.nature).toBe("BUSINESS_IN");
@@ -120,31 +120,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(deriveCashflowNature("BUSINESS", "OUT")).toBe("BUSINESS_OUT");
   });
 
-  it("待审核流水 → 确认审核调用 cashflowsApi.approve", async () => {
-    const pending = [{ id: 5, flow_no: "CF-P-05", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE", status: "PENDING" }];
-    resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: pending, total: pending.length });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await ui.click(await screen.findByRole("button", { name: /审\s*核/ }));
-    await ui.click(await screen.findByRole("button", { name: /确认审核/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.approve)).toHaveBeenCalledWith(5));
-  });
 
-  it("待审核流水 → 拒绝填写原因后调用 cashflowsApi.reject", async () => {
-    const pending = [{ id: 6, flow_no: "CF-P-06", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "PENDING" }];
-    resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: pending, total: pending.length });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await ui.click(await screen.findByRole("button", { name: /拒\s*绝/ }));
-    const modal = modalContent();
-    await ui.type(modal.querySelector("#reason") ?? modal, "金额存疑");
-    await ui.click(screen.getByRole("button", { name: /确认拒绝/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.reject)).toHaveBeenCalledWith(6, "金额存疑"));
-  });
 
-  it("已审核且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
+
+
+  it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
     resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: approved, total: approved.length });
     renderLight(<FundsPage />, { user: "admin" });
@@ -193,14 +173,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(screen.queryByText("已处置")).toBeNull();
   });
 
-  it("流水审核追溯列展示审核人/审核时间/冲销来源", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    // 单元格为多文本节点拼接（审核人 · 时间 · 冲销来源），用 textContent 函数匹配器断言整串；
-    // td 与内层 span textContent 相同，用 findAllByText 规避 multiple elements。
-    expect((await screen.findAllByText((_content, element) => element?.textContent === "admin · 2026-10-18 09:30 · 冲销#1")).length).toBeGreaterThan(0);
-  });
+
 
   it("新增对账提交：未达流水 ID 按逗号解析为数组", async () => {
     resolveMockOnce(vi.mocked(catalog.reconciliationsApi.create), { id: 210 });
@@ -250,7 +223,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByText(/POOL-A/);
     await ui.click(screen.getByRole("tab", { name: "对账" }));
-    expect(await screen.findByText(/系统余额口径：截至对账日期「已审核」流水的累计/)).toBeInTheDocument();
+    expect(await screen.findByText(/系统余额口径：截至对账日期「已入账」流水的累计/)).toBeInTheDocument();
   });
 
   it("总览统计卡展示自有权益合计（仅 OWNED 归属池计入）", async () => {

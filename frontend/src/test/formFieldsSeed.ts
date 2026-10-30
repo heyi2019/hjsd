@@ -162,7 +162,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "IN", label: "收入" }, { value: "OUT", label: "支出" },
   ] },
   { code: "FUND_FLOW_STATUS", label: "流水状态", group: "FUND", editable: false, options: [
-    { value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已审核" }, { value: "REJECTED", label: "已拒绝" },
+    { value: "APPROVED", label: "已入账" },
   ] },
   { code: "FUND_FLOW_FUND_NATURE", label: "流水资金性质", group: "FUND", editable: false, options: [
     { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
@@ -373,8 +373,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "QUALITY_ISSUE_UPDATE", label: "更新质量工单" },
     { value: "QUALITY_ISSUE_CLOSE", label: "关闭质量工单" },
     { value: "CASHFLOW_CREATE", label: "登记资金流水" },
-    { value: "CASHFLOW_APPROVE", label: "审核通过流水" },
-    { value: "CASHFLOW_REJECT", label: "驳回流水" },
     { value: "CASHFLOW_REVERSE", label: "冲销流水" },
     { value: "TRANSFER_CREATE", label: "发起资金划转" },
     { value: "TRANSFER_REPAIR", label: "修复单边划转" },

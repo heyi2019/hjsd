@@ -18,7 +18,6 @@ from app.auth.router import (
 )
 from app.finance.schemas import (
     CashflowCreate,
-    CashflowReject,
     CashflowReverse,
     DepositCreate,
     DepositLoss,
@@ -105,7 +104,6 @@ from app.parties.schemas import (
             CashflowCreate,
             {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "nature": "BUSINESS_IN", "category": "OTHER", "amount": "1.00"},
         ),
-        (CashflowReject, {"reason": "凭证不足"}),
         (CashflowReverse, {"reversed_on": date(2026, 10, 1), "reason": "重复"}),
         (
             ReconciliationCreate,

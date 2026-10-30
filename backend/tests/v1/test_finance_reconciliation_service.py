@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.foundation import Pool
-from app.finance.cashflows import approve_cashflow, create_cashflow
+from app.finance.cashflows import create_cashflow
 from app.finance.reconciliation import (
     _get_reconciliation,
     create_reconciliation,
@@ -48,7 +48,6 @@ def _seed_recon(seeded_db):
             amount=amount,
             actor="pytest",
         )
-        approve_cashflow(seeded_db, flow.id, actor="finance")
     return pool
 
 
@@ -130,7 +129,6 @@ def test_create_reconciliation_rejects_flow_outside_pool(seeded_db):
         amount=Decimal("5"),
         actor="pytest",
     )
-    approve_cashflow(seeded_db, flow2.id, actor="finance")
     with pytest.raises(Validation, match="未达流水必须属于当前资金池且不晚于对账日"):
         create_reconciliation(
             seeded_db,
@@ -180,8 +178,6 @@ def test_create_reconciliation_survives_decimal_balances(seeded_db):
         amount=Decimal("0.10"),
         actor="pytest",
     )
-    approve_cashflow(seeded_db, flow.id, actor="finance")
-
     # 组合一：70.30 - 70.10，严格等式下 70.30-70.10=0.19999999999999929 必炸
     item = create_reconciliation(
         seeded_db,

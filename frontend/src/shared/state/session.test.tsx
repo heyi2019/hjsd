@@ -19,7 +19,7 @@ function Probe() {
       <span data-testid="user">{user}</span>
       <span data-testid="perm-count">{permissions.size}</span>
       <span data-testid="can-create">{String(can("order.create"))}</span>
-      <span data-testid="can-approve">{String(can("order.exception.approve"))}</span>
+      <span data-testid="can-update">{String(can("order.update"))}</span>
       <button type="button" onClick={() => switchUser("finance")}>
         切到财务
       </button>
@@ -38,10 +38,10 @@ describe("SessionProvider：角色 → 权限", () => {
     expect(screen.getByTestId("can-create").textContent).toBe("true");
   });
 
-  it("operator 能建单但不能审批异常（operator 无 order.exception.approve）", () => {
+  it("operator 能建单且能处理异常（operator 有 order.update）", () => {
     renderLight(<Probe />, { user: "operator" });
     expect(screen.getByTestId("can-create").textContent).toBe("true");
-    expect(screen.getByTestId("can-approve").textContent).toBe("false");
+    expect(screen.getByTestId("can-update").textContent).toBe("true");
   });
 
   it("viewer 不能建单（只读角色）", () => {
@@ -77,7 +77,7 @@ describe("switchUser：切换角色", () => {
     await ui.click(screen.getByRole("button", { name: "切到财务" }));
     expect(screen.getByTestId("user").textContent).toBe("finance");
     expect(localStorage.getItem(DEV_USER_KEY)).toBe("finance");
-    expect(screen.getByTestId("can-approve").textContent).toBe("false");
+    expect(screen.getByTestId("can-update").textContent).toBe("false");
   });
 });
 

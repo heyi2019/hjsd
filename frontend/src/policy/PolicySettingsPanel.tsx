@@ -107,7 +107,6 @@ export function PolicySettingsPanel() {
     if (!current) return;
     const succeeded = await act(async () => {
       const created = await policyApi.createVersion(current.id, values);
-      await policyApi.approve(created.id, {});
     });
     if (!succeeded) return;
     setEditorOpen(false);

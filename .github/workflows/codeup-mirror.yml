@@ -1,0 +1,58 @@
+name: codeup-main-mirror
+
+# GitHub 是唯一 CI 主线；GitHub main 更新后自动镜像到 Codeup main。
+# Codeup main 保持保护状态，仅允许配置的同步身份更新。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  check-configuration:
+    name: Check Codeup mirror configuration
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          CODEUP_USERNAME: ${{ secrets.CODEUP_USERNAME }}
+          CODEUP_TOKEN: ${{ secrets.CODEUP_TOKEN }}
+        run: |
+          if [[ -n "$CODEUP_USERNAME" && -n "$CODEUP_TOKEN" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Codeup mirror not configured"
+              echo
+              echo "Add repository secrets CODEUP_USERNAME and CODEUP_TOKEN to enable automatic main-branch mirroring."
+              echo "Existing GitHub CI remains unaffected."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  mirror-main:
+    name: Mirror main to Codeup
+    needs: check-configuration
+    if: needs.check-configuration.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push GitHub main commit to Codeup main
+        env:
+          CODEUP_USERNAME: ${{ secrets.CODEUP_USERNAME }}
+          CODEUP_TOKEN: ${{ secrets.CODEUP_TOKEN }}
+          CODEUP_REPOSITORY: https://hjsd-cn-hangzhou.devops.aliyuncs.com/codeup/hjsd/hjsd.git
+        run: |
+          set -euo pipefail
+          # The credentials are supplied only to this process and never written to the repository.
+          git init --quiet
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --quiet --depth=1 origin "${GITHUB_SHA}"
+          git checkout --quiet --detach FETCH_HEAD
+          git remote add codeup "https://${CODEUP_USERNAME}:${CODEUP_TOKEN}@${CODEUP_REPOSITORY#https://}"
+          git push codeup "HEAD:refs/heads/main"
+

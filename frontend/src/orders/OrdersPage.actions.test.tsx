@@ -268,20 +268,22 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(list).getAllByText("¥1,234.00").length).toBeGreaterThan(0);
   });
 
-  it("移动端卡片点击查看详情打开订单抽屉", async () => {
+  it("移动端卡片点击编辑订单打开编辑弹窗", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
     await openLedger();
     const list = screen.getByLabelText("订单列表");
-    await ui.click(within(list).getAllByRole("button", { name: /查看详情/ })[0]);
-    expect(await screen.findByText("订单详情 · HS-2026-0001")).toBeInTheDocument();
+    // 移动端卡片顺序不一定与桌面行一致，按订单号定位目标卡片的编辑按钮，而非取 [0]。
+    const cards = within(list).getAllByText("HS-2026-0001");
+    const card = cards[0].closest(".orders-mobile-card") as HTMLElement;
+    await ui.click(within(card).getByRole("button", { name: /编辑订单/ }));
+    expect(await modalOf(/编辑订单 · HS-2026-0001/)).toBeInTheDocument();
   });
 
-  it("编辑订单：抽屉内打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
+  it("编辑订单：行操作列打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
     await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · HS-2026-0001");
-    await ui.click(screen.getByRole("button", { name: /编辑订单/ }));
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /编辑订单/ }));
     const modal = await modalOf(/编辑订单 · HS-2026-0001/);
     await ui.clear(within(modal).getByLabelText("成交日期"));
     await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
@@ -291,100 +293,6 @@ describe("OrdersPage：操作与筛选分支", () => {
       trade_date: "2026-10-05",
       note: "补登记",
     })));
-  });
-
-  it("订单详情：删除关联经二次确认后调用 deleteLink 并刷新列表", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
-    await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · HS-2026-0001");
-    await screen.findByText("关联订单");
-    // 关联行随 links 异步加载：删除触发按钮出现即关联行已挂载。
-    // antd Button 的 accessible name 会被加空格导致精确串失配，按 skill 约定用正则子串（同 UsersPanel 范式）。
-    await ui.click(await screen.findByRole("button", { name: /删除/ }, { timeout: 8000 }));
-    // 二次确认弹层打开：确认按钮（默认文案「确认」）出现，与触发按钮「删除」区分（套 UsersPanel 范式）
-    await ui.click(await screen.findByRole("button", { name: /确认/ }));
-    await waitFor(() => expect(catalog.ordersApi.deleteLink).toHaveBeenCalledWith(1, 77));
-    // 删除成功后重新拉取关联列表（首次为开抽屉、二次为删后刷新）
-    await waitFor(() => expect(catalog.ordersApi.links).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(message.success).mock.calls.map((call) => call[0])).toContain("订单关联已删除");
-  });
-
-  it("订单详情：关联行按 direction 展示方向文案与对应单号（防 incoming 误判回归）", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
-    vi.mocked(catalog.ordersApi.links).mockResolvedValue([
-      link1,
-      {
-        ...link1,
-        id: 78,
-        source_order_id: 1,
-        source_order_no: "HS-2026-0001",
-        target_order_id: 3,
-        target_order_no: "DG-2026-0003",
-        direction: "FOLLOW_UP",
-      },
-    ]);
-    await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · HS-2026-0001");
-    await screen.findByText("关联订单");
-    // direction=SOURCE → 本单是后续单，关联来源单（文案「来源单」；DG-2026-0002 与列表表格撞名，不单独断言）
-    await screen.findByText("来源单");
-    // direction=FOLLOW_UP → 本单是来源单，关联后续单「DG-2026-0003」（该单号不出现在列表，唯一）
-    await screen.findByText("后续单");
-    expect(screen.getByText("DG-2026-0003")).toBeInTheDocument();
-  });
-
-  it("订单详情：规则快照 found 时展示版本号与固化参数", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
-    vi.mocked(catalog.policyApi.orderSnapshot).mockResolvedValue({
-      found: true,
-      snapshot: {
-        policy_version_id: 7,
-        policy_snapshot: { REBATE: { policy_code: "REBATE", version: 2, config: { rate: "5" } } },
-      },
-    });
-    await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · HS-2026-0001");
-    expect(await screen.findByText("规则快照")).toBeInTheDocument();
-    expect(screen.getByText("#7")).toBeInTheDocument();
-    expect(screen.getByText("返点规则")).toBeInTheDocument();
-    expect(screen.getByText(/config=\{"rate":"5"\}/)).toBeInTheDocument();
-  });
-
-  it("抽屉展示动作记录", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
-      ...order1,
-      events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator: "张三" }],
-    });
-    await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · HS-2026-0001");
-    expect(screen.getByText("动作记录")).toBeInTheDocument();
-    // 事件行展示编号、金额、日期+操作人（#36：明细字段不再只有动作/操作人/日期）。
-    expect(screen.getByText("EV-101")).toBeInTheDocument();
-    expect(screen.getByText("1,000.00")).toBeInTheDocument();
-    expect(screen.getByText("2026-10-01 · 张三")).toBeInTheDocument();
-  });
-
-  it("抽屉点击去库存中心切换到库存 Tab 并关闭抽屉", async () => {
-    await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · HS-2026-0001");
-    await ui.click(screen.getByRole("button", { name: /去库存中心/ }));
-    await waitFor(() => expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true"));
-    expect(screen.queryByText("订单详情 · HS-2026-0001")).toBeNull();
-  });
-
-  it("抽屉点击去分期与回款切换到分期 Tab", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
-    await openLedger();
-    await ui.click(within(tableRow("DFQ-2026-0003")).getByRole("button", { name: /查看详情/ }));
-    await screen.findByText("订单详情 · DFQ-2026-0003");
-    await ui.click(screen.getByRole("button", { name: /去分期与回款/ }));
-    await waitFor(() => expect(screen.getByRole("tab", { name: "分期与回款" })).toHaveAttribute("aria-selected", "true"));
   });
 
   it("分润：打开弹窗按姓名预填已有比例", async () => {

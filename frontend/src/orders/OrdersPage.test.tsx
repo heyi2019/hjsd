@@ -200,10 +200,7 @@ describe("OrdersPage：四类业务台账", () => {
     vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...orders[0], status: "CANCELLED" });
 
     await openLedger("admin");
-    fireEvent.click(screen.getAllByText("查看详情")[0]);
-    await screen.findByText("订单详情 · HS-2026-0001");
-    const drawer = screen.getByRole("dialog");
-    fireEvent.click(within(drawer).getByRole("button", { name: /更多/ }));
+    fireEvent.click(screen.getAllByText("更多")[0]);
     fireEvent.click(await screen.findByText("取消交易"));
 
     expect(await screen.findByText("售出取消交易 · HS-2026-0001")).toBeInTheDocument();

@@ -149,6 +149,62 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   }));
 });
 
+it("售出金额可拆分进两个资金池（售出金额2 + 资金账户2）", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  resolveMock(vi.mocked(catalog.customersApi.list), []);
+  resolveMock(vi.mocked(catalog.customersApi.create), {
+    customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
+    duplicate_candidates: [],
+  });
+  resolveMock(vi.mocked(catalog.poolsApi.list), [
+    { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
+    { id: 4, code: "HJ_INVEST", name: "投资池", status: "ACTIVE" },
+  ]);
+  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  expect(await screen.findByText("买家信息")).toBeInTheDocument();
+  await ui.type(screen.getByLabelText("客户昵称"), "新买家");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("收款资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.type(screen.getByLabelText("售出金额2"), "150");
+  await ui.click(screen.getByLabelText("资金账户2"));
+  const investOptions = await screen.findAllByText(/投资池（HJ_INVEST）/);
+  await ui.click(investOptions[investOptions.length - 1]);
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
+  expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+    event_type: "SELL",
+    amount: "350",
+    pool_id: 3,
+    amount2: "150",
+    pool_id2: 4,
+    portion: "PROFIT",
+  }));
+});
+
+it("仅填售出金额2 未选资金账户2 时提交被拦截", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  resolveMock(vi.mocked(catalog.customersApi.list), []);
+  resolveMock(vi.mocked(catalog.customersApi.create), {
+    customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
+    duplicate_candidates: [],
+  });
+  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  expect(await screen.findByText("买家信息")).toBeInTheDocument();
+  await ui.type(screen.getByLabelText("客户昵称"), "新买家");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("收款资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.type(screen.getByLabelText("售出金额2"), "150");
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
+  expect(screen.getByText(/请选择资金账户2/)).toBeInTheDocument();
+});
+
 describe("InventoryPanel：写入与长路径", () => {
 it("自营在库账号可以售出并在来源单登记 HS 售出事件", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });

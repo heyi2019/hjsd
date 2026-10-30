@@ -77,10 +77,10 @@
 .inventory-detail .ant-descriptions-bordered .ant-descriptions-row { border-color: var(--color-border); }
 .inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label,
 .inventory-detail .ant-descriptions-bordered .ant-descriptions-item-content { border-color: var(--color-border); }
-.inventory-edit-modal .ant-modal-body { padding-top: var(--space-2); }
-.inventory-edit-core { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--glass-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-primary) 6%, var(--glass)); }
-.inventory-edit-core label, .inventory-edit-more__fields label { display: grid; gap: var(--space-1); min-width: 0; }
-.inventory-edit-core label > span, .inventory-edit-more__fields label > span { color: var(--color-text-secondary); font: var(--font-caption-2); }
+.inventory-detail__edit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--glass-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-primary) 6%, var(--glass)); }
+.inventory-detail__edit-grid label, .inventory-edit-more__fields label { display: grid; gap: var(--space-1); min-width: 0; }
+.inventory-detail__edit-grid label > span, .inventory-edit-more__fields label > span { color: var(--color-text-secondary); font: var(--font-caption-2); }
+.inventory-detail__footer { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) 0 var(--space-1); border-top: 1px solid var(--color-border); margin-top: var(--space-4); }
 .inventory-edit-more { margin-top: var(--space-3); border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--soft) 42%, transparent); }
 .inventory-edit-more summary { padding: var(--space-2) var(--space-3); color: var(--color-text-primary); font-weight: 650; cursor: pointer; }
 .inventory-edit-more summary::marker { color: var(--color-primary); }
@@ -91,6 +91,10 @@
 .inventory-edit-operator { min-width: var(--col-w-190); }
 .inventory-detail__section { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
 .inventory-detail__section--profile { margin-top: 0; }
+/* 只读态按板块分栏后，每个 Tab 面板内只有一个板块，原本用于「板块堆叠」的上外边距不再需要。 */
+.inventory-detail__tabs .inventory-detail__section,
+.inventory-detail__tabs .inventory-execution-list,
+.inventory-detail__tabs .inventory-finance-list { margin-top: 0; }
 .inventory-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
 .inventory-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
 .inventory-execution-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
@@ -151,6 +155,6 @@
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
   .inventory-detail { padding: var(--space-3) 0; }
-  .inventory-edit-core, .inventory-edit-more__fields { grid-template-columns: 1fr; }
+  .inventory-detail__edit-grid, .inventory-edit-more__fields { grid-template-columns: 1fr; }
   .inventory-edit-more__note { grid-column: auto; }
 }

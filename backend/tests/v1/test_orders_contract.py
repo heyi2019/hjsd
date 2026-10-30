@@ -587,10 +587,12 @@ class TestCreateOrderValidation:
     def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="必须大于 0"):
+            # BUY 金额允许为 0（提号表单金额选填以 0 兜底，events.post_event 放行 0），
+            # 故用 COST（金额必须为正）验证“非法金额=业务错误”的语义。
             order_service.post_event(
                 seeded_db,
                 order.id,
-                event_type="BUY",
+                event_type="COST",
                 amount=Decimal("0"),
                 occurred_on=D,
                 actor="pytest",

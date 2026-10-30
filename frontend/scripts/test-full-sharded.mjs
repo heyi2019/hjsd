@@ -2,7 +2,8 @@
  *  关键提速（2026-10-27）：react/deep 不再切成多个子进程 shard —— 每个子进程是独立的 vite
  *  实例，会各自重 transform antd/react，把单进程 249s（78 文件）放大到分片 408s（69 非 deep）。
  *  改为「每层一个 vitest 进程」后，同层文件共享一份 transform 缓存，日常层由 ~408s 降至 ~170s。
- *  分片间最多 2 并发（jsdom+antd 稳定边界，见 memory 2026-10-20 实测；并发 3 实验已否决）。
+ *  各层串行执行（jsdom+antd 在完整回归中需要隔离资源；并行会造成深度用例偶发 60s 超时，
+ *  甚至触发常规层 600s 保护）。串行不减少测试，只牺牲层间并行换取 CI 可重复性。
  *
  *  模式：
  *    默认          ：fast + quick + 常规 react（不含 deep）  —— 日常 CI / 里程碑前
@@ -22,9 +23,9 @@ const mode = rawArgs.includes("--deep-only") ? "deep-only" : rawArgs.includes("-
 // 模式标志不传给 vitest，其余参数（如 --reporter）原样透传。
 const extraArgs = rawArgs.filter((arg) => arg !== "--deep-only" && arg !== "--all");
 
-// [2026-10-27 实测定案] 并发 3 实验否决：RUN1 >6.5min（比并发 2 的 262.81s 更慢）且 shard-1
-// 直接 exit 1（机制与 10-20 的 4 workers 超时同源）。2 是本机稳定边界，勿再上调。
-const CONCURRENCY = 2;
+// 完整回归层间串行：每层的 Vitest worker 结束后再启动下一层，避免多个 jsdom+antd
+// 进程在 CI runner 上争抢 CPU/内存导致非确定性超时。测试数量与覆盖范围不变。
+const CONCURRENCY = 1;
 
 const testFilePattern = /\.(test|spec)\.(ts|tsx)$/;
 const DEEP_PATTERN = /\.deep\.test\.(ts|tsx)$/;
@@ -113,7 +114,7 @@ const layerDesc = mode === "deep-only"
     ? `全量（含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length} / react-deep ${deepFiles.length}`
     : `日常（不含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length}（react-deep ${deepFiles.length} 移出，由 test:full:deep 承担）`;
 console.log(
-  `${layerDesc}，层间最多 ${CONCURRENCY} 并发`,
+  `${layerDesc}，层间串行执行（并发度 ${CONCURRENCY}）`,
 );
 const failures = [];
 // fast / quick 先于 react/deep 串行跑完，确保轻量快环先出结果。

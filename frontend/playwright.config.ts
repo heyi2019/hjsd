@@ -55,7 +55,7 @@ export default defineConfig({
       // 生产库 heijin_erp_v1.db；每次运行都迁移 + 种子 + 起 uvicorn。
       // reuseExistingServer:false 保证每次强制重建，避免脏数据累积或复用错库。
       // 独占 8124，绕开 8123 的生产 dev 后端。
-      command: `bash /Users/aries/黑金时代/backend/scripts/e2e_backend.sh`,
+      command: "bash ../backend/scripts/e2e_backend.sh",
       url: `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1/auth/me`,
       reuseExistingServer: false,
       timeout: 120000,

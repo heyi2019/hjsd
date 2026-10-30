@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,7 +17,7 @@ import {
   type OrderType,
   type Pool,
 } from "../shared/api/catalog";
-import { currentDevUser, normalizeError } from "../shared/api/client";
+import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
@@ -480,8 +480,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           pool_id: first?.event.pool_id ?? undefined,
         });
         const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
+        const activeEmployees = employeeList.filter((employee) => employee.is_active);
         setCancelPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-        setCancelEmployees(employeeList.filter((employee) => employee.is_active));
+        setCancelEmployees(activeEmployees);
+        // 先在打开弹窗的加载阶段写入默认操作人，避免依赖 ResponsibleEmployeeSelect
+        // 内部的 /auth/me 异步回填；提交动作必须始终携带显式员工 ID。
+        if (cancelForm.getFieldValue("operator_user_ids") == null) {
+          const defaultEmployee = activeEmployees.find((employee) => employee.username === currentOperator)
+            ?? (activeEmployees.length === 1 ? activeEmployees[0] : undefined);
+          if (defaultEmployee) cancelForm.setFieldValue("operator_user_ids", [defaultEmployee.id]);
+        }
         if (first && cancelForm.getFieldValue("pool_id") == null) {
           cancelForm.setFieldValue("pool_id", poolList[0]?.id);
         }
@@ -536,13 +544,29 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             appMessage.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining.toFixed(2)}`);
             return;
           }
+          // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
+          // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式负责人。
+          let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
+          if (!operatorUserIds?.length) {
+            const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
+            if (byDevUser) operatorUserIds = [byDevUser.id];
+            else {
+              try {
+                const current = await currentUser();
+                const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
+                if (bySessionUser) operatorUserIds = [bySessionUser.id];
+              } catch {
+                // 下拉组件已尝试默认当前员工；解析失败时保留空值，让后端按必填规则返回明确错误。
+              }
+            }
+          }
           const result = await ordersApi.postEvent(order.id, {
             event_type: "CANCEL",
             amount,
             occurred_on: values.cancelled_on,
             offset_event_id: selected.event.id,
             pool_id: Number(values.pool_id),
-            operator_user_ids: values.operator_user_ids,
+            operator_user_ids: operatorUserIds,
             reason: values.reason,
             note: cancelScope === "INVREFUND" ? "库存取消交易，冲销入库并入账" : "售出取消交易，原路退款",
             form_extra_scope: cancelScope,
@@ -764,9 +788,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                       setPage(1);
                     }}
                   />
-                  <Button size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
+                  <PermissionButton permission="finance.read" size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
                     导出 CSV
-                  </Button>
+                  </PermissionButton>
                   <Typography.Text strong>业务筛选</Typography.Text>
                   <Segmented
                     value={businessModeFilter}

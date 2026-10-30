@@ -21,7 +21,7 @@ from app.domain.enums import (
     RebateStatus,
     RebateType,
 )
-from app.domain.trade import Order, RebateRecord
+from app.domain.trade import RebateRecord
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service

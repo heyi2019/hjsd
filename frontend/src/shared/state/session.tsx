@@ -136,6 +136,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // 用户以为已退出却仍停留在已登录界面。
     try {
       await logoutApi();
+    } catch {
+      // 退出是本地会话的终止动作，不应被后端不可达阻断或产生未处理拒绝。
+      // 服务端若可达会撤销 token；不可达时 finally 仍清理本地 token 并落登录页。
     } finally {
       setAuthenticated(false);
       setMustChangePassword(false);

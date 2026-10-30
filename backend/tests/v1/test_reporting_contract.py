@@ -24,7 +24,7 @@ from app.domain.enums import (
     RebateStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, RebateRecord
+from app.domain.trade import Account, RebateRecord
 from app.orders import service as order_service
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
@@ -116,32 +116,6 @@ def _order(seeded_db, *, trade_date: date = D, account_id: int | None = None):
     return order_service.create_order(
         seeded_db, order_type="HS", trade_date=trade_date, actor="pytest",
         account_id=account_id,
-    )
-
-
-def _cashflow(
-    seeded_db,
-    *,
-    flow_no: str,
-    occurred_on: date,
-    nature: str,
-    direction: str,
-    amount: str,
-    order_event_id: int | None = None,
-) -> None:
-    seeded_db.add(
-        Cashflow(
-            flow_no=flow_no,
-            pool_id=1,
-            occurred_on=occurred_on,
-            nature=nature,
-            category="OTHER",
-            direction=direction,
-            amount=to_money(amount),
-            order_event_id=order_event_id,
-            created_by="pytest",
-            updated_by="pytest",
-        )
     )
 
 

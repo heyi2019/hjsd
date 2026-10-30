@@ -1,4 +1,4 @@
-import { CfgItem } from "../ConfigurableField";
+import { CfgItem, useFieldConfig, fieldLabel } from "../ConfigurableField";
 import type { ReactNode } from "react";
 import type { Pool } from "../../shared/api/catalog";
 import { MoneyInput, Select } from "../../shared/ui";
@@ -10,6 +10,7 @@ export function RecoveryFeeSection(props: {
   pools: Pool[];
   financeExtras?: ReactNode;
 }) {
+  const cfg = useFieldConfig();
   return (
     <section className="recovery-fee-section recovery-fees" aria-labelledby="recovery-fees-title">
       <div className="recovery-fees__heading">
@@ -19,7 +20,7 @@ export function RecoveryFeeSection(props: {
         </div>
       </div>
       <div className="primary-amount-section recovery-fee-card recovery-fee-card--primary">
-        <div className="recovery-fee-card__label"><span className="form-field__required-mark" aria-hidden="true">*</span>账号号价</div>
+        <div className="recovery-fee-card__label"><span className="form-field__required-mark" aria-hidden="true">*</span>{fieldLabel(cfg, "recovery_price", "账号号价")}</div>
         <CfgItem className="primary-amount-section__price" name="recovery_price" hideLabel rules={[{ required: true, message: "回收价必填" }]}>
           <MoneyInput placeholder="请输入金额" />
         </CfgItem>

@@ -1,5 +1,5 @@
 /** 返点明细：登记即完成一条业务事实，只支持编辑和删除（REB-01 / A06）。 */
-import { Button, Card, Form, Input, Space, Typography } from "antd";
+import { Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -230,7 +230,7 @@ export function RebatesPanel() {
         title="返点明细"
         extra={
           <Space>
-            <Button size="small" loading={exporting} onClick={() => void exportCsv()}>导出 CSV</Button>
+            <PermissionButton permission="finance.read" size="small" loading={exporting} onClick={() => void exportCsv()}>导出 CSV</PermissionButton>
             <PermissionButton
               permission="order.event.post"
               type="primary"

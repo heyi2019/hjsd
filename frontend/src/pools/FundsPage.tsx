@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。 */
-import { Button, Card, Form, Input, Modal as AntdModal, Space, Tabs, Tooltip, Typography } from "antd";
+import { Card, Form, Input, Modal as AntdModal, Space, Tabs, Tooltip, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -938,9 +938,9 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
                   <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
                   <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
                   <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
-                  <Button size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
+                  <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
                     导出 CSV
-                  </Button>
+                  </PermissionButton>
                 </div>
                 <Typography.Paragraph type="secondary" className="ui-drawer-hint">
                   状态口径：订单事件过账生成的流水直接为「已审核」；本页手工登记的独立流水需审核通过后才计入系统余额。

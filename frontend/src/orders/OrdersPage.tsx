@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -788,9 +788,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                       setPage(1);
                     }}
                   />
-                  <Button size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
+                  <PermissionButton permission="finance.read" size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
                     导出 CSV
-                  </Button>
+                  </PermissionButton>
                   <Typography.Text strong>业务筛选</Typography.Text>
                   <Segmented
                     value={businessModeFilter}

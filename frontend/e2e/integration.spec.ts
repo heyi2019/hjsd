@@ -28,12 +28,13 @@ test.describe("real frontend<->backend integration", () => {
     const resp = await customersResp;
     expect(resp.status()).toBe(200);
     const body = await resp.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body.length).toBeGreaterThanOrEqual(1);
+    const customers = body.items;
+    expect(Array.isArray(customers)).toBe(true);
+    expect(customers.length).toBeGreaterThanOrEqual(1);
 
     // 取真实响应中的客户名断言渲染，避免把测试绑定到会变化的种子名称。
-    expect(body.length).toBeGreaterThan(0);
-    await expect(page.getByText(body[0].display_name).first()).toBeVisible();
+    expect(customers.length).toBeGreaterThan(0);
+    await expect(page.getByText(customers[0].display_name).first()).toBeVisible();
   });
 
   test("资金中心：真实 /pools 返回荷包且渲染到页面", async ({ page }) => {

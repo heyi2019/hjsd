@@ -1,13 +1,27 @@
 import { Spin, Typography } from "antd";
-import type { Account, AccountAuditEntry, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
+import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
 import { executionActionLabel } from "../shared/lib/format";
-import { accountFinancialFlows, financeTypeLabel, rebateTypeLabel, PROFILE_ACCOUNT_TYPES } from "./inventory-logic";
 import {
-  InventoryDetailView,
+  STATUS_LABEL,
+  BUSINESS_MODE_LABEL,
+  INVENTORY_TYPE_LABEL,
+  VALUE_ADDED_SERVICE_LABEL,
+  accountFinancialFlows,
+  financeTypeLabel,
+  rebateTypeLabel,
+  PROFILE_ACCOUNT_TYPES,
+} from "./inventory-logic";
+import {
+  OrderDetailView,
   type InventoryPartyLink,
   type InventoryExecutionRow,
   type InventoryFinanceRow,
-} from "./InventoryDetailView";
+} from "./OrderDetailView";
+import {
+  classifyEventCategory,
+  type InventoryEventDraft,
+  type OrderDetailMeta,
+} from "./OrderDetail.shared";
 
 function dateTimeMinute(value: string | null | undefined): string {
   if (!value) return "-";
@@ -126,7 +140,20 @@ function orderExtraValues(detail: AccountExecutionDetail | undefined): Array<{ k
   return values;
 }
 
-export function InventoryDetail({
+/** 当前运营状态：已售 > 寄售中 > 已下架 > 分期中 > 在库。 */
+function resolveOperationStatus(
+  accountStatus: string,
+  hasActiveConsignment: boolean,
+  hasUnlistedConsignment: boolean,
+): string {
+  if (accountStatus === "SOLD") return "已售";
+  if (hasActiveConsignment) return "寄售中";
+  if (accountStatus === "VOID" || hasUnlistedConsignment) return "已下架";
+  if (accountStatus === "INSTALLMENT") return "分期中";
+  return "在库";
+}
+
+export function OrderDetail({
   row,
   detail,
   loading,
@@ -136,16 +163,24 @@ export function InventoryDetail({
   onEventEdit,
   onPartyClick,
   employees = [],
+  extraForm,
+  onSave,
+  onCancel,
+  saving,
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
   loading: boolean;
   editing?: Account | null;
   onEdit?: (account: Account) => void;
-  eventDrafts?: Record<number, { amount: string; note: string | null; operator_user_ids?: number[] }>;
+  eventDrafts?: Record<number, InventoryEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
   employees?: EmployeeOption[];
   onPartyClick?: (party: InventoryPartyLink) => void;
+  extraForm?: unknown;
+  onSave?: () => void;
+  onCancel?: () => void;
+  saving?: boolean;
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
@@ -167,6 +202,7 @@ export function InventoryDetail({
       rate: "-",
       occurredAt: dateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
       poolName: cashflow.pool_name || "未分配资金池",
+      operator: cashflow.operator || event?.operator_names?.join("、") || event?.operator || "-",
       event,
     })),
     ...rebateItems.map(({ rebate }) => ({
@@ -178,12 +214,14 @@ export function InventoryDetail({
       rate: `${rebate.rate}%`,
       occurredAt: dateTimeMinute(rebate.collected_at ?? rebate.collected_on),
       poolName: "-",
+      operator: "-",
     })),
   ];
 
   const executionRows: InventoryExecutionRow[] = detail?.orders.flatMap((order) => (
     order.events.map((event) => ({
       key: `${order.order_id}-${event.id}`,
+      category: classifyEventCategory(event.event_type),
       action: executionActionLabel(event.event_type, order.order_type),
       occurredAt: dateTimeMinute(event.occurred_at ?? event.occurred_on),
       amount: event.amount,
@@ -192,44 +230,71 @@ export function InventoryDetail({
       event,
     }))
   )) ?? [];
-  const auditRows: AccountAuditEntry[] = detail?.audit ?? [];
+
+  const consignmentOrders = (detail?.orders ?? []).filter((order) => order.order_type === "DG" && order.status !== "CANCELLED");
+  const hasActiveConsignment = consignmentOrders.some((order) => {
+    const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
+    return !unlisted;
+  });
+  const hasUnlistedConsignment = consignmentOrders.some((order) => {
+    const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
+    return Boolean(unlisted);
+  });
+  const operationStatusLabel = resolveOperationStatus(row.status, hasActiveConsignment, hasUnlistedConsignment);
+
+  const meta: OrderDetailMeta = {
+    inventoryNo: row.stock_no ?? "-",
+    status: row.status,
+    statusLabel: STATUS_LABEL[row.status] ?? row.status,
+    gameType: row.game_type ?? null,
+    gameAccount: row.game_account ?? null,
+    platform: row.platform ?? null,
+    cost: row.cost_amount ?? null,
+    businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,
+    inventoryType: row.inventory_type ? (INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type) : null,
+    valueAddedService: row.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service) : null,
+    orderNo: detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
+    createdBy: row.created_by || "-",
+    registeredAt: dateTimeMinute(detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
+    soldAt: eventDate(detail, "SELL"),
+    removedAt: eventDate(detail, "CANCEL"),
+    recoveryPlatform: transactionPlatforms(detail, new Set(["HS", "TH"])),
+    salePlatform: transactionPlatforms(detail, new Set(["DG", "DFQ"]), true),
+    consignmentSummary: consignmentSummary(detail, row.status),
+    password: row.game_password || "-",
+    channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
+    boundPhone: row.bound_phone || "-",
+    secondary: row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无",
+    showProfileFields: PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? ""),
+    accountDescription: row.account_description || "-",
+    accountImages: row.account_images ?? [],
+    note: row.note || "-",
+    orderNotes: orderNotes(detail),
+    orderParties: renderOrderParties(orderParties(detail), onPartyClick),
+    orderExtras: orderExtraValues(detail),
+    operationStatusLabel,
+    hasActiveConsignment,
+  };
 
   return (
-    <InventoryDetailView
-      meta={{
-        orderNo: detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
-        recoveryPlatform: transactionPlatforms(detail, new Set(["HS", "TH"])),
-        salePlatform: transactionPlatforms(detail, new Set(["DG", "DFQ"]), true),
-        orderParties: renderOrderParties(orderParties(detail), onPartyClick),
-        orderNotes: orderNotes(detail),
-        orderExtras: orderExtraValues(detail),
-        createdBy: row.created_by || "-",
-        registeredAt: dateTimeMinute(detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
-        soldAt: eventDate(detail, "SELL"),
-        removedAt: eventDate(detail, "CANCEL"),
-        consignmentSummary: consignmentSummary(detail, row.status),
-        password: row.game_password || "-",
-        channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
-        boundPhone: row.bound_phone || "-",
-        secondary: row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无",
-        showProfileFields: PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? ""),
-        accountDescription: row.account_description || "-",
-        accountImages: row.account_images ?? [],
-        note: row.note || "-",
-      }}
+    <OrderDetailView
+      meta={meta}
       editing={editing}
       onEdit={onEdit}
       eventDrafts={eventDrafts}
       onEventEdit={onEventEdit}
       employees={employees}
       executionRows={executionRows}
-      auditRows={auditRows}
       financeRows={financeRows}
       expenseCount={expenseFlows.length}
       incomeCount={incomeFlows.length}
       totalExpense={totalExpense}
       totalIncome={totalIncome}
       flowCount={financialFlows.length + rebateItems.length}
+      extraForm={extraForm}
+      onSave={onSave}
+      onCancel={onCancel}
+      saving={saving}
     />
   );
 }

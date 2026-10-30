@@ -240,9 +240,9 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
+    // 内联编辑：点「编辑」直接就地展开该行进入编辑态，不再弹窗。
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑游戏/产品类型")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑平台")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑账号密码")).not.toBeVisible();
@@ -332,15 +332,16 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
-    expect(await screen.findByText("流转记录")).toBeInTheDocument();
+    expect(await screen.findByText("登记与流转信息")).toBeInTheDocument();
     const detailPanel = document.querySelector(".inventory-detail") as HTMLElement;
     const accountSummary = detailPanel.querySelector(".inventory-detail__meta") as HTMLElement;
     expect(within(accountSummary).getByText("建档操作人")).toBeInTheDocument();
-    expect(within(accountSummary).queryByText("业务", { exact: true })).toBeNull();
+    // 新版板块1「游戏账号信息」直接展示账号基本资料（业务 / 平台 / 成本等）。
+    expect(within(accountSummary).getByText("业务")).toBeInTheDocument();
     expect(within(accountSummary).queryByText("类型", { exact: true })).toBeNull();
     expect(within(accountSummary).queryByText("游戏/产品类型", { exact: true })).toBeNull();
-    expect(within(accountSummary).queryByText("平台", { exact: true })).toBeNull();
-    expect(within(accountSummary).queryByText("成本", { exact: true })).toBeNull();
+    expect(within(accountSummary).getByText("平台")).toBeInTheDocument();
+    expect(within(accountSummary).getByText("成本")).toBeInTheDocument();
     expect(within(accountSummary).getByText("登记时间")).toBeInTheDocument();
     expect(within(accountSummary).getByText("出售时间")).toBeInTheDocument();
     expect(within(accountSummary).getByText("下架时间")).toBeInTheDocument();
@@ -358,6 +359,8 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(accountSummary).getAllByText("寄售平台A").length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
+    // 展开区已按板块分栏：先切到「操作明细」页签，否则该板块未激活、不在无障碍树内，ByRole 查询取不到表头。
+    await ui.click(screen.getByRole("tab", { name: "操作明细" }));
     const executionTable = detailPanel.querySelector(".inventory-execution-table") as HTMLElement;
     const executionHeaders = within(executionTable).getAllByRole("columnheader");
     for (const name of ["动作", "动作时间", "金额", "操作人", "备注"]) {
@@ -379,6 +382,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(detailPanel).getByText("资金明细")).toBeInTheDocument();
     expect(within(detailPanel).queryByText("资金流水", { exact: true })).toBeNull();
     expect(within(detailPanel).queryByText("流水时间", { exact: true })).toBeNull();
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     const financePanel = detailPanel.querySelector(".inventory-finance-list") as HTMLElement;
     const financeSummary = financePanel.querySelector(".inventory-finance-summary") as HTMLElement;
     expect(within(financeSummary).getByText("支出")).toBeInTheDocument();

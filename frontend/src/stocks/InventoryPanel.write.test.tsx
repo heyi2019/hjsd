@@ -128,8 +128,8 @@ describe("InventoryPanel：写入与长路径", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+    // 内联编辑：点「编辑」就地展开该行进入编辑态（无弹窗），核心字段可直接改。
     const input = await screen.findByLabelText("编辑游戏账号/产品");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "updated-account" } });
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({

@@ -11,7 +11,6 @@ QA500B 补齐轮确认这 5 个枚举值无写入路径，本文件按补齐端�
 from __future__ import annotations
 
 from datetime import date
-import pytest
 
 from app.domain.enums import (
     DepositStatus,
@@ -20,7 +19,6 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit
 from app.domain.trade import RebateRecord as RebateRecordModel
-from app.core.errors import Validation
 from app.finance import service as finance_service
 from app.imports import service as imports_service
 from app.policy import service as policy_service
@@ -194,37 +192,6 @@ def _make_rebate(seeded_db, *, code: str) -> RebateRecordModel:
         channel=None,
         note="状态收口测试返点",
     )
-
-
-@pytest.mark.skip(reason="返点作废已删除")
-def test_void_open_rebate(seeded_db):
-    record = _make_rebate(seeded_db, code="a1")
-    with pytest.raises(Validation):
-        finance_service.void_rebate(
-            seeded_db, record.id, reason="挂错订单", actor="pytest"
-        )
-
-
-@pytest.mark.skip(reason="返点作废与结算状态机已删除")
-def test_void_settled_rebate_rejected(seeded_db):
-    record = _make_rebate(seeded_db, code="a2")
-    finance_service.settle_rebate(
-        seeded_db,
-        record.id,
-        gross_amount="50",
-        settled_on=date(2026, 10, 18),
-        pool_id=1,
-        actor="pytest",
-        platform_fee="0",
-        note=None,
-    )
-    import pytest
-    from app.core.errors import Validation
-
-    with pytest.raises(Validation):
-        finance_service.void_rebate(
-            seeded_db, record.id, reason="有结算不可废", actor="pytest"
-        )
 
 
 # ── 4. Deposit CANCELLED：全额冲正取消 ───────────────────────────

@@ -15,7 +15,6 @@ import { OrderTypesPanel } from "./panels/OrderTypesPanel";
 import { OrderFormFieldsPanel } from "./panels/OrderFormFieldsPanel";
 import { ListColumnsPanel } from "./panels/ListColumnsPanel";
 import { PartySourceSettingsPanel } from "./panels/PartySourceSettingsPanel";
-import { PeriodLocksPanel } from "./panels/PeriodLocksPanel";
 import { PoolsAndRoutesPanel } from "./panels/PoolsAndRoutesPanel";
 import { SequencesPanel } from "./panels/SequencesPanel";
 
@@ -69,9 +68,6 @@ export function SettingsPage() {
     { key: "intermediary-platforms", label: "中介业务配置", render: () => <IntermediaryPlatformSettingsPanel /> },
     { key: "party-sources", label: "参与方来源", render: () => <PartySourceSettingsPanel /> },
     { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
-    ...(can("finance.period.lock")
-      ? [{ key: "period-locks", label: "月结账期锁", render: () => <PeriodLocksPanel /> }]
-      : []),
     ...(can("import.manage") ? [{ key: "imports", label: "导入", render: () => <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} /> }] : []),
     ...(can("user.manage")
       ? [

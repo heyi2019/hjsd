@@ -8,7 +8,6 @@ import {
   depositsApi,
   poolsApi,
   transfersApi,
-  periodLocksApi,
   reconciliationsApi,
   type Reconciliation,
   type Cashflow,
@@ -216,7 +215,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
-  const [periodLocks, setPeriodLocks] = useState<import("../shared/api/catalog").PeriodLock[]>([]);
   const [depositOpen, setDepositOpen] = useState(false);
   const [cashflowOpen, setCashflowOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -227,7 +225,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const [lossTarget, setLossTarget] = useState<Deposit | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Deposit | null>(null);
   const [repairTarget, setRepairTarget] = useState<Cashflow | null>(null);
-  const [periodLockOpen, setPeriodLockOpen] = useState(false);
   const [unmatchedTarget, setUnmatchedTarget] = useState<Reconciliation | null>(null);
   const [cashflowKeyword, setCashflowKeyword] = useState("");
   const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
@@ -265,7 +262,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const [lossForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
   const [repairForm] = Form.useForm();
-  const [periodLockForm] = Form.useForm();
 
   // 用 ref 持有最新筛选值，使全局 load()（含写操作后刷新）也能套用当前筛选条件。
   const cashflowFromRef = useRef(cashflowFrom);
@@ -340,7 +336,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       setDeposits(await depositsApi.list());
       await fetchCashflows();
       setReconciliations(await reconciliationsApi.list());
-      setPeriodLocks(await periodLocksApi.list());
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -486,15 +481,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     });
   };
 
-  const submitPeriodLock = async (values: Record<string, unknown>) => {
-    await write.run(async () => {
-      await periodLocksApi.create({ period: values.period as string, note: values.note as string });
-      appMessage.success("账期已锁定");
-      setPeriodLockOpen(false);
-      periodLockForm.resetFields();
-      await load();
-    });
-  };
 
   const submitReconciliation = async (values: Record<string, unknown>) => {
     const poolId = Number(values.pool_id);
@@ -814,12 +800,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     },
   ];
 
-  const periodLockColumns: ColumnsType<import("../shared/api/catalog").PeriodLock> = [
-    { title: "账期", dataIndex: "period" },
-    { title: "锁定时间", dataIndex: "locked_at", render: (v: string | undefined) => v ? new Date(v).toLocaleString("zh-CN") : "—" },
-    { title: "锁定人", dataIndex: "locked_by" },
-    { title: "说明", dataIndex: "note", render: (v: string | null | undefined) => v || "—" },
-  ];
 
   return (
     <section className="ui-stack">
@@ -1002,18 +982,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
                   emptyText="暂无单边划转异常"
                   loading={loading}
                   onPageChange={() => undefined}
-                  />
-                </Card>
-                <Card className="glass" title="月结锁定" extra={<PermissionButton permission="finance.period.lock" type="primary" onClick={() => { periodLockForm.setFieldsValue({ period: new Date().toISOString().slice(0, 7) }); setPeriodLockOpen(true); }}>锁定账期</PermissionButton>}>
-                  <DataTable
-                    columns={periodLockColumns}
-                    rows={periodLocks}
-                    page={1}
-                    pageSize={10}
-                    total={periodLocks.length}
-                    emptyText="暂无已锁定账期"
-                    loading={loading}
-                    onPageChange={() => undefined}
                   />
                 </Card>
               </div>
@@ -1264,16 +1232,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         </FieldConfigScope>
       </Modal>
 
-      <Modal title="锁定账期" open={periodLockOpen} onCancel={() => setPeriodLockOpen(false)} footer={null}>
-        <InlineError error={write.error} />
-        <FieldConfigScope scope="FUNDLOCK" active={periodLockOpen}>
-          <BusinessForm scope="FUNDLOCK" form={periodLockForm} onFinish={submitPeriodLock}>
-          <CfgItem name="period" label="会计账期" rules={[{ required: true }, { pattern: /^\d{4}-\d{2}$/, message: "请输入 YYYY-MM" }]}><Input placeholder="YYYY-MM" /></CfgItem>
-          <CfgItem name="note" label="说明"><Input.TextArea rows={3} /></CfgItem>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认锁定</PermissionButton>
-        </BusinessForm>
-        </FieldConfigScope>
-      </Modal>
 
       <AntdModal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>
         <Typography.Paragraph type="secondary">

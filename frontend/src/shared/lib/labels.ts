@@ -199,7 +199,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   REBATE_VOID: "作废返点",
   RECONCILIATION_CREATE: "登记对账",
   RECONCILIATION_RESOLVE: "处置对账差异",
-  PERIOD_LOCK: "锁定账期",
   QUALITY_ISSUE_CREATE: "新建质量工单",
   QUALITY_ISSUE_UPDATE: "更新质量工单",
   QUALITY_ISSUE_CLOSE: "关闭质量工单",

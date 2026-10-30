@@ -31,6 +31,7 @@ backend/tests/v1/test_parties.py :: phone
 backend/tests/v1/test_parties_contract.py :: phone
 # 合成测试号码：仅用于分期交付/订单事件契约，非真实用户数据。
 backend/tests/v1/test_installments_contract.py :: phone
+backend/tests/v1/test_list_export_csv.py :: phone
 backend/tests/v1/test_orders.py :: phone
 # 接口规范文档的号码为占位示例值；v1.0/v1.1 双登记是版本迁移期的过渡安排，
 # 待 v1.1 正式入库、v1.0 删除后，删除 v1.0 这一行（届时会提示为死条目）。

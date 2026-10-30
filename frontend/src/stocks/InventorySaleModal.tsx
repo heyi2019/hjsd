@@ -36,6 +36,7 @@ export function InventorySaleModal(props: {
   const { config } = useOrderFormConfig(open ? "SALE" : undefined);
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
   const saleAmount = Form.useWatch("amount", form);
+  const amount2 = Form.useWatch("amount2", form);
   const downPayment = Form.useWatch("down_payment", form);
   const serviceFee = Form.useWatch("service_fee", form);
   const periodServiceFee = Form.useWatch("per_period_service_fee", form);
@@ -182,6 +183,9 @@ export function InventorySaleModal(props: {
           note: values.cashflow_note as string | undefined,
           bound_phone: values.bound_phone as string | undefined,
           bound_phone_owner: values.bound_phone_owner as string | undefined,
+          ...(values.amount2 != null && String(values.amount2) !== ""
+            ? { amount2: String(values.amount2), pool_id2: values.pool_id2 as number }
+            : {}),
         });
         appMessage.success("账号已售出");
       }
@@ -230,6 +234,20 @@ export function InventorySaleModal(props: {
             {paymentMethod === "FULL" ? <>
               <CfgItem name="pool_id" label="收款资金账户" rules={[{ required: true, message: "请选择收款资金账户" }]}>
                 <Select placeholder="请选择收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+              </CfgItem>
+              <CfgItem
+                name="amount2"
+                label="售出金额2"
+                rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}
+              >
+                <MoneyInput placeholder="可选填，分笔进不同资金池" />
+              </CfgItem>
+              <CfgItem
+                name="pool_id2"
+                label="资金账户2"
+                rules={amount2 != null && Number(amount2) > 0 ? [{ required: true, message: "请选择资金账户2" }] : []}
+              >
+                <Select placeholder="请选择资金账户2" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
               </CfgItem>
               <CfgItem name="cashflow_note" label="资金流水备注">
                 <Input placeholder="可选填" />

@@ -15,8 +15,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint("uq_cashflow_event", "cashflow", type_="unique")
+    # SQLite 不支持 ALTER 删除约束，必须用 batch 复制重建（建新表→拷→删→改名）。
+    with op.batch_alter_table("cashflow") as batch_op:
+        batch_op.drop_constraint("uq_cashflow_event", type_="unique")
 
 
 def downgrade() -> None:
-    op.create_unique_constraint("uq_cashflow_event", "cashflow", ["order_event_id"])
+    with op.batch_alter_table("cashflow") as batch_op:
+        batch_op.create_unique_constraint("uq_cashflow_event", ["order_event_id"])

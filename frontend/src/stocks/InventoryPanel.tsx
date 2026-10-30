@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Dropdown, Form, Input, Segmented, Space, Typography } from "antd";
@@ -7,8 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Key } f
 import { stocksApi, employeesApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
-import {
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessForm,
   ErrorBanner,
@@ -17,8 +16,7 @@ import {
   Select,
   StatRow,
   StatusTag,
-  useCompactLayout,
-} from "../shared/ui";
+  useCompactLayout, } from "../shared/ui";
 import { InventorySaleModal } from "./InventorySaleModal";
 import { InventoryConsignmentModal } from "./InventoryConsignmentModal";
 import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "./InventoryPlatformOffsaleModal";
@@ -27,14 +25,11 @@ import { OrderDetail } from "./OrderDetail";
 import type { InventoryPartyLink } from "./OrderDetailView";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
 import "./InventoryPanel.css";
-import {
-  BUSINESS_MODE_LABEL,
+import { BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
-  PROFILE_ACCOUNT_TYPES,
   VALUE_ADDED_SERVICE_LABEL,
   inventoryAge,
-  isEditableAccountType,
-} from "./inventory-logic";
+  isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";

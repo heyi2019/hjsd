@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "./appFeedback";
+import { appMessage } from "./appFeedback";
 /** 破坏性/不可逆操作的统一按钮：二次确认 + loading + 防重 + 权限门控。
  *
  * 背景：此前全站 Popconfirm 仅 4 处，流水审核、规则发布、停用资金池/业务类型/用户、

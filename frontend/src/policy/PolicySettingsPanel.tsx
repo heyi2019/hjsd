@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 经营规则配置（T19 / BAS-06-01~02）：定义 → 版本 → 发布 → 生效期。
  *
  * 2026-10-26 重构：

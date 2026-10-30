@@ -2,9 +2,8 @@
 import { Card, Form, Input, Modal as AntdModal, Space, Tabs, Tooltip, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  cashflowsApi,
+import { useCallback, useMemo, useRef, useState } from "react";
+import { cashflowsApi,
   depositsApi,
   poolsApi,
   transfersApi,
@@ -13,16 +12,14 @@ import {
   type Cashflow,
   type Deposit,
   type Pool,
-  type PoolBalance,
-} from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
+  type PoolBalance, } from "../shared/api/catalog";
+import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
 import { NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import { StudioExpensePanel } from "./StudioExpensePanel";
-import {
-  BusinessActionModal,
+import { BusinessActionModal,
   BusinessForm,
   DataTable,
   ErrorBanner,
@@ -33,8 +30,7 @@ import {
   Select,
   StatRow,
   StatusTag,
-  useCompactLayout,
-} from "../shared/ui";
+  useCompactLayout, } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -434,7 +430,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     });
   };
 
-
   const reverseCashflow = async (values: Record<string, unknown>) => {
     if (!reverseTarget) return;
     const targetId = reverseTarget.id;
@@ -480,7 +475,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       await load();
     });
   };
-
 
   const submitReconciliation = async (values: Record<string, unknown>) => {
     const poolId = Number(values.pool_id);
@@ -799,7 +793,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       ),
     },
   ];
-
 
   return (
     <section className="ui-stack">
@@ -1231,7 +1224,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         </BusinessForm>
         </FieldConfigScope>
       </Modal>
-
 
       <AntdModal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>
         <Typography.Paragraph type="secondary">

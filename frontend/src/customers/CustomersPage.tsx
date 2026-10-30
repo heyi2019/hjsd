@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 客户中心：客户档案与订单参与关系；合作方单独 Tab，不与客户混用（CUS-01 / A11）。
  *  扩展字段（BAS-04）：定义即「客户建档」表单的自定义字段（设置 › 表单字段 › 客户建档），
  *  建档/编辑表单与详情抽屉按定义动态渲染，值随客户行存 form_extra。 */
@@ -9,8 +9,7 @@ import { SearchOutlined } from "@ant-design/icons";
 const SearchButton = Button;
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  counterpartiesApi,
+import { counterpartiesApi,
   customersApi,
   orderFormFieldsApi,
   type Counterparty,
@@ -18,9 +17,8 @@ import {
   type CustomerBusiness,
   type CustomerDetail,
   type CustomerInstallment,
-  type OrderFormField,
-} from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
+  type OrderFormField, } from "../shared/api/catalog";
+import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { money, today } from "../shared/lib/format";
 import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
@@ -28,28 +26,23 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useListViewColumns } from "../shared/lib/listColumns";
-import {
-  CfgItem,
+import { CfgItem,
   CustomFieldSection,
   FieldConfigScope,
   buildFormExtraDisplay,
-  formatExtraDisplayValue,
-} from "../orders/ConfigurableField";
+  formatExtraDisplayValue, } from "../orders/ConfigurableField";
 import "./CustomersPage.css";
-import {
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessForm,
   ErrorBanner,
   ConfirmButton,
   PermissionButton,
-  PermissionGate,
   Select,
   StatRow,
   StatusTag,
   useCompactLayout,
-  CompactActions,
-} from "../shared/ui";
+  CompactActions, } from "../shared/ui";
 
 /** 订单客户角色兜底文案：词典 ORDER_CUSTOMER_ROLE 未加载/未配置时兜底。
  *  取值与后端 order_customer_roles.role 一致。 */

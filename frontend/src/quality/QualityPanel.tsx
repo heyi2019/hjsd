@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
 import { Card, Form, Input, Space, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";

@@ -1,5 +1,5 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Input, Modal } from "antd";
+import { Form, Input } from "antd";
 import { useEffect, useRef } from "react";
 import type { EmployeeOption, GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";

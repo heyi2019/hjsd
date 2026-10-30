@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 附件中心：按业务对象维护附件索引；文件内容由后端统一存储和鉴权。 */
 import { Card, Input, Space, Upload } from "antd";
 import type { UploadProps } from "antd";

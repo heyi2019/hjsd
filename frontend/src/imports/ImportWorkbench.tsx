@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 导入工作台（MIG-01）：导入 → 映射预览 → 人工指派 → 对账 → 提交 / 回滚 / 更正。
  *
  * 页面必须持续强调的红线（对应任务清单「阻断规则」）：
@@ -10,16 +10,13 @@ import { Card, Form, Input, Space, Tabs, Typography, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import {
-  importsApi,
+import { importsApi,
   type ImportBatch,
   type ImportRow,
   type MappingPreview,
-  type ReconciliationReport,
-} from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
-import {
-  ConfirmButton,
+  type ReconciliationReport, } from "../shared/api/catalog";
+import { normalizeError } from "../shared/api/client";
+import { ConfirmButton,
   BusinessActionModal,
   BusinessForm,
   DataTable,
@@ -32,9 +29,8 @@ import {
   Select,
   StatCard,
   StatRow,
-  StatusTag,
-} from "../shared/ui";
-import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+  StatusTag, } from "../shared/ui";
+import { useOptionSet } from "../shared/lib/optionSets";
 
 /** 嵌入模式：作为「设置」页内的 Tab 渲染时，不再重复输出 PageHeader 大标题，
  *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */

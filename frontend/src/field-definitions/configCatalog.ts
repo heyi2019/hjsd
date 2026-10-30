@@ -23,15 +23,6 @@ import {
 
 export type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
 
-export const CONFIG_GROUP_LABEL: Record<ConfigGroupCode, string> = {
-  FIELD: "字段配置",
-  MASTER: "业务主数据",
-  POLICY: "业务规则",
-  GOV: "数据治理",
-  ORG: "组织与权限",
-  OPS: "作业与外观",
-};
-
 export interface SettingsItemMeta {
   /** 与 SettingsPage 的 Tab key 一致，用于跳转。 */
   key: string;
@@ -175,9 +166,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
 ];
 
 /** 全部涉及的 entity_type 扁平集合，供「最近配置改动」流水过滤。 */
-export const CONFIG_ENTITY_TYPES: string[] = [
-  ...new Set(SETTINGS_ITEMS.flatMap((item) => item.entityTypes)),
-];
 
 /** entity_type → 配置项标签，流水中把「order_form_field」翻成人话。 */
 export const ENTITY_TYPE_TO_ITEM: Record<string, string> = Object.fromEntries(

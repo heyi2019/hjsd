@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../../shared/ui/appFeedback";
+import { appMessage } from "../../shared/ui/appFeedback";
 /** 资金路由页：跨业务类型一览「订单过账往哪个资金池走」。
  *
  * 存在理由：路由（order_type_pools）此前只嵌在「业务类型」页里，必须逐个类型点「路由」
@@ -12,14 +12,12 @@ import { appMessage, appModal } from "../../shared/ui/appFeedback";
 import { Card, Form, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  orderTypesApi,
+import { orderTypesApi,
   poolsApi,
   type OrderType,
   type OrderTypeRoute,
   type Pool,
-  type RouteImpactPreview,
-} from "../../shared/api/catalog";
+  type RouteImpactPreview, } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";

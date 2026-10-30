@@ -4,21 +4,18 @@ import { Button, Card, Form, Input, Segmented, Space, Tabs, Typography } from "a
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import {
-  installmentsApi,
+import { installmentsApi,
   ordersApi,
   type Installment,
   type InstallmentDisposition,
   type Order,
-  type Schedule,
-} from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
+  type Schedule, } from "../shared/api/catalog";
+import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { INSTALLMENT_STATUS_LABEL, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
-import {
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessForm,
   ErrorBanner,
@@ -29,8 +26,7 @@ import {
   Select,
   StatRow,
   StatusTag,
-  useCompactLayout,
-} from "../shared/ui";
+  useCompactLayout, } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { useListViewColumns } from "../shared/lib/listColumns";
@@ -306,7 +302,6 @@ function ContractTable({
         await load();
     });
   };
-
 
   // 总应收只采用后端下发值，前端不再自行推导第二套口径。
   const receivable = (row: Installment) => Number(row.total_receivable);

@@ -1,11 +1,10 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Card, DatePicker, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  installmentsApi,
+import { useCallback, useState } from "react";
+import { installmentsApi,
   ordersApi,
   orderTypesApi,
   policyApi,
@@ -13,13 +12,11 @@ import {
   poolsApi,
   type Installment,
   type Order,
-  type OrderLink,
   type OrderType,
-  type Pool,
-} from "../shared/api/catalog";
+  type Pool, } from "../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { LINK_STATUS_LABEL } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
@@ -27,8 +24,7 @@ import { useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import {
-  DataTable,
+import { DataTable,
   ErrorBanner,
   MoneyInput,
   MoneyText,
@@ -36,21 +32,16 @@ import {
   PermissionGate,
   Select,
   StatusTag,
-  ConfirmButton,
   AdaptiveFormGrid,
-  ResizableModal,
   BusinessActionModal,
-  BusinessForm,
-} from "../shared/ui";
+  BusinessForm, } from "../shared/ui";
 import { OrderDetailPane } from "./OrderDetailPane";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
 import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
-import {
-  DEFAULT_BUSINESS_CENTER_TAB,
+import { DEFAULT_BUSINESS_CENTER_TAB,
   type BusinessCenterEntryTab,
-  type BusinessCenterTab,
-} from "./businessCenter";
+  type BusinessCenterTab, } from "./businessCenter";
 
 // 订单字段板块常量（ORDER_FIELD_SECTION_LABEL / ORDER_FIELD_SECTION_ORDER）已迁移至 OrderDetailPane。
 
@@ -794,7 +785,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         ]}
       />
 
-
       <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
         open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
@@ -907,7 +897,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           </FieldConfigScope>
         </BusinessForm>
       </BusinessActionModal>
-
 
       <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}

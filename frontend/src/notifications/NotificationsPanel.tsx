@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 系统提醒：查看未读通知并标记已读（SYS-01-04）。 */
 import { Card, Checkbox, Space } from "antd";
 import { useCallback, useEffect, useState } from "react";

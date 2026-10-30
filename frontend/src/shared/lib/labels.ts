@@ -93,11 +93,6 @@ export const FIELD_TYPE_LABEL: Record<string, string> = {
   MULTI_SELECT: "多选",
 };
 
-export function labelOf(value: string | null | undefined, labels: Record<string, string>): string {
-  if (!value) return "-";
-  return labels[value] ?? value;
-}
-
 export function orderTypeLabel(code: string | null | undefined, names?: Record<string, string>): string {
   if (!code) return "-";
   return names?.[code] ?? ORDER_TYPE_LABEL[code] ?? code;

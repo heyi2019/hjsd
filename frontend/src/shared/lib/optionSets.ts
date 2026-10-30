@@ -78,13 +78,6 @@ export function optionLabelSync(code: string, value: string | null | undefined):
  * 组件用：按 code + value 取展示文案，未命中回落 fallback，再回落原值。
  * 词典加载完成后会触发重渲染，因此设置页改 label 后表格展示同步变化。
  */
-export function useOptionLabel(code: string, value: string | null | undefined, fallback?: string): string {
-  const options = useOptionSet(code);
-  const found = options?.find((item) => item.value === value);
-  if (found?.label) return found.label;
-  if (fallback) return fallback;
-  return value ?? "-";
-}
 
 /**
  * 展示映射的统一入口（T25）：优先读选项词典，回落传入的硬编码映射，再回落原值。

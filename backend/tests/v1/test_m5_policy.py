@@ -664,7 +664,6 @@ class TestPolicyApi:
         assert version.status_code == 200
         # 保存即发布：新建版本直接为 ACTIVE，无独立审批环节
         assert version.json()["status"] == PolicyStatus.ACTIVE.value
-        version_id = version.json()["id"]
 
         listed = seeded_client.get(f"/api/v1/policies/{definition_id}/versions", headers=json_headers)
         assert listed.status_code == 200

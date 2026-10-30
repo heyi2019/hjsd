@@ -135,7 +135,7 @@ def test_expire_sweep_marks_lapsed_versions(seeded_db):
 
 def test_expire_sweep_idempotent(seeded_db):
     definition = _make_def(seeded_db, "EXP-IDEM")
-    version = policy_service.create_version(
+    policy_service.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2026, 1, 1),

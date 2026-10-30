@@ -49,7 +49,7 @@ def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
         scope_type="GLOBAL",
         actor="pytest",
     )
-    version = policy_service.create_version(
+    policy_service.create_version(
         seeded_db,
         definition["id"],
         effective_from=D,

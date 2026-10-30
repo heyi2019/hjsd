@@ -36,7 +36,12 @@ from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.finance.attributes import accounting_attribute_for_order_event
 from app.orders.form_fields import validate_form_extra
-from ._common import _positive_money, _required_bool, _required_text
+from ._common import (
+    _non_negative_money,
+    _positive_money,
+    _required_bool,
+    _required_text,
+)
 
 # 事件 → 现金流方向 / 性质 / 分类
 EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
@@ -248,7 +253,12 @@ def post_event(
             )
         category = flow_category
 
-    money = _positive_money(amount, field="amount")
+    # 初始买入(BUY)对应的号价/成本允许为 0：提号表单将该字段设为选填时前端以 0 兜底，
+    # 此处需放行 0；其余资金事件金额必须为正数，以保持账务完整。
+    if event_type == EventType.BUY.value:
+        money = _non_negative_money(amount, field="amount")
+    else:
+        money = _positive_money(amount, field="amount")
     if event_type == EventType.REFUND.value:
         _required_text(reason, field="reason", message="退款必须填写原因")
         refund_responsibility = refund_responsibility or "COMPANY"

@@ -98,12 +98,14 @@ class TestOrderStateMachine:
                 actor="hunt",
             )
 
-    def test_zero_amount_is_rejected(self, seeded_db):
+    def test_zero_buy_amount_is_allowed(self, seeded_db):
+        # 方案 C：提号号价设为选填留空时前端以 0 兜底，BUY 初始买入金额允许为 0。
+        # 负数仍被拒绝（见 test_negative_amount_is_rejected）。
         order = _order(seeded_db)
-        with pytest.raises(Exception):
-            order_service.post_event(
-                seeded_db, order.id, event_type="BUY", amount="0", occurred_on=D, actor="hunt"
-            )
+        event, _ = order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="0", occurred_on=D, actor="hunt"
+        )
+        assert event.amount == 0
 
     def test_same_event_cannot_derive_two_cashflows(self, seeded_db):
         """事件→现金流必须一对一：重复登记同一事件不允许。"""

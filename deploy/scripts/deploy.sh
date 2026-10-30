@@ -132,11 +132,21 @@ echo "==> 服务状态"
 docker compose ps
 
 echo "==> 后端健康检查"
-sleep 5
-if curl -fsS http://127.0.0.1/api/v1/health; then
-  echo "  OK"
-else
-  echo "  ✗ 健康检查未通过，请查 docker compose logs backend" >&2
+health_response=""
+health_ok=0
+for attempt in {1..30}; do
+  if health_response="$(curl -fsS --max-time 5 http://127.0.0.1/api/v1/health 2>/dev/null)"; then
+    printf '%s\n' "$health_response"
+    echo "  OK（第 ${attempt} 次检查）"
+    health_ok=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$health_ok" -ne 1 ]; then
+  echo "  ✗ 健康检查在 60 秒内未通过，请查 docker compose logs backend frontend" >&2
+  docker compose logs --tail=80 backend frontend >&2 || true
   exit 1
 fi
 

@@ -87,7 +87,7 @@ export function UsersPanel() {
         <Form.Item name="pool_ids" label="可见资金池"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
       </BusinessForm>
     </BusinessActionModal>
-    <BusinessActionModal title={`重置密码：${resetting?.username ?? ""}`} open={Boolean(resetting)} onCancel={() => setResetting(null)} onOk={() => resetForm.submit()} destroyOnHidden>
+    <BusinessActionModal size="compact" title={`重置密码：${resetting?.username ?? ""}`} open={Boolean(resetting)} onCancel={() => setResetting(null)} onOk={() => resetForm.submit()} destroyOnHidden>
       <BusinessForm form={resetForm} onFinish={resetPassword}>
         <Form.Item name="password" label="新密码" rules={[{ required: true, min: 8, message: "密码至少 8 位" }]}><Input.Password placeholder="新密码（至少 8 位）" autoComplete="new-password" /></Form.Item>
       </BusinessForm>

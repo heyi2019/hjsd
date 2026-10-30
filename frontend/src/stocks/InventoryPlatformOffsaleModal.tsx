@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ordersApi, type Account, type AccountExecutionOrder } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
-import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 
 export type ActiveConsignment = {
@@ -102,15 +102,17 @@ export function InventoryPlatformOffsaleModal(props: {
   };
 
   return (
-    <BusinessActionModal
+    <BusinessActionModal size="compact"
       title={selectedMode === "SYSTEM" ? "出库" : "下架"}
       open={open}
       destroyOnHidden
       onCancel={props.onClose}
       footer={
-        <PermissionButton permission="order.update" danger type="primary" aria-label={selectedMode === "SYSTEM" ? "确认出库" : "确认下架"} loading={submitting} onClick={() => form.submit()}>
-          {selectedMode === "SYSTEM" ? "确认出库" : "确认下架"}
-        </PermissionButton>
+        <CompactActions onCancel={props.onClose} divider={false}>
+          <PermissionButton permission="order.update" danger type="primary" aria-label={selectedMode === "SYSTEM" ? "确认出库" : "确认下架"} loading={submitting} onClick={() => form.submit()}>
+            {selectedMode === "SYSTEM" ? "确认出库" : "确认下架"}
+          </PermissionButton>
+        </CompactActions>
       }
     >
       <ErrorBanner error={error} />

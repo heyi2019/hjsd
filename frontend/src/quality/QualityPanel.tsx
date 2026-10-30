@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualityMetricRow, type QualityMetricValue, type QualityMetrics, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { BusinessActionModal, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 
@@ -254,20 +254,24 @@ export function QualityPanel() {
           <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={creating}>创建工单</PermissionButton>
         </BusinessForm>
       </BusinessActionModal>
-      <BusinessActionModal title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
+      <BusinessActionModal size="compact" title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
         <InlineError error={closeTarget ? error : null} />
         <BusinessForm form={closeForm} onFinish={closeIssue}>
           <Form.Item name="resolution" label="处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </BusinessActionModal>
-      <BusinessActionModal title="批量关闭质量工单" open={batchCloseOpen} onCancel={() => setBatchCloseOpen(false)} footer={null}>
+      <BusinessActionModal size="compact" title="批量关闭质量工单" open={batchCloseOpen} onCancel={() => setBatchCloseOpen(false)} footer={null}>
         <InlineError error={batchCloseOpen ? error : null} />
         <BusinessForm form={batchCloseForm} onFinish={batchCloseIssues}>
           <Form.Item name="resolution" label="批量处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} placeholder="将应用到当前列表中最多 50 条未关闭工单" /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </BusinessActionModal>
     </section>

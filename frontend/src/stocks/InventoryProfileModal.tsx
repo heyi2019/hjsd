@@ -103,7 +103,7 @@ export function InventoryProfileModal({
   }
 
   return (
-    <BusinessActionModal
+    <BusinessActionModal size="compact"
       open={Boolean(target)}
       title={target?.mode === "images" ? "账号图片" : target?.mode === "description" ? "账号描述" : "编辑账号资料"}
       okText="保存"

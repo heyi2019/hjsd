@@ -53,7 +53,7 @@ export function PolicyResolveModal({
   }, [open, initialCode, form]);
 
   return (
-    <BusinessActionModal
+    <BusinessActionModal size="compact"
       open={open}
       title="规则生效期自查"
       okText="解析"

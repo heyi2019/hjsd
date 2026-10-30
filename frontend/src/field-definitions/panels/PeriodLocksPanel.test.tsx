@@ -5,7 +5,7 @@
  *   精确串匹配会因子串拼接失败；
  * - 表格「—」占位要锁定到具体单元格：一行里 locked_at 与 note 都可能渲染「—」。
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
@@ -75,11 +75,11 @@ describe("PeriodLocksPanel", () => {
     renderLight(<PeriodLocksPanel />, { user: "admin" });
     const modal = await openModal();
 
-    const period = within(modal).getByLabelText("会计账期");
-    // 打开弹窗时已预填当月，必须先清空再输入，否则会拼接成 "2026-102026-11"
-    await ui.clear(period);
-    await ui.type(period, "2026-11");
-    await ui.type(within(modal).getByLabelText("说明"), "11月封账");
+    const period = within(modal).getByLabelText("会计账期") as HTMLInputElement;
+    // 会计账期已改为原生年月选择器（input[type=month]），值恒为 "YYYY-MM" 字符串。
+    expect(period).toHaveAttribute("type", "month");
+    fireEvent.change(period, { target: { value: "2026-11" } });
+    fireEvent.change(within(modal).getByLabelText("说明"), { target: { value: "11月封账" } });
     await ui.click(within(modal).getByRole("button", { name: /确认锁定/ }));
 
     await waitFor(() =>
@@ -91,17 +91,17 @@ describe("PeriodLocksPanel", () => {
     await waitFor(() => expect(catalog.periodLocksApi.list).toHaveBeenCalledTimes(2));
   });
 
-  it("账期格式不合法时不发起 create", async () => {
+  it("账期为空时不发起 create 并提示必填", async () => {
     renderLight(<PeriodLocksPanel />, { user: "admin" });
     const modal = await openModal();
 
-    const input = within(modal).getByLabelText("会计账期");
-    await ui.clear(input);
-    await ui.type(input, "2026/11");
+    // 原生年月选择器（input[type=month]）由浏览器约束为 YYYY-MM，空值走必填校验。
+    const input = within(modal).getByLabelText("会计账期") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "" } });
     await ui.click(within(modal).getByRole("button", { name: /确认锁定/ }));
 
-    expect(await within(modal).findByText("请输入 YYYY-MM")).toBeTruthy();
     expect(catalog.periodLocksApi.create).not.toHaveBeenCalled();
+    expect(await within(modal).findByText(/Please enter|必填|请输入|不能为空/)).toBeTruthy();
   });
 
   it("create 失败时错误显示在弹窗内，不吞掉", async () => {

@@ -107,23 +107,6 @@ def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
     return order.id
 
 
-def _rebate_and_settlement(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db,
-        source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY",
-        base_amount=Decimal("1000"),
-        rate=Decimal("5"),
-        collected_on=TODAY,
-        actor="pytest",
-    )
-    settle = rebates.settle_rebate(
-        seeded_db, record.id, gross_amount=Decimal("10"),
-        settled_on=TODAY, pool_id=1, actor="pytest",
-    )
-    return record, settle
-
-
 def test_rebate_module_creates_record_directly(seeded_db):
     record = rebates.create_rebate(
         seeded_db,

@@ -105,18 +105,6 @@ describe("SettingsPage.deep", () => {
     expect(container.querySelector(".ant-tabs-top")).toBeNull();
   });
 
-  it("月结账期锁可在设置页打开，质量异常议题不再作为设置页入口", async () => {
-    vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([
-      { id: 1, period: "2026-09", locked_at: "2026-10-01T09:30:00", locked_by: "heyi", note: "9月封账" },
-    ] as never);
-    renderLight(<SettingsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月结账期锁" });
-
-    await ui.click(screen.getByRole("tab", { name: "月结账期锁" }));
-    expect(await screen.findByText("2026-09")).toBeInTheDocument();
-
-    expect(screen.queryByRole("tab", { name: "质量异常议题" })).toBeNull();
-  });
 
   it("切换 Tab 仅挂载激活面板：配置中心内点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
     renderLight(<SettingsPage />, { user: "admin" });

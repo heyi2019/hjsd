@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import PolicyScopeType, PolicyStatus
-from app.domain.parties import PolicyDefinition, PolicyVersion
+from app.domain.parties import PolicyDefinition
 from app.orders import service as order_service
 from app.policy import service as policy_service
 

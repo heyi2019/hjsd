@@ -9,12 +9,11 @@
 """
 from __future__ import annotations
 
-import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, inspect, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -28,7 +27,6 @@ from app.domain.enums import (
     CounterpartyType,
     CustomerStatus,
     EntityType,
-    FieldType,
     LeadStatus,
     LeadType,
     OrderStatus,
@@ -41,26 +39,17 @@ from app.domain.parties import (
     CustomerLead,
     OrderCustomerRole,
 )
-from app.domain.foundation import AuditLog, Pool
+from app.domain.foundation import AuditLog
 from app.domain.trade import (
-    Account,
-    Cashflow,
     Installment,
     InstallmentSchedule,
     Order,
     OrderEvent,
 )
-from app.domain.users import User
 
 from ._common import (
     CONTACT_FIELDS,
-    FIELD_KEY_PATTERN,
-    ORDER_TYPE_CODE_PATTERN,
-    _ENTITY_LABELS,
-    _EXTRA_ENTITY_MODELS,
-    _FIXED_OUTPUT_FIELDS,
     _UNSET,
-    _fixed_entity_fields,
     mask_id,
     mask_phone,
     _normalize_extra_values,

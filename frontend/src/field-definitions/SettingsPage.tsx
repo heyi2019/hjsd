@@ -5,7 +5,10 @@
  * 第一性原理：标签 / 权限 / 只读一律取自 configCatalog.ts 单一事实源，组件挂载复用
  * panels/panelRegistry.tsx，消除与注册表重复的硬编码。仅两处必要的显式逻辑：
  *   1. 「配置中心」为容器页签（渲染 ConfigCenterPanel），非注册表项，置于业务字典之后；
- *   2. 「导入」页签需要父级 batchId 状态以跨 Tab 保留批次选择，单独特判（其余通用项走 PANEL_REGISTRY）。 */
+ *   2. 「导入」页签需要父级 batchId 状态以跨 Tab 保留批次选择，单独特判（其余通用项走 PANEL_REGISTRY）。
+
+ * 注：账期锁定（period-locks）已由 dev 彻底移除（面板与注册表项均删除），
+ * 故 SETTINGS_TAB_ORDER 不含该项。 */
 import { Tabs } from "antd";
 import { useEffect, useState } from "react";
 import { useSession } from "../shared/state/session";
@@ -24,7 +27,6 @@ interface TabItem {
 const SETTINGS_TAB_ORDER = [
   "business-dictionary",
   "policies",
-  "period-locks",
   "imports",
   "users",
   "teams",

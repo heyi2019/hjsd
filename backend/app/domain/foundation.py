@@ -173,27 +173,6 @@ class DocumentSequence(Base, TimestampMixin):
     current_value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class PeriodLock(Base, AuditMixin):
-    """会计月份锁定：锁定后该月业务事实不可新增或审核。"""
-
-    __tablename__ = "period_locks"
-    __table_args__ = (
-        CheckConstraint(
-            "length(period) = 7 AND substr(period, 5, 1) = '-'",
-            name="period_lock_format_valid",
-        ),
-        UniqueConstraint("period", name="uq_period_locks_period"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    period: Mapped[str] = mapped_column(String(7), nullable=False)
-    locked_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
-    )
-    locked_by: Mapped[str] = mapped_column(String(64), nullable=False)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # FUNDLOCK 作用域自定义字段值。
-    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class AuditLog(Base):
@@ -228,7 +207,6 @@ __all__ = [
     "DocumentSequence",
     "GameTypeOption",
     "OrderTypeDef",
-    "PeriodLock",
     "OrderTypePool",
     "Pool",
 ]

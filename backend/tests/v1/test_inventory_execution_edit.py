@@ -7,7 +7,6 @@ from app.stocks import service as accounts
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, OrderEvent
 from app.orders import service as orders
-from app.finance import service as finance
 
 
 def test_inventory_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):
@@ -51,19 +50,6 @@ def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
     assert response.status_code == 409
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).game_account == "stale-before"
-    assert seeded_db.get(OrderEvent, event.id).amount == Decimal("100")
-
-
-def test_locked_period_cannot_be_changed(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="locked", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
-    order = orders.create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
-    orders.post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
-    finance.create_period_lock(seeded_db, period="2026-10", actor="pytest")
-    seeded_db.commit()
-    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "150"}]})
-    assert response.status_code == 409
-    seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).amount == Decimal("100")
 
 

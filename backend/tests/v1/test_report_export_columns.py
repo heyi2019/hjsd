@@ -37,7 +37,7 @@ def _finance_rows(seeded_db) -> None:
         ("IN", "100.00", "SELF_REVENUE"),
         ("OUT", "40.00", "SELF_DIRECT_COST"),
     ):
-        flow = create_cashflow(
+        create_cashflow(
             seeded_db,
             pool_id=pool.id,
             occurred_on=date(2026, 10, 17),

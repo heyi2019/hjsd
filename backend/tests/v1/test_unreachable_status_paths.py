@@ -18,7 +18,6 @@ from app.domain.enums import (
     PolicyStatus,
 )
 from app.domain.trade import Cashflow, Deposit
-from app.domain.trade import RebateRecord as RebateRecordModel
 from app.finance import service as finance_service
 from app.imports import service as imports_service
 from app.policy import service as policy_service
@@ -135,7 +134,7 @@ def test_expire_sweep_marks_lapsed_versions(seeded_db):
 
 def test_expire_sweep_idempotent(seeded_db):
     definition = _make_def(seeded_db, "EXP-IDEM")
-    version = policy_service.create_version(
+    policy_service.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2026, 1, 1),
@@ -152,46 +151,6 @@ def test_expire_sweep_idempotent(seeded_db):
 # ── 3. Rebate VOID：零结算作废 ───────────────────────────────────
 
 TODAY = date(2026, 10, 17)
-
-
-def _make_rebate(seeded_db, *, code: str) -> RebateRecordModel:
-    from app.stocks import service as stocks_service
-    from app.orders import service as orders_service
-
-    account = stocks_service.create_account(
-        seeded_db,
-        game_account=f"void-rebate-{code}",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
-        actor="pytest",
-    )
-    order = orders_service.create_order(
-        seeded_db,
-        order_type="HS",
-        trade_date=TODAY,
-        actor="pytest",
-        account_id=account.id,
-    )
-    orders_service.post_event(
-        seeded_db,
-        order.id,
-        event_type="BUY",
-        amount="100",
-        occurred_on=TODAY,
-        pool_id=1,
-        actor="pytest",
-    )
-    return finance_service.create_rebate(
-        seeded_db,
-        source_order_id=order.id,
-        rebate_type="BUY",
-        base_amount="100",
-        collected_on=TODAY,
-        actor="pytest",
-        rate=None,
-        channel=None,
-        note="状态收口测试返点",
-    )
 
 
 # ── 4. Deposit CANCELLED：全额冲正取消 ───────────────────────────

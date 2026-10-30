@@ -22,7 +22,6 @@ import pytest
 
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
-from app.domain.trade import RebateSettlement
 from app.finance import cashflows, rebates, router as finance_router, schemas
 from app.reporting import service as reporting_service
 
@@ -92,18 +91,6 @@ def _corrupt_settlement_fk(seeded_db, settlement_id: int, column: str, bad_id: i
     finally:
         raw.close()
     seeded_db.expire_all()  # 让主会话重载（否则 identity map 返回旧对象）
-
-
-def _make_settlement(seeded_db, *, record_id, flow_id, fee_id):
-    settle = RebateSettlement(
-        rebate_record_id=record_id, settled_on=TODAY, settlement_no="DANG",
-        gross_amount=Decimal("10"), platform_fee=Decimal("0"), net_amount=Decimal("10"),
-        cashflow_id=flow_id, fee_cashflow_id=fee_id,
-        created_by="pytest", updated_by="pytest",
-    )
-    seeded_db.add(settle)
-    seeded_db.flush()
-    return settle
 
 
 # ----------------------------------------------------------- finance/router.py:492-495 / 503

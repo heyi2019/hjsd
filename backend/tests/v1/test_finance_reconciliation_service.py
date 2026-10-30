@@ -36,7 +36,7 @@ def _seed_recon(seeded_db):
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None, "种子池 HJ_INVEST 缺失"
     for amount in (Decimal("50"), Decimal("20")):
-        flow = create_cashflow(
+        create_cashflow(
             seeded_db,
             pool_id=pool.id,
             occurred_on=date(2026, 10, 17),
@@ -166,7 +166,7 @@ def test_create_reconciliation_survives_decimal_balances(seeded_db):
     """
     pool = _seed_recon(seeded_db)
     # 系统余额再加一笔 0.10 → 70.10（system_balance 带角分，最贴近真实流水）
-    flow = create_cashflow(
+    create_cashflow(
         seeded_db,
         pool_id=pool.id,
         occurred_on=date(2026, 10, 17),

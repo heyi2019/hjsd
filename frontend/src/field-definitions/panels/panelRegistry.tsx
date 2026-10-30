@@ -6,7 +6,9 @@
  * 由 ConfigCenterPanel 引用，面板本身不反向依赖本模块，无环。
  *
  * navigate 参数为配置中心内部跨面板跳转（如表单字段里的「配置游戏类型」）提供钩子，
- * 由调用方（ConfigCenterPanel）注入 setSelected。 */
+ * 由调用方（ConfigCenterPanel）注入 setSelected。
+
+ * 注：账期锁定（period-locks）已由 dev 彻底移除，本注册表不含该项。 */
 import type { ReactElement } from "react";
 import { BusinessDictionaryPanel } from "./BusinessDictionaryPanel";
 import { ConfigAuditPanel } from "./ConfigAuditPanel";
@@ -16,7 +18,6 @@ import { OrderTypesPanel } from "./OrderTypesPanel";
 import { OrderFormFieldsPanel } from "./OrderFormFieldsPanel";
 import { ListColumnsPanel } from "./ListColumnsPanel";
 import { PartySourceSettingsPanel } from "./PartySourceSettingsPanel";
-import { PeriodLocksPanel } from "./PeriodLocksPanel";
 import { PoolsAndRoutesPanel } from "./PoolsAndRoutesPanel";
 import { SequencesPanel } from "./SequencesPanel";
 import { PolicySettingsPanel } from "../../policy/PolicySettingsPanel";
@@ -45,7 +46,6 @@ export const PANEL_REGISTRY: Record<string, PanelRenderer> = {
   "intermediary-platforms": () => <IntermediaryPlatformSettingsPanel />,
   "party-sources": () => <PartySourceSettingsPanel />,
   "policies": () => <PolicySettingsPanel />,
-  "period-locks": () => <PeriodLocksPanel />,
   "imports": () => <ImportWorkbench embedded />,
   "users": () => <UsersPanel />,
   "teams": () => <TeamsPanel />,

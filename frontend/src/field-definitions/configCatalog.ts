@@ -14,7 +14,6 @@ import {
   listColumnsApi,
   orderFormFieldsApi,
   orderTypesApi,
-  periodLocksApi,
   policyApi,
   poolsApi,
   sequencesApi,
@@ -135,15 +134,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     permission: "import.manage",
     entityTypes: ["import_batch"],
     count: async () => (await importsApi.batches()).total,
-  },
-  {
-    key: "period-locks",
-    label: "月结账期锁",
-    summary: "封账后该账期禁止登记/修改现金流",
-    group: "OPS",
-    permission: "finance.period.lock",
-    entityTypes: ["period_lock"],
-    count: async () => (await periodLocksApi.list()).length,
   },
   {
     key: "sequences",

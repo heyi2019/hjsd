@@ -10,10 +10,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
-from app.core.errors import Conflict, ErrorCode, NotFound, Validation
+from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
-from app.core.periods import assert_period_open, normalize_period
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AccountingAttribute,
@@ -24,7 +23,6 @@ from app.domain.enums import (
     FundNature,
     Nature,
 )
-from app.domain.foundation import PeriodLock
 from app.domain.trade import Cashflow, Deposit, Order
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
@@ -54,42 +52,6 @@ def _get_cashflow(
     return flow
 
 
-def create_period_lock(
-    session: Session, *, period: str, actor: str, note: str | None = None,
-    form_extra: Mapping[str, Any] | None = None,
-) -> PeriodLock:
-    normalized = normalize_period(period)
-    if session.scalar(select(PeriodLock).where(PeriodLock.period == normalized)) is not None:
-        raise Conflict(
-            f"账期 {normalized} 已锁定",
-            code=ErrorCode.DUPLICATE_CODE,
-            details={"period": normalized},
-        )
-    item = PeriodLock(
-        period=normalized,
-        locked_by=actor,
-        note=note,
-        form_extra=validate_form_extra(session, order_type_code="FUNDLOCK", values=form_extra),
-        created_by=actor,
-        updated_by=actor,
-    )
-    session.add(item)
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.PERIOD_LOCK,
-        entity_type="period_lock",
-        entity_id=normalized,
-        actor=actor,
-        after={"period": normalized, "locked_by": actor},
-    )
-    return item
-
-
-def list_period_locks(session: Session) -> list[PeriodLock]:
-    return list(session.scalars(select(PeriodLock).order_by(PeriodLock.period.desc())).all())
-
-
 def create_cashflow(
     session: Session,
     *,
@@ -110,7 +72,6 @@ def create_cashflow(
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
-    assert_period_open(session, occurred_on, operation="创建现金流")
     try:
         direction = Direction(direction).value
     except ValueError as exc:
@@ -221,7 +182,6 @@ def reverse_cashflow(
         type_message="冲销流水必须填写原因",
     )
     flow = _get_cashflow(session, cashflow_id, user)
-    assert_period_open(session, reversed_on, operation="创建冲销流水")
     if flow.status != CashflowStatus.APPROVED.value:
         raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
     if flow.order_event_id is not None:
@@ -287,7 +247,6 @@ def create_deposit(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
-    assert_period_open(session, paid_on, operation="创建押金流水")
     money = _positive(amount, field="amount")
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
@@ -364,7 +323,6 @@ def return_deposit(
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
     if user is not None and not user.can_see_pool(deposit.pool_id):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
-    assert_period_open(session, released_on, operation="释放押金")
     money = _positive(amount, field="amount")
     outstanding = (
         to_money(deposit.paid_amount)
@@ -457,7 +415,6 @@ def cancel_deposit(
                 "lost_amount": str(deposit.lost_amount),
             },
         )
-    assert_period_open(session, cancelled_on, operation="取消押金")
     text = _text(reason, field="reason", message="取消押金必须填写理由")
     money = to_money(deposit.paid_amount)
     deposit.status = DepositStatus.CANCELLED.value
@@ -513,7 +470,6 @@ def lose_deposit(
     deposit = session.get(Deposit, deposit_id)
     if deposit is None or (user is not None and not user.can_see_pool(deposit.pool_id)):
         raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
-    assert_period_open(session, lost_on, operation="登记押金损失")
     text_reason = _text(
         reason,
         field="reason",
@@ -738,10 +694,8 @@ def list_cashflows(
 __all__ = [
     "create_cashflow",
     "create_deposit",
-    "create_period_lock",
     "list_cashflows",
     "list_deposits",
-    "list_period_locks",
     "cancel_deposit",
     "lose_deposit",
     "return_deposit",

@@ -531,14 +531,6 @@ export interface Deposit {
   note?: string | null;
 }
 
-export interface PeriodLock {
-  id: number;
-  period: string;
-  locked_at?: string;
-  locked_by: string;
-  note?: string | null;
-}
-
 export interface TransferResult {
   transfer_id: string;
   source_pool_id?: number;
@@ -1620,10 +1612,6 @@ export const transfersApi = {
   create: (data: Record<string, unknown>) => api.post<TransferResult>("/transfers", data).then(r => r.data),
   repair: (transferId: string, data: { counterpart_pool_id: number; reason: string }) =>
     api.post<TransferResult>(`/transfers/${transferId}/repair`, data).then(r => r.data),
-};
-export const periodLocksApi = {
-  list: () => api.get<PeriodLock[]>("/period-locks").then((r) => r.data),
-  create: (data: { period: string; note?: string }) => api.post<PeriodLock>("/period-locks", data).then((r) => r.data),
 };
 export const reconciliationsApi = {
   list: () => api.get<Reconciliation[]>("/reconciliations").then(r => r.data),

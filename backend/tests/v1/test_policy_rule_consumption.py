@@ -37,7 +37,7 @@ def _publish(seeded_db, policy_code: str, config: dict) -> None:
         scope_type="GLOBAL",
         actor="pytest",
     )
-    version = policy_service.create_version(
+    policy_service.create_version(
         seeded_db,
         definition["id"],
         effective_from=D,

@@ -4,7 +4,7 @@ import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { resetTestBrowserState } from "./browser-state";
 
-afterEach(() => {
+afterEach(async () => {
   // 清空所有 mock 的调用记录与一次性返回值队列（mockResolvedValueOnce 等），
   // 为后续启用 isolate:false 复用模块图扫清 mock 共享泄漏；配合各文件 beforeEach 重新设定返回值。
   vi.resetAllMocks();
@@ -29,6 +29,10 @@ afterEach(() => {
   while (document.body.firstElementChild) {
     document.body.removeChild(document.body.firstElementChild);
   }
+  // antd Table/rc-overflow schedules a MessageChannel update after unmount.
+  // Let that task drain while jsdom is still alive; otherwise the callback can
+  // run after the test environment is torn down and raise `window is not defined`.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
 });
 
 // jsdom polyfills for APIs antd v5 touches during render/unmount.

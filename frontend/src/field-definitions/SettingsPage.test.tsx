@@ -51,26 +51,28 @@ beforeEach(() => {
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
-it("业务字典仅说明业务口径，不展示配置跳转按钮", async () => {
+it("业务配置类页签已聚合进配置中心，左侧仅保留配置中心与非业务配置类页签", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
   const tabs = await screen.findAllByRole("tab");
-  expect(tabs.slice(0, 3).map((tab) => tab.textContent)).toEqual([
-    "业务字典",
-    "业务类型",
-      "表单字段",
-  ]);
+  const labels = tabs.map((t) => t.textContent);
+  // 配置中心与各非业务配置类页签保留
+  expect(labels).toContain("配置中心");
+  expect(labels).toContain("业务字典");
+  expect(labels).toContain("经营规则");
+  // 原独立业务配置页签已移除（进配置中心）
+  expect(screen.queryByRole("tab", { name: "业务类型" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "表单字段" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "列表字段" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "资金池" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "游戏与渠道" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "编号序列" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "中介业务配置" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "参与方来源" })).toBeNull();
+  // 默认仍是业务字典
   expect(screen.getByText("业务分类口径")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /配置字段与表单/ })).toBeNull();
-  expect(screen.queryByRole("button", { name: /管理扩展字段/ })).toBeNull();
-  expect(screen.queryByRole("tab", { name: "选项词典" })).toBeNull();
-  expect(screen.queryByRole("tab", { name: "配置总览" })).toBeNull();
-
-  expect(screen.getByRole("tab", { name: "业务类型" })).toBeInTheDocument();
-  expect(screen.getByRole("tab", { name: "资金池" })).toBeInTheDocument();
-  expect(screen.getByRole("tab", { name: "经营规则" })).toBeInTheDocument();
-  // 业务字典作为入口时，业务类型面板尚未挂载。
-  expect(screen.queryByText("HS")).toBeNull();
-  await ui.click(screen.getByRole("tab", { name: "业务类型" }));
+  // 进入配置中心后能看到业务类型页签并默认渲染其页面
+  await ui.click(screen.getByRole("tab", { name: "配置中心" }));
+  expect(await screen.findByTestId("center-nav-order-types")).toBeInTheDocument();
   expect(await screen.findByText("HS")).toBeInTheDocument();
 });
 

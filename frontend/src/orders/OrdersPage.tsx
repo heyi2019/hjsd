@@ -468,8 +468,16 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
           pool_id: first?.event.pool_id ?? undefined,
         });
         const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
+        const activeEmployees = employeeList.filter((employee) => employee.is_active);
         setCancelPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-        setCancelEmployees(employeeList.filter((employee) => employee.is_active));
+        setCancelEmployees(activeEmployees);
+        // 先在打开弹窗的加载阶段写入默认操作人，避免依赖 ResponsibleEmployeeSelect
+        // 内部的 /auth/me 异步回填；提交动作必须始终携带显式员工 ID。
+        if (cancelForm.getFieldValue("operator_user_ids") == null) {
+          const defaultEmployee = activeEmployees.find((employee) => employee.username === currentOperator)
+            ?? (activeEmployees.length === 1 ? activeEmployees[0] : undefined);
+          if (defaultEmployee) cancelForm.setFieldValue("operator_user_ids", [defaultEmployee.id]);
+        }
         if (first && cancelForm.getFieldValue("pool_id") == null) {
           cancelForm.setFieldValue("pool_id", poolList[0]?.id);
         }

@@ -53,7 +53,7 @@ def test_reporting_read_routes_publish_typed_response_models(app):
 def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     seeded_db, seeded_client, headers
 ):
-    from app.finance.cashflows import approve_cashflow, create_cashflow
+    from app.finance.cashflows import create_cashflow
 
     # 资金池账户已下线：直接在种子池上造流水（等价于原 get_pool + create_pool_account）
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
@@ -75,7 +75,6 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
             actor="pytest",
             note="资金属性分析测试",
         )
-        approve_cashflow(seeded_db, flow.id, actor="finance")
 
     report = reporting_service.finance_dimension_report(
         seeded_db, from_date=date(2026, 10, 17), to_date=date(2026, 10, 17)

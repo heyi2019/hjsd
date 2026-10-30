@@ -52,5 +52,7 @@ def test_every_json_api_route_declares_response_model(app):
     # → 174（自定义列 +3：GET /list-columns/custom-fields、POST /list-columns/{scope}/custom、
     # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/作废旧入口已移除。
     # → 176（主列表导出 +6：/orders /stocks /customers /installments /rebates /cashflows）。
+    # → 174（删除资金流水审核/驳回端点：POST /cashflows/{id}/approve、POST /cashflows/{id}/reject，
+    # 资金流水改为创建即入账；下游 reporting/orders/quality 仍按 ==APPROVED 过滤，不受影响）。
     # 以当前应用实际路由数为准。
-    assert public_routes == 176
+    assert public_routes == 174

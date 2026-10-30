@@ -318,30 +318,6 @@ def create_cashflow(
     return _cashflow_out(db, flow)
 
 
-@router.post("/cashflows/{cashflow_id}/approve", response_model=schemas.CashflowOut)
-def approve_cashflow(
-    cashflow_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_deposit,
-) -> schemas.CashflowOut:
-    flow = service.approve_cashflow(db, cashflow_id, actor=_actor(user), user=user)
-    return _cashflow_out(db, flow)
-
-
-@router.post("/cashflows/{cashflow_id}/reject", response_model=schemas.CashflowOut)
-def reject_cashflow(
-    cashflow_id: int,
-    payload: schemas.CashflowReject,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_deposit,
-) -> schemas.CashflowOut:
-    flow = service.reject_cashflow(
-        db, cashflow_id, actor=_actor(user), reason=payload.reason,
-        form_extra=payload.form_extra, form_extra_scope=payload.form_extra_scope, user=user,
-    )
-    return _cashflow_out(db, flow)
-
-
 @router.post("/cashflows/{cashflow_id}/reverse", response_model=schemas.CashflowOut)
 def reverse_cashflow(
     cashflow_id: int,

@@ -220,9 +220,7 @@ def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, header
     row = seeded_db.get(Cashflow, flow_id)
     assert row.form_extra == {"landlord": "李某"}
 
-    # 审核后冲销，冲销流水携带 form_extra
-    approved = seeded_client.post(f"/api/v1/cashflows/{flow_id}/approve", headers=headers)
-    assert approved.status_code == 200, approved.text
+    # 流水创建即已入账，直接冲销，冲销流水携带 form_extra
     reversed_flow = seeded_client.post(
         f"/api/v1/cashflows/{flow_id}/reverse",
         json={"reversed_on": D, "reason": "录错", "form_extra": {"ticket": "RV-1"}},

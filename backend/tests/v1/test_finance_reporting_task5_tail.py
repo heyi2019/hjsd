@@ -1,7 +1,6 @@
 """Task #5 收口：finance / reporting 剩余 16 行缺失（直调内部函数绕过 DI）。
 
 覆盖目标（行号来自 coverage 基线）：
-- app/finance/cashflows.py:261         reject_cashflow 带 form_extra 合并分支
 - app/finance/cashflows.py:509         cancel_deposit 服务层 押金不存在 NotFound
 - app/finance/rebates.py:179/182       _rebate_base_from_snapshot snapshot 空 / config 非 dict
 - app/finance/rebates.py:645           void_rebate 零结算(OPEN)但已有结算流水的拒绝分支
@@ -54,20 +53,6 @@ def _order_with_buy(seeded_db):
         occurred_on=TODAY, actor="pytest", pool_id=1,
     )
     return order.id
-
-
-# ----------------------------------------------------------- cashflows.py:261
-def test_reject_cashflow_merges_form_extra(seeded_db):
-    flow = cashflows.create_cashflow(
-        seeded_db, pool_id=1, occurred_on=TODAY, direction="OUT",
-        nature="BUSINESS_OUT", category="OTHER", amount=Decimal("10"), actor="pytest",
-    )
-    rejected = cashflows.reject_cashflow(
-        seeded_db, flow.id, actor="pytest", reason="不合理",
-        form_extra={"studio_rej": "备注"},
-    )
-    assert rejected.status == "REJECTED"
-    assert rejected.form_extra.get("studio_rej") == "备注"
 
 
 # ----------------------------------------------------------- cashflows.py:509

@@ -23,7 +23,6 @@ import { NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import {
-  ConfirmButton,
   BusinessActionModal,
   BusinessForm,
   DataTable,
@@ -99,13 +98,9 @@ function MobilePoolList({ rows, balances }: { rows: Pool[]; balances: Record<num
 /** 移动端（≤640px）资金流水卡片列表。 */
 function MobileCashflowList({
   rows,
-  onApprove,
-  onReject,
   onReverse,
 }: {
   rows: Cashflow[];
-  onApprove: (row: Cashflow) => void;
-  onReject: (row: Cashflow) => void;
   onReverse: (row: Cashflow) => void;
 }) {
   if (rows.length === 0) return <div className="data-mobile-empty">暂无资金流水</div>;
@@ -117,7 +112,7 @@ function MobileCashflowList({
             <span>{row.flow_no}</span>
             <StatusTag
               status={row.status}
-              label={configurableLabel("FUND_FLOW_STATUS", row.status, { PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" })}
+              label={configurableLabel("FUND_FLOW_STATUS", row.status, { APPROVED: "已入账" })}
             />
           </div>
           <dl className="data-mobile-card__meta">
@@ -132,12 +127,6 @@ function MobileCashflowList({
             {row.note ? <div><dt>备注</dt><dd>{row.note}</dd></div> : null}
           </dl>
           <Space size={2}>
-            {row.status === "PENDING" && (
-              <PermissionButton permission="deposit.post" size="small" onClick={() => onApprove(row)}>审核</PermissionButton>
-            )}
-            {row.status === "PENDING" && (
-              <PermissionButton permission="deposit.post" size="small" onClick={() => onReject(row)}>拒绝</PermissionButton>
-            )}
             {row.status === "APPROVED" && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
               <PermissionButton permission="deposit.post" size="small" onClick={() => onReverse(row)}>冲销</PermissionButton>
             )}
@@ -233,7 +222,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const [transferOpen, setTransferOpen] = useState(false);
   const [reconciliationOpen, setReconciliationOpen] = useState(false);
   const [resolveTarget, setResolveTarget] = useState<Reconciliation | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<Cashflow | null>(null);
   const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
   const [lossTarget, setLossTarget] = useState<Deposit | null>(null);
@@ -273,7 +261,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const [transferForm] = Form.useForm();
   const [reconciliationForm] = Form.useForm();
   const [resolveForm] = Form.useForm();
-  const [rejectForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
   const [lossForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
@@ -445,23 +432,13 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         amount: values.amount as string,
         note: values.note as string,
       });
-      appMessage.success("独立资金流水已提交，等待审核");
+      appMessage.success("独立资金流水已提交，已入账");
       setCashflowOpen(false);
       cashflowForm.resetFields();
       await load();
     });
   };
 
-  const reviewCashflow = async (action: "approve" | "reject", row: Cashflow, reason?: string) => {
-    await write.run(async () => {
-      if (action === "approve") await cashflowsApi.approve(row.id);
-      else await cashflowsApi.reject(row.id, reason ?? "");
-      appMessage.success(action === "approve" ? "流水已审核" : "流水已拒绝");
-      setRejectTarget(null);
-      rejectForm.resetFields();
-      await load();
-    });
-  };
 
   const reverseCashflow = async (values: Record<string, unknown>) => {
     if (!reverseTarget) return;
@@ -761,20 +738,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       render: (v: string) => <MoneyText value={v} />,
     },
     { title: "来源", dataIndex: "source" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { PENDING: "待审核", APPROVED: "已审核", REJECTED: "已拒绝" })} /> },
-    {
-      title: "审核追溯",
-      key: "audit",
-      width: 190,
-      render: (_v, row) => (
-        <span className="muted">
-          {row.reviewed_by
-            ? `${row.reviewed_by}${row.reviewed_at ? ` · ${row.reviewed_at.replace("T", " ").slice(0, 16)}` : ""}`
-            : "—"}
-          {row.reversal_of_id ? ` · 冲销#${row.reversal_of_id}` : ""}
-        </span>
-      ),
-    },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
@@ -782,23 +746,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       width: 170,
       render: (_v, row) => (
         <Space size={2}>
-          {row.status === "PENDING" && (
-            <ConfirmButton
-              permission="deposit.post"
-              size="small"
-              title="审核通过这笔流水"
-              description="审核后流水计入损益且不可撤销。如金额有误，请先冲销或拒绝。"
-              okText="确认审核"
-              onConfirm={() => reviewCashflow("approve", row)}
-            >
-              审核
-            </ConfirmButton>
-          )}
-          {row.status === "PENDING" && (
-            <PermissionButton permission="deposit.post" size="small" onClick={() => setRejectTarget(row)}>
-              拒绝
-            </PermissionButton>
-          )}
           {row.status === "APPROVED" && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
             <PermissionButton
               permission="deposit.post"
@@ -829,7 +776,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
     { title: "资金池", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
     { title: "账户", dataIndex: "account_label" },
-    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已审核流水，剔除待审核/已拒绝">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
+    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
     { title: "账面余额", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
     { title: "差异", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
@@ -943,7 +890,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
                   </PermissionButton>
                 </div>
                 <Typography.Paragraph type="secondary" className="ui-drawer-hint">
-                  状态口径：订单事件过账生成的流水直接为「已审核」；本页手工登记的独立流水需审核通过后才计入系统余额。
+                  状态口径：所有流水（含本页手工登记的独立流水）过账即「已入账」，直接计入系统余额。
                 </Typography.Paragraph>
                 {cashflowTotal > cashflows.length ? (
                   <Typography.Text type="warning">
@@ -962,8 +909,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
                 {compact ? (
                   <MobileCashflowList
                     rows={visibleCashflows}
-                    onApprove={(row) => reviewCashflow("approve", row)}
-                    onReject={(row) => setRejectTarget(row)}
                     onReverse={(row) => { reverseForm.setFieldsValue({ reversed_on: today() }); setReverseTarget(row); }}
                   />
                 ) : (
@@ -1027,7 +972,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
             children: (
               <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
                 <Typography.Paragraph type="secondary" className="ui-card-hint">
-                  系统余额口径：截至对账日期「已审核」流水的累计（待审核/已拒绝不计入）；按池内账户对账时另含该账户期初余额。差异 = 账面余额 − 系统余额。
+                  系统余额口径：截至对账日期「已入账」流水的累计；按池内账户对账时另含该账户期初余额。差异 = 账面余额 − 系统余额。
                 </Typography.Paragraph>
                 <DataTable<Reconciliation>
                   columns={reconciliationColumns}
@@ -1144,7 +1089,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           <CfgItem name="category" label="类别" rules={[{ required: true }]}><Input /></CfgItem>
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></CfgItem>
           <CfgItem name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></CfgItem>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交审核</PermissionButton>
+          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交</PermissionButton>
         </BusinessForm>
         </FieldConfigScope>
       </Modal>
@@ -1172,7 +1117,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
           <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>
           <CfgItem name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></CfgItem>
-          <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已审核流水）"><Input.TextArea rows={2} /></CfgItem>
+          <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已入账流水）"><Input.TextArea rows={2} /></CfgItem>
           <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交对账</PermissionButton>
         </BusinessForm>
@@ -1189,23 +1134,13 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         </FieldConfigScope>
       </Modal>
 
-      <Modal title="拒绝资金流水" open={Boolean(rejectTarget)} onCancel={() => setRejectTarget(null)} footer={null}>
-        <InlineError error={write.error} />
-        <FieldConfigScope scope="FUNDREJECT" active={Boolean(rejectTarget)}>
-          <BusinessForm scope="FUNDREJECT" form={rejectForm} onFinish={(values) => rejectTarget && void reviewCashflow("reject", rejectTarget, values.reason as string)}>
-          <CfgItem name="reason" label="拒绝原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认拒绝</PermissionButton>
-        </BusinessForm>
-        </FieldConfigScope>
-      </Modal>
-
       <Modal title="冲销资金流水" open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="FUNDREVERSE" active={Boolean(reverseTarget)}>
           <BusinessForm scope="FUNDREVERSE" form={reverseForm} onFinish={reverseCashflow}>
           <Typography.Paragraph type="secondary" className="ui-drawer-hint">
             冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，
-            状态直接为「已审核」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
+            状态直接为「已入账」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
           </Typography.Paragraph>
           <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
             <Input placeholder="YYYY-MM-DD" />

@@ -967,8 +967,6 @@ export const depositsApi = {
 
 export const cashflowsApi = {
   create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),
-  approve: (id: number) => api.post<Cashflow>(`/cashflows/${id}/approve`).then(r => r.data),
-  reject: (id: number, reason: string, formExtra?: Record<string, unknown>) => api.post<Cashflow>(`/cashflows/${id}/reject`, { reason, form_extra: formExtra }).then(r => r.data),
   reverse: (id: number, data: {reversed_on: string; reason: string; form_extra?: Record<string, unknown>}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
   list: (params?: {
     pool_id?: number;
@@ -1543,8 +1541,6 @@ export const policyApi = {
     api.post<PolicyVersion>(`/policies/${definitionId}/versions`, payload).then((r) => r.data),
   updateDraft: (versionId: number, config: Record<string, unknown>) =>
     api.patch<PolicyVersion>(`/policy-versions/${versionId}`, { config }).then((r) => r.data),
-  approve: (versionId: number, payload: { approver?: string; note?: string }) =>
-    api.post<PolicyVersion>(`/policy-versions/${versionId}/approve`, payload).then((r) => r.data),
   /** 作废草稿版本（SUPERSEDED）：仅 DRAFT 可作废；已发布版本是历史解析口径，服务端拒绝。 */
   supersede: (versionId: number, payload: { reason: string; replaced_by_version_id?: number }) =>
     api.post<PolicyVersion>(`/policy-versions/${versionId}/supersede`, payload).then((r) => r.data),

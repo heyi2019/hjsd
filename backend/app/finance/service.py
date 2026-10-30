@@ -15,7 +15,6 @@ from .rebates import (
     list_rebates,
 )
 from .cashflows import (
-    approve_cashflow,
     cancel_deposit,
     create_cashflow,
     create_deposit,
@@ -24,7 +23,6 @@ from .cashflows import (
     list_deposits,
     list_period_locks,
     lose_deposit,
-    reject_cashflow,
     return_deposit,
     reverse_cashflow,
 )
@@ -51,7 +49,6 @@ def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
 
 
 __all__ = [
-    "approve_cashflow",
     "cancel_deposit",
     "create_cashflow",
     "create_deposit",
@@ -72,6 +69,5 @@ __all__ = [
     "repair_transfer",
     "return_deposit",
     "lose_deposit",
-    "reject_cashflow",
     "reverse_cashflow",
 ]

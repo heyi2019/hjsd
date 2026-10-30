@@ -44,20 +44,6 @@ def _all_scope_user() -> CurrentUser:
     )
 
 
-def _make_pending_flow(seeded_db):
-    return cashflows.create_cashflow(
-        seeded_db,
-        pool_id=1,
-        occurred_on=TODAY,
-        direction="IN",
-        nature="EXTERNAL_IN",
-        category="客户收款",
-        amount=Decimal("100"),
-        actor="pytest",
-        note="router 测试",
-    )
-
-
 def _order_with_buy(seeded_db) -> int:
     account = stocks_service.create_account(
         seeded_db,
@@ -96,18 +82,6 @@ def test_router_list_cashflows_empty_pool_ids(seeded_db):
     result = finance_router.list_cashflows(pool_id=None, db=seeded_db, user=_restricted_user())
     assert result.items == []
     assert result.total == 0
-
-
-# ----------------------------------------------------- reject_cashflow 主路径
-def test_router_reject_cashflow_endpoint(seeded_db):
-    flow = _make_pending_flow(seeded_db)
-    result = finance_router.reject_cashflow(
-        flow.id,
-        payload=schemas.CashflowReject(reason="不符合"),
-        db=seeded_db,
-        user=_all_scope_user(),
-    )
-    assert result.status == "REJECTED"
 
 
 # ----------------------------------------------------- list_reconciliations 可见性

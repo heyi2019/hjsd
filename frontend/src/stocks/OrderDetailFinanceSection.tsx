@@ -42,7 +42,7 @@ export function OrderDetailFinanceSection({
       dataIndex: "amount",
       key: "amount",
       align: "right",
-      render: (value: string, financeRow) => (
+      render: (value: string) => (
         <div className="inventory-finance-table__amount">
           <MoneyText value={value} />
         </div>

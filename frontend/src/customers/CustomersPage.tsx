@@ -62,10 +62,6 @@ function customerDateKey(value: string | null | undefined): string | null {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function customerStatusLabel(status: string): string | undefined {
-  return status === "DISABLED" ? "已拉黑" : undefined;
-}
-
 function MobileCustomerList(props: {
   rows: Customer[];
   onDetail: (row: Customer) => void;

@@ -456,7 +456,7 @@ export function ImportWorkbench({
                           title: "导入前",
                           dataIndex: "before",
                           align: "right",
-                          render: (v: Record<string, string>, row) => (
+                          render: (_v: Record<string, string>, row) => (
                             <MoneyText value={row.before} />
                           ),
                         },

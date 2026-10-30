@@ -1,6 +1,6 @@
 import { Form, Input } from "antd";
 import { AdaptiveFormGrid, NestedFormSection, Select } from "../shared/ui";
-import { CfgItem } from "./ConfigurableField";
+import { CfgItem, sectionLabel } from "./ConfigurableField";
 import { useOptionSet } from "../shared/lib/optionSets";
 import type { EmployeeOption } from "../shared/api/catalog";
 import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
@@ -9,6 +9,7 @@ import "./DeliveryInfoSection.css";
 /** 建单时已知的账号交接条件；实际交付完成仍在订单详情中登记。 */
 export function DeliveryInfoSection(props: { showIntermediary?: boolean; employees?: EmployeeOption[] }) {
   const form = Form.useFormInstance();
+  const deliveryTitle = sectionLabel("DELIVER", "交付信息");
   const intermediaryType = Form.useWatch("intermediary_type", form);
   const compensationEnabled = intermediaryType === "包赔";
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
@@ -16,7 +17,7 @@ export function DeliveryInfoSection(props: { showIntermediary?: boolean; employe
   const compensationTypeOptions = useOptionSet("COMPENSATION_TYPE") ?? [];
 
   return (
-    <NestedFormSection className="nested-form-section--card delivery-info-section" title="交付信息">
+    <NestedFormSection className="nested-form-section--card delivery-info-section" title={deliveryTitle}>
       <AdaptiveFormGrid>
         <CfgItem name="bound_phone" label="换绑手机号"><Input placeholder="可选填" /></CfgItem>
         <CfgItem name="bound_phone_owner" label="手机号绑定人"><Input placeholder="可选填" /></CfgItem>

@@ -2,7 +2,7 @@ import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useOrderFormConfig, FieldConfigContext, CustomFieldSection } from "./ConfigurableField";
+import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import {
   counterpartiesApi,
   customersApi,
@@ -72,6 +72,7 @@ export function CreateBusinessModal(props: {
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
   const { config } = useOrderFormConfig(orderType);
+  const { labels } = useOrderFormSectionLabels(orderType);
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
   useEffect(() => {
@@ -385,11 +386,13 @@ export function CreateBusinessModal(props: {
         }}
       >
         <FieldConfigContext.Provider value={config}>
-          {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
-            <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
-          </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : isDg ? <DgOrderSection gameTypes={gameTypes} employees={employees} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} employees={employees} />}
-          {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
-          <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
+          <SectionLabelsContext.Provider value={labels}>
+            {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
+              <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
+            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : isDg ? <DgOrderSection gameTypes={gameTypes} employees={employees} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} employees={employees} />}
+            {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
+            <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
+          </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
       </BusinessForm>
     </BusinessActionModal>

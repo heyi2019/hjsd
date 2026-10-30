@@ -85,11 +85,58 @@ export function useOrderFormConfig(orderType: string | undefined): {
   return { config, loading };
 }
 
+/** 按业务类型拉取板块标题覆盖映射（section_key -> 显示标题）。
+ *  仅在 orderType 有效时请求；无配置或请求失败时降级为空映射，各板块保持原硬编码标题。 */
+export function useOrderFormSectionLabels(orderType: string | undefined): {
+  labels: Record<string, string>;
+  loading: boolean;
+} {
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!orderType) {
+      setLabels({});
+      return undefined;
+    }
+    let cancelled = false;
+    setLoading(true);
+    Promise.resolve(orderFormFieldsApi.listSectionLabels(orderType))
+      .then((rows) => {
+        if (cancelled) return;
+        setLabels(rows ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) setLabels({});
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderType]);
+  return { labels, loading };
+}
+
 /** 配置上下文：CreateBusinessModal 注入当前业务类型的字段配置，各 Section 默认从此读取。 */
 export const FieldConfigContext = createContext<FieldConfigMap>({});
 
 export function useFieldConfig(): FieldConfigMap {
   return useContext(FieldConfigContext);
+}
+
+/** 板块标题配置上下文：CreateBusinessModal / FieldConfigScope 把当前业务类型的板块标题映射注入此处，
+ * 各 Section 的硬编码标题改用 ``sectionLabel(key, fallback)`` 读取，实现「设置里改板块名 → 建单同步显示」。 */
+export const SectionLabelsContext = createContext<Record<string, string>>({});
+
+export function useSectionLabels(): Record<string, string> {
+  return useContext(SectionLabelsContext);
+}
+
+/** 读取板块显示标题：优先用配置覆盖值，无配置时回退硬编码 fallback（与 fieldLabel 同机制）。 */
+export function sectionLabel(key: string, fallback: string): string {
+  const labels = useSectionLabels();
+  return labels[key] ?? fallback;
 }
 
 /** 按「表单作用域」按需拉取配置并注入上下文。
@@ -101,7 +148,12 @@ export function FieldConfigScope(props: {
   children: ReactNode;
 }): ReactElement {
   const { config } = useOrderFormConfig(props.active ? props.scope : undefined);
-  return <FieldConfigContext.Provider value={config}>{props.children}</FieldConfigContext.Provider>;
+  const { labels } = useOrderFormSectionLabels(props.active ? props.scope : undefined);
+  return (
+    <FieldConfigContext.Provider value={config}>
+      <SectionLabelsContext.Provider value={labels}>{props.children}</SectionLabelsContext.Provider>
+    </FieldConfigContext.Provider>
+  );
 }
 
 export function isFieldActive(config: FieldConfigMap, key: string): boolean {
@@ -150,15 +202,31 @@ export function resolveRules(
   const def = fieldConfigFor(config, key);
   const base = (baseRules ?? []).filter(Boolean) as Rule[];
   if (!def) return base;
+  // 金额类字段（NUMBER/MONEY）在「必填」语义下不允许为 0 / 负数：
+  // 选填（含条件必填未命中）时本规则不挂载，留空传 0 由后端按选填口径放行。
+  const isMoney = def.field_type === "NUMBER" || def.field_type === "MONEY";
+  const moneyPositiveRule: Rule = {
+    validator(_rule, value) {
+      if (value === undefined || value === null || value === "") return Promise.resolve();
+      const n = typeof value === "number" ? value : Number(value);
+      if (Number.isNaN(n)) return Promise.resolve();
+      return n > 0 ? Promise.resolve() : Promise.reject(new Error(`${def.label}必须大于 0`));
+    },
+  };
   if (def.required) {
     const hasRequired = base.some((rule) => rule && (rule as { required?: boolean }).required);
-    return hasRequired ? base : [...base, { required: true, message: `${def.label}必填` } as Rule];
+    const rules = hasRequired ? [...base] : [...base, { required: true, message: `${def.label}必填` } as Rule];
+    if (isMoney) rules.push(moneyPositiveRule);
+    return rules;
   }
   const stripped = base.filter((rule) => !(rule as { required?: boolean }).required);
   if (def.required_when) {
-    return isConditionActive(def.required_when, values)
-      ? [...stripped, { required: true, message: `${def.label}必填` } as Rule]
-      : stripped;
+    if (isConditionActive(def.required_when, values)) {
+      const rules = [...stripped, { required: true, message: `${def.label}必填` } as Rule];
+      if (isMoney) rules.push(moneyPositiveRule);
+      return rules;
+    }
+    return stripped;
   }
   return stripped;
 }
@@ -276,7 +344,7 @@ export function CustomFieldSection(props: { testIdSuffix?: string; section?: Ord
   if (defs.length === 0) return null;
   return (
     <section className="ui-stack custom-field-section" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
-      <Typography.Text type="secondary" strong>{CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"]}</Typography.Text>
+      <Typography.Text type="secondary" strong>{sectionLabel(props.section ?? "EXTRA", CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"])}</Typography.Text>
       {defs.map((def) => (
         <CustomFormField key={def.id} def={def} />
       ))}

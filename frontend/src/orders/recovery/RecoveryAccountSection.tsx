@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
 import type { EmployeeOption } from "../../shared/api/catalog";
-import { CfgItem } from "../ConfigurableField";
+import { CfgItem, sectionLabel } from "../ConfigurableField";
 import { DeliveryInfoSection } from "../DeliveryInfoSection";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import "./RecoveryAccountSection.css";
@@ -41,6 +41,7 @@ export function RecoveryAccountSection(props: {
     ...props.fieldNames,
   };
   const form = Form.useFormInstance();
+  const accountTitle = sectionLabel("ACCOUNT_PRODUCT", "游戏账号信息");
   const selectedGameType = Form.useWatch(fieldNames.gameType, form);
   const channelRegions = props.gameTypes?.find((item) => item.name === selectedGameType)?.channel_regions ?? [];
   const selectedChannelRegion = Form.useWatch(fieldNames.channelRegion, form);
@@ -54,7 +55,7 @@ export function RecoveryAccountSection(props: {
   return (
     <section className="recovery-account-section recovery-entry-fields" aria-labelledby="game-account-info-title">
       <div id="game-account-info-title" className="recovery-entry-fields__title">
-        游戏账号信息
+        {accountTitle}
       </div>
       <CfgItem name={fieldNames.gameType} label="游戏类型" rules={[{ required: true, message: "游戏类型必填" }]}>
         {props.gameTypes?.length ? (

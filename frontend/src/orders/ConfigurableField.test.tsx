@@ -17,11 +17,13 @@ import {
   CustomFieldSection,
   CustomFormField,
   FieldConfigContext,
+  SectionLabelsContext,
   fieldLabel,
   injectOptionsIfMissing,
   isConditionActive,
   resolveOptionItems,
   resolveRules,
+  sectionLabel,
   buildFormExtraDisplay,
   type FieldConfigMap,
 } from "./ConfigurableField";
@@ -98,6 +100,60 @@ describe("resolveRules 必填以配置为最终口径", () => {
       moneyValidator,
     ] as never);
     expect(out).toEqual([moneyValidator]);
+  });
+});
+
+describe("resolveRules 金额字段必填 > 0（选填可 0 / 必填不可 0）", () => {
+  const moneyValidatorOf = (
+    rules: unknown,
+  ): ((r: unknown, v: unknown) => Promise<unknown>) | undefined => {
+    const list = rules as Array<{ validator?: (r: unknown, v: unknown) => Promise<unknown> }>;
+    return list.find((r) => typeof r.validator === "function")?.validator;
+  };
+  const validate = async (rules: unknown, value: unknown): Promise<string> => {
+    const v = moneyValidatorOf(rules);
+    if (!v) return "no-validator";
+    try {
+      await v(undefined, value);
+      return "pass";
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+
+  it("必填 NUMBER 字段填 0 被拒（必填不可以为 0）", async () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(cfg, "price", []), 0)).toContain("必须大于 0");
+  });
+
+  it("必填 NUMBER 字段填负数被拒", async () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(cfg, "price", []), -50)).toContain("必须大于 0");
+  });
+
+  it("必填 NUMBER 字段填正数通过", async () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(cfg, "price", []), 100)).toBe("pass");
+  });
+
+  it("选填 NUMBER 字段不挂载金额校验（选填可以 0）", () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: false }),
+    };
+    expect(moneyValidatorOf(resolveRules(cfg, "price", []))).toBeUndefined();
+  });
+
+  it("必填 TEXT 字段不加金额校验（非 NUMBER 不受影响）", () => {
+    const cfg: FieldConfigMap = {
+      note: makeField({ field_key: "note", label: "备注", field_type: "TEXT", required: true }),
+    };
+    expect(moneyValidatorOf(resolveRules(cfg, "note", []))).toBeUndefined();
   });
 });
 
@@ -448,5 +504,38 @@ describe("buildFormExtraDisplay：历史扩展字段值统一展开（含删除/
     ]);
     expect(buildFormExtraDisplay(undefined, defs)).toEqual([]);
     expect(buildFormExtraDisplay(null, defs)).toEqual([]);
+  });
+});
+
+describe("sectionLabel / SectionLabelsContext：板块标题跟随后端配置", () => {
+  function TitleProbe(props: { sectionKey: string; fallback: string }) {
+    return <span data-testid="title">{sectionLabel(props.sectionKey, props.fallback)}</span>;
+  }
+
+  it("无覆盖时回退硬编码 fallback", () => {
+    renderLight(<TitleProbe sectionKey="FINANCE" fallback="资金明细" />);
+    expect(screen.getByTestId("title")).toHaveTextContent("资金明细");
+  });
+
+  it("设置面板改板块名后，建单通过 SectionLabelsContext 同步显示新名", () => {
+    // 复刻 CreateBusinessModal：把后端返回的覆盖映射注入 SectionLabelsContext
+    renderLight(
+      <SectionLabelsContext.Provider value={{ FINANCE: "资金明细改名" }}>
+        <TitleProbe sectionKey="FINANCE" fallback="资金明细" />
+      </SectionLabelsContext.Provider>,
+    );
+    expect(screen.getByTestId("title")).toHaveTextContent("资金明细改名");
+  });
+
+  it("未覆盖的板块仍显示 fallback，已覆盖的显示新名（混合场景）", () => {
+    renderLight(
+      <SectionLabelsContext.Provider value={{ PARTICIPANT: "供货方信息改名" }}>
+        <TitleProbe sectionKey="PARTICIPANT" fallback="供货方信息" />
+        <TitleProbe sectionKey="FINANCE" fallback="资金明细" />
+      </SectionLabelsContext.Provider>,
+    );
+    const probes = screen.getAllByTestId("title");
+    expect(probes[0]).toHaveTextContent("供货方信息改名");
+    expect(probes[1]).toHaveTextContent("资金明细");
   });
 });

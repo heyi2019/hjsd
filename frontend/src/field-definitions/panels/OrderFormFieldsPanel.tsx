@@ -56,7 +56,6 @@ const ORDER_SCOPE_OPTIONS = [
 ];
 const ORDER_SCOPE_CODES = new Set(ORDER_SCOPE_OPTIONS.map((item) => item.value));
 const SECTION_ORDER_STORAGE_KEY = "heijin.form-field-section-order";
-const SECTION_LABEL_STORAGE_KEY = "heijin.form-field-section-labels";
 const DEFAULT_SECTION_ORDER = FIELD_SECTION_OPTIONS.map((item) => item.value);
 type SectionManagementRow = {
   value: string;
@@ -158,30 +157,10 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     try {
       const saved = JSON.parse(localStorage.getItem(SECTION_ORDER_STORAGE_KEY) ?? "null");
       if (Array.isArray(saved)) setSectionOrder(saved.filter((value): value is string => typeof value === "string"));
-      const labels = JSON.parse(localStorage.getItem(SECTION_LABEL_STORAGE_KEY) ?? "null");
-      if (labels && typeof labels === "object" && !Array.isArray(labels)) {
-        const nextLabels: Record<string, string> = {};
-        for (const [key, label] of Object.entries(labels as Record<string, unknown>)) {
-          if (typeof label === "string") nextLabels[key] = label;
-        }
-        setSectionLabels(nextLabels);
-      }
     } catch {
       // 本地排序配置损坏时回退默认顺序，不影响字段配置。
     }
   }, []);
-
-  const moveSection = (value: string, offset: number) => {
-    setSectionOrder((current) => {
-      const next = [...current];
-      const index = next.indexOf(value);
-      const target = index + offset;
-      if (index < 0 || target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target], next[index]];
-      localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  };
 
   const editSection = (value: string) => {
     const option = orderedSectionOptions.find((item) => item.value === value);
@@ -214,10 +193,15 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     if (addingSection) {
       const nextOrder = [...sectionOrder, key];
       const nextLabels = { ...sectionLabels, [key]: value };
+      try {
+        await orderFormFieldsApi.saveSectionLabels({ order_type_code: activeType, labels: nextLabels });
+      } catch (err) {
+        setError(normalizeError(err));
+        return;
+      }
       setSectionOrder(nextOrder);
       setSectionLabels(nextLabels);
       localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
-      localStorage.setItem(SECTION_LABEL_STORAGE_KEY, JSON.stringify(nextLabels));
       setAddingSection(false);
       setSectionDraft({ value: "", label: "" });
       return;
@@ -239,10 +223,15 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     const nextLabels = { ...sectionLabels };
     delete nextLabels[editingSectionValue];
     nextLabels[key] = value;
+    try {
+      await orderFormFieldsApi.saveSectionLabels({ order_type_code: activeType, labels: nextLabels });
+    } catch (err) {
+      setError(normalizeError(err));
+      return;
+    }
     setSectionOrder(nextOrder);
     setSectionLabels(nextLabels);
     localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
-    localStorage.setItem(SECTION_LABEL_STORAGE_KEY, JSON.stringify(nextLabels));
     setEditingSectionValue(null);
     setSectionDraft({ value: "", label: "" });
   };
@@ -256,9 +245,20 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
     }
   }, []);
 
+  // 板块标题（覆盖映射）以业务类型为单位从后端读取，与建单表单共享同一份配置。
+  const loadSectionLabels = useCallback(async (code: string) => {
+    try {
+      const labels = await orderFormFieldsApi.listSectionLabels(code);
+      setSectionLabels(labels ?? {});
+    } catch {
+      setSectionLabels({});
+    }
+  }, []);
+
   useEffect(() => {
     void load(activeType);
-  }, [activeType, load]);
+    void loadSectionLabels(activeType);
+  }, [activeType, load, loadSectionLabels]);
   useEffect(() => {
     void gameTypesApi.list({ include_inactive: false }).then((items) => setGameTypeNames(items.map((item) => item.name))).catch(() => undefined);
     void optionSetsApi.get("INTERMEDIARY_PLATFORM").then((item) => setIntermediaryPlatformNames((item.options ?? []).map((option) => option.label))).catch(() => undefined);
@@ -704,8 +704,6 @@ export function OrderFormFieldsPanel({ initialScope, onConfigureGameTypes, onCon
                   <PermissionGate permission="field-definition.manage">
                     <Space size={2}>
                       <PermissionButton permission="field-definition.manage" size="small" aria-label={`编辑${row.label}`} onClick={() => editSection(row.value)}>编辑</PermissionButton>
-                      <PermissionButton permission="field-definition.manage" size="small" disabled={row.index === 0} aria-label={`${row.label}上移`} onClick={() => moveSection(row.value, -1)}>上移</PermissionButton>
-                      <PermissionButton permission="field-definition.manage" size="small" disabled={row.index === sectionManagementRows.length - 1} aria-label={`${row.label}下移`} onClick={() => moveSection(row.value, 1)}>下移</PermissionButton>
                       <PermissionButton permission="field-definition.manage" size="small" onClick={() => setSectionFilter(row.value)}>查看字段</PermissionButton>
                     </Space>
                   </PermissionGate>

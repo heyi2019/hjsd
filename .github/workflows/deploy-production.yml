@@ -1,0 +1,128 @@
+name: deploy-production
+
+# 迁移阶段先手动触发，验证 GitHub Actions 直连 ECS 成功后再开启 main push。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy to ECS
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ECS_HOST: ${{ secrets.ECS_HOST }}
+      ECS_PORT: ${{ secrets.ECS_PORT || '22' }}
+      ECS_USER: ${{ secrets.ECS_USER || 'root' }}
+      ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
+      ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ECS_HOST ECS_USER ECS_SSH_PRIVATE_KEY ECS_KNOWN_HOSTS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing GitHub Actions secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production images
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+          [[ -n "$VERSION" ]] || { echo 'Unable to read backend/app/version.py' >&2; exit 1; }
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          docker buildx build --platform linux/amd64 --load \
+            -t "heijin-backend:${VERSION}" \
+            -f backend/Dockerfile backend
+          docker buildx build --platform linux/amd64 --load \
+            -t "heijin-frontend:${VERSION}" \
+            -f frontend/Dockerfile .
+
+      - name: Create deployment package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          docker save "heijin-backend:${APP_VERSION}" "heijin-frontend:${APP_VERSION}" \
+            | gzip > "output/heijin-images-${APP_VERSION}-amd64.tar.gz"
+
+          # 只上传运行所需的部署文件；应用代码和静态资源已在镜像中。
+          # version.py 必须保留，deploy.sh 与 backup_daily.sh 用它解析镜像版本。
+          tar -czf output/heijin-source.tar.gz \
+            backend/app/version.py \
+            deploy/docker-compose.yml \
+            deploy/scripts \
+            frontend/nginx.conf
+
+          tar -czf output/heijin-deploy.tgz -C output \
+            "heijin-images-${APP_VERSION}-amd64.tar.gz" \
+            heijin-source.tar.gz
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$ECS_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$ECS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Upload deployment package
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -P "$ECS_PORT" \
+            output/heijin-deploy.tgz \
+            "${ECS_USER}@${ECS_HOST}:/tmp/heijin-deploy.tgz"
+
+      - name: Deploy and verify production
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p "$ECS_PORT" "${ECS_USER}@${ECS_HOST}" \
+            "APP_VERSION='${APP_VERSION}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          rm -rf /tmp/heijin-gh-cd
+          mkdir -p /tmp/heijin-gh-cd
+
+          tar -xzf /tmp/heijin-deploy.tgz -C /tmp/heijin-gh-cd
+          tar -xzf /tmp/heijin-gh-cd/heijin-deploy.tgz -C /tmp/heijin-gh-cd
+          gunzip -c "/tmp/heijin-gh-cd/heijin-images-${APP_VERSION}-amd64.tar.gz" | docker load
+          tar -xzf /tmp/heijin-gh-cd/heijin-source.tar.gz -C /opt/heijin
+
+          cd /opt/heijin/deploy
+          ERP_SKIP_BUILD=1 APP_VERSION="$APP_VERSION" bash scripts/deploy.sh
+          curl -fsS http://127.0.0.1/api/v1/health
+          REMOTE
+
+      - name: Publish deployment summary
+        run: |
+          {
+            echo "### Production deployment"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Version: \`${APP_VERSION}\`"
+            echo "- Target: ECS"
+            echo "- Health check: passed"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -56,5 +56,9 @@ jobs:
           set -euo pipefail
           # The credentials are supplied only to this process and never written to the repository.
           git remote add codeup "https://${CODEUP_USERNAME}:${CODEUP_TOKEN}@${CODEUP_REPOSITORY#https://}"
-          git push codeup "HEAD:refs/heads/main"
+          codeup_main_sha="$(git ls-remote codeup refs/heads/main | awk '{print $1}')"
+          test -n "$codeup_main_sha"
+          git push codeup \
+            "--force-with-lease=refs/heads/main:${codeup_main_sha}" \
+            "HEAD:refs/heads/main"
 

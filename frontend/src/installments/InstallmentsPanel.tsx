@@ -414,7 +414,7 @@ function ContractTable({
             换绑交付
           </PermissionButton>
           <PermissionButton
-            permission="order.exception.approve"
+            permission="order.update"
             size="small"
             disabled={
               !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
@@ -442,7 +442,7 @@ function ContractTable({
             提前结清
           </PermissionButton>
           <PermissionButton
-            permission="order.exception.approve"
+            permission="order.update"
             size="small"
             danger
             disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
@@ -454,7 +454,7 @@ function ContractTable({
             dispositions[row.id]?.some((item) => item.action === "RECOVER") &&
             !dispositions[row.id]?.some((item) => item.action === "RESELL") && (
               <PermissionButton
-                permission="order.exception.approve"
+                permission="order.update"
                 size="small"
                 onClick={() => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
               >
@@ -499,7 +499,7 @@ function ContractTable({
       render: (_v, schedule) => (
         <Space size={2}>
           <PermissionButton
-            permission="order.exception.approve"
+            permission="order.update"
             size="small"
             disabled={["PAID", "WAIVED"].includes(schedule.status)}
             onClick={() => {
@@ -511,7 +511,7 @@ function ContractTable({
             减免
           </PermissionButton>
           <PermissionButton
-            permission="order.exception.approve"
+            permission="order.update"
             size="small"
             disabled={["PAID", "WAIVED"].includes(schedule.status)}
             onClick={() => {
@@ -668,7 +668,7 @@ function ContractTable({
             <Input.TextArea rows={2} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="installment-recover" />
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+          <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
           </PermissionButton>
         </BusinessForm>
@@ -708,7 +708,7 @@ function ContractTable({
             <Input.TextArea rows={2} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="installment-resale" />
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+          <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认登记
           </PermissionButton>
         </BusinessForm>
@@ -821,7 +821,7 @@ function ContractTable({
             <Input.TextArea rows={3} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="installment-default" />
-          <PermissionButton permission="order.exception.approve" type="primary" danger htmlType="submit" loading={write.pending}>
+          <PermissionButton permission="order.update" type="primary" danger htmlType="submit" loading={write.pending}>
             确认登记违约
           </PermissionButton>
         </BusinessForm>
@@ -850,7 +850,7 @@ function ContractTable({
             <Input.TextArea rows={2} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="installment-waive" />
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+          <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认减免
           </PermissionButton>
         </BusinessForm>
@@ -876,7 +876,7 @@ function ContractTable({
             <Input.TextArea rows={2} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="installment-extend" />
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={write.pending}>
+          <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认展期
           </PermissionButton>
         </BusinessForm>
@@ -959,7 +959,7 @@ function MobileInstallmentList({
                 换绑交付
               </PermissionButton>
               <PermissionButton
-                permission="order.exception.approve"
+                permission="order.update"
                 size="small"
                 disabled={!(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) || dispo.some((item) => item.action === "RECOVER")}
                 onClick={() => onRecover(row)}
@@ -984,7 +984,7 @@ function MobileInstallmentList({
                 提前结清
               </PermissionButton>
               <PermissionButton
-                permission="order.exception.approve"
+                permission="order.update"
                 size="small"
                 danger
                 disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
@@ -993,7 +993,7 @@ function MobileInstallmentList({
                 登记违约
               </PermissionButton>
               {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) && dispo.some((item) => item.action === "RECOVER") && !dispo.some((item) => item.action === "RESELL") && (
-                <PermissionButton permission="order.exception.approve" size="small" onClick={() => onResale(row)}>
+                <PermissionButton permission="order.update" size="small" onClick={() => onResale(row)}>
                   登记出售
                 </PermissionButton>
               )}

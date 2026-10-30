@@ -18,7 +18,6 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
-    PERM_ORDER_EXCEPTION_APPROVE,
     PERM_ORDER_UPDATE,
     PERM_REPORT_READ,
     CurrentUser,
@@ -99,7 +98,7 @@ def _assert_permission(user: CurrentUser, target: _Target, *, write: bool) -> No
     if user.is_admin:
         return
     if target.entity_type == "quality_issue":
-        allowed = user.has(PERM_ORDER_EXCEPTION_APPROVE if write else PERM_REPORT_READ)
+        allowed = user.has(PERM_ORDER_UPDATE if write else PERM_REPORT_READ)
     elif target.entity_type == "cashflow":
         allowed = user.has(PERM_FINANCE_READ)
     elif write:

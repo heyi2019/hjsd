@@ -49,12 +49,10 @@ PERM_ORDER_CREATE = "order.create"
 PERM_ORDER_UPDATE = "order.update"
 PERM_ORDER_EVENT_POST = "order.event.post"
 PERM_FINANCE_ORDER_EVENT_POST = "finance.order.event.post"
-PERM_ORDER_EXCEPTION_APPROVE = "order.exception.approve"
 PERM_FINANCE_READ = "finance.read"
 PERM_DEPOSIT_POST = "deposit.post"
 PERM_TRANSFER_POST = "finance.transfer"
 PERM_POLICY_MANAGE = "policy.manage"
-PERM_POLICY_APPROVE = "policy.approve"
 PERM_FIELD_DEFINITION_MANAGE = "field-definition.manage"
 PERM_AUDIT_READ = "audit.read"
 PERM_POOL_MANAGE = "pool.manage"
@@ -80,12 +78,10 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_ORDER_UPDATE,
         PERM_ORDER_EVENT_POST,
         PERM_FINANCE_ORDER_EVENT_POST,
-        PERM_ORDER_EXCEPTION_APPROVE,
         PERM_FINANCE_READ,
         PERM_DEPOSIT_POST,
         PERM_TRANSFER_POST,
         PERM_POLICY_MANAGE,
-        PERM_POLICY_APPROVE,
         PERM_FIELD_DEFINITION_MANAGE,
         PERM_AUDIT_READ,
         PERM_POOL_MANAGE,
@@ -138,9 +134,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             PERM_CUSTOMER_CONTACT_READ,
             PERM_COUNTERPARTY_READ,
             PERM_FINANCE_READ,
-            PERM_ORDER_EXCEPTION_APPROVE,
             PERM_POLICY_MANAGE,
-            PERM_POLICY_APPROVE,
             PERM_AUDIT_READ,
             PERM_REPORT_READ,
             PERM_REPORT_EXPORT,

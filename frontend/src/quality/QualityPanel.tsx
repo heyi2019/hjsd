@@ -201,11 +201,11 @@ export function QualityPanel() {
       key: "actions",
       render: (_v, row) => row.status === "OPEN" ? (
         <Space size={2}>
-          <PermissionButton permission="order.exception.approve" size="small" loading={updating} onClick={() => void updateIssueStatus(row, "IN_PROGRESS")}>开始处理</PermissionButton>
-          <PermissionButton permission="order.exception.approve" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
+          <PermissionButton permission="order.update" size="small" loading={updating} onClick={() => void updateIssueStatus(row, "IN_PROGRESS")}>开始处理</PermissionButton>
+          <PermissionButton permission="order.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
         </Space>
       ) : row.status === "IN_PROGRESS" ? (
-        <PermissionButton permission="order.exception.approve" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
+        <PermissionButton permission="order.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton>
       ) : null,
     },
   ];
@@ -238,9 +238,9 @@ export function QualityPanel() {
           onPageChange={() => undefined}
         />
       </Card>
-      <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.exception.approve" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.exception.approve" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
+      <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.update" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.update" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
         <DataTable<QualityIssue> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
-        <PermissionButton permission="order.exception.approve" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
+        <PermissionButton permission="order.update" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <BusinessActionModal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={createOpen ? error : null} />
@@ -251,7 +251,7 @@ export function QualityPanel() {
           <Form.Item name="entity_type" label="对象类型" rules={[{ required: true }]}><Input placeholder="order / account / customer" /></Form.Item>
           <Form.Item name="entity_id" label="对象编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="message" label="问题描述" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
-          <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={creating}>创建工单</PermissionButton>
+          <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={creating}>创建工单</PermissionButton>
         </BusinessForm>
       </BusinessActionModal>
       <BusinessActionModal size="compact" title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
@@ -260,7 +260,7 @@ export function QualityPanel() {
           <Form.Item name="resolution" label="处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
           <CompactActions>
-            <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
+            <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
           </CompactActions>
         </BusinessForm>
       </BusinessActionModal>
@@ -270,7 +270,7 @@ export function QualityPanel() {
           <Form.Item name="resolution" label="批量处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} placeholder="将应用到当前列表中最多 50 条未关闭工单" /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
           <CompactActions>
-            <PermissionButton permission="order.exception.approve" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
+            <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
           </CompactActions>
         </BusinessForm>
       </BusinessActionModal>

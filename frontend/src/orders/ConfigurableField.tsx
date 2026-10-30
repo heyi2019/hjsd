@@ -150,15 +150,31 @@ export function resolveRules(
   const def = fieldConfigFor(config, key);
   const base = (baseRules ?? []).filter(Boolean) as Rule[];
   if (!def) return base;
+  // 金额类字段（NUMBER/MONEY）在「必填」语义下不允许为 0 / 负数：
+  // 选填（含条件必填未命中）时本规则不挂载，留空传 0 由后端按选填口径放行。
+  const isMoney = def.field_type === "NUMBER" || def.field_type === "MONEY";
+  const moneyPositiveRule: Rule = {
+    validator(_rule, value) {
+      if (value === undefined || value === null || value === "") return Promise.resolve();
+      const n = typeof value === "number" ? value : Number(value);
+      if (Number.isNaN(n)) return Promise.resolve();
+      return n > 0 ? Promise.resolve() : Promise.reject(new Error(`${def.label}必须大于 0`));
+    },
+  };
   if (def.required) {
     const hasRequired = base.some((rule) => rule && (rule as { required?: boolean }).required);
-    return hasRequired ? base : [...base, { required: true, message: `${def.label}必填` } as Rule];
+    const rules = hasRequired ? [...base] : [...base, { required: true, message: `${def.label}必填` } as Rule];
+    if (isMoney) rules.push(moneyPositiveRule);
+    return rules;
   }
   const stripped = base.filter((rule) => !(rule as { required?: boolean }).required);
   if (def.required_when) {
-    return isConditionActive(def.required_when, values)
-      ? [...stripped, { required: true, message: `${def.label}必填` } as Rule]
-      : stripped;
+    if (isConditionActive(def.required_when, values)) {
+      const rules = [...stripped, { required: true, message: `${def.label}必填` } as Rule];
+      if (isMoney) rules.push(moneyPositiveRule);
+      return rules;
+    }
+    return stripped;
   }
   return stripped;
 }

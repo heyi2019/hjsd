@@ -101,6 +101,60 @@ describe("resolveRules 必填以配置为最终口径", () => {
   });
 });
 
+describe("resolveRules 金额字段必填 > 0（选填可 0 / 必填不可 0）", () => {
+  const moneyValidatorOf = (
+    rules: unknown,
+  ): ((r: unknown, v: unknown) => Promise<unknown>) | undefined => {
+    const list = rules as Array<{ validator?: (r: unknown, v: unknown) => Promise<unknown> }>;
+    return list.find((r) => typeof r.validator === "function")?.validator;
+  };
+  const validate = async (rules: unknown, value: unknown): Promise<string> => {
+    const v = moneyValidatorOf(rules);
+    if (!v) return "no-validator";
+    try {
+      await v(undefined, value);
+      return "pass";
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+
+  it("必填 NUMBER 字段填 0 被拒（必填不可以为 0）", async () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(cfg, "price", []), 0)).toContain("必须大于 0");
+  });
+
+  it("必填 NUMBER 字段填负数被拒", async () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(cfg, "price", []), -50)).toContain("必须大于 0");
+  });
+
+  it("必填 NUMBER 字段填正数通过", async () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(cfg, "price", []), 100)).toBe("pass");
+  });
+
+  it("选填 NUMBER 字段不挂载金额校验（选填可以 0）", () => {
+    const cfg: FieldConfigMap = {
+      price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: false }),
+    };
+    expect(moneyValidatorOf(resolveRules(cfg, "price", []))).toBeUndefined();
+  });
+
+  it("必填 TEXT 字段不加金额校验（非 NUMBER 不受影响）", () => {
+    const cfg: FieldConfigMap = {
+      note: makeField({ field_key: "note", label: "备注", field_type: "TEXT", required: true }),
+    };
+    expect(moneyValidatorOf(resolveRules(cfg, "note", []))).toBeUndefined();
+  });
+});
+
 describe("CustomFormField", () => {
   it("TEXT 字段值归集到 form_extra.<field_key>", async () => {
     const def = makeField({ field_key: "vip_tag", label: "VIP标签", field_type: "TEXT", required: false });

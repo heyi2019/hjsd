@@ -135,7 +135,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(catalog.transfersApi.repair).mockResolvedValueOnce({ transfer_id: "TRF-001" });
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "异常与月结" }));
+    await ui.click(screen.getByRole("tab", { name: "异常" }));
     await ui.click(await screen.findByRole("button", { name: /修复划转/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /POOL-B/);

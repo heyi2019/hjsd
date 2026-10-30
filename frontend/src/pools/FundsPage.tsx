@@ -969,7 +969,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           },
           {
             key: "controls",
-            label: "异常与月结",
+            label: "异常",
             children: (
               <div className="ui-stack">
                 <Card className="glass" title="单边划转异常">

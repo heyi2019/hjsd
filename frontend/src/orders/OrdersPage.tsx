@@ -42,7 +42,7 @@ import {
   BusinessActionModal,
   BusinessForm,
 } from "../shared/ui";
-import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../orders/ConfigurableField";
+import { OrderDetailPane } from "./OrderDetailPane";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
 import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
@@ -52,15 +52,7 @@ import {
   type BusinessCenterTab,
 } from "./businessCenter";
 
-const ORDER_FIELD_SECTION_LABEL: Record<string, string> = {
-  ACCOUNT_PRODUCT: "账号 / 产品信息",
-  BUSINESS: "业务方案信息",
-  DELIVER: "交付信息",
-  FINANCE: "费用与资金",
-  PARTICIPANT: "参与方信息",
-  EXTRA: "其他补充信息",
-};
-const ORDER_FIELD_SECTION_ORDER = ["ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "FINANCE", "EXTRA", "PARTICIPANT"];
+// 订单字段板块常量（ORDER_FIELD_SECTION_LABEL / ORDER_FIELD_SECTION_ORDER）已迁移至 OrderDetailPane。
 
 function MobileOrderList(props: {
   orders: Order[];
@@ -86,7 +78,7 @@ function MobileOrderList(props: {
             <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
             <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
           </dl>
-          <PermissionButton permission="order.event.post" type="link" onClick={() => props.onSelect(order)}>查看详情</PermissionButton>
+          <PermissionButton permission="order.update" type="link" onClick={() => props.onSelect(order)}>编辑订单</PermissionButton>
         </article>
       ))}
     </div>
@@ -281,9 +273,11 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  // 订单详情展示自定义字段历史值：按 order_type 拉字段配置，对 form_extra 做兜底展开
-  // （含已删除/停用字段标注），保证字段生命周期操作后历史值始终可追溯。
-  const { config: orderFieldConfig } = useOrderFormConfig(selectedOrder?.order_type);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
+  const handleLedgerExpand = (expanded: boolean, record: Order) => {
+    // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
+    setExpandedOrderIds(expanded ? [String(record.id)] : []);
+  };
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
   const [cancelScope, setCancelScope] = useState<CancelFormScope>("ORDERCANC");
@@ -300,10 +294,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
-  const [links, setLinks] = useState<OrderLink[]>([]);
-  const [linkOpen, setLinkOpen] = useState(false);
-  const [linkSubmitting, setLinkSubmitting] = useState(false);
-  const [linkForm] = Form.useForm();
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
   const employeeOptions = [
@@ -318,8 +308,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [editOpen, setEditOpen] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm();
-  const [orderSnapshot, setOrderSnapshot] = useState<{ found: boolean; snapshot: { policy_version_id?: number | null; policy_snapshot?: Record<string, unknown> | null } | null } | null>(null);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -378,27 +366,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     }
   };
 
-  const openOrder = async (order: Order) => {
-    try {
-      // 先取详情，抽屉立即可见；关联单与规则快照互不依赖，并行补齐、各自独立回写
-      //（setLinks 不再等快照返回，避免未 mock 快照接口时阻塞关联行渲染）。
-      const detail = await ordersApi.get(order.id);
-      setSelectedOrder(detail);
-      setSnapshotLoading(true);
-      ordersApi.links(order.id)
-        .then((linksResult) => setLinks(linksResult))
-        .catch(() => setLinks([]));
-      policyApi.orderSnapshot(order.id)
-        .then((s) => setOrderSnapshot(s))
-        // 规则快照（BAS-06-04）：无权查看时静默降级为 null，不阻断详情展示。
-        .catch(() => setOrderSnapshot(null))
-        .finally(() => setSnapshotLoading(false));
-    } catch (error) {
-      setSnapshotLoading(false);
-      appMessage.error(normalizeError(error).message);
-    }
-  };
-
   /** 可冲销动作：已过账的 BUY/COST/SELL，按剩余可冲金额过滤（后端支持部分冲销）。 */
   const reversibleEvents = (order: Order | null) => {
     const posted = (order?.events ?? []).filter((event) => event.is_posted);
@@ -421,36 +388,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     .filter(({ event }) => scope === "INVREFUND"
       ? ["BUY", "COST"].includes(event.event_type)
       : event.event_type === "SELL");
-
-  const submitLink = async (values: Record<string, unknown>) => {
-    if (!selectedOrder) return;
-    setLinkSubmitting(true);
-    try {
-      await ordersApi.createLink(selectedOrder.id, {
-        related_order_id: Number(values.related_order_id),
-        relation_type: values.relation_type as "SOURCE" | "FOLLOW_UP",
-        split_ratio: values.split_ratio ? String(values.split_ratio) : undefined,
-        split_amount: values.split_amount ? String(values.split_amount) : undefined,
-        note: values.note as string | undefined,
-        form_extra: values.form_extra as Record<string, unknown> | undefined,
-      });
-      appMessage.success("订单关联已建立");
-      setLinkOpen(false);
-      linkForm.resetFields();
-      setLinks(await ordersApi.links(selectedOrder.id));
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setLinkSubmitting(false);
-    }
-  };
-
-  const removeLink = async (link: OrderLink) => {
-    if (!selectedOrder) return;
-    await ordersApi.deleteLink(selectedOrder.id, link.id);
-    appMessage.success("订单关联已删除");
-    setLinks(await ordersApi.links(selectedOrder.id));
-  };
 
   const openCancelTransaction = async (sourceOrder?: Order) => {
     try {
@@ -592,12 +529,12 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
 
   /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅 DFQ 可维护，
    *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
-  const openEditOrder = () => {
-    if (!selectedOrder) return;
-    const snapshot = selectedOrder.account_snapshot;
+  const openEditOrder = (order: Order) => {
+    setSelectedOrder(order);
+    const snapshot = order.account_snapshot;
     editForm.setFieldsValue({
-      trade_date: selectedOrder.trade_date,
-      note: selectedOrder.note ?? undefined,
+      trade_date: order.trade_date,
+      note: order.note ?? undefined,
       snap_game_account: snapshot?.game_account,
       snap_game_type: snapshot?.game_type ?? undefined,
       snap_game_password: snapshot?.game_password ?? undefined,
@@ -687,7 +624,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       key: "actions",
       render: (_, order) => (
         <Space size={2}>
-          <PermissionButton permission="order.event.post" type="link" onClick={() => void openOrder(order)}>查看详情</PermissionButton>
+          <PermissionButton permission="order.update" type="link" onClick={() => openEditOrder(order)}>编辑订单</PermissionButton>
           <PermissionGate permission="order.event.post">
             <Dropdown
               trigger={["click"]}
@@ -719,18 +656,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
       ),
     },
   ];
-
-  const orderExtraItems = buildFormExtraDisplay(selectedOrder?.form_extra, Object.values(orderFieldConfig));
-  const orderFieldSections = new Map(Object.values(orderFieldConfig).map((field) => [field.field_key, field.section ?? "EXTRA"]));
-  const orderExtraGroups = [...orderExtraItems.reduce((groups, item) => {
-    const section = orderFieldSections.get(item.key) ?? "EXTRA";
-    const current = groups.get(section) ?? [];
-    current.push(item);
-    groups.set(section, current);
-    return groups;
-  }, new Map<string, typeof orderExtraItems>())]
-    .sort(([left], [right]) => (ORDER_FIELD_SECTION_ORDER.indexOf(left) === -1 ? 99 : ORDER_FIELD_SECTION_ORDER.indexOf(left)) - (ORDER_FIELD_SECTION_ORDER.indexOf(right) === -1 ? 99 : ORDER_FIELD_SECTION_ORDER.indexOf(right)))
-    .map(([section, items]) => ({ section, items }));
 
   return (
     <section className="ui-stack orders-page">
@@ -843,7 +768,11 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   total={filteredOrders.length}
                   emptyText="暂无业务订单"
                   className="orders-ledger"
-
+                  expandable={{
+                    expandedRowKeys: expandedOrderIds,
+                    onExpand: handleLedgerExpand,
+                    expandedRowRender: (order) => <OrderDetailPane order={order} typeNames={typeNames} />,
+                  }}
                   onPageChange={(nextPage, nextSize) => {
                     setPage(nextPage);
                     setPageSize(nextSize);
@@ -852,7 +781,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                 <MobileOrderList
                   orders={filteredOrders}
                   emptyText="暂无业务订单"
-                  onSelect={(order) => void openOrder(order)}
+                  onSelect={(order) => openEditOrder(order)}
                 />
               </Card>
             ),
@@ -865,263 +794,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         ]}
       />
 
-      <Drawer
-        title={selectedOrder ? `订单详情 · ${selectedOrder.order_no}` : "订单详情"}
-        open={Boolean(selectedOrder)}
-        onClose={() => setSelectedOrder(null)}
-        width={420}
-      >
-        {selectedOrder ? (
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="业务">{BUSINESS_MODE_LABEL[selectedOrder.business_mode ?? ""] || "-"}</Descriptions.Item>
-            <Descriptions.Item label="类型">{BUSINESS_TYPE_LABEL[selectedOrder.business_type ?? ""] || orderTypeLabel(selectedOrder.order_type, typeNames)}</Descriptions.Item>
-            <Descriptions.Item label="增值服务">{configurableLabel("INSTALLMENT_CONTRACT_TYPE", selectedOrder.value_added_service, VALUE_ADDED_SERVICE_LABEL)}</Descriptions.Item>
-            <Descriptions.Item label="游戏/产品类型">{selectedOrder.account_game_type || "-"}</Descriptions.Item>
-            <Descriptions.Item label="游戏账号/产品">{[selectedOrder.account_game_account, selectedOrder.account_channel_region].filter(Boolean).join(" / ") || "-"}</Descriptions.Item>
-            <Descriptions.Item label="对方">{selectedOrder.party_name || "-"}</Descriptions.Item>
-            <Descriptions.Item label="获客来源">{selectedOrder.party_source || "-"}</Descriptions.Item>
-            <Descriptions.Item label="获客负责人">{selectedOrder.party_created_by || "-"}</Descriptions.Item>
-            <Descriptions.Item label="获客时间">{selectedOrder.party_created_at ? new Date(selectedOrder.party_created_at).toLocaleString("zh-CN") : "-"}</Descriptions.Item>
-            <Descriptions.Item label="金额/进度">{selectedOrder.installment_principal ? `¥${selectedOrder.installment_paid ?? "0.00"}/${selectedOrder.installment_principal} · ${selectedOrder.installment_periods ?? 0}期` : selectedOrder.event_total ? `¥${selectedOrder.event_total}` : "-"}</Descriptions.Item>
-            <Descriptions.Item label="最新动作">{selectedOrder.last_event_type ? `${executionActionLabel(selectedOrder.last_event_type, selectedOrder.order_type)}${selectedOrder.last_event_amount ? ` · ¥${selectedOrder.last_event_amount}` : ""}` : "-"}</Descriptions.Item>
-            <Descriptions.Item label="状态"><StatusTag status={selectedOrder.status} optionSet="ORDER_STATUS" /></Descriptions.Item>
-            <Descriptions.Item label="关联状态"><StatusTag status={selectedOrder.link_status ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", selectedOrder.link_status ?? "LINKED", LINK_STATUS_LABEL)} /></Descriptions.Item>
-            <Descriptions.Item label="成交日">{selectedOrder.trade_date || "-"}</Descriptions.Item>
-            <Descriptions.Item label="备注">{selectedOrder.note || "-"}</Descriptions.Item>
-          </Descriptions>
-        ) : null}
-        {selectedOrder && orderExtraGroups.map(({ section, items }) => (
-          <div className="ui-form-spaced" key={section}>
-            <Typography.Text strong>{ORDER_FIELD_SECTION_LABEL[section] ?? section}</Typography.Text>
-            <Descriptions column={1} bordered size="small">
-              {items.map((it) => (
-                <Descriptions.Item
-                  key={it.key}
-                  label={`${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}`}
-                >
-                  {formatExtraDisplayValue(it.value) || "-"}
-                </Descriptions.Item>
-              ))}
-            </Descriptions>
-          </div>
-        ))}
-        {selectedOrder?.events?.length ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>动作记录</Typography.Text>
-            {selectedOrder.events.map((event) => (
-              <div key={event.id} className="orders-event-row">
-                <span>
-                  <b>{executionActionLabel(event.event_type, selectedOrder.order_type)}</b>
-                  {` ${event.event_no}`}
-                  {event.offset_event_id ? ` · 冲销 #${event.offset_event_id}` : ""}
-                </span>
-                <span>
-                  <MoneyText value={event.amount} />
-                  {" · "}{EVENT_PORTION_LABEL[event.portion ?? ""] ?? event.portion ?? "本金"}
-                  {event.is_posted ? "" : " · 未过账"}
-                </span>
-                <span>{event.occurred_on} · {event.operator || "-"}</span>
-                {event.reason || event.refund_responsibility || event.delivery_mode ? (
-                  <span className="muted">
-                    {[
-                      event.delivery_mode ? `交付 ${configurableLabel("DELIVERY_MODE", event.delivery_mode, DELIVERY_MODE_LABEL)}` : "",
-                      event.refund_responsibility ? `责任方 ${configurableLabel("REFUND_RESPONSIBILITY", event.refund_responsibility, REFUND_RESPONSIBILITY_LABEL)}` : "",
-                      event.reason,
-                    ].filter(Boolean).join(" · ")}
-                  </span>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {selectedOrder ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>关联订单</Typography.Text>
-            <PermissionButton
-              permission="order.update"
-              size="small"
-              onClick={() => {
-                linkForm.resetFields();
-                setLinkOpen(true);
-              }}
-            >
-              新建关联
-            </PermissionButton>
-            {links.length ? (
-              links.map((link) => (
-                <div key={link.id} className="orders-event-row">
-                  <span>{link.direction === "SOURCE" ? "来源单" : "后续单"}</span>
-                  <span>
-                    {link.direction === "SOURCE" ? link.source_order_no : link.target_order_no}
-                  </span>
-                  <span>
-                    {link.split_ratio
-                      ? `${link.split_ratio}%`
-                      : link.split_amount
-                        ? `¥${money(link.split_amount)}`
-                        : "-"}
-                  </span>
-                  <ConfirmButton
-                    permission="order.update"
-                    size="small"
-                    type="link"
-                    danger
-                    title="删除订单关联"
-                    description="删除后该上下游关系即刻解除；如误删，可重新建立同一关联。"
-                    onConfirm={() => removeLink(link)}
-                  >
-                    删除
-                  </ConfirmButton>
-                </div>
-              ))
-            ) : (
-              <Typography.Text type="secondary">暂无关联订单</Typography.Text>
-            )}
-          </div>
-        ) : null}
-        {selectedOrder ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>规则快照</Typography.Text>
-            {snapshotLoading ? (
-              <Typography.Text type="secondary">读取中…</Typography.Text>
-            ) : orderSnapshot?.found && orderSnapshot.snapshot ? (
-              <>
-                <div className="orders-event-row">
-                  <span>规则版本</span>
-                  <span>#{orderSnapshot.snapshot.policy_version_id ?? "-"}</span>
-                </div>
-                {Object.entries(orderSnapshot.snapshot.policy_snapshot ?? {}).map(([code, snap]) => (
-                  <div key={code} className="orders-event-row">
-                    <span>{code === "REBATE" ? "返点规则" : code === "COMMISSION" ? "提成规则" : code}</span>
-                    <span className="muted">
-                      {typeof snap === "object" && snap !== null
-                        ? Object.entries(snap as Record<string, unknown>)
-                            .filter(([key]) => key !== "captured_at")
-                            .map(([key, value]) => `${key}=${typeof value === "object" && value !== null ? JSON.stringify(value) : String(value)}`)
-                            .join(" · ")
-                        : String(snap)}
-                    </span>
-                  </div>
-                ))}
-                <Typography.Text type="secondary">快照按成交日固化，规则改版不会回写历史订单。</Typography.Text>
-              </>
-            ) : (
-              <Typography.Text type="secondary">建单时无生效的返点/提成规则，未固化规则快照。</Typography.Text>
-            )}
-          </div>
-        ) : null}
-        {selectedOrder?.cashflows?.length ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>资金流水</Typography.Text>
-            {selectedOrder.cashflows.map((flow) => (
-              <div key={flow.flow_no} className="orders-event-row">
-                <span>{flow.occurred_on}</span>
-                <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
-                <span><MoneyText value={flow.amount} /></span>
-                <span><StatusTag status={flow.status} optionSet="FUND_FLOW_STATUS" /></span>
-                <span>操作人：{flow.operator || currentOperator}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {selectedOrder?.rebates?.length ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>返点</Typography.Text>
-            {selectedOrder.rebates.map((rebate) => (
-              <div key={rebate.id} className="orders-event-row">
-                <span>{rebate.rebate_no}</span>
-                <span>{rebate.rate}% · <MoneyText value={rebate.base_amount} /></span>
-                <span>{rebate.collected_on}</span>
-                <span>已登记</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {selectedOrder?.installment ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>分期合约 · {selectedOrder.installment.inst_no}</Typography.Text>
-            <Typography.Text type="secondary">
-              本金 ¥{money(selectedOrder.installment.principal)} · 已收 ¥{money(selectedOrder.installment.paid_amount)}
-              {Number(selectedOrder.installment.waived_amount) > 0 ? ` · 减免 ¥${money(selectedOrder.installment.waived_amount)}` : ""}
-              {Number(selectedOrder.installment.bad_debt_amount) > 0 ? ` · 坏账 ¥${money(selectedOrder.installment.bad_debt_amount)}` : ""}
-              {" · "}{selectedOrder.installment.periods} 期
-            </Typography.Text>
-            <div className="orders-event-row">
-              <span><StatusTag status={selectedOrder.installment.status} optionSet="INSTALLMENT_STATUS" /></span>
-              <span>{selectedOrder.installment.delivered_on ? `交付于 ${selectedOrder.installment.delivered_on}` : "未交付"}</span>
-              <span>{selectedOrder.installment.first_due_on ? `首期 ${selectedOrder.installment.first_due_on}` : ""}</span>
-            </div>
-            {(selectedOrder.installment_schedule ?? []).map((row) => (
-              <div key={row.id} className="orders-event-row">
-                <span>第 {row.period_no} 期</span>
-                <span>{row.due_on}</span>
-                <span>应收 ¥{money(row.due_amount)}</span>
-                <span>已收 ¥{money(row.received_amount)}</span>
-                <span><StatusTag status={row.status} label={configurableLabel("SCHEDULE_STATUS", row.status, SCHEDULE_STATUS_LABEL)} /></span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {selectedOrder?.audit?.length ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>审计记录</Typography.Text>
-            {selectedOrder.audit.map((entry) => (
-              <div key={entry.id} className="orders-event-row">
-                <span>{entry.action}</span>
-                <span>{entry.actor}</span>
-                <span>{entry.occurred_at ? new Date(entry.occurred_at).toLocaleString("zh-CN") : "-"}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {selectedOrder?.attachments?.length ? (
-          <div className="ui-form-spaced">
-            <Typography.Text strong>附件</Typography.Text>
-            {selectedOrder.attachments.map((file) => (
-              <div key={file.id} className="orders-event-row">
-                <span>{file.file_name}</span>
-                <span>{(file.size_bytes / 1024).toFixed(1)} KB</span>
-                <span>{file.created_at ? file.created_at.slice(0, 10) : "-"}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {selectedOrder ? (
-          <Space className="ui-form-spaced" wrap>
-            <PermissionButton permission="order.update" onClick={openEditOrder}>编辑订单</PermissionButton>
-            <Dropdown
-              trigger={["click"]}
-              menu={{
-                items: [
-                  { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
-                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
-                  { key: "cancel", label: selectedOrder.order_type === "DG" ? "系统下架" : "取消交易", danger: true, disabled: !["ACTIVE", "COMPLETED"].includes(selectedOrder.status) },
-                ],
-                onClick: ({ key }) => {
-                  if (key === "allocation") void openAllocations();
-                  if (key === "refund") void openRefund();
-                  if (key === "cancel") {
-                    if (selectedOrder.order_type === "DG") openSystemOffsale();
-                    else void openCancelTransaction();
-                  }
-                },
-              }}
-            >
-              <PermissionButton permission="order.event.post">更多</PermissionButton>
-            </Dropdown>
-            {selectedOrder.account_id ? (
-              <PermissionButton permission="order.event.post" type="link" onClick={() => { setActiveTab("inventory"); setSelectedOrder(null); }}>
-                去库存中心
-            </PermissionButton>
-            ) : null}
-            {selectedOrder.installment_principal ? (
-              <PermissionButton permission="order.event.post" type="link" onClick={() => { setActiveTab("collections"); setSelectedOrder(null); }}>
-                去分期与回款
-            </PermissionButton>
-            ) : null}
-          </Space>
-        ) : null}
-      </Drawer>
 
       <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
@@ -1236,52 +908,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
         </BusinessForm>
       </BusinessActionModal>
 
-      <BusinessActionModal
-        title={selectedOrder ? `新建订单关联 · ${selectedOrder.order_no}` : "新建订单关联"}
-        open={linkOpen}
-        confirmLoading={linkSubmitting}
-        onCancel={() => setLinkOpen(false)}
-        okText="建立关联"
-        onOk={() => void linkForm.submit()}
-      >
-        <BusinessForm scope="ORDERLINK" form={linkForm} onFinish={submitLink}>
-          <FieldConfigScope scope="ORDERLINK" active={linkOpen}>
-          <Typography.Paragraph type="secondary">
-            关联单用于把同一真实交易拆分的上下游订单串起来；分成口径作为关系快照保存，不会改写订单自身金额。
-          </Typography.Paragraph>
-          <CfgItem
-            name="related_order_id"
-            label="关联订单"
-            rules={[{ required: true, message: "请选择关联订单" }]}
-          >
-            <Select
-              showSearch
-              placeholder="请选择订单"
-              optionFilterProp="label"
-              options={orders
-                .filter((item) => item.id !== selectedOrder?.id)
-                .map((item) => ({
-                  value: item.id,
-                  label: `${item.order_no}${item.party_name ? ` · ${item.party_name}` : ""}`,
-                }))}
-            />
-          </CfgItem>
-          <CfgItem name="relation_type" label="关系" rules={[{ required: true, message: "请选择关系" }]}>
-            <Select placeholder="请选择关系" options={relationTypeOptions} />
-          </CfgItem>
-          <CfgItem name="split_ratio" label="分成比例（%）" tooltip="与分成金额二选一，按交易拆分口径填写">
-            <Input placeholder="例如 60" />
-          </CfgItem>
-          <CfgItem name="split_amount" label="分成金额（元）" tooltip="与分成比例二选一">
-            <Input placeholder="例如 1000.00" />
-          </CfgItem>
-          <CfgItem name="note" label="备注">
-            <Input.TextArea rows={2} placeholder="关联说明（选填）" />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="order-link" />
-          </FieldConfigScope>
-        </BusinessForm>
-      </BusinessActionModal>
 
       <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}

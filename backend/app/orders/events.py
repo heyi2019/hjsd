@@ -36,7 +36,7 @@ from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.finance.attributes import accounting_attribute_for_order_event
 from app.orders.form_fields import validate_form_extra
-from ._common import _positive_money, _required_bool, _required_text
+from ._common import _non_negative_money, _positive_money, _required_bool, _required_text
 
 # 事件 → 现金流方向 / 性质 / 分类
 EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
@@ -78,6 +78,8 @@ def post_event(
     occurred_on: date,
     actor: str,
     pool_id: int | None = None,
+    pool_id2: int | None = None,
+    amount2: Any = 0,
     portion: str = "PRINCIPAL",
     delivery_mode: str | None = None,
     offset_event_id: int | None = None,
@@ -325,6 +327,21 @@ def post_event(
     if user is not None and not user.can_see_pool(resolved_pool_id):
         raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
     _assert_pool_active(session, resolved_pool_id)
+    # 售出拆分：同一笔 SELL 可同时进入两个资金池（资金账户1 + 资金账户2）。
+    # 仅当显式传入 pool_id2 时启用；金额2 必须为正，且二者须成对出现。
+    secondary_money: Decimal = Decimal("0")
+    resolved_pool_id2: int | None = None
+    if pool_id2 is not None:
+        secondary_money = _non_negative_money(amount2, field="amount2")
+        if secondary_money <= 0:
+            raise Validation("售出金额2 必须为正数", details={"field": "amount2"})
+        resolved_pool_id2 = pool_id2
+        if user is not None and not user.can_see_pool(resolved_pool_id2):
+            raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id2})
+        _assert_pool_active(session, resolved_pool_id2)
+    elif amount2 is not None:
+        if _non_negative_money(amount2, field="amount2") > 0:
+            raise Validation("填写了售出金额2 必须选择资金账户2", details={"field": "pool_id2"})
     cancel_direction = Direction.IN.value
     if event_type == EventType.CANCEL.value:
         cancel_direction = _opposite_direction(offset_event_id, session, order_id=order.id)
@@ -369,7 +386,7 @@ def post_event(
         ),
         order_id=order.id,
         event_type=event_type,
-        amount=money,
+        amount=money + secondary_money,
         portion=portion,
         occurred_on=occurred_on,
         pool_id=resolved_pool_id,
@@ -409,6 +426,30 @@ def post_event(
         updated_by=actor,
     )
     session.add(flow)
+    # 先落库主流水，确保拆分流水编号（count+1）能正确递增、不与主流水冲突。
+    session.flush()
+
+    # 售出拆分：将金额2 派生为同一 SELL 事件下的第二笔资金流水，进入资金账户2。
+    if resolved_pool_id2 is not None:
+        secondary_flow = Cashflow(
+            flow_no=next_cashflow_no(
+                session, order_no=order.order_no, order_id=order.id, category=category
+            ),
+            pool_id=resolved_pool_id2,
+            occurred_on=occurred_on,
+            nature=nature,
+            fund_nature=fund_nature,
+            accounting_attribute=accounting_attribute,
+            category=category,
+            direction=direction,
+            amount=secondary_money,
+            order_id=order.id,
+            order_event_id=event.id,
+            note=note,
+            created_by=actor,
+            updated_by=actor,
+        )
+        session.add(secondary_flow)
 
     _apply_account_effect(
         session,

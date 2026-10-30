@@ -340,7 +340,8 @@ class Cashflow(Base, AuditMixin):
             name="cashflow_direction_nature_valid",
         ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
-        UniqueConstraint("order_event_id", name="uq_cashflow_event"),
+        # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池），
+        # 故不再对 order_event_id 设唯一约束；历史唯一约束由迁移 0065 在库中移除。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_deposit", "deposit_id"),

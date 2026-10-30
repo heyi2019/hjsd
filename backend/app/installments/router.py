@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
@@ -17,8 +18,10 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
+from app.domain.enums import AuditAction
 from app.domain.trade import InstallmentSchedule
 from app.installments import schemas, service
+from app.lists.export import build_list_csv, csv_file_response
 from app.parties import service as parties_service
 
 router = APIRouter(tags=["HS-01/DFQ-01 分期合约"])
@@ -59,6 +62,28 @@ def list_installments(
         schemas.InstallmentOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
         for item in items
     ]
+
+
+@router.get("/installments/export.csv")
+def export_installments_csv(
+    status: str | None = Query(default=None),
+    order_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> Response:
+    """分期与回款按可见列导出 CSV：同 /installments 口径，天然全量。"""
+    outputs = list_installments(status=status, order_id=order_id, db=db, _user=_user)
+    rows = [output.model_dump() for output in outputs]
+    csv_text, meta = build_list_csv(db, "INSTALLMENT", rows)
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="INSTALLMENT",
+        actor=_user.username,
+        after={"rows": len(rows), "column_count": meta["column_count"]},
+    )
+    return csv_file_response(csv_text, f"分期与回款-{date.today().isoformat()}.csv")
 
 
 @router.post("/installments", response_model=schemas.InstallmentOut, status_code=201)

@@ -21,6 +21,7 @@ import {
   type OrderFormField,
 } from "../shared/api/catalog";
 import { errorMessage, normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { money, today } from "../shared/lib/format";
 import { COUNTERPARTY_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -228,6 +229,25 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
   const [mergeForm] = Form.useForm();
 
   const activeDefs = fieldDefs.filter((def) => def.is_active);
+
+  const [exporting, setExporting] = useState(false);
+  /** 客户按列配置导出 CSV：后端沿用筛选与联系方式脱敏口径。 */
+  const exportCustomers = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(
+        await customersApi.exportCsv({
+          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+        }),
+        `客户-${today()}.csv`,
+      );
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -455,9 +475,19 @@ function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?:
       className="glass"
       title="客户档案"
       extra={
-        <PermissionButton permission="customer.create" type="primary" onClick={() => setCreateOpen(true)}>
-          新建客户
-        </PermissionButton>
+        <Space>
+          <Button
+            size="small"
+            aria-label="导出客户CSV"
+            loading={exporting}
+            onClick={() => void exportCustomers()}
+          >
+            导出 CSV
+          </Button>
+          <PermissionButton permission="customer.create" type="primary" onClick={() => setCreateOpen(true)}>
+            新建客户
+          </PermissionButton>
+        </Space>
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />

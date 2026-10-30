@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Button, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,6 +18,7 @@ import {
   type Pool,
 } from "../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -253,6 +254,17 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [pageSize, setPageSize] = useState(10);
   // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
   const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
+  const [ledgerExporting, setLedgerExporting] = useState(false);
+  const exportLedger = async () => {
+    setLedgerExporting(true);
+    try {
+      downloadBlob(await ordersApi.exportCsv(), `业务台账-${today()}.csv`);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setLedgerExporting(false);
+    }
+  };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
@@ -776,6 +788,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                       setPage(1);
                     }}
                   />
+                  <Button size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
+                    导出 CSV
+                  </Button>
                   <Typography.Text strong>业务筛选</Typography.Text>
                   <Segmented
                     value={businessModeFilter}

@@ -5,7 +5,9 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -24,6 +26,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
+from app.lists.export import build_list_csv, csv_file_response
 from app.parties import schemas, service
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
@@ -90,6 +93,47 @@ def list_customers(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/customers/export.csv")
+def export_customers_csv(
+    keyword: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> Response:
+    """客户按可见列导出 CSV：同 /customers 筛选与联系方式脱敏口径，全量不分页。"""
+    reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
+    customers = service.list_customers(
+        db, keyword=keyword, status=status, user=user, limit=None, offset=0
+    )
+    extras = service.get_extra_values_bulk(
+        db, entity_type="customer", entity_ids=[item.id for item in customers]
+    )
+    activity = service.get_customer_activity_summary(db, [item.id for item in customers])
+    rows = [
+        service.to_customer_out(
+            item,
+            reveal_contact=reveal,
+            extra_values=extras.get(item.id),
+            activity_summary=activity.get(item.id),
+        )
+        for item in customers
+    ]
+    csv_text, meta = build_list_csv(db, "CUSTOMER", rows)
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="CUSTOMER",
+        actor=user.username,
+        after={
+            "rows": len(rows),
+            "column_count": meta["column_count"],
+            "contact_revealed": reveal,
+        },
+    )
+    return csv_file_response(csv_text, f"客户-{date.today().isoformat()}.csv")
 
 
 @router.post(

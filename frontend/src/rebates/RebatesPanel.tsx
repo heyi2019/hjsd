@@ -1,5 +1,5 @@
 /** 返点明细：登记即完成一条业务事实，只支持编辑和删除（REB-01 / A06）。 */
-import { Card, Form, Input, Space, Typography } from "antd";
+import { Button, Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +12,7 @@ import {
   type Rebate,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import {
@@ -57,6 +58,18 @@ export function RebatesPanel() {
   const write = useAsyncAction();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(await rebatesApi.exportCsv(), `返点-${today()}.csv`);
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -216,16 +229,19 @@ export function RebatesPanel() {
         className="glass"
         title="返点明细"
         extra={
-          <PermissionButton
-            permission="order.event.post"
-            type="primary"
-            onClick={() => {
-              form.resetFields();
-              setCreateOpen(true);
-            }}
-          >
-            新增返点记录
-          </PermissionButton>
+          <Space>
+            <Button size="small" loading={exporting} onClick={() => void exportCsv()}>导出 CSV</Button>
+            <PermissionButton
+              permission="order.event.post"
+              type="primary"
+              onClick={() => {
+                form.resetFields();
+                setCreateOpen(true);
+              }}
+            >
+              新增返点记录
+            </PermissionButton>
+          </Space>
         }
       >
         <DataTable<Rebate>

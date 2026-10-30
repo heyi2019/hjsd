@@ -15,7 +15,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.lists import service as list_columns_service
+from app.lists.export import build_list_csv, csv_file_response
 from app.lists.scopes import report_scope
 from app.reporting import service
 from app.reporting.schemas import (
@@ -126,36 +126,16 @@ def export_report(
         user=user,
     )
     # 导出列 = 该报表在「设置 → 列表字段」里的可见列：隐藏的列不导，表头用中文列名。
+    # 列拼装（含自定义列注入与值翻译）统一走 lists.export，与主列表导出同一套口径。
     scope = report_scope(report_name)
-    csv_columns: list[tuple[str, str, bool]] | None = None
-    value_labels: dict[str, dict[str, str]] | None = None
     if scope is not None:
-        config = list_columns_service.get_config(db, scope.code)
-        # 传全量（含可见标记）：只传可见列会让隐藏列被当成「未登记键」又追加回去
-        csv_columns = [
-            (column["key"], column["label"], column["is_visible"])
-            for column in config["columns"]
-        ]
-        # 枚举列的值也翻成中文：字典来自 option_sets，列注册表只声明归属
-        value_labels = list_columns_service.get_value_labels(db, scope.code)
-        # 自定义列：界面从行扩展字段（form_extra / extra_values）取值，报表行本身没有
-        # `extra:xxx` 这个平铺键。这里把值注入明细行，让 report_csv 的「已登记键」判断
-        # 能命中，保证「界面看到的列 = 导出的列」；隐藏列仍由 csv_columns 的 visible 剔除。
-        custom_sources = {
-            column["key"]: column["source_key"]
-            for column in config["columns"]
-            if column.get("custom") and column.get("source_key")
-        }
-        if custom_sources:
-            for item in report.get("items", []) or []:
-                if not isinstance(item, dict):
-                    continue
-                extras = item.get("form_extra") or item.get("extra_values") or {}
-                if not isinstance(extras, dict):
-                    extras = {}
-                for key, source_key in custom_sources.items():
-                    item[key] = extras.get(source_key)
-    item_count = len(report.get("items", [])) if isinstance(report.get("items"), list) else 0
+        total = report.get("total") if isinstance(report.get("total"), dict) else None
+        csv_text, export_meta = build_list_csv(
+            db, scope.code, report.get("items") or [], total=total
+        )
+    else:
+        csv_text = service.report_csv(report)
+        export_meta = {"column_count": None, "translated_columns": []}
     record_audit(
         db,
         action="REPORT_EXPORT",
@@ -164,24 +144,16 @@ def export_report(
         actor=user.username,
         after={
             "report_name": report_name,
-            "item_count": item_count,
+            "item_count": len(report.get("items") or []) if isinstance(report.get("items"), list) else 0,
             "from": from_date.isoformat() if from_date else None,
             "to": to_date.isoformat() if to_date else None,
             "on": on.isoformat() if on else None,
-            "column_count": (
-                sum(1 for _key, _label, visible in csv_columns if visible)
-                if csv_columns is not None
-                else None
-            ),
-            "translated_columns": sorted(value_labels) if value_labels else [],
+            "column_count": export_meta["column_count"],
+            "translated_columns": export_meta["translated_columns"],
         },
     )
     filename = f"{report_name}-{date.today().isoformat()}.csv"
-    return Response(
-        content=service.report_csv(report, columns=csv_columns, value_labels=value_labels),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return csv_file_response(csv_text, filename)
 
 
 __all__ = ["router"]

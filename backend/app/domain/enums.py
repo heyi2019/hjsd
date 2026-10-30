@@ -451,6 +451,7 @@ class AuditAction(StrEnum):
     LIST_COLUMNS_RESET = "LIST_COLUMNS_RESET"  # 列表列配置恢复默认（清空该列表全部配置行）
     LIST_COLUMN_ADD = "LIST_COLUMN_ADD"  # 列表新增自定义列（绑定表单自定义字段）
     LIST_COLUMN_REMOVE = "LIST_COLUMN_REMOVE"  # 列表删除自定义列
+    LIST_EXPORT = "LIST_EXPORT"  # 业务主列表按列配置导出 CSV
     EVENT_CREATE = "EVENT_CREATE"
     EVENT_POST = "EVENT_POST"
     DEPOSIT_CREATE = "DEPOSIT_CREATE"

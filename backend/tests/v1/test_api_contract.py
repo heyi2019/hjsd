@@ -14,6 +14,12 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/v1/attachments/{attachment_id}/download"),
         ("DELETE", "/api/v1/game-types/{game_type_id}"),
         ("DELETE", "/api/v1/rebates/{rebate_id}"),
+        ("GET", "/api/v1/orders/export.csv"),
+        ("GET", "/api/v1/stocks/export.csv"),
+        ("GET", "/api/v1/customers/export.csv"),
+        ("GET", "/api/v1/installments/export.csv"),
+        ("GET", "/api/v1/rebates/export.csv"),
+        ("GET", "/api/v1/cashflows/export.csv"),
     }
 )
 
@@ -45,5 +51,6 @@ def test_every_json_api_route_declares_response_model(app):
     # PUT /list-columns/{scope}）→ 171（+DELETE /list-columns/{scope}：恢复默认）
     # → 174（自定义列 +3：GET /list-columns/custom-fields、POST /list-columns/{scope}/custom、
     # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/作废旧入口已移除。
+    # → 176（主列表导出 +6：/orders /stocks /customers /installments /rebates /cashflows）。
     # 以当前应用实际路由数为准。
-    assert public_routes == 170
+    assert public_routes == 176

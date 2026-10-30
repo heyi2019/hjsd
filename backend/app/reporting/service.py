@@ -113,6 +113,7 @@ def report_csv(
     *,
     columns: list[tuple[str, str, bool]] | None = None,
     value_labels: dict[str, dict[str, str]] | None = None,
+    force_registered_keys: bool = False,
 ) -> str:
     """将报表 items 与 total 统一导出为 UTF-8 CSV，嵌套字段保留为 JSON。
 
@@ -124,6 +125,9 @@ def report_csv(
     - 唯一例外：**合计行独有**的未登记键（如 total_amount），追加在末尾，避免合计丢失。
       注意必须传全量配置而非只传可见列，否则隐藏列会被误判成「未登记」；
     - 传 None 时退回「数据里出现什么键就导什么列」的旧行为。
+
+    `force_registered_keys`：True 时可见登记列**无论行里是否出现过**都进表头
+    （主列表导出空数据也要完整表头）；默认 False 保持报表旧行为（只出现在数据里的键才导）。
 
     `value_labels` = {列 key: {代码值: 中文}}，来自 lists.get_value_labels()：
     - 只翻译「字符串且命中字典」的单元格；金额 / 日期 / 未命中值原样输出；
@@ -162,7 +166,12 @@ def report_csv(
         registered = {key for key, _label, _visible in columns}
         fieldnames = ["row_type"]
         for key, _label, visible in columns:
-            if visible and key != "row_type" and key in keys and key not in fieldnames:
+            if (
+                visible
+                and key != "row_type"
+                and (force_registered_keys or key in keys)
+                and key not in fieldnames
+            ):
                 fieldnames.append(key)
         # 只补合计行独有的字段：明细里的 order_id / extra_values 等内部字段不导
         for key in total_only_keys:

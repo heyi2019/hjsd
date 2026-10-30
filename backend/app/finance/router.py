@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import NotFound
+from app.core.audit import record_audit
 from app.core.security import (
     PERM_DEPOSIT_POST,
     PERM_FINANCE_READ,
@@ -22,7 +23,9 @@ from app.core.security import (
     require_permissions,
 )
 from app.finance import schemas, service
+from app.domain.enums import AuditAction
 from app.domain.trade import Deposit, Order, RebateRecord
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.orders import service as orders_service
 from app.parties import service as parties_service
 
@@ -236,6 +239,52 @@ def list_cashflows(
         items=[_cashflow_out(db, item) for item in items],
         total=total,
     )
+
+
+@router.get("/cashflows/export.csv")
+def export_cashflows_csv(
+    pool_id: int | None = Query(default=None),
+    order_id: int | None = Query(default=None),
+    direction: str | None = Query(default=None),
+    occurred_from: date | None = Query(default=None),
+    occurred_to: date | None = Query(default=None),
+    status: str | None = Query(default=None),
+    nature: str | None = Query(default=None),
+    fund_nature: str | None = Query(default=None),
+    accounting_attribute: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    created_by: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> Response:
+    result = list_cashflows(
+        pool_id=pool_id,
+        order_id=order_id,
+        direction=direction,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+        status=status,
+        nature=nature,
+        fund_nature=fund_nature,
+        accounting_attribute=accounting_attribute,
+        category=category,
+        created_by=created_by,
+        limit=EXPORT_ROW_LIMIT,
+        offset=0,
+        db=db,
+        user=user,
+    )
+    rows = [item.model_dump() for item in result.items]
+    csv_text, meta = build_list_csv(db, "CASHFLOW", rows)
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="CASHFLOW",
+        actor=user.username,
+        after={"rows": len(rows), "column_count": meta["column_count"]},
+    )
+    return csv_file_response(csv_text, f"资金流水-{date.today().isoformat()}.csv")
 
 
 @router.post("/cashflows", response_model=schemas.CashflowOut, status_code=201)
@@ -545,6 +594,27 @@ def list_rebates(
 ) -> list[schemas.RebateOut]:
     items = service.list_rebates(db, source_order_id=source_order_id, user=_user)
     return [_rebate_out(item) for item in items]
+
+
+@router.get("/rebates/export.csv")
+def export_rebates_csv(
+    source_order_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> Response:
+    """返点按可见列导出 CSV，沿用 /rebates 的权限口径。"""
+    outputs = list_rebates(source_order_id=source_order_id, db=db, _user=_user)
+    rows = [output.model_dump() for output in outputs]
+    csv_text, meta = build_list_csv(db, "REBATE", rows)
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="REBATE",
+        actor=_user.username,
+        after={"rows": len(rows), "column_count": meta["column_count"]},
+    )
+    return csv_file_response(csv_text, f"返点-{date.today().isoformat()}.csv")
 
 
 @router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)

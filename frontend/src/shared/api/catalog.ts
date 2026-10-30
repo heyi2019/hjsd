@@ -669,6 +669,13 @@ export const customersApi = {
     api.patch<Customer>(`/customers/${id}/status`, { status }).then((r) => r.data),
   merge: (id: number, target_customer_id: number, reason: string) =>
     api.post<Customer>(`/customers/${id}/merge`, { target_customer_id, reason }).then((r) => r.data),
+  exportCsv: (params?: { keyword?: string; status?: string }) =>
+    api
+      .get<Blob>("/customers/export.csv", {
+        params: { ...params, _t: Date.now() },
+        responseType: "blob",
+      })
+      .then((r) => r.data),
 };
 
 export const counterpartiesApi = {
@@ -708,6 +715,10 @@ export const ordersApi = {
     }
     return all;
   },
+  exportCsv: () =>
+    api
+      .get<Blob>("/orders/export.csv", { params: { _t: Date.now() }, responseType: "blob" })
+      .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
   links: (orderId: number) =>
@@ -897,6 +908,13 @@ export const installmentsApi = {
   resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   list: (params?: { status?: string; order_id?: number }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
+  exportCsv: (params?: { status?: string; order_id?: number }) =>
+    api
+      .get<Blob>("/installments/export.csv", {
+        params: { ...params, _t: Date.now() },
+        responseType: "blob",
+      })
+      .then((r) => r.data),
   create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[] }) =>
     api.post<Installment>("/installments", payload).then((r) => r.data),
   schedules: (id: number) =>
@@ -962,11 +980,34 @@ export const cashflowsApi = {
     offset?: number;
   }) =>
     api.get<{ items: Cashflow[]; total: number }>("/cashflows", { params }).then((r) => r.data),
+  exportCsv: (params?: {
+    pool_id?: number;
+    order_id?: number;
+    direction?: string;
+    occurred_from?: string;
+    occurred_to?: string;
+    status?: string;
+    nature?: string;
+    fund_nature?: string;
+    accounting_attribute?: string;
+    category?: string;
+    created_by?: string;
+  }) =>
+    api
+      .get<Blob>("/cashflows/export.csv", {
+        params: { ...params, _t: Date.now() },
+        responseType: "blob",
+      })
+      .then((r) => r.data),
 };
 
 export const rebatesApi = {
   list: (params?: { source_order_id?: number }) =>
     api.get<Rebate[]>("/rebates", { params }).then((r) => r.data),
+  exportCsv: () =>
+    api
+      .get<Blob>("/rebates/export.csv", { params: { _t: Date.now() }, responseType: "blob" })
+      .then((r) => r.data),
   create: (payload: Partial<Rebate> & {
     source_order_id: number;
     rebate_type: "BUY" | "SELL";

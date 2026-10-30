@@ -24,7 +24,8 @@ RUN npm run build
 FROM alpine:3.20
 
 # tzdata 保证日志时间与国内一致；nginx 包自带 nginx 用户，worker 进程以该身份运行。
-RUN apk add --no-cache nginx tzdata \
+RUN sed -i 's|https://dl-cdn.alpinelinux.org/alpine|https://mirrors.aliyun.com/alpine|g' /etc/apk/repositories \
+    && apk add --no-cache nginx tzdata \
     && mkdir -p /run/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/snippets \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \

@@ -13,7 +13,8 @@ FROM alpine:3.20
 # py3-pip 只在构建期用，末尾随 pip 一起卸载。
 # 最后补 python 软链：alpine 只有 python3，而官方 python 镜像有 python 软链。
 # 补上后 deploy.sh 与文档里既有的 `python scripts/*.py` 调用可零改动继续工作。
-RUN apk add --no-cache python3 py3-pip libstdc++ tzdata \
+RUN sed -i 's|https://dl-cdn.alpinelinux.org/alpine|https://mirrors.aliyun.com/alpine|g' /etc/apk/repositories \
+    && apk add --no-cache python3 py3-pip libstdc++ tzdata \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone \
     && ln -sf /usr/bin/python3 /usr/local/bin/python

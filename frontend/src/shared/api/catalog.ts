@@ -338,6 +338,7 @@ export interface EventPostResult {
 export interface Account {
   id: number;
   stock_no?: string | null;
+  source_order_id?: number | null;
   source_order_no?: string | null;
   game_type?: string | null;
   business_mode?: string | null;
@@ -815,6 +816,11 @@ export const ordersApi = {
       form_extra?: Record<string, unknown>;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
+  /** 向已有订单追加客户角色（库存售出时把买家挂到来源单，不新建订单）。 */
+  addCustomerRole: (
+    orderId: number,
+    payload: { customer_id: number; role: string },
+  ) => api.post<Order>(`/orders/${orderId}/customer-roles`, payload).then((r) => r.data),
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
   patch: (
     orderId: number,

@@ -59,6 +59,7 @@ class AccountOut(BaseModel):
 
     id: int
     stock_no: str | None = None
+    source_order_id: int | None = None
     source_order_no: str | None = None
     game_account: str | None = None
     game_type: str | None = None
@@ -378,6 +379,7 @@ def _account_output(
         output.game_password = None
     output.extra_values = extra_values or {}
     if source_order is not None:
+        output.source_order_id = source_order.id
         output.source_order_no = source_order.order_no
     return output
 

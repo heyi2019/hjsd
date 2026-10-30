@@ -515,6 +515,31 @@ def _customer_role(order_id: int, customer_id: int, role: str):
     return OrderCustomerRole(order_id=order_id, customer_id=customer_id, role=role)
 
 
+def add_customer_role(
+    session: Session, order_id: int, customer_id: int, role: str, *,
+    actor: str, user: CurrentUser | None = None,
+) -> Order:
+    """向已有订单追加客户角色（按 order_id+customer_id+role 去重）；
+
+    用于库存售出时把买家挂到来源单——来源单在入库时已建档，售出不再新建订单。
+    """
+    order = get_order(session, order_id, user)
+    from app.domain.parties import OrderCustomerRole
+    from sqlalchemy import select
+
+    existing = session.scalar(
+        select(OrderCustomerRole.id).where(
+            OrderCustomerRole.order_id == order_id,
+            OrderCustomerRole.customer_id == customer_id,
+            OrderCustomerRole.role == role,
+        )
+    )
+    if existing is None:
+        session.add(_customer_role(order_id, customer_id, role))
+        session.flush()
+    return order
+
+
 def _counterparty_role(order_id: int, counterparty_id: int, role: str):
     from app.domain.parties import OrderCounterpartyRole
 

@@ -482,15 +482,33 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     """库存账号售出必须建立在已采购入库之上。"""
     if order.order_type != "HS":
         if order.order_type == "TH":
-            purchased = session.scalar(
-                select(OrderEvent.id).where(
-                    OrderEvent.order_id == order.id,
-                    OrderEvent.event_type == EventType.BUY.value,
-                    OrderEvent.is_posted.is_(True),
+            # 售出单本身不再重复 BUY：采购事实记在该账号的历史订单上
+            # （提号入库单建单即登记 BUY，库存中心售出时会另开一张 TH 售出单）。
+            # 故与 HS 同口径按账号维度追溯；账号缺失的历史数据回退到本订单维度。
+            if order.account_id is not None:
+                purchased = session.scalar(
+                    select(OrderEvent.id)
+                    .join(Order, Order.id == OrderEvent.order_id)
+                    .where(
+                        Order.account_id == order.account_id,
+                        OrderEvent.event_type == EventType.BUY.value,
+                        OrderEvent.is_posted.is_(True),
+                    )
+                    .limit(1)
                 )
-            )
+            else:
+                purchased = session.scalar(
+                    select(OrderEvent.id).where(
+                        OrderEvent.order_id == order.id,
+                        OrderEvent.event_type == EventType.BUY.value,
+                        OrderEvent.is_posted.is_(True),
+                    )
+                )
             if purchased is None:
-                raise Validation("TH 收款前必须存在 BUY 事件")
+                raise Validation(
+                    "TH 售出前必须存在已过账 BUY 事件（账号未采购入库）",
+                    details={"order_no": order.order_no, "account_id": order.account_id},
+                )
         return
 
     if session.scalar(

@@ -22,15 +22,6 @@ import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSect
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import "./InventorySaleModal.css";
 
-/** 库存账号售出：按货源类型映射回收 / 代挂订单类型。 */
-const SALE_ORDER_TYPE: Record<string, string> = {
-  RECOVERY: "HS",
-  PICKUP: "TH",
-  CONSIGNMENT: "DG",
-};
-const resolveSaleOrderType = (inventoryType?: string | null): string =>
-  (inventoryType && SALE_ORDER_TYPE[inventoryType]) || "HS";
-
 export function InventorySaleModal(props: {
   account: Account | null;
   onClose: () => void;
@@ -126,7 +117,13 @@ export function InventorySaleModal(props: {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
+    const sourceOrderId = props.account.source_order_id;
+    if (sourceOrderId == null) {
+      setError({ message: "该库存账号未关联到入库订单，无法在其上登记售出" });
+      return;
+    }
     setSubmitting(true);
+    // 售出 = 原买入订单上的卖出动作（SELL），不再新建订单；买家建档后挂到来源单。
     try {
       const customerNickname = String(values.customer_nickname ?? "").trim();
       const customerPhone = values.customer_phone as string | undefined;
@@ -146,27 +143,9 @@ export function InventorySaleModal(props: {
         source: values.customer_source as string | undefined,
         note: values.note as string | undefined,
       })).customer;
-      const order = await ordersApi.create({
-        order_type: resolveSaleOrderType(props.account.inventory_type),
-        trade_date: today(),
-        account_id: props.account.id,
-        account_snapshot: props.account.game_account ? {
-          game_account: props.account.game_account,
-          game_type: props.account.game_type ?? undefined,
-          game_password: props.account.game_password ?? undefined,
-          channel_region: props.account.channel_region ?? undefined,
-          bound_phone: values.bound_phone as string | undefined,
-          bound_phone_owner: values.bound_phone_owner as string | undefined,
-          has_secondary: props.account.has_secondary ?? undefined,
-          note: props.account.note ?? undefined,
-        } : undefined,
-        note: values.note as string | undefined,
-        form_extra: values.form_extra as Record<string, unknown> | undefined,
-        form_extra_scope: "SALE",
-        customer_roles: [{
-          customer_id: customer.id,
-          role: props.account.inventory_type === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER",
-        }],
+      await ordersApi.addCustomerRole(sourceOrderId, {
+        customer_id: customer.id,
+        role: props.account.inventory_type === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER",
       });
 
       if (values.payment_method === "INSTALLMENT") {
@@ -178,7 +157,7 @@ export function InventorySaleModal(props: {
         );
         const firstDueOn = schedule[0]?.due_on ?? today();
         await installmentsApi.create({
-          order_id: order.id,
+          order_id: sourceOrderId,
           adjust_final_period: true,
           // 提号、代挂账号进入库存后，分期售出统一按库存分期出售处理。
           contract_type: "STOCK_SALE",
@@ -194,7 +173,7 @@ export function InventorySaleModal(props: {
         });
         appMessage.success("分期售出已创建，账号已进入分期中");
       } else {
-        await ordersApi.postEvent(order.id, {
+        await ordersApi.postEvent(sourceOrderId, {
           event_type: "SELL",
           amount: values.amount as string,
           occurred_on: today(),

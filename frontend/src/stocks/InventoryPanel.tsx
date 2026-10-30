@@ -646,7 +646,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         onCreated={async () => {
           setSaleTarget(null);
           await load();
-          // 售出会在业务台账生成新订单号，同步通知上层重拉台账，避免两边数据不同步。
+          // 售出会在原买入订单上登记 SELL（不再新建订单），同步通知上层重拉台账，避免两边数据不同步。
           onOrdersChanged?.();
         }}
       />

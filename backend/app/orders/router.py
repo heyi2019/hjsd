@@ -680,6 +680,22 @@ def post_event(
     )
 
 
+@router.post("/orders/{order_id}/customer-roles", response_model=schemas.OrderOut)
+def add_order_customer_role(
+    order_id: int,
+    payload: schemas.CustomerRoleInput,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> schemas.OrderOut:
+    """向已有订单追加客户角色（如库存售出时把买家挂到来源单）。"""
+    service.add_customer_role(
+        db, order_id, payload.customer_id, payload.role,
+        actor=_actor(user), user=user,
+    )
+    order = service.get_order(db, order_id, user)
+    return _order_output(db, order, user)
+
+
 @router.get("/pools/{pool_id}/balance", response_model=schemas.PoolBalanceOut)
 def pool_balance(
     pool_id: int,

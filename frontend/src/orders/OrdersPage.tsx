@@ -17,7 +17,7 @@ import {
   type OrderType,
   type Pool,
 } from "../shared/api/catalog";
-import { currentDevUser, normalizeError } from "../shared/api/client";
+import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -524,13 +524,29 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
             appMessage.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining.toFixed(2)}`);
             return;
           }
+          // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
+          // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式负责人。
+          let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
+          if (!operatorUserIds?.length) {
+            const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
+            if (byDevUser) operatorUserIds = [byDevUser.id];
+            else {
+              try {
+                const current = await currentUser();
+                const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
+                if (bySessionUser) operatorUserIds = [bySessionUser.id];
+              } catch {
+                // 下拉组件已尝试默认当前员工；解析失败时保留空值，让后端按必填规则返回明确错误。
+              }
+            }
+          }
           const result = await ordersApi.postEvent(order.id, {
             event_type: "CANCEL",
             amount,
             occurred_on: values.cancelled_on,
             offset_event_id: selected.event.id,
             pool_id: Number(values.pool_id),
-            operator_user_ids: values.operator_user_ids,
+            operator_user_ids: operatorUserIds,
             reason: values.reason,
             note: cancelScope === "INVREFUND" ? "库存取消交易，冲销入库并入账" : "售出取消交易，原路退款",
             form_extra_scope: cancelScope,

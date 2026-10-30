@@ -140,7 +140,7 @@ def main() -> int:
                 elif latest is None:
                     created_versions.append(code)
                     if args.apply:
-                        version = policy_service.create_version(
+                        policy_service.create_version(
                             session,
                             definition_id,
                             effective_from=date.today(),

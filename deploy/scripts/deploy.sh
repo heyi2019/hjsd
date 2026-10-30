@@ -110,7 +110,13 @@ echo "==> 预置经营规则定义与默认版本（幂等）"
 docker compose run --rm backend python scripts/seed_policy_definitions.py --apply
 
 echo "==> 启动服务"
-docker compose up -d
+if ! docker compose up -d; then
+  # Docker Compose 在重建依赖服务的瞬间可能返回旧容器 ID 不存在；
+  # 等待一次让 Docker 完成清理后重试，真实启动错误仍会在第二次失败时退出。
+  echo "⚠ 首次启动返回错误，等待 Docker 清理依赖容器后重试"
+  sleep 5
+  docker compose up -d
+fi
 
 if [ -n "${ADMIN_PASSWORD:-}" ]; then
   echo "==> 初始化管理员账号"

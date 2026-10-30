@@ -54,6 +54,15 @@ async function openModal(user = "admin") {
   return openTypedModal("HS", user);
 }
 
+it("设置面板改板块名后，建单同步显示后端覆盖标题", async () => {
+  // 复刻「设置里把『资金明细』改名为『资金明细改名』→ 后端落库 → 建单读配置即时同步」
+  vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({ FINANCE: "资金明细改名" });
+  await openTypedModal("HS");
+  // 未覆盖前的硬编码 fallback 不再出现，取而代之的是后端配置的新名
+  expect(await screen.findByText("资金明细改名")).toBeInTheDocument();
+  expect(screen.queryByText("资金明细")).not.toBeInTheDocument();
+});
+
 async function openTypedModal(orderType: string, user = "admin") {
   const onCreated = vi.fn();
   renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG" | "DFQ"} />, { user });

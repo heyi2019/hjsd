@@ -1,4 +1,4 @@
-import { CfgItem, useFieldConfig, fieldLabel } from "../ConfigurableField";
+import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../ConfigurableField";
 import type { ReactNode } from "react";
 import type { Pool } from "../../shared/api/catalog";
 import { MoneyInput, Select } from "../../shared/ui";
@@ -11,11 +11,12 @@ export function RecoveryFeeSection(props: {
   financeExtras?: ReactNode;
 }) {
   const cfg = useFieldConfig();
+  const financeTitle = sectionLabel("FINANCE", "资金明细");
   return (
     <section className="recovery-fee-section recovery-fees" aria-labelledby="recovery-fees-title">
       <div className="recovery-fees__heading">
         <div>
-          <div id="recovery-fees-title" className="recovery-fees__title">资金明细</div>
+          <div id="recovery-fees-title" className="recovery-fees__title">{financeTitle}</div>
           <div className="recovery-fees__hint">填写账号价格与实际发生的附加费用</div>
         </div>
       </div>

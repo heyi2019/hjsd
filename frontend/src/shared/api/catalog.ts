@@ -1085,6 +1085,18 @@ export const orderFormFieldsApi = {
       .patch<OrderFormField>(`/order-form-fields/${id}/active?active=${active}`)
       .then((r) => r.data),
   remove: (id: number) => api.delete(`/order-form-fields/${id}`),
+  /** 拉取某业务类型的板块标题覆盖映射（section_key -> 显示标题）。 */
+  listSectionLabels: (orderTypeCode: string) =>
+    api
+      .get<Record<string, string>>("/order-form-fields/section-labels", {
+        params: { order_type_code: orderTypeCode },
+      })
+      .then((r) => r.data),
+  /** 保存某业务类型的板块标题覆盖映射（section_key -> 显示标题；空串=恢复默认）。 */
+  saveSectionLabels: (payload: { order_type_code: string; labels: Record<string, string> }) =>
+    api
+      .put<Record<string, string>>("/order-form-fields/section-labels", payload)
+      .then((r) => r.data),
 };
 
 /* ── 列表列显示配置（业务台账 / 库存中心 / 分期与回款） ────────── */

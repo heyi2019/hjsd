@@ -1,11 +1,12 @@
 import { Input } from "antd";
-import { CfgItem, CfgNestedItem } from "../ConfigurableField";
+import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
 import { CustomerSourceFields } from "../CustomerSourceInput";
 import type { ReactNode } from "react";
 import "./RecoveryCustomerSection.css";
 
 export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; title?: string } = {}) {
-  const title = props.title ?? "客户信息";
+  const configuredTitle = sectionLabel("PARTICIPANT", "客户信息");
+  const title = props.title ?? configuredTitle;
   return (
     <section className="recovery-customer-section recovery-customer-fields" aria-labelledby="customer-info-title">
       <div id="customer-info-title" className="recovery-customer-fields__title">{title}</div>

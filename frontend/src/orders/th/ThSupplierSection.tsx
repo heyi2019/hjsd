@@ -3,16 +3,17 @@ import type { ReactNode } from "react";
 import { Select } from "../../shared/ui";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { SUPPLIER_SOURCE_FALLBACK_OPTIONS } from "../CustomerSourceInput";
-import { CfgItem, CfgNestedItem } from "../ConfigurableField";
+import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
 
 /** 提号复用回收页客户信息的结构，只将业务主体替换为供货方。 */
 export function ThSupplierSection(props: { participantExtras?: ReactNode } = {}) {
+  const participantTitle = sectionLabel("PARTICIPANT", "供货方信息");
   const supplierSource = Form.useWatch("supplier_source");
   const configuredOptions = useOptionSet("SUPPLIER_SOURCE");
   const sourceOptions = configuredOptions?.length ? configuredOptions : SUPPLIER_SOURCE_FALLBACK_OPTIONS;
   return (
     <section className="th-supplier-section recovery-customer-fields" aria-labelledby="supplier-info-title">
-      <div id="supplier-info-title" className="recovery-customer-fields__title">供货方信息</div>
+      <div id="supplier-info-title" className="recovery-customer-fields__title">{participantTitle}</div>
       <CfgItem className="recovery-order-modal__party-field" name="supplier_nickname" label="供货方昵称" rules={[{ required: true, message: "请输入供货方昵称" }]}>
         <Input placeholder="请输入供货方昵称" />
       </CfgItem>

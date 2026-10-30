@@ -2,7 +2,7 @@ import { Form } from "antd";
 import type { Pool } from "../../shared/api/catalog";
 import type { ReactNode } from "react";
 import { MoneyInput, Select } from "../../shared/ui";
-import { CfgItem, useFieldConfig, fieldLabel } from "../ConfigurableField";
+import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../ConfigurableField";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
 import "../recovery/RecoveryFeeSection.css";
 import "./ThFeeSection.css";
@@ -10,6 +10,7 @@ import "./ThFeeSection.css";
 /** 提号沿用回收页费用明细。 */
 export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }) {
   const cfg = useFieldConfig();
+  const financeTitle = sectionLabel("FINANCE", "资金明细");
   const purchaseAmount = Form.useWatch("th_purchase_amount");
   const intermediaryFee = Form.useWatch("intermediary_fee");
   const expenseItems = Form.useWatch("expense_items") as Array<{ amount?: number }> | undefined;
@@ -20,7 +21,7 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
     <section className="recovery-fee-section recovery-fees th-fees" aria-labelledby="th-fees-title">
       <div className="recovery-fees__heading">
         <div>
-          <div id="th-fees-title" className="recovery-fees__title">资金明细</div>
+          <div id="th-fees-title" className="recovery-fees__title">{financeTitle}</div>
           <div className="recovery-fees__hint">填写账号价格、预计收款与实际发生的附加费用</div>
         </div>
       </div>

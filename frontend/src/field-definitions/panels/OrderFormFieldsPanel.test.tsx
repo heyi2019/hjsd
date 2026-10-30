@@ -106,12 +106,35 @@ describe("OrderFormFieldsPanel", () => {
     localStorage.setItem("heijin.form-field-section-order", JSON.stringify([
       "ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "OPERATION", "FINANCE", "EXTRA", "PARTICIPANT", "CUSTOM_OPS",
     ]));
-    localStorage.setItem("heijin.form-field-section-labels", JSON.stringify({ CUSTOM_OPS: "自定义运营" }));
+    // 板块标题改走后端落库：设置面板加载时从 listSectionLabels 读取覆盖映射。
+    vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({ CUSTOM_OPS: "自定义运营" });
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("板块管理");
 
     expect(screen.getByText("CUSTOM_OPS")).toBeInTheDocument();
     expect(screen.getByText("自定义运营")).toBeInTheDocument();
+  });
+
+  it("编辑板块名称调用 saveSectionLabels 落库（设置改板块名 → 建单同步显示）", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({});
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("板块管理");
+
+    await ui.click(screen.getByLabelText("编辑运营信息"));
+    const labelInput = screen.getByLabelText("板块名称");
+    await ui.clear(labelInput);
+    await ui.type(labelInput, "运营信息改名");
+    await ui.click(screen.getByText("保存板块"));
+
+    await waitFor(() =>
+      expect(vi.mocked(catalog.orderFormFieldsApi).saveSectionLabels).toHaveBeenCalled(),
+    );
+    const payload = vi.mocked(catalog.orderFormFieldsApi).saveSectionLabels.mock.calls[0][0] as {
+      order_type_code: string;
+      labels: Record<string, string>;
+    };
+    expect(payload.order_type_code).toBe("HS");
+    expect(payload.labels.OPERATION).toBe("运营信息改名");
   });
 
   it("挂载时按当前业务类型拉取字段列表", async () => {

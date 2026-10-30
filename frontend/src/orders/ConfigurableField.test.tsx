@@ -17,11 +17,13 @@ import {
   CustomFieldSection,
   CustomFormField,
   FieldConfigContext,
+  SectionLabelsContext,
   fieldLabel,
   injectOptionsIfMissing,
   isConditionActive,
   resolveOptionItems,
   resolveRules,
+  sectionLabel,
   buildFormExtraDisplay,
   type FieldConfigMap,
 } from "./ConfigurableField";
@@ -502,5 +504,38 @@ describe("buildFormExtraDisplay：历史扩展字段值统一展开（含删除/
     ]);
     expect(buildFormExtraDisplay(undefined, defs)).toEqual([]);
     expect(buildFormExtraDisplay(null, defs)).toEqual([]);
+  });
+});
+
+describe("sectionLabel / SectionLabelsContext：板块标题跟随后端配置", () => {
+  function TitleProbe(props: { sectionKey: string; fallback: string }) {
+    return <span data-testid="title">{sectionLabel(props.sectionKey, props.fallback)}</span>;
+  }
+
+  it("无覆盖时回退硬编码 fallback", () => {
+    renderLight(<TitleProbe sectionKey="FINANCE" fallback="资金明细" />);
+    expect(screen.getByTestId("title")).toHaveTextContent("资金明细");
+  });
+
+  it("设置面板改板块名后，建单通过 SectionLabelsContext 同步显示新名", () => {
+    // 复刻 CreateBusinessModal：把后端返回的覆盖映射注入 SectionLabelsContext
+    renderLight(
+      <SectionLabelsContext.Provider value={{ FINANCE: "资金明细改名" }}>
+        <TitleProbe sectionKey="FINANCE" fallback="资金明细" />
+      </SectionLabelsContext.Provider>,
+    );
+    expect(screen.getByTestId("title")).toHaveTextContent("资金明细改名");
+  });
+
+  it("未覆盖的板块仍显示 fallback，已覆盖的显示新名（混合场景）", () => {
+    renderLight(
+      <SectionLabelsContext.Provider value={{ PARTICIPANT: "供货方信息改名" }}>
+        <TitleProbe sectionKey="PARTICIPANT" fallback="供货方信息" />
+        <TitleProbe sectionKey="FINANCE" fallback="资金明细" />
+      </SectionLabelsContext.Provider>,
+    );
+    const probes = screen.getAllByTestId("title");
+    expect(probes[0]).toHaveTextContent("供货方信息改名");
+    expect(probes[1]).toHaveTextContent("资金明细");
   });
 });

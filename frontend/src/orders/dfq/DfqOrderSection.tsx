@@ -1,4 +1,3 @@
-import { appMessage } from "../../shared/ui/appFeedback";
 import { Form, Input } from "antd";
 import { useEffect, useRef } from "react";
 import type { EmployeeOption, GameTypeOption, Pool } from "../../shared/api/catalog";

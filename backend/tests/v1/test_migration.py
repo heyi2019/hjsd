@@ -189,6 +189,12 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
         engine.dispose()
 
 
+def test_postgres_alembic_version_storage_allows_long_revision_ids():
+    """PostgreSQL 迁移版本名超过 Alembic 默认 32 字符时仍能写入版本表。"""
+    env_source = (BACKEND_DIR / "alembic" / "env.py").read_text(encoding="utf-8")
+    assert "VARCHAR(64)" in env_source
+
+
 def test_order_cancel_amount_is_incoming_finance_flow(migration_env):
     """取消交易的冲销金额应记录为退款入账，而非原始支出。"""
     env, db_file = migration_env

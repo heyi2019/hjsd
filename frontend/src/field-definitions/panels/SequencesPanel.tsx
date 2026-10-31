@@ -104,9 +104,12 @@ export function SequencesPanel() {
       : configurableLabel("SEQUENCE_KEY", key, SEQUENCE_KEY_LABEL);
 
   const renderEntry = (key: string): JSX.Element | null => {
+    const staticEntry = STATIC_ENTRIES[key];
+    if (key === "INSTALLMENT" && staticEntry) {
+      return <StaticEntryLine key={key} name={staticEntry.name} desc={staticEntry.desc} />;
+    }
     const row = byKey.get(key);
     if (row) return <EntryLine key={row.sequence_key} name={label(row.sequence_key)} desc={describe(row)} />;
-    const staticEntry = STATIC_ENTRIES[key];
     return staticEntry ? <StaticEntryLine key={key} name={staticEntry.name} desc={staticEntry.desc} /> : null;
   };
 

@@ -80,7 +80,8 @@ it("业务分类明确分期归自营增值服务", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
   // 默认 Tab 是业务字典。
   expect(await screen.findByText("分期（自营增值服务）", { exact: true })).toBeInTheDocument();
-  expect(screen.getByText(/本方账号售出后，买家分期支付售卖款/)).toBeInTheDocument();
+  expect(screen.getByText("本方账号售出后，买家分期支付售卖款。", { exact: true })).toBeInTheDocument();
+  expect(screen.queryByText(/归自营售出，不单独产生业务编号/)).toBeNull();
 });
 
 it("库存管理下单独展示分期管理口径", async () => {

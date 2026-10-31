@@ -60,7 +60,7 @@ export function BusinessDictionaryPanel() {
         <Descriptions.Item label="增值服务">
           <EntryLine
             name="分期（自营增值服务）"
-            desc="本方账号售出后，买家分期支付售卖款；归自营售出，不单独产生业务编号。"
+            desc="本方账号售出后，买家分期支付售卖款。"
           />
         </Descriptions.Item>
         <Descriptions.Item label="库存管理">

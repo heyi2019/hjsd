@@ -1,3 +1,6 @@
+import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
+import { ColumnsType } from "antd/es/table";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { counterpartiesApi, orderFormFieldsApi } from "../shared/api/catalog";
 import type { Counterparty, OrderFormField } from "../shared/api/catalog";
@@ -8,9 +11,6 @@ import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag, useCompactLayout } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { MobileCounterpartyList, collectExtras } from "./CustomersPage.fragments";
-import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
-import { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useRef, useState } from "react";
 
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();

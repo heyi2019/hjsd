@@ -1,6 +1,6 @@
-import { DatePicker, Input, InputNumber, Select, Space, Switch } from "antd";
+import { DatePicker, Input, InputNumber, Space, Switch } from "antd";
 import type { ReactNode } from "react";
-import { PermissionButton, StatusTag } from "../shared/ui";
+import { PermissionButton, Select, StatusTag } from "../shared/ui";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
 import type { Counterparty, Customer, OrderFormField } from "../shared/api/catalog";
 

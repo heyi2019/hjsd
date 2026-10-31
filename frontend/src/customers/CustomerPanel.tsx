@@ -1,3 +1,7 @@
+import { SearchOutlined } from "@ant-design/icons";
+import { Button, Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
+import { ColumnsType } from "antd/es/table";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CfgItem, FieldConfigScope, buildFormExtraDisplay, formatExtraDisplayValue } from "../orders/ConfigurableField";
 import { customersApi, orderFormFieldsApi } from "../shared/api/catalog";
 import type { Customer, CustomerBusiness, CustomerDetail, CustomerInstallment, OrderFormField } from "../shared/api/catalog";
@@ -11,10 +15,6 @@ import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { CUSTOMER_ROLE_LABEL, customerDateKey, MobileCustomerList, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
-import { SearchOutlined } from "@ant-design/icons";
-import { Button, Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
-import { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useRef, useState } from "react";
 
 const SearchButton = Button;
 

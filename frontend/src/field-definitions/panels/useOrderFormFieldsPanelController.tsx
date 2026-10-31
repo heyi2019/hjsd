@@ -1,7 +1,4 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-/** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
- *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
- *  仅自定义字段可删除（预置字段受保护）。 */
 import { Form, Input, InputNumber, Popconfirm, Space, Switch, Tooltip, Typography } from "antd";
 import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";

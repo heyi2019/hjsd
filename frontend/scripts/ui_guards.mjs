@@ -267,6 +267,7 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/field-definitions/panels/GameTypeSettingsPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/IntermediaryPlatformSettingsPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/OrderFormFieldsPanel.tsx", "表单字段配置界面本身（即守卫所保护的设置页）"],
+  ["src/field-definitions/panels/useOrderFormFieldsPanelController.tsx", "同上：字段配置界面的编辑表单 JSX 拆分到 controller 后仍是同一界面，非业务录入"],
   ["src/field-definitions/panels/OrderTypeRoutesPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/OrderTypesPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/PoolsPanel.tsx", "资金池配置界面本身"],

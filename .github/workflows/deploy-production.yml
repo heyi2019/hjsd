@@ -151,8 +151,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           TAG="v${APP_VERSION}"
-          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists, skipping"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Remote tag ${TAG} already exists, skipping"
           else
             git tag -a "${TAG}" -m "Production release ${APP_VERSION} (${GITHUB_SHA})"
             git push origin "${TAG}"

@@ -29,6 +29,9 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env            # 生产环境变量（含 JWT_SECRET_KEY / DATABASE_URL / CORS_ORIGINS）
+    environment:
+      # 让 /health 与镜像 tag 显示同一发布版本；shell APP_VERSION 覆盖 .env 遗留值。
+      APP_VERSION: ${APP_VERSION:-latest}
     volumes:
       - erp_db:/app/data   # 保留原 SQLite 备份与附件；正式业务库已切到 PostgreSQL
     depends_on:

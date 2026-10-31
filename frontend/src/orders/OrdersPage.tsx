@@ -22,6 +22,7 @@ import {
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { filterRetiredOrderTypeOptions } from "../shared/lib/retiredProducts";
 import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
@@ -266,7 +267,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
   const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
-  const orderBusinessOptions: Opt[] = useOptionSet("ORDER_BUSINESS") ?? [];
+  const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
   // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
   const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];

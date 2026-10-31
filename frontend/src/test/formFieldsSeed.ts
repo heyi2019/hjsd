@@ -249,7 +249,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" },
   ] },
   { code: "CAPITAL_TYPE", label: "资金性质", group: "ORDER", editable: false, options: [
-    { value: "STOCK", label: "库存型" }, { value: "ZERO", label: "零本金型" }, { value: "CREDIT", label: "分期业务" },
+    { value: "STOCK", label: "库存型" }, { value: "ZERO", label: "零本金型" },
   ] },
   { code: "ROUTE_PORTION", label: "资金份额", group: "ORDER", editable: false, options: [
     { value: "PRINCIPAL", label: "本金" }, { value: "PROFIT", label: "利润" }, { value: "GROSS", label: "总额" },

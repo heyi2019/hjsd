@@ -32,6 +32,7 @@ import { BUSINESS_MODE_LABEL,
   isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
+import { filterRetiredValueAddedServiceOptions } from "../shared/lib/retiredProducts";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
@@ -200,7 +201,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型 / 增值服务）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
-  const valueAddedOptions = useOptionSet("VALUE_ADDED_SERVICE");
+  const valueAddedOptions = filterRetiredValueAddedServiceOptions(useOptionSet("VALUE_ADDED_SERVICE") ?? []);
   const load = useCallback(async () => {
     try {
       const list = await stocksApi.list({ status: "WAITING" });

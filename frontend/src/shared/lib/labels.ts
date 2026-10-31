@@ -11,7 +11,6 @@ export const ORDER_TYPE_LABEL: Record<string, string> = {
 export const CAPITAL_TYPE_LABEL: Record<string, string> = {
   STOCK: "库存型",
   ZERO: "零本金型",
-  CREDIT: "分期业务",
 };
 
 export const BUSINESS_MODE_LABEL: Record<string, string> = {

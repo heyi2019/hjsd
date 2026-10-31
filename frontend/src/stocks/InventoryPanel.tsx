@@ -122,7 +122,7 @@ export function MobileInventoryList({
           <article key={row.id} className="data-mobile-card">
             <div className="data-mobile-card__topline">
               <span className="data-mobile-card__title">{row.stock_no || row.game_account || `账号 ${row.id}`}</span>
-              <StatusTag status={row.inventory_status ?? row.status} label={row.status === "VOID" ? "下架" : undefined} />
+              <StatusTag status={row.inventory_status ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} />
             </div>
             <dl className="data-mobile-card__meta">
               <div><dt>游戏/产品类型</dt><dd>{row.game_type || "-"}</dd></div>
@@ -137,7 +137,7 @@ export function MobileInventoryList({
             </dl>
             <div className="data-mobile-card__actions">
               <PermissionButton permission="order.create" type="link" size="small" onClick={() => onDetail(row)}>详情</PermissionButton>
-              <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "IN_STOCK"} onClick={() => onSale(row)}>售出</PermissionButton>
+              <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "WAITING"} onClick={() => onSale(row)}>售出</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" onClick={() => onRebate(row)}>返点</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>作废</PermissionButton>
@@ -203,7 +203,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   const valueAddedOptions = useOptionSet("VALUE_ADDED_SERVICE");
   const load = useCallback(async () => {
     try {
-      const list = await stocksApi.list({ status: "IN_STOCK" });
+      const list = await stocksApi.list({ status: "WAITING" });
       setRows(list ?? []);
       setError(null);
     } catch (err) {
@@ -236,7 +236,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   }, [expandedAccountIds]);
 
   const visibleRows = (rows ?? []).filter((row) => {
-    const matchesStatus = row.status === "IN_STOCK";
+    const matchesStatus = row.status === "WAITING";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
     const matchesType = !inventoryType || row.inventory_type === inventoryType;
     const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
@@ -394,7 +394,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);
       },
     },
-    { title: "状态", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? row.status} label={row.status === "VOID" ? "下架" : undefined} /> },
+    { title: "状态", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
     {
       title: "成本",
       dataIndex: "cost_amount",
@@ -413,7 +413,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
             type="link"
             size="small"
             aria-label="售出"
-            disabled={row.status !== 'IN_STOCK'}
+            disabled={row.status !== 'WAITING'}
             onClick={(event) => {
               event.stopPropagation();
               setSaleTarget(row);

@@ -6,7 +6,7 @@ import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, poli
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { LINK_STATUS_LABEL } from "../shared/lib/labels";
-import { executionActionLabel, money, today } from "../shared/lib/format";
+import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
@@ -388,7 +388,7 @@ export function useOrdersPageController(params: {
     { title: "游戏账号/产品", dataIndex: "account_game_account", render: (v: string | null) => v || "-" },
     { title: "平台", dataIndex: "account_platform", render: (v: string | null) => v || "-" },
     { title: "金额", dataIndex: "event_total", render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "库存状态", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} optionSet="INVENTORY_STATUS" /> : "-" },
+    { title: "账号周期", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
     {

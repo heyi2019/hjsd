@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { installmentsApi, ordersApi, type Installment, type InstallmentDisposition, type Order, type Schedule } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { INSTALLMENT_STATUS_LABEL, money, today } from "../shared/lib/format";
+import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus, money, today } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { MoneyText, PermissionButton, StatusTag, useCompactLayout } from "../shared/ui";
@@ -328,7 +328,7 @@ export function useContractTableController(params: { contractType: string; reloa
         />
       ),
     },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("INSTALLMENT_STATUS", v, INSTALLMENT_STATUS_LABEL)} /> },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={installmentDisplayStatus(v)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(v), INSTALLMENT_STATUS_LABEL)} /> },
     {
       title: "操作",
       key: "actions",

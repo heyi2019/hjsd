@@ -31,7 +31,7 @@ def _new_account(seeded_db, *, game_account: str = "guard-acc") -> Account:
         platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
-        status="IN_STOCK",
+        status="WAITING",
         created_by="pytest",
         updated_by="pytest",
     )

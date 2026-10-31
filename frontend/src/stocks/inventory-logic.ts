@@ -60,7 +60,9 @@ export function inventoryAge(
   days: number;
   color: "green" | "orange" | "red";
 } | null {
-  if ((row.inventory_status ?? row.status) !== "IN_STOCK" || !row.buy_date) return null;
+  const inventoryStatus = row.inventory_status
+    ?? (row.status === "WAITING" || row.status === "IN_STOCK" ? "IN_STOCK" : row.status);
+  if (inventoryStatus !== "IN_STOCK" || !row.buy_date) return null;
   const buyDate = new Date(`${row.buy_date}T00:00:00`);
   if (!Number.isFinite(buyDate.getTime())) return null;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

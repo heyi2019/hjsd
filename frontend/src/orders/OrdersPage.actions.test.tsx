@@ -78,7 +78,7 @@ const order1: Order = {
   account_game_type: "原神",
   account_game_account: "seller-001",
   account_platform: "安卓",
-  account_status: "IN_STOCK",
+  account_status: "WAITING",
   party_name: "卖家甲",
   party_source: "同行推荐",
   event_total: "1234.00",
@@ -262,7 +262,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     const list = screen.getByLabelText("订单列表");
     // 移动端卡片直接输出 account_status 原始值（未走 StatusTag 映射）
-    for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "IN_STOCK"]) {
+    for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "待售"]) {
       expect(within(list).getAllByText(value).length).toBeGreaterThan(0);
     }
     expect(within(list).getAllByText("¥1,234.00").length).toBeGreaterThan(0);

@@ -283,7 +283,7 @@ def create_installment(
         ) is not None
         # DG 代挂订单创建即把账号纳入库存，没有 BUY 事件；HS/TH 仍要求可追溯买入流水。
         requires_buy_event = account is not None and account.inventory_type != "CONSIGNMENT"
-        if account is None or account.status != AccountStatus.IN_STOCK.value or (requires_buy_event and not has_buy_event):
+        if account is None or account.status != AccountStatus.WAITING.value or (requires_buy_event and not has_buy_event):
             raise Validation(
                 "STOCK_SALE 要求账号已入库且已在库",
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
@@ -443,7 +443,7 @@ def create_installment(
         require_all=True,
     )
 
-    if account is not None and account.status == AccountStatus.IN_STOCK.value:
+    if account is not None and account.status == AccountStatus.WAITING.value:
         # 分期状态归 installments.status；账号一旦签约即视为已售，库存归属由
         # stock.inventory_status 独立标记为出库。
         account.status = transition(

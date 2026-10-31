@@ -100,7 +100,7 @@ export function buildInventoryCsv(
         row.stock_no,
         row.platform,
         row.cost_amount,
-        inventoryStatusLabel(row.status),
+        inventoryStatusLabel(row.inventory_status ?? "IN_STOCK"),
         age ? `${age.days}天` : "",
         row.created_by,
         detailText.registrationAt,

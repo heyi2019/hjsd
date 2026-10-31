@@ -22,7 +22,7 @@ import {
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
-import { executionActionLabel, money, today } from "../shared/lib/format";
+import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { useListViewColumns } from "../shared/lib/listColumns";
@@ -77,7 +77,7 @@ function MobileOrderList(props: {
             <div><dt>游戏账号/产品</dt><dd>{order.account_game_account || "-"}</dd></div>
             <div><dt>平台</dt><dd>{order.account_platform || "-"}</dd></div>
             <div><dt>金额</dt><dd>{formatOrderAmount(order)}</dd></div>
-            <div><dt>库存状态</dt><dd>{order.account_status || "-"}</dd></div>
+            <div><dt>账号周期</dt><dd>{order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-"}</dd></div>
             <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
             <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
           </dl>
@@ -627,7 +627,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     { title: "游戏账号/产品", dataIndex: "account_game_account", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "平台", dataIndex: "account_platform", width: 72, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "库存状态", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} optionSet="INVENTORY_STATUS" /> : "-" },
+    { title: "账号周期", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", width: 198, ellipsis: true, render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", width: 111, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
     {

@@ -208,7 +208,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "STOCK_SALE", label: "分期出售" }, { value: "ADVANCE_PURCHASE", label: "代分期" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
   ] },
   { code: "INSTALLMENT_STATUS", label: "分期状态", group: "INSTALLMENT", editable: false, options: [
-    { value: "PENDING", label: "待首付" }, { value: "ACTIVE", label: "收款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },
+    { value: "ACTIVE", label: "还款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },
   ] },
   { code: "SCHEDULE_STATUS", label: "期次状态", group: "INSTALLMENT", editable: false, options: [
     { value: "PENDING", label: "待收" }, { value: "PARTIAL", label: "部分收款" }, { value: "PAID", label: "已收" }, { value: "OVERDUE", label: "逾期" }, { value: "WAIVED", label: "已减免" },

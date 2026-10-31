@@ -39,7 +39,7 @@ def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
         platform="王者",
         business_mode="SELF" if game_account != "th-stock-acc" else "DISTRIBUTION",
         inventory_type="RECOVERY" if game_account != "th-stock-acc" else "PICKUP",
-        status=AccountStatus.IN_STOCK.value,
+        status=AccountStatus.WAITING.value,
         created_by="pytest",
         updated_by="pytest",
     )
@@ -396,7 +396,7 @@ class TestEventRules:
         assert account is not None
         assert account.game_account == "inline-recovery-account"
         assert account.inventory_type == inventory_type
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         assert account.cost_amount == Decimal("0.00")
 
         event, _ = service.post_event(
@@ -411,7 +411,7 @@ class TestEventRules:
         assert event.event_type == "BUY"
         assert account.cost_amount == Decimal("100.00")
         assert account.buy_date == TODAY
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
 
     def test_inline_consignment_creates_inventory(self, seeded_db):
         order = service.create_order(
@@ -421,7 +421,7 @@ class TestEventRules:
         account = seeded_db.get(Account, order.account_id)
         assert account is not None
         assert account.inventory_type == "CONSIGNMENT"
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         assert account.cost_amount == Decimal("0.00")
 
     def test_dg_cannot_post_buy_or_cost(self, seeded_db):

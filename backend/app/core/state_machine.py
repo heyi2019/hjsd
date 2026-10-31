@@ -27,13 +27,13 @@ ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
 
 ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     # 同一账号允许再次买入，作为重新入库事件保留历史轨迹。
-    "IN_STOCK": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "SOLD", "SELL": "SOLD", "VOID": "VOID"},
+    "WAITING": {"BUY_STOCK": "WAITING", "BUY_CREDIT": "SOLD", "SELL": "SOLD", "VOID": "VOID"},
     "SOLD": {
-        "BUY_STOCK": "IN_STOCK",
+        "BUY_STOCK": "WAITING",
         "BUY_CREDIT": "SOLD",
-        "RECOVER": "IN_STOCK",
-        "CANCEL_STOCK": "IN_STOCK",
-        "CANCEL_SELL": "IN_STOCK",
+        "RECOVER": "WAITING",
+        "CANCEL_STOCK": "WAITING",
+        "CANCEL_SELL": "WAITING",
         "CANCEL_SELL_END": "VOID",
         "VOID": "VOID",
     },

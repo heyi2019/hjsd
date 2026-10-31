@@ -23,7 +23,7 @@ describe("InventoryPanel：状态边界", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     await waitFor(() =>
-      expect(vi.mocked(catalog.stocksApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "IN_STOCK")).toBe(true),
+      expect(vi.mocked(catalog.stocksApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "WAITING")).toBe(true),
     );
     expect(screen.queryByPlaceholderText("按状态筛选")).toBeNull();
   });

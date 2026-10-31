@@ -1,6 +1,7 @@
 """T01 / SYS-01-01：单一基线迁移 — 可重复执行、不覆盖旧库、Up/Down 闭环。"""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -376,8 +377,29 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
                 text("SELECT sql FROM sqlite_master WHERE type='table' AND name='stocks'")
             ).scalar_one()
             assert "'PENDING'" not in create_sql
-            expected = "status IN ('IN_STOCK', 'SOLD', 'VOID')"
+            expected = "status IN ('WAITING', 'SOLD', 'VOID')"
             assert expected in create_sql
+    finally:
+        engine.dispose()
+
+
+def test_installment_status_options_hide_internal_pending(migration_env):
+    """PENDING 仅保留内部流程使用，不进入分期业务状态词典。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            options = connection.execute(
+                text("SELECT options FROM option_sets WHERE code = 'INSTALLMENT_STATUS'")
+            ).scalar_one()
+            values = json.loads(options)
+            assert [item["value"] for item in values] == [
+                "ACTIVE", "OVERDUE", "SETTLED", "DELIVERED", "DEFAULTED", "CLOSED", "CANCELLED"
+            ]
+            assert values[0]["label"] == "还款中"
     finally:
         engine.dispose()
 

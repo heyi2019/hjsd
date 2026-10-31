@@ -1,5 +1,5 @@
 import type { Order } from "../shared/api/catalog";
-import { executionActionLabel, money } from "../shared/lib/format";
+import { ACCOUNT_STATUS_LABEL, executionActionLabel, money } from "../shared/lib/format";
 import { PermissionButton, StatusTag } from "../shared/ui";
 
 export function MobileOrderList(props: {
@@ -22,7 +22,7 @@ export function MobileOrderList(props: {
             <div><dt>游戏账号/产品</dt><dd>{order.account_game_account || "-"}</dd></div>
             <div><dt>平台</dt><dd>{order.account_platform || "-"}</dd></div>
             <div><dt>金额</dt><dd>{formatOrderAmount(order)}</dd></div>
-            <div><dt>库存状态</dt><dd>{order.account_status || "-"}</dd></div>
+            <div><dt>账号周期</dt><dd>{order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-"}</dd></div>
             <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
             <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
           </dl>

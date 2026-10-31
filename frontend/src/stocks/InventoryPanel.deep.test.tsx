@@ -38,7 +38,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 
 const inStockRow = {
   id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "安卓",
-  status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01",
+  status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01",
   created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "初始描述",
 } as unknown as Account;
 

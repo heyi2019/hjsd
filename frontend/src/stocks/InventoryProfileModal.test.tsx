@@ -20,7 +20,7 @@ const account = {
   game_type: "手游",
   account_description: "旧描述",
   account_images: [],
-  status: "IN_STOCK",
+  status: "WAITING",
   inventory_type: "RECOVERY",
 } as unknown as Account;
 

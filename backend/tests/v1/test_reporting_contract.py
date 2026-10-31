@@ -133,7 +133,7 @@ class TestR1Inventory:
         account = Account(
             game_account="report-null-platform",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("125.00"),
             platform=None,
             created_by="pytest",
@@ -154,7 +154,7 @@ class TestR1Inventory:
         pickup = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             buy_date=D,
             cost_amount=to_money("500.00"),
             created_by="pytest",
@@ -171,7 +171,7 @@ class TestR1Inventory:
         in_stock = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             buy_date=D,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -184,7 +184,7 @@ class TestR1Inventory:
             updated_by="pytest",
         )
         no_buy_date = Account(
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("500.00"),
             created_by="pytest",
             updated_by="pytest",
@@ -193,7 +193,7 @@ class TestR1Inventory:
         seeded_db.flush()
 
         order = _order(seeded_db, account_id=in_stock.id)
-        # 买-卖-买周期：SELL 会把账号翻 SOLD，再 BUY 回 IN_STOCK，
+        # 买-卖-买周期：SELL 会把账号翻 SOLD，再 BUY 回 WAITING，
         # 此时历史 SELL 事件仍计入 expected_price（覆盖 R1 账号循环的售价汇总）
         order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",

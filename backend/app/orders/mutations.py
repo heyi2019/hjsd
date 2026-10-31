@@ -147,7 +147,7 @@ def cancel_order(
         and order.account_id is not None
     ):
         account = session.get(Account, order.account_id)
-        if account is not None and account.status == AccountStatus.IN_STOCK.value:
+        if account is not None and account.status == AccountStatus.WAITING.value:
             account.status = AccountStatus.VOID.value
             account.updated_by = actor
     if form_extra:

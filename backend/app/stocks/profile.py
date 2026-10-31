@@ -72,7 +72,7 @@ def create_account(
         bound_phone=bound_phone,
         has_secondary=has_secondary,
         platform=platform,
-        status=AccountStatus.IN_STOCK.value,
+        status=AccountStatus.WAITING.value,
         account_description=account_description,
         account_images=validated_images or [],
         note=note,

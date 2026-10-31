@@ -28,8 +28,7 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
 };
 
 export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
-  PENDING: "待首付",
-  ACTIVE: "收款中",
+  ACTIVE: "还款中",
   OVERDUE: "逾期",
   SETTLED: "已结清",
   DELIVERED: "已交付",
@@ -38,8 +37,13 @@ export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
   CANCELLED: "已取消",
 };
 
+/** PENDING 是合约落库的内部初始化值，业务界面按还款中展示，不作为筛选项暴露。 */
+export function installmentDisplayStatus(status: string): string {
+  return status === "PENDING" ? "ACTIVE" : status;
+}
+
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
-  IN_STOCK: "在库",
+  WAITING: "待售",
   SOLD: "已售",
   VOID: "失效",
 };

@@ -42,7 +42,7 @@ def _account(seeded_db) -> Account:
         platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
-        status=AccountStatus.IN_STOCK.value,
+        status=AccountStatus.WAITING.value,
         created_by="pytest",
         updated_by="pytest",
     )

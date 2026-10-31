@@ -42,7 +42,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("account_game_account", "游戏账号/产品"),
             ListColumn("account_platform", "平台"),
             ListColumn("event_total", "金额"),
-            ListColumn("account_status", "库存状态"),
+            ListColumn("account_status", "账号周期"),
             ListColumn("last_event_type", "最新动作"),
             ListColumn("status", "状态"),
             ListColumn("link_status", "关联"),

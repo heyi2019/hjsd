@@ -48,7 +48,7 @@ const orders = [
     account_game_type: "原神",
     account_game_account: "seller-001",
     account_platform: "安卓",
-    account_status: "IN_STOCK",
+    account_status: "WAITING",
     party_name: "卖家甲",
     party_source: "同行推荐",
     event_total: "1234.00",
@@ -118,7 +118,7 @@ describe("OrdersPage：四类业务台账", () => {
   it("业务台账统一展示通用字段", async () => {
     await openLedger();
 
-    for (const label of ["订单号", "对方 / 来源", "游戏/产品类型", "游戏账号/产品", "平台", "金额", "库存状态", "最新动作", "状态", "日期", "操作"]) {
+    for (const label of ["订单号", "对方 / 来源", "游戏/产品类型", "游戏账号/产品", "平台", "金额", "账号周期", "最新动作", "状态", "日期", "操作"]) {
       expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
     }
     for (const [label, width] of Object.entries({
@@ -128,7 +128,7 @@ describe("OrdersPage：四类业务台账", () => {
       "游戏账号/产品": "140px",
       "平台": "72px",
       "金额": "126px",
-      "库存状态": "102px",
+      "账号周期": "102px",
       "最新动作": "198px",
       "状态": "111px",
       "关联": "111px",
@@ -140,7 +140,7 @@ describe("OrdersPage：四类业务台账", () => {
       expect(ledgerColumnStyles).toContain(`width: ${width};`);
     }
     expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
-    for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "¥1,234.00", "在库"]) {
+    for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "¥1,234.00", "待售"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     }
   });
@@ -157,7 +157,7 @@ describe("OrdersPage：四类业务台账", () => {
         game_account: "seller-001",
         game_type: "原神",
         platform: "安卓",
-        status: "IN_STOCK",
+        status: "WAITING",
         cost_amount: "1234.00",
         created_by: "admin",
         created_at: "2026-10-01T09:30:00",
@@ -220,7 +220,7 @@ describe("OrdersPage：四类业务台账", () => {
         game_account: "seller-001",
         game_type: "原神",
         platform: "安卓",
-        status: "IN_STOCK",
+        status: "WAITING",
         cost_amount: "1234.00",
         created_by: "admin",
         created_at: "2026-10-01T09:30:00",

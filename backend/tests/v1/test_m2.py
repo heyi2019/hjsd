@@ -208,7 +208,7 @@ class TestA05HsStockSale:
             occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
-        assert seeded_db.get(type(account), account.id).status == AccountStatus.IN_STOCK.value
+        assert seeded_db.get(type(account), account.id).status == AccountStatus.WAITING.value
 
         invest = _pool(seeded_db, "HJ_INVEST")
         contract = installment_service.create_installment(

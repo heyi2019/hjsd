@@ -82,7 +82,7 @@ class Account(Base, AuditMixin):
     has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=AccountStatus.IN_STOCK.value
+        String(16), nullable=False, default=AccountStatus.WAITING.value
     )
     # 独立库存口径：只表达在库/出库；status 保留账号生命周期原因，订单和分期另有各自状态。
     inventory_status: Mapped[str] = mapped_column(
@@ -100,7 +100,7 @@ class Account(Base, AuditMixin):
 def _inventory_status_for_account_status(status: object) -> str:
     return (
         InventoryStatus.IN_STOCK.value
-        if status == AccountStatus.IN_STOCK.value
+        if status == AccountStatus.WAITING.value
         else InventoryStatus.OUT_OF_STOCK.value
     )
 

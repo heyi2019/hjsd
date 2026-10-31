@@ -91,7 +91,7 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     account = session.get(Account, order.account_id)
     if account is None:
         raise NotFound(f"账号 {order.account_id} 不存在", details={"account_id": order.account_id})
-    if account.status != AccountStatus.IN_STOCK.value:
+    if account.status != AccountStatus.WAITING.value:
         raise Validation(
             "账号必须先完成回收并进入库存后才能售出",
             details={"account_status": account.status, "account_id": account.id},

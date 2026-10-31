@@ -169,7 +169,7 @@ function orderExtraValues(detail: AccountExecutionDetail | undefined): Array<{ k
   return values;
 }
 
-/** 当前运营状态：已售 > 寄售中 > 已下架 > 在库；分期进度由分期管理展示。 */
+/** 账号周期：已售 > 寄售中 > 已下架 > 待售；分期进度由分期管理展示。 */
 function resolveOperationStatus(
   accountStatus: string,
   hasActiveConsignment: boolean,
@@ -178,7 +178,7 @@ function resolveOperationStatus(
   if (accountStatus === "SOLD") return "已售";
   if (hasActiveConsignment) return "寄售中";
   if (accountStatus === "VOID" || hasUnlistedConsignment) return "已下架";
-  return "在库";
+  return "待售";
 }
 
 export function OrderDetail({

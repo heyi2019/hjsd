@@ -8,7 +8,7 @@ const account = {
   id: 1,
   game_account: "acc-1",
   inventory_type: "RECOVERY",
-  status: "IN_STOCK",
+  status: "WAITING",
   created_by: "admin",
   created_at: "2026-10-01T09:30:00",
   account_description: "高段位账号",

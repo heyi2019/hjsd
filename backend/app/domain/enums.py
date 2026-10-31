@@ -252,7 +252,7 @@ class CashflowStatus(StrEnum):
 class AccountStatus(StrEnum):
     """账号生命周期状态（ACC-01-03）：保留出库原因与可逆动作。"""
 
-    IN_STOCK = "IN_STOCK"  # 在库
+    WAITING = "WAITING"  # 待售
     SOLD = "SOLD"  # 已售
     VOID = "VOID"  # 取消/失效
 

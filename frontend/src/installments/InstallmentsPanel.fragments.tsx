@@ -1,6 +1,6 @@
 import { Space } from "antd";
 import type { Installment, InstallmentDisposition, Order } from "../shared/api/catalog";
-import { INSTALLMENT_STATUS_LABEL } from "../shared/lib/format";
+import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
@@ -63,7 +63,7 @@ export function MobileInstallmentList({
           <article className="data-mobile-card" key={row.id}>
             <div className="data-mobile-card__topline">
               <span>{row.inst_no}</span>
-              <StatusTag status={row.status} label={configurableLabel("INSTALLMENT_STATUS", row.status, INSTALLMENT_STATUS_LABEL)} />
+              <StatusTag status={installmentDisplayStatus(row.status)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(row.status), INSTALLMENT_STATUS_LABEL)} />
             </div>
             <dl className="data-mobile-card__meta">
               <div><dt>订单</dt><dd>{order?.order_no ?? row.order_id}</dd></div>

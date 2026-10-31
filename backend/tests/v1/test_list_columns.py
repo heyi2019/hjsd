@@ -37,6 +37,7 @@ def test_list_scopes_match_registry(seeded_client, headers):
     assert {item["code"] for item in payload} == {scope.code for scope in LIST_SCOPES}
     ledger = next(item for item in payload if item["code"] == "LEDGER")
     assert [column["key"] for column in ledger["columns"][:2]] == ["order_no", "party"]
+    assert next(column for column in ledger["columns"] if column["key"] == "account_status")["label"] == "账号周期"
     # 缺行默认可见（不播种也能用）
     assert all(column["is_visible"] for column in ledger["columns"])
     assert ledger["columns"][0]["locked"] is True

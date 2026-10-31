@@ -11,7 +11,7 @@ import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
 vi.mock("../shared/api/catalog")
 
 const accounts = [
-  { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
+  { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
   { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
@@ -235,7 +235,7 @@ it("自营在库账号可以售出并在来源单登记 HS 售出事件", async 
 it("代挂账号售出在来源单登记 DG 售出事件并挂寄售方", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
-      { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
+      { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -260,7 +260,7 @@ it("代挂账号售出在来源单登记 DG 售出事件并挂寄售方", async 
 it("代挂账号出售时选择分期，建立库存分期出售合同而不是直接 SELL", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
-      { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "IN_STOCK", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
+      { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -286,7 +286,7 @@ it("代挂账号出售时选择分期，建立库存分期出售合同而不是�
 it("提号库存从库存中心售出时统一按库存分期出售", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
-      { id: 6, source_order_id: 21, game_account: "pickup-acc", platform: "B平台", status: "IN_STOCK", cost_amount: "0.00", inventory_type: "PICKUP" },
+      { id: 6, source_order_id: 21, game_account: "pickup-acc", platform: "B平台", status: "WAITING", cost_amount: "0.00", inventory_type: "PICKUP" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("pickup-acc");

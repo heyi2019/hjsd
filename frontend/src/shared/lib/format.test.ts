@@ -66,16 +66,19 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
     );
   });
 
-  it("分期状态覆盖后端 InstallmentStatus", () => {
+  it("分期状态只展示对外业务状态", () => {
     expect(Object.keys(INSTALLMENT_STATUS_LABEL).sort()).toEqual(
-      ["ACTIVE", "CANCELLED", "CLOSED", "DEFAULTED", "DELIVERED", "OVERDUE", "PENDING", "SETTLED"].sort(),
+      ["ACTIVE", "CANCELLED", "CLOSED", "DEFAULTED", "DELIVERED", "OVERDUE", "SETTLED"].sort(),
     );
+    expect(INSTALLMENT_STATUS_LABEL.ACTIVE).toBe("还款中");
+    expect(INSTALLMENT_STATUS_LABEL.PENDING).toBeUndefined();
   });
 
   it("账号状态覆盖后端 AccountStatus", () => {
     expect(Object.keys(ACCOUNT_STATUS_LABEL).sort()).toEqual(
-      ["IN_STOCK", "SOLD", "VOID"].sort(),
+      ["WAITING", "SOLD", "VOID"].sort(),
     );
+    expect(ACCOUNT_STATUS_LABEL.WAITING).toBe("待售");
   });
 
   it("事件类型覆盖后端 EventType", () => {

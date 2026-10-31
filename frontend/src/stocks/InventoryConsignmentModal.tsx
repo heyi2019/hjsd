@@ -1,14 +1,12 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
 import { DatePicker, Form, Table } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
-import {
-  ordersApi,
+import { ordersApi,
   stocksApi,
   type Account,
-  type AccountExecutionDetail,
-} from "../shared/api/catalog";
+  type AccountExecutionDetail, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";

@@ -170,9 +170,5 @@ function consignmentPlatforms(detail: AccountExecutionDetail | undefined): strin
   return names?.length ? names.join("\n") : "-";
 }
 
-function estimatedRebateAmount(baseAmount: string, rate: string): string {
-  const amount = Number(baseAmount) * Number(rate) / 100;
-  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
-}
 
 

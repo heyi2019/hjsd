@@ -17,7 +17,6 @@
 import { Input, InputNumber, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Key } from "react";
 import {
   listColumnsApi,
   type ListColumnConfig,

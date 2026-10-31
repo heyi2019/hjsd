@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 工作室收支：在指定资金池上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
  *
  * 设计约束（刻意不新增后端表）：
@@ -12,19 +12,16 @@ import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  cashflowsApi,
+import { cashflowsApi,
   optionSetsApi,
   type Cashflow,
   type OptionItem,
-  type Pool,
-} from "../shared/api/catalog";
+  type Pool, } from "../shared/api/catalog";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { clearOptionSetsCache } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
-import {
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessForm,
   ErrorBanner,
@@ -35,8 +32,7 @@ import {
   Select,
   StatRow,
   StatusTag,
-  CompactActions,
-} from "../shared/ui";
+  CompactActions, } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 
 /** 承载资金池词典：value 存池 code，池改名不影响配置。 */
@@ -168,11 +164,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     void load();
   }, [load]);
 
-
   const submitRegister = async (values: Record<string, unknown>) => {
     const direction = (values.direction as string) === "IN" ? "IN" : "OUT";
     await write.run(async () => {
-      const flow = await cashflowsApi.create({
+      await cashflowsApi.create({
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,

@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 用户中心：当前账号/角色信息 + 修改登录密码（顶栏入口进入）。
  *  区别于 auth/ChangePasswordPage（首登强制改密）：本组件挂载在顶栏「用户中心」Modal 内，
  *  改密走同一 changePassword API（后端校验旧密码），成功后本次会话直接生效。

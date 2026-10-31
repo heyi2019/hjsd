@@ -9,22 +9,10 @@ export const STATUS_LABEL: Record<string, string> = {
   VOID: "下架",
 };
 
-export const BUSINESS_MODE_LABEL: Record<string, string> = {
-  SELF: "自营",
-  DISTRIBUTION: "分销",
-};
-
-export const INVENTORY_TYPE_LABEL: Record<string, string> = {
-  RECOVERY: "回收",
-  PICKUP: "提号",
-  CONSIGNMENT: "代挂",
-};
-
-/** 增值服务维度（accounts.value_added_service）：与业务类型独立。 */
-export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
-  STOCK_SALE: "分期",
-  ADVANCE_PURCHASE: "代分期",
-};
+// 业务 / 类型 / 增值服务文案统一引用共享标签源（shared/lib/labels），避免多份副本漂移。
+// VALUE_ADDED_SERVICE_LABEL 在此补齐 PICKUP_SALE/CONSIGNMENT_SALE，修复库存页与导出裸码显示。
+export { BUSINESS_MODE_LABEL, VALUE_ADDED_SERVICE_LABEL } from "../shared/lib/labels";
+export { BUSINESS_TYPE_LABEL as INVENTORY_TYPE_LABEL } from "../shared/lib/labels";
 
 export const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
 export const EDITABLE_ACCOUNT_TYPES = new Set(["RECOVERY", "PICKUP", "CONSIGNMENT"]);

@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../../shared/ui/appFeedback";
+import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";

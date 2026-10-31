@@ -14,7 +14,7 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
-import { orderTypeLabel } from "../shared/lib/labels";
+import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
   ErrorBanner,
@@ -33,18 +33,6 @@ import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 import { useListViewColumns } from "../shared/lib/listColumns";
-
-const BUSINESS_MODE_LABEL: Record<string, string> = {
-  SELF: "自营",
-  DISTRIBUTION: "分销",
-};
-
-const ORDER_TYPE_LABEL: Record<string, string> = {
-  HS: "回收",
-  TH: "提号",
-  DG: "代挂",
-  DFQ: "代分期",
-};
 
 export function RebatesPanel() {
   const [rows, setRows] = useState<Rebate[]>([]);

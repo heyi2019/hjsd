@@ -59,7 +59,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
  * 代分期的 BUY 仍是兼容性事件编码，页面只展示为“付款”；借款本金由业务字段和资金属性表达。
  * 买入交付和售出交付结合订单类型判断：代分期是向客户完成售出交付，其余交付语义归入买入交付。
  */
-export const EXECUTION_ACTION_LABEL: Record<string, string> = {
+const EXECUTION_ACTION_LABEL: Record<string, string> = {
   BUY: "买号",
   COST: "费用支出",
   SELL: "售出",

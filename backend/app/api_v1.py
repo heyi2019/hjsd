@@ -31,6 +31,7 @@ from app.reporting.router import router as reporting_router
 from app.finance.router import router as finance_router
 from app.installments.router import router as installments_router
 from app.orders.router import router as orders_router
+from app.orders.form_fields_router import router as order_form_fields_router
 from app.parties.router import router as parties_router
 from app.search.router import router as search_router
 from app.auth.router import router as auth_router, admin_router as users_router, teams_router
@@ -150,6 +151,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(parties_router, prefix=settings.api_prefix)
     app.include_router(search_router, prefix=settings.api_prefix)
     app.include_router(orders_router, prefix=settings.api_prefix)
+    app.include_router(order_form_fields_router, prefix=settings.api_prefix)
     app.include_router(installments_router, prefix=settings.api_prefix)
     app.include_router(finance_router, prefix=settings.api_prefix)
     app.include_router(stocks_router, prefix=settings.api_prefix)

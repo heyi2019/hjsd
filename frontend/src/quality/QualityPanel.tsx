@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 质量中心：异常摘要、工单处理与关闭（QLT-01）。 */
 import { Card, Form, Input, Space, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -47,7 +47,6 @@ function renderMetric(value: QualityMetricValue | undefined, formula?: string) {
 
 export function QualityPanel() {
   const severityOptions = useOptionSet("QUALITY_SEVERITY") ?? [];
-  const qualityStatusOptions = useOptionSet("QUALITY_STATUS") ?? [];
   const [summary, setSummary] = useState<QualitySummary | null>(null);
   const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
   const [metricWindow, setMetricWindow] = useState(6);

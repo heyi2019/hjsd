@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 import { Card, Form, Input, Space } from "antd";
 import { useEffect, useState } from "react";
 import { errorMessage } from "../shared/api/client";

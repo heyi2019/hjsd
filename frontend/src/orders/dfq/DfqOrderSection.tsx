@@ -1,5 +1,4 @@
-import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Input, Modal } from "antd";
+import { Form, Input } from "antd";
 import { useEffect, useRef } from "react";
 import type { EmployeeOption, GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
@@ -84,7 +83,6 @@ function DfqInstallmentInfo() {
 }
 
 export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {
-  const form = Form.useFormInstance();
   const participantTitle = sectionLabel("PARTICIPANT", "分期客户");
 
   return (

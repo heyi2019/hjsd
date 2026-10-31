@@ -155,7 +155,7 @@ export function CreateBusinessModal(props: {
           source: values.customer_source as string,
           note: values.note as string,
         });
-        const order = await ordersApi.create({
+        await ordersApi.create({
           order_type: "DFQ",
           trade_date: today(),
           note: values.note as string,

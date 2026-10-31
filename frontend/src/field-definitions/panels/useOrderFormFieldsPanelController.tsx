@@ -337,7 +337,7 @@ export function useOrderFormFieldsPanelController({
         row.field_key === "intermediary_type" ? `中介类型主数据 · ${intermediaryTypeNames.slice(0, 2).join("、") || "暂无"}等 ${intermediaryTypeNames.length} 项` :
         row.field_key === "compensation_type" ? `包赔类型主数据 · ${compensationTypeNames.slice(0, 2).join("、") || "暂无"}等 ${compensationTypeNames.length} 项` :
         row.field_key === "payment_pool_id" ? "资金账户主数据 · 随资金账户配置联动" :
-        ["customer_source", "dg_customer_source", "dfq_customer_source"].includes(row.field_key) ? "客户来源主数据 · 回收/代挂/代分期共用" :
+        ["customer_source", "dg_customer_source"].includes(row.field_key) ? "客户来源主数据 · 回收/代挂共用" :
         row.field_key === "supplier_source" ? "供货方来源主数据 · 随供货方来源配置联动" :
         value && value.length
           ? value.map((o) => (typeof o === "string" ? o : o.label)).join("、")
@@ -488,7 +488,7 @@ export function useOrderFormFieldsPanelController({
             <PermissionButton permission="field-definition.manage" onClick={onConfigurePools}>配置资金账户</PermissionButton>
           </Form.Item>
         ) : null}
-        {editingField && ["customer_source", "dg_customer_source", "dfq_customer_source", "supplier_source"].includes(editingField.field_key) && onConfigurePartySources ? (
+        {editingField && ["customer_source", "dg_customer_source", "supplier_source"].includes(editingField.field_key) && onConfigurePartySources ? (
           <Form.Item>
             <PermissionButton permission="field-definition.manage" onClick={onConfigurePartySources}>
               {editingField.field_key === "supplier_source" ? "配置供货方来源" : "配置客户来源"}

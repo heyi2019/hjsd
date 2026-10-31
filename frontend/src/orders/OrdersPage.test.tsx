@@ -82,7 +82,7 @@ describe("OrdersPage：四类业务台账", () => {
     renderLight(<OrdersPage />);
     await screen.findByRole("tab", { name: "业务台账" });
     expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
-    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂、代分期分别承载不同业务。")).toBeNull();
+    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
     expect(screen.queryByText(/待处理/)).toBeNull();
   });
 
@@ -312,11 +312,11 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
   });
 
-  it("新建订单菜单提供回收、提号、代挂、代分期四个表单", async () => {
+  it("新建订单菜单提供回收、提号、代挂三个表单", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务台账" });
     await ui.click(screen.getByRole("button", { name: /新建订单/ }));
-    for (const label of ["新建回收订单", "新建提号订单", "新建代挂订单", "新建代分期订单"]) {
+    for (const label of ["新建回收订单", "新建提号订单", "新建代挂订单"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
   });

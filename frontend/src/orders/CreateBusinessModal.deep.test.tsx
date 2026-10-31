@@ -44,11 +44,11 @@ afterEach(() => {
 
 async function openTypedModal(orderType: string, onClose = vi.fn(), onCreated = vi.fn()) {
   renderLight(
-    <CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG" | "DFQ"} />,
+    <CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG"} />,
     { user: "admin" },
   );
   const title = await screen.findByText(
-    orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : "新建代分期订单",
+    orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : "新建业务",
   );
   return { container: title.closest(".ant-modal-content") as HTMLElement, onClose, onCreated };
 }

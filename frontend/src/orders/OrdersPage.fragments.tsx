@@ -33,14 +33,13 @@ export function MobileOrderList(props: {
   );
 }
 
-export type BusinessFilterKey = "all" | "HS" | "TH" | "DG" | "DFQ";
+export type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
 export type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
 
 export const BUSINESS_CREATE_ITEMS = [
   { key: "HS", label: "新建回收订单" },
   { key: "TH", label: "新建提号订单" },
   { key: "DG", label: "新建代挂订单" },
-  { key: "DFQ", label: "新建代分期订单" },
 ];
 
 /** 分润弹窗的一行：姓名（员工 id 或 COMPANY）+ 角色 + 比例 + 金额（比例/金额都选填、互斥）。 */

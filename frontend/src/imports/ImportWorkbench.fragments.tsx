@@ -35,7 +35,7 @@ export const IMPORT_TEMPLATES: Record<string, { filename: string; content: strin
   },
   STANDARD_INSTALLMENT: {
     filename: "分期导入模板.csv",
-    content: "合同日期,合同类型,本金,首付,期数,每期金额,已收金额,状态,备注\n2026-01-31,ADVANCE_PURCHASE,0.00,0.00,1,0.00,0.00,PENDING,",
+    content: "合同日期,合同类型,本金,首付,期数,每期金额,已收金额,状态,备注\n2026-01-31,STOCK_SALE,0.00,0.00,1,0.00,0.00,PENDING,",
   },
   STANDARD_LEAD: {
     filename: "需求导入模板.csv",

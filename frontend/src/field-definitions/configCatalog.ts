@@ -54,7 +54,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "order-types",
     label: "业务类型",
-    summary: "回收/提号/代挂/代分期等定义，含资金性质与编号前缀",
+    summary: "回收/提号/代挂等定义，含资金性质与编号前缀",
     group: "MASTER",
     // 只收 OrderTypeDef：路由（OrderTypePool）归「资金池」项，
     // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool / pool_account 的处理口径一致）。

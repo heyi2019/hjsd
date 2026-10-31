@@ -81,17 +81,6 @@ export function DashboardPage({ onNavigate, active = true }: { onNavigate?: (key
               />
             </div>
           </section>
-          <section className="dashboard-entry-group dashboard-entry-group--no-accent dashboard-entry-group--neutral dashboard-entry-group--service" aria-labelledby="dashboard-value-service-title">
-            <div className="dashboard-entry-group__heading">
-              <h2 id="dashboard-value-service-title">增值服务</h2>
-            </div>
-            <div className="dashboard-entry-group__items">
-              <EntryCard
-                title="代分期服务"
-                onClick={() => openCreate("DFQ")}
-              />
-            </div>
-          </section>
         </PermissionGate>
       </EntryRow>
 

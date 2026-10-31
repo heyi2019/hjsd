@@ -19,6 +19,23 @@
 .inventory-sale-installment-fields { grid-column: 1 / -1; }
 .inventory-sale-installment-fields .installment-schedule-list { grid-column: 1 / -1; }
 
+/* 分期计划卡片：把逐期到期日容器做成带标题的独立区块，与资金流水卡片视觉一致。 */
+.inventory-sale-plan {
+  grid-column: 1 / -1;
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 50%, transparent);
+}
+.inventory-sale-plan__title {
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: var(--border-w) solid var(--glass-border);
+  color: var(--color-text-primary);
+  font: var(--font-section);
+}
+
 /* 售表单统一布局：标签在左、输入在右（贴合系统全局『左标签右填写』规范，与买号表单一致）。
    仅作用于售表单作用域，不改共享组件本身。 */
 .inventory-sale-modal .ant-form-item-row {

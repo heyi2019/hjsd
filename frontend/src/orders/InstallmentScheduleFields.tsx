@@ -24,7 +24,7 @@ export function serializeInstallmentSchedule(
   return (items ?? []).map((item, index) => ({ period_no: index + 1, due_on: toDateString(item.due_on) }));
 }
 
-/** 代分期与库存售出共用的逐期到期日计划。期数由各自业务表单负责同步。 */
+/** 库存售出共用的逐期到期日计划。期数由各自业务表单负责同步。 */
 export function InstallmentScheduleFields(props: { name: string }) {
   return <Form.List name={props.name} initialValue={[{}]}>{(fields) => (
     <div className="installment-schedule-list">

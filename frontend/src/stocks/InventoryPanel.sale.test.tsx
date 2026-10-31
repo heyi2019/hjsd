@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
+  resolveMock(vi.mocked(catalog.installmentsApi.pay), { id: 51 });
   resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[0],
     orders: [{
@@ -337,7 +338,7 @@ it("代挂售出复用买号交付信息块，交付负责人提交落库到来�
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({ form_extra: { delivery_responsible_ids: [1] } })));
   });
 
-it("提号库存从库存中心售出时统一按库存分期出售", async () => {
+it("提号库存从库存中心售出时统一按库存分期出售，确立时收首付", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
       { id: 6, source_order_id: 21, game_account: "pickup-acc", platform: "B平台", status: "WAITING", cost_amount: "0.00", inventory_type: "PICKUP" },
@@ -349,6 +350,10 @@ it("提号库存从库存中心售出时统一按库存分期出售", async () =
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1200");
     await ui.click(screen.getByText("分期付款"));
+    await ui.clear(screen.getByLabelText("首付金额"));
+    await ui.type(screen.getByLabelText("首付金额"), "300");
+    await ui.click(screen.getByLabelText("资金账户"));
+    await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     await ui.clear(screen.getByLabelText("分期期数"));
     await ui.type(screen.getByLabelText("分期期数"), "2");
     await ui.clear(screen.getByLabelText("每期金额"));
@@ -359,8 +364,15 @@ it("提号库存从库存中心售出时统一按库存分期出售", async () =
       order_id: 21,
       contract_type: "STOCK_SALE",
       principal: "1200",
+      down_payment: "300",
     })));
+    // 首付在分期计划确立时通过 pay(period_no:0) 入账，金额=首付、进所选资金账户。
+    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.pay)).toHaveBeenCalledWith(
+      41,
+      expect.objectContaining({ amount: "300", period_no: 0, pool_id: 3 }),
+    ));
     expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled();
+    // 首付走分期 pay 通道（PAYMENT/PROFIT），不单独再挂 SELL 事件。
     expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
   });
 

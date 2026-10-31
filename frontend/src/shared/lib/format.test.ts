@@ -87,11 +87,11 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
     );
   });
 
-  it("交付动作按订单类型区分买入交付与售出交付", () => {
-    expect(executionActionLabel("BUY", "DFQ")).toBe("付款");
-    expect(executionActionLabel("DELIVER", "DFQ")).toBe("售出交付");
+  it("交付动作文案：DELIVER 统一为买入交付，不再按订单类型区分", () => {
     expect(executionActionLabel("DELIVER", "HS")).toBe("买入交付");
-    expect(executionActionLabel("PAYMENT", "DFQ")).toBe("还款（分期）");
+    expect(executionActionLabel("DELIVER", "DG")).toBe("买入交付");
+    expect(executionActionLabel("BUY", "HS")).toBe("买号");
+    expect(executionActionLabel("PAYMENT", "HS")).toBe("回款（分期）");
   });
 });
 

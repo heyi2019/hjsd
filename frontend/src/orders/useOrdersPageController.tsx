@@ -241,9 +241,7 @@ export function useOrdersPageController(params: {
         appMessage.success(
           installment.contract_type === "PICKUP_SALE"
             ? `${refundSummary}，提号交易已结束`
-            : installment.contract_type === "ADVANCE_PURCHASE"
-              ? `${refundSummary}，代分期交易已结束`
-              : `${refundSummary}，账号已回到库存`,
+            : `${refundSummary}，账号已回到库存`,
         );
         if (result.order_status === "CANCELLED") await load();
       } else {
@@ -307,7 +305,7 @@ export function useOrdersPageController(params: {
     }
   };
 
-  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅 DFQ 可维护，
+  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅特定业务可维护，
    *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
   const openEditOrder = (order: Order) => {
     setSelectedOrder(order);

@@ -21,8 +21,7 @@ describe("表单作用域顺序", () => {
     const options = buildGroupedScopeOptions([
       { code: "FUNDFLOW", label: "录入流水", group: "FUND" },
       { code: "HS", label: "回收建单", group: "ORDER" },
-      { code: "DFQ", label: "代分期建单", group: "ORDER" },
-      { code: "TH", label: "提号建单", group: "ORDER" },
+          { code: "TH", label: "提号建单", group: "ORDER" },
       { code: "DG", label: "代挂建单", group: "ORDER" },
       { code: "ORDERCANC", label: "售出取消交易", group: "ORDEROP" },
       { code: "SALE", label: "库存售出", group: "INVENTORY" },
@@ -30,7 +29,7 @@ describe("表单作用域顺序", () => {
     ]);
 
     expect(options.map((group) => group.label)).toEqual(["资金", "建单表单", "订单操作", "库存中心"]);
-    expect(options[1].options.map((item) => item.value)).toEqual(["HS", "DFQ", "TH", "DG"]);
+    expect(options[1].options.map((item) => item.value)).toEqual(["HS", "TH", "DG"]);
     expect(options[3].options.map((item) => item.value)).toEqual(["SALE", "CONSIGN"]);
   });
 

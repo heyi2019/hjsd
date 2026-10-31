@@ -6,7 +6,6 @@ export const ORDER_TYPE_LABEL: Record<string, string> = {
   HS: "回收",
   TH: "提号",
   DG: "代挂",
-  DFQ: "代分期",
 };
 
 export const CAPITAL_TYPE_LABEL: Record<string, string> = {
@@ -24,12 +23,10 @@ export const BUSINESS_TYPE_LABEL: Record<string, string> = {
   RECOVERY: "回收",
   PICKUP: "提号",
   CONSIGNMENT: "代挂",
-  INSTALLMENT: "代分期",
 };
 
 export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
   STOCK_SALE: "分期",
-  ADVANCE_PURCHASE: "代分期",
   PICKUP_SALE: "提号分期",
   CONSIGNMENT_SALE: "代挂分期",
 };
@@ -119,7 +116,6 @@ export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   SELF_DIRECT_COST: "自营直接成本",
   TH_DIRECT_COST: "提号/代挂直接成本",
   TH_REVENUE: "提号/代挂收入",
-  DFQ_PRINCIPAL: "代分期借款本金",
   SERVICE_REVENUE: "增值服务收入",
   REBATE_INCOME: "返点收入",
   OPERATING_EXPENSE: "运营费用",

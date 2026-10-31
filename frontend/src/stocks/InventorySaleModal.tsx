@@ -5,7 +5,6 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { customersApi,
   employeesApi,
-  installmentsApi,
   ordersApi,
   poolsApi,
   type Account,
@@ -17,10 +16,11 @@ import { today } from "../shared/lib/format";
 import { AdaptiveFormGrid, BusinessActionModal, BusinessForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
-import { InstallmentScheduleFields, resizeInstallmentSchedule, serializeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
+import { InstallmentScheduleFields, resizeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSection";
 import { DeliveryInfoSection } from "../orders/DeliveryInfoSection";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
+import { collectFullPayment, collectInstallmentPayment } from "./ReceiverSection";
 import "./InventorySaleModal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
@@ -112,9 +112,9 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     const count = Number(periods);
     if (!Number.isInteger(count) || count <= 0) return;
     const current = form.getFieldValue("installment_schedule") as Array<{ due_on?: unknown }> | undefined;
-    const next = resizeInstallmentSchedule(current, count, (index) => ({ due_on: dayjs().add(index, "month") })).map((item, index) => ({
+    const next = resizeInstallmentSchedule(current, count, (index) => ({ due_on: dayjs().add(index + 1, "month") })).map((item, index) => ({
       ...item,
-      due_on: item.due_on ?? dayjs().add(index, "month"),
+      due_on: item.due_on ?? dayjs().add(index + 1, "month"),
     }));
     if (current?.length !== next.length || current.some((item) => !item?.due_on)) form.setFieldValue("installment_schedule", next);
   }, [form, paymentMethod, periods]);
@@ -177,48 +177,10 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       });
 
       if (values.payment_method === "INSTALLMENT") {
-        const schedule = serializeInstallmentSchedule(
-          values.installment_schedule as Array<{ due_on?: unknown }> | undefined,
-          (value) => value && typeof value === "object" && "format" in value
-            ? (value as { format: (template: string) => string }).format("YYYY-MM-DD")
-            : today(),
-        );
-        const firstDueOn = schedule[0]?.due_on ?? today();
-        await installmentsApi.create({
-          order_id: sourceOrderId,
-          adjust_final_period: true,
-          // 提号账号进入库存后，分期售出统一按库存分期出售处理（代挂售出仅全款，不在本表单分期）。
-          contract_type: "STOCK_SALE",
-          principal: String(values.amount ?? 0),
-          down_payment: String(values.down_payment ?? 0),
-          service_fee: String(values.service_fee ?? 0),
-          periods: Number(values.periods ?? 1),
-          per_period_service_fee: String(values.per_period_service_fee ?? 0),
-          per_period: String(values.per_period ?? 0),
-          first_due_on: firstDueOn,
-          schedule,
-          note: values.note as string | undefined,
-        });
+        await collectInstallmentPayment({ sourceOrderId, values, isConsignment });
         appMessage.success("分期售出已创建，账号已进入分期中");
       } else {
-        const consignmentExtra: Record<string, unknown> = {};
-        if (isConsignment && values.sale_amount != null && String(values.sale_amount) !== "") {
-          consignmentExtra.form_extra = { sale_amount: String(values.sale_amount) };
-        }
-        await ordersApi.postEvent(sourceOrderId, {
-          event_type: "SELL",
-          amount: values.amount as string,
-          occurred_on: today(),
-          pool_id: values.pool_id as number,
-          portion: "PROFIT",
-          note: values.cashflow_note as string | undefined,
-          bound_phone: values.bound_phone as string | undefined,
-          bound_phone_owner: values.bound_phone_owner as string | undefined,
-          ...(values.amount2 != null && String(values.amount2) !== ""
-            ? { amount2: String(values.amount2), pool_id2: values.pool_id2 as number }
-            : {}),
-          ...consignmentExtra,
-        });
+        await collectFullPayment({ sourceOrderId, values, isConsignment });
         appMessage.success("账号已售出");
       }
       // 交付负责人是订单级字段，售出后在来源单上登记（merge 进订单 form_extra，不动其它字段）。
@@ -306,11 +268,21 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                 <div className="inventory-sale-installment-fields">
                   <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
                   <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
+                  <CfgItem
+                    name="pool_id"
+                    label="资金账户"
+                    rules={downPayment != null && Number(downPayment) > 0 ? [{ required: true, message: "请选择首付收款资金账户" }] : []}
+                  >
+                    <Select placeholder="首付收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+                  </CfgItem>
                   <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
                   <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>
                   <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}><MoneyInput placeholder="按服务费总额/期数计算" /></CfgItem>
                   <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value); if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配"); } }]} extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
-                  <InstallmentScheduleFields name="installment_schedule" />
+                  <div className="inventory-sale-plan">
+                    <div className="inventory-sale-plan__title">分期计划</div>
+                    <InstallmentScheduleFields name="installment_schedule" />
+                  </div>
                 </div>
               )}
             </AdaptiveFormGrid>

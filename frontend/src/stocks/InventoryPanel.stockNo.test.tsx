@@ -10,7 +10,7 @@ vi.mock("../shared/api/catalog");
 
 setupInventoryPanelMocks();
 
-// 覆盖共享 mock：本文件使用含 DG 代挂 / DFQ 代分期衍生账号的 stockNoAccounts。
+// 覆盖共享 mock：本文件使用含 DG 代挂衍生账号的 stockNoAccounts。
 beforeEach(() => {
   vi.mocked(catalog.stocksApi.list).mockResolvedValue(stockNoAccounts as never);
 });
@@ -38,17 +38,17 @@ describe("InventoryPanel：库存编号（KU 编码）", () => {
     expect(screen.getByText("acc-1")).toBeInTheDocument();
   });
 
-  it("不同业务类型的库存账号均显示各自 stock_no（含 DG/DFQ 衍生）", async () => {
+  it("不同业务类型的库存账号均显示各自 stock_no（含 DG/TH 衍生）", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("KU_00004");
-    // 库存中心只展示仍在库的 HS 回收 / DG 代挂 / DFQ 代分期账号
+    // 库存中心只展示仍在库的 HS 回收 / DG 代挂 / TH 提号账号
     expect(screen.getByText("KU_00001")).toBeInTheDocument();
     expect(screen.getByText("KU_00003")).toBeInTheDocument();
     expect(screen.getByText("KU_00004")).toBeInTheDocument();
     expect(screen.queryByText("KU_00002")).toBeNull();
   });
 
-  it("导出 CSV 的库存编号列取自 stock_no（含 DG/DFQ 衍生）", () => {
+  it("导出 CSV 的库存编号列取自 stock_no（含 DG/TH 衍生）", () => {
     const csv = buildInventoryCsv(stockNoAccounts);
     expect(csv).toContain("KU_00003");
     expect(csv).toContain("KU_00004");

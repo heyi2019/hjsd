@@ -553,25 +553,32 @@
 .user-center__meta dd { margin: 0; color: var(--color-text-primary); }
 .user-center__perms { display: flex; flex-wrap: wrap; gap: var(--space-1-half); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
 .user-center__perms li { padding: 2px var(--space-2); border: var(--border-w) solid var(--color-border); border-radius: var(--radius-compact); background: var(--soft); color: var(--color-text-secondary); font-size: var(--fs-caption-1); }
+.user-center__password-form { row-gap: var(--space-2); }
 .user-center__password-form .ant-form-item {
   display: block;
   margin-block-end: var(--space-3);
 }
 .user-center__password-form .ant-form-item-row {
   display: grid;
-  grid-template-columns: minmax(6.5rem, 7.5rem) minmax(0, 1fr);
+  grid-template-columns: 7rem minmax(0, 22rem);
   align-items: center;
-  column-gap: var(--space-3);
+  column-gap: var(--space-2);
+  justify-content: start;
 }
 .user-center__password-form .ant-form-item-label { padding: 0; text-align: start; }
+.user-center__password-form .ant-form-item-label > label { white-space: nowrap; }
 .user-center__password-form .ant-form-item-control { min-width: 0; }
 .user-center__password-form .ant-form-item-explain,
 .user-center__password-form .ant-form-item-extra { grid-column: 2; }
 .user-center__password-form > .ant-btn-primary { grid-column: 1 / -1; margin-block-start: var(--space-2); }
 .user-center__password-form .user-center__logout {
   grid-column: 1 / -1;
-  justify-self: start;
-  min-width: 7rem;
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ui-control-height-lg);
+  margin-block-start: 0;
+  font-weight: 650;
   border-color: var(--color-error) !important;
   background: var(--color-error) !important;
   color: var(--on-accent) !important;

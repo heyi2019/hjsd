@@ -73,7 +73,7 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
           <Form.Item name="confirm_password" label="确认新密码" rules={[{ required: true }]}>
             <Input.Password autoComplete="new-password" />
           </Form.Item>
-          <Button type="primary" htmlType="submit" loading={submitting}>保存新密码</Button>
+          <Button type="primary" htmlType="submit" loading={submitting}>修改密码</Button>
           <Button
             type="primary"
             danger

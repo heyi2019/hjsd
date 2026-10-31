@@ -45,6 +45,8 @@ describe("UserCenterPage：账号信息与修改密码", () => {
     expect(list.querySelectorAll("li").length).toBeGreaterThan(0);
     expect(list.textContent).not.toMatch(/[a-z-]+\.[a-z-]+/);
     expect(document.querySelector(".user-center__password-form")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /修改密码/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /保存新密码/ })).toBeNull();
     expect(screen.getByRole("button", { name: /退出登录/ })).toHaveClass("user-center__logout");
   });
 
@@ -53,7 +55,7 @@ describe("UserCenterPage：账号信息与修改密码", () => {
     fireEvent.change(screen.getByLabelText("当前密码"), { target: { value: "old-pass-123" } });
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "different-999" } });
-    fireEvent.click(screen.getByRole("button", { name: /保存新密码/ }));
+    fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(changePasswordApi).not.toHaveBeenCalled();
   });
@@ -63,7 +65,7 @@ describe("UserCenterPage：账号信息与修改密码", () => {
     fireEvent.change(screen.getByLabelText("当前密码"), { target: { value: "old-pass-123" } });
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
-    fireEvent.click(screen.getByRole("button", { name: /保存新密码/ }));
+    fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
     await waitFor(() => expect(changePasswordApi).toHaveBeenCalledWith("old-pass-123", "new-pass-12345"));
     expect(await screen.findByText("密码已更新")).toBeInTheDocument();
   });

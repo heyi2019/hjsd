@@ -24,6 +24,17 @@ vi.mock("../shared/api/catalog");
 setupInventoryPanelMocks();
 
 describe("InventoryPanel：账号台账", () => {
+  it("筛选控件放在台账内容区内并与上边缘保持间距", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+
+    const search = await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
+    const filters = search.closest(".inventory-filters");
+    expect(filters).toBeInTheDocument();
+    expect(filters).toHaveClass("ui-filter-bar");
+    expect(filters).toHaveClass("ui-filter-bar--spaced");
+    expect(screen.queryByText("账号台账")).not.toBeInTheDocument();
+  });
+
   it("建单后刷新库存并把新账号放在第一页", async () => {
     const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
     await screen.findByText("acc-1");

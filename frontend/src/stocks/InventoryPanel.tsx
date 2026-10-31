@@ -625,46 +625,41 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         ]}
       />
 
-      <Card
-        className="glass"
-        title="账号台账"
-        extra={
-          <Space wrap>
-            <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
-            <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
-            <Select allowClear placeholder="按增值服务筛选" className="ui-control-width-inventory" value={valueAddedService} options={valueAddedOptions ?? []} onChange={(value) => { setValueAddedService(value); setPage(1); }} />
-            <Input
-              allowClear
-              value={keyword}
-              placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
-              aria-label="搜索库存账号"
-              className="ui-control-width-inventory"
-              onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+      <Card className="glass">
+        <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
+          <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
+          <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
+          <Select allowClear placeholder="按增值服务筛选" className="ui-control-width-inventory" value={valueAddedService} options={valueAddedOptions ?? []} onChange={(value) => { setValueAddedService(value); setPage(1); }} />
+          <Input
+            allowClear
+            value={keyword}
+            placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
+            aria-label="搜索库存账号"
+            className="ui-control-width-inventory"
+            onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+          />
+          <PermissionButton
+            permission="report.read"
+            aria-label="导出"
+            icon={<DownloadOutlined />}
+            loading={exporting}
+            onClick={() => void handleExport()}
+          >
+            导出
+          </PermissionButton>
+          <Space size={8}>
+            <Typography.Text type="secondary">排序</Typography.Text>
+            <Segmented
+              aria-label="库存排序"
+              value={sortDesc ? "desc" : "asc"}
+              options={[
+                { value: "desc", label: "最新在前" },
+                { value: "asc", label: "最旧在前" },
+              ]}
+              onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
             />
-            <PermissionButton
-              permission="report.read"
-              aria-label="导出"
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              onClick={() => void handleExport()}
-            >
-              导出
-            </PermissionButton>
-            <Space size={8}>
-              <Typography.Text type="secondary">排序</Typography.Text>
-              <Segmented
-                aria-label="库存排序"
-                value={sortDesc ? "desc" : "asc"}
-                options={[
-                  { value: "desc", label: "最新在前" },
-                  { value: "asc", label: "最旧在前" },
-                ]}
-                onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
-              />
-            </Space>
           </Space>
-        }
-      >
+        </Space>
         {compact ? (
           <MobileInventoryList
             rows={orderedRows}

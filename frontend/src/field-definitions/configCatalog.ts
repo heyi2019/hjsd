@@ -21,11 +21,12 @@ import {
   usersApi,
 } from "../shared/api/catalog";
 
-export type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
+export type ConfigGroupCode = "FIELD" | "MASTER" | "SEQUENCE" | "POLICY" | "GOV" | "ORG" | "OPS";
 
 export const CONFIG_GROUP_LABEL: Record<ConfigGroupCode, string> = {
   FIELD: "字段配置",
   MASTER: "业务主数据",
+  SEQUENCE: "编号管理",
   POLICY: "业务规则",
   GOV: "数据治理",
   ORG: "组织与权限",
@@ -139,7 +140,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     key: "sequences",
     label: "编号序列",
     summary: "单号生成现状排查；后端只读，不能在此修改",
-    group: "OPS",
+    group: "SEQUENCE",
     permission: "order-type.manage",
     readOnly: true,
     entityTypes: [],

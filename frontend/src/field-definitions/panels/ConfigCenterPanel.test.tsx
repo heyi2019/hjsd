@@ -31,24 +31,36 @@ beforeEach(() => {
   vi.mocked(catalog.optionSetsApi.list).mockResolvedValue({ items: [] } as never);
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 } as never);
   vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([] as never);
+  vi.mocked(catalog.sequencesApi.list).mockResolvedValue([] as never);
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
 describe("ConfigCenterPanel", () => {
-  it("顶部仅渲染字段配置与业务主数据两组，默认显示业务类型页面", async () => {
+  it("顶部渲染字段配置、业务主数据与编号管理，默认显示业务类型页面", async () => {
     renderLight(<ConfigCenterPanel />, { user: "admin" });
-    // 仅有两组标题
+    // 仅展示配置中心纳入的三组标题
     expect(await screen.findByText("字段配置")).toBeInTheDocument();
     expect(screen.getByText("业务主数据")).toBeInTheDocument();
     expect(screen.queryByText("业务规则")).toBeNull();
     expect(screen.queryByText("数据治理")).toBeNull();
     expect(screen.queryByText("组织与权限")).toBeNull();
     expect(screen.queryByText("作业与外观")).toBeNull();
+    expect(screen.getByText("编号管理")).toBeInTheDocument();
     // 默认选中业务类型（无权限门槛），渲染其现有页面（mock 数据 HS）
     expect(await screen.findByText("HS")).toBeInTheDocument();
-    // 两组导航项均存在
+    // 三组导航项均存在
     expect(screen.getByTestId("center-nav-form-fields")).toBeInTheDocument();
     expect(screen.getByTestId("center-nav-order-types")).toBeInTheDocument();
+    expect(screen.getByTestId("center-nav-sequences")).toBeInTheDocument();
+  });
+
+  it("点击编号序列后显示只读编号页面", async () => {
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<ConfigCenterPanel />, { user: "admin" });
+    await ui.click(screen.getByTestId("center-nav-sequences"));
+
+    expect(screen.getByText(/序列编号由后端按域独立发放/)).toBeInTheDocument();
+    expect(screen.getByText("库存编号")).toBeInTheDocument();
   });
 
   it("点击顶部页签切换到对应现有页面（业务类型 → 列表字段）", async () => {

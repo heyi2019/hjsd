@@ -40,7 +40,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | 系统发布版本 | `V1.0.1` |
 | 前端构建版本 | `1.0.1` |
 | 后端 API 版本 | `1.0.1`（唯一事实源 `backend/app/version.py`） |
-| 数据库迁移基线 | Alembic `0071`（生产 PostgreSQL 当前从 `0064` 继续升级） |
+| 数据库迁移基线 | Alembic 活动链 `0001` → `0003`（head `0003`）。**2026-11-01 更正**：10-31 已将 `0002..0071` 压平，生产 PostgreSQL 已 stamp 至 `0003`（= head），不再从 `0064` 走增量升级 |
 
 ### 本次内容
 

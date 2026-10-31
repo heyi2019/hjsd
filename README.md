@@ -90,7 +90,8 @@ cd frontend && npm run build
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
 | `backend/app` 领域包 | 20 个已挂载 router：`foundation` `parties` `search` `orders` + `orders.form_fields` `value_added_services`（分期域，路由名仍为 installments）`finance` `stocks` `reporting` `policy` `quality` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM |
-| `backend/alembic/versions` | 74 个迁移文件；基线 `0001_baseline.py`，当前 head `0073` |
+| `backend/alembic/squashed_versions` | **活动迁移链**：`0001_current_schema_baseline` → `0002` → `0003`，唯一 head `0003`（`alembic.ini` 的 `version_locations` 只指向此目录） |
+| `backend/alembic/versions` | 74 个历史增量迁移，**不被 alembic 加载**，仅作追溯（`run_regression.py lint` 仍扫描） |
 | `backend/tests/v1` | v1 测试 |
 | `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |

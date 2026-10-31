@@ -77,7 +77,7 @@ class SequenceKey(StrEnum):
     CASHFLOW_IN = "CASHFLOW_IN"
     IMPORT = "IMPORT"
     ATTACHMENT = "ATTACHMENT"
-    # 库存编号：账号台账唯一编码，KU + 四位流水（KU0001…），系统生成不可手改。
+    # 库存编号：账号台账唯一编码，KU_ + 五位流水（KU_00001…），系统生成不可手改。
     STOCK_NO = "STOCK_NO"
 
 

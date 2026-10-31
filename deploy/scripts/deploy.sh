@@ -18,7 +18,11 @@ set +a
 # 版本号唯一事实源是 backend/app/version.py：这里解析后导出，供镜像 tag 与容器内 /health 使用。
 # 不从 .env 读，避免"改了代码忘改配置"导致线上显示旧版本。
 # 解析失败只降级为 latest 并告警——版本标识不该成为部署关键路径上的阻断点。
-APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' ../backend/app/version.py 2>/dev/null | head -1 || true)"
+# 部署/回滚可显式覆盖版本（回滚时由 CI 传入 APP_VERSION=旧版本）；
+# 正常发布不设置该变量，仍从 version.py 单一事实源解析。
+if [ -z "${APP_VERSION:-}" ]; then
+  APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' ../backend/app/version.py 2>/dev/null | head -1 || true)"
+fi
 if [ -z "$APP_VERSION" ]; then
   APP_VERSION="latest"
   echo "⚠ 未能从 ../backend/app/version.py 解析版本号，镜像 tag 回落 latest" >&2

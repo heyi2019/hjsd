@@ -31,3 +31,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET section = 'BUSINESS' "
         "WHERE order_type_code = 'CONSIGN' AND field_key = 'platform_ids'"
     )
+

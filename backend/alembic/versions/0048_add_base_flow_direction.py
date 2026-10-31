@@ -23,3 +23,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET flow_direction = NULL "
         "WHERE flow_direction = 'BASE'"
     )
+

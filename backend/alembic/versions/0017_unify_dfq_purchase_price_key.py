@@ -20,3 +20,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET field_key = 'dfq_purchase_price' "
         "WHERE order_type_code = 'DFQ' AND field_key = 'recovery_price'"
     )
+

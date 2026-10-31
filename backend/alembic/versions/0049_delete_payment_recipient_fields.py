@@ -16,3 +16,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 历史字段已废弃，不恢复，避免重新出现在建单配置中。
     pass
+

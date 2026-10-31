@@ -44,3 +44,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 历史数据按业务要求删除，不可恢复；保留空回滚以支持迁移链回退。
     pass
+

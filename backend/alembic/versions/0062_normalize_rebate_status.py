@@ -18,3 +18,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 状态归一化不可逆，回退不恢复旧状态。
     pass
+

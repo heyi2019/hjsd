@@ -50,3 +50,4 @@ def downgrade() -> None:
         suffix = old_name.removeprefix("ix_stocks_")
         op.execute(text(f"DROP INDEX {old_name}"))
         op.execute(text(f"CREATE INDEX ix_accounts_{suffix} ON accounts ({suffix})"))
+

@@ -26,3 +26,4 @@ def downgrade() -> None:
         "UPDATE game_type_options SET channel_regions = NULL "
         "WHERE name IN ('王者荣耀', '和平精英', '原神')"
     )
+

@@ -104,3 +104,4 @@ def downgrade() -> None:
         session.commit()
     finally:
         session.close()
+

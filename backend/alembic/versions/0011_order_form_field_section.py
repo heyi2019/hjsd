@@ -17,3 +17,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("order_form_fields", "section")
+

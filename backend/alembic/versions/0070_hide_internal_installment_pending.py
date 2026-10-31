@@ -49,3 +49,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     _set_options(_LEGACY_INSTALLMENT_STATUS_OPTIONS)
+

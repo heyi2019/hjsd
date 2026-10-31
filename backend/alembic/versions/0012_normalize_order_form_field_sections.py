@@ -17,3 +17,4 @@ def downgrade() -> None:
     op.execute("UPDATE order_form_fields SET section = 'ORDER' WHERE section = 'EXTRA'")
     op.execute("UPDATE order_form_fields SET section = 'ACCOUNT' WHERE section = 'ACCOUNT_PRODUCT'")
     op.execute("UPDATE order_form_fields SET section = 'CUSTOMER' WHERE section = 'PARTICIPANT'")
+

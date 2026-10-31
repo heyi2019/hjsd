@@ -40,3 +40,4 @@ def downgrade() -> None:
             "UPDATE order_form_fields SET field_key = "
             f"'{old_key}' WHERE order_type_code = 'DFQ' AND field_key = '{new_key}'"
         )
+

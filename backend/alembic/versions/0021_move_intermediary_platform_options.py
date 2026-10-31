@@ -25,3 +25,4 @@ def downgrade() -> None:
         "WHERE order_type_code IN ('HS', 'TH') AND field_key = 'intermediary_platform'"
     )
     op.execute("UPDATE option_sets SET options = '[]' WHERE code = 'INTERMEDIARY_PLATFORM'")
+

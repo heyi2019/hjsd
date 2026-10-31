@@ -23,3 +23,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 历史流水按业务要求删除，不可恢复。
     pass
+

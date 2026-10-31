@@ -38,3 +38,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.add_column("order_form_fields", sa.Column("fund_nature", sa.String(length=16), nullable=True))
     op.drop_column("order_form_fields", "flow_direction")
+

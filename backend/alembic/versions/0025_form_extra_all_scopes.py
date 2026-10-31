@@ -28,3 +28,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     for table in reversed(_TABLES):
         op.drop_column(table, "form_extra")
+

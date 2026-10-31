@@ -1,9 +1,39 @@
 # 宜游轩 ERP · 阿里云部署指南
 
-> 目标：在阿里云 ECS 上用 Docker Compose 跑起后端（FastAPI + SQLite）与前端（React + Vite + Nginx）。
-> 已就绪的部署包：`backend/Dockerfile`、`frontend/Dockerfile`、`frontend/nginx.conf`、`deploy/docker-compose.yml`、`deploy/env/.env.production.example`、`deploy/scripts/deploy.sh`。
+> 当前发布状态（2026-10-31）：阿里云 ECS 已运行 PostgreSQL 16，后端已通过 `postgresql+psycopg` 连接该库。生产库当前 Alembic 版本为 `0064_expand_buy_rebate_scope`，下一次发布需继续执行 `0065→0071`，再创建数据库版本审计表。
+>
+> **数据库引擎切换已完成；迁移链收口仍需完成。** 目前编排和 PostgreSQL 驱动已接入，但备份恢复脚本仍保留 SQLite 回退路径。下文标记为「历史 SQLite 流程」的内容仅供回退与取数参考，不得用于 PostgreSQL 正式备份。
 
-## 零、本地构建注意事项（macOS + Docker Desktop 已实测通过）
+## 零、当前发布模型与切库门槛
+
+```text
+GitHub Actions（linux/amd64 构建）
+  ├─ heijin-backend:<version>
+  ├─ heijin-frontend:<version>
+  └─ postgres:16-alpine（必须随离线包预置，ECS 不依赖 Docker Hub 拉取）
+              ↓
+阿里云 ECS / Docker Compose
+  ├─ db       PostgreSQL，持久卷 erp_pgdata，仅绑定 127.0.0.1:5432
+  ├─ backend  DATABASE_URL 指向 db:5432
+  └─ frontend 对外暴露 80/443
+```
+
+数据库发布分为两个明确阶段：
+
+1. **已完成的切库**：SQLite 数据已导入 PostgreSQL，`erp_pgdata` 为正式业务数据卷；原 SQLite 卷在验收期保留，只作回退依据。
+2. **后续应用发布**：只发布经 CI 验证的应用镜像与部署文件；数据库结构由 Alembic 升级，数据备份改为 PostgreSQL 的 `pg_dump` / `pg_restore`。
+
+切库前必须全部满足以下条件：
+
+- 发布离线包包含 `postgres:16-alpine`，或 ECS 已通过受验证的镜像源预拉并校验该镜像；不能假定 Docker Hub 可访问。
+- `deploy/.env` 配置强随机 `POSTGRES_PASSWORD` 与 PostgreSQL `DATABASE_URL`，且 PostgreSQL 端口不对公网开放。
+- 线上数据库版本 `0064` 已只读核对；发布前必须在备份副本上演练 `0065→0071`，通过行数、关键表、管理员登录、业务读写与健康检查验证。
+- 自动发布脚本能显式执行、记录并校验迁移；失败时保持 SQLite 原卷和 PostgreSQL 空卷，不能半切换。
+- PostgreSQL 备份、恢复和异地留存已演练；旧的 SQLite 备份脚本不可继续充当正式数据库的灾备方案。
+
+---
+
+## 一、本地构建注意事项（macOS + Docker Desktop 已实测通过）
 
 完整跑通 `docker compose build` + `up`，后端健康检查与 nginx 同源反代均正常。两个实战踩坑已修进部署包：
 
@@ -35,7 +65,7 @@
 
 ---
 
-## 一、阿里云 ECS 选购清单（推荐）
+## 二、阿里云 ECS 选购清单（推荐）
 
 | 项目 | 推荐配置 | 说明 |
 |------|----------|------|
@@ -53,7 +83,7 @@
 
 ---
 
-## 二、购买步骤（阿里云控制台）
+## 三、购买步骤（阿里云控制台）
 
 1. 进入 **ECS 控制台 → 实例 → 创建实例**。
 2. 基础配置：选地域、实例规格（2核4G）、镜像（Ubuntu 22.04）。
@@ -65,7 +95,7 @@
 
 ---
 
-## 三、服务器初始化（SSH 登录后）
+## 四、服务器初始化（SSH 登录后）
 
 ```bash
 # 1. 安装 Docker + Compose 插件（Ubuntu 22.04）
@@ -80,7 +110,9 @@ sudo ufw allow 22,80,443/tcp
 
 ---
 
-## 四、部署项目
+## 五、部署项目（历史 SQLite 流程，仅用于现网回退与数据取证）
+
+> 本节命令尚未切换到 PostgreSQL，不能用于新的切库发布。切库上线应以本文「零、当前发布模型与切库门槛」为准，待离线 PostgreSQL 镜像、环境变量、自动迁移、备份恢复四项接入后，再补充可执行的正式 runbook。
 
 方式 A：git 拉取（推荐，便于更新）
 ```bash
@@ -164,7 +196,7 @@ docker compose down -v      # ⚠ 会连同卷内 backup 目录一起删除，�
 
 ---
 
-## 五、（可选）域名 + HTTPS
+## 六、（可选）域名 + HTTPS
 
 ```bash
 # 1. 域名解析 A 记录指向 ECS 公网 IP
@@ -178,7 +210,7 @@ sudo certbot certonly --standalone -d your-domain.com
 
 ---
 
-## 六、运维
+## 七、运维（历史 SQLite 流程）
 
 ```bash
 docker compose ps                 # 状态
@@ -249,7 +281,7 @@ ls -1t /tmp/restore_check/*.db | head -1
 
 ---
 
-## 七、生产注意事项
+## 八、生产注意事项
 
 1. **JWT_SECRET_KEY 必须替换**，否则任何人可伪造 token。
 2. **CORS_ORIGINS**：前端经 nginx 同源反代访问 API，浏览器不跨域，**留空即可**（留空 = 不启用 CORS，是正确状态）；仅当前端独立域名时才填真实来源，生产禁止 `*`（启动校验会拒绝）。
@@ -259,6 +291,7 @@ ls -1t /tmp/restore_check/*.db | head -1
    - **两层防护分工**：脚本的 ufw 对 22 是全网放行，IP 白名单由云安全组负责；只做一层等于没做。
    - 执行后**保持当前 SSH 会话不退出**，另开终端确认密钥登录成功后，再关闭原会话。
 5. **网关防护已内置**：Nginx 会限制单 IP 并发、对 API 限流，并对登录接口执行更严格的限流（超额返回 429）；同时发送防点击劫持、MIME 嗅探和权限策略响应头。生产 API 文档（`/docs`、`/redoc`、`/openapi.json`）已关闭。
-6. **正式库**：当前正式环境为 ECS 上的 SQLite v1 持久化库，部署前由脚本执行 `alembic upgrade head` 并保留数据卷，随后预置经营规则定义（幂等）；PostgreSQL 仅作为后续迁移目标，迁移完成前不得直接切换。
-7. **备份**：用 `scripts/backup_db.py` 做在线快照（见第六节），不要 `tar` 运行中的 `data/` 卷；换 PG 后改用 `pg_dump`。
-8. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离，配置已强制校验，勿手动改 `DATABASE_URL` 指向旧库。
+6. **正式数据库目标**：PostgreSQL 使用 `erp_pgdata` 持久卷，服务端口只能绑定 `127.0.0.1:5432`；业务容器经 Compose 内网访问，安全组不开放 5432。
+7. **切库纪律**：不得直接修改 `DATABASE_URL` 让线上服务指向空 PostgreSQL。必须先冻结写入、备份 SQLite、执行迁移工具、校验数据和业务链路，再完成流量切换；旧 SQLite 卷在验收期内保留，作为可验证的回退源。
+8. **备份**：切库完成前继续用 `scripts/backup_db.py` 保存 SQLite 一致性快照；切库完成后正式备份必须改为 `pg_dump`，恢复使用 `pg_restore`。不要对运行中的数据库数据目录直接 `tar`。
+9. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离；切库前勿手动改 `DATABASE_URL` 指向历史库，切库后勿将其改回 SQLite 以规避 PostgreSQL 故障。

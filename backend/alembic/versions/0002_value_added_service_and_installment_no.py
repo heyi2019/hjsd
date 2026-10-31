@@ -168,3 +168,4 @@ def downgrade() -> None:
     bind.execute(text("DELETE FROM document_sequences WHERE sequence_key = 'INSTALLMENT'"))
     # 回填建的账号保留（无归属引用时无害），仅回退结构与词典。
     op.drop_column("accounts", "value_added_service")
+

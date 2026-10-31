@@ -43,3 +43,4 @@ def downgrade() -> None:
         "WHERE order_type_code IN ('HS', 'TH') "
         "AND field_key IN ('other_fee_name', 'other_fee_amount', 'other_fee_recipient', 'design_fee')"
     )
+

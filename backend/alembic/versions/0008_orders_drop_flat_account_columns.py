@@ -151,3 +151,4 @@ def downgrade() -> None:
     op.execute(text("ALTER TABLE _orders_old_0008 RENAME TO orders"))
     for _, ddl in _ORDERS_INDEXES:
         op.execute(text(ddl))
+

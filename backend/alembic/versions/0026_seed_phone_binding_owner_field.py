@@ -36,3 +36,4 @@ def downgrade() -> None:
         "DELETE FROM order_form_fields "
         "WHERE order_type_code IN ('HS', 'DFQ') AND field_key = 'bound_phone_owner'"
     )
+

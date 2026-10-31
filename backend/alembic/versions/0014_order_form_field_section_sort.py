@@ -34,3 +34,4 @@ def downgrade() -> None:
         "ELSE 6000 END "
         "WHERE order_type_code IN ('HS', 'TH', 'DG', 'DFQ')"
     )
+

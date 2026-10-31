@@ -38,3 +38,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("UPDATE order_form_fields SET section = 'EXTRA' WHERE order_type_code NOT IN ('HS', 'TH', 'DG', 'DFQ')")
+

@@ -30,3 +30,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET section = 'PARTICIPANT', sort_order = 4900 "
         "WHERE order_type_code = 'DFQ' AND field_key = 'note'"
     )
+

@@ -43,3 +43,4 @@ def downgrade() -> None:
             conv("ck_accounts_account_status_valid"),
             "status IN ('IN_STOCK', 'SOLD', 'VOID')",
         )
+

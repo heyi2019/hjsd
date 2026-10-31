@@ -23,3 +23,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table("cashflow") as batch_op:
         batch_op.create_unique_constraint("uq_cashflow_event", ["order_event_id"])
+

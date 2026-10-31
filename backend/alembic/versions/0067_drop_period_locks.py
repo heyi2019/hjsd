@@ -35,3 +35,4 @@ def downgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_period_locks")),
         sa.UniqueConstraint("period", name="uq_period_locks_period"),
     )
+

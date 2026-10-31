@@ -21,3 +21,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET label = '经手平台' "
         "WHERE field_key = 'intermediary_platform'"
     )
+

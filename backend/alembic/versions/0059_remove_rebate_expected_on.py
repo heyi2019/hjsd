@@ -25,3 +25,4 @@ def downgrade() -> None:
             ["expected_on", "status"],
             unique=False,
         )
+

@@ -86,3 +86,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     _rebuild(_STOCKS_DDL_WITH_UNIQUE)
+

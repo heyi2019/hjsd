@@ -23,3 +23,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 旧配置按新业务口径删除，不恢复。
     pass
+

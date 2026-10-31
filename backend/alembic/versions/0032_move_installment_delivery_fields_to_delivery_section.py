@@ -24,3 +24,4 @@ def downgrade() -> None:
         "WHERE order_type_code = 'INSTDELIVER' "
         "AND field_key IN ('delivery_mode', 'delivered_on', 'note')"
     )
+

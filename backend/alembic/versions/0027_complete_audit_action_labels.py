@@ -58,3 +58,4 @@ def downgrade() -> None:
         text('UPDATE option_sets SET options = :options WHERE code = \'AUDIT_ACTION\''),
         {"options": json.dumps(options, ensure_ascii=False)},
     )
+

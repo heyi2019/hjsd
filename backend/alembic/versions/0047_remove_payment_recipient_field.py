@@ -21,3 +21,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET is_active = 1 "
         "WHERE field_key = 'payment_recipient'"
     )
+

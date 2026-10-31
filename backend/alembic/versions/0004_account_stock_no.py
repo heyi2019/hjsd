@@ -56,3 +56,4 @@ def downgrade() -> None:
     op.drop_index("uq_accounts_stock_no", table_name="accounts")
     bind.execute(text("DELETE FROM document_sequences WHERE sequence_key = 'STOCK_NO'"))
     op.drop_column("accounts", "stock_no")
+

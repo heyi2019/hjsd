@@ -41,3 +41,4 @@ def downgrade() -> None:
         "WHERE (order_type_code = 'HS' AND field_key = 'customer_source_other') "
         "OR (order_type_code = 'DG' AND field_key = 'dg_customer_source_other')"
     )
+

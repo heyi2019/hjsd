@@ -46,3 +46,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DELETE FROM option_sets WHERE code IN ('CUSTOMER_SOURCE', 'SUPPLIER_SOURCE')")
+

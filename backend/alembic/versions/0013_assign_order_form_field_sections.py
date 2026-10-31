@@ -52,3 +52,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     all_keys = ACCOUNT_KEYS + PARTICIPANT_KEYS + BUSINESS_KEYS + FINANCE_KEYS
     _update(all_keys, "EXTRA")
+

@@ -24,3 +24,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 新口径说明不回退到仅支持回收的旧文案。
     pass
+

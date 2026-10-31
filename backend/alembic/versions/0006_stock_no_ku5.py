@@ -53,3 +53,4 @@ def downgrade() -> None:
             "updated_at = CURRENT_TIMESTAMP WHERE sequence_key = 'STOCK_NO'"
         )
     )
+

@@ -231,7 +231,7 @@ def test_consignment_platform_field_is_operation_section(migration_env):
 
 
 def test_distribution_installment_types_are_merged_into_stock_sale():
-    """历史提号/代挂分期迁移后统一按库存分期出售处理。"""
+    """历史提号/代挂分期迁移后统一按库存分期出售处理（压平后逻辑并入 0002_squash）。"""
     import importlib.util
 
     migration_path = BACKEND_DIR / "alembic" / "versions" / "0056_merge_distribution_installment_types.py"
@@ -246,15 +246,29 @@ def test_distribution_installment_types_are_merged_into_stock_sale():
     assert "WHERE contract_type IN ('PICKUP_SALE', 'CONSIGNMENT_SALE')" in source
 
 
-def test_refund_form_is_reframed_as_cash_outflow():
-    """资金收支表单移除责任方，补齐日期和固定支出流向。"""
-    migration_path = BACKEND_DIR / "alembic" / "versions" / "0057_update_refund_cashflow_form_fields.py"
-    source = migration_path.read_text(encoding="utf-8")
-    assert "refund_responsibility" in source
-    assert "is_active = False" in source
-    assert 'field_key="occurred_on"' in source
-    assert 'field_key="direction"' in source
-    assert '"value": "OUT"' in source
+def test_refund_form_is_reframed_as_cash_outflow(migration_env):
+    """资金收支表单移除责任方，补齐日期和固定支出流向（压平后逻辑并入 0002_squash）。"""
+    env, db_file = migration_env
+    assert _alembic(env, "upgrade", "head").returncode == 0
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT field_key, field_type, is_active, options FROM order_form_fields "
+                    "WHERE order_type_code = 'REFUND'"
+                )
+            ).fetchall()
+            by_key = {r[0]: r for r in rows}
+            assert "refund_responsibility" in by_key, "应保留 责任方 字段"
+            assert by_key["refund_responsibility"][2] == 0, "refund_responsibility 应停用"
+            assert "occurred_on" in by_key, "应新增 发生日期 字段"
+            assert by_key["occurred_on"][1] == "DATE", "发生日期 应为 DATE 类型"
+            assert "direction" in by_key, "应新增 资金流向 字段"
+            assert "OUT" in (by_key["direction"][3] or ""), "资金流向 应为支出(OUT)"
+    finally:
+        engine.dispose()
 
 
 def test_upgrade_is_repeatable(migration_env):
@@ -384,34 +398,30 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
 
 
 def test_account_status_rename_migrates_legacy_rows_without_touching_inventory_status(migration_env):
-    """升级已有 0069 库时，账号周期迁移不能被旧 CHECK 约束拦截。"""
+    """库存周期状态由 IN_STOCK 更名为 WAITING，库存状态保持独立列不被更名触碰。
+
+    squash 后无法停在中间态复现「已存在旧 status 行」，故改为验证最终 schema：
+    stocks.status 的 CHECK 已更名为 WAITING（不再含 IN_STOCK），且 inventory_status
+    作为独立列共存。
+    """
+    import re
+
     env, db_file = migration_env
-    result = _alembic(env, "upgrade", "0069_split_order_installment_status")
-    assert result.returncode == 0, result.stdout + result.stderr
-
-    engine = create_engine(f"sqlite:///{db_file}")
-    try:
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "INSERT INTO stocks "
-                    "(id, status, inventory_status, cost_amount, created_by, updated_by) "
-                    "VALUES (9001, 'IN_STOCK', 'IN_STOCK', 0, 'pytest', 'pytest')"
-                )
-            )
-    finally:
-        engine.dispose()
-
-    result = _alembic(env, "upgrade", "head")
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert _alembic(env, "upgrade", "head").returncode == 0
 
     engine = create_engine(f"sqlite:///{db_file}")
     try:
         with engine.connect() as connection:
-            row = connection.execute(
-                text("SELECT status, inventory_status FROM stocks WHERE id = 9001")
-            ).one()
-            assert row == ("WAITING", "IN_STOCK")
+            cols = [c["name"] for c in inspect(connection).get_columns("stocks")]
+            assert "inventory_status" in cols, "库存状态应独立保留为列"
+            create_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE name='stocks'")
+            ).scalar()
+            m = re.search(r"CHECK \(status IN \(([^)]*)\)", create_sql)
+            assert m, "stocks 应有 status CHECK 约束"
+            status_values = m.group(1)
+            assert "WAITING" in status_values, "status 应已更名为 WAITING"
+            assert "IN_STOCK" not in status_values, "旧 IN_STOCK 应从 status CHECK 移除"
     finally:
         engine.dispose()
 

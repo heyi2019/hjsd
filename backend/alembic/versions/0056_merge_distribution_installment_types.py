@@ -30,3 +30,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 两种旧类型已合并为同一业务口径，迁移后无法可靠区分原始类型，故不回写。
     pass
+

@@ -20,3 +20,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 旧字段已被新的附加支出明细模型取代，不在回滚时重新引入过时定义。
     pass
+

@@ -133,3 +133,4 @@ def downgrade() -> None:
         {"options": _SEQ_OPTIONS_OLD},
     )
     _rebuild_table(padding_max=4, value_max=9999)
+

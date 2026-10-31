@@ -22,3 +22,4 @@ def downgrade() -> None:
     with op.batch_alter_table("list_column_configs") as batch:
         batch.drop_column("fixed")
         batch.drop_column("width")
+

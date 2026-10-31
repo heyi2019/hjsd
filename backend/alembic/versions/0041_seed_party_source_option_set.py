@@ -40,3 +40,4 @@ def downgrade() -> None:
     op.execute(
         "DELETE FROM option_sets WHERE code = 'PARTY_SOURCE'"
     )
+

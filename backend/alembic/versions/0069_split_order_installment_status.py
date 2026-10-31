@@ -63,3 +63,4 @@ def downgrade() -> None:
             "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')",
         )
 
+

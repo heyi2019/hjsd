@@ -63,3 +63,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     # 排序调整不改变字段内容，回滚时保留当前稳定顺序。
     pass
+

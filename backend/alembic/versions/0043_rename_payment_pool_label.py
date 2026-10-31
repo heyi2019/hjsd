@@ -21,3 +21,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET label = '付款资金账户' "
         "WHERE field_key = 'payment_pool_id' AND label = '资金账户'"
     )
+

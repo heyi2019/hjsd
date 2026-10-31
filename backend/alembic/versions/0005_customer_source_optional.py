@@ -97,3 +97,4 @@ def downgrade() -> None:
             " '{\"field\": \"dg_customer_source\", \"op\": \"eq\", \"values\": [\"其他\"]}')"
         )
     )
+

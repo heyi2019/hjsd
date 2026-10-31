@@ -17,3 +17,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("rebate_records", "operator_user_ids")
+

@@ -57,22 +57,22 @@ class OrderFormField(Base, AuditMixin):
     # 资金字段的流向属性：IN=收入，OUT=支出；非资金字段为空。
     flow_direction: Mapped[str | None] = mapped_column(String(8), nullable=True)
     required: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=sa.text("0")
+        Boolean, nullable=False, server_default=sa.false()
     )
     # 条件必填：{"field": 依赖字段键, "op": "eq|ne|filled", "values": [触发值]}
     # 与 required 互斥（required=True 时忽略并清空）；为空即纯选填。
     required_when: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=sa.text("1")
+        Boolean, nullable=False, server_default=sa.true()
     )
     sort_order: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sa.text("0")
     )
     locked: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=sa.text("0")
+        Boolean, nullable=False, server_default=sa.false()
     )
     is_custom: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=sa.text("0")
+        Boolean, nullable=False, server_default=sa.false()
     )
     # 字段归属板块：账号/产品、客户/供货方、费用资金、业务方案、交付、运营、其他补充。
     section: Mapped[str] = mapped_column(

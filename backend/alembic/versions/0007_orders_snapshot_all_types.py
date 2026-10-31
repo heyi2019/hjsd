@@ -115,3 +115,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     _rebuild(_SNAPSHOT_CHECK_OLD)
+

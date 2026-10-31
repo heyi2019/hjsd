@@ -21,3 +21,4 @@ def downgrade() -> None:
         "UPDATE order_form_fields SET flow_direction = NULL "
         "WHERE order_type_code = 'ORDERCANC' AND field_key = 'cancel_amount'"
     )
+

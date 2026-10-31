@@ -15,3 +15,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("game_type_options", "channel_regions")
+

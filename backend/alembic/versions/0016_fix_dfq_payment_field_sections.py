@@ -22,3 +22,4 @@ def downgrade() -> None:
         "WHERE order_type_code = 'DFQ' AND field_key IN "
         "('dfq_payment_pool_id', 'dfq_payment_recipient', 'dfq_payment_note')"
     )
+

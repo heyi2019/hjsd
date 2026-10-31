@@ -40,3 +40,4 @@ def downgrade() -> None:
     with op.batch_alter_table("stocks") as batch_op:
         batch_op.drop_constraint("account_inventory_status_valid", type_="check")
         batch_op.drop_column("inventory_status")
+

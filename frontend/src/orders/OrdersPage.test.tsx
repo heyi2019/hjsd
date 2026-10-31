@@ -126,6 +126,57 @@ describe("OrdersPage：四类业务台账", () => {
     }
   });
 
+  it("行展开直接复用库存中心的订单详情", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      { ...orders[0], account_id: 1 },
+      orders[1],
+    ]);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: {
+        id: 1,
+        stock_no: "KU_00001",
+        game_account: "seller-001",
+        game_type: "原神",
+        platform: "安卓",
+        status: "IN_STOCK",
+        cost_amount: "1234.00",
+        created_by: "admin",
+        created_at: "2026-10-01T09:30:00",
+      },
+      orders: [{
+        order_id: 1,
+        order_no: "HS-2026-0001",
+        order_type: "HS",
+        trade_date: "2026-10-01",
+        created_at: "2026-10-01T09:30:00",
+        status: "ACTIVE",
+        events: [{
+          id: 11,
+          event_no: "EV0011",
+          event_type: "BUY",
+          amount: "1234.00",
+          occurred_on: "2026-10-01",
+          occurred_at: "2026-10-01T10:00:00",
+          portion: "PRINCIPAL",
+          is_posted: true,
+          operator: "admin",
+        }],
+      }],
+    } as never);
+
+    await openLedger();
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+
+    // 与库存中心同一套详情：六个板块整块出现，而非订单摘要。
+    expect(await screen.findByText("游戏账号信息")).toBeInTheDocument();
+    expect(screen.getByText("运营信息")).toBeInTheDocument();
+    expect(screen.getByText("资金明细")).toBeInTheDocument();
+    expect(screen.getByText("操作明细")).toBeInTheDocument();
+    expect(screen.getByText("参与方信息")).toBeInTheDocument();
+    expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
+  });
+
   it("操作列提供更多菜单入口", async () => {
     await openLedger("admin");
 

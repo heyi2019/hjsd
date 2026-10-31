@@ -1,6 +1,6 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务中心：库存中心 + 业务台账 + 分期回款。 */
-import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Tabs, Typography } from "antd";
+import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Spin, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -11,6 +11,8 @@ import {
   policyApi,
   employeesApi,
   poolsApi,
+  stocksApi,
+  type AccountExecutionDetail,
   type Installment,
   type Order,
   type OrderLink,
@@ -25,6 +27,8 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
+import { OrderDetail } from "../stocks/OrderDetail";
+import type { InventoryPartyLink } from "../stocks/OrderDetailView";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import {
@@ -42,7 +46,6 @@ import {
   BusinessActionModal,
   BusinessForm,
 } from "../shared/ui";
-import { OrderDetailPane } from "./OrderDetailPane";
 import { CreateBusinessModal, type BusinessOrderType } from "./CreateBusinessModal";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
 import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
@@ -52,7 +55,7 @@ import {
   type BusinessCenterTab,
 } from "./businessCenter";
 
-// 订单字段板块常量（ORDER_FIELD_SECTION_LABEL / ORDER_FIELD_SECTION_ORDER）已迁移至 OrderDetailPane。
+// 台账行展开直接复用库存中心的订单详情（LedgerOrderDetail），字段板块顺序与库存中心同一份实现。
 
 function MobileOrderList(props: {
   orders: Order[];
@@ -274,9 +277,26 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
+  // 台账行展开直接复用库存中心的 OrderDetail：按订单 account_id 拉执行明细后原样渲染，
+  // 详情只在库存中心一处维护，库存侧改动自动同步到台账。
+  const [ledgerDetails, setLedgerDetails] = useState<Record<number, AccountExecutionDetail>>({});
+  const [ledgerDetailLoading, setLedgerDetailLoading] = useState<Record<number, boolean>>({});
+  async function loadLedgerDetail(accountId: number) {
+    if (ledgerDetails[accountId] || ledgerDetailLoading[accountId]) return;
+    setLedgerDetailLoading((current) => ({ ...current, [accountId]: true }));
+    try {
+      const detail = await stocksApi.executionDetail(accountId);
+      setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setLedgerDetailLoading((current) => ({ ...current, [accountId]: false }));
+    }
+  }
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
+    if (expanded && record.account_id) void loadLedgerDetail(record.account_id);
   };
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
@@ -587,7 +607,6 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
   useReloadOnActive(active, load);
 
-  const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)
     .slice()
@@ -771,7 +790,26 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                   expandable={{
                     expandedRowKeys: expandedOrderIds,
                     onExpand: handleLedgerExpand,
-                    expandedRowRender: (order) => <OrderDetailPane order={order} typeNames={typeNames} />,
+                    expandedRowRender: (order) => {
+                      const accountId = order.account_id ?? null;
+                      if (accountId === null) {
+                        return <Typography.Text type="secondary">该订单未关联库存账号，暂无库存详情。</Typography.Text>;
+                      }
+                      const detail = ledgerDetails[accountId];
+                      if (!detail) return <Spin size="small" />;
+                      return (
+                        <OrderDetail
+                          row={detail.account}
+                          detail={detail}
+                          loading={Boolean(ledgerDetailLoading[accountId])}
+                          onPartyClick={(party: InventoryPartyLink) => onNavigate?.(
+                            party.entityType === "customer"
+                              ? `customers?customer_id=${party.id}`
+                              : `customers?counterparty_id=${party.id}`,
+                          )}
+                        />
+                      );
+                    },
                   }}
                   onPageChange={(nextPage, nextSize) => {
                     setPage(nextPage);

@@ -5,10 +5,30 @@ import pytest
 
 from app.core.errors import AppError, ErrorCode
 from app.domain.enums import CapitalType, PoolStatus, Portion
+from app.domain.options import OptionSet
+from app.domain.trade_models.form_config import OrderFormField
+from app.foundation.catalog_seed import seed_catalog
 from app.foundation import service
 
 
 class TestOrderTypes:
+    def test_catalog_seed_is_idempotent_and_sets_cancel_flow_direction(self, db):
+        seed_catalog(db, actor="pytest")
+        db.commit()
+
+        first_option_count = db.query(OptionSet).count()
+        first_field_count = db.query(OrderFormField).count()
+        cancel_amount = db.query(OrderFormField).filter_by(
+            order_type_code="ORDERCANC", field_key="cancel_amount"
+        ).one()
+        assert cancel_amount.flow_direction == "IN"
+
+        seed_catalog(db, actor="second")
+        db.commit()
+
+        assert db.query(OptionSet).count() == first_option_count
+        assert db.query(OrderFormField).count() == first_field_count
+
     def test_new_business_needs_no_code_change(self, db):
         order_type = service.create_order_type(
             db, code="TB", name="同行代收", capital_type=CapitalType.STOCK.value, actor="pytest"

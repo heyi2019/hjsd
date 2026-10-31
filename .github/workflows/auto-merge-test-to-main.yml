@@ -1,0 +1,63 @@
+name: auto-merge-test-to-main
+
+# 触发：每次 push 到 test 分支（即 dev 推上来）
+# 行为：轮询 4 个 CI gate（lint/frontend-gate/frontend-e2e/coverage），
+#       全部 success 后将 test 以 non-ff merge commit 合入 main，
+#       从而触发 deploy-production 自动部署 ECS。
+# 安全：仅 --no-ff 合并（main 含旧 merge commit 无法快进）；
+#       幂等（test 已合入 main 则跳过）；任一 gate 失败则中止，绝不强制合并。
+on:
+  push:
+    branches: [test]
+
+permissions:
+  contents: write
+
+jobs:
+  wait-and-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for merge)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Wait for all 4 CI gates to be green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -e
+          for wf in lint-gate frontend-gate frontend-e2e coverage-gate; do
+            echo "waiting for $wf ..."
+            for i in $(seq 1 120); do
+              STATUS=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=$SHA&name=$wf&per_page=10" \
+                --jq '.workflow_runs[] | select(.status=="completed") | .conclusion' | head -1)
+              if [ "$STATUS" = "success" ]; then echo "$wf: success"; break; fi
+              if [ "$STATUS" = "failure" ] || [ "$STATUS" = "cancelled" ] || [ "$STATUS" = "timed_out" ]; then
+                echo "$wf: $STATUS — aborting auto-merge"; exit 1
+              fi
+              sleep 15
+            done
+            if [ "$STATUS" != "success" ]; then
+              echo "$wf still not green ($STATUS) after timeout — aborting"; exit 1
+            fi
+          done
+          echo "ALL 4 GATES GREEN for $SHA"
+
+      - name: Merge test -> main (non-fast-forward)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+          # 幂等：test 已完全合入 main 则跳过
+          if git merge-base --is-ancestor origin/test origin/main; then
+            echo "test already merged into main; nothing to do"
+            exit 0
+          fi
+          git checkout -B main origin/main
+          git merge origin/test --no-ff -m "auto-merge: test -> main (CI gates green)"
+          git push origin main

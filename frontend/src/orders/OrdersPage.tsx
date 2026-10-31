@@ -733,7 +733,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                     value={keyword}
                     placeholder="搜索订单号 / 游戏账号/产品 / 对方 / 备注"
                     aria-label="搜索订单"
-                    className="orders-ledger-search"
+                    className="ui-ledger-search"
                     onChange={(event) => {
                       setKeyword(event.target.value);
                       setPage(1);

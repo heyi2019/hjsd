@@ -646,7 +646,7 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
             value={keyword}
             placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
             aria-label="搜索库存账号"
-            className="ui-control-width-inventory"
+            className="ui-ledger-search"
             onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
           />
           <Typography.Text strong>游戏类型筛选</Typography.Text>

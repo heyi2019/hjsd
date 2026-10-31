@@ -1358,7 +1358,7 @@
 .ui-control-width-policy { width: var(--control-filter-select-width); }
 .ui-control-width-inventory { width: var(--col-w-180); }
 .ui-control-width-import { width: var(--col-w-280); }
-.orders-ledger-search { width: var(--col-w-280); }
+.ui-ledger-search { width: var(--col-w-280); }
 
 /* 分润明细是一个完整的数据行，桌面端保持字段与操作同排，避免金额/删除按钮掉到下一行。 */
 .orders-allocation-row {

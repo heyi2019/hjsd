@@ -32,6 +32,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(filters).toBeInTheDocument();
     expect(filters).toHaveClass("ui-filter-bar");
     expect(filters).toHaveClass("ui-filter-bar--spaced");
+    expect(search.closest(".ant-input-affix-wrapper")).toHaveClass("ui-ledger-search");
     expect(screen.queryByText("账号台账")).not.toBeInTheDocument();
   });
 

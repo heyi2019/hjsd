@@ -140,6 +140,7 @@ export function MobileInventoryList({
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "IN_STOCK"} onClick={() => onSale(row)}>售出</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" onClick={() => onRebate(row)}>返点</PermissionButton>
+              <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>作废</PermissionButton>
               {isEditableAccountType(row.inventory_type) ? (
                 <>
                   <PermissionButton permission="order.create" type="link" size="small" disabled={editingAccount !== null} onClick={() => onEdit(row)}>编辑</PermissionButton>
@@ -445,6 +446,19 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           >
             返点
           </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            type="link"
+            size="small"
+            aria-label="作废"
+            disabled={row.status === "SOLD" || row.status === "VOID"}
+            onClick={(event) => {
+              event.stopPropagation();
+              void openVoid(row);
+            }}
+          >
+            作废
+          </PermissionButton>
           {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton
               permission="order.create"
@@ -615,6 +629,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           <Space wrap>
             <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
             <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
+            <Select allowClear placeholder="按增值服务筛选" className="ui-control-width-inventory" value={valueAddedService} options={valueAddedOptions ?? []} onChange={(value) => { setValueAddedService(value); setPage(1); }} />
             <Input
               allowClear
               value={keyword}

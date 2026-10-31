@@ -148,36 +148,7 @@ export function validateAllocations(
   return { ok: true, items };
 }
 
-// 与 backend/app/domain/enums.py ScheduleStatus 一致（StatusTag 未内置 PARTIAL/WAIVED）
-const SCHEDULE_STATUS_LABEL: Record<string, string> = {
-  PENDING: "待收",
-  PARTIAL: "部分收取",
-  PAID: "已付清",
-  OVERDUE: "逾期",
-  WAIVED: "已减免",
-};
-
-// 与 backend/app/domain/enums.py Portion / DeliveryMode 一致
-const EVENT_PORTION_LABEL: Record<string, string> = {
-  PRINCIPAL: "本金",
-  PROFIT: "利润",
-  GROSS: "总额",
-};
-
-const DELIVERY_MODE_LABEL: Record<string, string> = {
-  PLATFORM_OPERATOR: "平台/本方操作换绑",
-  CUSTOMER_SELF: "客户自行换绑",
-};
-
 type CancelFormScope = "ORDERCANC" | "INVREFUND";
-
-const REFUND_RESPONSIBILITY_LABEL: Record<string, string> = {
-  COMPANY: "公司",
-  CUSTOMER: "客户",
-  CONSIGNOR: "寄售方",
-  PLATFORM: "平台",
-  OTHER: "其他",
-};
 
 function formatOrderAmount(order: Order): string {
   if (order.installment_principal) {
@@ -255,11 +226,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   type Opt = { value: string; label: string };
   const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
   const orderBusinessOptions: Opt[] = useOptionSet("ORDER_BUSINESS") ?? [];
-  // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
-  const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
-  // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
-  const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
   const [keyword, setKeyword] = useState("");
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
@@ -1102,4 +1069,3 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     </section>
   );
 }
-

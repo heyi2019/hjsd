@@ -47,7 +47,6 @@ function renderMetric(value: QualityMetricValue | undefined, formula?: string) {
 
 export function QualityPanel() {
   const severityOptions = useOptionSet("QUALITY_SEVERITY") ?? [];
-  const qualityStatusOptions = useOptionSet("QUALITY_STATUS") ?? [];
   const [summary, setSummary] = useState<QualitySummary | null>(null);
   const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
   const [metricWindow, setMetricWindow] = useState(6);

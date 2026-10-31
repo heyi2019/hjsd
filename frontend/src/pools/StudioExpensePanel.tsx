@@ -167,7 +167,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
   const submitRegister = async (values: Record<string, unknown>) => {
     const direction = (values.direction as string) === "IN" ? "IN" : "OUT";
     await write.run(async () => {
-      const flow = await cashflowsApi.create({
+      await cashflowsApi.create({
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,

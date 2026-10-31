@@ -83,7 +83,6 @@ function DfqInstallmentInfo() {
 }
 
 export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {
-  const form = Form.useFormInstance();
   const participantTitle = sectionLabel("PARTICIPANT", "分期客户");
 
   return (

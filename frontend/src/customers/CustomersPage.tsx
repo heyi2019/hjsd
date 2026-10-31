@@ -824,6 +824,7 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
   const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [rows, setRows] = useState<Counterparty[]>([]);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [open, setOpen] = useState(false);
@@ -953,6 +954,8 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
     },
   ];
 
+  const visibleCounterparties = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
+
   return (
     <Card
       className="glass"
@@ -964,15 +967,18 @@ function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focus
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
+      <Space wrap className="counterparty-filter-bar">
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={statusFilter} options={counterpartyStatusOptions ?? []} onChange={(value) => setStatusFilter(value)} />
+      </Space>
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。
       </Typography.Paragraph>
       {!compact ? <DataTable<Counterparty>
         columns={columns}
-        rows={rows}
+        rows={visibleCounterparties}
         page={1}
         pageSize={10}
-        total={rows.length}
+        total={visibleCounterparties.length}
         emptyText="暂无合作方"
         onPageChange={() => undefined}
      /> : <MobileCounterpartyList

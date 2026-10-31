@@ -52,7 +52,8 @@ interface RouteRow extends OrderTypeRoute {
 }
 
 export function OrderTypeRoutesPanel() {
-  const { can } = useSession();
+  // 权限由外层 PermissionGate 与表单内 PermissionButton 统一控制，无需在组件内用 can() 细粒度判断
+  useSession();
   const [types, setTypes] = useState<OrderType[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [routes, setRoutes] = useState<RouteRow[]>([]);

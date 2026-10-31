@@ -38,4 +38,3 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
         values = {**values, "created_by": actor, "updated_by": actor}
         session.add(OrderFormField(**values))
     session.flush()
-

@@ -142,12 +142,11 @@ jobs:
         # 部署成功后打 annotated git tag（v<version>），作为线上运行版本的不可变快照，
         # 便于出问题回溯"线上跑的是哪次提交"，也供 rollback.yml 输入版本号。
         if: success()
-        env:
-          TAG: "v${APP_VERSION}"
         run: |
           set -euo pipefail
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
+          TAG="v${APP_VERSION}"
           if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "Tag ${TAG} already exists, skipping"
           else

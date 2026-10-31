@@ -23,7 +23,8 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.value_added_services import service as installments_service
-from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
+from app.lists import service as list_columns_service
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response, detail_json
 from app.orders import schemas, service
 
 from .router_output import (
@@ -36,6 +37,60 @@ from .router_output import (
 )
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
+
+ORDER_DETAIL_EXPORT_COLUMNS = [
+    ("detail_account_password", "账号密码", True),
+    ("detail_account_channel_region", "渠道 / 区服", True),
+    ("detail_account_bound_phone", "绑定手机号", True),
+    ("detail_account_secondary", "有无二次", True),
+    ("detail_account_description", "账号描述", True),
+    ("detail_account_images", "账号图片", True),
+    ("detail_order_note", "订单备注", True),
+    ("detail_order_extra", "订单扩展字段", True),
+    ("detail_buy_delivery_phone", "买号交付-换绑手机号", True),
+    ("detail_buy_delivery_owner", "买号交付-手机号绑定人", True),
+    ("detail_buy_delivery_platform", "买号交付-交易平台", True),
+    ("detail_buy_delivery_type", "买号交付-中介类型", True),
+    ("detail_buy_delivery_compensation", "买号交付-包赔类型", True),
+    ("detail_buy_delivery_responsible", "买号交付-交付负责人", True),
+    ("detail_events", "操作明细", True),
+    ("detail_cashflows", "资金明细", True),
+    ("detail_rebates", "返点明细", True),
+    ("detail_installment", "分期合约", True),
+    ("detail_installment_schedule", "分期计划", True),
+    ("detail_links", "关联订单", True),
+    ("detail_attachments", "附件", True),
+    ("detail_audit", "审计记录", True),
+]
+
+
+def _order_detail_export_fields(detail: dict, value_labels: dict[str, dict[str, str]]) -> dict[str, str | None]:
+    account = detail.get("account_snapshot") or {}
+    form_extra = detail.get("form_extra") or {}
+    return {
+        "detail_account_password": account.get("game_password"),
+        "detail_account_channel_region": account.get("channel_region"),
+        "detail_account_bound_phone": account.get("bound_phone"),
+        "detail_account_secondary": account.get("has_secondary"),
+        "detail_account_description": account.get("account_description"),
+        "detail_account_images": detail_json(account.get("account_images") or [], value_labels),
+        "detail_order_note": detail.get("note"),
+        "detail_order_extra": detail_json(form_extra, value_labels),
+        "detail_buy_delivery_phone": form_extra.get("bound_phone"),
+        "detail_buy_delivery_owner": form_extra.get("bound_phone_owner"),
+        "detail_buy_delivery_platform": form_extra.get("intermediary_platform"),
+        "detail_buy_delivery_type": form_extra.get("intermediary_type"),
+        "detail_buy_delivery_compensation": form_extra.get("compensation_type"),
+        "detail_buy_delivery_responsible": detail_json(form_extra.get("delivery_responsible_ids") or [], value_labels),
+        "detail_events": detail_json(detail.get("events") or [], value_labels),
+        "detail_cashflows": detail_json(detail.get("cashflows") or [], value_labels),
+        "detail_rebates": detail_json(detail.get("rebates") or [], value_labels),
+        "detail_installment": detail_json(detail.get("installment"), value_labels),
+        "detail_installment_schedule": detail_json(detail.get("installment_schedule") or [], value_labels),
+        "detail_links": detail_json(detail.get("links") or [], value_labels),
+        "detail_attachments": detail_json(detail.get("attachments") or [], value_labels),
+        "detail_audit": detail_json(detail.get("audit") or [], value_labels),
+    }
 
 read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 create_orders = require_permissions(PERM_ORDER_CREATE)
@@ -114,12 +169,21 @@ def export_orders_csv(
         user=_user,
     )
     rows = _order_list_payload(db, orders)
+    value_labels = list_columns_service.get_value_labels(db, "LEDGER")
+    for row, order in zip(rows, orders, strict=True):
+        detail = _order_detail_output(db, order, _user).model_dump(mode="json")
+        row.update(_order_detail_export_fields(detail, value_labels))
     # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
     for row in rows:
         row["party"] = " · ".join(
             part for part in (row.get("party_name"), row.get("party_source")) if part
         )
-    csv_text, meta = build_list_csv(db, "LEDGER", rows)
+    csv_text, meta = build_list_csv(
+        db,
+        "LEDGER",
+        rows,
+        extra_columns=ORDER_DETAIL_EXPORT_COLUMNS,
+    )
     record_audit(
         db,
         action=AuditAction.LIST_EXPORT,

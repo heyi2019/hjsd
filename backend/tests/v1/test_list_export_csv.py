@@ -75,6 +75,25 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
     assert "HS9801" in body  # 明细行带订单号
 
 
+def test_orders_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers, seeded_db):
+    _seed_order(seeded_db, order_no="HS9803", form_extra={"delivery_note": "已交付"})
+    body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    header = _headers(body)
+    assert "详情" not in header
+    assert "账号密码" in header
+    assert "操作明细" in header
+    assert "delivery_note" in body
+    assert "HS9803" in body
+
+
+def test_installments_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers):
+    body = seeded_client.get("/api/v1/installments/export.csv", headers=headers).text
+    header = _headers(body)
+    assert "详情" not in header
+    assert "期次明细" in header
+    assert "处置记录" in header
+
+
 def test_orders_export_respects_hidden_column(seeded_client, headers, seeded_db):
     columns = next(
         scope

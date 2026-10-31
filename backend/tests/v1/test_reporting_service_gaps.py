@@ -48,12 +48,12 @@ def _make_bad_debt(seeded_db, *, occurred_on: date, with_event: bool = False) ->
         seeded_db,
         game_account=f"bd-{occurred_on.isoformat()}",
         actor="pytest",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
+        business_mode="DISTRIBUTION",
+        inventory_type="CONSIGNMENT",
     )
     order = order_service.create_order(
         seeded_db,
-        order_type="DFQ",
+        order_type="DG",
         trade_date=occurred_on,
         actor="pytest",
         account_id=account.id,
@@ -61,7 +61,7 @@ def _make_bad_debt(seeded_db, *, occurred_on: date, with_event: bool = False) ->
     inst = Installment(
         inst_no=f"BD-{occurred_on.isoformat()}",
         order_id=order.id,
-        contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+        contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
         principal=Decimal("0"),
         down_payment=Decimal("0"),
         service_fee=Decimal("0"),

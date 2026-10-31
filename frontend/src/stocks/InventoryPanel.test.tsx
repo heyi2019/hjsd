@@ -78,26 +78,6 @@ describe("InventoryPanel：账号台账", () => {
     }
   });
 
-  it("代分期账号（业务类型留空）同样展示编辑与更多操作", async () => {
-    const dfqAccount = {
-      ...accounts[0],
-      id: 88,
-      game_account: "dfq-acc",
-      inventory_type: null,
-      value_added_service: "ADVANCE_PURCHASE",
-    };
-    vi.mocked(catalog.stocksApi.list).mockResolvedValue([dfqAccount, ...accounts]);
-    renderLight(<InventoryPanel />, { user: "admin" });
-    const row = await screen.findByText("dfq-acc").then(() => {
-      const rows = screen.getAllByRole("row");
-      return rows.find((item) => within(item).queryByText("dfq-acc") !== null)!;
-    });
-
-    for (const label of ["编辑", "更多"]) {
-      expect(within(row).getByRole("button", { name: label })).toBeInTheDocument();
-    }
-  });
-
   it("系统下架只对代挂账号开放，平台下架对在库账号开放", async () => {
     vi.mocked(catalog.stocksApi.list).mockResolvedValue([stockNoAccounts[2], accounts[0]]);
     renderLight(<InventoryPanel />, { user: "admin" });

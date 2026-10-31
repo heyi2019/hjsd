@@ -203,7 +203,6 @@ def _service_fee_from_snapshot(
 #: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
 _CONTRACT_ALLOWED_ORDER_TYPES = {
     InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH", "DG"}),
-    InstallmentContractType.ADVANCE_PURCHASE.value: frozenset({"DFQ"}),
     InstallmentContractType.PICKUP_SALE.value: frozenset({"TH"}),
     InstallmentContractType.CONSIGNMENT_SALE.value: frozenset({"DG"}),
 }
@@ -289,13 +288,6 @@ def create_installment(
                 code=ErrorCode.INSTALLMENT_TYPE_INVALID,
                 details={"account_status": account.status if account else None},
             )
-    elif contract_type == InstallmentContractType.ADVANCE_PURCHASE.value:
-        if order.account_id is not None and account is None:
-            raise Validation(
-                "ADVANCE_PURCHASE 关联的库存账号不存在",
-                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
-                details={"order_no": order.order_no, "account_id": order.account_id},
-            )
     # PICKUP_SALE → TH、CONSIGNMENT_SALE → DG 的订单类型校验已在上方表驱动分支统一处理。
 
     if periods <= 0:
@@ -370,12 +362,9 @@ def create_installment(
         raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
 
     # 分期合约号（用户口径 2026-10-28）：统一「订单号-INS序号」衍生。
-    # 代分期沿用代分期订单号（DFQ0001 → DFQ0001-INS01）；
+    # 分期合约号沿用订单编号（FQ0001 → FQ0001-INS01）；
     # 自营分期以独立 FQ 序列为分期订单号，合约号同式衍生（FQ0001 → FQ0001-INS01）。
-    if contract_type == InstallmentContractType.ADVANCE_PURCHASE.value:
-        installment_no_value = order_installment_no(order.order_no)
-    else:
-        installment_no_value = order_installment_no(allocate_number(session, SequenceKey.INSTALLMENT.value))
+    installment_no_value = order_installment_no(allocate_number(session, SequenceKey.INSTALLMENT.value))
     installment = Installment(
         inst_no=installment_no_value,
         order_id=order.id,

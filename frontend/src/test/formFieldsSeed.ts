@@ -45,13 +45,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "dg_customer_source", label: "客户来源", type: "SELECT", options: SRC },
   ],
-  DFQ: [
-    { key: "dfq_has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
-    { key: "dfq_customer_source", label: "客户来源", type: "SELECT", options: SRC },
-    { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: PLAT },
-    { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
-    { key: "compensation_type", label: "包赔类型", type: "SELECT", options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }] },
-  ],
   TH: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: SRC },
@@ -78,7 +71,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
         { value: "SELF_DIRECT_COST", label: "自营直接成本" },
         { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" },
         { value: "TH_REVENUE", label: "提号/代挂收入" },
-        { value: "DFQ_PRINCIPAL", label: "代分期借款本金" },
         { value: "SERVICE_REVENUE", label: "增值服务收入" },
         { value: "REBATE_INCOME", label: "返点收入" },
         { value: "OPERATING_EXPENSE", label: "运营费用" },
@@ -168,7 +160,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
   ] },
   { code: "FUND_FLOW_ACCOUNTING_ATTRIBUTE", label: "流水核算属性", group: "FUND", editable: false, options: [
-    { value: "SELF_REVENUE", label: "自营收入" }, { value: "SELF_DIRECT_COST", label: "自营直接成本" }, { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" }, { value: "TH_REVENUE", label: "提号/代挂收入" }, { value: "DFQ_PRINCIPAL", label: "代分期借款本金" }, { value: "SERVICE_REVENUE", label: "增值服务收入" }, { value: "REBATE_INCOME", label: "返点收入" }, { value: "OPERATING_EXPENSE", label: "运营费用" }, { value: "DEPOSIT", label: "押金/保证金" }, { value: "EXTERNAL_FUNDING", label: "外部资金" }, { value: "INTERNAL_TRANSFER", label: "内部调拨" }, { value: "REVERSAL", label: "冲销" }, { value: "REFUND", label: "退款" },
+    { value: "SELF_REVENUE", label: "自营收入" }, { value: "SELF_DIRECT_COST", label: "自营直接成本" }, { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" }, { value: "TH_REVENUE", label: "提号/代挂收入" }, { value: "SERVICE_REVENUE", label: "增值服务收入" }, { value: "REBATE_INCOME", label: "返点收入" }, { value: "OPERATING_EXPENSE", label: "运营费用" }, { value: "DEPOSIT", label: "押金/保证金" }, { value: "EXTERNAL_FUNDING", label: "外部资金" }, { value: "INTERNAL_TRANSFER", label: "内部调拨" }, { value: "REVERSAL", label: "冲销" }, { value: "REFUND", label: "退款" },
   ] },
   /* ── 0008 补种：客户 / 订单 / 分期 / 导入 / 规则 / 质量 / 资金 / 系统 ── */
   { code: "CUSTOMER_STATUS", label: "客户状态", group: "CUSTOMER", editable: false, options: [
@@ -196,7 +188,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "COMPANY", label: "公司" }, { value: "CUSTOMER", label: "客户" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" }, { value: "OTHER", label: "其他" },
   ] },
   { code: "ORDER_BUSINESS", label: "订单业务类型", group: "ORDER", editable: false, options: [
-    { value: "HS", label: "回收" }, { value: "TH", label: "提号" }, { value: "DG", label: "代挂" }, { value: "DFQ", label: "代分期" },
+    { value: "HS", label: "回收" }, { value: "TH", label: "提号" }, { value: "DG", label: "代挂" },
   ] },
   { code: "ORDER_BUSINESS_MODE", label: "订单业务模式", group: "ORDER", editable: false, options: [
     { value: "SELF", label: "自营" }, { value: "DISTRIBUTION", label: "分销" },
@@ -205,7 +197,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" }, { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
   ] },
   { code: "INSTALLMENT_CONTRACT_TYPE", label: "分期合约类型", group: "INSTALLMENT", editable: false, options: [
-    { value: "STOCK_SALE", label: "分期出售" }, { value: "ADVANCE_PURCHASE", label: "代分期" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
+    { value: "STOCK_SALE", label: "分期出售" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
   ] },
   { code: "INSTALLMENT_STATUS", label: "分期状态", group: "INSTALLMENT", editable: false, options: [
     { value: "ACTIVE", label: "还款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },
@@ -423,14 +415,13 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "CUSTOMER_SELF", label: "客户自行换绑" },
   ] },
   { code: "REBATE_TYPE", label: "返点类型", group: "FUND", editable: false, options: [
-    { value: "BUY", label: "买号返点（对应回收/提号/代分期）" },
+    { value: "BUY", label: "买号返点（对应回收/提号）" },
     { value: "SELL", label: "卖号返点（对应售出）" },
   ] },
   { code: "SEQUENCE_KEY", label: "编号域", group: "SYSTEM", editable: false, options: [
     { value: "ORDER_HS", label: "回收编号" },
     { value: "ORDER_TH", label: "提号编号" },
     { value: "ORDER_DG", label: "代挂编号" },
-    { value: "ORDER_DFQ", label: "代分期订单" },
     { value: "INSTALLMENT", label: "分期订单" },
     { value: "CUSTOMER", label: "客户" },
     { value: "COUNTERPARTY", label: "合作方" },

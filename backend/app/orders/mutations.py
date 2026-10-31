@@ -32,7 +32,6 @@ from app.domain.enums import (
 
 from ._shared import (
     _audit_value,
-    _normalize_account_snapshot,
     get_order,
 )
 
@@ -73,9 +72,7 @@ def update_order(
             raise Validation("已有登记事件的订单只能修改备注，核算字段必须通过冲销/更正")
 
     if account_snapshot is not _UNSET and account_snapshot is not None:
-        if order.order_type != "DFQ":
-            raise Validation("只有 DFQ 代分期订单可以填写订单账号快照")
-        account_snapshot = _normalize_account_snapshot(account_snapshot)
+        raise Validation("订单账号快照当前不支持")
 
     before = {
         "trade_date": order.trade_date,

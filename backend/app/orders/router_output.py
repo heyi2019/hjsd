@@ -36,7 +36,7 @@ def _actor(user: CurrentUser) -> str:
 
 
 def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
-    """按订单权限输出详情，避免财务/查看权限读取 DFQ 游戏密码。"""
+    """按订单权限输出详情，避免财务/查看权限读取游戏密码。"""
     output = schemas.OrderOut.model_validate(order)
     # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
     output.extra_values = dict(order.form_extra or {})
@@ -295,7 +295,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "note": order.note,
             "extra_values": extra_values.get(order.id, {}),
             "created_at": order.created_at,
-            # DFQ 使用订单文本快照；HS / TH / DG 从库存实体展示安全的业务字段，
+            # HS / TH / DG 从库存实体展示安全的业务字段，
             # 不把快照中的 game_password 原样带入列表响应。
             "account_game_type": (account.game_type if account else None) or snapshot.get("game_type"),
             "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),

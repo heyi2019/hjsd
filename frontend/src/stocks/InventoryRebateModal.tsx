@@ -21,25 +21,25 @@ import "./InventoryRebateModal.css";
 type RebateKind = "BUY" | "SELL";
 
 const REBATE_KIND_LABEL: Record<RebateKind, string> = {
-  BUY: "买号返点（对应回收/提号/代分期）",
+  BUY: "买号返点（对应回收/提号）",
   SELL: "卖号返点（对应售出）",
 };
 
 function sourceOrder(detail: AccountExecutionDetail | null, kind: RebateKind) {
   if (kind === "BUY") {
     return detail?.orders.find((order) =>
-      ["HS", "TH", "DFQ"].includes(order.order_type),
+      ["HS", "TH"].includes(order.order_type),
     );
   }
   const sellOrder = detail?.orders.find((order) => order.events.some((event) =>
-    event.event_type === "SELL" || (order.order_type === "DFQ" && event.event_type === "PAYMENT"),
+    event.event_type === "SELL",
   ));
-  return sellOrder ?? detail?.orders.find((order) => ["HS", "TH", "DG", "DFQ"].includes(order.order_type));
+  return sellOrder ?? detail?.orders.find((order) => ["HS", "TH", "DG"].includes(order.order_type));
 }
 
 function defaultBaseAmount(detail: AccountExecutionDetail | null, kind: RebateKind): string {
   const order = sourceOrder(detail, kind);
-  const eventType = kind === "BUY" ? "BUY" : order?.order_type === "DFQ" ? "PAYMENT" : "SELL";
+  const eventType = kind === "BUY" ? "BUY" : "SELL";
   return order?.events.find((event) => event.event_type === eventType)?.amount ?? "0";
 }
 

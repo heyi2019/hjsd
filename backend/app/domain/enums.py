@@ -68,9 +68,8 @@ class SequenceKey(StrEnum):
     ORDER_HS = "ORDER_HS"
     ORDER_TH = "ORDER_TH"
     ORDER_DG = "ORDER_DG"
-    ORDER_DFQ = "ORDER_DFQ"
     # 分期订单独立编号域（自营分期，关联回收/提号/代挂来源订单）；
-    # 分期合约号统一「订单号-INS序号」衍生：自营 FQ0001-INS01 / 代分期 DFQ0001-INS01。
+    # 分期合约号统一「订单号-INS序号」衍生：自营 FQ0001-INS01。
     INSTALLMENT = "INSTALLMENT"
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
@@ -225,7 +224,6 @@ class AccountingAttribute(StrEnum):
     SELF_DIRECT_COST = "SELF_DIRECT_COST"
     TH_DIRECT_COST = "TH_DIRECT_COST"
     TH_REVENUE = "TH_REVENUE"
-    DFQ_PRINCIPAL = "DFQ_PRINCIPAL"
     SERVICE_REVENUE = "SERVICE_REVENUE"
     REBATE_INCOME = "REBATE_INCOME"
     OPERATING_EXPENSE = "OPERATING_EXPENSE"
@@ -283,7 +281,6 @@ class InstallmentContractType(StrEnum):
     """各业务独立分期合约类型，避免把不同资金/资产口径混在一起。"""
 
     STOCK_SALE = "STOCK_SALE"
-    ADVANCE_PURCHASE = "ADVANCE_PURCHASE"
     PICKUP_SALE = "PICKUP_SALE"
     CONSIGNMENT_SALE = "CONSIGNMENT_SALE"
 

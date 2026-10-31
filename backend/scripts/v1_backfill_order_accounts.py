@@ -4,7 +4,7 @@
 - 任意状态的订单都建/挂库存账号（取消单 → 账号状态 VOID）；
 - 同一 game_account 只建一个账号实体（后续订单挂靠同一账号，与「重开」语义一致）；
 - 已在台账中的 game_account 直接挂靠现有账号，不重建；
-- 状态推导：CANCELLED→VOID；有已入账 SELL→SOLD；DFQ 合约未结→INSTALLMENT；其余→IN_STOCK；
+- 状态推导：CANCELLED→VOID；有已入账 SELL→SOLD；分期合约未结→INSTALLMENT；其余→IN_STOCK；
 - cost_amount = 该订单已入账 BUY+COST 之和；buy_date = 最早 BUY 日；
 - 无快照/快照无游戏账号的订单（18 笔）无法回填，仅打印清单。
 
@@ -42,14 +42,14 @@ def _derive_status(session, order: Order, events: list[OrderEvent]) -> str:
         return "VOID"
     if any(e.event_type == "SELL" for e in events):
         return "SOLD"
-    if order.order_type == "DFQ":
-        from app.domain.trade import Installment
+    # 分期合约未结清则账号仍在分期中；不再按订单类型区分。
+    from app.domain.trade import Installment
 
-        contract = session.scalar(
-            select(Installment).where(Installment.order_id == order.id)
-        )
-        if contract is not None and contract.status in _INSTALLMENT_OPEN:
-            return "INSTALLMENT"
+    contract = session.scalar(
+        select(Installment).where(Installment.order_id == order.id)
+    )
+    if contract is not None and contract.status in _INSTALLMENT_OPEN:
+        return "INSTALLMENT"
     return "IN_STOCK"
 
 

@@ -569,7 +569,7 @@ def test_user_deactivation_with_active_orders_requires_handover_or_retention_not
     from app.orders import service as orders_service
 
     order = orders_service.create_order(
-        seeded_db, order_type="DFQ", trade_date=date.today(),
+        seeded_db, order_type="HS", trade_date=date.today(),
         owner_id=1, actor="pytest",
     )
 
@@ -588,7 +588,7 @@ def test_user_deactivation_handover_moves_active_orders_and_records_audit(seeded
     from app.orders import service as orders_service
 
     order = orders_service.create_order(
-        seeded_db, order_type="DFQ", trade_date=date.today(), owner_id=1, actor="pytest",
+        seeded_db, order_type="HS", trade_date=date.today(), owner_id=1, actor="pytest",
     )
     updated = service.update_user(
         seeded_db,
@@ -615,7 +615,7 @@ def test_user_deactivation_rejects_inactive_handover_target(seeded_db):
     target.is_active = False
     seeded_db.flush()
     orders_service.create_order(
-        seeded_db, order_type="DFQ", trade_date=date.today(), owner_id=1, actor="pytest",
+        seeded_db, order_type="HS", trade_date=date.today(), owner_id=1, actor="pytest",
     )
 
     with pytest.raises(Validation, match="交接目标必须是启用用户"):

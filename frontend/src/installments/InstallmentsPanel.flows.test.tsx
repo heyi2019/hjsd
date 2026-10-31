@@ -164,25 +164,6 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     ));
     expect(successSpy).toHaveBeenCalledWith("期次展期已登记");
   });
-
-  it("终止分期并退款：代分期取消后账号回到库存（后端 CANCEL_STOCK→IN_STOCK）", async () => {
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([
-      { ...baseInstallment, contract_type: "ADVANCE_PURCHASE", status: "ACTIVE" },
-    ]);
-    vi.mocked(catalog.installmentsApi.cancel).mockResolvedValueOnce({
-      refund_amount: "40.00",
-    } as Awaited<ReturnType<typeof catalog.installmentsApi.cancel>>);
-    renderLight(<InstallmentsPanel />, { user: "admin" });
-    await ui.click(screen.getByText("代分期"));
-    await screen.findByText("HS0001-INS01");
-    await ui.click(screen.getByRole("button", { name: /终止分期并退款/ }));
-    const modal = openModal("退款登记");
-    await ui.type(within(modal).getByLabelText("取消原因"), "渠道终止");
-    await ui.click(within(modal).getByRole("button", { name: /确认退款并终止分期/ }));
-    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.cancel)).toHaveBeenCalled());
-    expect(successSpy).toHaveBeenCalledWith("退款已登记：¥40.00，账号已回到库存");
-  });
-
   it("标记逾期：有新增时提示已标记笔数并刷新列表", async () => {
     vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
     renderLight(<InstallmentsPanel />, { user: "admin" });

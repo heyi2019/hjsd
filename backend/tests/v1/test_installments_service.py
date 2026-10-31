@@ -44,21 +44,25 @@ from app.orders import service as orders_service
 TODAY = date(2026, 10, 12)
 FUTURE = date(2026, 11, 30)
 
-
-def _account(seeded_db, game_account: str):
+def _account(
+    seeded_db,
+    game_account: str,
+    *,
+    business_mode="SELF",
+    inventory_type="RECOVERY",
+):
     from app.stocks import service as stocks_service
 
     return stocks_service.create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
+        business_mode=business_mode,
+        inventory_type=inventory_type,
         actor="pytest",
     )
 
-
-def _order(seeded_db, *, order_type="DFQ", account_id=None, trade_date=TODAY):
+def _order(seeded_db, *, order_type="DG", account_id=None, trade_date=TODAY):
     return orders_service.create_order(
         seeded_db,
         order_type=order_type,
@@ -66,7 +70,6 @@ def _order(seeded_db, *, order_type="DFQ", account_id=None, trade_date=TODAY):
         actor="pytest",
         account_id=account_id,
     )
-
 
 def _buy(seeded_db, order_id: int, amount="800"):
     orders_service.post_event(
@@ -78,12 +81,11 @@ def _buy(seeded_db, order_id: int, amount="800"):
         actor="pytest",
     )
 
-
 def _contract(
     seeded_db,
     order_id: int,
     *,
-    contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+    contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
     principal=None,
     down_payment="100",
     periods=2,
@@ -106,7 +108,6 @@ def _contract(
         **kwargs,
     )
 
-
 def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, offset_event_id=None):
     event = OrderEvent(
         event_no=f"EVT-{order_id}-{event_type}-{amount}-{offset_event_id}",
@@ -121,20 +122,23 @@ def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, off
     seeded_db.flush()
     return event
 
-
-def _dfq_overdue(seeded_db, game_account: str, **kwargs):
-    """DFQ 订单 + 逾期分期合约（订单创建时即关联库存账号）。"""
-    account = _account(seeded_db, game_account)
-    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+def _dg_overdue(seeded_db, game_account: str, **kwargs):
+    """DG 订单 + 逾期分期合约（订单创建时即关联库存账号）。"""
+    account = _account(
+        seeded_db,
+        game_account,
+        business_mode="DISTRIBUTION",
+        inventory_type="CONSIGNMENT",
+    )
+    order = _order(seeded_db, order_type="DG", account_id=account.id)
     contract = _contract(seeded_db, order.id, **kwargs)
     contract.status = InstallmentStatus.OVERDUE.value
     seeded_db.flush()
     return order, contract
 
-
 # ------------------------------------------------------- 建单：合约类型与计划
 def test_create_pickup_sale_requires_th_order(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     with pytest.raises(Validation, match="PICKUP_SALE 只能用于 TH 订单"):
         _contract(
             seeded_db,
@@ -142,9 +146,8 @@ def test_create_pickup_sale_requires_th_order(seeded_db):
             contract_type=InstallmentContractType.PICKUP_SALE.value,
         )  # 320-326
 
-
 def test_create_consignment_sale_requires_dg_order(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="HS")
     with pytest.raises(Validation, match="CONSIGNMENT_SALE 只能用于 DG 订单"):
         _contract(
             seeded_db,
@@ -152,9 +155,8 @@ def test_create_consignment_sale_requires_dg_order(seeded_db):
             contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
         )  # 327-333
 
-
 def test_create_rejects_schedule_period_out_of_range(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     with pytest.raises(Validation, match="分期计划期次必须从 1 开始且不能重复"):
         _contract(
             seeded_db,
@@ -166,9 +168,8 @@ def test_create_rejects_schedule_period_out_of_range(seeded_db):
             ],
         )  # 349-352
 
-
 def test_create_rejects_negative_final_period(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     # 本金 0 + 每期 100×2 = 200 的还款计划，尾期调整后为负
     with pytest.raises(Validation, match="每期金额过高"):
         _contract(
@@ -181,33 +182,11 @@ def test_create_rejects_negative_final_period(seeded_db):
             adjust_final_period=True,
         )  # 393-395
 
-
-# --------------------------------------------- DFQ 快照账号物化（回收前置）
-def test_materialize_dfq_recovery_account_requires_inventory_account(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
-    with pytest.raises(Validation, match="DFQ 分期没有关联库存账号"):
-        installment_service._materialize_dfq_recovery_account(
-            seeded_db, order, actor="pytest"
-        )  # 85-88
-
-
-def test_materialize_dfq_recovery_account_uses_order_inventory_account(seeded_db):
-    account = _account(seeded_db, "dfq-recovery-account")
-    order = _order(seeded_db, order_type="DFQ")
-    order.account_id = account.id
-    seeded_db.flush()
-    account = installment_service._materialize_dfq_recovery_account(
-        seeded_db, order, actor="pytest"
-    )
-    assert order.account_id == account.id
-    assert account.business_mode == "SELF"
-    assert account.inventory_type == "RECOVERY"
-    assert account.game_account == "dfq-recovery-account"
-
+# --------------------------------------------- 快照账号物化（回收前置）
 
 # ------------------------------------------------------------- 取消：状态守卫
 def test_cancel_rejects_closed_contract(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
@@ -216,9 +195,8 @@ def test_cancel_rejects_closed_contract(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 661-672
 
-
 def test_cancel_rejects_non_active_order(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     order.status = "CANCELLED"
     seeded_db.flush()
@@ -227,10 +205,9 @@ def test_cancel_rejects_non_active_order(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 674-682
 
-
 def test_cancel_skips_payment_already_reversed(seeded_db):
     """PAYMENT 已被 CANCEL 冲销同额 → remaining<=0，跳过逐笔退款（L712）。"""
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     payment = _posted_event(seeded_db, order.id, event_type=EventType.PAYMENT.value, amount="100")
     _posted_event(
@@ -244,7 +221,6 @@ def test_cancel_skips_payment_already_reversed(seeded_db):
         seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
     )
     assert result["refund_amount"] == Decimal("0.00")  # 696-712
-
 
 def test_cancel_refund_total_matches_per_event_recompute(seeded_db):
     """取消退款总额必须与「逐笔 PAYMENT 独立核算」一致。
@@ -329,10 +305,9 @@ def test_cancel_refund_total_matches_per_event_recompute(seeded_db):
     # 两笔可退：第 1 笔 100 + 第 2 笔剩余 180
     assert len(result["cancel_event_ids"]) == 2
 
-
 # ------------------------------------------------------------- 减免：期次守卫
 def test_waive_rejects_missing_period(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     with pytest.raises(NotFound, match="期次 99 不存在"):
         installment_service.waive_schedule(
@@ -345,9 +320,8 @@ def test_waive_rejects_missing_period(seeded_db):
             reason="减免",
         )  # 790-797
 
-
 def test_waive_rejects_completed_period(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -368,9 +342,8 @@ def test_waive_rejects_completed_period(seeded_db):
             reason="减免",
         )  # 800-801
 
-
 def test_waive_rejects_amount_over_outstanding(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id, per_period="300")
     with pytest.raises(Validation, match="减免金额超过未收金额"):
         installment_service.waive_schedule(
@@ -383,10 +356,9 @@ def test_waive_rejects_amount_over_outstanding(seeded_db):
             reason="减免",
         )  # 803-809
 
-
 # ------------------------------------------------------------- 展期：期次守卫
 def test_extend_rejects_missing_period(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     with pytest.raises(NotFound, match="期次 99 不存在"):
         installment_service.extend_schedule(
@@ -398,9 +370,8 @@ def test_extend_rejects_missing_period(seeded_db):
             reason="展期",
         )  # 870-877
 
-
 def test_extend_rejects_received_period(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -420,9 +391,8 @@ def test_extend_rejects_received_period(seeded_db):
             reason="展期",
         )  # 878-879
 
-
 def test_extend_rejects_completed_period(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -442,9 +412,8 @@ def test_extend_rejects_completed_period(seeded_db):
             reason="展期",
         )  # 880-881
 
-
 def test_extend_rejects_earlier_due_on(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id, first_due_on=FUTURE)
     with pytest.raises(Validation, match="展期后的到期日必须晚于原到期日"):
         installment_service.extend_schedule(
@@ -456,9 +425,8 @@ def test_extend_rejects_earlier_due_on(seeded_db):
             reason="展期",
         )  # 882-883
 
-
 def test_extend_resets_overdue_period_to_pending(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -479,10 +447,9 @@ def test_extend_resets_overdue_period_to_pending(seeded_db):
     assert updated.status == ScheduleStatus.PENDING.value  # 884-887
     assert updated.due_on == FUTURE
 
-
 # --------------------------------------------------------- 提前结清：状态守卫
 def test_settle_early_rejects_settled_contract(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.SETTLED.value
     seeded_db.flush()
@@ -491,9 +458,8 @@ def test_settle_early_rejects_settled_contract(seeded_db):
             seeded_db, contract.id, paid_on=TODAY, actor="pytest"
         )  # 947-956
 
-
 def test_settle_early_rejects_when_nothing_outstanding(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     for row in seeded_db.scalars(
         select(InstallmentSchedule).where(
@@ -507,10 +473,9 @@ def test_settle_early_rejects_when_nothing_outstanding(seeded_db):
             seeded_db, contract.id, paid_on=TODAY, actor="pytest"
         )  # 957-967
 
-
 # ----------------------------------------------------------- 账号回收：处置守卫
 def test_recover_rejects_contract_not_overdue(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     assert contract.status in {
         InstallmentStatus.PENDING.value,
@@ -521,9 +486,8 @@ def test_recover_rejects_contract_not_overdue(seeded_db):
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
         )  # 1054-1058
 
-
 def test_recover_rejects_order_without_account(seeded_db):
-    """非 DFQ 订单且无库存账号 → 不物化快照，直接报「没有可回收的账号」。
+    """未关联库存账号的订单 → 不物化快照，直接报「没有可回收的账号」。
 
     用 TH + PICKUP_SALE 组合：建单合法且天然不带库存账号（HS+STOCK_SALE 会
     强制要求账号在库，DG+CONSIGNMENT_SALE 会要求订单类型为 DG）。
@@ -541,9 +505,8 @@ def test_recover_rejects_order_without_account(seeded_db):
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
         )  # 1062-1065
 
-
 def test_recover_rejects_duplicate_recovery(seeded_db):
-    order, contract = _dfq_overdue(seeded_db, "recover-dup-account")
+    order, contract = _dg_overdue(seeded_db, "recover-dup-account")
     installment_service.recover_account(
         seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
     )
@@ -555,18 +518,16 @@ def test_recover_rejects_duplicate_recovery(seeded_db):
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
         )  # 1069-1076
 
-
 # ------------------------------------------------------- 回收账号出售登记全流程
 def _recovered(seeded_db, game_account: str):
     """返回 (order, contract)：已完成账号回收、合约 CLOSED。"""
-    order, contract = _dfq_overdue(seeded_db, game_account)
+    order, contract = _dg_overdue(seeded_db, game_account)
     installment_service.recover_account(
         seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
     )
     seeded_db.refresh(order)
     seeded_db.refresh(contract)
     return order, contract
-
 
 def _sale_order(seeded_db, account_id: int, *, with_sell=True):
     sale = _order(seeded_db, order_type="HS")
@@ -575,7 +536,6 @@ def _sale_order(seeded_db, account_id: int, *, with_sell=True):
     if with_sell:
         _posted_event(seeded_db, sale.id, event_type=EventType.SELL.value, amount="900")
     return sale
-
 
 def test_record_sale_requires_note(seeded_db):
     order, contract = _recovered(seeded_db, "resale-need-note")
@@ -590,9 +550,8 @@ def test_record_sale_requires_note(seeded_db):
             note="   ",
         )  # 1128
 
-
 def test_record_sale_rejects_contract_not_closable(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     sale = _order(seeded_db, order_type="HS")
     with pytest.raises(Validation, match="只有已关闭、逾期或违约合约可以登记出售"):
@@ -605,9 +564,8 @@ def test_record_sale_rejects_contract_not_closable(seeded_db):
             note="出售",
         )  # 1130-1135
 
-
 def test_record_sale_rejects_order_without_account(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
@@ -622,7 +580,6 @@ def test_record_sale_rejects_order_without_account(seeded_db):
             note="出售",
         )  # 1136-1139
 
-
 def test_record_sale_rejects_unknown_sale_order(seeded_db):
     order, contract = _recovered(seeded_db, "resale-unknown-order")
     with pytest.raises(Validation, match="出售必须关联新的售出订单"):
@@ -635,7 +592,6 @@ def test_record_sale_rejects_unknown_sale_order(seeded_db):
             note="出售",
         )  # 1137-1141
 
-
 def test_record_sale_rejects_same_order(seeded_db):
     order, contract = _recovered(seeded_db, "resale-same-order")
     with pytest.raises(Validation, match="出售必须关联新的售出订单"):
@@ -647,7 +603,6 @@ def test_record_sale_rejects_same_order(seeded_db):
             actor="pytest",
             note="出售",
         )  # 1140-1141
-
 
 def test_record_sale_rejects_different_account(seeded_db):
     order, contract = _recovered(seeded_db, "resale-diff-account")
@@ -663,11 +618,15 @@ def test_record_sale_rejects_different_account(seeded_db):
             note="出售",
         )  # 1142-1143
 
-
 def test_record_sale_requires_prior_recovery(seeded_db):
     """有库存账号但从未登记回收 → 不能出售。"""
-    account = _account(seeded_db, "resale-no-recover")
-    order = _order(seeded_db, order_type="DFQ")
+    account = _account(
+        seeded_db,
+        "resale-no-recover",
+        business_mode="DISTRIBUTION",
+        inventory_type="CONSIGNMENT",
+    )
+    order = _order(seeded_db, order_type="DG")
     order.account_id = account.id
     seeded_db.flush()
     contract = _contract(seeded_db, order.id)
@@ -684,7 +643,6 @@ def test_record_sale_requires_prior_recovery(seeded_db):
             note="出售",
         )  # 1144-1151
 
-
 def test_record_sale_requires_posted_sell(seeded_db):
     order, contract = _recovered(seeded_db, "resale-no-sell")
     sale = _sale_order(seeded_db, order.account_id, with_sell=False)
@@ -697,7 +655,6 @@ def test_record_sale_requires_posted_sell(seeded_db):
             actor="pytest",
             note="出售",
         )  # 1152-1160
-
 
 def test_record_sale_rejects_duplicate(seeded_db):
     order, contract = _recovered(seeded_db, "resale-duplicate")
@@ -720,7 +677,6 @@ def test_record_sale_rejects_duplicate(seeded_db):
             note="再卖一次",
         )  # 1161-1168
 
-
 def test_record_sale_success(seeded_db):
     order, contract = _recovered(seeded_db, "resale-success")
     sale = _sale_order(seeded_db, order.account_id)
@@ -736,7 +692,6 @@ def test_record_sale_success(seeded_db):
     assert disposition.account_id == order.account_id
     assert disposition.related_order_id == sale.id
     assert disposition.note == "出售给新客户"  # _required_text 去空白
-
 
 # ------------------------------------------------- 外键 / 精度保证的不可达防御
 def _raw_sql(seeded_db, sql: str, params=()):
@@ -762,28 +717,26 @@ def _raw_sql(seeded_db, sql: str, params=()):
         raw.close()
     seeded_db.expire_all()
 
-
-def test_create_advance_purchase_rejects_dangling_account(seeded_db):
-    """orders.account_id 悬空 → ADVANCE_PURCHASE 建单拒绝（L315）。
+def test_create_stock_sale_rejects_dangling_account(seeded_db):
+    """orders.account_id 悬空 → STOCK_SALE 建单拒绝（L315）。
 
     FK `orders.account_id → accounts.id ON DELETE SET NULL` 保证正常路径不会留下
     悬空引用；这里用独立连接绕过外键，复现直连脏数据场景。
     """
     account = _account(seeded_db, "ACC-315")
-    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
     seeded_db.flush()
     _raw_sql(seeded_db, "UPDATE orders SET account_id = 999315 WHERE id = ?", (order.id,))
-    with pytest.raises(Validation, match="ADVANCE_PURCHASE 关联的库存账号不存在"):
+    with pytest.raises(Validation, match="STOCK_SALE 要求账号已入库且已在库"):
         _contract(
             seeded_db,
             order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
         )
-
 
 def test_cancel_rejects_dangling_order(seeded_db):
     """installments.order_id 悬空 → 取消分期报「所属订单不存在」（L676）。"""
-    _, contract = _dfq_overdue(seeded_db, "ACC-676")
+    _, contract = _dg_overdue(seeded_db, "ACC-676")
     _raw_sql(
         seeded_db,
         "UPDATE installments SET order_id = 999676 WHERE id = ?",
@@ -794,11 +747,15 @@ def test_cancel_rejects_dangling_order(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
         )
 
-
 def test_cancel_rejects_dangling_account(seeded_db):
     """orders.account_id 悬空 → 取消分期报「关联账号不存在」（L739）。"""
-    account = _account(seeded_db, "ACC-739")
-    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+    account = _account(
+        seeded_db,
+        "ACC-739",
+        business_mode="DISTRIBUTION",
+        inventory_type="CONSIGNMENT",
+    )
+    order = _order(seeded_db, order_type="DG", account_id=account.id)
     contract = _contract(seeded_db, order.id)
     seeded_db.flush()
     _raw_sql(seeded_db, "UPDATE orders SET account_id = 999739 WHERE id = ?", (order.id,))
@@ -807,14 +764,13 @@ def test_cancel_rejects_dangling_account(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
         )
 
-
 def test_settle_early_skips_sub_cent_residual(seeded_db):
     """期次残留「分以下零头」脏数据 → SQL 判有余额、量化到分后为 0 → continue（L975）。
 
     正常数据下 `received + waived < due` 与 `outstanding > 0` 等价，故该分支恒不
     触发；仅当 DB 存在超过 2 位小数的脏值时才会走到，此处用独立连接直写复现。
     """
-    _, contract = _dfq_overdue(seeded_db, "ACC-975")
+    _, contract = _dg_overdue(seeded_db, "ACC-975")
     _raw_sql(
         seeded_db,
         "UPDATE installment_schedules SET due_amount = '1.00', "
@@ -837,10 +793,9 @@ def test_settle_early_skips_sub_cent_residual(seeded_db):
     assert result.id == contract.id
     assert after == before  # continue 生效：零头不足 1 分，未生成 PAYMENT
 
-
 def test_recover_rejects_dangling_order(seeded_db):
     """installments.order_id 悬空 → 回收账号报「没有所属订单」（L1061）。"""
-    _, contract = _dfq_overdue(seeded_db, "ACC-1061")
+    _, contract = _dg_overdue(seeded_db, "ACC-1061")
     _raw_sql(
         seeded_db,
         "UPDATE installments SET order_id = 999161 WHERE id = ?",
@@ -851,11 +806,15 @@ def test_recover_rejects_dangling_order(seeded_db):
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
         )
 
-
 def test_recover_rejects_dangling_account(seeded_db):
     """orders.account_id 悬空 → 回收账号报「关联账号不存在」（L1068）。"""
-    account = _account(seeded_db, "ACC-1068")
-    order = _order(seeded_db, order_type="DFQ", account_id=account.id)
+    account = _account(
+        seeded_db,
+        "ACC-1068",
+        business_mode="DISTRIBUTION",
+        inventory_type="CONSIGNMENT",
+    )
+    order = _order(seeded_db, order_type="DG", account_id=account.id)
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.OVERDUE.value
     seeded_db.flush()
@@ -864,7 +823,6 @@ def test_recover_rejects_dangling_account(seeded_db):
         installment_service.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
         )
-
 
 def test_record_sale_is_the_only_installment_resale_entrypoint():
     assert not hasattr(installment_service, "record_resale")

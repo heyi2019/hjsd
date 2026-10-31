@@ -44,7 +44,6 @@ from app.domain.trade import (
 )
 
 from ._shared import (
-    _materialize_dfq_recovery_account,
     _merge_form_extra,
     _required_text,
     get_installment,
@@ -73,9 +72,6 @@ def recover_account(
     order = session.get(Order, installment.order_id)
     if order is None:
         raise Validation("分期合约没有所属订单")
-    if order.order_type == "DFQ":
-        # 建单即入库的代分期账号统一转自营可售。
-        _materialize_dfq_recovery_account(session, order, actor=actor)
     if order.account_id is None:
         raise Validation("分期合约没有可回收的账号")
     account = session.get(Account, order.account_id)
@@ -236,7 +232,7 @@ def deliver(
     actor: str,
     user: CurrentUser | None = None,
 ) -> Installment:
-    """换绑交付：只能从 `SETTLED` 进入，生成无金额 `DELIVER`（DFQ-01-07 / A04 / A05）。"""
+    """换绑交付：只能从 `SETTLED` 进入，生成无金额 `DELIVER`（A04 / A05）。"""
     installment = get_installment(session, installment_id, user)
     _merge_form_extra(session, installment, scope="INSTDELIVER", values=form_extra)
     if installment.status != InstallmentStatus.SETTLED.value:
@@ -298,7 +294,7 @@ def mark_overdue(
     actor: str = "system",
     user: CurrentUser | None = None,
 ) -> int:
-    """按到期日实时标记逾期；已收满的期次不标记（DFQ-01-06）。"""
+    """按到期日实时标记逾期；已收满的期次不标记。"""
     stmt = (
         select(InstallmentSchedule)
         .join(Installment, Installment.id == InstallmentSchedule.installment_id)

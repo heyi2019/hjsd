@@ -49,7 +49,7 @@ const soldRow = {
 } as unknown as Account;
 
 const installmentRow = {
-  id: 3, source_order_no: "DFQ-2026-0003", game_account: "acc-3", platform: "安卓",
+  id: 3, source_order_no: "HS-2026-0003", game_account: "acc-3", platform: "安卓",
   status: "SOLD", inventory_status: "OUT_OF_STOCK", inventory_type: "RECOVERY", cost_amount: "300.00", buy_date: "2026-10-03",
   created_by: "admin", created_at: "2026-10-03T09:30:00",
 } as unknown as Account;

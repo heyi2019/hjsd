@@ -32,7 +32,6 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("HS", "回收建单", GROUP_ORDER),
     FormScope("TH", "提号建单", GROUP_ORDER),
     FormScope("DG", "代挂建单", GROUP_ORDER),
-    FormScope("DFQ", "代分期建单", GROUP_ORDER),
     # ---- 订单操作（迁移 0019）----
     FormScope("ORDERCANC", "售出取消交易", GROUP_ORDER_OP),
     FormScope("ORDEREDIT", "编辑订单", GROUP_ORDER_OP),

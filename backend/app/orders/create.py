@@ -32,7 +32,6 @@ from app.domain.enums import (
     CapitalType,
     CommissionMode,
     CommissionPayer,
-    InstallmentContractType,
     OrderStatus,
     PolicyType,
 )
@@ -78,7 +77,7 @@ def create_order(
             details={"order_type": order_type},
         )
     # 账号资料的唯一输入是 account_snapshot；库存账号引用只传 account_id。
-    if account_snapshot is not None and definition.code not in {"HS", "TH", "DG", "DFQ"}:
+    if account_snapshot is not None and definition.code not in {"HS", "TH", "DG"}:
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
@@ -247,18 +246,6 @@ def create_order(
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
             extra_values=(account_snapshot or {}).get("extra_values"),
-        ).id
-
-    # 代分期垫资买入：账号计入本方库存（业务类型留空，增值服务=分销分期/代分期）。
-    if definition.code == "DFQ" and account_id is None and account_snapshot is not None:
-        snap = account_snapshot or {}
-        account_id = _create_inline_inventory_account(
-            session, order_type="DFQ", game_account=snap["game_account"], actor=actor,
-            game_type=snap.get("game_type"), game_password=snap.get("game_password"),
-            channel_region=snap.get("channel_region"), bound_phone=snap.get("bound_phone"),
-            has_secondary=snap.get("has_secondary"), account_note=snap.get("note"),
-            value_added_service=InstallmentContractType.ADVANCE_PURCHASE.value,
-            platform=snap.get("platform"), extra_values=snap.get("extra_values"),
         ).id
 
     order = Order(

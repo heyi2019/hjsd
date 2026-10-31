@@ -92,11 +92,4 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     await ui.click(screen.getByRole("button", { name: "代挂" }));
     expect(await screen.findByText("新建代挂订单")).toBeInTheDocument();
   });
-
-  it("点「代分期服务」卡打开代分期登记弹窗", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "代分期服务" });
-    await ui.click(screen.getByRole("button", { name: "代分期服务" }));
-    expect(await screen.findByText("新建代分期订单")).toBeInTheDocument();
-  });
 });

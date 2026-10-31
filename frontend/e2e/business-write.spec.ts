@@ -17,7 +17,6 @@ test("五类业务写入并按业务规则作废测试订单", async ({ request 
     { order_type: "HS", account_id: accountFor("RECOVERY") },
     { order_type: "TH", account_id: accountFor("PICKUP") },
     { order_type: "DG", account_id: accountFor("CONSIGNMENT") },
-    { order_type: "DFQ" },
   ];
   const created: number[] = [];
   for (const payload of cases) {
@@ -91,49 +90,6 @@ test("自营分期出售：买入、分期收款、结清后交付", async ({ re
   const delivery = await request.post(`${apiBase}/installments/${installment.id}/deliver`, {
     headers,
     data: { delivery_mode: "PLATFORM_OPERATOR", delivered_on: "2026-10-17", note: "E2E 测试换绑凭证" },
-  });
-  expect(delivery.status()).toBe(200);
-  expect((await delivery.json()).status).toBe("DELIVERED");
-});
-
-test("分销代分期：DFQ 建约、分期收款、结清后交付", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
-  const headers = { "X-Dev-User": "admin" };
-  const orderResponse = await request.post(`${apiBase}/orders`, {
-    headers,
-    data: { order_type: "DFQ", trade_date: "2026-10-17" },
-  });
-  expect(orderResponse.status()).toBe(201);
-  const order = await orderResponse.json();
-  const installmentResponse = await request.post(`${apiBase}/installments`, {
-    headers,
-    data: {
-      order_id: order.id,
-      contract_type: "ADVANCE_PURCHASE",
-      principal: "1200.00",
-      down_payment: "0.00",
-      periods: 3,
-      per_period: "400.00",
-      first_due_on: "2026-10-17",
-    },
-  });
-  expect(installmentResponse.status()).toBe(201);
-  const installment = await installmentResponse.json();
-  const buy = await request.post(`${apiBase}/orders/${order.id}/events`, {
-    headers,
-    data: { event_type: "BUY", amount: "1200.00", occurred_on: "2026-10-17" },
-  });
-  expect(buy.status()).toBe(201);
-  for (const period_no of [1, 2, 3]) {
-    const payment = await request.post(`${apiBase}/installments/${installment.id}/payments`, {
-      headers,
-      data: { amount: "400.00", paid_on: "2026-10-17", period_no },
-    });
-    expect(payment.status()).toBe(200);
-  }
-  const delivery = await request.post(`${apiBase}/installments/${installment.id}/deliver`, {
-    headers,
-    data: { delivery_mode: "PLATFORM_OPERATOR", delivered_on: "2026-10-17", note: "E2E 代分期换绑凭证" },
   });
   expect(delivery.status()).toBe(200);
   expect((await delivery.json()).status).toBe("DELIVERED");
@@ -230,7 +186,7 @@ test("客户需求池：新建、查询与转单", async ({ request }) => {
   });
   expect(customerResponse.status()).toBe(201);
   const customer = (await customerResponse.json()).customer;
-  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DFQ", trade_date: "2026-10-17" } });
+  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17" } });
   expect(orderResponse.status()).toBe(201);
   const order = await orderResponse.json();
   const created = await request.post(`${apiBase}/leads`, {
@@ -271,7 +227,7 @@ test("治理能力：报表导出与订单附件闭环", async ({ request }) => 
   const report = await request.get(`${apiBase}/reports/order-profit/export.csv`, { headers, params: { from: "2026-01-01", to: "2026-12-31" } });
   expect(report.status()).toBe(200);
   expect(report.headers()["content-type"]).toContain("text/csv");
-  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DFQ", trade_date: "2026-10-17" } });
+  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17" } });
   expect(orderResponse.status()).toBe(201);
   const order = await orderResponse.json();
   const attachment = await request.post(`${apiBase}/attachments`, {

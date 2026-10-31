@@ -24,26 +24,8 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
   PARTICIPANT: "客户 / 供货方补充信息",
   EXTRA: "其他补充信息",
 };
-const DFQ_SHARED_FIELD_ALIASES: Record<string, string> = {
-  recovery_price: "dfq_purchase_price",
-  game_type: "dfq_game_type",
-  game_account: "dfq_game_account",
-  game_password: "dfq_game_password",
-  channel_region: "dfq_channel_region",
-  bound_phone: "dfq_bound_phone",
-  has_secondary: "dfq_has_secondary",
-  game_account_note: "dfq_account_note",
-  customer_nickname: "dfq_customer_nickname",
-  customer_source: "dfq_customer_source",
-  customer_contact_name: "dfq_customer_contact",
-  customer_phone: "dfq_customer_phone",
-  customer_wechat: "dfq_customer_wechat",
-  customer_qq: "dfq_customer_qq",
-  note: "dfq_note",
-};
-
 function fieldConfigFor(config: FieldConfigMap, key: string): OrderFormField | undefined {
-  return config[key] ?? (DFQ_SHARED_FIELD_ALIASES[key] ? config[DFQ_SHARED_FIELD_ALIASES[key]] : undefined);
+  return config[key];
 }
 
 export function useOrderFormConfig(orderType: string | undefined): {
@@ -64,12 +46,6 @@ export function useOrderFormConfig(orderType: string | undefined): {
         if (cancelled) return;
         const map: FieldConfigMap = {};
         for (const row of rows ?? []) map[row.field_key] = row;
-        if (orderType === "DFQ") {
-          for (const [canonicalKey, dfqKey] of Object.entries(DFQ_SHARED_FIELD_ALIASES)) {
-            const source = map[dfqKey];
-            if (source && !map[canonicalKey]) map[canonicalKey] = { ...source, field_key: canonicalKey };
-          }
-        }
         setConfig(map);
       })
       .catch(() => {

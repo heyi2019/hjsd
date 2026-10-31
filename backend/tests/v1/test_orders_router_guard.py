@@ -19,22 +19,17 @@ from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
 
-
 def _admin() -> CurrentUser:
     return CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
-
 
 def _viewer() -> CurrentUser:
     return CurrentUser.build(id=2, username="viewer", roles=["VIEWER"], owner_scope="SELF")
 
-
 def _auditor() -> CurrentUser:
     return CurrentUser.build(id=3, username="auditor", roles=["AUDITOR"], owner_scope="SELF")
 
-
 def _finance() -> CurrentUser:
     return CurrentUser.build(id=4, username="finance", roles=["FINANCE"], owner_scope="SELF")
-
 
 def _new_account(
     seeded_db,
@@ -56,9 +51,7 @@ def _new_account(
     seeded_db.commit()
     return account
 
-
 # ---- create_order 业务校验分支（在 service 调用前即拦截，无需有效账号） ----
-
 
 def test_create_order_th_with_installment_rejected(seeded_db):
     # 355: TH/DG 带分期合约须走出售动作，建单阶段禁止
@@ -75,58 +68,17 @@ def test_create_order_th_with_installment_rejected(seeded_db):
     with pytest.raises(Validation, match="TH/DG 分期必须在出售动作中选择付款方式并建立分期合约"):
         router.create_order(payload, db=seeded_db, user=_admin())
 
-
-def test_create_order_dfq_installment_requires_initial_buy(seeded_db):
-    # 357: DFQ 分期订单必须同时提交初始买入
-    payload = schemas.OrderCreate(
-        order_type="DFQ",
-        trade_date=TODAY,
-        installment=schemas.OrderInstallmentCreate(
-            contract_type="ADVANCE_PURCHASE",
-            periods=1,
-            first_due_on=TODAY,
-            principal=Decimal("0"),
-        ),
-    )
-    with pytest.raises(Validation, match="TH/DFQ 分期订单必须同时提交初始买入和分期合约"):
-        router.create_order(payload, db=seeded_db, user=_admin())
-
-
-def test_create_order_dfq_initial_buy_requires_installment(seeded_db):
-    # 359: DFQ 初始买入必须与分期合约同时提交
-    payload = schemas.OrderCreate(
-        order_type="DFQ",
-        trade_date=TODAY,
-        initial_buy=schemas.InitialBuyCreate(amount=Decimal("0"), occurred_on=TODAY),
-    )
-    with pytest.raises(Validation, match="初始买入和分期合约必须同时提交"):
-        router.create_order(payload, db=seeded_db, user=_admin())
-
-
-def test_create_order_initial_buy_only_for_dfq_hs_th(seeded_db):
-    # 371: 只有 DFQ/HS/TH 可在建单时提交初始买入
-    payload = schemas.OrderCreate(
-        order_type="DG",
-        trade_date=TODAY,
-        initial_buy=schemas.InitialBuyCreate(amount=Decimal("0"), occurred_on=TODAY),
-    )
-    with pytest.raises(Validation, match="只有 DFQ、HS 或 TH 订单可以在创建时提交初始买入"):
-        router.create_order(payload, db=seeded_db, user=_admin())
-
-
 def test_create_order_initial_cost_requires_buy_on_hs_th(seeded_db):
     # 373: 初始费用仅适用于同时提交初始买入的回收/提号订单
     payload = schemas.OrderCreate(
-        order_type="DFQ",
+        order_type="HS",
         trade_date=TODAY,
         initial_costs=[schemas.InitialCostCreate(amount=Decimal("0"), occurred_on=TODAY)],
     )
     with pytest.raises(Validation, match="初始费用仅适用于同时提交初始买入的回收或提号订单"):
         router.create_order(payload, db=seeded_db, user=_admin())
 
-
 # ---- create_order 权限拦截分支 ----
-
 
 def test_create_order_hs_initial_buy_requires_event_perm(seeded_db):
     # 376: HS 初始买入需 order.event.post 或 finance.order.event.post
@@ -137,7 +89,6 @@ def test_create_order_hs_initial_buy_requires_event_perm(seeded_db):
     )
     with pytest.raises(PermissionDenied, match="无权登记买入事件"):
         router.create_order(payload, db=seeded_db, user=_auditor())
-
 
 def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
     # 378: HS 初始费用需 order.event.post（财务仅可登记买卖事件）
@@ -150,14 +101,12 @@ def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
     with pytest.raises(PermissionDenied, match="无权登记费用事件"):
         router.create_order(payload, db=seeded_db, user=_finance())
 
-
 # ---- _order_output：非管理员剥离 game_password（64-67） ----
-
 
 def test_order_output_strips_game_password_for_non_admin(seeded_db):
     order = service.create_order(
         seeded_db,
-        order_type="DFQ",
+        order_type="HS",
         trade_date=TODAY,
         actor="pytest",
         account_snapshot={"game_account": "x", "game_password": "secret"},
@@ -168,9 +117,7 @@ def test_order_output_strips_game_password_for_non_admin(seeded_db):
     assert out.account_snapshot is not None
     assert out.account_snapshot.get("game_password") is None
 
-
 # ---- _order_list_payload：客户/对手方角色回写（249 / 255） ----
-
 
 def test_order_list_payload_includes_customer_role(seeded_db):
     account = _new_account(seeded_db)
@@ -188,7 +135,6 @@ def test_order_list_payload_includes_customer_role(seeded_db):
     payloads = router._order_list_payload(seeded_db, [order])
     assert payloads[0]["party_name"] == "甲"
     assert payloads[0]["party_role"] == "BUYER"
-
 
 def test_order_list_payload_includes_counterparty_role(seeded_db):
     account = _new_account(
@@ -214,9 +160,7 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
     assert payloads[0]["party_name"] == "同行乙"
     assert payloads[0]["party_role"] == "PEER"
 
-
 # ---- pool_balance：无池授权返回 NotFound（603-605） ----
-
 
 def test_pool_balance_hidden_for_unauthorized_viewer(seeded_db):
     with pytest.raises(NotFound, match="资金池不存在"):

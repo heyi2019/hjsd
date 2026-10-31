@@ -17,7 +17,7 @@ import { DataTable,
   StatRow,
   StatusTag,
   useCompactLayout, } from "../shared/ui";
-import { InventorySaleModal } from "./InventorySaleModal";
+import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "./InventorySaleModal";
 import { InventoryConsignmentModal } from "./InventoryConsignmentModal";
 import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "./InventoryPlatformOffsaleModal";
 import { InventoryRebateModal } from "./InventoryRebateModal";
@@ -724,10 +724,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         )}
       </Card>
 
-      <InventorySaleModal
-        account={saleTarget}
-        onClose={() => setSaleTarget(null)}
-        onCreated={async () => {
+      {saleTarget ? (() => {
+        const onCreated = async () => {
           const account = saleTarget;
           setSaleTarget(null);
           await load();
@@ -735,8 +733,12 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           if (account) dropExecutionCache(account.id);
           // 售出会在原买入订单上登记 SELL（不再新建订单），同步通知上层重拉台账，避免两边数据不同步。
           onOrdersChanged?.();
-        }}
-      />
+        };
+        const common = { account: saleTarget, onClose: () => setSaleTarget(null), onCreated };
+        if (saleTarget.inventory_type === "CONSIGNMENT") return <ConsignmentSaleModal {...common} />;
+        if (saleTarget.inventory_type === "PICKUP") return <PickupSaleModal {...common} />;
+        return <RecoverySaleModal {...common} />;
+      })() : null}
       <InventoryConsignmentModal
         account={consignmentTarget}
         onClose={() => setConsignmentTarget(null)}

@@ -2,7 +2,7 @@
 
 种子内容包括：
 - 资金池 `HJ_INVEST`（投资款荷包）/ `HJ_PROFIT`（利润荷包）（PRD §1.2）；
-- 四类主业务 `HS` 回收 / `TH` 提号 / `DG` 代挂 / `DFQ` 代分期（PRD §2.0）；
+- 三类主业务 `HS` 回收 / `TH` 提号 / `DG` 代挂（PRD §2.0）；
 - 业务↔资金池默认路由（本金→投资款池，利润→利润池；DG 总额→利润池）；
 - 各编号域初始化（订单按业务独立、客户 CUS、合作方 CP 等）。
 
@@ -38,7 +38,6 @@ SEED_ORDER_TYPES: tuple[tuple[str, str, str, int, str], ...] = (
     ("HS", "回收", CapitalType.STOCK.value, 10, "客户把号卖给我，我择机卖出（库存型）"),
     ("TH", "提号", CapitalType.STOCK.value, 20, "买家找我买号，我去同行那里提号卖给他（库存型）"),
     ("DG", "代挂", CapitalType.ZERO.value, 30, "客户让我帮忙卖他的号，我收服务费（零本金型）"),
-    ("DFQ", "代分期", CapitalType.CREDIT.value, 40, "代分期服务"),
 )
 
 SEED_GAME_TYPES: tuple[tuple[str, int, bool], ...] = (
@@ -54,8 +53,6 @@ SEED_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("TH", Portion.PROFIT.value, "HJ_PROFIT"),
     ("DG", Portion.PROFIT.value, "HJ_PROFIT"),
     ("DG", Portion.GROSS.value, "HJ_PROFIT"),
-    ("DFQ", Portion.PRINCIPAL.value, "HJ_INVEST"),
-    ("DFQ", Portion.PROFIT.value, "HJ_PROFIT"),
 )
 
 # (sequence_key, prefix, padding) —— 订单编号域随业务动态生成，此处只初始化非订单域
@@ -207,7 +204,7 @@ def seed_is_applied(session: Session) -> bool:
     return (
         service.get_pool_by_code(session, "HJ_INVEST") is not None
         and service.get_pool_by_code(session, "HJ_PROFIT") is not None
-        and all(service.get_order_type_by_code(session, code) is not None for code in ("HS", "TH", "DG", "DFQ"))
+        and all(service.get_order_type_by_code(session, code) is not None for code in ("HS", "TH", "DG"))
         and _all_seed_routes_ready(session)
         and all(
             any(item.name == name for item in service.list_game_types(session))

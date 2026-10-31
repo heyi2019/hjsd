@@ -1,32 +1,60 @@
 import { appMessage } from "../shared/ui/appFeedback";
-/** 库存账号售出：回收 / 代挂账号从库存中心售出，按货源类型映射订单类型。 */
+/** 库存账号售出：回收 / 提号 / 代挂账号从库存中心售出，按货源类型映射订单类型与买家角色。 */
 import { Form, Input, Radio } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { customersApi,
-  installmentsApi,
+  employeesApi,
   ordersApi,
   poolsApi,
   type Account,
   type Customer,
+  type EmployeeOption,
   type Pool, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { BusinessActionModal, BusinessForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
+import { AdaptiveFormGrid, BusinessActionModal, BusinessForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
-import { InstallmentScheduleFields, resizeInstallmentSchedule, serializeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
+import { InstallmentScheduleFields, resizeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSection";
+import { DeliveryInfoSection } from "../orders/DeliveryInfoSection";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
+import { collectFullPayment, collectInstallmentPayment } from "./ReceiverSection";
 import "./InventorySaleModal.css";
 
-export function InventorySaleModal(props: {
+type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
+
+/** 买家角色：代挂（CONSIGNMENT）为委托方 CONSIGNOR，其余（回收/提号）为买家 BUYER。 */
+function buyerRoleOf(inventoryType: string | null | undefined): "BUYER" | "CONSIGNOR" {
+  return inventoryType === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER";
+}
+
+export interface InventorySaleModalProps {
   account: Account | null;
   onClose: () => void;
   onCreated: () => void | Promise<void>;
-}) {
+  /** 固定货源类型（RECOVERY/PICKUP/CONSIGNMENT），用于锁定标题与买家角色；缺省时从 account.inventory_type 推断（兼容旧调用）。 */
+  inventoryType?: SaleInventoryType;
+  /** 弹窗标题，按货源类型差异化。 */
+  title?: string;
+  /** 买家信息区标题，按货源类型差异化（代挂为委托方信息）。 */
+  buyerInfoTitle?: string;
+}
+
+type SaleWrapperProps = Pick<InventorySaleModalProps, "account" | "onClose" | "onCreated">;
+
+/**
+ * 库存售出表单的共享实现。回收 / 提号 / 代挂三种货源共用同一套字段、校验与提交逻辑，
+ * 仅通过 inventoryType 注入的标题、买家信息标题与买家角色产生差异。
+ */
+export function InventorySaleModalBase(props: InventorySaleModalProps) {
+  const { account, inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
+  const resolvedType = inventoryType ?? account?.inventory_type;
+  const isConsignment = resolvedType === "CONSIGNMENT";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
@@ -84,9 +112,9 @@ export function InventorySaleModal(props: {
     const count = Number(periods);
     if (!Number.isInteger(count) || count <= 0) return;
     const current = form.getFieldValue("installment_schedule") as Array<{ due_on?: unknown }> | undefined;
-    const next = resizeInstallmentSchedule(current, count, (index) => ({ due_on: dayjs().add(index, "month") })).map((item, index) => ({
+    const next = resizeInstallmentSchedule(current, count, (index) => ({ due_on: dayjs().add(index + 1, "month") })).map((item, index) => ({
       ...item,
-      due_on: item.due_on ?? dayjs().add(index, "month"),
+      due_on: item.due_on ?? dayjs().add(index + 1, "month"),
     }));
     if (current?.length !== next.length || current.some((item) => !item?.due_on)) form.setFieldValue("installment_schedule", next);
   }, [form, paymentMethod, periods]);
@@ -94,11 +122,12 @@ export function InventorySaleModal(props: {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void Promise.all([customersApi.list(), poolsApi.list()])
-      .then(([customerList, poolList]) => {
+    void Promise.all([customersApi.list(), poolsApi.list(), employeesApi.list()])
+      .then(([customerList, poolList, employeeList]) => {
         if (cancelled) return;
         setCustomers(customerList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
+        setEmployees(employeeList);
         setError(null);
       })
       .catch((cause) => {
@@ -144,48 +173,22 @@ export function InventorySaleModal(props: {
       })).customer;
       await ordersApi.addCustomerRole(sourceOrderId, {
         customer_id: customer.id,
-        role: props.account.inventory_type === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER",
+        role: buyerRoleOf(resolvedType),
       });
 
       if (values.payment_method === "INSTALLMENT") {
-        const schedule = serializeInstallmentSchedule(
-          values.installment_schedule as Array<{ due_on?: unknown }> | undefined,
-          (value) => value && typeof value === "object" && "format" in value
-            ? (value as { format: (template: string) => string }).format("YYYY-MM-DD")
-            : today(),
-        );
-        const firstDueOn = schedule[0]?.due_on ?? today();
-        await installmentsApi.create({
-          order_id: sourceOrderId,
-          adjust_final_period: true,
-          // 提号、代挂账号进入库存后，分期售出统一按库存分期出售处理。
-          contract_type: "STOCK_SALE",
-          principal: String(values.amount ?? 0),
-          down_payment: String(values.down_payment ?? 0),
-          service_fee: String(values.service_fee ?? 0),
-          periods: Number(values.periods ?? 1),
-          per_period_service_fee: String(values.per_period_service_fee ?? 0),
-          per_period: String(values.per_period ?? 0),
-          first_due_on: firstDueOn,
-          schedule,
-          note: values.note as string | undefined,
-        });
+        await collectInstallmentPayment({ sourceOrderId, values, isConsignment });
         appMessage.success("分期售出已创建，账号已进入分期中");
       } else {
-        await ordersApi.postEvent(sourceOrderId, {
-          event_type: "SELL",
-          amount: values.amount as string,
-          occurred_on: today(),
-          pool_id: values.pool_id as number,
-          portion: "PROFIT",
-          note: values.cashflow_note as string | undefined,
-          bound_phone: values.bound_phone as string | undefined,
-          bound_phone_owner: values.bound_phone_owner as string | undefined,
-          ...(values.amount2 != null && String(values.amount2) !== ""
-            ? { amount2: String(values.amount2), pool_id2: values.pool_id2 as number }
-            : {}),
-        });
+        await collectFullPayment({ sourceOrderId, values, isConsignment });
         appMessage.success("账号已售出");
+      }
+      // 交付负责人是订单级字段，售出后在来源单上登记（merge 进订单 form_extra，不动其它字段）。
+      const deliveryResponsibleIds = Array.isArray(values.delivery_responsible_ids)
+        ? (values.delivery_responsible_ids as unknown[]).filter((id): id is number => typeof id === "number")
+        : [];
+      if (deliveryResponsibleIds.length > 0) {
+        await ordersApi.patch(sourceOrderId, { form_extra: { delivery_responsible_ids: deliveryResponsibleIds } });
       }
       form.resetFields();
       props.onClose();
@@ -199,7 +202,7 @@ export function InventorySaleModal(props: {
 
   return (
     <BusinessActionModal
-      title="售出账号"
+      title={title}
       open={open}
       className="inventory-sale-modal recovery-order-modal"
       destroyOnHidden
@@ -214,53 +217,75 @@ export function InventorySaleModal(props: {
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
         <BusinessForm scope="SALE" form={form} onFinish={submit}>
-          <RecoveryCustomerSection title="买家信息" />
-          <CfgItem name="bound_phone" label="换绑手机号">
-            <Input placeholder="可选填" />
-          </CfgItem>
-          <CfgItem name="bound_phone_owner" label="手机号绑定人">
-            <Input placeholder="可选填" />
-          </CfgItem>
+          <RecoveryCustomerSection title={buyerInfoTitle} />
+          <DeliveryInfoSection showIntermediary employees={employees} />
           <section className="inventory-sale-cashflow" aria-labelledby="inventory-sale-cashflow-title">
             <div id="inventory-sale-cashflow-title" className="inventory-sale-cashflow__title">资金流水</div>
-            <CfgItem name="amount" label="售出金额" rules={[{ required: true, message: "请输入售出金额" }, { validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}>
-              <MoneyInput placeholder="请输入金额" />
-            </CfgItem>
-            <CfgItem name="payment_method" label="付款方式" initialValue="FULL">
-              <Radio.Group optionType="button" buttonStyle="solid" />
-            </CfgItem>
-            {paymentMethod === "FULL" ? <>
-              <CfgItem name="pool_id" label="收款资金账户" rules={[{ required: true, message: "请选择收款资金账户" }]}>
-                <Select placeholder="请选择收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+            <AdaptiveFormGrid>
+              {isConsignment && (
+                <CfgItem
+                  name="sale_amount"
+                  label="售出金额（仅记录）"
+                  rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}
+                >
+                  <MoneyInput placeholder="代挂无买入价，此处仅作记录，不计入利润" />
+                </CfgItem>
+              )}
+              <CfgItem name="amount" label={isConsignment ? "利润" : "售出金额"} rules={[{ required: true, message: isConsignment ? "请输入利润" : "请输入售出金额" }, { validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}>
+                <MoneyInput placeholder={isConsignment ? "请输入利润（代挂佣金）" : "请输入金额"} />
               </CfgItem>
-              <CfgItem
-                name="amount2"
-                label="售出金额2"
-                rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}
-              >
-                <MoneyInput placeholder="可选填，分笔进不同资金池" />
-              </CfgItem>
-              <CfgItem
-                name="pool_id2"
-                label="资金账户2"
-                rules={amount2 != null && Number(amount2) > 0 ? [{ required: true, message: "请选择资金账户2" }] : []}
-              >
-                <Select placeholder="请选择资金账户2" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
-              </CfgItem>
-              <CfgItem name="cashflow_note" label="资金流水备注">
-                <Input placeholder="可选填" />
-              </CfgItem>
-            </> : (
-              <div className="inventory-sale-installment-fields">
-                <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
-                <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
-                <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
-                <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>
-                <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}><MoneyInput placeholder="按服务费总额/期数计算" /></CfgItem>
-                <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value); if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配"); } }]} extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
-                <InstallmentScheduleFields name="installment_schedule" />
-              </div>
-            )}
+              {!isConsignment && (
+                <CfgItem name="payment_method" label="付款方式" initialValue="FULL">
+                  <Radio.Group optionType="button" buttonStyle="solid" />
+                </CfgItem>
+              )}
+              {paymentMethod === "FULL" ? <>
+                <CfgItem name="pool_id" label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
+                  <Select placeholder="资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+                </CfgItem>
+                {!isConsignment && (
+                  <CfgItem
+                    name="amount2"
+                    label="售出金额2"
+                    rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}
+                  >
+                    <MoneyInput placeholder="可选填，分笔进不同资金池" />
+                  </CfgItem>
+                )}
+                {!isConsignment && (
+                  <CfgItem
+                    name="pool_id2"
+                    label="资金账户2"
+                    rules={amount2 != null && Number(amount2) > 0 ? [{ required: true, message: "请选择资金账户2" }] : []}
+                  >
+                    <Select placeholder="资金账户2" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+                  </CfgItem>
+                )}
+                <CfgItem name="cashflow_note" label="资金流水备注">
+                  <Input placeholder="可选填" />
+                </CfgItem>
+              </> : (
+                <div className="inventory-sale-installment-fields">
+                  <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
+                  <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
+                  <CfgItem
+                    name="pool_id"
+                    label="资金账户"
+                    rules={downPayment != null && Number(downPayment) > 0 ? [{ required: true, message: "请选择首付收款资金账户" }] : []}
+                  >
+                    <Select placeholder="首付收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+                  </CfgItem>
+                  <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
+                  <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>
+                  <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}><MoneyInput placeholder="按服务费总额/期数计算" /></CfgItem>
+                  <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value); if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配"); } }]} extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
+                  <div className="inventory-sale-plan">
+                    <div className="inventory-sale-plan__title">分期计划</div>
+                    <InstallmentScheduleFields name="installment_schedule" />
+                  </div>
+                </div>
+              )}
+            </AdaptiveFormGrid>
             <AdditionalFeeFields pools={pools} />
           </section>
           <CustomFieldSection testIdSuffix="inventory-sale" />
@@ -268,4 +293,24 @@ export function InventorySaleModal(props: {
       </FieldConfigContext.Provider>
     </BusinessActionModal>
   );
+}
+
+/** 回收账号售出（RECOVERY）。 */
+export function RecoverySaleModal(props: SaleWrapperProps) {
+  return <InventorySaleModalBase {...props} inventoryType="RECOVERY" title="售出回收账号" buyerInfoTitle="买家信息" />;
+}
+
+/** 提号账号售出（PICKUP）。 */
+export function PickupSaleModal(props: SaleWrapperProps) {
+  return <InventorySaleModalBase {...props} inventoryType="PICKUP" title="售出提号账号" buyerInfoTitle="买家信息" />;
+}
+
+/** 代挂账号售出（CONSIGNMENT），买家为委托方。 */
+export function ConsignmentSaleModal(props: SaleWrapperProps) {
+  return <InventorySaleModalBase {...props} inventoryType="CONSIGNMENT" title="售出代挂账号" buyerInfoTitle="委托方信息" />;
+}
+
+/** 兼容默认导出：行为等同原统一售出表单（标题/角色从 account.inventory_type 推断）。 */
+export function InventorySaleModal(props: InventorySaleModalProps) {
+  return <InventorySaleModalBase {...props} />;
 }

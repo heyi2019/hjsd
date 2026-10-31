@@ -23,7 +23,6 @@ from app.core.money import (
     to_money,
 )
 from app.domain.trade import (
-    Account,
     Installment,
     Order,
 )
@@ -60,23 +59,6 @@ def _merge_form_extra(
     checked = validate_form_extra(session, order_type_code=scope, values=values)
     installment.form_extra = {**(installment.form_extra or {}), **checked}
 
-
-def _materialize_dfq_recovery_account(
-    session: Session,
-    order: Order,
-    *,
-    actor: str,
-) -> Account:
-    """DFQ 回收转自营：使用建单时已入库的账号转为可售库存。"""
-    if order.account_id is None:
-        raise Validation("DFQ 分期没有关联库存账号")
-    account = session.get(Account, order.account_id)
-    if account is None:
-        raise NotFound("分期合约关联账号不存在")
-    account.business_mode = "SELF"
-    account.inventory_type = "RECOVERY"
-    account.value_added_service = None
-    return account
 
 def _add_months(base: date, months: int) -> date:
     """按月推进到期日：`base + months` 个月，超出目标月天数时截断到月末。

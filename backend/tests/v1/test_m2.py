@@ -18,7 +18,7 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, InstallmentSchedule, Order
+from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
 from app.finance import service as finance_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
@@ -26,12 +26,10 @@ from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
 
-
 def _pool(seeded_db, code: str) -> Pool:
     pool = seeded_db.scalar(select(Pool).where(Pool.code == code))
     assert pool is not None
     return pool
-
 
 def _account(seeded_db, game_account: str):
     return stocks_service.create_account(
@@ -43,57 +41,29 @@ def _account(seeded_db, game_account: str):
         actor="pytest",
     )
 
+class TestA04DgConsignmentSale:
 
-class TestA04DfqAdvancePurchase:
-    def test_dfq_installment_is_separate_from_inventory_status(self, seeded_db):
-        order = orders_service.create_order(
-            seeded_db,
-            order_type="DFQ",
-            trade_date=TODAY,
-            actor="pytest",
-            account_snapshot={"game_account": "dfq-status-separation"},
-        )
-        contract = installment_service.create_installment(
-            seeded_db,
-            order_id=order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
-            principal=Decimal("100"),
-            down_payment=Decimal("20"),
-            periods=1,
-            per_period=Decimal("80"),
-            first_due_on=TODAY,
-            actor="pytest",
-        )
-        seeded_db.flush()
-
-        account = seeded_db.get(Account, order.account_id)
-        assert account is not None
-        assert contract.status == InstallmentStatus.PENDING.value
-        assert order.status == OrderStatus.INSTALLMENT.value
-        assert account.inventory_status == "OUT_OF_STOCK"
-        assert account.id not in {item["account_id"] for item in stocks_service.inventory(seeded_db)}
-
-    def test_buy_downpayment_two_periods_deliver(self, seeded_db):
-        supplier = parties_service.create_counterparty(
-            seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"
+    def test_downpayment_two_periods_deliver(self, seeded_db):
+        platform = parties_service.create_counterparty(
+            seeded_db, display_name="寄售平台B", type="PLATFORM", actor="pytest"
         )
         customer = parties_service.create_customer(seeded_db, display_name="分期客户", actor="pytest")
         seeded_db.commit()
 
         order = orders_service.create_order(
             seeded_db,
-            order_type="DFQ",
+            order_type="DG",
             trade_date=TODAY,
             actor="pytest",
-            customer_roles=[(customer.id, "INSTALLMENT_CUSTOMER")],
-            counterparty_roles=[(supplier.id, "SUPPLIER")],
+            customer_roles=[(customer.id, "CONSIGNOR")],
+            counterparty_roles=[(platform.id, "PLATFORM")],
         )
         seeded_db.commit()
 
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
             principal=Decimal("1200"),
             down_payment=Decimal("200"),
             periods=2,
@@ -101,12 +71,10 @@ class TestA04DfqAdvancePurchase:
             first_due_on=TODAY,
             actor="pytest",
         )
-        orders_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
-            occurred_on=TODAY, actor="pytest",
-        )
         seeded_db.commit()
-        assert contract.inst_no == f"{order.order_no}-INS01"
+        # 分期合约号统一走独立 FQ 序列（2026-10-28 口径），不再由订单号衍生
+        assert contract.inst_no.startswith("FQ")
+        assert contract.inst_no.endswith("-INS01")
         assert installment_service.total_receivable(contract) == Decimal("1200.00")
 
         installment_service.pay(
@@ -147,13 +115,13 @@ class TestA04DfqAdvancePurchase:
     def test_unsettled_contract_cannot_deliver(self, seeded_db):
         seeded_db.commit()
         order = orders_service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
+            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
             principal=Decimal("1100"),
             down_payment=Decimal("100"),
             periods=2,
@@ -172,13 +140,13 @@ class TestA04DfqAdvancePurchase:
     def test_payment_cannot_exceed_receivable(self, seeded_db):
         seeded_db.commit()
         order = orders_service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
+            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
             principal=Decimal("600"),
             down_payment=Decimal("100"),
             periods=1,
@@ -193,7 +161,6 @@ class TestA04DfqAdvancePurchase:
                 period_no=1, actor="pytest",
             )
         assert exc.value.code == ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE
-
 
 class TestA05HsStockSale:
     def test_stock_sale_contract_adds_no_new_buy(self, seeded_db):
@@ -326,7 +293,6 @@ class TestA05HsStockSale:
         ).all()
         assert len(overdue) == 2
 
-
 class TestA08Deposit:
     def test_deposit_holds_available_balance_without_profit_impact(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -366,7 +332,6 @@ class TestA08Deposit:
             )
         assert exc.value.code == ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE
 
-
 class TestA06Rebate:
 
     def test_rebate_requires_active_source_order(self, seeded_db):
@@ -385,7 +350,6 @@ class TestA06Rebate:
                 actor="pytest",
             )
         assert exc.value.code == ErrorCode.ORDER_STATUS_CONFLICT
-
 
 class TestM2Api:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):

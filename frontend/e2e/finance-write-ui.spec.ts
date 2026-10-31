@@ -196,18 +196,29 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
-    // 预置分期合约：DFQ 订单 + 代分期合约（ADVANCE_PURCHASE）。
+    // 预置分期合约：HS 回收订单（关联在库 RECOVERY 账号并登记 BUY）+ 自营分期出售合约。
+    const stocksResponse = await request.get(`${API_BASE}/stocks`, { headers: ADMIN });
+    expect(stocksResponse.ok()).toBe(true);
+    const account = ((await stocksResponse.json()).items as Array<{ id: number; inventory_status: string; inventory_type?: string }>).find(
+      (item) => item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
+    );
+    expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
     const order = await request.post(`${API_BASE}/orders`, {
       headers: ADMIN,
-      data: { order_type: "DFQ", trade_date: "2026-10-21" },
+      data: { order_type: "HS", trade_date: "2026-10-21", account_id: account!.id },
     });
     expect(order.status()).toBe(201);
     const orderId = (await order.json()).id as number;
+    const buy = await request.post(`${API_BASE}/orders/${orderId}/events`, {
+      headers: ADMIN,
+      data: { event_type: "BUY", amount: "1200.00", occurred_on: "2026-10-21" },
+    });
+    expect(buy.status()).toBe(201);
     const inst = await request.post(`${API_BASE}/installments`, {
       headers: ADMIN,
       data: {
         order_id: orderId,
-        contract_type: "ADVANCE_PURCHASE",
+        contract_type: "STOCK_SALE",
         principal: "1200.00",
         down_payment: "0.00",
         periods: 3,
@@ -221,8 +232,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await page.goto("/");
     await navItem(page, "业务中心").click();
     await page.getByRole("tab", { name: "分期与回款", exact: true }).click();
-    // 安装面板默认在「分期出售」子 Tab，切到「代分期」以匹配 ADVANCE_PURCHASE 合约。
-    await page.getByRole("tab", { name: "代分期", exact: true }).click();
+    // 分期面板只剩「分期出售」Tab（代分期已下线），STOCK_SALE 合约直接在默认 Tab 内渲染。
 
     const row = page.locator(".ant-table-row", { hasText: instNo }).first();
     await expect(row).toBeVisible({ timeout: 10000 });

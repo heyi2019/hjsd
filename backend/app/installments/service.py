@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from ._shared import (
     _add_months,
-    _materialize_dfq_recovery_account,
     _merge_form_extra,
     _non_negative,
     _positive,
@@ -44,7 +43,6 @@ from .settlement import mark_default, settle_early
 
 __all__ = [
     "_add_months",
-    "_materialize_dfq_recovery_account",
     "_merge_form_extra",
     "_non_negative",
     "_normalize_schedule",

@@ -34,7 +34,7 @@ const installments = [
   },
   {
     id: 2,
-    inst_no: "DFQ0001-INS01",
+    inst_no: "HS0002-INS01",
     contract_type: "STOCK_SALE",
     order_id: 10,
     down_payment: "0.00",

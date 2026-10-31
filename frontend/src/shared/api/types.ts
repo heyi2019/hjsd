@@ -182,7 +182,7 @@ export interface Order {
   attachments?: OrderAttachment[];
   /** 自定义扩展字段历史值（按 field_key 归集）；删除/停用字段的值仍保留在此，详情展示时兜底。 */
   form_extra?: Record<string, unknown>;
-  /** DFQ 建单时的账号文本快照（无 order.create 权限时 game_password 被后端置空）。 */
+  /** 建单时的账号文本快照（无 order.create 权限时 game_password 被后端置空）。 */
   account_snapshot?: {
     game_account: string;
     game_type?: string | null;

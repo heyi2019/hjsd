@@ -221,7 +221,6 @@ def _seed_option_sets(seeded_db) -> None:
         ],
         "ORDER_BUSINESS": [
             {"value": "DG", "label": "代挂"},
-            {"value": "DFQ", "label": "代分期"},
         ],
         "ORDER_STATUS": [
             {"value": "ACTIVE", "label": "进行中"},

@@ -71,7 +71,7 @@ class Account(Base, AuditMixin):
     game_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     business_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
     inventory_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
-    # 增值服务维度（与业务类型独立）：STOCK_SALE=自营分期 / ADVANCE_PURCHASE=分销分期（代分期）。
+    # 增值服务维度（与业务类型独立）：STOCK_SALE=自营分期。
     value_added_service: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # 库存编号：台账唯一编码 KU + 四位流水（系统生成，不可手改）。
     stock_no: Mapped[str | None] = mapped_column(String(32), nullable=True)

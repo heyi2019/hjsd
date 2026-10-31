@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { CreateBusinessModal } from "./CreateBusinessModal";
-import { DfqOrderSection } from "./dfq/DfqOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";
 import { FieldConfigContext } from "./ConfigurableField";
 import { Form } from "antd";
@@ -65,13 +64,13 @@ it("设置面板改板块名后，建单同步显示后端覆盖标题", async (
 
 async function openTypedModal(orderType: string, user = "admin") {
   const onCreated = vi.fn();
-  renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG" | "DFQ"} />, { user });
-  const title = await screen.findByText(orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : orderType === "DFQ" ? "新建代分期订单" : "新建业务");
+  renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={onCreated} initialOrderType={orderType as "HS" | "TH" | "DG"} />, { user });
+  const title = await screen.findByText(orderType === "HS" ? "新建回收订单" : orderType === "TH" ? "新建提号订单" : orderType === "DG" ? "新建代挂订单" : "新建业务");
   return { container: title.closest(".ant-modal-content") as HTMLElement, onCreated };
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
-it.each(["HS", "TH", "DG", "DFQ"])("%s 建单提供换绑手机号字段", async (orderType) => {
+it.each(["HS", "TH", "DG"])("%s 建单提供换绑手机号字段", async (orderType) => {
   await openTypedModal(orderType);
   expect(screen.getByLabelText("换绑手机号")).toBeInTheDocument();
 });
@@ -80,16 +79,15 @@ it.each([
   ["HS", "回收负责人"],
   ["TH", "提号负责人"],
   ["DG", "代挂负责人"],
-  ["DFQ", "代分期负责人"],
 ])("%s 在游戏账号信息登记%s", async (orderType, label) => {
   await openTypedModal(orderType);
   expect(screen.getByLabelText(label)).toBeInTheDocument();
 });
 
-it("回收和代分期均提供手机号绑定人这一核心账号字段", async () => {
+it("回收和代挂均提供手机号绑定人这一核心账号字段", async () => {
   await openTypedModal("HS");
   expect(screen.getByLabelText("手机号绑定人")).toBeInTheDocument();
-  await openTypedModal("DFQ");
+  await openTypedModal("DG");
   expect((await screen.findAllByLabelText("手机号绑定人")).length).toBeGreaterThan(0);
 });
 
@@ -133,17 +131,6 @@ it("回收建单将支出账户紧跟账号号价，不再展示独立资金流�
   expect(content.indexOf("资金明细")).toBeLessThan(content.indexOf("交付信息"));
 });
 
-it("代分期将分期计划放在参与方信息之后", async () => {
-  const { container } = await openTypedModal("DFQ");
-  const content = container.textContent ?? "";
-
-  expect(content.indexOf("借款与分期信息")).toBeLessThan(content.indexOf("付款信息"));
-  expect(content.indexOf("付款信息")).toBeLessThan(content.indexOf("交付信息"));
-  expect(content.indexOf("交付信息")).toBeLessThan(content.indexOf("分期客户"));
-  expect(content.indexOf("分期客户")).toBeLessThan(content.indexOf("分期计划"));
-  expect(content.indexOf("分期计划")).toBeLessThan(content.indexOf("补充信息"));
-});
-
 it("代挂建单在交付信息前展示业务信息", () => {
   renderLight(
     <Form>
@@ -156,24 +143,6 @@ it("代挂建单在交付信息前展示业务信息", () => {
   );
   const content = document.body.textContent ?? "";
   expect(content.indexOf("代挂方案")).toBeLessThan(content.indexOf("交付信息"));
-});
-
-it("代分期的金额字段与账号备注读取表单字段配置", async () => {
-  renderLight(
-    <Form>
-      <FieldConfigContext.Provider value={{
-        dfq_purchase_price: { id: 301, order_type_code: "DFQ", field_key: "dfq_purchase_price", label: "购号成本", field_type: "NUMBER", options: null, required: true, is_active: true, sort_order: 110, locked: true, is_custom: false, note: null },
-        dfq_account_note: { id: 302, order_type_code: "DFQ", field_key: "dfq_account_note", label: "账号补充说明", field_type: "TEXT", options: null, required: false, is_active: true, sort_order: 70, locked: false, is_custom: false, note: null },
-        dfq_period_amount: { id: 303, order_type_code: "DFQ", field_key: "dfq_period_amount", label: "每期金额", field_type: "NUMBER", options: null, required: false, is_active: false, sort_order: 160, locked: false, is_custom: false, note: null },
-      }}>
-        <DfqOrderSection pools={[]} />
-      </FieldConfigContext.Provider>
-    </Form>,
-  );
-
-  expect(screen.getByText(/购号成本/)).toBeInTheDocument();
-  expect(screen.getByLabelText("账号补充说明")).toBeInTheDocument();
-  expect(screen.queryByText(/每期金额/)).toBeNull();
 });
 
 it("回收入口内联填写游戏账号信息，不加载库存账号", async () => {

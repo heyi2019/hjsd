@@ -73,7 +73,7 @@ class OrderInstallmentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     contract_type: str = Field(
-        description="ADVANCE_PURCHASE / PICKUP_SALE / CONSIGNMENT_SALE"
+        description="STOCK_SALE / PICKUP_SALE / CONSIGNMENT_SALE"
     )
     principal: Decimal = Field(default=Decimal("0"), ge=0)
     down_payment: Decimal = Field(default=Decimal("0"), ge=0)
@@ -91,7 +91,7 @@ class OrderInstallmentCreate(BaseModel):
 class OrderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG / DFQ")
+    order_type: str = Field(min_length=2, max_length=10, description="HS / TH / DG")
     trade_date: date
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None

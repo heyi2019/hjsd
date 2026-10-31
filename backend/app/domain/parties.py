@@ -261,7 +261,7 @@ class OrderCustomerRole(Base, TimestampMixin):
 
 
 class OrderCounterpartyRole(Base, TimestampMixin):
-    """订单合作方角色：TH 同行、DFQ 供货方、DG 平台由此关联。"""
+    """订单合作方角色：TH 同行、DG 平台由此关联。"""
 
     __tablename__ = "order_counterparty_roles"
     __table_args__ = (

@@ -101,13 +101,11 @@ _CUSTOMER_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
     "HS": frozenset({"SELLER", "BUYER", "INSTALLMENT_CUSTOMER"}),
     "TH": frozenset({"BUYER"}),
     "DG": frozenset({"CONSIGNOR"}),
-    "DFQ": frozenset({"INSTALLMENT_CUSTOMER"}),
 }
 _COUNTERPARTY_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
     "HS": frozenset(),
     "TH": frozenset({"PEER"}),
     "DG": frozenset({"PLATFORM"}),
-    "DFQ": frozenset({"SUPPLIER"}),
 }
 
 
@@ -182,8 +180,6 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         "HS": ("SELF", "RECOVERY"),
         "TH": ("DISTRIBUTION", "PICKUP"),
         "DG": ("DISTRIBUTION", "CONSIGNMENT"),
-        # 代分期（垫资买入）：业务类型留空，以增值服务维度（代分期/分销）标识。
-        "DFQ": ("DISTRIBUTION", None),
     }[order_type]
     return stocks_service.create_account(
         session, game_account=game_account, actor=actor, game_type=game_type,

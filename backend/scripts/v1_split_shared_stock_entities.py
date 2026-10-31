@@ -59,14 +59,14 @@ def _derive_status(session, order: Order, events: list[OrderEvent]) -> str:
         return "VOID"
     if any(e.event_type == "SELL" for e in events):
         return "SOLD"
-    if order.order_type == "DFQ":
-        from app.domain.trade import Installment
+    # 分期合约未结清则账号仍在分期中；不再按订单类型区分。
+    from app.domain.trade import Installment
 
-        contract = session.scalar(
-            select(Installment).where(Installment.order_id == order.id)
-        )
-        if contract is not None and contract.status in _INSTALLMENT_OPEN:
-            return "INSTALLMENT"
+    contract = session.scalar(
+        select(Installment).where(Installment.order_id == order.id)
+    )
+    if contract is not None and contract.status in _INSTALLMENT_OPEN:
+        return "INSTALLMENT"
     return "IN_STOCK"
 
 

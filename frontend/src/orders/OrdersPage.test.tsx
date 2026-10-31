@@ -84,6 +84,15 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByRole("tab", { name: "业务台账" })).toBeNull();
   });
 
+  it("订单台账不提供关联筛选和关联列", async () => {
+    renderLight(<OrdersPage />);
+    await screen.findByRole("tab", { name: "订单台账" });
+
+    expect(screen.queryByText("关联筛选")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "关联状态筛选" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "关联" })).toBeNull();
+  });
+
   it("业务中心重新激活时刷新库存列表", async () => {
     const { rerender } = renderLight(<OrdersPage active={false} />);
     await screen.findByRole("tab", { name: "库存中心" });
@@ -173,7 +182,6 @@ describe("OrdersPage：四类订单台账", () => {
       "账号周期": "102px",
       "最新动作": "198px",
       "状态": "111px",
-      "关联": "111px",
       "日期": "144px",
       "操作": "220px",
     })) {

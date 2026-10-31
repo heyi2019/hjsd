@@ -5,9 +5,8 @@ import { useCallback, useState } from "react";
 import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, type Installment, type Order, type OrderType, type Pool } from "../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { LINK_STATUS_LABEL } from "../shared/lib/labels";
 import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
-import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../shared/ui";
@@ -43,10 +42,8 @@ export function useOrdersPageController(params: {
   };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
-  const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
-  // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
+  // 业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
-  const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
   const orderBusinessOptions: Opt[] = useOptionSet("ORDER_BUSINESS") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
@@ -367,7 +364,7 @@ export function useOrdersPageController(params: {
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword)
     .slice()
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
@@ -389,13 +386,6 @@ export function useOrdersPageController(params: {
     { title: "账号周期", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
-    {
-      title: "关联",
-      dataIndex: "link_status",
-      render: (v: string | undefined) => (
-        <StatusTag status={v ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", v ?? "LINKED", LINK_STATUS_LABEL)} />
-      ),
-    },
     { title: "日期", dataIndex: "trade_date" },
     {
       title: "操作",
@@ -473,7 +463,6 @@ export function useOrdersPageController(params: {
     keyword,
     ledgerExporting,
     ledgerSortDesc,
-    linkStatusFilter,
     load,
     loadError,
     loading,
@@ -513,7 +502,6 @@ export function useOrdersPageController(params: {
     setKeyword,
     setLedgerExporting,
     setLedgerSortDesc,
-    setLinkStatusFilter,
     setLoadError,
     setLoading,
     setOrderTypeFilter,
@@ -531,7 +519,6 @@ export function useOrdersPageController(params: {
     types,
     users,
     ledgerColumns,
-    linkStatusOptions,
     orderBusinessOptions,
     orderBusinessModeOptions,
     profitRoleOptions,

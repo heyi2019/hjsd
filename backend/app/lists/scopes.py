@@ -45,7 +45,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("account_status", "账号周期"),
             ListColumn("last_event_type", "最新动作"),
             ListColumn("status", "状态"),
-            ListColumn("link_status", "关联"),
             ListColumn("trade_date", "日期"),
             ListColumn("actions", "操作"),
         ),

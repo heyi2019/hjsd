@@ -21,10 +21,10 @@ import {
 } from "../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { filterRetiredOrderTypeOptions } from "../shared/lib/retiredProducts";
 import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
-import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { columnKey, orderMobileFields as arrangeMobileFields, useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
@@ -92,7 +92,6 @@ function getOrderMobileFields(order: Order, fieldOrder?: string[]) {
     { key: "event_total", label: "金额", value: formatOrderAmount(order) },
     { key: "account_status", label: "账号周期", value: order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-" },
     { key: "last_event_type", label: "最新动作", value: order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-" },
-    { key: "link_status", label: "关联", value: order.link_status ?? "-" },
     { key: "trade_date", label: "日期", value: order.trade_date || "-" },
   ], fieldOrder);
 }
@@ -227,24 +226,21 @@ function filterBusinessOrders(
   type: BusinessFilterKey,
   mode: BusinessModeFilterKey,
   keyword: string,
-  link: string,
   gameType: string,
 ): Order[] {
   const normalizedKeyword = keyword.trim().toLowerCase();
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
-    && (link === "all" || (order.link_status ?? "LINKED") === link)
     && (gameType === "all" || order.account_game_type === gameType)
     && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
   ));
 }
 
-function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey, link: string): number {
+function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey): number {
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
-    && (link === "all" || (order.link_status ?? "LINKED") === link)
   )).length;
 }
 
@@ -273,11 +269,9 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
-  const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
   const [gameTypeFilter, setGameTypeFilter] = useState("all");
-  // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
+  // 业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
-  const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
   // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
   const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
@@ -634,7 +628,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   }, [active, initialMine]);
 
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter, gameTypeFilter)
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter)
     .slice()
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
@@ -656,15 +650,6 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
     { title: "账号周期", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", width: 198, ellipsis: true, render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", width: 111, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
-    {
-      title: "关联",
-      dataIndex: "link_status",
-      width: 111,
-      ellipsis: true,
-      render: (v: string | undefined) => (
-        <StatusTag status={v ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", v ?? "LINKED", LINK_STATUS_LABEL)} />
-      ),
-    },
     { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
     {
       title: "操作",
@@ -763,10 +748,10 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   <Segmented
                     value={orderTypeFilter}
                     options={[
-                      { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter, linkStatusFilter)}` },
+                      { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter)}` },
                       ...orderBusinessOptions.map((item) => ({
                         value: item.value,
-                        label: `${item.label} ${countBusinessOrders(orders, item.value as BusinessFilterKey, businessModeFilter, linkStatusFilter)}`,
+                        label: `${item.label} ${countBusinessOrders(orders, item.value as BusinessFilterKey, businessModeFilter)}`,
                       })),
                     ]}
                     onChange={(value) => {
@@ -786,20 +771,6 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                     ]}
                     onChange={(value) => {
                       setBusinessModeFilter(value as BusinessModeFilterKey);
-                      setPage(1);
-                    }}
-                  />
-                  <Typography.Text strong>关联筛选</Typography.Text>
-                  <Select
-                    aria-label="关联状态筛选"
-                    className="ui-filter-select"
-                    value={linkStatusFilter}
-                    options={[
-                      { value: "all", label: "全部关联状态" },
-                      ...linkStatusOptions.map(({ value, label }) => ({ value, label })),
-                    ]}
-                    onChange={(value) => {
-                      setLinkStatusFilter(value);
                       setPage(1);
                     }}
                   />

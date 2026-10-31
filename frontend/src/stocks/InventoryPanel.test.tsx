@@ -41,7 +41,8 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
     expect(screen.getByText("类型筛选")).toBeInTheDocument();
     expect(screen.getByText("业务筛选")).toBeInTheDocument();
-    expect(screen.getByText("增值服务筛选")).toBeInTheDocument();
+    expect(screen.queryByText("增值服务筛选")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "增值服务筛选" })).not.toBeInTheDocument();
     expect(screen.getByText("排序")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导出 CSV" })).toBeInTheDocument();
   });

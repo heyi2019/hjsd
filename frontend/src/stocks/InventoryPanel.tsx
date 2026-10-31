@@ -678,17 +678,6 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
             ]}
             onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
           />
-          <Typography.Text strong>增值服务筛选</Typography.Text>
-          <Select
-            aria-label="增值服务筛选"
-            className="ui-filter-select"
-            value={valueAddedService ?? "all"}
-            options={[
-              { value: "all", label: "全部增值服务" },
-              ...(valueAddedOptions ?? []),
-            ]}
-            onChange={(value) => { setValueAddedService(value === "all" ? undefined : value); setPage(1); }}
-          />
           <Typography.Text strong>排序</Typography.Text>
           <Segmented
             aria-label="库存排序"

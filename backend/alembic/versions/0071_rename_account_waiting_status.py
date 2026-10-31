@@ -13,6 +13,13 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # SQLite 的 CHECK 约束会在 UPDATE 时立即校验，先放宽约束才能迁移旧值。
+    with op.batch_alter_table("stocks", naming_convention={}) as batch_op:
+        batch_op.drop_constraint(conv("ck_accounts_account_status_valid"), type_="check")
+        batch_op.create_check_constraint(
+            conv("ck_accounts_account_status_valid"),
+            "status IN ('IN_STOCK', 'WAITING', 'SOLD', 'VOID')",
+        )
     op.execute(sa.text("UPDATE stocks SET status = 'WAITING' WHERE status = 'IN_STOCK'"))
     with op.batch_alter_table("stocks", naming_convention={}) as batch_op:
         batch_op.drop_constraint(conv("ck_accounts_account_status_valid"), type_="check")
@@ -23,6 +30,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    with op.batch_alter_table("stocks", naming_convention={}) as batch_op:
+        batch_op.drop_constraint(conv("ck_accounts_account_status_valid"), type_="check")
+        batch_op.create_check_constraint(
+            conv("ck_accounts_account_status_valid"),
+            "status IN ('IN_STOCK', 'WAITING', 'SOLD', 'VOID')",
+        )
     op.execute(sa.text("UPDATE stocks SET status = 'IN_STOCK' WHERE status = 'WAITING'"))
     with op.batch_alter_table("stocks", naming_convention={}) as batch_op:
         batch_op.drop_constraint(conv("ck_accounts_account_status_valid"), type_="check")

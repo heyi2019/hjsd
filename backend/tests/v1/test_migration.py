@@ -383,6 +383,39 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
         engine.dispose()
 
 
+def test_account_status_rename_migrates_legacy_rows_without_touching_inventory_status(migration_env):
+    """升级已有 0069 库时，账号周期迁移不能被旧 CHECK 约束拦截。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "0069_split_order_installment_status")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO stocks "
+                    "(id, status, inventory_status, cost_amount, created_by, updated_by) "
+                    "VALUES (9001, 'IN_STOCK', 'IN_STOCK', 0, 'pytest', 'pytest')"
+                )
+            )
+    finally:
+        engine.dispose()
+
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT status, inventory_status FROM stocks WHERE id = 9001")
+            ).one()
+            assert row == ("WAITING", "IN_STOCK")
+    finally:
+        engine.dispose()
+
+
 def test_installment_status_options_hide_internal_pending(migration_env):
     """PENDING 仅保留内部流程使用，不进入分期业务状态词典。"""
     env, db_file = migration_env

@@ -13,7 +13,6 @@ export const ALLOWED_ATTRIBUTES_BY_FUND_NATURE: Record<string, string[]> = {
     "SELF_DIRECT_COST",
     "TH_DIRECT_COST",
     "TH_REVENUE",
-    "DFQ_PRINCIPAL",
     "SERVICE_REVENUE",
     "REBATE_INCOME",
     "OPERATING_EXPENSE",

@@ -9,7 +9,7 @@ import { DeliveryInfoSection } from "../DeliveryInfoSection";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import "./RecoveryAccountSection.css";
 
-/** 新建业务（回收/提号/代挂/代分期）的游戏账号资料区。只负责字段，不处理提交和接口。
+/** 新建业务（回收/提号/代挂）的游戏账号资料区。只负责字段，不处理提交和接口。
  *  库存编号由库存中心创建账号时自动生成，业务单内联填写游戏账号信息，不再关联已有库存账号。 */
 export function RecoveryAccountSection(props: {
   children?: ReactNode;

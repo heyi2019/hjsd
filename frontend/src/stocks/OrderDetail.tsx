@@ -296,7 +296,7 @@ export function OrderDetail({
     removedAt: eventDate(detail, "CANCEL"),
     removedPlatform: eventPlatform(detail, "CANCEL"),
     recoveryPlatform: transactionPlatforms(detail, new Set(["HS", "TH"])),
-    salePlatform: transactionPlatforms(detail, new Set(["DG", "DFQ"]), true),
+    salePlatform: transactionPlatforms(detail, new Set(["DG"]), true),
     consignmentSummary: consignmentSummary(detail, row.status),
     password: row.game_password || "-",
     channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",

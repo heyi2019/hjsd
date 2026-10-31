@@ -19,12 +19,12 @@ class TestSeed:
         db.commit()
 
         assert first["pools_created"] == 2
-        assert first["order_types_created"] == 4
-        assert first["routes_created"] == 8
+        assert first["order_types_created"] == 3
+        assert first["routes_created"] == 6
         assert second["pools_created"] == 0
         assert second["pools_skipped"] == 2
         assert second["order_types_created"] == 0
-        assert second["order_types_skipped"] == 4
+        assert second["order_types_skipped"] == 3
 
     def test_seeded_pools_and_order_types(self, seeded_db):
         invest = service.get_pool_by_code(seeded_db, "HJ_INVEST")
@@ -38,7 +38,6 @@ class TestSeed:
             "HS": (CapitalType.STOCK.value, 1),
             "TH": (CapitalType.STOCK.value, 2),
             "DG": (CapitalType.ZERO.value, 3),
-            "DFQ": (CapitalType.CREDIT.value, 4),
         }
         codes = {item.code: item for item in service.list_order_types(seeded_db)}
         for code, (capital_type, _) in expected.items():

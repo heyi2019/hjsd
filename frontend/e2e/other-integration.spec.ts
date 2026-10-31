@@ -38,19 +38,26 @@ test("资金中心页面划转后生成一收一支的内部资金流水", async
   await expect(dialog).toBeHidden();
 });
 
-test("代分期页面收款结清后交付，不重复产生流水", async ({ page, request }) => {
+test("分期页面收款结清后交付，不重复产生流水", async ({ page, request }) => {
   const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };
-  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "DFQ", trade_date: "2026-10-17" } });
+  const stocksResponse = await request.get(`${base}/stocks`, { headers });
+  expect(stocksResponse.ok()).toBe(true);
+  const account = ((await stocksResponse.json()).items as Array<{ id: number; inventory_status: string; inventory_type?: string }>).find(
+    (item) => item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
+  );
+  expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
+  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "HS", trade_date: "2026-10-17", account_id: account!.id } });
   expect(created.status()).toBe(201);
   const order = await created.json();
-  const response = await request.post(`${base}/installments`, { headers, data: { order_id: order.id, contract_type: "ADVANCE_PURCHASE", principal: "100", down_payment: "0", periods: 1, per_period: "100", first_due_on: "2026-10-17" } });
+  const buyEvent = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
+  expect(buyEvent.status()).toBe(201);
+  const response = await request.post(`${base}/installments`, { headers, data: { order_id: order.id, contract_type: "STOCK_SALE", principal: "100", down_payment: "0", periods: 1, per_period: "100", first_due_on: "2026-10-17" } });
   expect(response.status()).toBe(201);
   const installment = await response.json();
   await page.goto("/");
   await navItem(page, "业务中心").click();
   await page.getByRole("tab", { name: "分期与回款" }).click();
-  await page.getByRole("tab", { name: "代分期" }).click();
   const row = page.getByRole("row").filter({ hasText: installment.inst_no });
   await row.getByRole("button", { name: "登记收款" }).click();
   const dialog = page.getByRole("dialog", { name: `分期收款 · ${installment.inst_no}` });

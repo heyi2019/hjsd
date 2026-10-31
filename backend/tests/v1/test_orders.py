@@ -18,7 +18,6 @@ from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
 
-
 def test_order_auxiliary_routes_expose_typed_response_models(app):
     paths = app.openapi()["paths"]
 
@@ -31,7 +30,6 @@ def test_order_auxiliary_routes_expose_typed_response_models(app):
     assert balance_response["content"]["application/json"]["schema"]["$ref"].endswith(
         "/PoolBalanceOut"
     )
-
 
 def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     account = Account(
@@ -47,16 +45,13 @@ def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     seeded_db.commit()
     return account
 
-
 def _customer(seeded_db, name: str = "甲"):
     return parties_service.create_customer(seeded_db, display_name=name, actor="pytest")
-
 
 def _pool(seeded_db, code: str) -> Pool:
     pool = seeded_db.scalar(select(Pool).where(Pool.code == code))
     assert pool is not None
     return pool
-
 
 def _flows(seeded_db, pool_id: int) -> list[Cashflow]:
     return list(
@@ -64,7 +59,6 @@ def _flows(seeded_db, pool_id: int) -> list[Cashflow]:
             select(Cashflow).where(Cashflow.pool_id == pool_id).order_by(Cashflow.id)
         ).all()
     )
-
 
 def _settled_hs_installment(seeded_db):
     account = _new_account(seeded_db, game_account="delivery-account")
@@ -95,7 +89,6 @@ def _settled_hs_installment(seeded_db):
         period_no=1, actor="pytest",
     )
     return order
-
 
 class TestA01HsStock:
     def test_sell_requires_recovered_account(self, seeded_db):
@@ -299,7 +292,6 @@ class TestA01HsStock:
             )
         assert exc.value.code == ErrorCode.ORDER_STATUS_CONFLICT
 
-
 class TestA02ThStock:
     def test_th_order_keeps_inventory_link_without_snapshot(self, seeded_db):
         account = _new_account(seeded_db, game_account="th-stock-acc")
@@ -352,7 +344,6 @@ class TestA02ThStock:
         # 提号按普通库存资金处理，不再要求 BUY/SELL 互相核销。
         assert seeded_db.get(Order, order.id).capital_type == "STOCK"
 
-
 class TestA03DgZeroCapital:
     def test_service_income_routes_to_profit_pool(self, seeded_db):
         consignor = _customer(seeded_db, "委托方")
@@ -377,7 +368,6 @@ class TestA03DgZeroCapital:
         assert len(flows) == 1
         assert str(flows[0].amount) == "200.00"
         assert flows[0].nature == Nature.BUSINESS_IN.value
-
 
 class TestEventRules:
     @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP")])
@@ -543,57 +533,6 @@ class TestEventRules:
                 offset_event_id=buy.id,
             )
 
-    def test_dfq_buy_requires_advance_purchase_contract(self, seeded_db):
-        order = service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
-        )
-
-        with pytest.raises(Validation, match="ADVANCE_PURCHASE"):
-            service.post_event(
-                seeded_db,
-                order.id,
-                event_type="BUY",
-                amount=Decimal("100"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
-
-    def test_dfq_cannot_post_sell(self, seeded_db):
-        order = service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
-        )
-        installment_service.create_installment(
-            seeded_db,
-            order_id=order.id,
-            contract_type="ADVANCE_PURCHASE",
-            principal=Decimal("100"),
-            down_payment=Decimal("0"),
-            periods=1,
-            per_period=Decimal("100"),
-            first_due_on=TODAY,
-            actor="pytest",
-        )
-        service.post_event(
-            seeded_db,
-            order.id,
-            event_type="BUY",
-            amount=Decimal("100"),
-            occurred_on=TODAY,
-            actor="pytest",
-        )
-
-        with pytest.raises(Validation) as exc:
-            service.post_event(
-                seeded_db,
-                order.id,
-                event_type="SELL",
-                amount=Decimal("120"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
-
-        assert "PAYMENT" in str(exc.value)
-
     def test_payment_requires_a_source_installment(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
@@ -718,7 +657,6 @@ class TestEventRules:
                 customer_roles=[(customer.id, "SELLER")],
             )
         assert exc.value.code == ErrorCode.CUSTOMER_DISABLED
-
 
 class TestOrdersApi:
     def test_invalid_money_input_returns_business_422(self, seeded_client, seeded_db, headers):

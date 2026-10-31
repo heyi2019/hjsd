@@ -141,11 +141,8 @@ def create_order(
     if payload.installment is not None and normalized_order_type in {"TH", "DG"}:
         raise Validation("TH/DG 分期必须在出售动作中选择付款方式并建立分期合约")
     if payload.initial_buy is None and payload.installment is not None and normalized_order_type != "DG":
-        raise Validation("TH/DFQ 分期订单必须同时提交初始买入和分期合约")
-    if payload.initial_buy is not None and payload.installment is None and normalized_order_type == "DFQ":
-        raise Validation("初始买入和分期合约必须同时提交")
+        raise Validation("TH 分期订单必须同时提交初始买入和分期合约")
     expected_contract_type = {
-        "DFQ": "ADVANCE_PURCHASE",
         "TH": "PICKUP_SALE",
         "DG": "CONSIGNMENT_SALE",
     }.get(normalized_order_type)
@@ -154,8 +151,8 @@ def create_order(
             f"{normalized_order_type} 订单必须使用 {expected_contract_type} 分期合约",
             details={"contract_type": payload.installment.contract_type},
         )
-    if payload.initial_buy is not None and normalized_order_type not in {"DFQ", "HS", "TH"}:
-        raise Validation("只有 DFQ、HS 或 TH 订单可以在创建时提交初始买入")
+    if payload.initial_buy is not None and normalized_order_type not in {"HS", "TH"}:
+        raise Validation("只有 HS 或 TH 订单可以在创建时提交初始买入")
     if payload.initial_costs and (normalized_order_type not in {"HS", "TH"} or payload.initial_buy is None):
         raise Validation("初始费用仅适用于同时提交初始买入的回收或提号订单")
     if normalized_order_type in {"HS", "TH"} and payload.initial_buy is not None:

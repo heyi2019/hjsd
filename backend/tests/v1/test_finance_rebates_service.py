@@ -149,14 +149,14 @@ def test_rate_from_snapshot_bad_value():
 
 
 # ----------------------------------------------------- 返点类型与订单类型约束
-def test_create_rebate_buy_requires_hs_th_dfq(seeded_db):
+def test_create_rebate_buy_rejects_dg(seeded_db):
     order_id = _order_with_sell(seeded_db)  # DG 订单已 ACTIVE
-    with pytest.raises(Validation, match="买号返点只能关联回收、提号或代分期"):
+    with pytest.raises(Validation, match="买号返点只能关联回收、提号订单"):
         rebates.create_rebate(
             seeded_db, source_order_id=order_id, rebate_type="BUY",
             base_amount=Decimal("1000"), rate=Decimal("5"),
             collected_on=TODAY, actor="pytest",
-        )  # 买号返点仅限 HS/TH/DFQ（代分期为垫资买入），DG 不可
+        )  # 买号返点仅限 HS/TH，DG 不可
 
 
 def test_create_rebate_buy_allows_th(seeded_db):
@@ -191,17 +191,6 @@ def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
     assert record.rebate_type == "SELL"
 
 
-def test_create_rebate_sell_dfq_allows_created_order(seeded_db):
-    """DFQ 创建订单后即可登记卖号返点。"""
-    order = orders_service.create_order(
-        seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest",
-    )
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=order.id, rebate_type="SELL",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    assert record.rebate_type == "SELL"
 
 
 # ----------------------------------------------------- settle_rebate 订单不可见 (201-202)

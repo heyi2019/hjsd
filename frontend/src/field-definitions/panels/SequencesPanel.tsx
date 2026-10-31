@@ -2,8 +2,8 @@
  *  展示结构与业务字典一致：一级分组 + 二级条目；用于断号 / 跳号 / 重号排查——
  *  编号由后端统一发放，本面板不提供任何写入口。
  *  用户口径（2026-10-28）：库存编号 / 回收 / 提号 / 代挂 / 分期订单（关联业务类型）/
- *  代分期订单（不关联业务类型）/ 分期合约编号；库存编号非序列发放域、做一级分组（组级说明），
- *  分期合约编号由分期订单号或代分期订单号衍生（FQ/DFQ编号-INS序号），为增值服务组内静态条目。 */
+ *  分期合约编号；库存编号非序列发放域、做一级分组（组级说明），
+ *  分期合约编号由分期订单号衍生（FQ编号-INS序号），为增值服务组内静态条目。 */
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { Card, Descriptions, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
@@ -15,7 +15,6 @@ const SEQUENCE_KEY_LABEL: Record<string, string> = {
   ORDER_HS: "回收编号",
   ORDER_TH: "提号编号",
   ORDER_DG: "代挂编号",
-  ORDER_DFQ: "代分期订单",
   INSTALLMENT: "分期订单",
   CUSTOMER: "客户",
   COUNTERPARTY: "合作方",
@@ -28,28 +27,26 @@ const SEQUENCE_KEY_LABEL: Record<string, string> = {
   ATTACHMENT: "附件",
 };
 
-/** 条目说明前缀：标注分期/代分期与业务类型的关联口径。 */
+/** 条目说明前缀：标注分期与业务类型的关联口径。 */
 const SEQUENCE_ANNOTATION: Record<string, string> = {
   INSTALLMENT: "关联业务类型（来源回收/提号/代挂订单）",
-  ORDER_DFQ: "不关联业务类型",
 };
 
 /** 非独立发放域的静态条目（无 document_sequences 行，仅口径说明）。
- *  分期合约编号：自营分期合约使用分期订单号衍生（FQ0001-INS01），
- *  代分期合约沿用代分期订单号衍生（DFQ0001-INS01）。 */
+ *  分期合约编号：自营分期合约使用分期订单号衍生（FQ0001-INS01）。 */
 const STATIC_ENTRIES: Record<string, { name: string; desc: string }> = {
   INSTALLMENT_CONTRACT: {
     name: "分期合约编号",
-    desc: "自营分期合约使用分期订单号衍生（FQ编号-INS序号）；代分期合约沿用代分期订单号衍生（DFQ编号-INS序号）",
+    desc: "自营分期合约使用分期订单号衍生（FQ编号-INS序号）",
   },
 };
 
 /** 一级分组 → 二级编号域（顺序即展示顺序）。
  *  库存编号为一级分组（用户裁决 2026-10-28）：非序列发放域，仅组级说明、无二级条目。 */
 const SEQUENCE_GROUPS: Array<{ label: string; keys: string[]; desc?: string }> = [
-  { label: "库存编号", keys: [], desc: "回收/提号/代挂/代分期订单建单时自动新增，进入库存中心；不参与序列发放" },
+  { label: "库存编号", keys: [], desc: "回收/提号/代挂订单建单时自动新增，进入库存中心；不参与序列发放" },
   { label: "业务订单", keys: ["ORDER_HS", "ORDER_TH", "ORDER_DG"] },
-  { label: "增值服务", keys: ["INSTALLMENT", "ORDER_DFQ", "INSTALLMENT_CONTRACT"] },
+  { label: "增值服务", keys: ["INSTALLMENT", "INSTALLMENT_CONTRACT"] },
   { label: "档案编号", keys: ["CUSTOMER", "COUNTERPARTY"] },
   { label: "运营工单", keys: ["LEAD", "QUALITY_ISSUE", "NOTIFICATION"] },
   { label: "资金与系统", keys: ["CASHFLOW_OUT", "CASHFLOW_IN", "IMPORT", "ATTACHMENT"] },

@@ -48,10 +48,7 @@ def create_account(
     # 2026-10-28 口径：game_account 不唯一——同一游戏账号可反复回购，
     # 每次收购都是独立库存实体（各自成本与生命周期），不做查重限制。
     validate_inventory_context(business_mode, inventory_type)
-    if value_added_service is not None and value_added_service not in {
-        InstallmentContractType.STOCK_SALE.value,
-        InstallmentContractType.ADVANCE_PURCHASE.value,
-    }:
+    if value_added_service is not None and value_added_service != InstallmentContractType.STOCK_SALE.value:
         raise Validation(
             "增值服务无效",
             details={"field": "value_added_service", "value": value_added_service},

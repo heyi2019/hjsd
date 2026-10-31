@@ -21,7 +21,7 @@ export const installmentsApi = {
     api.get<Schedule[]>(`/installments/${id}/schedules`).then((r) => r.data),
   pay: (
     id: number,
-    payload: { amount: string; paid_on: string; period_no?: number; note?: string; form_extra?: Record<string, unknown> },
+    payload: { amount: string; paid_on: string; period_no?: number; pool_id?: number; note?: string; form_extra?: Record<string, unknown> },
   ) =>
     api
       .post<{ installment: Installment; schedule: Schedule }>(

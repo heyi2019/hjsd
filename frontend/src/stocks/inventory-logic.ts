@@ -16,7 +16,7 @@ export { BUSINESS_TYPE_LABEL as INVENTORY_TYPE_LABEL } from "../shared/lib/label
 export const PROFILE_ACCOUNT_TYPES = new Set(["RECOVERY", "CONSIGNMENT"]);
 export const EDITABLE_ACCOUNT_TYPES = new Set(["RECOVERY", "PICKUP", "CONSIGNMENT"]);
 
-/** 可编辑/更多操作适用范围：三类业务类型，以及业务类型留空的代分期账号（DFQ 建单即入库，inventory_type 为空）。 */
+/** 可编辑/更多操作适用范围：三类业务类型。 */
 export function isEditableAccountType(inventoryType?: string | null): boolean {
   return inventoryType == null || EDITABLE_ACCOUNT_TYPES.has(inventoryType);
 }

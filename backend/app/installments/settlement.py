@@ -48,7 +48,7 @@ def settle_early(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
-    """提前收清剩余应收，逐期生成 PAYMENT 并关闭未来计划（DFQ-01-08）。"""
+    """提前收清剩余应收，逐期生成 PAYMENT 并关闭未来计划。"""
     installment = get_installment(session, installment_id, user)
     _merge_form_extra(session, installment, scope="INSTSETTLE", values=form_extra)
     if installment.status in (
@@ -116,7 +116,7 @@ def mark_default(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
-    """将逾期合约置为违约，保留未收计划供后续追偿（DFQ-01-08）。"""
+    """将逾期合约置为违约，保留未收计划供后续追偿。"""
     text_reason = _required_text(
         reason, field="reason", message="违约处置必须填写原因"
     )

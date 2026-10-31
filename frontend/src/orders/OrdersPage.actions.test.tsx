@@ -96,8 +96,8 @@ const order2: Order = {
 };
 const order3: Order = {
   id: 3,
-  order_no: "DFQ-2026-0003",
-  order_type: "DFQ",
+  order_no: "HS-2026-0003",
+  order_type: "HS",
   capital_type: "CREDIT",
   trade_date: "2026-10-03",
   status: "ACTIVE",
@@ -528,7 +528,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     await openLedger();
-    await openRowMenu("DFQ-2026-0003", "取消交易");
+    await openRowMenu("HS-2026-0003", "取消交易");
     const modal = await modalOf(/分期取消交易 · INS-1/);
     await ui.type(screen.getByLabelText("取消原因"), "提前结清");
     fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
@@ -542,7 +542,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
     await openLedger();
-    await openRowMenu("DFQ-2026-0003", "取消交易");
+    await openRowMenu("HS-2026-0003", "取消交易");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith("未找到可取消的分期合约"));
   });
 

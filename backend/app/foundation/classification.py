@@ -14,7 +14,6 @@ BUSINESS_CLASSIFICATION: dict[str, BusinessClassification] = {
     "HS": {"business_mode": "SELF", "business_type": "RECOVERY", "value_added_service": None},
     "TH": {"business_mode": "DISTRIBUTION", "business_type": "PICKUP", "value_added_service": None},
     "DG": {"business_mode": "DISTRIBUTION", "business_type": "CONSIGNMENT", "value_added_service": None},
-    "DFQ": {"business_mode": "DISTRIBUTION", "business_type": "INSTALLMENT", "value_added_service": "ADVANCE_PURCHASE"},
 }
 
 

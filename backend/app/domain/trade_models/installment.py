@@ -1,4 +1,4 @@
-"""分期合约、期次计划与处置流水（DFQ-01）。"""
+"""分期合约、期次计划与处置流水。"""
 
 from __future__ import annotations
 

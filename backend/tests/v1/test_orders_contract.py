@@ -40,7 +40,6 @@ from app.orders import schemas, service as order_service
 
 D = date(2026, 10, 4)
 
-
 def test_order_create_uses_account_snapshot_as_the_only_account_input():
     with pytest.raises(ValidationError, match="extra_forbidden"):
         schemas.OrderCreate(
@@ -48,7 +47,6 @@ def test_order_create_uses_account_snapshot_as_the_only_account_input():
             trade_date=D,
             game_account="legacy-flat-account",
         )
-
 
 def test_order_create_validates_active_custom_field_values(seeded_db):
     field = OrderFormField(
@@ -74,7 +72,6 @@ def test_order_create_validates_active_custom_field_values(seeded_db):
             account_snapshot={"game_account": "invalid-extra-account"},
             form_extra={"idcard_check": "not-a-number"},
         )
-
 
 def test_account_product_custom_values_follow_inline_inventory_account(seeded_db):
     field = OrderFormField(
@@ -108,7 +105,6 @@ def test_account_product_custom_values_follow_inline_inventory_account(seeded_db
     assert account.form_extra == {"idcard_store": "123456"}
     assert order.form_extra is None
 
-
 @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP"), ("DG", "CONSIGNMENT")])
 def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db, headers, order_type, inventory_type):
     payload = {
@@ -124,7 +120,6 @@ def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db,
     assert account is not None
     assert account.inventory_type == inventory_type
     assert account.cost_amount == Decimal("110.00" if order_type != "DG" else "0.00")
-
 
 def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_engine, headers, monkeypatch):
     from fastapi.testclient import TestClient
@@ -146,7 +141,6 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
             func.json_extract(Order.account_snapshot, "$.game_account") == "rollback-inline"
         )
     ) is None
-
 
 def _order(
     seeded_db,
@@ -172,13 +166,11 @@ def _order(
         form_extra=form_extra, form_extra_scope=form_extra_scope,
     )
 
-
 def _scoped_user() -> CurrentUser:
     """非 admin、SELF 作用域用户（可见集只有自己）。"""
     return CurrentUser.build(
         id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
     )
-
 
 def test_database_allows_inventory_links_for_th_orders(seeded_db):
     account = stocks_service.create_account(
@@ -194,7 +186,6 @@ def test_database_allows_inventory_links_for_th_orders(seeded_db):
     assert order.account_id == account.id
     assert order.account_snapshot is None
 
-
 def test_database_accepts_th_order_snapshot_and_rejects_custom_type(seeded_db):
     """2026-10-28 口径：快照 CHECK 放宽为四类业务通用，自定义类型仍被库层拒绝。"""
     order = _order(seeded_db, order_type="TH")
@@ -209,7 +200,6 @@ def test_database_accepts_th_order_snapshot_and_rejects_custom_type(seeded_db):
     with pytest.raises(IntegrityError):
         seeded_db.flush()
     seeded_db.rollback()
-
 
 @pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
 def test_sell_completes_non_installment_orders(seeded_db, order_type):
@@ -250,7 +240,6 @@ def test_sell_completes_non_installment_orders(seeded_db, order_type):
 
     assert order.status == OrderStatus.COMPLETED.value
 
-
 # ------------------------------------------------------------------ 建单校验
 class TestCreateOrderValidation:
 
@@ -262,14 +251,14 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="订单负责人必须是启用用户"):
             order_service.create_order(
                 seeded_db,
-                order_type="DFQ",
+                order_type="HS",
                 trade_date=D,
                 owner_id=owner.id,
                 actor="pytest",
             )
 
     def test_order_links_record_source_follow_up_and_split_share(self, seeded_db):
-        source = _order(seeded_db, order_type="DFQ")
+        source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
 
         link = order_service.create_order_link(
@@ -300,7 +289,7 @@ class TestCreateOrderValidation:
             )
 
     def test_order_link_rejects_self_and_invalid_relation(self, seeded_db):
-        order = _order(seeded_db, order_type="DFQ")
+        order = _order(seeded_db, order_type="HS")
         with pytest.raises(Validation, match="不能关联自身"):
             order_service.create_order_link(
                 seeded_db,
@@ -319,7 +308,7 @@ class TestCreateOrderValidation:
             )
 
     def test_order_link_delete_removes_link_and_writes_audit(self, seeded_db):
-        source = _order(seeded_db, order_type="DFQ")
+        source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
         link = order_service.create_order_link(
             seeded_db,
@@ -363,7 +352,7 @@ class TestCreateOrderValidation:
         assert [item["id"] for item in relisted] == [again.id]
 
     def test_order_link_delete_rejects_foreign_and_missing(self, seeded_db):
-        source = _order(seeded_db, order_type="DFQ")
+        source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
         bystander = _order(seeded_db, order_type="HS")
         link = order_service.create_order_link(
@@ -683,20 +672,6 @@ class TestCreateOrderValidation:
             _order(seeded_db)
         assert "已停用" in str(exc.value)
 
-    def test_dfq_can_link_inventory_account_for_recovery_sale(self, seeded_db):
-        account = Account(
-            status=AccountStatus.WAITING.value,
-            cost_amount=to_money("0"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        seeded_db.add(account)
-        seeded_db.flush()
-
-        order = _order(seeded_db, order_type="DFQ", account_id=account.id)
-
-        assert order.account_id == account.id
-
     def test_order_rejects_mismatched_existing_account_context(self, seeded_db):
         account = Account(
             business_mode="SELF",
@@ -853,36 +828,6 @@ class TestCreateOrderValidation:
                 commission_payer="BUYER",
             )
 
-    def test_dfq_account_snapshot_materializes_inventory_account(self, seeded_db):
-        """2026-10-28 裁决：代分期垫资账号计入本方库存——建单即建账并回挂。"""
-        order = order_service.create_order(
-            seeded_db,
-            order_type="DFQ",
-            trade_date=D,
-            actor="pytest",
-            account_snapshot={
-                "game_type": "王者荣耀",
-                "game_account": "dfq-text-account",
-                "game_password": "secret",
-                "channel_region": "安卓一区",
-                "bound_phone_owner": "张三",
-                "note": "仅订单文本",
-            },
-        )
-
-        assert order.account_snapshot["game_account"] == "dfq-text-account"
-        assert order.account_snapshot["bound_phone_owner"] == "张三"
-        account = seeded_db.scalar(
-            select(Account).where(Account.game_account == "dfq-text-account")
-        )
-        assert account is not None
-        assert order.account_id == account.id
-        # 业务类型留空，以增值服务维度（代分期/分销）标识。
-        assert account.business_mode == "DISTRIBUTION"
-        assert account.inventory_type is None
-        assert account.value_added_service == "ADVANCE_PURCHASE"
-        assert account.status == "WAITING"
-
     def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
         account = stocks_service.create_account(
             seeded_db,
@@ -920,28 +865,15 @@ class TestCreateOrderValidation:
         assert account.stock_no is not None
         assert order.account_snapshot == {"game_account": "th-snapshot-account"}
 
-    def test_dfq_account_snapshot_rejects_unknown_fields(self, seeded_db):
-        with pytest.raises(Validation, match="订单账号快照字段校验失败"):
-            order_service.create_order(
-                seeded_db,
-                order_type="DFQ",
-                trade_date=D,
-                actor="pytest",
-                account_snapshot={
-                    "game_account": "dfq-invalid-snapshot",
-                    "account_note": "不属于订单账号文本字段",
-                },
-            )
-
     def test_account_snapshot_rejects_removed_legacy_account_fields(self, seeded_db):
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
             order_service.create_order(
                 seeded_db,
-                order_type="DFQ",
+                order_type="HS",
                 trade_date=D,
                 actor="pytest",
                 account_snapshot={
-                    "game_account": "dfq-legacy-region",
+                    "game_account": "hs-legacy-region",
                     "region": "旧字段",
                 },
             )
@@ -950,16 +882,15 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
             order_service.create_order(
                 seeded_db,
-                order_type="DFQ",
+                order_type="HS",
                 trade_date=D,
                 actor="pytest",
                 account_snapshot={
-                    "game_account": "dfq-no-media",
+                    "game_account": "hs-no-media",
                     "account_description": "订单快照不承载营销资料",
                     "account_images": ["image-1"],
                 },
             )
-
 
 # ------------------------------------------------------------------ 查询与作用域
 class TestGetAndListOrders:
@@ -1152,7 +1083,6 @@ class TestGetAndListOrders:
         assert response.json()["total"] == 1
         assert [item["id"] for item in response.json()["items"]] == [mine.id]
 
-
 # ------------------------------------------------------------------ 事件入参
 class TestPostEventValidation:
     def test_invalid_portion_rejected_before_event_write(self, seeded_db):
@@ -1283,7 +1213,6 @@ class TestPostEventValidation:
         order.status = "COMPLETED"
         refund, _ = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=D, actor="pytest", reason="售后")
         assert refund.amount == 30
-
 
 # ------------------------------------------------------------------ 冲销方向
 class TestCancelOffsetDirection:
@@ -1471,7 +1400,6 @@ class TestCancelOffsetDirection:
 
         assert flow.direction == "IN"
 
-
 # ------------------------------------------------------------------ 账号效果
 class TestAccountEffect:
     def test_event_updates_account_operator(self, seeded_db):
@@ -1612,11 +1540,11 @@ class TestAccountEffect:
         assert account.status == AccountStatus.VOID.value
 
     def test_payment_event_cannot_bypass_installment_service(self, seeded_db):
-        order = _order(seeded_db, order_type="DFQ")
+        order = _order(seeded_db, order_type="DG")
         installments_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
             principal=Decimal("1000"),
             periods=1,
             per_period=Decimal("1000"),
@@ -1635,11 +1563,11 @@ class TestAccountEffect:
             )
 
     def test_cancel_payment_is_rejected_until_schedule_reversal_is_supported(self, seeded_db):
-        order = _order(seeded_db, order_type="DFQ")
+        order = _order(seeded_db, order_type="DG")
         contract = installments_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
             principal=to_money("1000"),
             periods=1,
             per_period=to_money("1000"),
@@ -1684,7 +1612,6 @@ class TestAccountEffect:
             seeded_db, ghost, "BUY", Decimal("100")
         ) is None
 
-
 # ------------------------------------------------------------------ 池余额
 class TestPoolBalance:
     def test_pool_balance_service_enforces_pool_visibility(self, seeded_db):
@@ -1703,73 +1630,8 @@ class TestPoolBalance:
         with pytest.raises(NotFound):
             order_service.pool_balance(seeded_db, 999999)
 
-
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
-    def test_dfq_snapshot_populates_safe_order_list_fields(
-        self, seeded_client, headers
-    ):
-        created = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DFQ",
-                "trade_date": D.isoformat(),
-                "account_snapshot": {
-                    "game_type": "王者荣耀",
-                    "game_account": "dfq-list-account",
-                    "game_password": "must-not-list",
-                    "channel_region": "安卓一区",
-                    "platform": "平台A",
-                },
-            },
-            headers=headers,
-        )
-        assert created.status_code == 201, created.text
-
-        listed = seeded_client.get("/api/v1/orders", headers=headers)
-
-        assert listed.status_code == 200, listed.text
-        row = next(item for item in listed.json()["items"] if item["id"] == created.json()["id"])
-        assert row["account_game_type"] == "王者荣耀"
-        assert row["account_game_account"] == "dfq-list-account"
-        assert row["account_channel_region"] == "安卓一区"
-        assert row["account_platform"] == "平台A"
-        assert row["account_snapshot"] is None
-
-    def test_viewer_order_detail_redacts_dfq_game_password(
-        self, seeded_client, headers
-    ):
-        created = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DFQ",
-                "trade_date": D.isoformat(),
-                "account_snapshot": {
-                    "game_type": "王者荣耀",
-                    "game_account": "dfq-secret-account",
-                    "game_password": "secret-password",
-                },
-            },
-            headers=headers,
-        )
-        assert created.status_code == 201, created.text
-
-        viewer = CurrentUser.build(
-            id=5,
-            username="finance-reader",
-            roles=["VIEWER"],
-            owner_scope="ALL",
-        )
-        viewer_headers = {"Authorization": f"Bearer {build_access_token(viewer)}"}
-        fetched = seeded_client.get(
-            f"/api/v1/orders/{created.json()['id']}",
-            headers=viewer_headers,
-        )
-
-        assert fetched.status_code == 200, fetched.text
-        snapshot = fetched.json()["account_snapshot"]
-        assert snapshot["game_account"] == "dfq-secret-account"
-        assert snapshot["game_password"] is None
 
     def test_order_request_rejects_removed_or_unknown_fields(
         self, seeded_client, headers
@@ -1798,49 +1660,6 @@ class TestOrdersApi:
             headers=headers,
         )
         assert response.status_code == 422, response.text
-
-    def test_update_dfq_account_snapshot_uses_order_account_contract(
-        self, seeded_client, headers
-    ):
-        created = seeded_client.post(
-            "/api/v1/orders",
-            json={"order_type": "DFQ", "trade_date": D.isoformat()},
-            headers=headers,
-        )
-        assert created.status_code == 201, created.text
-        order_id = created.json()["id"]
-
-        invalid = seeded_client.patch(
-            f"/api/v1/orders/{order_id}",
-            json={"account_snapshot": {"game_type": "王者荣耀"}},
-            headers=headers,
-        )
-        assert invalid.status_code == 422, invalid.text
-
-        unknown = seeded_client.patch(
-            f"/api/v1/orders/{order_id}",
-            json={
-                "account_snapshot": {
-                    "game_account": "dfq-edit-account",
-                    "unknown_field": "不能静默丢弃",
-                }
-            },
-            headers=headers,
-        )
-        assert unknown.status_code == 422, unknown.text
-
-        valid = seeded_client.patch(
-            f"/api/v1/orders/{order_id}",
-            json={
-                "account_snapshot": {
-                    "game_account": "dfq-edit-account",
-                    "game_type": "王者荣耀",
-                }
-            },
-            headers=headers,
-        )
-        assert valid.status_code == 200, valid.text
-        assert valid.json()["account_snapshot"]["game_account"] == "dfq-edit-account"
 
     def test_th_account_snapshot_creates_inline_account_via_api(
         self, seeded_client, headers
@@ -1903,40 +1722,6 @@ class TestOrdersApi:
         )
         assert cancelled.status_code == 200, cancelled.text
         assert cancelled.json()["status"] == "CANCELLED"
-
-    def test_scoped_user_cannot_choose_foreign_pool_for_composite_dfq(
-        self, seeded_client, seeded_db
-    ):
-        user = CurrentUser.build(
-            id=9,
-            username="operator",
-            roles=["OPERATOR"],
-            owner_scope="SELF",
-            pool_ids=frozenset({1}),
-        )
-        headers = {"Authorization": f"Bearer {build_access_token(user)}"}
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DFQ",
-                "trade_date": D.isoformat(),
-                "initial_buy": {
-                    "amount": "800.00",
-                    "occurred_on": D.isoformat(),
-                    "pool_id": 2,
-                    "portion": "PRINCIPAL",
-                },
-                "installment": {
-                    "contract_type": "ADVANCE_PURCHASE",
-                    "principal": "800.00",
-                    "periods": 1,
-                    "first_due_on": "2026-11-01",
-                    "per_period": "800.00",
-                },
-            },
-            headers=headers,
-        )
-        assert response.status_code == 404, response.text
 
     def test_scoped_user_cannot_assign_created_order_to_other_owner(
         self, seeded_client, seeded_db
@@ -2031,63 +1816,16 @@ class TestOrdersApi:
         assert body["commission_mode"] == "DEDUCT_FROM_SETTLEMENT"
         assert body["commission_payer"] == "CONSIGNOR"
 
-    def test_dfq_composite_create_persists_buy_and_installment(
-        self, seeded_client, seeded_db, headers
-    ):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DFQ",
-                "trade_date": D.isoformat(),
-                "initial_buy": {
-                    "amount": "800.00",
-                    "occurred_on": D.isoformat(),
-                    "pool_id": 1,
-                    "portion": "PRINCIPAL",
-                },
-                "installment": {
-                    "contract_type": "ADVANCE_PURCHASE",
-                    "principal": "800.00",
-                    "down_payment": "0",
-                    "service_fee": "80.00",
-                    "periods": 2,
-                    "per_period_service_fee": "40.00",
-                    "per_period": "440.00",
-                    "first_due_on": "2026-11-01",
-                    "schedule": [
-                        {"period_no": 1, "due_on": "2026-11-01"},
-                        {"period_no": 2, "due_on": "2026-12-01"},
-                    ],
-                },
-            },
-            headers=headers,
-        )
-
-        assert response.status_code == 201, response.text
-        order_id = response.json()["id"]
-        assert seeded_db.scalar(
-            select(OrderEvent.id).where(
-                OrderEvent.order_id == order_id,
-                OrderEvent.event_type == "BUY",
-                OrderEvent.is_posted.is_(True),
-            )
-        ) is not None
-        contract = seeded_db.scalar(
-            select(Installment).where(Installment.order_id == order_id)
-        )
-        assert contract is not None
-        assert contract.contract_type == "ADVANCE_PURCHASE"
-
     def test_embedded_installment_schedule_rejects_unknown_fields(
         self, seeded_client, headers
     ):
         response = seeded_client.post(
             "/api/v1/orders",
             json={
-                "order_type": "DFQ",
+                "order_type": "DG",
                 "trade_date": D.isoformat(),
                 "installment": {
-                    "contract_type": "ADVANCE_PURCHASE",
+                    "contract_type": "CONSIGNMENT_SALE",
                     "principal": "800.00",
                     "periods": 1,
                     "first_due_on": "2026-11-01",
@@ -2103,40 +1841,6 @@ class TestOrdersApi:
             headers=headers,
         )
         assert response.status_code == 422, response.text
-
-    def test_dfq_composite_create_rolls_back_when_contract_is_invalid(
-        self, seeded_client, seeded_db, headers
-    ):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DFQ",
-                "trade_date": D.isoformat(),
-                "note": "atomic-dfq-failure",
-                "initial_buy": {
-                    "amount": "800.00",
-                    "occurred_on": D.isoformat(),
-                    "pool_id": 1,
-                },
-                "installment": {
-                    "contract_type": "STOCK_SALE",
-                    "principal": "800.00",
-                    "periods": 1,
-                    "first_due_on": "2026-11-01",
-                },
-            },
-            headers=headers,
-        )
-
-        assert response.status_code == 422, response.text
-        # 测试夹具将 get_db 替换为只 yield 会话，显式模拟生产依赖的异常回滚。
-        seeded_db.rollback()
-        assert seeded_db.scalar(
-            select(Order.id).where(Order.note == "atomic-dfq-failure")
-        ) is None
-        assert seeded_db.scalar(
-            select(OrderEvent.id).where(OrderEvent.note == "atomic-dfq-failure")
-        ) is None
 
     def test_list_and_get_endpoints(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
@@ -2236,7 +1940,7 @@ class TestOrdersApi:
         assert order_audit["request_id"] == request_id
 
     def test_order_link_endpoints_and_detail_links(self, seeded_client, seeded_db, headers):
-        source = _order(seeded_db, order_type="DFQ")
+        source = _order(seeded_db, order_type="HS")
         target = _order(seeded_db, order_type="HS")
 
         created = seeded_client.post(
@@ -2264,7 +1968,7 @@ class TestOrdersApi:
         assert detail.json()["links"][0]["id"] == created.json()["id"]
 
     def test_order_link_delete_endpoint(self, seeded_client, seeded_db, headers):
-        source = _order(seeded_db, order_type="DFQ")
+        source = _order(seeded_db, order_type="HS")
         target = _order(seeded_db, order_type="HS")
         created = seeded_client.post(
             f"/api/v1/orders/{target.id}/links",
@@ -2297,7 +2001,7 @@ class TestOrdersApi:
         assert again.status_code == 404, again.text
 
     def test_order_link_delete_requires_update_permission(self, seeded_client, seeded_db, headers, viewer_headers):
-        source = _order(seeded_db, order_type="DFQ")
+        source = _order(seeded_db, order_type="HS")
         target = _order(seeded_db, order_type="HS")
         created = seeded_client.post(
             f"/api/v1/orders/{target.id}/links",

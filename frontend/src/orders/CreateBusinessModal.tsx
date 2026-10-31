@@ -1,6 +1,7 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
+import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import {
@@ -26,15 +27,13 @@ import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
 import { resizeInstallmentSchedule, serializeInstallmentSchedule } from "./InstallmentScheduleFields";
 import { DgOrderSection } from "./dg/DgOrderSection";
-import { DfqOrderSection } from "./dfq/DfqOrderSection";
 
-export type BusinessOrderType = "HS" | "TH" | "DG" | "DFQ";
+export type BusinessOrderType = "HS" | "TH" | "DG";
 
 const MODAL_TITLES: Record<string, string> = {
   HS: "新建回收订单",
   TH: "新建提号订单",
   DG: "新建代挂订单",
-  DFQ: "新建代分期订单",
 };
 
 function toDateString(value: unknown) {
@@ -58,7 +57,6 @@ export function CreateBusinessModal(props: {
   const isRecovery = orderType === "HS";
   const isTh = orderType === "TH";
   const isDg = orderType === "DG";
-  const isDfq = orderType === "DFQ";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
@@ -122,7 +120,7 @@ export function CreateBusinessModal(props: {
       defaults[gameTypeField] = defaultGameType;
     }
     form.setFieldsValue(defaults);
-  }, [form, gameTypes, isDfq, isRecovery, isTh, orderType, props.open]);
+  }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
@@ -144,61 +142,6 @@ export function CreateBusinessModal(props: {
           ? values[key].filter((id): id is number => typeof id === "number")
           : [];
         if (responsibleIds.length > 0) orderFormExtra[key] = responsibleIds;
-      }
-      if (isDfq) {
-        const customer = await customersApi.create({
-          display_name: values.customer_nickname as string,
-          contact_name: values.customer_contact_name as string,
-          phone: values.customer_phone as string,
-          wechat: values.customer_wechat as string,
-          qq: values.customer_qq as string,
-          source: values.customer_source as string,
-          note: values.note as string,
-        });
-        await ordersApi.create({
-          order_type: "DFQ",
-          trade_date: today(),
-          note: values.note as string,
-          form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,
-          account_snapshot: {
-            game_type: values.game_type as string,
-            game_account: values.game_account as string,
-            game_password: values.game_password as string,
-            channel_region: values.channel_region as string,
-            bound_phone: values.bound_phone as string,
-            bound_phone_owner: values.bound_phone_owner as string,
-            has_secondary: values.has_secondary ? values.has_secondary === "有" : undefined,
-            purchase_price: values.recovery_price as string | undefined,
-            note: values.game_account_note as string,
-            extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
-          },
-          customer_roles: [{ customer_id: customer.customer.id, role: "INSTALLMENT_CUSTOMER" }],
-          initial_buy: {
-            amount: String(values.dfq_total_amount ?? 0),
-            occurred_on: today(),
-            portion: "PRINCIPAL",
-            pool_id: values.payment_pool_id as number,
-            note: `付款：剩余号款${values.payment_note ? `｜${String(values.payment_note)}` : ""}`,
-          },
-          installment: {
-            contract_type: "ADVANCE_PURCHASE",
-            adjust_final_period: true,
-            principal: String(values.recovery_price ?? 0),
-            down_payment: String(values.dfq_down_payment ?? 0),
-            service_fee: String(values.dfq_service_fee ?? 0),
-            periods: Number(values.dfq_periods ?? 1),
-            per_period_service_fee: String(values.dfq_period_service_fee ?? 0),
-            per_period: String(values.dfq_period_amount ?? 0),
-            first_due_on: toDateString((values.dfq_schedule as Array<{ due_on?: unknown }> | undefined)?.[0]?.due_on),
-            schedule: serializeInstallmentSchedule(values.dfq_schedule as Array<{ due_on?: unknown }> | undefined, toDateString),
-            note: values.note as string,
-          },
-        });
-        appMessage.success("代分期订单已创建");
-        props.onClose();
-        form.resetFields();
-        void Promise.resolve(props.onCreated()).catch(() => undefined);
-        return;
       }
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
@@ -280,7 +223,7 @@ export function CreateBusinessModal(props: {
       await ordersApi.create({
         order_type: props.initialOrderType,
         trade_date: today(),
-        // 2026-10-28 口径：账号资料统一走 account_snapshot（与 DFQ 建单一致），
+        // 2026-10-28 口径：账号资料统一走 account_snapshot（与建单一致），
         // 后端据此内联建库存账号并发放 KU_ 编号；与单独账号字段互斥。
         account_snapshot: {
           game_account: values.game_account as string,
@@ -360,13 +303,6 @@ export function CreateBusinessModal(props: {
         wrapperCol={{ flex: "1 1 auto" }}
         onFinish={submit}
         onValuesChange={(changed) => {
-          if ("dfq_periods" in changed) {
-            const count = Number(changed.dfq_periods);
-            const schedule = (form.getFieldValue("dfq_schedule") ?? []) as Array<{ due_on?: unknown }>;
-            if (Number.isInteger(count) && count > 0 && count <= 120 && count !== schedule.length) {
-              form.setFieldValue("dfq_schedule", resizeInstallmentSchedule(schedule, count));
-            }
-          }
           const clear: Record<string, undefined> = {};
           for (const [source, other] of [["supplier_source", "supplier_source_other"]]) {
             if (source in changed && changed[source] !== "其他") clear[other] = undefined;
@@ -389,7 +325,7 @@ export function CreateBusinessModal(props: {
           <SectionLabelsContext.Provider value={labels}>
             {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
               <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
-            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : isDg ? <DgOrderSection gameTypes={gameTypes} employees={employees} /> : <DfqOrderSection pools={pools} gameTypes={gameTypes} employees={employees} />}
+            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
             {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
           </SectionLabelsContext.Provider>

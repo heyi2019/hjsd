@@ -11,7 +11,6 @@ export const MANAGED_OPTION_FIELD_KEYS = [
   "customer_source",
   "supplier_source",
   "dg_customer_source",
-  "dfq_customer_source",
 ];
 export const CONDITION_OP_OPTIONS = [
   { value: "eq", label: "等于" },
@@ -37,7 +36,6 @@ export const ORDER_SCOPE_OPTIONS = [
   { value: "HS", label: "回收" },
   { value: "TH", label: "提号" },
   { value: "DG", label: "代挂" },
-  { value: "DFQ", label: "代分期" },
 ];
 export const ORDER_SCOPE_CODES = new Set(ORDER_SCOPE_OPTIONS.map((item) => item.value));
 export const SECTION_ORDER_STORAGE_KEY = "heijin.form-field-section-order";

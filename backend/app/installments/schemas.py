@@ -20,7 +20,7 @@ class ScheduleCreate(RequestModel):
 class InstallmentCreate(RequestModel):
     order_id: int
     contract_type: str = Field(
-        description="STOCK_SALE / ADVANCE_PURCHASE / PICKUP_SALE / CONSIGNMENT_SALE"
+        description="STOCK_SALE / PICKUP_SALE / CONSIGNMENT_SALE"
     )
     principal: Decimal = Decimal("0")
     down_payment: Decimal = Decimal("0")

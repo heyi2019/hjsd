@@ -150,7 +150,6 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 "HS": "STOCK",
                 "TH": "STOCK",
                 "DG": "ZERO",
-                "DFQ": "CREDIT",
             }
 
             routes = {
@@ -171,7 +170,7 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
             sequences = {
                 row[0] for row in connection.execute(text("SELECT sequence_key FROM document_sequences"))
             }
-            assert {"ORDER_HS", "ORDER_TH", "ORDER_DG", "ORDER_DFQ", "CUSTOMER", "COUNTERPARTY"} <= sequences
+            assert {"ORDER_HS", "ORDER_TH", "ORDER_DG", "CUSTOMER", "COUNTERPARTY"} <= sequences
             # 2026-10-28 裁决：分期合约启用独立编号域 FQ；EVENT/REBATE 仍禁止。
             assert {"EVENT", "REBATE"}.isdisjoint(sequences)
             assert connection.execute(
@@ -297,7 +296,7 @@ def test_upgrade_is_repeatable(migration_env):
             pool_count = connection.execute(text("SELECT COUNT(*) FROM pools")).scalar()
             type_count = connection.execute(text("SELECT COUNT(*) FROM order_type_defs")).scalar()
             route_count = connection.execute(text("SELECT COUNT(*) FROM order_type_pools")).scalar()
-        assert (pool_count, type_count, route_count) == (2, 4, 8)
+        assert (pool_count, type_count, route_count) == (2, 3, 6)
     finally:
         engine.dispose()
 

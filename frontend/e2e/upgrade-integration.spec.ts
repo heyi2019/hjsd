@@ -5,10 +5,18 @@ const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api/v1";
 const headers = { "X-Dev-User": "admin" };
 
 test("已交付分期订单可从页面登记退款", async ({ page, request }) => {
-  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "DFQ", trade_date: "2026-10-17" } });
+  const stocksResponse = await request.get(`${base}/stocks`, { headers });
+  expect(stocksResponse.ok()).toBe(true);
+  const account = ((await stocksResponse.json()).items as Array<{ id: number; inventory_status: string; inventory_type?: string }>).find(
+    (item) => item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
+  );
+  expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
+  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "HS", trade_date: "2026-10-17", account_id: account!.id } });
   expect(created.status()).toBe(201);
   const order = await created.json();
-  const installment = await request.post(`${base}/installments`, { headers, data: { order_id: order.id, contract_type: "ADVANCE_PURCHASE", principal: "100", down_payment: "0", periods: 1, per_period: "100", first_due_on: "2026-10-17" } });
+  const buyEvent = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
+  expect(buyEvent.status()).toBe(201);
+  const installment = await request.post(`${base}/installments`, { headers, data: { order_id: order.id, contract_type: "STOCK_SALE", principal: "100", down_payment: "0", periods: 1, per_period: "100", first_due_on: "2026-10-17" } });
   expect(installment.status()).toBe(201);
   const contract = await installment.json();
   const payment = await request.post(`${base}/installments/${contract.id}/payments`, { headers, data: { amount: "100", paid_on: "2026-10-17", period_no: 1 } });
@@ -40,10 +48,18 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
 });
 
 test("分润页面按人模型保存四项比例", async ({ page, request }) => {
-  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "DFQ", trade_date: "2026-10-17" } });
+  const stocksResponse = await request.get(`${base}/stocks`, { headers });
+  expect(stocksResponse.ok()).toBe(true);
+  const account = ((await stocksResponse.json()).items as Array<{ id: number; inventory_status: string; inventory_type?: string }>).find(
+    (item) => item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
+  );
+  expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
+  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "HS", trade_date: "2026-10-17", account_id: account!.id } });
   expect(created.status()).toBe(201);
   const order = await created.json();
-  const contract = await request.post(`${base}/installments`, { headers, data: { order_id: order.id, contract_type: "ADVANCE_PURCHASE", principal: "100", down_payment: "0", periods: 1, per_period: "100", first_due_on: "2026-10-17" } });
+  const buyEvent = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
+  expect(buyEvent.status()).toBe(201);
+  const contract = await request.post(`${base}/installments`, { headers, data: { order_id: order.id, contract_type: "STOCK_SALE", principal: "100", down_payment: "0", periods: 1, per_period: "100", first_due_on: "2026-10-17" } });
   expect(contract.status()).toBe(201);
   const buy = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
   expect(buy.status()).toBe(201);

@@ -27,7 +27,7 @@ _EXTRA_DEFINITION_SCOPES: dict[str, tuple[str, ...]] = {
     "lead": ("LEAD", "LEADCLOSE", "LEADCONVERT"),
     "counterparty": ("COUNTERPARTY",),
     # 账号/产品字段在四种建单表单中复用；只取账号/产品板块的自定义项。
-    "account": ("HS", "TH", "DG", "DFQ"),
+    "account": ("HS", "TH", "DG"),
 }
 _EXTRA_ENTITY_MODELS: dict[str, type] = {
     "customer": Customer,

@@ -61,7 +61,7 @@ def pay(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
-    """收款：`PAYMENT` 是收入事实，派生现金流并累计已收（DFQ-01-04/05）。"""
+    """收款：`PAYMENT` 是收入事实，派生现金流并累计已收。"""
     installment = get_installment(session, installment_id, user)
     _merge_form_extra(session, installment, scope="INSTPAY", values=form_extra)
     if installment.status in (

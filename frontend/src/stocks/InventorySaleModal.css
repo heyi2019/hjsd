@@ -1,22 +1,57 @@
-.inventory-sale-cashflow,
-.inventory-sale-installment-fields {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
+/* 资金流水卡片容器：内部字段由 AdaptiveFormGrid 负责多列布局（与交付信息一致）。
+   设 container-type 后，内部 AdaptiveFormGrid 的 @container 断点才会随卡片宽度生效。 */
+.inventory-sale-cashflow {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 66%, transparent);
+  container-type: inline-size;
 }
-.inventory-sale-cashflow__title,
-.inventory-sale-installment-fields > .muted { grid-column: 1 / -1; }
-/* 建单里的附加费用卡片是独立整行；售出弹窗也必须占满资金流水网格，
-   由卡片内部 AdaptiveFormGrid 决定 1/2/3/4 列，不能挤在外层的第一列。 */
-.inventory-sale-cashflow > .nested-form-section--card { grid-column: 1 / -1; }
-.inventory-sale-cashflow { margin-top: var(--space-4); padding: var(--space-4); border: var(--border-w) solid var(--glass-border); border-radius: var(--radius-md); background: color-mix(in srgb, var(--glass) 66%, transparent); }
-.inventory-sale-cashflow__title { padding-bottom: var(--space-2); border-bottom: var(--border-w) solid var(--glass-border); color: var(--color-text-primary); font: var(--font-section); }
+.inventory-sale-cashflow__title {
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: var(--border-w) solid var(--glass-border);
+  color: var(--color-text-primary);
+  font: var(--font-section);
+}
 .inventory-sale-cashflow .ant-form-item { margin-bottom: 0; min-width: 0; }
 .inventory-sale-installment-fields { grid-column: 1 / -1; }
 .inventory-sale-installment-fields .installment-schedule-list { grid-column: 1 / -1; }
-.ant-modal[data-recovery-layout="double"] .inventory-sale-cashflow,
-.ant-modal[data-recovery-layout="double"] .inventory-sale-installment-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.ant-modal[data-recovery-layout="three"] .inventory-sale-cashflow,
-.ant-modal[data-recovery-layout="three"] .inventory-sale-installment-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.ant-modal[data-recovery-layout="four"] .inventory-sale-cashflow,
-.ant-modal[data-recovery-layout="four"] .inventory-sale-installment-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* 分期计划卡片：把逐期到期日容器做成带标题的独立区块，与资金流水卡片视觉一致。 */
+.inventory-sale-plan {
+  grid-column: 1 / -1;
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--glass) 50%, transparent);
+}
+.inventory-sale-plan__title {
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: var(--border-w) solid var(--glass-border);
+  color: var(--color-text-primary);
+  font: var(--font-section);
+}
+
+/* 售表单统一布局：标签在左、输入在右（贴合系统全局『左标签右填写』规范，与买号表单一致）。
+   仅作用于售表单作用域，不改共享组件本身。 */
+.inventory-sale-modal .ant-form-item-row {
+  flex-direction: row !important;
+  align-items: flex-start !important;
+}
+.inventory-sale-modal .ant-form-item-label {
+  flex: 0 0 132px !important;
+  max-width: 132px !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  text-align: left !important;
+  padding-right: var(--space-2) !important;
+}
+.inventory-sale-modal .ant-form-item-control {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}

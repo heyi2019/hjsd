@@ -204,50 +204,6 @@ def main() -> None:
         overdue_contracts.append(d5_inst)
         created.append(d5_sale)
 
-        # DFQ：快照建单、分期收款完成，以及逾期回收后转为可出售库存。
-        f1 = order(
-            session,
-            "DFQ",
-            "DFQ01-分期进行中",
-            snapshot={"game_account": "BATCH-DFQ01-20261018", "game_type": "王者荣耀", "purchase_price": "800"},
-        )
-        contract(session, f1, InstallmentContractType.ADVANCE_PURCHASE.value, first_due_on=TODAY)
-        event(session, f1, EventType.BUY.value, "800")
-        created.append(f1)
-
-        f2 = order(
-            session,
-            "DFQ",
-            "DFQ02-分期完成",
-            snapshot={"game_account": "BATCH-DFQ02-20261018", "game_type": "王者荣耀", "purchase_price": "820"},
-        )
-        f2_inst = contract(session, f2, InstallmentContractType.ADVANCE_PURCHASE.value, first_due_on=TODAY)
-        event(session, f2, EventType.BUY.value, "820")
-        complete_contract(session, f2_inst)
-        created.append(f2)
-
-        f3 = order(
-            session,
-            "DFQ",
-            "DFQ03-逾期回收",
-            snapshot={"game_account": "BATCH-DFQ03-20261018", "game_type": "王者荣耀", "purchase_price": "830"},
-        )
-        f3_inst = contract(session, f3, InstallmentContractType.ADVANCE_PURCHASE.value, first_due_on=PAST)
-        event(session, f3, EventType.BUY.value, "830")
-        overdue_contracts.append(f3_inst)
-        created.append(f3)
-
-        f4 = order(
-            session,
-            "DFQ",
-            "DFQ04-逾期回收",
-            snapshot={"game_account": "BATCH-DFQ04-20261018", "game_type": "王者荣耀", "purchase_price": "840"},
-        )
-        f4_inst = contract(session, f4, InstallmentContractType.ADVANCE_PURCHASE.value, first_due_on=PAST)
-        event(session, f4, EventType.BUY.value, "840")
-        overdue_contracts.append(f4_inst)
-        created.append(f4)
-
         # 统一按规则标记逾期，再登记回收；只处理本批次的合约。
         installments_service.mark_overdue(session, as_of=TODAY, actor=ACTOR)
         for item in overdue_contracts:
@@ -275,14 +231,6 @@ def main() -> None:
         d5_resale = order(session, "DG", "DG05-回收后分期出售", account_id=dg5.id)
         contract(session, d5_resale, InstallmentContractType.CONSIGNMENT_SALE.value, first_due_on=TODAY)
         created.append(d5_resale)
-
-        # DFQ 回收后的库存出售，覆盖全款与分期两种出口。
-        f3_account_id = session.scalar(select(Order.account_id).where(Order.id == f3.id))
-        f4_account_id = session.scalar(select(Order.account_id).where(Order.id == f4.id))
-        created.append(full_sale(session, "HS", "DFQ03-回收后全款出售", f3_account_id))
-        f4_resale = order(session, "HS", "DFQ04-回收后分期出售", account_id=f4_account_id)
-        contract(session, f4_resale, InstallmentContractType.STOCK_SALE.value, first_due_on=TODAY)
-        created.append(f4_resale)
 
         # 买入返点 + 卖出返点：返点登记即完成，不再拆分结算/冲销状态机。
         rebates_service.create_rebate(

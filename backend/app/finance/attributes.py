@@ -10,7 +10,6 @@ _ALLOWED_ATTRIBUTES_BY_FUND_NATURE: dict[str, frozenset[str]] = {
         AccountingAttribute.SELF_DIRECT_COST.value,
         AccountingAttribute.TH_DIRECT_COST.value,
         AccountingAttribute.TH_REVENUE.value,
-        AccountingAttribute.DFQ_PRINCIPAL.value,
         AccountingAttribute.SERVICE_REVENUE.value,
         AccountingAttribute.REBATE_INCOME.value,
         AccountingAttribute.OPERATING_EXPENSE.value,
@@ -52,10 +51,6 @@ _ORDER_EVENT_ATTRIBUTES: dict[tuple[str, str], str] = {
     ("HS", "REFUND"): AccountingAttribute.REFUND.value,
     ("TH", "REFUND"): AccountingAttribute.REFUND.value,
     ("DG", "REFUND"): AccountingAttribute.REFUND.value,
-    ("DFQ", "REFUND"): AccountingAttribute.REFUND.value,
-    ("DFQ", "BUY"): AccountingAttribute.DFQ_PRINCIPAL.value,
-    ("DFQ", "PAYMENT"): AccountingAttribute.DFQ_PRINCIPAL.value,
-    ("DFQ", "CANCEL"): AccountingAttribute.REVERSAL.value,
 }
 
 

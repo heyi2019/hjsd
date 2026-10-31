@@ -139,13 +139,13 @@ it("返点按买入与售出订单区分类型并登记", async () => {
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
     expect(screen.queryByText(/关联业务订单创建后即可登记返点/)).toBeNull();
-    expect(screen.getByLabelText("买号返点（对应回收/提号/代分期）")).toBeChecked();
+    expect(screen.getByLabelText("买号返点（对应回收/提号）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeEnabled();
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
-    expect(screen.getByLabelText("买号返点（对应回收/提号/代分期）")).not.toBeChecked();
+    expect(screen.getByLabelText("买号返点（对应回收/提号）")).not.toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeChecked();
-    await ui.click(screen.getByLabelText("买号返点（对应回收/提号/代分期）"));
-    expect(screen.getByLabelText("买号返点（对应回收/提号/代分期）")).toBeChecked();
+    await ui.click(screen.getByLabelText("买号返点（对应回收/提号）"));
+    expect(screen.getByLabelText("买号返点（对应回收/提号）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).not.toBeChecked();
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
@@ -188,6 +188,6 @@ it("提号分销已登记 BUY 后可登记买号返点", async () => {
     }],
   });
   renderLight(<InventoryRebateModal account={accounts[1]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-  expect(await screen.findByLabelText("买号返点（对应回收/提号/代分期）")).toBeChecked();
+  expect(await screen.findByLabelText("买号返点（对应回收/提号）")).toBeChecked();
 });
 });

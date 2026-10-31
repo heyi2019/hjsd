@@ -88,14 +88,13 @@ function MobileOrderList(props: {
   );
 }
 
-type BusinessFilterKey = "all" | "HS" | "TH" | "DG" | "DFQ";
+type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
 type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
 
 const BUSINESS_CREATE_ITEMS = [
   { key: "HS", label: "新建回收订单" },
   { key: "TH", label: "新建提号订单" },
   { key: "DG", label: "新建代挂订单" },
-  { key: "DFQ", label: "新建代分期订单" },
 ];
 
 /** 分润弹窗的一行：姓名（员工 id 或 COMPANY）+ 角色 + 比例 + 金额（比例/金额都选填、互斥）。 */
@@ -485,9 +484,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         appMessage.success(
           installment.contract_type === "PICKUP_SALE"
             ? `${refundSummary}，提号交易已结束`
-            : installment.contract_type === "ADVANCE_PURCHASE"
-              ? `${refundSummary}，代分期交易已结束`
-              : `${refundSummary}，账号已回到库存`,
+            : `${refundSummary}，账号已回到库存`,
         );
         if (result.order_status === "CANCELLED") await load();
       } else {
@@ -551,7 +548,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
     }
   };
 
-  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅 DFQ 可维护，
+  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅特定业务可维护，
    *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
   const openEditOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -860,9 +857,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
             {cancelInstallmentTarget
               ? cancelInstallmentTarget.contract_type === "PICKUP_SALE"
                 ? "按已收款原资金池退款，提号取消后交易直接结束。"
-                : cancelInstallmentTarget.contract_type === "ADVANCE_PURCHASE"
-                  ? "按已收款原资金池退款，取消后终止代分期交易。"
-                  : "按已收款原资金池退款，取消后账号回到库存。"
+                : "按已收款原资金池退款，取消后账号回到库存。"
               : cancelScope === "INVREFUND"
                 ? "冲销入库流水，金额进入公司钱包；可按原资金池入账，也可做部分冲销。"
                 : "冲销售出流水，金额退还客户；可按原资金池退款，也可做部分冲销。"}
@@ -934,25 +929,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="订单备注（选填）" />
           </CfgItem>
-          {selectedOrder?.account_snapshot && selectedOrder.order_type === "DFQ" && !orderHasPostedEvents ? (
-            selectedOrder.account_snapshot.game_password ? (
-              <>
-                <Typography.Paragraph type="secondary">账号快照（代分期建单时填写的文本信息）：</Typography.Paragraph>
-                <CfgItem name="snap_game_account" label="库存编号" rules={[{ required: true, message: "请输入库存编号" }]}>
-                  <Input />
-                </CfgItem>
-                <CfgItem name="snap_game_type" label="游戏/产品类型"><Input /></CfgItem>
-                <CfgItem name="snap_game_password" label="账号密码"><Input placeholder="留空表示清除密码" /></CfgItem>
-                <CfgItem name="snap_channel_region" label="区服"><Input /></CfgItem>
-                <CfgItem name="snap_bound_phone" label="绑定手机"><Input /></CfgItem>
-                <CfgItem name="snap_platform" label="平台"><Input /></CfgItem>
-                <CfgItem name="snap_purchase_price" label="号价" rules={moneyRules("号价")}><MoneyInput placeholder="例如 1000.00" /></CfgItem>
-                <CfgItem name="snap_note" label="快照备注"><Input.TextArea rows={2} /></CfgItem>
-              </>
-            ) : (
-              <Typography.Paragraph type="secondary">账号快照密码字段无权查看，为避免覆盖隐藏信息，快照暂不可编辑；如需修改请联系有订单创建权限的人员。</Typography.Paragraph>
-            )
-          ) : null}
+
           <CustomFieldSection testIdSuffix="order-edit" />
           </FieldConfigScope>
         </BusinessForm>
@@ -1153,7 +1130,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         onCreated={async () => {
           setCreateType(undefined);
           setInventoryRefreshKey((key) => key + 1);
-          // 代分期建单会同时生成新分期合约，同步重拉「分期回款」列表。
+          // 建单后同步重拉「分期回款」列表，覆盖售出分期等会生成新合约的场景。
           setInstallmentRefreshKey((key) => key + 1);
           await load();
         }}

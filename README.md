@@ -97,7 +97,7 @@ cd frontend && npm run build
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
 | `docs` | 当前有效文档 15 份（PRD、数据字典、架构、DDL、API、权限矩阵、状态机等），索引见 `docs/README.md`；时点性报告已归档至 `docs/archive/` |
 | `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
-| `data` `logs` `runtime` `outputs` `monitor` `business_output` | 运行态与生成物，默认不提交 |
+| `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
 
 ## 关键业务约束
 

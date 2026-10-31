@@ -32,17 +32,11 @@ htmlcov/
 # Vitest JSON 报告产物（--reporter=json 输出目录）
 /frontend/.vitest/
 
-# 运行期目录：日志、运行时状态、监控数据、截图产物，不入版本库
+# 运行期目录：日志与截图产物，不入版本库
 /logs/*
 !/logs/.gitkeep
-/runtime/*
-!/runtime/.gitkeep
-/monitor/*
-!/monitor/.gitkeep
 /outputs/*
 !/outputs/.gitkeep
-/business_output/*
-!/business_output/.gitkeep
 
 # 附件上传运行产物，不纳入代码版本库
 /backend/data/attachments/*

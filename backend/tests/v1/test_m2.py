@@ -18,7 +18,7 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
+from app.domain.trade import Account, Cashflow, Installment, InstallmentSchedule, Order
 from app.finance import service as finance_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
@@ -45,6 +45,34 @@ def _account(seeded_db, game_account: str):
 
 
 class TestA04DfqAdvancePurchase:
+    def test_dfq_installment_is_separate_from_inventory_status(self, seeded_db):
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="DFQ",
+            trade_date=TODAY,
+            actor="pytest",
+            account_snapshot={"game_account": "dfq-status-separation"},
+        )
+        contract = installment_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            principal=Decimal("100"),
+            down_payment=Decimal("20"),
+            periods=1,
+            per_period=Decimal("80"),
+            first_due_on=TODAY,
+            actor="pytest",
+        )
+        seeded_db.flush()
+
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert contract.status == InstallmentStatus.PENDING.value
+        assert order.status == OrderStatus.ACTIVE.value
+        assert account.inventory_status == "OUT_OF_STOCK"
+        assert account.id not in {item["account_id"] for item in stocks_service.inventory(seeded_db)}
+
     def test_buy_downpayment_two_periods_deliver(self, seeded_db):
         supplier = parties_service.create_counterparty(
             seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"

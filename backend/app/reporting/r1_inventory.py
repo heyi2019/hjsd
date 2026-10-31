@@ -14,7 +14,7 @@ from app.parties import service as parties_service
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.domain.enums import (
-    AccountStatus,
+    InventoryStatus,
     OrderStatus,
 )
 from app.domain.trade import (
@@ -33,12 +33,8 @@ from ._shared import (
 def r1_inventory_health(
     session: Session, *, user: CurrentUser | None = None
 ) -> dict[str, Any]:
-    """R1 库存健康表：统计回收/代挂账号中处于在库或分期状态的账号。"""
+    """R1 库存健康表：统计独立库存状态为在库的回收/代挂账号。"""
     today = date.today()
-    stock_statuses = [
-        AccountStatus.IN_STOCK.value,
-        AccountStatus.INSTALLMENT.value,
-    ]
 
     order_cost: dict[int, Decimal] = defaultdict(lambda: ZERO)
     order_income: dict[int, Decimal] = defaultdict(lambda: ZERO)
@@ -84,7 +80,7 @@ def r1_inventory_health(
     for account in accounts:
         if account.inventory_type == "PICKUP":
             continue
-        if account.status not in stock_statuses:
+        if account.inventory_status != InventoryStatus.IN_STOCK.value:
             continue
         orders = order_by_account.get(account.id, [])
         holding_days = (
@@ -100,7 +96,7 @@ def r1_inventory_health(
                 "game_account": account.game_account,
                 "platform": account.platform,
                 "business": ",".join({o.order_type for o in orders}) or None,
-                "status": account.status,
+                "status": account.inventory_status,
                 "buy_amount": total_cost,
                 "extra_cost": max(
                     ZERO, sum((order_cost[o.id] for o in orders), ZERO) - total_cost

@@ -9,12 +9,14 @@ from app.domain.enums import (
     AccountStatus,
     BusinessMode,
     InventoryType,
+    InventoryStatus,
 )
 from datetime import date
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    event,
     Index,
     Integer,
     JSON,
@@ -58,6 +60,11 @@ class Account(Base, AuditMixin):
             "('PICKUP', 'CONSIGNMENT'))",
             name="account_inventory_context_valid",
         ),
+        CheckConstraint(
+            f"inventory_status IN {InventoryStatus.values()!r}"
+            .replace("[", "(").replace("]", ")"),
+            name="account_inventory_status_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -77,6 +84,10 @@ class Account(Base, AuditMixin):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AccountStatus.IN_STOCK.value
     )
+    # 独立库存口径：只表达在库/出库；status 保留账号生命周期原因，订单和分期另有各自状态。
+    inventory_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=InventoryStatus.IN_STOCK.value
+    )
     buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     account_description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -84,3 +95,19 @@ class Account(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 表单字段配置体系：INVEDIT 等作用域自定义字段值（与 Order.form_extra 同构）。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+def _inventory_status_for_account_status(status: object) -> str:
+    return (
+        InventoryStatus.IN_STOCK.value
+        if status == AccountStatus.IN_STOCK.value
+        else InventoryStatus.OUT_OF_STOCK.value
+    )
+
+
+@event.listens_for(Account.status, "set", retval=False)
+def _sync_inventory_status(target: Account, value: object, _old_value: object, _initiator: object) -> object:
+    """账号生命周期变化时同步物理库存口径，避免 INSTALLMENT 被当作在库。"""
+    if value is not None:
+        target.inventory_status = _inventory_status_for_account_status(value)
+    return value

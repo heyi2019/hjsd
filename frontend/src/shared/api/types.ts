@@ -346,6 +346,7 @@ export interface Account {
   note?: string | null;
   platform?: string | null;
   status: string;
+  inventory_status?: string;
   cost_amount: string;
   buy_date?: string | null;
   created_by: string;
@@ -360,6 +361,7 @@ export interface AccountInventoryRow {
   inventory_type?: string | null;
   platform?: string | null;
   status: string;
+  inventory_status?: string;
   cost_amount: string;
   account_description?: string | null;
   account_images?: string[];

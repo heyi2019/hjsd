@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.core.security import CurrentUser, owner_scope_ids
-from app.domain.enums import AccountStatus, BusinessMode, InventoryType
+from app.domain.enums import BusinessMode, InventoryStatus, InventoryType
 from app.domain.trade import Account, Order
 
-INVENTORY_STATUSES = (AccountStatus.IN_STOCK.value, AccountStatus.INSTALLMENT.value)
+# 只按独立库存状态统计；分期状态属于 installments，不再占用库存口径。
+INVENTORY_STATUSES = (InventoryStatus.IN_STOCK.value,)
 _UNSET = object()
 
 

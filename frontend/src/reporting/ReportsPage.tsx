@@ -9,6 +9,7 @@ import { SearchPanel } from "../search/SearchPanel";
 import { AuditPanel } from "../audit/AuditPanel";
 import { AttachmentPanel } from "../attachments/AttachmentPanel";
 import { reportsApi,
+  employeesApi,
   type BusinessPnlReport,
   type BusinessPnlRow,
   type CommissionReport,
@@ -105,9 +106,10 @@ export function MobileReportCards<T>({
   );
 }
 
-export function ReportsPage({ onNavigate, active = true }: { onNavigate?: (key: string) => void; active?: boolean }) {
+export function ReportsPage({ onNavigate, active = true, initialReportTab }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
   const reportOptions = useOptionSet("REPORT_NAME") ?? REPORT_FALLBACK;
-  const [activeTab, setActiveTab] = useState("r1");
+  const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
+  const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "r1");
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
@@ -116,6 +118,13 @@ export function ReportsPage({ onNavigate, active = true }: { onNavigate?: (key: 
   // 报表视图统计周期：提升到父级，避免切换 Tab（非挂载）后筛选条件丢失。
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
+  useEffect(() => {
+    // keep-alive 下离开经营中心时保留个人视图，避免隐藏页在切换期间改请求口径；
+    // 重新激活后再按 URL 入口决定是「我的收益」还是完整提成对账。
+    if (!active) return;
+    setMyEarnings(initialReportTab === "my-earnings");
+    if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
+  }, [active, initialReportTab]);
   const reportRange: ReportRange = {
     params: { from: reportFrom || undefined, to: reportTo || undefined },
     picker: (
@@ -155,7 +164,7 @@ export function ReportsPage({ onNavigate, active = true }: { onNavigate?: (key: 
   const tabItems = [
     { key: "r1", label: "库存 R1", render: () => <InventoryReport /> },
     { key: "r2", label: "月度损益 R2", render: () => <MonthlyPnl range={reportRange} /> },
-    { key: "r3", label: "提成对账 R3", render: () => <Commission range={reportRange} /> },
+    { key: "r3", label: "提成对账 R3", render: () => <Commission range={reportRange} mine={myEarnings} /> },
     { key: "r4", label: "资金日报 R4", render: () => <DailyFunds /> },
     { key: "r5", label: "业务损益 R5", render: () => <BusinessPnl range={reportRange} /> },
     { key: "finance-dimensions", label: "资金属性分析", render: () => <FinanceDimensions range={reportRange} /> },
@@ -354,16 +363,40 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
   );
 }
 
-function Commission({ range }: { range: ReportRange }) {
+function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
   const compact = useCompactLayout();
   const { params, picker } = range;
+  const [employees, setEmployees] = useState<{ id: number; username: string; display_name: string; is_active: boolean }[]>([]);
+  const [employeeError, setEmployeeError] = useState<{ message: string; code?: string } | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number>(0);
+  useEffect(() => {
+    if (mine) return;
+    let mounted = true;
+    employeesApi.list()
+      .then((items) => {
+        if (!mounted) return;
+        setEmployees(items);
+        setEmployeeError(null);
+      })
+      .catch((error) => {
+        if (mounted) setEmployeeError(normalizeError(error));
+      });
+    return () => { mounted = false; };
+  }, [mine]);
+  const commissionParams = {
+    ...(params.from ? { from: params.from } : {}),
+    ...(params.to ? { to: params.to } : {}),
+    ...(mine ? { mine: true } : {}),
+    ...(!mine ? { all_people: true } : {}),
+    ...(!mine && selectedUserId ? { user_id: selectedUserId } : {}),
+  };
   const { data, loading, error, reload } = useReport<CommissionReport>(
-    () => reportsApi.commission(params),
-    [params.from, params.to],
+    () => reportsApi.commission(commissionParams),
+    [params.from, params.to, mine, selectedUserId],
   );
   const { arrange: arrangeCommission } = useListViewColumns("RPT_COMMISSION");
   const columns: ColumnsType<CommissionRow> = [
-    { title: "人员 ID", dataIndex: "user_id", width: 100 },
+    ...(mine ? [] : [{ title: "人员 ID", dataIndex: "user_id", width: 100 }]),
     { title: "订单号", dataIndex: "order_no", width: 160 },
     { title: "利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "费率", dataIndex: "rate", align: "right", width: 90},
@@ -377,13 +410,28 @@ function Commission({ range }: { range: ReportRange }) {
     },
   ];
   return (
-    <Card className="glass" title="提成对账 R3">
+    <Card className="glass" title={mine ? "我的收益" : "提成对账 R3"}>
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar">{picker}</Space>
-      <Note>人员维度可钻取到每一单；应付与已付差异即为待追补金额（RPT-01-03）。</Note>
+      <Space className="ui-filter-bar">
+        {!mine ? (
+          <Select
+            value={selectedUserId}
+            onChange={(value) => setSelectedUserId((value as number) || 0)}
+            options={[
+              { value: 0, label: "全部" },
+              ...employees.map((employee) => ({ value: employee.id, label: `${employee.display_name}（${employee.username}）` })),
+            ]}
+            className="ui-control-width-import"
+          />
+        ) : null}
+        {picker}
+      </Space>
+      <ErrorBanner error={employeeError} />
+      <Note>{mine ? "仅展示当前登录用户在分润配置中获得的收益。" : "默认展示所有人的经营总览；可按人员筛选到每一单。应付与已付差异即为待追补金额（RPT-01-03）。"}</Note>
       <StatRow
         items={[
-          { label: "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
+          { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
+          { label: mine ? "我的收益" : "分润基数", amount: data?.total.profit_base ?? "-" },
           { label: "应付合计", amount: data?.total.payable ?? "-" },
           { label: "已付合计", amount: data?.total.paid ?? "-" },
           { label: "差异", amount: data?.total.difference ?? "-", tone: "auto" },

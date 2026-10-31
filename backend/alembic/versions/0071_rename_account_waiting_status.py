@@ -18,7 +18,9 @@ def _find_status_constraint() -> str:
     for constraint in inspector.get_check_constraints("stocks"):
         name = constraint.get("name")
         sqltext = (constraint.get("sqltext") or "").upper()
-        if name and "STATUS IN" in sqltext and "INVENTORY_STATUS" not in sqltext:
+        # PostgreSQL renders ``status IN (...)`` as ``= ANY (ARRAY[...])``;
+        # SOLD + VOID identifies the account-cycle status in both dialects.
+        if name and "SOLD" in sqltext and "VOID" in sqltext and "INVENTORY_STATUS" not in sqltext:
             return name
     raise RuntimeError("无法定位 stocks 的 status CHECK 约束")
 

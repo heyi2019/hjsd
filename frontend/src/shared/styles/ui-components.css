@@ -61,6 +61,19 @@
   font-variant-numeric: tabular-nums;
 }
 .ui-stat__hint { font: var(--font-caption-2); }
+.ui-stat--interactive {
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ui-stat--interactive:hover {
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-raised);
+  transform: translateY(-1px);
+}
+.ui-stat--interactive:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 .ui-stat--income { border-color: color-mix(in srgb, var(--color-success) 34%, var(--glass-border)); }
 .ui-stat--expense { border-color: color-mix(in srgb, var(--color-error) 34%, var(--glass-border)); }
 .ui-stat--warn {

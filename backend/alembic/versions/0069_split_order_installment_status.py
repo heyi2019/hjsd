@@ -18,7 +18,13 @@ def _find_status_constraint(table_name: str) -> str:
     for constraint in inspector.get_check_constraints(table_name):
         name = constraint.get("name")
         sqltext = (constraint.get("sqltext") or "").upper()
-        if name and "STATUS IN" in sqltext and "INVENTORY_STATUS" not in sqltext:
+        # PostgreSQL renders ``status IN (...)`` as ``= ANY (ARRAY[...])``;
+        # matching the stable enum members works across both dialects and old names.
+        if table_name == "stocks":
+            matches_status = "SOLD" in sqltext and "VOID" in sqltext
+        else:
+            matches_status = "COMPLETED" in sqltext and "CANCELLED" in sqltext
+        if name and matches_status and "INVENTORY_STATUS" not in sqltext:
             return name
     raise RuntimeError(f"无法定位 {table_name} 的 status CHECK 约束")
 

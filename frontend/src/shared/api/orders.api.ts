@@ -27,6 +27,7 @@ export const ordersApi = {
     status?: string;
     limit?: number;
     offset?: number;
+    mine?: boolean;
   }): Promise<Order[]> => {
     if (params?.limit != null) {
       return api.get<PageResponse<Order>>("/orders", { params }).then((r) => r.data.items);

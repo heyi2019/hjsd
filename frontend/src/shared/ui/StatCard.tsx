@@ -10,9 +10,22 @@ export function StatCard(props: {
   value: ReactNode;
   hint?: string;
   tone?: StatTone;
+  onClick?: () => void;
 }) {
+  const interactive = Boolean(props.onClick);
   return (
-    <div className={`ui-stat ui-stat--${props.tone ?? "plain"}`}>
+    <div
+      className={`ui-stat ui-stat--${props.tone ?? "plain"}${interactive ? " ui-stat--interactive" : ""}`}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={props.onClick}
+      onKeyDown={interactive ? (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          props.onClick?.();
+        }
+      } : undefined}
+    >
       <span className="ui-stat__label muted">{props.label}</span>
       <span className="ui-stat__value">{props.value}</span>
       {props.hint ? <span className="ui-stat__hint muted">{props.hint}</span> : null}
@@ -28,6 +41,7 @@ export function StatRow(props: {
     /** count=计数（整数原样显示）；money=金额（千分位两位小数）。默认按 amount 推断。 */
     kind?: "count" | "money";
     hint?: string;
+    onClick?: () => void;
     /** auto：按金额正负自动上色（中国区惯例：正红负绿）。 */
     tone?: StatTone | "auto";
   }[];
@@ -54,6 +68,7 @@ export function StatRow(props: {
             value={value}
             hint={item.hint}
             tone={item.tone === "auto" ? "plain" : item.tone}
+            onClick={item.onClick}
           />
         );
       })}

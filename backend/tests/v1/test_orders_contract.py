@@ -1102,6 +1102,30 @@ class TestGetAndListOrders:
         # 无 user 不过滤：两张单都可见
         assert len(order_service.list_orders(seeded_db)) == 2
 
+    def test_list_orders_mine_includes_created_owner_and_sold_orders(self, seeded_db):
+        created_by_me = order_service.create_order(
+            seeded_db, order_type="HS", trade_date=D, actor="operator", owner_id=1,
+        )
+        owned_by_me = _order(seeded_db, owner_id=9)
+        sold_by_me = _order(seeded_db, owner_id=1)
+        order_service.post_event(
+            seeded_db, sold_by_me.id, event_type="BUY", amount="50.00",
+            occurred_on=D, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, sold_by_me.id, event_type="SELL", amount="100.00",
+            occurred_on=D, actor="operator",
+        )
+        foreign = _order(seeded_db, owner_id=1)
+
+        operator = CurrentUser.build(
+            id=9, username="operator", roles=["ADMIN"], owner_scope="ALL"
+        )
+        personal = order_service.list_orders(seeded_db, user=operator, mine=True)
+        personal_ids = {order.id for order in personal}
+        assert {created_by_me.id, owned_by_me.id, sold_by_me.id}.issubset(personal_ids)
+        assert foreign.id not in personal_ids
+
     def test_list_orders_supports_workbench_date_owner_keyword_filters(
         self, seeded_client, seeded_db, headers
     ):

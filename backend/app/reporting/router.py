@@ -59,9 +59,14 @@ def commission(
     user: CurrentUser = read_access,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    mine: bool = Query(default=False),
+    all_people: bool = Query(default=False),
+    user_id: int | None = Query(default=None, gt=0),
 ) -> CommissionOut:
-    """R3 提成对账：人员可钻取到每一单。"""
-    return service.r3_commission_reconciliation(db, from_date=from_date, to_date=to_date, user=user)
+    """R3 提成对账：默认按权限范围汇总；经营中心可显式查看全员并按人员筛选。"""
+    return service.r3_commission_reconciliation(
+        db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, user_id=user_id
+    )
 
 
 @router.get("/reports/business-pnl", response_model=BusinessPnlOut)

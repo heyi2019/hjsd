@@ -33,6 +33,7 @@ beforeEach(() => {
     items: [],
     total: { order_count: 0, payable: "0", paid: "0", difference: "0" },
   });
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), {
     items: [],

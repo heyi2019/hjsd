@@ -238,13 +238,14 @@ function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: Bus
   )).length;
 }
 
-export function OrdersPage({ initialTab, active = true, onNavigate }: { initialTab?: BusinessCenterEntryTab; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void } = {}) {
+export function OrdersPage({ initialTab, initialMine = false, active = true, onNavigate }: { initialTab?: BusinessCenterEntryTab; initialMine?: boolean; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void } = {}) {
   // 当前登录人仅作为历史数据没有指定操作人时的回退显示；新记录以勾选员工为准。
   const currentOperator = currentDevUser();
   const [orders, setOrders] = useState<Order[]>([]);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mineOrders, setMineOrders] = useState(initialMine);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
@@ -332,7 +333,10 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, typeList] = await Promise.all([ordersApi.list(), orderTypesApi.list()]);
+      const [list, typeList] = await Promise.all([
+        ordersApi.list(mineOrders ? { mine: true } : undefined),
+        orderTypesApi.list(),
+      ]);
       setOrders(list);
       setTypes(typeList);
       setLoadError(null);
@@ -341,7 +345,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mineOrders]);
 
   const openAllocations = async (sourceOrder?: Order) => {
     try {
@@ -606,6 +610,9 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
   // keep-alive：切走再切回不会重挂载。重新激活（active 翻回 true）时重拉列表，
   // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
   useReloadOnActive(active, load);
+  useEffect(() => {
+    if (active) setMineOrders(initialMine);
+  }, [active, initialMine]);
 
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)

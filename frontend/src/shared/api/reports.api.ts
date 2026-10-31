@@ -7,7 +7,7 @@ export const reportsApi = {
   inventoryHealth: () => api.get<InventoryHealthReport>("/reports/inventory-health").then((r) => r.data),
   monthlyPnl: (params?: { from?: string; to?: string }) =>
     api.get<MonthlyPnlReport>("/reports/monthly-pnl", { params }).then((r) => r.data),
-  commission: (params?: { from?: string; to?: string }) =>
+  commission: (params?: { from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number }) =>
     api.get<CommissionReport>("/reports/commission", { params }).then((r) => r.data),
   businessPnl: (params?: { from?: string; to?: string }) =>
     api.get<BusinessPnlReport>("/reports/business-pnl", { params }).then((r) => r.data),

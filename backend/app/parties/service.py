@@ -21,17 +21,21 @@ from .counterparties import (
     set_counterparty_status,
     update_counterparty,
 )
-from .customers import (
-    _customer_list_stmt,
-    assert_customer_usable,
-    count_customers,
-    create_customer,
-    duplicate_candidates,
-    get_customer,
+from .customer_detail import (
     get_customer_activity_summary,
     get_customer_detail,
-    list_customers,
+)
+from .customer_merge import (
+    assert_customer_usable,
+    duplicate_candidates,
     merge_customers,
+)
+from .customers import (
+    _customer_list_stmt,
+    count_customers,
+    create_customer,
+    get_customer,
+    list_customers,
     set_customer_status,
     update_customer,
 )

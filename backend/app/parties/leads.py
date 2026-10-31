@@ -21,7 +21,7 @@ from app.domain.parties import CustomerLead
 from app.domain.trade import Order
 
 from ._common import _UNSET, _normalize_extra_values, _required_text, _validate_owner_id
-from .customers import assert_customer_usable
+from .customer_merge import assert_customer_usable
 from .fields import _validate_required_extras, set_extra_values
 
 def _get_lead_for_user(

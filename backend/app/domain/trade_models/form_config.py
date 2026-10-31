@@ -22,7 +22,7 @@ from sqlalchemy.orm import (
 )
 
 class OrderFormField(Base, AuditMixin):
-    """表单字段配置：按表单作用域码（建单 HS/TH/DG/DFQ、客户建档 CUSTOMER 等）描述字段构成。
+    """表单字段配置：按表单作用域码（建单 HS/TH/DG、客户建档 CUSTOMER 等）描述字段构成。
 
     全站唯一的字段定义来源，替代已下线的独立字段定义表（2026-10-26 合并）：
     本表描述表单字段的展示/必填/停用/排序，并可覆盖核心核算字段的必填态。核心核算字段

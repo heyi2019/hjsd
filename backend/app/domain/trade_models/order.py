@@ -42,7 +42,7 @@ from sqlalchemy.orm import (
 )
 
 class Order(Base, AuditMixin):
-    """订单主表：编号按业务前缀分配（HS/TH/DG/DFQ）。"""
+    """订单主表：编号按业务前缀分配（HS/TH/DG）。"""
 
     __tablename__ = "orders"
     __table_args__ = (
@@ -83,7 +83,7 @@ class Order(Base, AuditMixin):
         ),
         CheckConstraint(
             "account_snapshot IS NULL OR account_snapshot = 'null' "
-            "OR order_type IN ('HS', 'TH', 'DG', 'DFQ')",
+            "OR order_type IN ('HS', 'TH', 'DG')",
             name="order_account_snapshot_type_valid",
         ),
     )
@@ -98,7 +98,7 @@ class Order(Base, AuditMixin):
     # 分期场景的 service_fee 走 installments.service_fee（活列），勿混淆。
     commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    # DFQ 建单时可只保留账号文本快照；逾期回收后会补建库存实体并写入 account_id。
+    # HS/TH/DG 建单时的账号文本快照统一存于 account_snapshot。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("stocks.id", ondelete="SET NULL"), nullable=True

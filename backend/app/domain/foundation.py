@@ -68,7 +68,7 @@ class Pool(Base, AuditMixin):
 
 
 class OrderTypeDef(Base, AuditMixin):
-    """业务类型主数据：首批 HS/TH/DG/DFQ，可自由新增（BAS-02-02）。"""
+    """业务类型主数据：首批 HS/TH/DG，可自由新增（BAS-02-02）。"""
 
     __tablename__ = "order_type_defs"
     __table_args__ = (

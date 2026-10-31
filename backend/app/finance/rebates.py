@@ -75,9 +75,9 @@ def create_rebate(
             f"返点类型必须为 {RebateType.values()}",
             details={"field": "rebate_type", "value": rebate_type},
         )
-    if rebate_type == RebateType.BUY.value and order.order_type not in ("HS", "TH", "DFQ"):
+    if rebate_type == RebateType.BUY.value and order.order_type not in ("HS", "TH"):
         raise Validation(
-            "买号返点只能关联回收、提号或代分期订单",
+            "买号返点只能关联回收、提号订单",
             details={"rebate_type": rebate_type, "order_type": order.order_type},
         )
     # 返点资格由业务订单是否已创建决定；BUY/SELL/PAYMENT 仅作为后续业务流水，

@@ -34,7 +34,6 @@ from app.domain.enums import (
     CapitalType,
     Direction,
     EventType,
-    InstallmentContractType,
     InventoryType,
     PoolStatus,
 )
@@ -133,12 +132,6 @@ def _assert_event_allowed(
                 details={"field": "game_account"},
             )
         raise Validation("回收订单 BUY 必须关联库存账号")
-    if order.order_type == "DFQ" and event_type == EventType.BUY.value:
-        contract_type = session.scalar(
-            select(Installment.contract_type).where(Installment.order_id == order.id)
-        )
-        if contract_type != InstallmentContractType.ADVANCE_PURCHASE.value:
-            raise Validation("DFQ BUY 必须先创建 ADVANCE_PURCHASE 分期合约")
     if order.order_type == "DG" and event_type in {
         EventType.BUY.value,
         EventType.COST.value,
@@ -158,8 +151,6 @@ def _assert_event_allowed(
             AccountStatus.VOID.value,
         }:
             raise Validation("已售账号不能新增 COST")
-    if order.order_type == "DFQ" and event_type == EventType.SELL.value:
-        raise Validation("代分期只能通过 PAYMENT 收款，不能直接 SELL")
     if order.order_type in {"TH", "DG"} and event_type == EventType.SELL.value:
         installment = session.scalar(
             select(Installment).where(Installment.order_id == order.id)
@@ -271,7 +262,7 @@ def _post_deliver(
     form_extra: Mapping[str, Any] | None,
     allow_installment_delivery: bool,
 ) -> tuple[OrderEvent, None]:
-    """`DELIVER`：无金额、无现金流，必须记录交付方式与凭证（DFQ-01-07 / A04 / A05）。"""
+    """`DELIVER`：无金额、无现金流，必须记录交付方式与凭证（A04 / A05）。"""
     modes = ("PLATFORM_OPERATOR", "CUSTOMER_SELF")
     if delivery_mode not in modes:
         raise Validation(
@@ -431,7 +422,7 @@ def _apply_account_effect(
         account.cost_amount = to_money(account.cost_amount) + amount
         account.buy_date = order.trade_date
         next_action = "BUY_STOCK" if stock_type else "BUY_CREDIT"
-        # 合约先行（代分期建约已把账号置为分期中）时，BUY 仅补记成本，不重复转换。
+        # 合约先行（建约已把账号置为分期中）时，BUY 仅补记成本，不重复转换。
         target = ACCOUNT_TRANSITIONS.get(account.status, {}).get(next_action)
         if target is not None:
             account.status = target

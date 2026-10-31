@@ -278,23 +278,8 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                 )
             )
 
-    # 代分期是否已建合约：一次取回全部命中订单。逐单 EXISTS 是 O(DFQ 订单数)
-    # 条 SQL（实测 124 条），改成集合判断后恒为 1 条。
-    orders_with_installment = set(session.scalars(select(Installment.order_id).distinct()).all())
     for order in orders:
         order_events = [event for event in events_by_order.get(order.id, []) if event.is_posted]
-        if order.order_type == "DFQ" and order.account_id is not None:
-            issues.append(
-                _issue(
-                    code="ORDER_ACCOUNT_LINK_INVALID",
-                    severity="HIGH",
-                    title="文本账号订单错误关联库存",
-                    entity_type="order",
-                    entity_id=order.order_no,
-                    message="DFQ 的账号只能保存在订单账号快照中，不应关联库存账号。",
-                    details={"order_type": order.order_type, "account_id": order.account_id},
-                )
-            )
         if order.order_type == "HS" and order.capital_type == "STOCK" and order.account_id is None:
             if any(event.event_type == EventType.BUY.value and event.is_posted for event in order_events):
                 issues.append(
@@ -307,18 +292,6 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
                         message="库存型 HS 买入后必须能追溯到库存账号。",
                     )
                 )
-
-        if order.order_type == "DFQ" and order.id not in orders_with_installment:
-            issues.append(
-                _issue(
-                    code="INSTALLMENT_MISSING",
-                    severity="HIGH",
-                    title="代分期订单缺少合约",
-                    entity_type="order",
-                    entity_id=order.order_no,
-                    message="DFQ 订单必须关联一份 ADVANCE_PURCHASE 分期合约。",
-                )
-            )
 
     schedule_rows = session.scalars(
         select(InstallmentSchedule)

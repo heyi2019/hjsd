@@ -1,4 +1,4 @@
-"""installments.router：分期合约、收款、交付与逾期标记（HS-01-06 / DFQ-01）。"""
+"""installments.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
 from __future__ import annotations
 
 from datetime import date
@@ -24,7 +24,7 @@ from app.installments import schemas, service
 from app.lists.export import build_list_csv, csv_file_response
 from app.parties import service as parties_service
 
-router = APIRouter(tags=["HS-01/DFQ-01 分期合约"])
+router = APIRouter(tags=["HS-01 分期合约"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)

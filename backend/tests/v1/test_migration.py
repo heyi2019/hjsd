@@ -195,6 +195,13 @@ def test_postgres_alembic_version_storage_allows_long_revision_ids():
     assert "VARCHAR(64)" in env_source
 
 
+def test_postgres_status_migrations_resolve_renamed_stocks_constraint():
+    """0069/0071 不能假定 accounts 改名后检查约束仍使用旧表名。"""
+    for revision in ("0069_split_order_installment_status.py", "0071_rename_account_waiting_status.py"):
+        source = (BACKEND_DIR / "alembic" / "versions" / revision).read_text(encoding="utf-8")
+        assert "get_check_constraints" in source
+
+
 def test_order_cancel_amount_is_incoming_finance_flow(migration_env):
     """取消交易的冲销金额应记录为退款入账，而非原始支出。"""
     env, db_file = migration_env

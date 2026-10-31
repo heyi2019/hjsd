@@ -17,8 +17,6 @@ from app.finance.attributes import (
         ("TH", "BUY", AccountingAttribute.TH_DIRECT_COST.value),
         ("TH", "SELL", AccountingAttribute.TH_REVENUE.value),
         ("DG", "SELL", AccountingAttribute.SERVICE_REVENUE.value),
-        ("DFQ", "BUY", AccountingAttribute.DFQ_PRINCIPAL.value),
-        ("DFQ", "PAYMENT", AccountingAttribute.DFQ_PRINCIPAL.value),
         ("HS", "CANCEL", AccountingAttribute.REVERSAL.value),
     ],
 )

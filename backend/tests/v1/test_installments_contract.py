@@ -1,6 +1,6 @@
-"""installments 分期合约契约测试（ACC-01 / HS-01-06 / DFQ-01）。
+"""installments 分期合约契约测试（ACC-01 / HS-01-06）。
 
-与 test_m2.py / test_bughunt.py 的分工：既有文件已覆盖 DFQ 代分期全流程、
+与 test_m2.py / test_bughunt.py 的分工：既有文件已覆盖 HS/TH/DG 分期主路径、
 HS 分期出售不新增 BUY、超收校验、未结清不可交付、逾期标记主路径；
 本文件补建单校验分支（类型/账号/重复/期数/交付方式）、查询与过滤、
 收款守卫（DELIVERED 冲突/期次不存在/自动选期/收满防御）、交付守卫
@@ -40,14 +40,12 @@ from app.reporting import service as reporting_service
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
 
-
 def test_installment_action_routes_use_declared_response_types():
     assert get_type_hints(installments_router.pay_installment)["return"] == schemas.PaymentResult
     assert get_type_hints(installments_router.cancel_installment)["return"] == schemas.InstallmentCancelResult
     assert get_type_hints(installments_router.mark_overdue)["return"] == schemas.MarkOverdueOut
     assert get_type_hints(installments_router.recover_installment_account)["return"] == schemas.DispositionOut
     assert get_type_hints(installments_router.resale_installment_account)["return"] == schemas.DispositionOut
-
 
 def _account(seeded_db, game_account: str):
     from app.stocks import service as stocks_service
@@ -61,13 +59,11 @@ def _account(seeded_db, game_account: str):
         actor="pytest",
     )
 
-
-def _order(seeded_db, *, order_type="DFQ", account_id=None, owner_id=None, trade_date=TODAY):
+def _order(seeded_db, *, order_type="DG", account_id=None, owner_id=None, trade_date=TODAY):
     return orders_service.create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
     )
-
 
 def _buy(seeded_db, order_id: int, amount="800"):
     orders_service.post_event(
@@ -75,12 +71,11 @@ def _buy(seeded_db, order_id: int, amount="800"):
         occurred_on=TODAY, actor="pytest",
     )
 
-
 def _contract(
     seeded_db,
     order_id: int,
     *,
-    contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+    contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
     principal=None,
     down_payment="100",
     periods=2,
@@ -102,7 +97,6 @@ def _contract(
         actor="pytest",
         **kwargs,
     )
-
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
@@ -179,9 +173,21 @@ class TestCreateInstallmentValidation:
         assert contract.status == InstallmentStatus.SETTLED.value
 
     def test_installment_refund_only_after_delivery(self, seeded_db):
+        """REFUND 走 PRINCIPAL 资金池路由，DG 未配置该路由，故用 HS + STOCK_SALE。"""
         from app.orders import service as order_service
-        order = _order(seeded_db)
-        contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="100", principal="100")
+        account = _account(seeded_db, "refund-after-delivery")
+        purchase = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, purchase.id)
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        contract = _contract(
+            seeded_db,
+            order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            down_payment="0",
+            periods=1,
+            per_period="100",
+            principal="100",
+        )
         installment_service.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest")
         with pytest.raises(Validation, match="交付前"):
             order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=TODAY, actor="pytest", reason="退款")
@@ -313,7 +319,7 @@ class TestCreateInstallmentValidation:
             Installment(
                 inst_no="INS-INVALID-SCHEDULE-TOTAL",
                 order_id=order.id,
-                contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+                contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
                 principal=Decimal("700"),
                 down_payment=Decimal("100"),
                 service_fee=Decimal("0"),
@@ -409,11 +415,6 @@ class TestCreateInstallmentValidation:
 
         assert contract.order_id == sale_order.id
 
-    def test_advance_purchase_does_not_require_account(self, seeded_db):
-        # DFQ 是独立分销代分期，不关联库存账号。
-        order = _order(seeded_db, order_type="DFQ", account_id=None)
-        _contract(seeded_db, order.id)
-        assert order.account_id is None
 
     def test_duplicate_contract_conflicts(self, seeded_db):
         order = _order(seeded_db)
@@ -464,7 +465,6 @@ class TestCreateInstallmentValidation:
 
         assert exc.value.code == ErrorCode.ORDER_STATUS_CONFLICT
 
-
 # ------------------------------------------------------------------ 查询与过滤
 class TestGetAndListInstallments:
     def test_get_installment_notfound(self, seeded_db):
@@ -485,7 +485,6 @@ class TestGetAndListInstallments:
         by_order = installment_service.list_installments(seeded_db, order_id=order_b.id)
         assert [c.id for c in by_order] == [contract_b.id]
         assert contract_a.id not in [c.id for c in by_order]
-
 
 def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db):
     account = _account(seeded_db, "cancel-stock-installment")
@@ -535,51 +534,6 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
     assert cancel.amount == Decimal("100.00")
     assert seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == cancel.id)).direction == Direction.OUT.value
 
-
-def test_cancel_dfq_refunds_customer_without_reversing_historical_buy(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
-    contract = _contract(
-        seeded_db,
-        order.id,
-        contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
-        principal="500",
-        down_payment="100",
-        periods=1,
-        per_period="400",
-    )
-    installment_service.pay(
-        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
-    )
-    advance, _flow = orders_service.post_event(
-        seeded_db,
-        order.id,
-        event_type="BUY",
-        amount=Decimal("400"),
-        occurred_on=TODAY,
-        actor="pytest",
-    )
-
-    result = installment_service.cancel_installment(
-        seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消代分期"
-    )
-
-    seeded_db.refresh(contract)
-    seeded_db.refresh(order)
-    reversals = seeded_db.scalars(
-        select(OrderEvent).where(
-            OrderEvent.order_id == order.id,
-            OrderEvent.event_type == "CANCEL",
-        ).order_by(OrderEvent.id)
-    ).all()
-    assert result["refund_amount"] == Decimal("100.00")
-    assert result["reversed_amount"] == Decimal("0.00")
-    assert contract.status == InstallmentStatus.CANCELLED.value
-    assert order.status == "CANCELLED"
-    assert len(reversals) == 1
-    assert reversals[0].offset_event_id != advance.id
-    assert reversals[0].amount == Decimal("100.00")
-
-
 @pytest.mark.parametrize(
     ("order_type", "contract_type", "business_mode", "inventory_type", "expected_status"),
     [
@@ -616,7 +570,6 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
 
     seeded_db.refresh(account)
     assert account.status == expected_status
-
 
 def test_installment_payment_cannot_be_cancelled_through_generic_event_endpoint(seeded_db):
     order = _order(seeded_db)
@@ -656,7 +609,6 @@ def test_installment_scope_follows_order_owner(seeded_db):
     assert [item.id for item in visible] == [own_contract.id]
     with pytest.raises(NotFound):
         installment_service.get_installment(seeded_db, other_contract.id, scoped_user)
-
 
 # ------------------------------------------------------------------ 收款守卫
 class TestPayGuards:
@@ -747,7 +699,7 @@ class TestPayGuards:
                 actor="pytest",
             )
 
-    def _settled_dfq(self, seeded_db, tag: str) -> tuple[Order, Installment]:
+    def _settled_dg(self, seeded_db, tag: str) -> tuple[Order, Installment]:
         order = _order(seeded_db)
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
@@ -763,7 +715,7 @@ class TestPayGuards:
         return order, contract
 
     def test_pay_on_delivered_contract_conflicts(self, seeded_db):
-        order, contract = self._settled_dfq(seeded_db, "paid-delivered")
+        order, contract = self._settled_dg(seeded_db, "paid-delivered")
         installment_service.deliver(
             seeded_db, contract.id, delivery_mode=DeliveryMode.PLATFORM_OPERATOR.value,
             delivered_on=TODAY, note="平台操作换绑凭证", actor="pytest",
@@ -807,11 +759,10 @@ class TestPayGuards:
     def test_pick_schedule_all_paid_is_defensive(self, seeded_db):
         # 收满后 remaining_total=0，pay() 在 _pick_schedule 之前即被"超收"拦下；
         # 直调私有函数覆盖"所有期次已收满"防御分支
-        _, contract = self._settled_dfq(seeded_db, "allpaid")
+        _, contract = self._settled_dg(seeded_db, "allpaid")
         with pytest.raises(Validation) as exc:
             installment_service._pick_schedule(seeded_db, contract, None, TODAY)
         assert "所有期次已收满" in str(exc.value)
-
 
 # ------------------------------------------------------------------ 交付守卫
 class TestDeliverGuards:
@@ -860,7 +811,6 @@ class TestDeliverGuards:
                 delivered_on=TODAY, note="", actor="pytest",
             )
         assert "换绑凭证" in str(exc.value)
-
 
 # ------------------------------------------------------------------ 逾期升级
 class TestMarkOverdue:
@@ -1160,7 +1110,6 @@ class TestMarkOverdue:
         assert audit.before_json["due_on"] == original_due_on.isoformat()
         assert audit.after_json["due_on"] == "2026-12-31"
 
-
 # ------------------------------------------------------------------ 路由层
 class TestInstallmentsApi:
     def test_scoped_user_cannot_read_or_pay_other_order_contract(
@@ -1440,64 +1389,6 @@ class TestInstallmentsApi:
         assert account.status == "WAITING"
         assert contract.status == InstallmentStatus.CLOSED.value
 
-    def test_dfq_overdue_recovery_materializes_account_and_auto_links_resale(self, seeded_db):
-        order = orders_service.create_order(
-            seeded_db,
-            order_type="DFQ",
-            trade_date=TODAY,
-            actor="pytest",
-            account_snapshot={
-                "game_account": "dfq-recovery-account",
-                "game_type": "王者荣耀",
-                "game_password": "secret",
-            },
-        )
-        contract = _contract(
-            seeded_db,
-            order.id,
-            principal="1000",
-            down_payment="100",
-            periods=1,
-            per_period="900",
-            first_due_on=PAST,
-        )
-        _buy(seeded_db, order.id, amount="800")
-
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
-        installment_service.recover_account(
-            seeded_db,
-            contract.id,
-            occurred_on=TODAY,
-            actor="recovery-operator",
-            note="代分期逾期回收",
-        )
-
-        seeded_db.refresh(order)
-        assert order.account_id is not None
-        account = seeded_db.get(Account, order.account_id)
-        assert account is not None
-        assert account.status == "WAITING"
-        assert account.inventory_type == "RECOVERY"
-        assert account.cost_amount == Decimal("800.00")
-
-        sale_order = _order(seeded_db, order_type="HS", account_id=account.id)
-        orders_service.post_event(
-            seeded_db,
-            sale_order.id,
-            event_type="SELL",
-            amount=Decimal("1200"),
-            occurred_on=TODAY,
-            actor="resale-operator",
-        )
-        resale = seeded_db.scalar(
-            select(InstallmentDisposition).where(
-                InstallmentDisposition.installment_id == contract.id,
-                InstallmentDisposition.action == "RESELL",
-            )
-        )
-        assert resale is not None
-        assert resale.related_order_id == sale_order.id
-
     def test_recovery_closes_installment_and_sale_still_rolls_into_total_profit(
         self, seeded_db
     ):
@@ -1652,9 +1543,8 @@ class TestInstallmentsApi:
         assert resale is not None
         assert resale.related_order_id == resale_order.id
 
-
 def test_final_period_absorbs_rounding_difference(seeded_db):
-    order = _order(seeded_db, order_type="DFQ")
+    order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id, principal="1000", down_payment="0", periods=3, per_period="333.34", adjust_final_period=True)
     schedules = seeded_db.scalars(select(InstallmentSchedule).where(InstallmentSchedule.installment_id == contract.id).order_by(InstallmentSchedule.period_no)).all()
     assert [item.due_amount for item in schedules] == [Decimal("0"), Decimal("333.34"), Decimal("333.34"), Decimal("333.32")]
@@ -1663,7 +1553,6 @@ def test_final_period_absorbs_rounding_difference(seeded_db):
         installment_service.pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
     assert contract.status == InstallmentStatus.SETTLED.value
     assert contract.paid_amount == Decimal("1000.00")
-
 
 def test_cancel_endpoint_cancels_installment(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "cancel-endpoint-account")
@@ -1681,7 +1570,6 @@ def test_cancel_endpoint_cancels_installment(seeded_client, seeded_db, headers):
         headers=headers,
     )
     assert response.status_code == 200, response.text
-
 
 def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "list-dispo-account")
@@ -1707,7 +1595,6 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
     )
     assert response.status_code == 200, response.text
     assert any(item["action"] == "RECOVER" for item in response.json())
-
 
 def test_resale_endpoint_records_sale(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "resale-endpoint-account")

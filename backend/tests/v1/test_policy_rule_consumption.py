@@ -128,17 +128,18 @@ def test_explicit_rebate_base_wins_over_rule(seeded_db):
 
 
 # ------------------------------------------------------------ 分期服务费率
-def _dfq_order(seeded_db, *, game_account: str) -> int:
+def _dg_order(seeded_db, *, game_account: str) -> int:
+    """DG 订单要求账号为 DISTRIBUTION/CONSIGNMENT。"""
     account = account_service.create_account(
         seeded_db,
         game_account=game_account,
-        business_mode="SELF",
-        inventory_type="RECOVERY",
+        business_mode="DISTRIBUTION",
+        inventory_type="CONSIGNMENT",
         actor="pytest",
     )
     order = order_service.create_order(
         seeded_db,
-        order_type="DFQ",
+        order_type="DG",
         trade_date=D,
         actor="pytest",
         account_id=account.id,
@@ -150,7 +151,7 @@ def _sign(seeded_db, order_id: int, **kwargs):
     return installment_service.create_installment(
         seeded_db,
         order_id=order_id,
-        contract_type="ADVANCE_PURCHASE",
+        contract_type="CONSIGNMENT_SALE",
         principal=Decimal("700"),
         down_payment=Decimal("100"),
         periods=2,
@@ -163,7 +164,7 @@ def _sign(seeded_db, order_id: int, **kwargs):
 
 def test_installment_service_fee_derived_from_rule(seeded_db):
     _publish(seeded_db, "INSTALLMENT", {"service_fee_rate": "3", "base": "PRINCIPAL", "periods": "2"})
-    contract = _sign(seeded_db, _dfq_order(seeded_db, game_account="rule-fee-derived"))
+    contract = _sign(seeded_db, _dg_order(seeded_db, game_account="rule-fee-derived"))
     # 700 × 3% = 21.00
     assert contract.service_fee == Decimal("21.00")
 
@@ -172,17 +173,17 @@ def test_explicit_zero_service_fee_is_respected(seeded_db):
     """显式 0 = 不收服务费，不能被规则覆盖（区分「省略」与「填 0」）。"""
     _publish(seeded_db, "INSTALLMENT", {"service_fee_rate": "3", "base": "PRINCIPAL"})
     contract = _sign(
-        seeded_db, _dfq_order(seeded_db, game_account="rule-fee-zero"), service_fee=Decimal("0")
+        seeded_db, _dg_order(seeded_db, game_account="rule-fee-zero"), service_fee=Decimal("0")
     )
     assert contract.service_fee == Decimal("0.00")
 
 
 def test_installment_service_fee_defaults_to_zero_without_rule(seeded_db):
-    contract = _sign(seeded_db, _dfq_order(seeded_db, game_account="rule-fee-none"))
+    contract = _sign(seeded_db, _dg_order(seeded_db, game_account="rule-fee-none"))
     assert contract.service_fee == Decimal("0.00")
 
 
 def test_installment_rule_rejects_unsupported_base(seeded_db):
     _publish(seeded_db, "INSTALLMENT", {"service_fee_rate": "3", "base": "PROFIT"})
     with pytest.raises(Validation):
-        _sign(seeded_db, _dfq_order(seeded_db, game_account="rule-fee-bad-base"))
+        _sign(seeded_db, _dg_order(seeded_db, game_account="rule-fee-bad-base"))

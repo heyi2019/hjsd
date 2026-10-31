@@ -337,10 +337,10 @@ def test_update_order_records_date_change(seeded_db):
     assert updated.trade_date == TODAY2
 
 
-def test_update_order_rejects_account_snapshot_on_non_dfq(seeded_db):
+def test_update_order_rejects_account_snapshot(seeded_db):
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    with pytest.raises(Validation, match="只有 DFQ 代分期订单可以填写订单账号快照"):
+    with pytest.raises(Validation, match="订单账号快照当前不支持"):
         service.update_order(
             seeded_db, order.id, actor="pytest",
             account_snapshot={"game_account": "x"}, user=None,

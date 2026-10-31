@@ -30,14 +30,12 @@ def test_business_sequences_are_independent(db):
         (SequenceKey.ORDER_HS, "HS"),
         (SequenceKey.ORDER_TH, "TH"),
         (SequenceKey.ORDER_DG, "DG"),
-        (SequenceKey.ORDER_DFQ, "DFQ"),
     ):
         ensure_sequence(db, key, prefix, 4)
     db.commit()
     assert allocate_number(db, SequenceKey.ORDER_HS) == "HS0001"
     assert allocate_number(db, SequenceKey.ORDER_TH) == "TH0001"
     assert allocate_number(db, SequenceKey.ORDER_DG) == "DG0001"
-    assert allocate_number(db, SequenceKey.ORDER_DFQ) == "DFQ0001"
 
 
 def test_number_is_not_reused_after_rollback(db):

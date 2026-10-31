@@ -33,7 +33,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
     )
     order = orders_service.create_order(
         seeded_db,
-        order_type="DFQ",
+        order_type="HS",
         trade_date=date(2026, 10, 17),
         owner_id=9,
         actor="pytest",

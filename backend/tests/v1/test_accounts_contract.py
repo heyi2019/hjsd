@@ -25,7 +25,6 @@ from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
 
-
 def _account(seeded_db, game_account: str, **kwargs):
     inventory_type = kwargs.get("inventory_type", "RECOVERY")
     kwargs.setdefault(
@@ -37,12 +36,10 @@ def _account(seeded_db, game_account: str, **kwargs):
         seeded_db, game_account=game_account, platform="王者", actor="pytest", **kwargs
     )
 
-
 def _invest_pool(seeded_db) -> Pool:
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None
     return pool
-
 
 def _buy(seeded_db, account, amount="500"):
     order = orders_service.create_order(
@@ -54,7 +51,6 @@ def _buy(seeded_db, account, amount="500"):
         occurred_on=TODAY, actor="pytest",
     )
     return order
-
 
 def test_account_list_supports_limit_and_offset(seeded_client, seeded_db):
     _account(seeded_db, "page-account-1")
@@ -72,7 +68,6 @@ def test_account_list_supports_limit_and_offset(seeded_client, seeded_db):
     assert response.json()["offset"] == 1
     assert len(response.json()["items"]) == 1
     assert response.json()["items"][0]["game_account"] == "page-account-2"
-
 
 class TestCreateAccountGuards:
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
@@ -298,7 +293,6 @@ class TestCreateAccountGuards:
         account = _account(seeded_db, "consignment-acc", inventory_type="CONSIGNMENT")
         assert account.status == AccountStatus.WAITING.value
 
-
 class TestAccountQueries:
     def test_get_account_notfound(self, seeded_db):
         with pytest.raises(NotFound):
@@ -357,7 +351,6 @@ class TestAccountQueries:
         assert pickup in service.list_accounts(seeded_db)
         assert pickup.id not in {row["account_id"] for row in service.inventory(seeded_db)}
         assert service.total_inventory_cost(seeded_db) == Decimal("0.00")
-
 
 class TestAccountsApi:
     def test_inventory_endpoint_publishes_typed_response_contract(self, app):
@@ -808,17 +801,3 @@ class TestAccountsApi:
             "collected_at": rebate.created_at.isoformat(),
         }]
 
-    def test_execution_detail_ignores_independent_dfq_order(
-        self, seeded_client, seeded_db, headers
-    ):
-        account = _account(seeded_db, "source-priority-acc")
-        source_order = _buy(seeded_db, account, amount="300")
-        orders_service.create_order(
-            seeded_db, order_type="DFQ", trade_date=TODAY, actor="pytest"
-        )
-
-        response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
-        )
-
-        assert response.json()["account"]["source_order_no"] == source_order.order_no

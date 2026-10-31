@@ -18,7 +18,6 @@ from app.parties import service as party_service
 
 D = date(2026, 10, 4)
 
-
 def _order(seeded_db, order_type: str = "HS", **kw):
     if order_type == "HS" and kw.get("account_id") is None:
         account = account_service.create_account(
@@ -32,7 +31,6 @@ def _order(seeded_db, order_type: str = "HS", **kw):
     return order_service.create_order(
         seeded_db, order_type=order_type, trade_date=D, actor="hunt", **kw
     )
-
 
 # ------------------------------------------------------------------ 金额与精度
 class TestMoneyEdge:
@@ -61,7 +59,6 @@ class TestMoneyEdge:
             actor="hunt",
         )
         assert str(event.amount) == "0.30"
-
 
 # ------------------------------------------------------------------ 订单状态机
 class TestOrderStateMachine:
@@ -135,7 +132,6 @@ class TestOrderStateMachine:
                 actor="hunt",
             )
 
-
 # ------------------------------------------------------------------ 提号售出口径
 class TestPickupSale:
     """提号账号售出：售出单本身不再重复 BUY，采购事实按账号追溯（与 HS 同口径）。
@@ -184,7 +180,6 @@ class TestPickupSale:
                 occurred_on=D, actor="hunt", pool_id=1,
             )
 
-
 # ------------------------------------------------------------------ 分期
 class TestInstallment:
     def _contract(self, seeded_db, contract_type: str = "STOCK_SALE"):
@@ -220,35 +215,6 @@ class TestInstallment:
             actor="hunt",
         )
 
-    def test_hs_cannot_use_advance_purchase(self, seeded_db):
-        """STOCK_SALE 仅 HS、ADVANCE_PURCHASE 仅 DFQ，两者不能混用。"""
-        order = _order(seeded_db, order_type="HS")
-        with pytest.raises(Exception):
-            installment_service.create_installment(
-                seeded_db,
-                order_id=order.id,
-                contract_type="ADVANCE_PURCHASE",
-                principal="1200.00",
-                down_payment="0",
-                periods=3,
-                first_due_on=D,
-                actor="hunt",
-            )
-
-    def test_dfq_cannot_use_stock_sale(self, seeded_db):
-        order = _order(seeded_db, order_type="DFQ")
-        with pytest.raises(Exception):
-            installment_service.create_installment(
-                seeded_db,
-                order_id=order.id,
-                contract_type="STOCK_SALE",
-                principal="1200.00",
-                down_payment="0",
-                periods=3,
-                first_due_on=D,
-                actor="hunt",
-            )
-
     def test_overpayment_is_rejected(self, seeded_db):
         contract = self._contract(seeded_db)
         with pytest.raises(Exception):
@@ -262,7 +228,6 @@ class TestInstallment:
             installment_service.pay(
                 seeded_db, contract.id, amount="0", paid_on=D, actor="hunt"
             )
-
 
 # ------------------------------------------------------------------ 押金 / 返点
 class TestDepositAndRebate:
@@ -280,7 +245,6 @@ class TestDepositAndRebate:
             finance_service.create_deposit(
                 seeded_db, pool_id=1, amount="-100", paid_on=D, actor="hunt"
             )
-
 
 # ------------------------------------------------------------------ 主数据
 class TestMasterData:

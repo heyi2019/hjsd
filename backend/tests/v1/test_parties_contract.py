@@ -231,11 +231,11 @@ class TestListAndGetCustomers:
             actor="pytest",
             request_id=request_id,
         )
-        dfq = orders_service.create_order(
+        dg_order = orders_service.create_order(
             seeded_db,
-            order_type="DFQ",
+            order_type="DG",
             trade_date=date(2026, 10, 10),
-            customer_roles=[(customer.id, "INSTALLMENT_CUSTOMER")],
+            customer_roles=[(customer.id, "CONSIGNOR")],
             actor="pytest",
         )
         th = orders_service.create_order(
@@ -247,8 +247,8 @@ class TestListAndGetCustomers:
         )
         installment = installment_service.create_installment(
             seeded_db,
-            order_id=dfq.id,
-            contract_type="ADVANCE_PURCHASE",
+            order_id=dg_order.id,
+            contract_type="CONSIGNMENT_SALE",
             principal=500,
             down_payment=100,
             periods=1,
@@ -274,7 +274,7 @@ class TestListAndGetCustomers:
         assert detail["overview"]["installment_receivable_total"] == 500
         assert detail["overview"]["overdue_period_count"] == 1
         assert {item["order_no"] for item in detail["business"]} == {
-            dfq.order_no, th.order_no,
+            dg_order.order_no, th.order_no,
         }
         assert detail["business"][0]["roles"]
         assert detail["installments"][0]["inst_no"] == installment.inst_no
@@ -674,15 +674,15 @@ class TestPartiesApi:
         customer = _customer(seeded_db, "详情接口客户", owner_id=9)
         order = orders_service.create_order(
             seeded_db,
-            order_type="DFQ",
+            order_type="DG",
             trade_date=date(2026, 10, 12),
-            customer_roles=[(customer.id, "INSTALLMENT_CUSTOMER")],
+            customer_roles=[(customer.id, "CONSIGNOR")],
             actor="pytest",
         )
         installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type="ADVANCE_PURCHASE",
+            contract_type="CONSIGNMENT_SALE",
             principal=300,
             down_payment=100,
             periods=1,

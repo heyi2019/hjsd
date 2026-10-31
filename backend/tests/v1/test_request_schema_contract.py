@@ -73,7 +73,7 @@ from app.parties.schemas import (
         (ScheduleCreate, {"period_no": 1, "due_on": date(2026, 10, 1)}),
         (
             InstallmentCreate,
-            {"order_id": 1, "contract_type": "ADVANCE_PURCHASE", "periods": 1, "first_due_on": date(2026, 10, 1)},
+            {"order_id": 1, "contract_type": "STOCK_SALE", "periods": 1, "first_due_on": date(2026, 10, 1)},
         ),
         (PaymentIn, {"amount": "1.00", "paid_on": date(2026, 10, 1)}),
         (EarlySettlementIn, {"paid_on": date(2026, 10, 1)}),

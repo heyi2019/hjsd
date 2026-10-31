@@ -4,7 +4,7 @@
 - 新建账号自动获得 stock_no，格式 KU_ + 5 位数字；
 - 连续创建按序递增（KU_00001 → KU_00002 → KU_00003）；
 - stock_no 唯一、可经账号列表 API 回读；
-- 不同业务类型（回收/提号/代挂/代分期衍生）账号均生成 stock_no；
+- 不同业务类型（回收/提号/代挂）账号均生成 stock_no；
 - STOCK_NO 序列 current_value 随创建递增。
 """
 from __future__ import annotations
@@ -61,14 +61,6 @@ class TestStockNoGeneration:
             acc = _make(seeded_db, f"acc-bt-{inv}", inventory_type=inv)
             assert KU_PATTERN.match(acc.stock_no), (inv, acc.stock_no)
 
-    def test_dfq_advance_purchase_account_gets_stock_no(self, seeded_db):
-        acc = _make(
-            seeded_db,
-            "acc-dfq-1",
-            inventory_type="RECOVERY",
-            value_added_service="ADVANCE_PURCHASE",
-        )
-        assert KU_PATTERN.match(acc.stock_no)
 
     def test_stock_no_visible_in_accounts_list_api(self, seeded_client, headers, seeded_db):
         _make(seeded_db, "api-acc-1")

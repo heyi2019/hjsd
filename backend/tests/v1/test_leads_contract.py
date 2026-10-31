@@ -45,7 +45,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert updated.json()["budget"] == "2500.00"
 
     order = orders_service.create_order(
-        seeded_db, order_type="DFQ", trade_date=date(2026, 10, 17), actor="pytest"
+        seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
     )
     converted = seeded_client.post(
         f"/api/v1/leads/{lead['id']}/convert",

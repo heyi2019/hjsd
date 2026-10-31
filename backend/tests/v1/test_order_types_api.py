@@ -15,7 +15,6 @@ def test_fixed_business_classification_is_not_inferred_from_capital_type():
     }
     assert classification_for_order_type("TH")["business_mode"] == "DISTRIBUTION"
     assert classification_for_order_type("DG")["business_type"] == "CONSIGNMENT"
-    assert classification_for_order_type("DFQ")["value_added_service"] == "ADVANCE_PURCHASE"
 
 
 def test_create_business_then_route_then_activate(client, headers, seeded_db):
@@ -123,9 +122,8 @@ def test_duplicate_business_code_returns_422(client, seeded_db, headers):
 def test_seeded_business_visible(client, seeded_db, headers):
     body = client.get(ORDER_TYPES, headers=headers).json()
     codes = {item["code"] for item in body}
-    assert {"HS", "TH", "DG", "DFQ"} <= codes
+    assert {"HS", "TH", "DG"} <= codes
     by_code = {item["code"]: item for item in body}
     assert by_code["HS"]["business_mode"] == "SELF"
     assert by_code["TH"]["business_mode"] == "DISTRIBUTION"
     assert by_code["DG"]["business_type"] == "CONSIGNMENT"
-    assert by_code["DFQ"]["value_added_service"] == "ADVANCE_PURCHASE"

@@ -34,7 +34,6 @@ from app.installments import service as installments_service
 from app.quality import issues
 from app.quality import service as quality_service
 
-
 # ------------------------------------------------------------------- helpers
 def _account(seeded_db) -> Account:
     acc = Account(
@@ -50,7 +49,6 @@ def _account(seeded_db) -> Account:
     seeded_db.commit()
     return acc
 
-
 def _pool(seeded_db) -> Pool:
     pool = Pool(
         code="QPOOL2",
@@ -64,7 +62,6 @@ def _pool(seeded_db) -> Pool:
     seeded_db.add(pool)
     seeded_db.commit()
     return pool
-
 
 def _order(
     seeded_db,
@@ -92,7 +89,6 @@ def _order(
     seeded_db.commit()
     return order
 
-
 def _scoped_user(pool_ids):
     return CurrentUser.build(
         id=1,
@@ -102,12 +98,11 @@ def _scoped_user(pool_ids):
         owner_scope="SELF",
     )
 
-
-def _dfq_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
+def _dg_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
     order = _order(
         seeded_db,
         order_no=order_no,
-        order_type="DFQ",
+        order_type="DG",
         capital_type="ZERO",
         owner_id=owner_id,
         account_id=None,
@@ -115,7 +110,7 @@ def _dfq_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
     inst = installments_service.create_installment(
         seeded_db,
         order_id=order.id,
-        contract_type="ADVANCE_PURCHASE",
+        contract_type="CONSIGNMENT_SALE",
         principal=Decimal("100"),
         down_payment=Decimal("0"),
         periods=1,
@@ -135,17 +130,14 @@ def _dfq_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
     seeded_db.commit()
     return order, inst
 
-
 # ------------------------------------------------------------------- issues.py
 def test_get_issue_not_found(seeded_db):
     with pytest.raises(NotFound, match="质量工单不存在"):
         issues.get_issue(seeded_db, 999999)
 
-
 def test_list_issues_invalid_status(seeded_db):
     with pytest.raises(Validation, match="质量工单状态必须为"):
         issues.list_issues(seeded_db, status="NOPE")
-
 
 def test_create_issue_invalid_severity(seeded_db):
     with pytest.raises(Validation, match="质量工单严重级别无效"):
@@ -160,7 +152,6 @@ def test_create_issue_invalid_severity(seeded_db):
             actor="pytest",
         )
 
-
 def _open_issue(seeded_db, **kw):
     kw.setdefault("code", "GUARD")
     kw.setdefault("severity", "HIGH")
@@ -170,7 +161,6 @@ def _open_issue(seeded_db, **kw):
     kw.setdefault("message", "m")
     kw.setdefault("actor", "pytest")
     return issues.create_issue(seeded_db, **kw)
-
 
 def test_update_closed_issue_conflict(seeded_db):
     issue = _open_issue(seeded_db)
@@ -183,7 +173,6 @@ def test_update_closed_issue_conflict(seeded_db):
             actor="pytest",
         )
 
-
 def test_update_issue_to_closed_rejected(seeded_db):
     issue = _open_issue(seeded_db)
     with pytest.raises(Validation, match="关闭质量工单必须使用 close 接口"):
@@ -194,19 +183,16 @@ def test_update_issue_to_closed_rejected(seeded_db):
             actor="pytest",
         )
 
-
 def test_close_already_closed_conflict(seeded_db):
     issue = _open_issue(seeded_db)
     issues.close_issue(seeded_db, issue.id, resolution="done", evidence=None, actor="pytest")
     with pytest.raises(Conflict, match="质量工单已关闭"):
         issues.close_issue(seeded_db, issue.id, resolution="again", evidence=None, actor="pytest")
 
-
 def test_close_without_resolution(seeded_db):
     issue = _open_issue(seeded_db)
     with pytest.raises(Validation, match="关闭质量工单必须填写解决方式"):
         issues.close_issue(seeded_db, issue.id, resolution="   ", evidence=None, actor="pytest")
-
 
 def test_batch_close_invalid_selection(seeded_db):
     with pytest.raises(Validation, match="批量关闭工单必须选择 1-50 个且不能重复"):
@@ -217,7 +203,6 @@ def test_batch_close_invalid_selection(seeded_db):
             seeded_db, [issue.id, issue.id], resolution="x", evidence=None, actor="pytest"
         )
 
-
 def test_batch_close_without_resolution(seeded_db):
     issue = _open_issue(seeded_db, entity_id="E-RES")
     with pytest.raises(Validation, match="关闭质量工单必须填写解决方式"):
@@ -225,13 +210,11 @@ def test_batch_close_without_resolution(seeded_db):
             seeded_db, [issue.id], resolution="  ", evidence=None, actor="pytest"
         )
 
-
 def test_batch_close_missing_ids(seeded_db):
     with pytest.raises(NotFound, match="质量工单不存在"):
         issues.batch_close_issues(
             seeded_db, [999999], resolution="x", evidence=None, actor="pytest"
         )
-
 
 # ------------------------------------------------------------------- service.py
 def test_scan_skips_unposted_event(seeded_db):
@@ -251,7 +234,6 @@ def test_scan_skips_unposted_event(seeded_db):
     seeded_db.commit()
     result = quality_service.scan(seeded_db, user=None)
     assert isinstance(result, list)
-
 
 def test_scan_cashflow_source_mismatch(seeded_db):
     pool2 = _pool(seeded_db)
@@ -289,45 +271,25 @@ def test_scan_cashflow_source_mismatch(seeded_db):
     codes = {item["code"] for item in quality_service.scan(seeded_db, user=None)}
     assert "CASHFLOW_SOURCE_MISMATCH" in codes
 
-
-def test_scan_dfq_account_link_invalid_and_missing_installment(seeded_db):
-    acc = _account(seeded_db)
-    _order(
-        seeded_db,
-        order_no="DFQ-ACCT-1",
-        order_type="DFQ",
-        capital_type="ZERO",
-        owner_id=1,
-        account_id=acc.id,
-    )
-    codes = {item["code"] for item in quality_service.scan(seeded_db, user=None)}
-    assert "ORDER_ACCOUNT_LINK_INVALID" in codes
-    assert "INSTALLMENT_MISSING" in codes
-
-
 def test_scan_installment_overdue_visible(seeded_db):
-    _dfq_with_overdue_installment(seeded_db, order_no="DFQ-OVD-1", owner_id=1)
+    _dg_with_overdue_installment(seeded_db, order_no="DG-OVD-1", owner_id=1)
     codes = {item["code"] for item in quality_service.scan(seeded_db, user=None)}
     assert "INSTALLMENT_OVERDUE" in codes
 
-
 def test_scan_installment_scope_exclusion(seeded_db):
     # owner_id=2 对非管理员(SELF,id=1)不可见 -> 分期被跳过，不产生逾期工单
-    _dfq_with_overdue_installment(seeded_db, order_no="DFQ-HIDDEN-1", owner_id=2)
+    _dg_with_overdue_installment(seeded_db, order_no="DG-HIDDEN-1", owner_id=2)
     issues_found = quality_service.scan(seeded_db, user=_scoped_user([1]))
     assert not any(
         item["code"] == "INSTALLMENT_OVERDUE" for item in issues_found
     )
 
-
 def test_next_month_december():
     assert quality_service._next_month(date(2026, 12, 15)) == date(2027, 1, 1)
-
 
 def test_metric_months_invalid_range():
     with pytest.raises(Validation, match="开始日期不能晚于结束日期"):
         quality_service._metric_months(date(2026, 6, 1), date(2026, 1, 1))
-
 
 def test_metrics_scope_filters(seeded_db):
     order = _order(seeded_db, order_no="Q-METRIC-1")
@@ -378,7 +340,6 @@ def test_metrics_scope_filters(seeded_db):
     result = quality_service.metrics(seeded_db, user=_scoped_user([1]))
     assert "items" in result
 
-
 # ------------------------------------------------------- N+1 回归护栏（scan）
 def _count_selects(session, fn) -> int:
     """统计 fn() 执行期间发出的 SELECT 条数（不区分参数，只看次数）。"""
@@ -398,7 +359,6 @@ def _count_selects(session, fn) -> int:
     finally:
         event.remove(engine, "before_cursor_execute", _record)
     return len(seen)
-
 
 def test_scan_sql_count_does_not_grow_with_rows(seeded_db):
     """scan() 的 SQL 条数必须与行数无关。

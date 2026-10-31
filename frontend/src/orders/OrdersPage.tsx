@@ -653,13 +653,13 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
               trigger={["click"]}
               menu={{
                 items: [
-                  { key: "allocation", label: "分润", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
-                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "COMPLETED"].includes(order.status) },
+                  { key: "allocation", label: "分润", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
+                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
                     label: order.order_type === "DG" ? "系统下架" : "取消交易",
                     danger: true,
-                    disabled: !["ACTIVE", "COMPLETED"].includes(order.status),
+                    disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status),
                   },
                 ],
                 onClick: ({ key }) => {

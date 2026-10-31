@@ -178,9 +178,10 @@ class FieldType(StrEnum):
 
 # ---------------------------------------------------------------- 订单 / 事件
 class OrderStatus(StrEnum):
-    """订单状态机（错误码文档 §2）：创建即 ACTIVE，无草稿态（2026-10-13 移除）。"""
+    """订单生命周期：普通处理中、分期中、已完成或已取消。"""
 
     ACTIVE = "ACTIVE"
+    INSTALLMENT = "INSTALLMENT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -252,7 +253,6 @@ class AccountStatus(StrEnum):
     """账号生命周期状态（ACC-01-03）：保留出库原因与可逆动作。"""
 
     IN_STOCK = "IN_STOCK"  # 在库
-    INSTALLMENT = "INSTALLMENT"  # 分期中
     SOLD = "SOLD"  # 已售
     VOID = "VOID"  # 取消/失效
 

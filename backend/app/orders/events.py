@@ -173,7 +173,7 @@ def post_event(
         and order.status == OrderStatus.COMPLETED.value
         and order.order_type == "HS"
     )
-    if order.status != OrderStatus.ACTIVE.value and not (
+    if order.status not in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value} and not (
         can_refund_completed
         or can_cancel_completed
         or can_reopen_for_buy

@@ -254,7 +254,10 @@ def update_user(
         active_orders = session.scalars(
             select(Order).where(
                 Order.owner_id == user.id,
-                Order.status == OrderStatus.ACTIVE.value,
+                Order.status.in_([
+                    OrderStatus.ACTIVE.value,
+                    OrderStatus.INSTALLMENT.value,
+                ]),
             )
         ).all()
         has_handover = normalized_changes.get("handover_user_id") is not None

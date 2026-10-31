@@ -187,7 +187,7 @@ def cancel_installment(
     order = session.get(Order, installment.order_id)
     if order is None:
         raise NotFound("分期合约所属订单不存在", details={"order_id": installment.order_id})
-    if order.status != "ACTIVE":
+    if order.status not in {"ACTIVE", "INSTALLMENT"}:
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能取消分期",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
@@ -256,7 +256,7 @@ def cancel_installment(
         if account is None:
             raise NotFound("分期合约关联账号不存在", details={"account_id": order.account_id})
         action = (
-            "CANCEL_END"
+            "CANCEL_SELL_END"
             if installment.contract_type == InstallmentContractType.PICKUP_SALE.value
             else "CANCEL_STOCK"
         )

@@ -149,7 +149,7 @@ export interface SeedOptionSet {
 
 export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "INVENTORY_STATUS", label: "库存状态", group: "INVENTORY", editable: false, options: [
-    { value: "IN_STOCK", label: "在库" }, { value: "INSTALLMENT", label: "分期中" }, { value: "SOLD", label: "已售" }, { value: "VOID", label: "下架" },
+    { value: "IN_STOCK", label: "在库" }, { value: "OUT_OF_STOCK", label: "出库" },
   ] },
   { code: "INVENTORY_BUSINESS", label: "库存业务", group: "INVENTORY", editable: false, options: [
     { value: "SELF", label: "自营" }, { value: "DISTRIBUTION", label: "分销" },
@@ -187,7 +187,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "FIND_ACCOUNT", label: "找号" }, { value: "SELL_ACCOUNT", label: "卖号" }, { value: "SPECIFIC_SEARCH", label: "指定搜索" },
   ] },
   { code: "ORDER_STATUS", label: "订单状态", group: "ORDER", editable: false, options: [
-    { value: "ACTIVE", label: "进行中" }, { value: "COMPLETED", label: "已完成" }, { value: "CANCELLED", label: "已取消" },
+    { value: "ACTIVE", label: "进行中" }, { value: "INSTALLMENT", label: "分期中" }, { value: "COMPLETED", label: "已完成" }, { value: "CANCELLED", label: "已取消" },
   ] },
   { code: "ORDER_LINK_STATUS", label: "订单关联状态", group: "ORDER", editable: false, options: [
     { value: "LINKED", label: "已关联" }, { value: "UNLINKED", label: "未关联" }, { value: "ORPHAN", label: "孤儿单" }, { value: "UNLINKED_TRANSFER", label: "单边划转未关联" },

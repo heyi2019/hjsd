@@ -269,7 +269,7 @@ export function RebatesPanel() {
           <CfgItem name="source_order_id" label="来源订单" rules={[{ required: true }]}>
             <Select
               options={orders
-                .filter((order) => ["ACTIVE", "COMPLETED"].includes(order.status))
+                .filter((order) => ["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status))
                 .map((order) => ({ value: order.id, label: order.order_no }))}
             />
           </CfgItem>

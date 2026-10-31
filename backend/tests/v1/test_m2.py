@@ -69,7 +69,7 @@ class TestA04DfqAdvancePurchase:
         account = seeded_db.get(Account, order.account_id)
         assert account is not None
         assert contract.status == InstallmentStatus.PENDING.value
-        assert order.status == OrderStatus.ACTIVE.value
+        assert order.status == OrderStatus.INSTALLMENT.value
         assert account.inventory_status == "OUT_OF_STOCK"
         assert account.id not in {item["account_id"] for item in stocks_service.inventory(seeded_db)}
 
@@ -256,7 +256,7 @@ class TestA05HsStockSale:
         seeded_db.commit()
         contract = seeded_db.get(Installment, contract.id)
         assert contract.status == InstallmentStatus.SETTLED.value
-        assert seeded_db.get(type(account), account.id).status == AccountStatus.INSTALLMENT.value
+        assert seeded_db.get(type(account), account.id).status == AccountStatus.SOLD.value
 
         installment_service.deliver(
             seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",

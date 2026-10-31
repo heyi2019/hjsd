@@ -4,7 +4,6 @@ import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
  * ⚠️ 这些是渲染用的静态文案；筛选项的「可选项是哪些」由设置页「选项词典」配置（INVENTORY_STATUS / INVENTORY_BUSINESS / INVENTORY_TYPE）。 */
 export const STATUS_LABEL: Record<string, string> = {
   IN_STOCK: "在库",
-  INSTALLMENT: "分期中",
   SOLD: "已售",
   VOID: "下架",
 };
@@ -54,11 +53,14 @@ export function rebateTypeLabel(rebateType?: string | null, channel?: string | n
   return "其他返点";
 }
 
-export function inventoryAge(row: Pick<Account, "status" | "buy_date">, now = new Date()): {
+export function inventoryAge(
+  row: Pick<Account, "status" | "inventory_status" | "buy_date">,
+  now = new Date(),
+): {
   days: number;
   color: "green" | "orange" | "red";
 } | null {
-  if (!["IN_STOCK", "INSTALLMENT"].includes(row.status) || !row.buy_date) return null;
+  if ((row.inventory_status ?? row.status) !== "IN_STOCK" || !row.buy_date) return null;
   const buyDate = new Date(`${row.buy_date}T00:00:00`);
   if (!Number.isFinite(buyDate.getTime())) return null;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

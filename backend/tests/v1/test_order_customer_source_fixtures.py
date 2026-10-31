@@ -152,15 +152,15 @@ def test_dfq_order_lands_with_advance_purchase_account(seeded_client, seeded_db,
     assert order is not None
     assert order.order_type == "DFQ"
     assert order.order_no.startswith("DFQ")
-    assert order.status == "ACTIVE"
+    assert order.status == "INSTALLMENT"
     assert order.account_id is not None
 
     account = seeded_db.get(Account, order.account_id)
     assert account is not None
     assert account.business_mode == "DISTRIBUTION"
     assert account.value_added_service == "ADVANCE_PURCHASE"
-    # 带初始买入 + 分期合约的代分期账号进入「分期」态（仅建快照无买入时才是 IN_STOCK）。
-    assert account.status == "INSTALLMENT"
+    # 分期进度由合约维护；账号周期记录为已售，库存状态单独为出库。
+    assert account.status == "SOLD"
     # 代分期账号快照同步写入订单
     assert order.account_snapshot is not None
     assert order.account_snapshot.get("game_account") == "r9-dfq-account"

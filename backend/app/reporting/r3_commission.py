@@ -37,7 +37,15 @@ def r3_commission_reconciliation(
         _apply_order_scope(
             select(OrderProfitAllocation, Order)
             .join(Order, Order.id == OrderProfitAllocation.order_id)
-            .where(Order.status.in_([OrderStatus.COMPLETED.value, OrderStatus.ACTIVE.value])),
+            .where(
+                Order.status.in_(
+                    [
+                        OrderStatus.COMPLETED.value,
+                        OrderStatus.INSTALLMENT.value,
+                        OrderStatus.ACTIVE.value,
+                    ]
+                )
+            ),
             user,
             session,
         )

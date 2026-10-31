@@ -225,7 +225,7 @@ class TestCreateInstallmentValidation:
 
         assert contract.order_id == order.id
         seeded_db.refresh(account)
-        assert account.status == "INSTALLMENT"
+        assert account.status == "SOLD"
         assert account.updated_by == "contract-creator"
 
     def test_finance_can_collect_installment_payment_with_pool_scope(

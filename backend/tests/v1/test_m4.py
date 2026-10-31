@@ -24,7 +24,7 @@ class TestReports:
     def test_r1_excludes_th_and_zero_cost(self, seeded_db):
         data = reporting_service.r1_inventory_health(seeded_db)
         for item in data["items"]:
-            assert item["status"] in ("IN_STOCK", "INSTALLMENT")
+            assert item["status"] == "IN_STOCK"
 
     def test_r2_operating_expense_excludes_account_cost(self, seeded_db):
         """账号 COST 只能进直接成本，不能进运营费用（R2 验收口径）。"""

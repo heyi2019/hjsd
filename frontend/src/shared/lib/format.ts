@@ -22,6 +22,7 @@ export function today(): string {
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   ACTIVE: "进行中",
+  INSTALLMENT: "分期中",
   COMPLETED: "已完成",
   CANCELLED: "已取消",
 };
@@ -39,7 +40,6 @@ export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
 
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
   IN_STOCK: "在库",
-  INSTALLMENT: "分期中",
   SOLD: "已售",
   VOID: "失效",
 };

@@ -60,7 +60,11 @@ def create_rebate(
             code=ErrorCode.RESOURCE_NOT_FOUND,
             details={"source_order_id": source_order_id},
         ) from exc
-    if order.status not in (OrderStatus.ACTIVE.value, OrderStatus.COMPLETED.value):
+    if order.status not in (
+        OrderStatus.ACTIVE.value,
+        OrderStatus.INSTALLMENT.value,
+        OrderStatus.COMPLETED.value,
+    ):
         raise Validation(
             f"来源订单 {order.order_no} 状态 {order.status}，不可作为返点来源",
             code=ErrorCode.ORDER_STATUS_CONFLICT,

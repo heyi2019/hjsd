@@ -62,7 +62,7 @@ describe("today：本地日期字符串", () => {
 describe("状态枚举标签：与后端枚举一一对应", () => {
   it("订单状态覆盖后端 OrderStatus", () => {
     expect(Object.keys(ORDER_STATUS_LABEL).sort()).toEqual(
-      ["ACTIVE", "CANCELLED", "COMPLETED"].sort(),
+      ["ACTIVE", "CANCELLED", "COMPLETED", "INSTALLMENT"].sort(),
     );
   });
 
@@ -74,7 +74,7 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
 
   it("账号状态覆盖后端 AccountStatus", () => {
     expect(Object.keys(ACCOUNT_STATUS_LABEL).sort()).toEqual(
-      ["IN_STOCK", "INSTALLMENT", "SOLD", "VOID"].sort(),
+      ["IN_STOCK", "SOLD", "VOID"].sort(),
     );
   });
 

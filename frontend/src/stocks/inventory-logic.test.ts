@@ -15,6 +15,7 @@ describe("库存纯逻辑", () => {
 
   it("非在库状态不计算未售时长", () => {
     expect(inventoryAge({ status: "SOLD", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
+    expect(inventoryAge({ status: "SOLD", inventory_status: "OUT_OF_STOCK", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
   });
 
   it("返点类型优先使用业务类型", () => {

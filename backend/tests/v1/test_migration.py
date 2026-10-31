@@ -364,7 +364,7 @@ def test_order_event_portion_check_matches_domain_enum(migration_env):
 
 
 def test_accounts_status_check_drops_legacy_pending(migration_env):
-    """账号不再保留旧 PENDING/待收状态，迁移后默认直接进入在库。"""
+    """账号周期不再保留 INSTALLMENT，分期阶段由订单/分期状态承载。"""
     env, db_file = migration_env
     result = _alembic(env, "upgrade", "head")
     assert result.returncode == 0, result.stdout + result.stderr
@@ -376,7 +376,7 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
                 text("SELECT sql FROM sqlite_master WHERE type='table' AND name='stocks'")
             ).scalar_one()
             assert "'PENDING'" not in create_sql
-            expected = "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')"
+            expected = "status IN ('IN_STOCK', 'SOLD', 'VOID')"
             assert expected in create_sql
     finally:
         engine.dispose()

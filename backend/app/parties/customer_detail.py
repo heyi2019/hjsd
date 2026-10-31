@@ -50,7 +50,7 @@ def get_customer_activity_summary(
         if role_row.role not in item["order_roles"]:
             item["order_roles"].append(role_row.role)
         order_ids_by_customer[role_row.customer_id].add(order.id)
-        if order.status == "ACTIVE":
+        if order.status in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value}:
             active_order_ids_by_customer[role_row.customer_id].add(order.id)
         if order.created_at and (
             item["last_interaction_at"] is None
@@ -207,7 +207,9 @@ def get_customer_detail(
         "overview": {
             "order_count": len(orders),
             "active_order_count": sum(
-                item["status"] == OrderStatus.ACTIVE.value for item in orders
+                item["status"]
+                in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value}
+                for item in orders
             ),
             "completed_order_count": sum(
                 item["status"] == OrderStatus.COMPLETED.value for item in orders

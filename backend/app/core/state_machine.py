@@ -11,11 +11,15 @@ from app.core.errors import ErrorCode, Validation
 
 
 ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
-    "ACTIVE": {"COMPLETE": "COMPLETED", "CANCEL": "CANCELLED"},
+    "ACTIVE": {"INSTALLMENT": "INSTALLMENT", "COMPLETE": "COMPLETED", "CANCEL": "CANCELLED"},
     # 完成后的 SELL 仍可通过带 offset_event_id 的 CANCEL 冲销，
     # 以支持售出撤销并恢复库存；完整冲销后订单进入 CANCELLED。
     "COMPLETED": {
         "BUY": "ACTIVE",
+        "CANCEL": "CANCELLED",
+    },
+    "INSTALLMENT": {
+        "COMPLETE": "COMPLETED",
         "CANCEL": "CANCELLED",
     },
     "CANCELLED": {},
@@ -23,19 +27,15 @@ ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
 
 ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     # 同一账号允许再次买入，作为重新入库事件保留历史轨迹。
-    "IN_STOCK": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "INSTALLMENT", "SELL": "SOLD", "INSTALLMENT": "INSTALLMENT", "VOID": "VOID"},
-    "INSTALLMENT": {
-        "DELIVER": "SOLD",
-        "RECOVER": "IN_STOCK",
-        "CANCEL_STOCK": "IN_STOCK",
-        "CANCEL_END": "VOID",
-        "VOID": "VOID",
-    },
+    "IN_STOCK": {"BUY_STOCK": "IN_STOCK", "BUY_CREDIT": "SOLD", "SELL": "SOLD", "VOID": "VOID"},
     "SOLD": {
         "BUY_STOCK": "IN_STOCK",
-        "BUY_CREDIT": "INSTALLMENT",
+        "BUY_CREDIT": "SOLD",
+        "RECOVER": "IN_STOCK",
+        "CANCEL_STOCK": "IN_STOCK",
         "CANCEL_SELL": "IN_STOCK",
         "CANCEL_SELL_END": "VOID",
+        "VOID": "VOID",
     },
     "VOID": {},
 }

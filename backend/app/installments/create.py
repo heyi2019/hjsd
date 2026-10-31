@@ -32,6 +32,7 @@ from app.core.errors import (
 from app.core.money import to_money
 from app.core.state_machine import (
     ACCOUNT_TRANSITIONS,
+    ORDER_TRANSITIONS,
     transition,
 )
 from app.domain.enums import (
@@ -241,6 +242,15 @@ def create_installment(
         ) from exc
 
     order = orders_service.get_order(session, order_id, user)
+    existing = session.scalar(
+        select(Installment).where(Installment.order_id == order.id)
+    )
+    if existing is not None:
+        raise Conflict(
+            f"订单 {order.order_no} 已存在分期合约 {existing.inst_no}",
+            code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+            details={"inst_no": existing.inst_no},
+        )
     if order.status != "ACTIVE":
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能创建分期合约",
@@ -288,15 +298,6 @@ def create_installment(
             )
     # PICKUP_SALE → TH、CONSIGNMENT_SALE → DG 的订单类型校验已在上方表驱动分支统一处理。
 
-    existing = session.scalar(
-        select(Installment).where(Installment.order_id == order.id)
-    )
-    if existing is not None:
-        raise Conflict(
-            f"订单 {order.order_no} 已存在分期合约 {existing.inst_no}",
-            code=ErrorCode.INSTALLMENT_TYPE_INVALID,
-            details={"inst_no": existing.inst_no},
-        )
     if periods <= 0:
         raise Validation("期数必须大于 0", details={"field": "periods", "value": periods})
 
@@ -443,10 +444,15 @@ def create_installment(
     )
 
     if account is not None and account.status == AccountStatus.IN_STOCK.value:
+        # 分期状态归 installments.status；账号一旦签约即视为已售，库存归属由
+        # stock.inventory_status 独立标记为出库。
         account.status = transition(
-            ACCOUNT_TRANSITIONS, account.status, "INSTALLMENT", entity="账号"
+            ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号"
         )
         account.updated_by = actor
+    order.status = transition(
+        ORDER_TRANSITIONS, order.status, "INSTALLMENT", entity="订单"
+    )
     link_recovered_sale(
         session,
         order,

@@ -125,7 +125,7 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     ).json()) as {
       items: Array<{
         inventory_type: string;
-        status: string;
+        inventory_status: string;
         game_account: string;
         source_order_id?: number | null;
       }>;
@@ -135,7 +135,7 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     const account = accountPaged.items.find(
       (a) =>
         a.inventory_type === "CONSIGNMENT" &&
-        a.status === "IN_STOCK" &&
+        a.inventory_status === "IN_STOCK" &&
         a.game_account &&
         !a.source_order_id,
     );

@@ -7,7 +7,7 @@ test("五类业务写入并按业务规则作废测试订单", async ({ request 
   const accountsResponse = await request.get(`${apiBase}/stocks`, { headers });
   expect(accountsResponse.ok()).toBe(true);
   const accounts = (await accountsResponse.json()).items;
-  const inStock = accounts.filter((item: { status: string }) => item.status === "IN_STOCK");
+  const inStock = accounts.filter((item: { inventory_status: string }) => item.inventory_status === "IN_STOCK");
   const accountFor = (inventoryType: string) => {
     const account = inStock.find((item: { inventory_type?: string }) => item.inventory_type === inventoryType);
     expect(account, `缺少 ${inventoryType} 测试账号`).toBeTruthy();
@@ -48,8 +48,8 @@ test("自营分期出售：买入、分期收款、结清后交付", async ({ re
   expect(accountsResponse.ok()).toBe(true);
   const accounts = (await accountsResponse.json()).items;
   const account = accounts.find(
-    (item: { status: string; inventory_type?: string }) =>
-      item.status === "IN_STOCK" && item.inventory_type === "RECOVERY",
+    (item: { inventory_status: string; inventory_type?: string }) =>
+      item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
   );
   expect(account, "缺少 RECOVERY 测试账号").toBeTruthy();
 

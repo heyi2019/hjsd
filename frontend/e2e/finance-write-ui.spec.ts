@@ -152,10 +152,10 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     const accounts = (await request
       .get(`${API_BASE}/stocks`, { headers: ADMIN })
       .then((r) => r.json())) as {
-      items: Array<{ id: number; status: string; inventory_type?: string }>;
+      items: Array<{ id: number; inventory_status: string; inventory_type?: string }>;
     };
     const account = accounts.items.find(
-      (a) => a.status === "IN_STOCK" && a.inventory_type === "RECOVERY",
+      (a) => a.inventory_status === "IN_STOCK" && a.inventory_type === "RECOVERY",
     );
     expect(account, "缺少 RECOVERY 测试账号").toBeTruthy();
     const order = await request.post(`${API_BASE}/orders`, {

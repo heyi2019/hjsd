@@ -7,6 +7,7 @@ import { poolsApi, type Pool, type RouteImpactPreview } from "../../shared/api/c
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
+import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
 import { BusinessActionModal, CompactActions, BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
@@ -25,7 +26,6 @@ const PORTION_LABEL: Record<string, string> = {
 const CAPITAL_TYPE_FALLBACK = [
   { value: "STOCK", label: CAPITAL_TYPE_LABEL.STOCK },
   { value: "ZERO", label: CAPITAL_TYPE_LABEL.ZERO },
-  { value: "CREDIT", label: CAPITAL_TYPE_LABEL.CREDIT },
 ];
 const PORTION_FALLBACK = [
   { value: "PRINCIPAL", label: "本金" },
@@ -57,7 +57,7 @@ export function OrderTypesPanel() {
   const [routeForm] = Form.useForm();
   const load = useCallback(async () => {
     try {
-      setRows(await orderTypesApi.list());
+      setRows(filterRetiredOrderTypes(await orderTypesApi.list()));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));

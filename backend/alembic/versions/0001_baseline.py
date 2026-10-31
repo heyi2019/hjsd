@@ -473,6 +473,9 @@ _TABLES_IN_ORDER = ["accounts", "attachments", "audit_logs", "counterparties", "
 def _postgresql_sql(sql: str) -> str:
     """Translate the historical SQLite baseline DDL to PostgreSQL-safe DDL."""
     sql = sql.replace("DATETIME", "TIMESTAMP")
+    # PostgreSQL's json type cannot compare directly with an untyped string
+    # literal; the SQLite baseline uses the JSON null sentinel in this check.
+    sql = sql.replace("account_snapshot = 'null'", "account_snapshot = 'null'::json")
     sql = sql.replace("BOOLEAN DEFAULT (1)", "BOOLEAN DEFAULT TRUE")
     sql = sql.replace("BOOLEAN DEFAULT (0)", "BOOLEAN DEFAULT FALSE")
     sql = sql.replace("BOOLEAN DEFAULT 1", "BOOLEAN DEFAULT TRUE")

@@ -47,7 +47,6 @@ class CapitalType(StrEnum):
 
     STOCK = "STOCK"  # 回收：库存型
     ZERO = "ZERO"  # 代挂：零本金
-    CREDIT = "CREDIT"  # 历史资金分类编码
 
 
 class Portion(StrEnum):

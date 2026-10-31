@@ -43,6 +43,8 @@ const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserC
 type PageProps = {
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
   initialTab?: BusinessCenterEntryTab;
+  initialMine?: boolean;
+  initialReportTab?: "commission" | "my-earnings";
   /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
   active?: boolean;
   /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
@@ -75,6 +77,9 @@ export function AppShell() {
   const focusCustomerId = Number.isInteger(parsedCustomerFocusId) && parsedCustomerFocusId > 0 ? parsedCustomerFocusId : undefined;
   const focusCounterpartyId = Number.isInteger(parsedCounterpartyFocusId) && parsedCounterpartyFocusId > 0 ? parsedCounterpartyFocusId : undefined;
   const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
+  const businessMine = active === "business" && new URLSearchParams(location.search).get("mine") === "true";
+  const reportTab = active === "operations" ? new URLSearchParams(location.search).get("tab") : null;
+  const initialReportTab = reportTab === "commission" || reportTab === "my-earnings" ? reportTab : undefined;
   // 业务中心子页：URL 显式带子页则用它（并记忆）；否则恢复上次记忆，首次默认库存中心。
   const businessTab = active === "business" ? (rawBizTab ?? getStoredBizTab() ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
@@ -89,6 +94,13 @@ export function AppShell() {
       return;
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
+  };
+  const navigateToPersonalView = (view: "orders" | "earnings") => {
+    if (view === "orders") {
+      navigate("/business/ledger?mine=true");
+      return;
+    }
+    navigate("/operations?tab=my-earnings");
   };
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
@@ -267,11 +279,13 @@ export function AppShell() {
                     aria-hidden={!isActive}
                   >
                     {key === "dashboard" ? (
-                      <DashboardPage onNavigate={navigateTo} />
+                      <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}
                         initialTab={key === "business" ? businessTab : undefined}
+                        initialMine={key === "business" && active === "business" ? businessMine : undefined}
+                        initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
                         active={isActive}
                         focusCustomerId={key === "customers" ? focusCustomerId : undefined}
                         focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}

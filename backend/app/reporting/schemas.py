@@ -81,6 +81,7 @@ class CommissionGroupOut(ReportModel):
 
 class CommissionTotalOut(ReportModel):
     order_count: int
+    profit_base: Decimal = Decimal("0")
     payable: Decimal
     paid: Decimal
     difference: Decimal

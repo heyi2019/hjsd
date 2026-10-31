@@ -47,6 +47,20 @@ def test_reporting_read_routes_publish_typed_response_models(app):
         assert schema["$ref"].endswith(f"/{model_name}")
 
 
+def test_report_viewer_can_read_employee_options_for_operations_filter(
+    seeded_client, viewer_headers
+):
+    response = seeded_client.get("/api/v1/users/options", headers=viewer_headers)
+    assert response.status_code == 200, response.text
+    assert all(item["is_active"] for item in response.json())
+    report = seeded_client.get(
+        "/api/v1/reports/commission",
+        params={"all_people": "true"},
+        headers=viewer_headers,
+    )
+    assert report.status_code == 200, report.text
+
+
 def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     seeded_db, seeded_client, headers
 ):
@@ -314,6 +328,80 @@ class TestR2MonthlyPnl:
 
 # --------------------------------------------------------------------- R3 提成
 class TestR3Commission:
+    def test_my_commission_only_returns_the_logged_in_users_allocations(self, seeded_db):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="seeduser7",
+            owner_id=7,
+            account_snapshot={"game_account": "my-commission-account"},
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="seeduser7",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="1300.00",
+            occurred_on=D, actor="seeduser7",
+        )
+        policy_service.set_allocations(
+            seeded_db,
+            order.id,
+            items=[
+                {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+                {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+            ],
+            actor="pytest",
+        )
+
+        user = CurrentUser.build(
+            id=7,
+            username="seeduser7",
+            roles=["ADMIN"],
+            display_name="种子用户7",
+        )
+        data = reporting_service.r3_commission_reconciliation(
+            seeded_db, user=user, mine=True
+        )
+
+        assert {item["user_id"] for item in data["items"]} == {7}
+        assert data["total"]["order_count"] == 1
+        assert data["total"]["profit_base"] == Decimal("150.00")
+
+    def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db):
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="seeduser1",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="1300.00",
+            occurred_on=D, actor="seeduser1",
+        )
+        policy_service.set_allocations(
+            seeded_db,
+            order.id,
+            items=[
+                {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+                {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+            ],
+            actor="pytest",
+        )
+        scoped_user = CurrentUser.build(
+            id=7, username="seeduser7", roles=["VIEWER"], owner_scope="SELF"
+        )
+
+        all_people = reporting_service.r3_commission_reconciliation(
+            seeded_db, user=scoped_user, all_people=True
+        )
+        assert {item["user_id"] for item in all_people["items"]} == {7, 8}
+
+        one_person = reporting_service.r3_commission_reconciliation(
+            seeded_db, user=scoped_user, all_people=True, user_id=8
+        )
+        assert {item["user_id"] for item in one_person["items"]} == {8}
+
     def test_allocations_drill_down_and_date_filters(self, seeded_db):
         order = _order(seeded_db)
         order_service.post_event(

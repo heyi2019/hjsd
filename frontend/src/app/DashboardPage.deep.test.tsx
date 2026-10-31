@@ -13,6 +13,10 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
+    items: [],
+    total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
+  });
 });
 
 describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
@@ -26,8 +30,8 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     vi.mocked(catalog.ordersApi.list).mockRejectedValue(new Error("orders down"));
     renderLight(<DashboardPage />, { user: "admin" });
     expect(await screen.findAllByText(/orders down/)).toBeTruthy();
-    await ui.click(screen.getByRole("button", { name: /重新加载/ }));
-    await waitFor(() => expect(catalog.ordersApi.list).toHaveBeenCalledTimes(2));
+    await ui.click(screen.getAllByRole("button", { name: /重新加载/ })[0]);
+    await waitFor(() => expect(catalog.ordersApi.list).toHaveBeenCalledTimes(4));
   });
 
   it("今日关注计数：ACTIVE 与 非ACTIVE 两分支", async () => {
@@ -42,6 +46,31 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     const doneCard = (await screen.findByText("已完成业务")).closest(".ui-stat") as HTMLElement;
     expect(within(activeCard).getByText("1")).toBeInTheDocument();
     expect(within(doneCard).getByText("2")).toBeInTheDocument();
+  });
+
+  it("我的关注卡片展示当前登录用户的订单数与分润收益", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+      { id: 1, status: "ACTIVE" },
+      { id: 2, status: "COMPLETED" },
+    ] as unknown as Order[]);
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+      { id: 3, status: "ACTIVE" },
+      { id: 4, status: "ACTIVE" },
+      { id: 5, status: "COMPLETED" },
+    ] as unknown as Order[]);
+    vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
+      items: [],
+      total: { order_count: 1, profit_base: "123.45", payable: "0.00", paid: "0.00", difference: "0.00" },
+    });
+    renderLight(<DashboardPage />, { user: "operator" });
+
+    await waitFor(() => expect(catalog.ordersApi.list).toHaveBeenCalledWith({ mine: true }));
+    const orderCard = (await screen.findByText("我的订单")).closest(".ui-stat") as HTMLElement;
+    const activeCard = (await screen.findByText("进行中业务")).closest(".ui-stat") as HTMLElement;
+    const earningsCard = screen.getByText("我的收益").closest(".ui-stat") as HTMLElement;
+    expect(within(orderCard).getByText("2")).toBeInTheDocument();
+    expect(within(activeCard).getByText("2")).toBeInTheDocument();
+    expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();
   });
 
   it("汇总接口失败时「今日关注」显示占位「-」而非 0", async () => {

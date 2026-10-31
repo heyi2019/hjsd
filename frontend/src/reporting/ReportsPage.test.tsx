@@ -37,6 +37,10 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.reportsApi.inventoryHealth), emptyHealth);
   resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+    { id: 7, username: "operator", display_name: "业务同事", is_active: true },
+    { id: 8, username: "finance", display_name: "财务同事", is_active: true },
+  ]);
   resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
   resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
@@ -69,6 +73,28 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(catalog.reportsApi.businessPnl)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.reportsApi.orderProfit)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.poolsApi.list)).not.toHaveBeenCalled();
+  });
+
+  it("我的收益只加载当前登录用户的分润记录", async () => {
+    renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
+    const commissionTab = await screen.findByRole("tab", { name: "提成对账 R3" });
+    expect(commissionTab).toHaveAttribute("aria-selected", "true");
+    expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
+    expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(catalog.reportsApi.inventoryHealth)).not.toHaveBeenCalled();
+  });
+
+  it("提成对账可以按人员筛选", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true }));
+    await waitFor(() => expect(vi.mocked(catalog.employeesApi.list)).toHaveBeenCalled());
+    const personComboboxes = await screen.findAllByRole("combobox");
+    const personFilter = personComboboxes[personComboboxes.length - 1] as HTMLElement;
+    await ui.click(personFilter);
+    expect(await screen.findByText("全部", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
   });
 
   it("七个 Tab 齐全（R1-R5 + 订单利润 + 数据中心）", async () => {

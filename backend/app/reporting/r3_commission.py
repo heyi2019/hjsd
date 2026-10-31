@@ -29,10 +29,12 @@ from ._shared import (
 
 def r3_commission_reconciliation(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
-    user: CurrentUser | None = None,
+    user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     """R3 提成对账：按人员钻取到单；无规则版本时提成率为 0（不臆造）。"""
     _validate_date_range(from_date, to_date)
+    order_scope = None if all_people else user
     rows = session.execute(
         _apply_order_scope(
             select(OrderProfitAllocation, Order)
@@ -46,10 +48,14 @@ def r3_commission_reconciliation(
                     ]
                 )
             ),
-            user,
+            order_scope,
             session,
         )
     ).all()
+    if mine and user is not None:
+        rows = [row for row in rows if row[0].user_id == user.id]
+    if user_id is not None:
+        rows = [row for row in rows if row[0].user_id == user_id]
 
     per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)
     events = session.scalars(
@@ -57,7 +63,7 @@ def r3_commission_reconciliation(
             select(OrderEvent)
             .join(Order, Order.id == OrderEvent.order_id)
             .where(OrderEvent.is_posted.is_(True)),
-            user,
+            order_scope,
             session,
         )
     ).all()
@@ -67,7 +73,7 @@ def r3_commission_reconciliation(
     for order_id, order_events in events_by_order.items():
         income, buy_amount, direct_cost = _event_totals(order_events)
         per_order_profit[order_id] = income - buy_amount - direct_cost
-    for order_id, amount in _bad_debt_by_order(session, user=user).items():
+    for order_id, amount in _bad_debt_by_order(session, user=order_scope).items():
         per_order_profit[order_id] -= amount
 
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
@@ -121,6 +127,7 @@ def r3_commission_reconciliation(
         "groups": groups,
         "total": {
             "order_count": len(items),
+            "profit_base": _sum_report_field(items, "profit_base"),
             "payable": _sum_report_field(items, "payable"),
             "paid": _sum_report_field(items, "paid"),
             "difference": _sum_report_field(items, "difference"),

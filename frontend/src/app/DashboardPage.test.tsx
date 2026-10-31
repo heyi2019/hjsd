@@ -16,6 +16,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields(catalog);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
+    items: [],
+    total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
+  });
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {

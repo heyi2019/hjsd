@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import date
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
+from app.domain.enums import EventType
 from sqlalchemy import (
     exists,
     func,
@@ -29,11 +30,12 @@ def list_orders(
     limit: int = 100,
     offset: int = 0,
     user: CurrentUser | None = None,
+    mine: bool = False,
 ) -> list[Order]:
     stmt = _order_list_stmt(
         order_type=order_type, status=status, trade_date_from=trade_date_from,
         trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-        keyword=keyword, user=user, session=session,
+        keyword=keyword, user=user, mine=mine, session=session,
     )
     return list(
         session.scalars(
@@ -46,12 +48,12 @@ def count_orders(
     session: Session, *, order_type: str | None = None, status: str | None = None,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
     owner_id: int | None = None, pool_id: int | None = None,
-    keyword: str | None = None, user: CurrentUser | None = None,
+    keyword: str | None = None, user: CurrentUser | None = None, mine: bool = False,
 ) -> int:
     stmt = _order_list_stmt(
         order_type=order_type, status=status, trade_date_from=trade_date_from,
         trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-        keyword=keyword, user=user, session=session,
+        keyword=keyword, user=user, mine=mine, session=session,
     )
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
@@ -60,7 +62,7 @@ def _order_list_stmt(
     *, order_type: str | None, status: str | None,
     trade_date_from: date | None, trade_date_to: date | None,
     owner_id: int | None, pool_id: int | None, keyword: str | None,
-    user: CurrentUser | None, session: Session,
+    user: CurrentUser | None, mine: bool, session: Session,
 ):
     stmt = select(Order).outerjoin(Account, Account.id == Order.account_id)
     if order_type:
@@ -93,7 +95,21 @@ def _order_list_stmt(
                 Order.note.ilike(pattern),
             )
         )
-    if user is not None:
+    if mine and user is not None:
+        stmt = stmt.where(
+            or_(
+                Order.owner_id == user.id,
+                Order.created_by == user.username,
+                exists(
+                    select(OrderEvent.id).where(
+                        OrderEvent.order_id == Order.id,
+                        OrderEvent.event_type == EventType.SELL.value,
+                        OrderEvent.created_by == user.username,
+                    )
+                ),
+            )
+        )
+    elif user is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:
             stmt = stmt.where(scope)

@@ -1,28 +1,47 @@
-/** 工作台：优先动作 + 低负担导航入口。
- * 资金/订单数据总览仍归「经营中心 · 数据中心」，这里不复制数据、不制造假 KPI。 */
+/** 工作台：优先动作 + 当前登录用户的轻量关注卡片。
+ * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useEffect, useRef, useState } from "react";
-import { ordersApi, type Order } from "../shared/api/catalog";
+import { ordersApi, reportsApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
-export function DashboardPage({ onNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; active?: boolean }) {
+export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onPersonalNavigate?: (view: "orders" | "earnings") => void; active?: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<BusinessOrderType>("HS");
   const [orders, setOrders] = useState<Order[]>([]);
+  const [personalOrders, setPersonalOrders] = useState<Order[]>([]);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
+  const [personalOrdersError, setPersonalOrdersError] = useState<{ message: string; code?: string } | null>(null);
+  const [personalEarnings, setPersonalEarnings] = useState<string | null>(null);
+  const [earningsError, setEarningsError] = useState<{ message: string; code?: string } | null>(null);
   const mountedRef = useRef(true);
   const loadSummary = async () => {
-    try {
-      const nextOrders = await ordersApi.list();
-      if (!mountedRef.current) return;
-      setOrders(nextOrders);
+    const [personalOrdersResult, ordersResult, earningsResult] = await Promise.allSettled([
+      ordersApi.list({ mine: true }),
+      ordersApi.list(),
+      reportsApi.commission({ mine: true }),
+    ]);
+    if (!mountedRef.current) return;
+    if (personalOrdersResult.status === "fulfilled") {
+      setPersonalOrders(personalOrdersResult.value);
+      setPersonalOrdersError(null);
+    } else {
+      setPersonalOrdersError(normalizeError(personalOrdersResult.reason));
+    }
+    if (ordersResult.status === "fulfilled") {
+      setOrders(ordersResult.value);
       setSummaryError(null);
-    } catch (error) {
-      if (!mountedRef.current) return;
-      setSummaryError(normalizeError(error));
+    } else {
+      setSummaryError(normalizeError(ordersResult.reason));
+    }
+    if (earningsResult.status === "fulfilled") {
+      setPersonalEarnings(earningsResult.value.total.profit_base);
+      setEarningsError(null);
+    } else {
+      setEarningsError(normalizeError(earningsResult.reason));
     }
   };
   useEffect(() => () => {
@@ -105,6 +124,15 @@ export function DashboardPage({ onNavigate, active = true }: { onNavigate?: (key
              这里直接复用该失败态占位。 */
           { label: "进行中业务", kind: "count", amount: summaryError ? null : String(orders.filter((order) => order.status === "ACTIVE").length) },
           { label: "已完成业务", kind: "count", amount: summaryError ? null : String(orders.filter((order) => order.status !== "ACTIVE").length) },
+        ]} />
+      </section>
+
+      <section className="dashboard-summary" aria-labelledby="dashboard-personal-summary-title">
+        <h2 id="dashboard-personal-summary-title" className="dashboard-summary__title">我的关注</h2>
+        <ErrorBanner error={personalOrdersError ?? earningsError} onRetry={() => void loadSummary()} />
+        <StatRow items={[
+          { label: "我的订单", kind: "count", amount: personalOrdersError ? null : String(personalOrders.length), hint: "创建 / 售出订单", onClick: () => onPersonalNavigate?.("orders") },
+          { label: "我的收益", amount: earningsError ? null : personalEarnings, hint: "当前登录用户分润", onClick: () => onPersonalNavigate?.("earnings") },
         ]} />
       </section>
 

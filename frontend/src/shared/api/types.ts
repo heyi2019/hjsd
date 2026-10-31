@@ -754,7 +754,7 @@ export interface CommissionGroup {
 }
 
 export interface CommissionReport {
-  total: { order_count: number; payable: string; paid: string; difference: string };
+  total: { order_count: number; profit_base: string; payable: string; paid: string; difference: string };
   items: CommissionRow[];
   groups?: CommissionGroup[];
 }

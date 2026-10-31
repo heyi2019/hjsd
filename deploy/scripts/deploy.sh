@@ -107,6 +107,11 @@ echo "==> 执行数据库迁移"
 # （绝不把落后的库伪装成已迁移）。首次部署空库时 upgrade 直接成功，不会走到兜底。
 docker compose run --rm backend sh -c 'alembic upgrade head || python scripts/stamp_baseline.py'
 
+# 数据库版本「随推送版本来」：迁移完成后把当前发布版本戳记进 db_version 审计表，
+# 可追溯「哪个发布版本动了库、落到哪个 schema 态」。版本优先级：脚本 --version >
+# 容器环境 APP_VERSION > app/version.py 的 __version__（已随发版 bump）。
+docker compose run --rm -e APP_VERSION backend python scripts/stamp_db_version.py
+
 # 经营规则定义是系统闭集（REBATE / COMMISSION / INSTALLMENT / WRITE_DOWN / REFUND / DG_MIXED），
 # 迁移只建表不预置，缺定义时 make_snapshot 返回空快照且不报错（静默失效）。
 # 脚本幂等：定义按 (policy_code, GLOBAL) 判重、已有版本的跳过，可反复执行。

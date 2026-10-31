@@ -31,7 +31,6 @@ import { BUSINESS_MODE_LABEL,
   isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { filterRetiredValueAddedServiceOptions } from "../shared/lib/retiredProducts";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
@@ -171,7 +170,6 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
   const [rows, setRows] = useState<Account[]>([]);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
-  const [valueAddedService, setValueAddedService] = useState<string | undefined>(undefined);
   const [keyword, setKeyword] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -198,10 +196,9 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
   const [invEditExtraForm] = Form.useForm();
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型 / 增值服务）。
+  // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
-  const valueAddedOptions = filterRetiredValueAddedServiceOptions(useOptionSet("VALUE_ADDED_SERVICE") ?? []);
   const load = useCallback(async () => {
     try {
       const list = await stocksApi.list({ status: "WAITING" });
@@ -245,8 +242,7 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
   const inventoryRows = (rows ?? []).filter((row) => {
     const matchesStatus = row.status === "WAITING";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
-    const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
-    return matchesStatus && matchesBusiness && matchesValueAdded;
+    return matchesStatus && matchesBusiness;
   });
   const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
   const normalizedKeyword = keyword.trim().toLowerCase();

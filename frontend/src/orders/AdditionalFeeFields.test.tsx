@@ -56,4 +56,15 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     expect(Array.isArray(list) && list.length === 1).toBe(true);
     expect(getForm().getFieldValue("intermediary_fee")).toBeUndefined();
   });
+
+  it("将增加支出放在附加费用容器的右上方标题区", () => {
+    const { container } = renderFeeForm();
+    const addButton = screen.getByText("+ 增加支出").closest("button");
+    const card = container.querySelector(".recovery-fee-card");
+
+    if (!addButton) throw new Error("增加支出按钮未渲染");
+    expect(card).toBeInTheDocument();
+    expect(addButton.closest(".nested-form-section__header")).toBeInTheDocument();
+    expect(addButton.closest(".recovery-fee-card")).toBe(card);
+  });
 });

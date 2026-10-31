@@ -1,7 +1,7 @@
 """Task #5 收口：finance / reporting 剩余 16 行缺失（直调内部函数绕过 DI）。
 
 覆盖目标（行号来自 coverage 基线）：
-- app/finance/cashflows.py:509         cancel_deposit 服务层 押金不存在 NotFound
+- app/finance/deposits.py::cancel_deposit  cancel_deposit 服务层 押金不存在 NotFound
 - app/finance/rebates.py:179/182       _rebate_base_from_snapshot snapshot 空 / config 非 dict
 - app/finance/rebates.py:645           void_rebate 零结算(OPEN)但已有结算流水的拒绝分支
 - app/finance/rebates.py:429/463       reverse_rebate_settlement 关联 cashflow / fee 悬空
@@ -54,7 +54,7 @@ def _order_with_buy(seeded_db):
     return order.id
 
 
-# ----------------------------------------------------------- cashflows.py:509
+# ------------------------------------------------- deposits.py::cancel_deposit
 def test_cancel_deposit_unknown_raises(seeded_db):
     with pytest.raises(NotFound, match="押金.*不存在"):
         cashflows.cancel_deposit(

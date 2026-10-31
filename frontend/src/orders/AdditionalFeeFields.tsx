@@ -37,7 +37,6 @@ export function AdditionalFeeFields(props: { pools: Pool[] }) {
             <>
               <AdaptiveFormGrid className="recovery-fee-row additional-expense-list">
                 {fields.map((field) => <div className="additional-expense-row" key={field.key}>
-                  <Form.Item name={[field.name, "name"]} label="支出名称" rules={[{ required: true, message: "请输入支出名称" }]}><Input placeholder="例如：打赏" /></Form.Item>
                   <Form.Item name={[field.name, "amount"]} label="金额" rules={[{ required: true, message: "请输入支出金额" }]}><MoneyInput placeholder="金额" /></Form.Item>
                   <Form.Item name={[field.name, "pool_id"]} label="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}><Select placeholder="请选择账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
                   <Form.Item name={[field.name, "note"]} label="支出备注"><Input placeholder="可选填" /></Form.Item>

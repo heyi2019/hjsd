@@ -67,4 +67,13 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     expect(addButton.closest(".nested-form-section__header")).toBeInTheDocument();
     expect(addButton.closest(".recovery-fee-card")).toBe(card);
   });
+
+  it("新增支出行只保留金额、支出账户和支出备注", async () => {
+    renderFeeForm();
+    await ui.click(screen.getByText("+ 增加支出"));
+
+    expect(screen.queryByText("支出名称")).not.toBeInTheDocument();
+    expect(screen.getByText("支出备注")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("可选填")).toBeInTheDocument();
+  });
 });

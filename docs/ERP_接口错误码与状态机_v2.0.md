@@ -1,6 +1,6 @@
 # 宜游轩 ERP · 状态机与接口错误码 v2.0
 
-> 本文补充 [API 接口规范](ERP_API接口规范_v1.1.md)。状态变化只能由 Service 事务触发；前端根据权限、当前状态和接口返回控制按钮，不得自行推算财务状态。
+> 本文补充 [API 接口规范](ERP_API接口规范_v1.2.md)。状态变化只能由 Service 事务触发；前端根据权限、当前状态和接口返回控制按钮，不得自行推算财务状态。
 >
 > **权威来源**：`backend/app/core/state_machine.py`（`ORDER_TRANSITIONS` / `ACCOUNT_TRANSITIONS` / `INSTALLMENT_TRANSITIONS`）与 `app/domain/enums.py`。本文与代码逐条对齐。
 

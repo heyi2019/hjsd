@@ -1,6 +1,13 @@
-# 宜游轩 ERP · 数据库 DDL 与迁移方案 v1.0
+# 宜游轩 ERP · 数据库 DDL 与迁移方案 v1.1
 
-> **依据**：PRD v1.0 → 功能规格说明书 v1.0 → 数据字典 v1.0。MVP 使用 SQLite，生产迁 PostgreSQL 时由 Alembic 承接同结构；数据导入仅为 P2 参考能力。
+## 版本记录
+
+| 版本 | 日期 | 变更摘要 |
+|---|---|---|
+| v1.1 | 2026-11-01 | accounts→stocks；修正 game_account UNIQUE 错误约束（实际不唯一）；合约类型改三类；索引与种子表述校正；旧版 ERP_数据库DDL与迁移方案_v1.0.md 归档于 `docs/archive/` |
+
+
+> **依据**：PRD v1.3 → 数据字典 v2.0；功能编号体系沿用 `ERP_PRD_F01`（已冻结，仅编号有效）。MVP 使用 SQLite，生产迁 PostgreSQL 时由 Alembic 承接同结构；数据导入仅为 P2 参考能力。
 
 ## 1. 建表顺序
 

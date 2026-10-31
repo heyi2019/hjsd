@@ -4,8 +4,6 @@
 
 > **实现优先级**：本文以当前后端 OpenAPI 实现为准，PRD 与功能规格用于解释业务语义。导入属于 P2，不得为兼容旧数据改变新单请求结构、状态机或核算规则。
 
-> **修订（2026-11-01）**：删除已不存在的 `/period-locks` 端点（账期锁定整体移除）；补记 `lists` 列表列配置模块；更正前端 `catalog.ts` 已按域拆分。
-
 > **本次升级（2026-10-28）**：高频列表 `/orders`、`/customers`、`/stocks` 改为统一分页对象；旧的裸数组响应不再属于 v1.1 契约。前端领域 API 会自动翻页后向页面提供数组，但后端接口本身只接受/返回新契约。旧版独立字段定义接口已下线，统一使用订单表单字段配置。
 
 ## 1. 公共约定
@@ -38,12 +36,11 @@
 | 分期 | `GET/POST /installments`；`POST /installments/mark-overdue`；`GET /installments/{installment_id}/schedules`、`/dispositions`；`POST /installments/{installment_id}/payments`、`/recover`、`/resale`、`/settle-early`、`/default`、`/deliver`、`/cancel`；`POST /installments/{installment_id}/schedules/{period_no}/waive`、`/extend` | 分期合约、期次、收款与处置 |
 | 人员/团队 | `GET/POST /users`；`PATCH /users/{user_id}`；`POST /users/{user_id}/reset-password`；`GET/POST /teams`；`PATCH /teams/{team_id}` | 人员、角色、数据范围与团队 |
 | 资金 | `GET/POST /cashflows`；`POST /cashflows/{cashflow_id}/approve`、`/reject`、`/reverse`；`GET/POST /deposits`；`POST /deposits/{deposit_id}/returns`、`/cancel`、`/losses`；`GET/POST /rebates`；`GET /rebates/overdue`、`/rebates/{rebate_id}`；`GET/POST /rebates/{rebate_id}/settlements`；`POST /rebates/{rebate_id}/settlements/{settlement_id}/reverse`、`/rebates/{rebate_id}/void`；`GET/POST /reconciliations`；`POST /reconciliations/{reconciliation_id}/resolve` | 资金流水、押金、返点与对账；资金列表是否分页以各自响应模型为准 |
-| 划转 | POST `/transfers`、`/transfers/{transfer_id}/repair` | 原子资金划转与单边划转修复。**账期锁定能力已整体移除**：原 `GET/POST /period-locks` 端点、`period_locks` 表、`finance.period.lock` 权限与「锁定账期」入口均不存在，调用将返回 404 |
+| 月结/划转 | GET/POST `/period-locks`；POST `/transfers`、`/transfers/{id}/repair` | 会计期间锁定与原子资金划转 |
 | 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/finance-dimensions`、`/daily-funds`、`/order-profit`；GET `/reports/{report_name}/export.csv` | 库存健康、损益、佣金、资金、订单利润与导出 |
 | 质量 | `GET /quality/exceptions`、`/metrics`、`/issues`、`/issues/{issue_id}`；`POST /quality/scan`、`/issues`、`/issues/{issue_id}/close`、`/issues/batch-close`；`PATCH /quality/issues/{issue_id}` | 数据质量异常与指标 |
 | 搜索/通知 | `GET /search`、`/notifications`；`POST /notifications/{notification_id}/read`、`/notifications/sync-overdue-rebates` | 全局搜索与站内通知 |
 | 附件 | `GET/POST /attachments`；`GET /attachments/{attachment_id}/download`；`DELETE /attachments/{attachment_id}` | 订单、事件、资金、分期、质量异常附件 |
-| 列表列配置 | `GET /list-columns`；`GET /list-columns/custom-fields`；`PUT/DELETE /list-columns/{scope}`；`POST /list-columns/{scope}/custom`；`DELETE /list-columns/{scope}/custom/{column_key}` | 各列表作用域的列显示配置与自定义列定义；自定义列键为 `extra:{field_key}`，显示状态复用 `list_column_configs`（不另建状态表）；「恢复默认」只清显示配置、不删列定义 |
 | 表单扩展字段 | `GET/POST /order-form-fields`；`GET /order-form-fields/scopes`；`GET/PATCH/DELETE /order-form-fields/{field_id}`；`PATCH /order-form-fields/{field_id}/active` | 统一的订单/库存/客户等表单字段定义、启停、排序与作用域；值落在实体 `form_extra` |
 | 经营规则 | `GET/POST /policies`；`GET/POST /policies/{definition_id}/versions`；`GET /policies/{definition_id}`；`PATCH /policy-versions/{version_id}`；`POST /policy-versions/{version_id}/approve`、`/supersede`、`/policies/versions/expire-sweep`；`GET /policy-versions/resolve` | 规则版本、审批、快照与解析 |
 | 导入 | `GET/POST /imports/batches`；`GET /imports/batches/{batch_id}/rows`、`/preview`、`/reconciliation`；`POST /imports/rows/{row_id}/map`、`/skip`、`/unlinked-transfer`；`POST /imports/batches/{batch_id}/commit`、`/rollback`、`/corrections`、`/reject` | P2 标准导入与复核 |
@@ -82,7 +79,7 @@
 {"order_type":"HS","trade_date":"2026-10-04","account_id":12,"customer_roles":[{"customer_id":10,"role":"SELLER"},{"customer_id":11,"role":"BUYER"}],"counterparty_roles":[]}
 ```
 
-返回包含 `order_no`。HS 必须使用 `account_id` 关联回收库存；DG 使用 `account_id` 关联寄售库存；TH 使用 `account_id` 关联提号库存（PICKUP）。订单角色必须符合业务类型，且停用客户/合作方不可引用。TH 同行写 `counterparty_roles:PEER`，DG 寄售方写 `CONSIGNOR`；不得把同行或供货方写入客户。创建分期合约时，`contract_type=STOCK_SALE` 仅接受已买入在库的 HS 订单，`PICKUP_SALE` 仅接受 TH 订单，`CONSIGNMENT_SALE` 仅接受 DG 订单。
+返回包含 `order_no`。HS 必须使用 `account_id` 关联回收库存；DG 使用 `account_id` 关联寄售库存；TH 使用 `account_id` 关联提号库存（PICKUP）；DFQ 只填写 `account_snapshot` 中的游戏账号文本，禁止关联库存 `account_id`。订单角色必须符合业务类型，且停用客户/合作方不可引用。TH 同行写 `counterparty_roles:PEER`，DFQ 供货方写 `SUPPLIER`；不得把同行或供货方写入客户。创建分期合约时，`contract_type=STOCK_SALE` 仅接受已买入在库的 HS 订单，`ADVANCE_PURCHASE` 仅接受 DFQ 订单。
 
 ### 客户与合作方
 
@@ -105,12 +102,12 @@
 
 ### 分期收款与返点结算
 
-- 分期收款（HS 分期出售 / TH 提号分期 / DG 代挂分期）：`PAYMENT`，须同步更新 installment.paid，累计不得超过总应收。
+- 分期收款（HS 分期出售或 DFQ 代分期）：`PAYMENT`，须同步更新 installment.paid，累计不得超过总应收。
 - 返点结算：`{"settled_on":"2026-10-04","gross_amount":"100","platform_fee":"5","net_amount":"95","pool_id":2}`；净额自动入池。
 
 ## 4. 前后端联调与治理
 
-- 前端统一通过 `frontend/src/shared/api/client.ts` 发起请求；领域路径与响应类型按业务域拆分在 `frontend/src/shared/api/*.api.ts`（`catalog.ts` 现为 18 行再导出兼容层，`types.ts` 承载纯类型），页面不应直接拼接业务 URL。
+- 前端统一通过 `frontend/src/shared/api/client.ts` 发起请求；领域路径和响应类型集中在 `frontend/src/shared/api/catalog.ts`，页面不应直接拼接业务 URL。
 - `GET` 请求由客户端做短时并发去重与 SWR 缓存；成功的写请求会清空 GET 缓存。分页列表由领域 API 按 `limit/offset` 自动翻页，页面层只接收业务数组。
 - 后端路由必须声明 `response_model`；错误、参数校验和权限异常统一由应用工厂转换为 `{code,message,details}`。新增或修改接口必须同步契约测试与本文档。
 - OpenAPI 以 development 环境的 `/openapi.json` 为机器可读事实源；Markdown 只解释业务约束，不替代 OpenAPI 的字段级定义。

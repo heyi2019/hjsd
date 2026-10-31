@@ -1,6 +1,13 @@
-# 宜游轩 ERP · 架构设计 v1.0
+# 宜游轩 ERP · 架构设计 v1.1
 
-> **权威来源**：[PRD v1.2](ERP_PRD_v1.2_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
+## 版本记录
+
+| 版本 | 日期 | 变更摘要 |
+|---|---|---|
+| v1.1 | 2026-11-01 | 领域包改为实测结构（分期域为 value_added_services、人员与团队路由在 auth）；accounts 域→stocks；分期合约三类；迁移活动链改为 squashed_versions；旧版 ERP_架构设计_v1.0.md 归档于 `docs/archive/` |
+
+
+> **权威来源**：[PRD v1.3](ERP_PRD_v1.3_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
 
 ## 设计边界
 

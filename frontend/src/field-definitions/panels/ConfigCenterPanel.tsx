@@ -6,7 +6,7 @@
  * 复用单一事实源 configCatalog.ts 的 SETTINGS_ITEMS 注册表（分组 / 标签 / 权限 / 只读），
  * 右侧直接挂载各配置项既有的面板组件（BusinessDictionaryPanel / OrderTypesPanel …），
  * 不重写任何配置逻辑；跨面板跳转（如表单字段里的「配置游戏类型」）改为在本中心内切换选中项。 */
-import { Card, Typography } from "antd";
+import { Card } from "antd";
 import { useState, type ReactElement } from "react";
 import {
   CONFIG_GROUP_LABEL,
@@ -62,9 +62,6 @@ export function ConfigCenterPanel() {
       </nav>
       <section className="config-center__content" data-testid="center-content">
         <Card className="glass" title={SETTINGS_ITEMS.find((i) => i.key === selected)?.label ?? "配置"}>
-          <Typography.Paragraph type="secondary" className="ui-card-hint">
-            本页为对应配置项的现有页面，编辑入口与独立设置页签一致。
-          </Typography.Paragraph>
           {renderPanel(selected)}
         </Card>
       </section>

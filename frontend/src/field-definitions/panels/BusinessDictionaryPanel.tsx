@@ -45,9 +45,6 @@ function EntryGroup({ title, children, stacked = false }: { title: string; child
 export function BusinessDictionaryPanel() {
   return (
     <Card className="glass business-dictionary" title="业务分类口径">
-      <Typography.Paragraph type="secondary">
-        业务字典定义系统记录什么；字段与表单配置决定这些信息在哪里、以何种方式录入。核心业务字段受固定模型保护，扩展字段只补充业务信息，不覆盖资金、订单或库存事实。
-      </Typography.Paragraph>
       <Descriptions bordered size="small" column={1} labelStyle={{ width: 96 }}>
         <Descriptions.Item label="业务">
           <EntryLine name="自营" desc="本方承担资金、库存和利润。" />

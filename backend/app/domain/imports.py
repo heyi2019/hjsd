@@ -54,7 +54,10 @@ class ImportBatch(Base, AuditMixin):
     batch_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     source_name: Mapped[str] = mapped_column(String(128), nullable=False)
     source_kind: Mapped[str] = mapped_column(
-        String(32), nullable=False, default=ImportSourceKind.ORDER.value
+        String(32),
+        nullable=False,
+        default=ImportSourceKind.ORDER.value,
+        server_default="STANDARD_ORDER",
     )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=ImportBatchStatus.DRAFT.value

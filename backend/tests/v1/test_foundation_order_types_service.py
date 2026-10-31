@@ -38,6 +38,10 @@ class TestOrderTypes:
         with pytest.raises(AppError):
             service.create_order_type(db, code="XX", name="坏业务", capital_type="MAGIC", actor="pytest")
 
+    def test_retired_dfq_capital_type_rejected(self, db):
+        with pytest.raises(AppError):
+            service.create_order_type(db, code="DFQ", name="代分期", capital_type="CREDIT", actor="pytest")
+
 
 class TestRoutes:
     def test_default_routes_of_seeded_business(self, seeded_db):

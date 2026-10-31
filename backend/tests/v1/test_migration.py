@@ -309,10 +309,23 @@ def test_current_migration_head_is_exposed():
     # 不再硬编码 revision —— 迁移链推进后硬编码值会腐化（此前 0010 已落后于实际 head）。
     assert "(head)" in stdout, f"alembic heads 未报告 head：\n{stdout}"
     head_rev = stdout.split()[0]
-    version_files = [p.name for p in (BACKEND_DIR / "alembic" / "versions").glob("*.py")]
+    version_files = [
+        p.name for p in (BACKEND_DIR / "alembic" / "squashed_versions").glob("*.py")
+    ]
     assert any(head_rev in name for name in version_files), (
         f"head {head_rev} 在 alembic/versions 中找不到对应迁移文件：{version_files}"
     )
+
+
+def test_active_migration_chain_is_squashed_to_0001():
+    result = _alembic({}, "heads")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip().startswith("0001 ")
+
+    active_dir = BACKEND_DIR / "alembic" / "squashed_versions"
+    assert sorted(path.name for path in active_dir.glob("*.py")) == [
+        "0001_current_schema_baseline.py"
+    ]
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_env):
@@ -405,6 +418,39 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
             assert "'PENDING'" not in create_sql
             expected = "status IN ('WAITING', 'SOLD', 'VOID')"
             assert expected in create_sql
+    finally:
+        engine.dispose()
+
+
+def test_retired_product_checks_are_removed(migration_env):
+    """下线代分期后，数据库约束不得继续接受历史枚举值。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            orders_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'")
+            ).scalar_one()
+            type_defs_sql = connection.execute(
+                text(
+                    "SELECT sql FROM sqlite_master "
+                    "WHERE type='table' AND name='order_type_defs'"
+                )
+            ).scalar_one()
+            installments_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='installments'")
+            ).scalar_one()
+            cashflow_sql = connection.execute(
+                text("SELECT sql FROM sqlite_master WHERE type='table' AND name='cashflow'")
+            ).scalar_one()
+
+            assert "'CREDIT'" not in orders_sql
+            assert "'CREDIT'" not in type_defs_sql
+            assert "'ADVANCE_PURCHASE'" not in installments_sql
+            assert "'DFQ_PRINCIPAL'" not in cashflow_sql
     finally:
         engine.dispose()
 

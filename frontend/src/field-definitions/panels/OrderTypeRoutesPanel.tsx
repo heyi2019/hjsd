@@ -21,6 +21,7 @@ import { orderTypesApi,
 import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
+import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
 import { useSession } from "../../shared/state/session";
 import { BusinessForm, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
@@ -70,12 +71,13 @@ export function OrderTypeRoutesPanel() {
     setLoading(true);
     try {
       const [typeRows, poolRows] = await Promise.all([orderTypesApi.list(), poolsApi.list()]);
-      setTypes(typeRows);
+      const visibleTypeRows = filterRetiredOrderTypes(typeRows);
+      setTypes(visibleTypeRows);
       setPools(poolRows);
       // 业务类型是 4 个量级的小集合，逐个拉路由可换来一张横向可比的表；
       // 单个失败不拖垮整页，只丢该类型的路由。
       const perType = await Promise.all(
-        typeRows.map(async (type) => {
+        visibleTypeRows.map(async (type) => {
           try {
             const rows = await orderTypesApi.routes(type.id);
             return rows.map((row) => ({

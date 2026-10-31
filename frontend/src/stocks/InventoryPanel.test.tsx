@@ -35,6 +35,17 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByText("账号台账")).not.toBeInTheDocument();
   });
 
+  it("筛选栏沿用业务台账的分组布局", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+
+    await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
+    expect(screen.getByText("类型筛选")).toBeInTheDocument();
+    expect(screen.getByText("业务筛选")).toBeInTheDocument();
+    expect(screen.getByText("增值服务筛选")).toBeInTheDocument();
+    expect(screen.getByText("排序")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出 CSV" })).toBeInTheDocument();
+  });
+
   it("建单后刷新库存并把新账号放在第一页", async () => {
     const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -63,7 +74,7 @@ describe("InventoryPanel：账号台账", () => {
     );
 
     renderLight(<InventoryPanel />, { user: "admin" });
-    expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "导出 CSV" })).toBeInTheDocument();
     for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }

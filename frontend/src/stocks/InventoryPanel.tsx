@@ -1,6 +1,5 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
-import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Dropdown, Form, Input, Segmented, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Key } from "react";
@@ -243,15 +242,20 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
     if (body && scrollLeftRef.current) body.scrollLeft = scrollLeftRef.current;
   }, [expandedAccountIds]);
 
-  const visibleRows = (rows ?? []).filter((row) => {
+  const inventoryRows = (rows ?? []).filter((row) => {
     const matchesStatus = row.status === "WAITING";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
-    const matchesType = !inventoryType || row.inventory_type === inventoryType;
     const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
+    return matchesStatus && matchesBusiness && matchesValueAdded;
+  });
+  const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const visibleRows = inventoryRows.filter((row) => {
+    const matchesType = !inventoryType || row.inventory_type === inventoryType;
     const text = [row.game_account, row.game_type, row.channel_region, row.platform]
       .filter(Boolean).join(" ").toLowerCase();
-    const matchesKeyword = !keyword.trim() || text.includes(keyword.trim().toLowerCase());
-    return matchesStatus && matchesBusiness && matchesType && matchesValueAdded && matchesKeyword;
+    const matchesKeyword = !normalizedKeyword || text.includes(normalizedKeyword);
+    return matchesType && matchesKeyword;
   });
   // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
   const orderedRows = [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id));
@@ -634,9 +638,6 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
 
       <Card className="glass">
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
-          <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
-          <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
-          <Select allowClear placeholder="按增值服务筛选" className="ui-control-width-inventory" value={valueAddedService} options={valueAddedOptions ?? []} onChange={(value) => { setValueAddedService(value); setPage(1); }} />
           <Input
             allowClear
             value={keyword}
@@ -645,27 +646,59 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
             className="ui-control-width-inventory"
             onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
           />
+          <Typography.Text strong>类型筛选</Typography.Text>
+          <Segmented
+            aria-label="库存类型筛选"
+            value={inventoryType ?? "all"}
+            options={[
+              { value: "all", label: `全部 ${countInventoryRows()}` },
+              ...(inventoryTypeOptions ?? []).map((item) => ({
+                value: item.value,
+                label: `${item.label} ${countInventoryRows(item.value)}`,
+              })),
+            ]}
+            onChange={(value) => { setInventoryType(value === "all" ? undefined : String(value)); setPage(1); }}
+          />
           <PermissionButton
             permission="report.read"
-            aria-label="导出"
-            icon={<DownloadOutlined />}
+            aria-label="导出 CSV"
+            size="small"
             loading={exporting}
             onClick={() => void handleExport()}
           >
-            导出
+            导出 CSV
           </PermissionButton>
-          <Space size={8}>
-            <Typography.Text type="secondary">排序</Typography.Text>
-            <Segmented
-              aria-label="库存排序"
-              value={sortDesc ? "desc" : "asc"}
-              options={[
-                { value: "desc", label: "最新在前" },
-                { value: "asc", label: "最旧在前" },
-              ]}
-              onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
-            />
-          </Space>
+          <Typography.Text strong>业务筛选</Typography.Text>
+          <Segmented
+            aria-label="库存业务筛选"
+            value={businessMode ?? "all"}
+            options={[
+              { value: "all", label: "全部业务" },
+              ...(businessOptions ?? []).map((item) => ({ value: item.value, label: item.label })),
+            ]}
+            onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
+          />
+          <Typography.Text strong>增值服务筛选</Typography.Text>
+          <Select
+            aria-label="增值服务筛选"
+            className="ui-filter-select"
+            value={valueAddedService ?? "all"}
+            options={[
+              { value: "all", label: "全部增值服务" },
+              ...(valueAddedOptions ?? []),
+            ]}
+            onChange={(value) => { setValueAddedService(value === "all" ? undefined : value); setPage(1); }}
+          />
+          <Typography.Text strong>排序</Typography.Text>
+          <Segmented
+            aria-label="库存排序"
+            value={sortDesc ? "desc" : "asc"}
+            options={[
+              { value: "desc", label: "最新在前" },
+              { value: "asc", label: "最旧在前" },
+            ]}
+            onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
+          />
         </Space>
         {compact ? (
           <MobileInventoryList

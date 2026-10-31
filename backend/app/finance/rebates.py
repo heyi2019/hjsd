@@ -12,7 +12,6 @@ from app.core.audit import record_audit
 from app.core.business_numbering import rebate_no as order_rebate_no
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.periods import assert_period_open
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AuditAction,
@@ -51,7 +50,6 @@ def create_rebate(
 
     base_amount 省略时按 REBATE 规则的 config.base 从订单事件派生（与报表同口径）。
     """
-    assert_period_open(session, collected_on, operation="创建返点记录")
     try:
         order = orders_service.get_order(session, source_order_id, user)
     except NotFound as exc:
@@ -62,7 +60,11 @@ def create_rebate(
             code=ErrorCode.RESOURCE_NOT_FOUND,
             details={"source_order_id": source_order_id},
         ) from exc
-    if order.status not in (OrderStatus.ACTIVE.value, OrderStatus.COMPLETED.value):
+    if order.status not in (
+        OrderStatus.ACTIVE.value,
+        OrderStatus.INSTALLMENT.value,
+        OrderStatus.COMPLETED.value,
+    ):
         raise Validation(
             f"来源订单 {order.order_no} 状态 {order.status}，不可作为返点来源",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
@@ -259,7 +261,6 @@ def update_rebate(
         if record.rate > Decimal("100.00"):
             raise Validation("返点比例必须在 0% 到 100% 之间", details={"field": "rate"})
     if collected_on is not None:
-        assert_period_open(session, collected_on, operation="编辑返点记录")
         record.collected_on = collected_on
     if note is not None:
         record.note = note

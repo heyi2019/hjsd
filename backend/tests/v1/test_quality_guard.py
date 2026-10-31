@@ -14,20 +14,20 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import (
+    AccountStatus,
     CashflowStatus,
     Nature,
     QualityIssueStatus,
     ReconciliationStatus,
+    OrderStatus,
 )
 from app.domain.foundation import Pool, PoolOwnership, PoolStatus, PoolType
 from app.domain.trade import (
     Account,
-    AccountStatus,
     Cashflow,
     InstallmentSchedule,
     Order,
     OrderEvent,
-    OrderStatus,
     Reconciliation,
 )
 from app.installments import service as installments_service
@@ -42,7 +42,7 @@ def _account(seeded_db) -> Account:
         platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
-        status=AccountStatus.IN_STOCK.value,
+        status=AccountStatus.WAITING.value,
         created_by="pytest",
         updated_by="pytest",
     )

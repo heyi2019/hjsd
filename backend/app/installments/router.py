@@ -13,7 +13,7 @@ from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
-    PERM_ORDER_EXCEPTION_APPROVE,
+    PERM_ORDER_UPDATE,
     PERM_ORDER_EVENT_POST,
     CurrentUser,
     require_permissions,
@@ -32,7 +32,7 @@ post_payment = require_permissions(
     PERM_ORDER_EVENT_POST, PERM_FINANCE_ORDER_EVENT_POST, require_all=False
 )
 post_delivery = require_permissions(PERM_ORDER_EVENT_POST)
-default_manage = require_permissions(PERM_ORDER_EXCEPTION_APPROVE)
+default_manage = require_permissions(PERM_ORDER_UPDATE)
 
 
 def _actor(user: CurrentUser) -> str:

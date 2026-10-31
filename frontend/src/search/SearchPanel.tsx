@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 全局搜索：仅展示后端按权限过滤后的可跳转摘要（SYS-01-02）。 */
 import { Card, Form, Input } from "antd";
 import { useState } from "react";

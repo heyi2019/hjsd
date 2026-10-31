@@ -1,11 +1,10 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 工作室收支：在指定资金池上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
  *
  * 设计约束（刻意不新增后端表）：
  * - **入账复用「新增独立流水」**：支出 = OUT / BUSINESS_OUT / OPERATING_EXPENSE，
  *   收入 = IN / BUSINESS_IN / SELF_REVENUE，科目落在 `category`。只存在一套入账口径。
- * - **不走审核态**：提交后自动补审核，登记即入账（后端独立流水固定先 PENDING，
- *   此处紧接 `approve` 完成闭环；若自动审核失败会提示去流水页手动审核）。
+ * - **不走审核态**：提交即入账（后端独立流水直接 APPROVED，登记即计入损益，无需审核）。
  * - **承载资金池可勾选**：配置落在选项词典 `STUDIO_EXPENSE_POOL`（value=池 code），
  *   科目字典落在 `STUDIO_EXPENSE_ITEM`；首次保存时自动补建词典，服务端存储 ⇒ 全员同步。
  */
@@ -13,20 +12,16 @@ import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  cashflowsApi,
+import { cashflowsApi,
   optionSetsApi,
   type Cashflow,
   type OptionItem,
-  type Pool,
-} from "../shared/api/catalog";
+  type Pool, } from "../shared/api/catalog";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { clearOptionSetsCache } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
-import {
-  ConfirmButton,
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessForm,
   ErrorBanner,
@@ -37,7 +32,7 @@ import {
   Select,
   StatRow,
   StatusTag,
-} from "../shared/ui";
+  CompactActions, } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 
 /** 承载资金池词典：value 存池 code，池改名不影响配置。 */
@@ -104,12 +99,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
 
   const [registerOpen, setRegisterOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
-  const [rejectTarget, setRejectTarget] = useState<Cashflow | null>(null);
   const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
 
   const [registerForm] = Form.useForm();
   const [configForm] = Form.useForm();
-  const [rejectForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
   const write = useAsyncAction();
 
@@ -171,21 +164,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     void load();
   }, [load]);
 
-  const review = async (row: Cashflow, action: "approve" | "reject", reason?: string, formExtra?: Record<string, unknown>) => {
-    await write.run(async () => {
-      if (action === "approve") await cashflowsApi.approve(row.id);
-      else await cashflowsApi.reject(row.id, reason ?? "", formExtra);
-      appMessage.success(action === "approve" ? "支出已审核" : "支出已拒绝");
-      setRejectTarget(null);
-      rejectForm.resetFields();
-      await load();
-    });
-  };
-
   const submitRegister = async (values: Record<string, unknown>) => {
     const direction = (values.direction as string) === "IN" ? "IN" : "OUT";
     await write.run(async () => {
-      const flow = await cashflowsApi.create({
+      await cashflowsApi.create({
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,
@@ -197,15 +179,6 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         note: (values.note as string) || null,
         form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
-      // 关闭审核态：提交即入账，紧接自动补审核；失败不吞——提示去流水页手动审核。
-      const flowId = (flow as { id?: number } | undefined)?.id;
-      if (flowId) {
-        try {
-          await cashflowsApi.approve(flowId);
-        } catch {
-          appMessage.warning("已登记但自动审核未成功，请在「流水」页手动审核");
-        }
-      }
       appMessage.success(direction === "OUT" ? "支出已登记入账" : "收入已登记入账");
       setRegisterOpen(false);
       registerForm.resetFields();
@@ -292,38 +265,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
-      title: "审核追溯",
-      render: (_v, row) => (
-        <span className="muted">
-          {row.reviewed_by
-            ? `${row.reviewed_by}${row.reviewed_at ? ` · ${row.reviewed_at.replace("T", " ").slice(0, 16)}` : ""}`
-            : "—"}
-          {row.reversal_of_id ? ` · 冲销#${row.reversal_of_id}` : ""}
-        </span>
-      ),
-    },
-    {
       title: "操作",
       width: 170,
       render: (_v, row) => (
         <Space size={2}>
-          {row.status === "PENDING" && (
-            <ConfirmButton
-              permission="deposit.post"
-              size="small"
-              title="审核通过这笔工作室支出"
-              description="审核后支出计入损益且不可撤销。如金额有误，请先冲销或拒绝。"
-              okText="确认审核"
-              onConfirm={() => review(row, "approve")}
-            >
-              审核
-            </ConfirmButton>
-          )}
-          {row.status === "PENDING" && (
-            <PermissionButton permission="deposit.post" size="small" onClick={() => setRejectTarget(row)}>
-              拒绝
-            </PermissionButton>
-          )}
           {row.status === "APPROVED" && (
             <PermissionButton
               permission="deposit.post"
@@ -382,11 +327,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             allowClear
             value={status}
             placeholder="全部状态"
-            options={[
-              { value: "PENDING", label: "待审核" },
-              { value: "APPROVED", label: "已审核" },
-              { value: "REJECTED", label: "已拒绝" },
-            ]}
+            options={[{ value: "APPROVED", label: "已入账" }]}
             onChange={setStatus}
           />
           <PermissionButton permission="finance.read" onClick={() => void load()}>
@@ -476,7 +417,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         </BusinessForm>
       </BusinessActionModal>
 
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="配置工作室支出"
         open={configOpen}
         onCancel={() => setConfigOpen(false)}
@@ -499,33 +440,15 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           <Form.Item name="items" label="费用科目" extra="可直接输入新增科目后回车">
             <Select mode="tags" placeholder="房租 / 日用 / 水电 …" />
           </Form.Item>
-          <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={write.pending}>
-            保存配置
-          </PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={write.pending}>
+              保存配置
+            </PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </BusinessActionModal>
 
-      <BusinessActionModal
-        title="拒绝工作室支出"
-        open={Boolean(rejectTarget)}
-        onCancel={() => setRejectTarget(null)}
-        footer={null}
-      >
-        <InlineError error={write.error} />
-        <BusinessForm scope="STUDIOREJ" form={rejectForm} onFinish={(values) => review(rejectTarget!, "reject", values.reason as string, values.form_extra as Record<string, unknown> | undefined)}>
-          <FieldConfigScope scope="STUDIOREJ" active={Boolean(rejectTarget)}>
-          <CfgItem name="reason" label="拒绝原因" rules={[{ required: true, message: "请填写拒绝原因" }]}>
-            <Input.TextArea rows={3} />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="studio-reject" />
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
-            确认拒绝
-          </PermissionButton>
-          </FieldConfigScope>
-        </BusinessForm>
-      </BusinessActionModal>
-
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="冲销工作室支出"
         open={Boolean(reverseTarget)}
         onCancel={() => setReverseTarget(null)}
@@ -541,9 +464,11 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             <Input.TextArea rows={3} />
           </CfgItem>
           <CustomFieldSection testIdSuffix="studio-reverse" />
-          <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
-            确认冲销
-          </PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
+              确认冲销
+            </PermissionButton>
+          </CompactActions>
           </FieldConfigScope>
         </BusinessForm>
       </BusinessActionModal>

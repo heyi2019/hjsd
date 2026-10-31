@@ -1,0 +1,84 @@
+name: rollback-production
+
+# 手动一键回滚：输入目标版本号，将 ECS 上服务切回该版本镜像。
+# 前置：ECS 的 docker 中仍保留该版本的镜像（heijin-backend/heijin-frontend:<version>），
+# 未被 prune；否则需先在别处 docker save 导出并 scp + docker load 到 ECS。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Target version to roll back to (e.g. 1.2.3, must match an existing image tag on ECS)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Roll back production to a previous version
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ECS_HOST: ${{ secrets.ECS_HOST }}
+      ECS_PORT: ${{ secrets.ECS_PORT || '22' }}
+      ECS_USER: ${{ secrets.ECS_USER || 'root' }}
+      ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
+      ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
+      TARGET_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Validate inputs and secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$TARGET_VERSION" ]] || { echo "version input is required" >&2; exit 1; }
+          for name in ECS_HOST ECS_USER ECS_SSH_PRIVATE_KEY ECS_KNOWN_HOSTS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing GitHub Actions secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$ECS_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$ECS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Roll back on ECS
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p "$ECS_PORT" "${ECS_USER}@${ECS_HOST}" \
+            "APP_VERSION='${TARGET_VERSION}' ERP_SKIP_BUILD=1 bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /opt/heijin/deploy
+          for svc in backend frontend; do
+            if ! docker image inspect "heijin-${svc}:${APP_VERSION}" >/dev/null 2>&1; then
+              echo "✗ 缺少镜像 heijin-${svc}:${APP_VERSION}，无法回滚（可能已被 prune）" >&2
+              echo "  先在有该镜像的机器上导出：docker save heijin-${svc}:${APP_VERSION} | gzip > ${svc}.tar.gz" >&2
+              echo "  再 scp 到 ECS 并 docker load" >&2
+              exit 1
+            fi
+          done
+          ERP_SKIP_BUILD=1 APP_VERSION="${APP_VERSION}" bash scripts/deploy.sh
+          curl -fsS http://127.0.0.1/api/v1/health
+          REMOTE
+
+      - name: Publish rollback summary
+        run: |
+          {
+            echo "### Production rollback"
+            echo
+            echo "- Rolled back to version: \`${TARGET_VERSION}\`"
+            echo "- Target: ECS"
+            echo "- Health check: passed"
+          } >> "$GITHUB_STEP_SUMMARY"

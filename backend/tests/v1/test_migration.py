@@ -1,6 +1,7 @@
 """T01 / SYS-01-01：单一基线迁移 — 可重复执行、不覆盖旧库、Up/Down 闭环。"""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -364,7 +365,7 @@ def test_order_event_portion_check_matches_domain_enum(migration_env):
 
 
 def test_accounts_status_check_drops_legacy_pending(migration_env):
-    """账号不再保留旧 PENDING/待收状态，迁移后默认直接进入在库。"""
+    """账号周期不再保留 INSTALLMENT，分期阶段由订单/分期状态承载。"""
     env, db_file = migration_env
     result = _alembic(env, "upgrade", "head")
     assert result.returncode == 0, result.stdout + result.stderr
@@ -376,8 +377,62 @@ def test_accounts_status_check_drops_legacy_pending(migration_env):
                 text("SELECT sql FROM sqlite_master WHERE type='table' AND name='stocks'")
             ).scalar_one()
             assert "'PENDING'" not in create_sql
-            expected = "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')"
+            expected = "status IN ('WAITING', 'SOLD', 'VOID')"
             assert expected in create_sql
+    finally:
+        engine.dispose()
+
+
+def test_account_status_rename_migrates_legacy_rows_without_touching_inventory_status(migration_env):
+    """升级已有 0069 库时，账号周期迁移不能被旧 CHECK 约束拦截。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "0069_split_order_installment_status")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO stocks "
+                    "(id, status, inventory_status, cost_amount, created_by, updated_by) "
+                    "VALUES (9001, 'IN_STOCK', 'IN_STOCK', 0, 'pytest', 'pytest')"
+                )
+            )
+    finally:
+        engine.dispose()
+
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT status, inventory_status FROM stocks WHERE id = 9001")
+            ).one()
+            assert row == ("WAITING", "IN_STOCK")
+    finally:
+        engine.dispose()
+
+
+def test_installment_status_options_hide_internal_pending(migration_env):
+    """PENDING 仅保留内部流程使用，不进入分期业务状态词典。"""
+    env, db_file = migration_env
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(f"sqlite:///{db_file}")
+    try:
+        with engine.connect() as connection:
+            options = connection.execute(
+                text("SELECT options FROM option_sets WHERE code = 'INSTALLMENT_STATUS'")
+            ).scalar_one()
+            values = json.loads(options)
+            assert [item["value"] for item in values] == [
+                "ACTIVE", "OVERDUE", "SETTLED", "DELIVERED", "DEFAULTED", "CLOSED", "CANCELLED"
+            ]
+            assert values[0]["label"] == "还款中"
     finally:
         engine.dispose()
 

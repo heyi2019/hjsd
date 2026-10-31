@@ -1,0 +1,66 @@
+name: auto-merge-test-to-main
+
+# 触发：每次 push 到 test 分支（即 dev 推上来）
+# 行为：轮询 4 个 CI gate（lint/frontend-gate/frontend-e2e/coverage），
+#       全部 success 后将 test 以 non-ff merge commit 合入 main，
+#       从而触发 deploy-production 自动部署 ECS。
+# 安全：仅 --no-ff 合并（main 含旧 merge commit 8257024，无法纯快进）；
+#       幂等（test 已合入 main 则跳过）；任一 gate 失败则中止，绝不强制合并。
+on:
+  push:
+    branches: [test]
+
+permissions:
+  contents: write   # 推送 main 触发部署
+  actions: read     # 读取其他 workflow run 状态（轮询 4 gate 必需；显式声明 permissions 会重置其他权限为 none）
+
+jobs:
+  wait-and-merge:
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Checkout (full history for merge)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Wait for all 4 CI gates to be green
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for wf in lint-gate.yml frontend-gate.yml frontend-e2e.yml coverage-gate.yml; do
+            echo "waiting for $wf ..."
+            ok=""
+            for i in $(seq 1 80); do
+              st=$(gh run list --commit "$SHA" --workflow "$wf" --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)
+              if [ "$st" = "success" ]; then ok=1; break; fi
+              if [ "$st" = "failure" ] || [ "$st" = "cancelled" ] || [ "$st" = "timed_out" ]; then
+                echo "$wf: $st — aborting auto-merge"; exit 1
+              fi
+              sleep 15
+            done
+            if [ -z "$ok" ]; then
+              echo "$wf not green after timeout — aborting"; exit 1
+            fi
+            echo "$wf: success"
+          done
+          echo "ALL 4 GATES GREEN for $SHA"
+
+      - name: Merge test -> main (non-fast-forward)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
+          # 幂等：test 已完全合入 main 则跳过（避免重复部署）
+          if git merge-base --is-ancestor origin/test origin/main; then
+            echo "test already merged into main; nothing to do"
+            exit 0
+          fi
+          git checkout -B main origin/main
+          git merge origin/test --no-ff -m "auto-merge: test -> main (CI gates green)"
+          git push origin main

@@ -149,7 +149,7 @@ export interface SeedOptionSet {
 
 export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "INVENTORY_STATUS", label: "库存状态", group: "INVENTORY", editable: false, options: [
-    { value: "IN_STOCK", label: "在库" }, { value: "INSTALLMENT", label: "分期中" }, { value: "SOLD", label: "已售" }, { value: "VOID", label: "下架" },
+    { value: "IN_STOCK", label: "在库" }, { value: "OUT_OF_STOCK", label: "出库" },
   ] },
   { code: "INVENTORY_BUSINESS", label: "库存业务", group: "INVENTORY", editable: false, options: [
     { value: "SELF", label: "自营" }, { value: "DISTRIBUTION", label: "分销" },
@@ -162,7 +162,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "IN", label: "收入" }, { value: "OUT", label: "支出" },
   ] },
   { code: "FUND_FLOW_STATUS", label: "流水状态", group: "FUND", editable: false, options: [
-    { value: "PENDING", label: "待审核" }, { value: "APPROVED", label: "已审核" }, { value: "REJECTED", label: "已拒绝" },
+    { value: "APPROVED", label: "已入账" },
   ] },
   { code: "FUND_FLOW_FUND_NATURE", label: "流水资金性质", group: "FUND", editable: false, options: [
     { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
@@ -187,7 +187,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "FIND_ACCOUNT", label: "找号" }, { value: "SELL_ACCOUNT", label: "卖号" }, { value: "SPECIFIC_SEARCH", label: "指定搜索" },
   ] },
   { code: "ORDER_STATUS", label: "订单状态", group: "ORDER", editable: false, options: [
-    { value: "ACTIVE", label: "进行中" }, { value: "COMPLETED", label: "已完成" }, { value: "CANCELLED", label: "已取消" },
+    { value: "ACTIVE", label: "进行中" }, { value: "INSTALLMENT", label: "分期中" }, { value: "COMPLETED", label: "已完成" }, { value: "CANCELLED", label: "已取消" },
   ] },
   { code: "ORDER_LINK_STATUS", label: "订单关联状态", group: "ORDER", editable: false, options: [
     { value: "LINKED", label: "已关联" }, { value: "UNLINKED", label: "未关联" }, { value: "ORPHAN", label: "孤儿单" }, { value: "UNLINKED_TRANSFER", label: "单边划转未关联" },
@@ -208,7 +208,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "STOCK_SALE", label: "分期出售" }, { value: "ADVANCE_PURCHASE", label: "代分期" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
   ] },
   { code: "INSTALLMENT_STATUS", label: "分期状态", group: "INSTALLMENT", editable: false, options: [
-    { value: "PENDING", label: "待首付" }, { value: "ACTIVE", label: "收款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },
+    { value: "ACTIVE", label: "还款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },
   ] },
   { code: "SCHEDULE_STATUS", label: "期次状态", group: "INSTALLMENT", editable: false, options: [
     { value: "PENDING", label: "待收" }, { value: "PARTIAL", label: "部分收款" }, { value: "PAID", label: "已收" }, { value: "OVERDUE", label: "逾期" }, { value: "WAIVED", label: "已减免" },
@@ -368,13 +368,10 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "REBATE_VOID", label: "作废返点" },
     { value: "RECONCILIATION_CREATE", label: "登记对账" },
     { value: "RECONCILIATION_RESOLVE", label: "处置对账差异" },
-    { value: "PERIOD_LOCK", label: "锁定账期" },
     { value: "QUALITY_ISSUE_CREATE", label: "新建质量工单" },
     { value: "QUALITY_ISSUE_UPDATE", label: "更新质量工单" },
     { value: "QUALITY_ISSUE_CLOSE", label: "关闭质量工单" },
     { value: "CASHFLOW_CREATE", label: "登记资金流水" },
-    { value: "CASHFLOW_APPROVE", label: "审核通过流水" },
-    { value: "CASHFLOW_REJECT", label: "驳回流水" },
     { value: "CASHFLOW_REVERSE", label: "冲销流水" },
     { value: "TRANSFER_CREATE", label: "发起资金划转" },
     { value: "TRANSFER_REPAIR", label: "修复单边划转" },

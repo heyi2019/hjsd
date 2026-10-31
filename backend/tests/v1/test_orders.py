@@ -39,7 +39,7 @@ def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
         platform="王者",
         business_mode="SELF" if game_account != "th-stock-acc" else "DISTRIBUTION",
         inventory_type="RECOVERY" if game_account != "th-stock-acc" else "PICKUP",
-        status=AccountStatus.IN_STOCK.value,
+        status=AccountStatus.WAITING.value,
         created_by="pytest",
         updated_by="pytest",
     )
@@ -181,6 +181,81 @@ class TestA01HsStock:
         assert out_flows[1].flow_no == f"{order.order_no}-CF-COST-01"
         assert in_flows[0].flow_no == f"{order.order_no}-CF-SELL-01"
 
+    def test_sell_splits_into_two_pools(self, seeded_db):
+        """售出可拆分进两个资金池：一笔 SELL 事件派生两笔资金流水（资金账户1 + 资金账户2）。"""
+        account = _new_account(seeded_db)
+        seller = _customer(seeded_db, "卖家甲")
+        buyer = _customer(seeded_db, "买家乙")
+        seeded_db.commit()
+
+        order = service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+            account_id=account.id,
+            customer_roles=[(seller.id, "SELLER"), (buyer.id, "BUYER")],
+        )
+        seeded_db.commit()
+
+        service.post_event(
+            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
+            occurred_on=TODAY, actor="pytest",
+        )
+        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "HJ_INVEST")
+        service.post_event(
+            seeded_db, order.id, event_type="SELL", amount=Decimal("1000"),
+            occurred_on=TODAY, actor="pytest", portion="PROFIT",
+            pool_id=profit.id, amount2=Decimal("400"), pool_id2=invest.id,
+        )
+        seeded_db.commit()
+
+        account = seeded_db.get(Account, account.id)
+        assert account.status == AccountStatus.SOLD.value
+
+        # 仅一笔 SELL 事件，事件金额为本笔 + 拆分金额
+        sell_event = seeded_db.scalar(
+            select(OrderEvent).where(
+                OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"
+            )
+        )
+        assert sell_event is not None
+        assert sell_event.amount == Decimal("1400.00")
+
+        # 同一事件派生两笔流水，分别进入两个资金池
+        flows = seeded_db.scalars(
+            select(Cashflow).where(Cashflow.order_event_id == sell_event.id)
+            .order_by(Cashflow.id)
+        ).all()
+        assert len(flows) == 2
+        assert [str(f.amount) for f in flows] == ["1000.00", "400.00"]
+        assert {f.pool_id for f in flows} == {profit.id, invest.id}
+        assert flows[0].flow_no == f"{order.order_no}-CF-SELL-01"
+        assert flows[1].flow_no == f"{order.order_no}-CF-SELL-02"
+
+    def test_sell_split_requires_amount2_when_pool_id2_given(self, seeded_db):
+        """资金账户2 必须配套正向金额2，否则登记失败。"""
+        account = _new_account(seeded_db)
+        seller = _customer(seeded_db, "卖家甲")
+        buyer = _customer(seeded_db, "买家乙")
+        seeded_db.commit()
+        order = service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+            account_id=account.id,
+            customer_roles=[(seller.id, "SELLER"), (buyer.id, "BUYER")],
+        )
+        seeded_db.commit()
+        service.post_event(
+            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
+            occurred_on=TODAY, actor="pytest",
+        )
+        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "HJ_INVEST")
+        with pytest.raises(Validation, match="售出金额2 必须为正数"):
+            service.post_event(
+                seeded_db, order.id, event_type="SELL", amount=Decimal("1000"),
+                occurred_on=TODAY, actor="pytest", portion="PROFIT",
+                pool_id=profit.id, pool_id2=invest.id, amount2=Decimal("0"),
+            )
+
     def test_cost_cashflow_uses_its_business_category_in_number(self, seeded_db):
         account = _new_account(seeded_db)
         seeded_db.commit()
@@ -321,7 +396,7 @@ class TestEventRules:
         assert account is not None
         assert account.game_account == "inline-recovery-account"
         assert account.inventory_type == inventory_type
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         assert account.cost_amount == Decimal("0.00")
 
         event, _ = service.post_event(
@@ -336,7 +411,7 @@ class TestEventRules:
         assert event.event_type == "BUY"
         assert account.cost_amount == Decimal("100.00")
         assert account.buy_date == TODAY
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
 
     def test_inline_consignment_creates_inventory(self, seeded_db):
         order = service.create_order(
@@ -346,7 +421,7 @@ class TestEventRules:
         account = seeded_db.get(Account, order.account_id)
         assert account is not None
         assert account.inventory_type == "CONSIGNMENT"
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         assert account.cost_amount == Decimal("0.00")
 
     def test_dg_cannot_post_buy_or_cost(self, seeded_db):

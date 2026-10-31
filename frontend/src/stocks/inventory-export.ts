@@ -100,7 +100,7 @@ export function buildInventoryCsv(
         row.stock_no,
         row.platform,
         row.cost_amount,
-        inventoryStatusLabel(row.status),
+        inventoryStatusLabel(row.inventory_status ?? "IN_STOCK"),
         age ? `${age.days}天` : "",
         row.created_by,
         detailText.registrationAt,
@@ -170,9 +170,5 @@ function consignmentPlatforms(detail: AccountExecutionDetail | undefined): strin
   return names?.length ? names.join("\n") : "-";
 }
 
-function estimatedRebateAmount(baseAmount: string, rate: string): string {
-  const amount = Number(baseAmount) * Number(rate) / 100;
-  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
-}
 
 

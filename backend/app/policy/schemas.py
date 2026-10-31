@@ -29,11 +29,6 @@ class PolicyVersionUpdate(RequestModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
-class PolicyVersionApprove(RequestModel):
-    approver: str | None = Field(default=None, max_length=64)
-    note: str | None = None
-
-
 class PolicyVersionSupersede(RequestModel):
     reason: str = Field(min_length=1, max_length=2000)
     replaced_by_version_id: int | None = Field(default=None, gt=0)
@@ -154,7 +149,6 @@ __all__ = [
     "PolicyDefinitionOut",
     "PolicyResolveOut",
     "PolicySnapshotOut",
-    "PolicyVersionApprove",
     "PolicyVersionCreate",
     "PolicyVersionListOut",
     "PolicyVersionOut",

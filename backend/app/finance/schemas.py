@@ -21,26 +21,6 @@ class DepositCreate(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
-class PeriodLockCreate(RequestModel):
-    period: str = Field(min_length=7, max_length=7)
-    note: str | None = Field(default=None, max_length=500)
-    form_extra: dict[str, Any] | None = None
-
-
-class PeriodLockOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    period: str
-    locked_at: datetime
-    locked_by: str
-    note: str | None = None
-    created_at: datetime
-    updated_at: datetime
-    created_by: str
-    updated_by: str
-    form_extra: dict[str, Any] | None = None
-
 
 class DepositReturn(RequestModel):
     amount: Decimal
@@ -133,13 +113,6 @@ class CashflowCreate(RequestModel):
     # 表单字段配置体系（STUDIOEXP 作用域）：自定义字段值落 Cashflow.form_extra。
     form_extra: dict[str, Any] | None = None
     form_extra_scope: str = "FUNDFLOW"
-
-
-class CashflowReject(RequestModel):
-    reason: str
-    # 表单字段配置体系（STUDIOREJ 作用域）：合并进流水 form_extra。
-    form_extra: dict[str, Any] | None = None
-    form_extra_scope: str = "FUNDREJECT"
 
 
 class CashflowReverse(RequestModel):
@@ -260,12 +233,9 @@ __all__ = [
     "DepositOut",
     "DepositReturn",
     "DepositLoss",
-    "PeriodLockCreate",
-    "PeriodLockOut",
     "CashflowOut",
     "CashflowListOut",
     "CashflowCreate",
-    "CashflowReject",
     "CashflowReverse",
     "ReconciliationCreate",
     "ReconciliationResolve",

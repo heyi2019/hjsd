@@ -48,7 +48,7 @@ def _new_account(
         platform="王者",
         business_mode=business_mode,
         inventory_type=inventory_type,
-        status=AccountStatus.IN_STOCK.value,
+        status=AccountStatus.WAITING.value,
         created_by="pytest",
         updated_by="pytest",
     )

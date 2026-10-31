@@ -119,7 +119,7 @@ describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
     vi.mocked(catalog.installmentsApi.cancel).mockResolvedValueOnce({
       installment: { ...installments[0], status: "CANCELLED" },
       order_status: "CANCELLED",
-      account_status: "IN_STOCK",
+      account_status: "WAITING",
       refund_amount: "50.00",
       reversed_amount: "0.00",
       cancel_event_ids: [3],

@@ -98,12 +98,14 @@ class TestOrderStateMachine:
                 actor="hunt",
             )
 
-    def test_zero_amount_is_rejected(self, seeded_db):
+    def test_zero_buy_amount_is_allowed(self, seeded_db):
+        # 方案 C：提号号价设为选填留空时前端以 0 兜底，BUY 初始买入金额允许为 0。
+        # 负数仍被拒绝（见 test_negative_amount_is_rejected）。
         order = _order(seeded_db)
-        with pytest.raises(Exception):
-            order_service.post_event(
-                seeded_db, order.id, event_type="BUY", amount="0", occurred_on=D, actor="hunt"
-            )
+        event, _ = order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="0", occurred_on=D, actor="hunt"
+        )
+        assert event.amount == 0
 
     def test_same_event_cannot_derive_two_cashflows(self, seeded_db):
         """事件→现金流必须一对一：重复登记同一事件不允许。"""
@@ -131,6 +133,55 @@ class TestOrderStateMachine:
                 event_type="DELIVER",
                 occurred_on=D,
                 actor="hunt",
+            )
+
+
+# ------------------------------------------------------------------ 提号售出口径
+class TestPickupSale:
+    """提号账号售出：售出单本身不再重复 BUY，采购事实按账号追溯（与 HS 同口径）。
+
+    库存中心售出提号账号时会另开一张 TH 售出单，BUY 记在提号入库那张订单上；
+    若按「本订单必须有 BUY」校验，提号将永远无法售出。
+    """
+
+    def _pickup_account(self, seeded_db):
+        return account_service.create_account(
+            seeded_db,
+            game_account=f"hunt-pickup-{uuid4().hex[:8]}",
+            business_mode="DISTRIBUTION",
+            inventory_type="PICKUP",
+            actor="hunt",
+        )
+
+    def test_sale_order_sells_without_own_buy(self, seeded_db):
+        account = self._pickup_account(seeded_db)
+        stock_in = order_service.create_order(
+            seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
+        )
+        order_service.post_event(
+            seeded_db, stock_in.id, event_type="BUY", amount="800",
+            occurred_on=D, actor="hunt", pool_id=1,
+        )
+        sale = order_service.create_order(
+            seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
+        )
+        event, flow = order_service.post_event(
+            seeded_db, sale.id, event_type="SELL", amount="1200",
+            occurred_on=D, actor="hunt", pool_id=1,
+        )
+        assert event.event_type == "SELL"
+        assert flow is not None
+
+    def test_sale_rejected_when_account_never_bought(self, seeded_db):
+        """账号从未采购入库时，售出仍必须被拦截。"""
+        account = self._pickup_account(seeded_db)
+        sale = order_service.create_order(
+            seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
+        )
+        with pytest.raises(Exception, match="BUY"):
+            order_service.post_event(
+                seeded_db, sale.id, event_type="SELL", amount="1200",
+                occurred_on=D, actor="hunt", pool_id=1,
             )
 
 
@@ -229,79 +280,6 @@ class TestDepositAndRebate:
             finance_service.create_deposit(
                 seeded_db, pool_id=1, amount="-100", paid_on=D, actor="hunt"
             )
-
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_rebate_settle_more_than_receivable_is_rejected(self, seeded_db):
-        """可结算上限 = 返点基数 1000；一次结 1200 必须被拒。"""
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="hunt",
-        )
-        order_service.post_event(
-            seeded_db,
-            order.id,
-            event_type="SELL",
-            amount="1000.00",
-            occurred_on=D,
-            actor="hunt",
-        )
-        rebate = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount="1000.00",
-            rate="5",
-            collected_on=D,
-            actor="hunt",
-        )
-        with pytest.raises(Exception):
-            finance_service.settle_rebate(
-                seeded_db,
-                rebate.id,
-                gross_amount="1200.00",
-                platform_fee="0",
-                settled_on=D,
-                pool_id=1,
-                actor="hunt",
-            )
-
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_rebate_partial_then_full_settles(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="hunt",
-        )
-        order_service.post_event(
-            seeded_db,
-            order.id,
-            event_type="SELL",
-            amount="1000.00",
-            occurred_on=D,
-            actor="hunt",
-        )
-        rebate = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount="1000.00",
-            rate="5",
-            collected_on=D,
-            actor="hunt",
-        )
-        finance_service.settle_rebate(
-            seeded_db, rebate.id, gross_amount="400.00", platform_fee="0",
-            settled_on=D, pool_id=1, actor="hunt",
-        )
-        seeded_db.refresh(rebate)
-        assert rebate.status == "PARTIALLY_SETTLED"
-        finance_service.settle_rebate(
-            seeded_db, rebate.id, gross_amount="600.00", platform_fee="0",
-            settled_on=D, pool_id=1, actor="hunt",
-        )
-        seeded_db.refresh(rebate)
-        assert rebate.status == "SETTLED"
 
 
 # ------------------------------------------------------------------ 主数据

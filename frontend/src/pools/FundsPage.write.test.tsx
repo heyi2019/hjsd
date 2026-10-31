@@ -58,7 +58,6 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
   resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length });
-  vi.mocked(catalog.periodLocksApi.list).mockResolvedValue([]);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
   // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
@@ -136,7 +135,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(catalog.transfersApi.repair).mockResolvedValueOnce({ transfer_id: "TRF-001" });
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "异常与月结" }));
+    await ui.click(screen.getByRole("tab", { name: "异常" }));
     await ui.click(await screen.findByRole("button", { name: /修复划转/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /POOL-B/);
@@ -149,24 +148,6 @@ describe("FundsPage：资金写路径", () => {
     }]);
   });
 
-  it("月结锁定提交账期和说明", async () => {
-    vi.mocked(catalog.periodLocksApi.create).mockResolvedValueOnce({ id: 31, period: "2026-10", locked_by: "finance" });
-    renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "异常与月结" }));
-    await ui.click(await screen.findByRole("button", { name: /锁定账期/ }, { timeout: 5000 }));
-    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-    const period = modal.querySelector("#period") as HTMLInputElement;
-    await ui.clear(period);
-    await ui.type(period, "2026-10");
-    await ui.type(modal.querySelector("#note") ?? modal, "10 月对账完成");
-    await ui.click(screen.getByRole("button", { name: /确认锁定/ }));
-    await waitFor(() => expect(vi.mocked(catalog.periodLocksApi.create)).toHaveBeenCalled(), { timeout: 5000 });
-    expect(vi.mocked(catalog.periodLocksApi.create).mock.calls[0]).toEqual([{
-      period: "2026-10",
-      note: "10 月对账完成",
-    }]);
-  });
 
   it("押金取消：PAID 押金填原因后调用 depositsApi.cancel（全额冲正由后端写）", async () => {
     vi.mocked(catalog.depositsApi.list).mockResolvedValue([

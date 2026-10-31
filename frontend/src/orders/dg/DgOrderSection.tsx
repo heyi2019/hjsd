@@ -2,11 +2,12 @@ import { Input } from "antd";
 import { CustomFieldSection } from "../ConfigurableField";
 import type { EmployeeOption, GameTypeOption } from "../../shared/api/catalog";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
-import { CfgItem, CfgNestedItem } from "../ConfigurableField";
+import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
 import { CustomerSourceFields } from "../CustomerSourceInput";
 
 /** 代挂前端表单：沿用统一出售事实登记，订单创建阶段只登记寄售账号与委托客户。 */
 export function DgOrderSection(props: { gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {
+  const participantTitle = sectionLabel("PARTICIPANT", "委托客户");
   return (
     <>
       <RecoveryAccountSection gameTypes={props.gameTypes} employees={props.employees} businessResponsibleLabel="代挂负责人" accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
@@ -15,7 +16,7 @@ export function DgOrderSection(props: { gameTypes?: GameTypeOption[]; employees?
       </RecoveryAccountSection>
 
       <section className="dg-customer-section recovery-customer-fields" aria-labelledby="dg-customer-info-title">
-        <div id="dg-customer-info-title" className="recovery-customer-fields__title">委托客户</div>
+        <div id="dg-customer-info-title" className="recovery-customer-fields__title">{participantTitle}</div>
         <CfgItem className="recovery-order-modal__party-field" name="dg_customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
         <CustomerSourceFields name="dg_customer_source" otherName="dg_customer_source_other" />
         <div className="recovery-customer-contacts">

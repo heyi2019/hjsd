@@ -11,11 +11,12 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
-from app.domain.trade import OrderFormField
+from app.domain.trade import OrderFormField, OrderFormSectionLabel
 from app.orders import form_fields as ff
-from app.orders.schemas import OrderFormFieldCreate, OrderFormFieldUpdate
+from app.orders.schemas import OrderFormFieldCreate, OrderFormFieldUpdate, SectionLabelsSaveIn
 
 
 # --------------------------------------------------------------------------- #
@@ -946,3 +947,104 @@ def test_set_active_rejects_locked_field(seeded_db):
     ff.set_order_form_field_active(seeded_db, locked.id, True, actor="admin")
     seeded_db.commit()
     assert seeded_db.get(OrderFormField, locked.id).is_active is True
+
+
+# --------------------------------------------------------------------------- #
+# 板块标题（section labels）：落库 + 跨浏览器/用户共享
+# --------------------------------------------------------------------------- #
+def test_save_and_get_section_labels_roundtrip(seeded_db):
+    """设置面板改板块名 → 落库 → 其他会话从同一业务类型读到新名（共享单一事实源）。"""
+    before = ff.get_section_labels(seeded_db, order_type_code="TH")
+    assert before == {}
+
+    saved = ff.save_section_labels(
+        seeded_db,
+        order_type_code="TH",
+        labels={"FINANCE": "资金明细改", "PARTICIPANT": "供货方信息改"},
+        actor="admin",
+    )
+    seeded_db.commit()
+    assert saved == {"FINANCE": "资金明细改", "PARTICIPANT": "供货方信息改"}
+
+    # 同一业务类型重新读取，得到覆盖后映射（模拟另一个标签页/用户打开建单）
+    reread = ff.get_section_labels(seeded_db, order_type_code="TH")
+    assert reread == {"FINANCE": "资金明细改", "PARTICIPANT": "供货方信息改"}
+
+
+def test_section_labels_empty_label_resets_to_default(seeded_db):
+    """空标题 = 恢复默认：覆盖行被删除，读取映射中不再含该板块。"""
+    ff.save_section_labels(seeded_db, order_type_code="HS", labels={"FINANCE": "资金明细改"}, actor="admin")
+    seeded_db.commit()
+    assert ff.get_section_labels(seeded_db, order_type_code="HS") == {"FINANCE": "资金明细改"}
+
+    # 传空串 → 恢复默认
+    ff.save_section_labels(seeded_db, order_type_code="HS", labels={"FINANCE": ""}, actor="admin")
+    seeded_db.commit()
+    assert ff.get_section_labels(seeded_db, order_type_code="HS") == {}
+    # 物理行已删除
+    rows = seeded_db.scalars(
+        select(OrderFormSectionLabel).where(OrderFormSectionLabel.order_type_code == "HS")
+    ).all()
+    assert len(rows) == 0
+
+
+def test_section_labels_isolated_by_order_type(seeded_db):
+    """板块标题按业务类型隔离：TH 的改名不影响 DG。"""
+    ff.save_section_labels(seeded_db, order_type_code="TH", labels={"FINANCE": "T"}, actor="admin")
+    ff.save_section_labels(seeded_db, order_type_code="DG", labels={"FINANCE": "D"}, actor="admin")
+    seeded_db.commit()
+    assert ff.get_section_labels(seeded_db, order_type_code="TH") == {"FINANCE": "T"}
+    assert ff.get_section_labels(seeded_db, order_type_code="DG") == {"FINANCE": "D"}
+
+
+def test_section_labels_rejects_bad_code(seeded_db):
+    with pytest.raises(Validation):
+        ff.save_section_labels(seeded_db, order_type_code="HS@", labels={"FINANCE": "x"}, actor="admin")
+
+
+def test_section_labels_rejects_bad_section_key(seeded_db):
+    with pytest.raises(Validation):
+        ff.save_section_labels(seeded_db, order_type_code="HS", labels={"bad key!": "x"}, actor="admin")
+    with pytest.raises(Validation):
+        ff.save_section_labels(seeded_db, order_type_code="HS", labels={"finance": "x"}, actor="admin")
+
+
+def test_router_section_labels_roundtrip(seeded_client, headers):
+    """路由层闭环：GET 初始为空 → PUT 覆盖 → GET 返回新名 → PUT 空串恢复默认。"""
+    base = seeded_client.get(
+        "/api/v1/order-form-fields/section-labels", headers=headers,
+        params={"order_type_code": "TH"},
+    )
+    assert base.status_code == 200, base.text
+    assert base.json() == {}
+
+    saved = seeded_client.put(
+        "/api/v1/order-form-fields/section-labels", headers=headers,
+        json=SectionLabelsSaveIn(
+            order_type_code="TH", labels={"FINANCE": "资金明细改名"}
+        ).model_dump(mode="json"),
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json() == {"FINANCE": "资金明细改名"}
+
+    reread = seeded_client.get(
+        "/api/v1/order-form-fields/section-labels", headers=headers,
+        params={"order_type_code": "TH"},
+    )
+    assert reread.json() == {"FINANCE": "资金明细改名"}
+
+
+def test_router_section_labels_requires_auth(seeded_client):
+    resp = seeded_client.put(
+        "/api/v1/order-form-fields/section-labels",
+        json=SectionLabelsSaveIn(order_type_code="TH", labels={"FINANCE": "x"}).model_dump(mode="json"),
+    )
+    assert resp.status_code in (401, 403)
+
+
+def test_router_section_labels_rejects_bad_section_key(seeded_client, headers):
+    resp = seeded_client.put(
+        "/api/v1/order-form-fields/section-labels", headers=headers,
+        json={"order_type_code": "TH", "labels": {"bad key": "x"}},
+    )
+    assert resp.status_code == 422, resp.text

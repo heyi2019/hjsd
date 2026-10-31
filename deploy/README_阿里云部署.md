@@ -14,7 +14,7 @@
    - **前端构建阶段用 `node:22-alpine`**（原 `node:20-alpine`）：node 20 已接近 EOL，且实测两者产出**字节级一致**——`dist/assets/index-*.js` 的 hash 同为 `index-BgcbdH21.js`，换版本不改产物。选择 22 的额外好处是本机已有该镜像，Docker Hub 不通时仍能离线构建。
    ⚠️ **上线前先在 ECS 上 `docker pull alpine:3.20 node:22-alpine` 确认镜像源能拉到**——这两个是构建硬依赖，任一拉不到会直接中断构建。注意源里要有 `alpine` 与 `node`，不能只有 `python` 系列。
    ⚠️ **构建缓存被清后即失去离线能力**：`docker builder prune -af` 会删掉 base 镜像的 metadata 缓存。若无外网且本地无 `node:22-alpine`/`alpine:3.20` 镜像，`docker compose build` 会在 `FROM` 行就报 TLS handshake timeout。
-   ⚠️ 后续往 `requirements.txt` 加依赖时，必须确认该包有 musllinux wheel，否则 ECS 上会因缺编译器构建失败。
+   ⚠️ 后续往 `requirements.txt` 加运行时依赖时，必须确认该包有 musllinux wheel，否则 ECS 上会因缺编译器构建失败；改完须重新 `pip-compile requirements.txt -o requirements.lock.txt --strip-extras` 生成锁定文件（生产镜像装的是 requirements.lock.txt 而非 requirements.txt）。
 2. **前端构建上下文为项目根**：`ui_guards.mjs` 在构建期需读取 `backend/app/domain/enums.py` 校验前后端枚举对齐，故 `docker-compose.yml` 中 frontend 的 `build.context` 为 `..`（项目根），Dockerfile 内 `COPY backend/app /backend/app`；根目录 `.dockerignore` 已排除 `node_modules` 等避免上下文过大。
 3. **拉取镜像遇网络问题**：本机 macOS 上若构建报 `failed to fetch oauth token ... EOF`（docker.io 被本机代理干扰），给 Docker 配置代理或国内镜像加速器后再 build。**更正：阿里云 ECS 上 docker.io 直连是被拒的（实测 Connection refused），必须配镜像源——详见第 5 条。**
 4. **前端 API 基址注入（已实测定位，加固）**：`frontend/.env.local` 里是本地联调地址（`http://192.168.x.x:8123/api/v1`）。实测 Vite 6 优先级为 **进程环境变量 > `.env.local`**：Dockerfile 中 `ENV VITE_API_BASE=/api/v1` 会覆盖它，产物为同源 `/api/v1`（正确）；但一旦**去掉该 ENV 或不经 Docker 直接 `npm run build`**，内网地址就会被烤进生产包，前端所有请求打到不可达 IP。**加固**：`.dockerignore` 已排除 `**/.env.local`，`frontend/Dockerfile` 的 `ENV VITE_API_BASE=/api/v1` 严禁删除；**上传包亦已剔除所有 `.env`（含根 `.env` 与 `deploy/.env`，避免泄漏 JWT 密钥）**，服务器上须用模板重新生成。

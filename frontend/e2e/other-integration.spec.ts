@@ -80,7 +80,7 @@ test("代分期页面收款结清后交付，不重复产生流水", async ({ pa
   await expect(delivery).toBeHidden();
 });
 
-test("资金流水页面提交审核并审核通过", async ({ page }) => {
+test("资金流水页面新增即入账并在列表显示", async ({ page }) => {
   await page.goto("/");
   await navItem(page, "资金中心").click();
   await page.getByRole("tab", { name: "流水" }).click();
@@ -90,23 +90,20 @@ test("资金流水页面提交审核并审核通过", async ({ page }) => {
   await page.getByTitle("投资款荷包（HJ_INVEST）").last().click();
   await dialog.getByLabel("类别").fill("UI_TEST");
   await fillChecked(dialog.getByLabel("金额", { exact: true }), "12");
-  await dialog.getByLabel("摘要").fill("页面联调资金审核");
+  await dialog.getByLabel("摘要").fill("页面联调资金入账");
   const create = page.waitForResponse(r => r.url().endsWith("/cashflows") && r.request().method() === "POST");
-  await dialog.getByRole("button", { name: "提交审核" }).click();
+  // 口径：资金流水已取消审核/驳回，录入即入账（提交 3f7c115），按钮文案为「提交」。
+  await dialog.getByRole("button", { name: "提交" }).click();
   const created = await create;
   expect(created.status()).toBe(201);
   const flow = await created.json();
-  expect(flow.status).toBe("PENDING");
+  expect(flow.status).toBe("APPROVED");
   await expect(dialog).toBeHidden();
   const row = page.getByRole("row").filter({ hasText: flow.flow_no });
-  await expect(row.getByText("待审核")).toBeVisible({ timeout: 2000 });
-  const approve = page.waitForResponse(r => r.url().endsWith(`/cashflows/${flow.id}/approve`) && r.request().method() === "POST");
-  await row.getByRole("button", { name: /审\s*核/ }).click();
-  // 「审核」用 ConfirmButton 包了 Popconfirm（okText=确认审核），必须二次确认才会真正提交。
-  await page.getByRole("button", { name: /确\s*认\s*审\s*核/ }).click();
-  const approved = await approve;
-  expect(approved.status()).toBe(200);
-  expect((await approved.json()).status).toBe("APPROVED");
+  // 状态文案取自 option_set FUND_FLOW_STATUS（APPROVED → 「已审核」）。
+  // 注：src 里 configurableLabel 的 fallback 写的是「已入账」，但配置优先，
+  // 故实际渲染为「已审核」；两者文案不一致属产品待统一项，此处按实际渲染断言。
+  await expect(row.getByText("已审核")).toBeVisible({ timeout: 5000 });
 });
 
 
@@ -120,7 +117,9 @@ test("资金对账页面提交差异并核销", async ({ page }) => {
   await page.getByTitle("投资款荷包（HJ_INVEST）").last().click();
   const label = `页面对账-${Date.now()}`;
   await dialog.getByLabel("对账账户").fill(label);
-  await dialog.getByLabel("账面余额").fill("0");
+  // 校验规则：账面余额必须大于 0（填 0 会被表单拦截，onFinish 不触发 → 不发 POST）。
+  // 本用例本就验证「差异」场景，账面填 100 与系统余额（0）形成差异，故必须填差异原因（下方已填）。
+  await dialog.getByLabel("账面余额").fill("100.00");
   await dialog.getByLabel("差异原因").fill("页面联调对账差异");
   const create = page.waitForResponse(r => r.url().endsWith("/reconciliations") && r.request().method() === "POST");
   await dialog.getByRole("button", { name: "提交对账" }).click();

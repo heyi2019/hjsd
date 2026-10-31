@@ -12,7 +12,6 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
-from app.core.periods import assert_period_open
 from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
 from app.domain.trade import Cashflow
@@ -34,7 +33,6 @@ def create_transfer(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
-    assert_period_open(session, occurred_on, operation="创建资金划转")
     if source_pool_id == target_pool_id:
         raise Validation("转出池与转入池不能相同", details={"pool_id": source_pool_id})
     if user is not None and (
@@ -136,7 +134,6 @@ def repair_transfer(
     if len(rows) != 1:
         raise Validation("该划转不是单边记录，不能自动修复", details={"transfer_id": transfer})
     source = rows[0]
-    assert_period_open(session, source.occurred_on, operation="修复历史资金划转")
     if user is not None and (
         not user.can_see_pool(source.pool_id) or not user.can_see_pool(counterpart_pool_id)
     ):

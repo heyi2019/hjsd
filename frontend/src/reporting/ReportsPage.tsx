@@ -8,8 +8,7 @@ import { NotificationsPanel } from "../notifications/NotificationsPanel";
 import { SearchPanel } from "../search/SearchPanel";
 import { AuditPanel } from "../audit/AuditPanel";
 import { AttachmentPanel } from "../attachments/AttachmentPanel";
-import {
-  reportsApi,
+import { reportsApi,
   type BusinessPnlReport,
   type BusinessPnlRow,
   type CommissionReport,
@@ -23,22 +22,19 @@ import {
   type MonthlyPnlReport,
   type MonthlyPnlRow,
   type OrderProfitReport,
-  type OrderProfitRow,
-} from "../shared/api/catalog";
-import { errorMessage, normalizeError } from "../shared/api/client";
+  type OrderProfitRow, } from "../shared/api/catalog";
+import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { ACCOUNTING_ATTRIBUTE_LABEL, BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, FUND_NATURE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
-import {
-  DataTable,
+import { DataTable,
   ErrorBanner,
   MoneyText,
   StatRow,
   StatusTag,
   PermissionButton,
   Select,
-  useCompactLayout,
-} from "../shared/ui";
+  useCompactLayout, } from "../shared/ui";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useListViewColumns } from "../shared/lib/listColumns";
 
@@ -246,7 +242,6 @@ function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
 }
 
 /** 区间选择已提升到父级（reportRange），各报表通过 range 属性复用父级统计周期。 */
-
 
 function InventoryReport() {
   const compact = useCompactLayout();

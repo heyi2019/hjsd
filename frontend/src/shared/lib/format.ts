@@ -22,13 +22,13 @@ export function today(): string {
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   ACTIVE: "进行中",
+  INSTALLMENT: "分期中",
   COMPLETED: "已完成",
   CANCELLED: "已取消",
 };
 
 export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
-  PENDING: "待首付",
-  ACTIVE: "收款中",
+  ACTIVE: "还款中",
   OVERDUE: "逾期",
   SETTLED: "已结清",
   DELIVERED: "已交付",
@@ -37,9 +37,13 @@ export const INSTALLMENT_STATUS_LABEL: Record<string, string> = {
   CANCELLED: "已取消",
 };
 
+/** PENDING 是合约落库的内部初始化值，业务界面按还款中展示，不作为筛选项暴露。 */
+export function installmentDisplayStatus(status: string): string {
+  return status === "PENDING" ? "ACTIVE" : status;
+}
+
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
-  IN_STOCK: "在库",
-  INSTALLMENT: "分期中",
+  WAITING: "待售",
   SOLD: "已售",
   VOID: "失效",
 };
@@ -59,7 +63,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
  * 代分期的 BUY 仍是兼容性事件编码，页面只展示为“付款”；借款本金由业务字段和资金属性表达。
  * 买入交付和售出交付结合订单类型判断：代分期是向客户完成售出交付，其余交付语义归入买入交付。
  */
-export const EXECUTION_ACTION_LABEL: Record<string, string> = {
+const EXECUTION_ACTION_LABEL: Record<string, string> = {
   BUY: "买号",
   COST: "费用支出",
   SELL: "售出",

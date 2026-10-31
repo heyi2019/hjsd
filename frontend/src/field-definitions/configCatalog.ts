@@ -14,7 +14,6 @@ import {
   listColumnsApi,
   orderFormFieldsApi,
   orderTypesApi,
-  periodLocksApi,
   policyApi,
   poolsApi,
   sequencesApi,
@@ -33,7 +32,7 @@ export const CONFIG_GROUP_LABEL: Record<ConfigGroupCode, string> = {
   OPS: "作业与外观",
 };
 
-export interface SettingsItemMeta {
+interface SettingsItemMeta {
   /** 与 SettingsPage 的 Tab key 一致，用于跳转。 */
   key: string;
   label: string;
@@ -95,7 +94,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   },
   {
     key: "game-types",
-    label: "游戏与渠道配置",
+    label: "游戏与渠道",
     summary: "产品分类选项，建单与库存共用",
     group: "MASTER",
     entityTypes: ["GameTypeOption"],
@@ -137,15 +136,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     count: async () => (await importsApi.batches()).total,
   },
   {
-    key: "period-locks",
-    label: "月结账期锁",
-    summary: "封账后该账期禁止登记/修改现金流",
-    group: "OPS",
-    permission: "finance.period.lock",
-    entityTypes: ["period_lock"],
-    count: async () => (await periodLocksApi.list()).length,
-  },
-  {
     key: "sequences",
     label: "编号序列",
     summary: "单号生成现状排查；后端只读，不能在此修改",
@@ -185,9 +175,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
 ];
 
 /** 全部涉及的 entity_type 扁平集合，供「最近配置改动」流水过滤。 */
-export const CONFIG_ENTITY_TYPES: string[] = [
-  ...new Set(SETTINGS_ITEMS.flatMap((item) => item.entityTypes)),
-];
 
 /** entity_type → 配置项标签，流水中把「order_form_field」翻成人话。 */
 export const ENTITY_TYPE_TO_ITEM: Record<string, string> = Object.fromEntries(

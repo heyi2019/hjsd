@@ -1,0 +1,64 @@
+/** 配置中心：顶部页签菜单 + 下方现有配置页面。 */
+.config-center {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.config-center__nav {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 20px;
+  padding-bottom: 12px;
+  border-bottom: var(--border-w) solid var(--color-border);
+}
+
+.config-center__group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.config-center__group-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0 4px 0 0;
+}
+
+.config-center__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  text-align: center;
+  padding: 5px 12px;
+  border: var(--border-w) solid var(--color-border);
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.config-center__item:hover {
+  background: var(--brand-soft);
+  border-color: var(--color-primary);
+}
+
+.config-center__item--active {
+  background: var(--brand-soft);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+
+.config-center__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}

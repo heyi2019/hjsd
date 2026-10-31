@@ -110,7 +110,7 @@ class TestStockNoAtOrderCreation:
         assert account.stock_no is not None
         assert KU_PATTERN.match(account.stock_no)
         assert account.game_account == "hs-stockno-at-create"
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         # 订单本体尚无任何事件（BUY 未登记），编号已就位
         assert seeded_db.scalar(
             select(OrderEvent.id).where(OrderEvent.order_id == order.id)

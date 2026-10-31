@@ -1,7 +1,7 @@
 import { Form, Input, Typography } from "antd";
 import { BusinessActionModal, BusinessForm, Select } from "../shared/ui";
 import { useEffect } from "react";
-import { SCOPE_OPTIONS, today } from "./policyConstants";
+import { today } from "./policyConstants";
 import { describeConfig } from "./policyConfigSchema";
 
 export interface PolicyResolveValues {
@@ -53,7 +53,7 @@ export function PolicyResolveModal({
   }, [open, initialCode, form]);
 
   return (
-    <BusinessActionModal
+    <BusinessActionModal size="compact"
       open={open}
       title="规则生效期自查"
       okText="解析"

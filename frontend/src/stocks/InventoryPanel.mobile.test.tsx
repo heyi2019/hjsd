@@ -22,7 +22,7 @@ function makeRow(over: Partial<Account> = {}): Account {
     value_added_service: "NONE",
     game_type: "PUBG",
     platform: "Steam",
-    status: "IN_STOCK",
+    status: "WAITING",
     cost_amount: "100.00",
     ...over,
   } as Account;
@@ -54,7 +54,7 @@ describe("MobileInventoryList", () => {
     const user = userEvent.setup();
     renderCard(
       <MobileInventoryList
-        rows={[makeRow({ inventory_type: "SELF", status: "IN_STOCK" })]}
+        rows={[makeRow({ inventory_type: "SELF", status: "WAITING" })]}
         onDetail={() => {}}
         onSale={onSale}
         onConsign={() => {}}

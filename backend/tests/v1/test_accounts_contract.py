@@ -128,7 +128,7 @@ class TestCreateAccountGuards:
             game_account="db-invalid-context",
             business_mode="SELF",
             inventory_type="CONSIGNMENT",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
         )
         seeded_db.add(account)
         with pytest.raises(IntegrityError):
@@ -158,7 +158,7 @@ class TestCreateAccountGuards:
             game_account="pickup-original",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=Decimal("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -296,7 +296,7 @@ class TestCreateAccountGuards:
 
     def test_consignments_enter_inventory_without_purchase_payment(self, seeded_db):
         account = _account(seeded_db, "consignment-acc", inventory_type="CONSIGNMENT")
-        assert account.status == AccountStatus.IN_STOCK.value
+        assert account.status == AccountStatus.WAITING.value
 
 
 class TestAccountQueries:
@@ -318,7 +318,7 @@ class TestAccountQueries:
         assert [
             item.id
             for item in service.list_accounts(
-                seeded_db, status=AccountStatus.IN_STOCK.value
+                seeded_db, status=AccountStatus.WAITING.value
             )
         ] == [first.id, second.id]
         assert service.list_accounts(seeded_db, status="VOID") == []
@@ -346,7 +346,7 @@ class TestAccountQueries:
             game_account="pickup-not-inventory",
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=Decimal("300.00"),
             created_by="pytest",
             updated_by="pytest",
@@ -538,7 +538,7 @@ class TestAccountsApi:
         assert response.json()["items"] == []
 
         stocked = seeded_client.get(
-            "/api/v1/stocks", params={"status": AccountStatus.IN_STOCK.value},
+            "/api/v1/stocks", params={"status": AccountStatus.WAITING.value},
             headers=headers,
         )
         assert [item["game_account"] for item in stocked.json()["items"]] == [account.game_account]

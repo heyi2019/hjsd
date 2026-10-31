@@ -7,7 +7,7 @@
  *    「显示/隐藏 + 顺序 + 列宽 + 固定列」；
  *  - 自定义列由管理员新增，绑定一个已启用的表单自定义字段（field_key）；列键统一
  *    `extra:{field_key}`，显示状态与内置列共用同一套保存逻辑；
- *  - 锁定列（订单号/库存编号/合约号/操作列）不可隐藏 —— 后端也会二次拒绝（422）；
+ *  - 所有列（含身份列/操作列）均可隐藏与调序，无锁定约束；
  *  - 排序支持整行拖拽（HTML5 DnD，落在目标行位置），也保留上移/下移按钮；
  *  - 批量操作：勾选多列后一键显示/隐藏，一次整表提交；
  *  - 保存即生效，已打开的列表页会通过 refreshListColumns() 即时重排，无需刷新；
@@ -17,7 +17,6 @@
 import { Input, InputNumber, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Key } from "react";
 import {
   listColumnsApi,
   type ListColumnConfig,
@@ -310,14 +309,9 @@ export function ListColumnsPanel() {
       title: "显示",
       dataIndex: "is_visible",
       width: 120,
-      render: (visible: boolean, row) => (
+      render: (visible: boolean) => (
         <Space size={4}>
           <StatusTag status={visible ? "ACTIVE" : "DISABLED"} label={visible ? "显示" : "已隐藏"} />
-          {row.locked ? (
-            <Typography.Text type="secondary" aria-label={`锁定_${row.key}`}>
-              锁定
-            </Typography.Text>
-          ) : null}
         </Space>
       ),
     },
@@ -372,7 +366,7 @@ export function ListColumnsPanel() {
                 permission="field-definition.manage"
                 size="small"
                 aria-label={`显示_${row.key}`}
-                disabled={row.locked || saving}
+                disabled={saving}
                 onClick={() => void toggle(row.key, !row.is_visible)}
               >
                 {row.is_visible ? "隐藏" : "显示"}
@@ -492,7 +486,7 @@ export function ListColumnsPanel() {
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
-            getCheckboxProps: (row) => ({ disabled: row.locked || saving }),
+            getCheckboxProps: () => ({ disabled: saving }),
           }}
           /** 整行拖拽排序：拖起记录来源键，drop 到目标行位置后整表重排提交。 */
           onRow={(row) => ({

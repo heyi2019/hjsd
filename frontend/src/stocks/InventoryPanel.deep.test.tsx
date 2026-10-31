@@ -38,7 +38,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 
 const inStockRow = {
   id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "安卓",
-  status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01",
+  status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01",
   created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "初始描述",
 } as unknown as Account;
 
@@ -50,7 +50,7 @@ const soldRow = {
 
 const installmentRow = {
   id: 3, source_order_no: "DFQ-2026-0003", game_account: "acc-3", platform: "安卓",
-  status: "INSTALLMENT", inventory_type: "RECOVERY", cost_amount: "300.00", buy_date: "2026-10-03",
+  status: "SOLD", inventory_status: "OUT_OF_STOCK", inventory_type: "RECOVERY", cost_amount: "300.00", buy_date: "2026-10-03",
   created_by: "admin", created_at: "2026-10-03T09:30:00",
 } as unknown as Account;
 
@@ -131,16 +131,16 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
-  it("更多菜单 → 账号描述：打开描述编辑弹窗", async () => {
+  it("更多菜单 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "账号描述");
-    expect((await screen.findAllByText("账号描述")).length).toBeGreaterThan(0);
+    await clickMore(rowOf(1), "描述");
+    expect((await screen.findAllByText("描述")).length).toBeGreaterThan(0);
   });
 
-  it("更多菜单 → 账号图片：打开图片编辑弹窗", async () => {
+  it("更多菜单 → 作图：打开图片编辑弹窗", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "账号图片");
-    expect((await screen.findAllByText("账号图片")).length).toBeGreaterThan(0);
+    await clickMore(rowOf(1), "作图");
+    expect((await screen.findAllByText("作图")).length).toBeGreaterThan(0);
   });
 
   it("非代挂在库账号不展示下架入口", async () => {
@@ -148,8 +148,8 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     fireEvent.click(within(rowOf(1)).getByRole("button", { name: /更多/ }));
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("下架")).toBeNull();
-    expect(within(menu).getByText("账号描述")).toBeInTheDocument();
-    expect(within(menu).getByText("账号图片")).toBeInTheDocument();
+    expect(within(menu).getByText("描述")).toBeInTheDocument();
+    expect(within(menu).getByText("作图")).toBeInTheDocument();
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {

@@ -2,18 +2,15 @@
 
 账号状态与成本由订单事件驱动，本模块**不提供**改状态/改成本入口（ACC-01-03/04）。
 """
-from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.schemas import RequestModel
 from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FINANCE_READ,
@@ -43,77 +40,29 @@ from app.domain.trade import (
 )
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
-from app.core.periods import assert_period_open
-from app.core.schemas import PageOut
 from app.orders import service as orders_service
+
+from .schemas import (
+    AccountOut,
+    AccountListOut,
+    AccountProfileUpdate,
+    ExecutionEditRequest,
+    InventoryResponseOut,
+    ExecutionCashflowOut,
+    ExecutionEventOut,
+    ExecutionCounterpartyOut,
+    ExecutionCustomerOut,
+    ExecutionRebateOut,
+    AccountExecutionOrderOut,
+    AccountAuditOut,
+    AccountExecutionDetailOut,
+)
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
 edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
-
-
-class AccountOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    stock_no: str | None = None
-    source_order_no: str | None = None
-    game_account: str | None = None
-    game_type: str | None = None
-    business_mode: str | None = None
-    inventory_type: str | None = None
-    value_added_service: str | None = None
-    game_password: str | None = None
-    channel_region: str | None = None
-    bound_phone: str | None = None
-    has_secondary: bool | None = None
-    platform: str | None = None
-    note: str | None = None
-    account_description: str | None = None
-    account_images: list[str] | None = None
-    extra_values: dict[str, object] = Field(default_factory=dict)
-    status: str
-    cost_amount: Decimal
-    buy_date: date | None = None
-    created_by: str
-    created_at: datetime
-
-
-class AccountListOut(PageOut[AccountOut]):
-    pass
-
-
-class AccountProfileUpdate(RequestModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    game_account: str | None = Field(default=None, max_length=128)
-    game_type: str | None = Field(default=None, max_length=64)
-    game_password: str | None = Field(default=None, max_length=256)
-    channel_region: str | None = Field(default=None, max_length=128)
-    bound_phone: str | None = Field(default=None, max_length=64)
-    has_secondary: bool | None = None
-    platform: str | None = Field(default=None, max_length=64)
-    account_description: str | None = Field(default=None, max_length=2000)
-    account_images: list[str] | None = Field(default=None, max_length=9)
-    note: str | None = None
-    extra_values: dict[str, object] | None = None
-    # 表单字段配置体系（INVEDIT 作用域）：合并进账号 form_extra。
-    form_extra: dict[str, object] | None = None
-
-
-class ExecutionEditItem(RequestModel):
-    id: int = Field(gt=0)
-    expected_amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
-    amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
-    note: str | None = None
-    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
-
-
-class ExecutionEditRequest(RequestModel):
-    events: list[ExecutionEditItem] = Field(max_length=100)
-    profile: AccountProfileUpdate | None = None
 
 
 @router.patch("/stocks/{account_id}/execution-edit")
@@ -153,8 +102,6 @@ def update_execution_detail(
             raise NotFound("关联资金流水不存在")
         if Decimal(str(flow.amount)) != Decimal(str(event.amount)):
             raise Validation("执行记录与关联流水金额不一致，请先核对")
-        assert_period_open(db, event.occurred_on, operation="修改执行记录")
-        assert_period_open(db, flow.occurred_on, operation="修改资金流水")
         if (event.offset_event_id is not None or flow.reversal_of_id is not None
             or db.scalar(select(OrderEvent.id).where(OrderEvent.offset_event_id == event.id)) is not None
             or db.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)) is not None):
@@ -192,127 +139,6 @@ def update_execution_detail(
         account.updated_by = user.username
     db.flush()
     return {"ok": True}
-
-
-class AccountInventoryOut(BaseModel):
-    """库存健康接口的单行契约；与账号台账共享同一业务字段语义。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    account_id: int
-    stock_no: str | None = None
-    game_account: str | None = None
-    business_mode: str | None = None
-    inventory_type: str | None = None
-    value_added_service: str | None = None
-    platform: str | None = None
-    status: str
-    cost_amount: Decimal
-    account_description: str | None = None
-    account_images: list[str] = Field(default_factory=list)
-    extra_values: dict[str, object] = Field(default_factory=dict)
-
-
-class InventoryResponseOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    items: list[AccountInventoryOut]
-    count: int
-    total_cost: Decimal
-
-
-class ExecutionCashflowOut(BaseModel):
-    flow_no: str
-    pool_name: str | None = None
-    occurred_on: date
-    occurred_at: datetime
-    direction: str
-    nature: str
-    category: str
-    amount: Decimal
-    note: str | None = None
-    operator: str
-
-
-class ExecutionEventOut(BaseModel):
-    id: int
-    event_no: str
-    event_type: str
-    amount: Decimal
-    occurred_on: date
-    occurred_at: datetime
-    created_at: datetime
-    posted_at: datetime | None = None
-    pool_id: int | None = None
-    offset_event_id: int | None = None
-    portion: str
-    delivery_mode: str | None = None
-    is_posted: bool
-    reason: str | None = None
-    note: str | None = None
-    cashflow: ExecutionCashflowOut | None = None
-    operator: str
-    operator_user_ids: list[int] | None = None
-    operator_names: list[str] = Field(default_factory=list)
-
-
-class ExecutionCounterpartyOut(BaseModel):
-    id: int
-    display_name: str
-    role: str
-
-
-class ExecutionCustomerOut(BaseModel):
-    id: int
-    display_name: str
-    role: str
-
-
-class ExecutionRebateOut(BaseModel):
-    id: int
-    rebate_no: str
-    rebate_type: str
-    channel: str | None = None
-    rate: Decimal
-    base_amount: Decimal
-    status: str
-    collected_on: date
-    collected_at: datetime
-
-
-class AccountExecutionOrderOut(BaseModel):
-    order_id: int
-    order_no: str
-    order_type: str
-    trade_date: date
-    created_at: datetime
-    status: str
-    account_platform: str | None = None
-    note: str | None = None
-    extra_values: dict[str, object] = Field(default_factory=dict)
-    extra_fields: list[dict[str, object]] = Field(default_factory=list)
-    cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)
-    customers: list[ExecutionCustomerOut] = Field(default_factory=list)
-    counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
-    rebates: list[ExecutionRebateOut] = Field(default_factory=list)
-    events: list[ExecutionEventOut]
-    operator: str
-
-
-class AccountAuditOut(BaseModel):
-    id: int
-    action: str
-    entity_type: str
-    entity_id: str
-    actor: str
-    reason: str | None = None
-    occurred_at: datetime
-
-
-class AccountExecutionDetailOut(BaseModel):
-    account: AccountOut
-    orders: list[AccountExecutionOrderOut]
-    audit: list[AccountAuditOut] = Field(default_factory=list)
 
 
 INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
@@ -378,6 +204,7 @@ def _account_output(
         output.game_password = None
     output.extra_values = extra_values or {}
     if source_order is not None:
+        output.source_order_id = source_order.id
         output.source_order_no = source_order.order_no
     return output
 
@@ -479,7 +306,7 @@ def inventory(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> InventoryResponseOut:
-    """库存健康表 R1：只统计在库与分期中的真实占用。"""
+    """库存健康表 R1：只统计独立库存状态为在库的真实占用。"""
     rows = service.inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)

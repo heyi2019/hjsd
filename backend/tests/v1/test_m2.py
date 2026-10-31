@@ -18,7 +18,7 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
+from app.domain.trade import Account, Cashflow, Installment, InstallmentSchedule, Order
 from app.finance import service as finance_service
 from app.installments import service as installment_service
 from app.orders import service as orders_service
@@ -45,6 +45,34 @@ def _account(seeded_db, game_account: str):
 
 
 class TestA04DfqAdvancePurchase:
+    def test_dfq_installment_is_separate_from_inventory_status(self, seeded_db):
+        order = orders_service.create_order(
+            seeded_db,
+            order_type="DFQ",
+            trade_date=TODAY,
+            actor="pytest",
+            account_snapshot={"game_account": "dfq-status-separation"},
+        )
+        contract = installment_service.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type=InstallmentContractType.ADVANCE_PURCHASE.value,
+            principal=Decimal("100"),
+            down_payment=Decimal("20"),
+            periods=1,
+            per_period=Decimal("80"),
+            first_due_on=TODAY,
+            actor="pytest",
+        )
+        seeded_db.flush()
+
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        assert contract.status == InstallmentStatus.PENDING.value
+        assert order.status == OrderStatus.INSTALLMENT.value
+        assert account.inventory_status == "OUT_OF_STOCK"
+        assert account.id not in {item["account_id"] for item in stocks_service.inventory(seeded_db)}
+
     def test_buy_downpayment_two_periods_deliver(self, seeded_db):
         supplier = parties_service.create_counterparty(
             seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"
@@ -180,7 +208,7 @@ class TestA05HsStockSale:
             occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
-        assert seeded_db.get(type(account), account.id).status == AccountStatus.IN_STOCK.value
+        assert seeded_db.get(type(account), account.id).status == AccountStatus.WAITING.value
 
         invest = _pool(seeded_db, "HJ_INVEST")
         contract = installment_service.create_installment(
@@ -228,7 +256,7 @@ class TestA05HsStockSale:
         seeded_db.commit()
         contract = seeded_db.get(Installment, contract.id)
         assert contract.status == InstallmentStatus.SETTLED.value
-        assert seeded_db.get(type(account), account.id).status == AccountStatus.INSTALLMENT.value
+        assert seeded_db.get(type(account), account.id).status == AccountStatus.SOLD.value
 
         installment_service.deliver(
             seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
@@ -340,48 +368,6 @@ class TestA08Deposit:
 
 
 class TestA06Rebate:
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_two_settlements_and_net_amounts(self, seeded_db):
-        account = _account(seeded_db, "reb-acc")
-        seeded_db.commit()
-        order = orders_service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
-        )
-        seeded_db.commit()
-        orders_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
-            occurred_on=TODAY, actor="pytest",
-        )
-        seeded_db.commit()
-
-        record = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount=Decimal("300"),
-            rate=Decimal("0.10"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        seeded_db.commit()
-        assert record.rebate_no == f"{order.order_no}-RB01"
-
-        profit = _pool(seeded_db, "HJ_PROFIT")
-        first = finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("200"),
-            platform_fee=Decimal("20"), settled_on=TODAY, pool_id=profit.id, actor="pytest",
-        )
-        second = finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("100"),
-            platform_fee=Decimal("10"), settled_on=TODAY, pool_id=profit.id, actor="pytest",
-        )
-        seeded_db.commit()
-
-        assert first.settlement_no == f"{order.order_no}-RB01-CF-01"
-        assert second.settlement_no == f"{order.order_no}-RB01-CF-02"
-        assert first.net_amount == Decimal("180.00")
-        assert second.net_amount == Decimal("90.00")
-        assert finance_service.settled_net_total(seeded_db, record.id) == Decimal("270.00")
 
     def test_rebate_requires_active_source_order(self, seeded_db):
         order = orders_service.create_order(

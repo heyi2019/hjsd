@@ -20,14 +20,11 @@ from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
-    Direction,
-    Nature,
     OrderStatus,
     RebateStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, RebateRecord
-from app.finance import service as finance_service
+from app.domain.trade import Account, RebateRecord
 from app.orders import service as order_service
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
@@ -53,7 +50,7 @@ def test_reporting_read_routes_publish_typed_response_models(app):
 def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     seeded_db, seeded_client, headers
 ):
-    from app.finance.cashflows import approve_cashflow, create_cashflow
+    from app.finance.cashflows import create_cashflow
 
     # 资金池账户已下线：直接在种子池上造流水（等价于原 get_pool + create_pool_account）
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
@@ -62,7 +59,7 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
         ("IN", "100.00", "SELF_REVENUE"),
         ("OUT", "40.00", "SELF_DIRECT_COST"),
     ):
-        flow = create_cashflow(
+        create_cashflow(
             seeded_db,
             pool_id=pool.id,
             occurred_on=date(2026, 10, 17),
@@ -75,7 +72,6 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
             actor="pytest",
             note="资金属性分析测试",
         )
-        approve_cashflow(seeded_db, flow.id, actor="finance")
 
     report = reporting_service.finance_dimension_report(
         seeded_db, from_date=date(2026, 10, 17), to_date=date(2026, 10, 17)
@@ -123,32 +119,6 @@ def _order(seeded_db, *, trade_date: date = D, account_id: int | None = None):
     )
 
 
-def _cashflow(
-    seeded_db,
-    *,
-    flow_no: str,
-    occurred_on: date,
-    nature: str,
-    direction: str,
-    amount: str,
-    order_event_id: int | None = None,
-) -> None:
-    seeded_db.add(
-        Cashflow(
-            flow_no=flow_no,
-            pool_id=1,
-            occurred_on=occurred_on,
-            nature=nature,
-            category="OTHER",
-            direction=direction,
-            amount=to_money(amount),
-            order_event_id=order_event_id,
-            created_by="pytest",
-            updated_by="pytest",
-        )
-    )
-
-
 def _month_item(data: dict, month: str) -> dict:
     matched = [item for item in data["items"] if item["month"] == month]
     assert matched, f"月份 {month} 不在报表中: {[i['month'] for i in data['items']]}"
@@ -163,7 +133,7 @@ class TestR1Inventory:
         account = Account(
             game_account="report-null-platform",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("125.00"),
             platform=None,
             created_by="pytest",
@@ -184,7 +154,7 @@ class TestR1Inventory:
         pickup = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             buy_date=D,
             cost_amount=to_money("500.00"),
             created_by="pytest",
@@ -201,7 +171,7 @@ class TestR1Inventory:
         in_stock = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             buy_date=D,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -214,7 +184,7 @@ class TestR1Inventory:
             updated_by="pytest",
         )
         no_buy_date = Account(
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("500.00"),
             created_by="pytest",
             updated_by="pytest",
@@ -223,7 +193,7 @@ class TestR1Inventory:
         seeded_db.flush()
 
         order = _order(seeded_db, account_id=in_stock.id)
-        # 买-卖-买周期：SELL 会把账号翻 SOLD，再 BUY 回 IN_STOCK，
+        # 买-卖-买周期：SELL 会把账号翻 SOLD，再 BUY 回 WAITING，
         # 此时历史 SELL 事件仍计入 expected_price（覆盖 R1 账号循环的售价汇总）
         order_service.post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
@@ -341,52 +311,6 @@ class TestR2MonthlyPnl:
         assert detail["buy_amount"] == 500
         assert detail["net_profit"] == -500
 
-    @pytest.mark.skip(reason="返点不再通过结算资金流水入报表")
-    def test_operating_expense_and_rebate_net_loops(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
-        )
-        # 运营费用：非订单来源的业务支出流水
-        _cashflow(
-            seeded_db, flow_no="CF-R2-1", occurred_on=D,
-            nature=Nature.BUSINESS_OUT.value, direction=Direction.OUT.value,
-            amount="500.00",
-        )
-        _cashflow(
-            seeded_db, flow_no="CF-R2-2", occurred_on=EARLY,
-            nature=Nature.BUSINESS_OUT.value, direction=Direction.OUT.value,
-            amount="100.00",
-        )
-        # 返点结算：毛额 − 手续费 = 净额
-        record = finance_service.create_rebate(
-            seeded_db, source_order_id=order.id, base_amount="1000.00",
-            rebate_type="BUY",
-            collected_on=D, actor="pytest", rate="10",
-        )
-        finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount="100.00", settled_on=D, pool_id=2,
-            actor="pytest", platform_fee="10.00",
-        )
-
-        full = reporting_service.r2_monthly_pnl(seeded_db)
-        assert _month_item(full, "2026-10")["operating_expense"] == 510
-        assert _month_item(full, "2026-10")["rebate_income"] == 100
-        assert _month_item(full, "2026-09")["operating_expense"] == 100
-
-        # from 过滤同时排除运营费用与返点结算
-        gated = reporting_service.r2_monthly_pnl(seeded_db, from_date=date(2026, 10, 5))
-        assert gated["items"] == []
-
-        # to 过滤：10 月运营费用与结算日均被 continue，只剩 9 月运营费用
-        early_only = reporting_service.r2_monthly_pnl(
-            seeded_db, to_date=date(2026, 9, 30)
-        )
-        assert [i["month"] for i in early_only["items"]] == ["2026-09"]
-        assert _month_item(early_only, "2026-09")["operating_expense"] == 100
-        assert _month_item(early_only, "2026-09")["rebate_income"] == 0
-
 
 # --------------------------------------------------------------------- R3 提成
 class TestR3Commission:
@@ -458,210 +382,7 @@ class TestR3Commission:
 
 
 # --------------------------------------------------------------------- R5 业务
-class TestR5BusinessPnl:
-    @pytest.mark.skip(reason="返点不再通过结算资金流水入报表")
-    def test_rebate_settlement_outside_report_period_is_excluded(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
-        )
-        record = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount="1000.00",
-            collected_on=D,
-            actor="pytest",
-            rate="10",
-        )
-        finance_service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount="100.00",
-            settled_on=date(2026, 9, 30),
-            pool_id=2,
-            actor="pytest",
-            platform_fee="10.00",
-        )
-        seeded_db.commit()
-
-        hs = next(
-            row
-            for row in reporting_service.r5_business_pnl(
-                seeded_db,
-                from_date=date(2026, 10, 1),
-                to_date=date(2026, 10, 31),
-            )["items"]
-            if row["order_type"] == "HS"
-        )
-        assert hs["settled_rebate"] == 0
-        assert hs["uncollected_rebate"] == 100
-
-    @pytest.mark.skip(reason="返点登记即完成，不再存在分次结算")
-    def test_partial_rebate_settlement_keeps_uncollected_balance(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
-        )
-        record = finance_service.create_rebate(
-            seeded_db,
-            source_order_id=order.id,
-            rebate_type="BUY",
-            base_amount="1000.00",
-            collected_on=D,
-            actor="pytest",
-            rate="10",
-        )
-        finance_service.settle_rebate(
-            seeded_db,
-            record.id,
-            gross_amount="60.00",
-            settled_on=D,
-            pool_id=2,
-            actor="pytest",
-        )
-        seeded_db.commit()
-
-        item = next(
-            row
-            for row in reporting_service.r5_business_pnl(seeded_db)["items"]
-            if row["order_type"] == "HS"
-        )
-        assert item["settled_rebate"] == 60
-        assert item["uncollected_rebate"] == 40
-
-    @pytest.mark.skip(reason="返点没有未结算/已结算状态")
-    def test_uncollected_and_settled_rebate_buckets(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
-            seeded_db, order.id, event_type="SELL", amount="1300.00",
-            occurred_on=D, actor="pytest",
-        )
-        # 已结算返点：毛额 100 − 手续费 10 = 90
-        record = finance_service.create_rebate(
-            seeded_db, source_order_id=order.id, base_amount="1000.00",
-            rebate_type="BUY",
-            collected_on=D, actor="pytest", rate="10",
-        )
-        finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount="100.00", settled_on=D, pool_id=2,
-            actor="pytest", platform_fee="10.00",
-        )
-        # 未归集返点仍必须归属于具体订单。
-        dg_order = order_service.create_order(
-            seeded_db, order_type="DG", trade_date=D, actor="pytest"
-        )
-        seeded_db.add(
-            RebateRecord(
-                rebate_no="RB-R5-1",
-                source_order_id=dg_order.id,
-                rebate_type="SELL",
-                rate=to_money("10"),
-                base_amount=to_money("500.00"),
-                status=RebateStatus.OPEN.value,
-                collected_on=D,
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        seeded_db.commit()
-
-        data = reporting_service.r5_business_pnl(seeded_db)
-        by_type = {item["order_type"]: item for item in data["items"]}
-        hs = by_type["HS"]
-        assert hs["business_mode"] == "SELF"
-        assert hs["business_type"] == "RECOVERY"
-        assert hs["main_income"] == 1300
-        assert hs["main_cost"] == 1010
-        assert hs["main_profit"] == 290
-        assert hs["settled_rebate"] == 100
-        assert hs["uncollected_rebate"] == 0
-        assert hs["full_income"] == 390
-        # 未归集独立成桶，不摊给 HS
-        uncollected = by_type["DG"]
-        assert uncollected["uncollected_rebate"] == 50
-        assert uncollected["main_profit"] == 0
-        assert uncollected["full_income"] == 0
-
-        # from 过滤同时作用于事件和返点结算日期
-        gated = reporting_service.r5_business_pnl(seeded_db, from_date=date(2026, 10, 5))
-        gated_by_type = {item["order_type"]: item for item in gated["items"]}
-        assert gated_by_type["HS"]["main_income"] == 0
-        assert gated_by_type["HS"]["main_profit"] == 0
-        assert gated_by_type["HS"]["settled_rebate"] == 0
-        assert gated_by_type["HS"]["uncollected_rebate"] == 100
-        assert gated_by_type["DG"]["uncollected_rebate"] == 50
-
-        # to 过滤：occurred_on 和 settled_on=D 的数据均在区间外
-        gated_to = reporting_service.r5_business_pnl(seeded_db, to_date=date(2026, 10, 1))
-        to_by_type = {item["order_type"]: item for item in gated_to["items"]}
-        assert to_by_type["HS"]["main_income"] == 0
-        assert to_by_type["HS"]["settled_rebate"] == 0
-        assert to_by_type["HS"]["uncollected_rebate"] == 100
-        assert to_by_type["DG"]["uncollected_rebate"] == 50
-
-
 # --------------------------------------------------------------------- 订单利润明细
-class TestOrderProfitDetail:
-    @pytest.mark.skip(reason="返点不再通过结算资金流水入报表")
-    def test_event_classification_rebate_join_and_date_filters(self, seeded_db):
-        order = _order(seeded_db)
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
-            seeded_db, order.id, event_type="COST", amount="200.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
-            seeded_db, order.id, event_type="SELL", amount="1300.00",
-            occurred_on=D, actor="pytest",
-        )
-        record = finance_service.create_rebate(
-            seeded_db, source_order_id=order.id, base_amount="1000.00",
-            rebate_type="BUY",
-            collected_on=D, actor="pytest", rate="10",
-        )
-        finance_service.settle_rebate(
-            seeded_db, record.id, gross_amount="100.00", settled_on=D, pool_id=2,
-            actor="pytest", platform_fee="10.00",
-        )
-
-        data = reporting_service.order_profit_detail(seeded_db)
-        assert data["total"]["income"] == 1300
-        assert data["total"]["buy_amount"] == 1000
-        assert data["total"]["direct_cost"] == 210
-        assert data["total"]["rebate"] == 100
-        assert data["total"]["net_profit"] == 190
-        item = data["items"][0]
-        assert item["income"] == 1300
-        assert item["buy_amount"] == 1000
-        assert item["direct_cost"] == 210
-        assert item["rebate"] == 100
-        assert item["net_profit"] == 190
-
-        # 交易日在区间外 → continue
-        assert (
-            reporting_service.order_profit_detail(
-                seeded_db, from_date=date(2026, 10, 10)
-            )["items"]
-            == []
-        )
-        assert (
-            reporting_service.order_profit_detail(
-                seeded_db, to_date=date(2026, 10, 1)
-            )["items"]
-            == []
-        )
-
-
 # --------------------------------------------------------------------- API 日期参数
 class TestReportsApiDateParams:
     def test_from_to_query_aliases(self, seeded_client, seeded_db, headers):

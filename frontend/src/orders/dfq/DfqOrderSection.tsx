@@ -1,10 +1,9 @@
-import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Input, Modal } from "antd";
+import { Form, Input } from "antd";
 import { useEffect, useRef } from "react";
 import type { EmployeeOption, GameTypeOption, Pool } from "../../shared/api/catalog";
 import { AdaptiveFormGrid, MoneyInput, NestedFormField, NestedFormSection, Select } from "../../shared/ui";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
-import { CfgItem, CfgNestedItem, CustomFieldSection } from "../ConfigurableField";
+import { CfgItem, CfgNestedItem, CustomFieldSection, sectionLabel } from "../ConfigurableField";
 import { InstallmentScheduleFields } from "../InstallmentScheduleFields";
 import { CustomerSourceFields } from "../CustomerSourceInput";
 import "./DfqOrderSection.css";
@@ -84,7 +83,7 @@ function DfqInstallmentInfo() {
 }
 
 export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {
-  const form = Form.useFormInstance();
+  const participantTitle = sectionLabel("PARTICIPANT", "分期客户");
 
   return (
     <>
@@ -103,7 +102,7 @@ export function DfqOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOpti
       </RecoveryAccountSection>
 
       <section className="dfq-customer-section recovery-customer-fields" aria-labelledby="dfq-customer-info-title">
-        <div id="dfq-customer-info-title" className="recovery-customer-fields__title">分期客户</div>
+        <div id="dfq-customer-info-title" className="recovery-customer-fields__title">{participantTitle}</div>
         <CfgItem className="recovery-order-modal__party-field" name="customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
         <CustomerSourceFields name="customer_source" otherName="customer_source_other" />
         <div className="recovery-customer-contacts">

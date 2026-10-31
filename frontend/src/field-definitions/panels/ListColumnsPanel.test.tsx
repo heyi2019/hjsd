@@ -99,12 +99,12 @@ describe("ListColumnsPanel", () => {
     expect(screen.queryByText(/配置各列表显示哪些列、以什么顺序显示/)).not.toBeInTheDocument();
   });
 
-  it("默认展示第一个列表的全部列并标注锁定列", async () => {
+  it("默认展示第一个列表的全部列，所有列均可隐藏（无锁定）", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
     expect(screen.getByText("对方 / 来源")).toBeInTheDocument();
-    // 锁定列：隐藏按钮禁用
-    expect(screen.getByRole("button", { name: "显示_order_no" })).toBeDisabled();
+    // 身份列 order_no 的隐藏按钮不再被禁用
+    expect(screen.getByRole("button", { name: "显示_order_no" })).not.toBeDisabled();
   });
 
   it("隐藏列：提交整表且该列 is_visible=false", async () => {
@@ -281,13 +281,13 @@ describe("ListColumnsPanel", () => {
     await waitFor(() => expect(screen.queryByText("VIP 标签")).not.toBeInTheDocument());
   });
 
-  it("批量隐藏：勾选两列后「隐藏所选」一次整表提交，锁定列不可勾选", async () => {
+  it("批量隐藏：勾选后「隐藏所选」一次整表提交，所有列均可勾选", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
 
-    // 锁定列（订单号）的选择框禁用
-    const lockedRow = screen.getByText("订单号").closest("tr") as HTMLElement;
-    expect(lockedRow.querySelector('input[type="checkbox"]')).toBeDisabled();
+    // 身份列（订单号）的选择框现在可勾选
+    const orderRow = screen.getByText("订单号").closest("tr") as HTMLElement;
+    expect(orderRow.querySelector('input[type="checkbox"]')).not.toBeDisabled();
 
     // 勾选「对方 / 来源」后批量隐藏
     const partyRow = screen.getByText("对方 / 来源").closest("tr") as HTMLElement;

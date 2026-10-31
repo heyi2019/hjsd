@@ -1,11 +1,11 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
-import { Card, Form, Input, Modal, Space } from "antd";
+import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { BusinessActionModal, BusinessForm, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessForm, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -94,21 +94,25 @@ export function CustomerLeadPanel() {
         </BusinessForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>
-    <BusinessActionModal title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
+    <BusinessActionModal size="compact" title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
       <FieldConfigScope scope="LEADCLOSE" active={Boolean(closeTarget)}>
         <BusinessForm scope="LEADCLOSE" form={closeForm} onFinish={closeLead}>
           <CfgItem name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-close" />
-          <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </FieldConfigScope>
     </BusinessActionModal>
-    <BusinessActionModal title="需求转单" open={Boolean(convertTarget)} onCancel={() => setConvertTarget(null)} footer={null}>
+    <BusinessActionModal size="compact" title="需求转单" open={Boolean(convertTarget)} onCancel={() => setConvertTarget(null)} footer={null}>
       <FieldConfigScope scope="LEADCONVERT" active={Boolean(convertTarget)}>
         <BusinessForm scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
           <CfgItem name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-convert" />
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>
+          <CompactActions>
+            <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>
+          </CompactActions>
         </BusinessForm>
       </FieldConfigScope>
     </BusinessActionModal>

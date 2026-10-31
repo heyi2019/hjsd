@@ -43,10 +43,10 @@ def count_accounts(session: Session, *, status: str | None = None, user: Current
 
 
 def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict[str, Any]]:
-    """库存健康表：只统计在库与分期中的真实占用。"""
+    """库存健康表：只统计独立库存状态为在库的真实占用。"""
     rows = [
         row for row in list_accounts(session, user=user)
-        if row.status in INVENTORY_STATUSES and row.inventory_type != InventoryType.PICKUP.value
+        if row.inventory_status in INVENTORY_STATUSES and row.inventory_type != InventoryType.PICKUP.value
     ]
     extra_values = parties_service.get_extra_values_bulk(
         session, entity_type="account", entity_ids=[row.id for row in rows]
@@ -59,6 +59,7 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
             "inventory_type": row.inventory_type,
             "platform": row.platform,
             "status": row.status,
+            "inventory_status": row.inventory_status,
             "cost_amount": to_money(row.cost_amount),
             "account_description": row.account_description,
             "account_images": row.account_images or [],
@@ -74,7 +75,7 @@ def total_inventory_cost(session: Session, *, user: CurrentUser | None = None) -
 
 def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> list[Account]:
     stmt = select(Account).where(
-        Account.status.in_(INVENTORY_STATUSES),
+        Account.inventory_status.in_(INVENTORY_STATUSES),
         or_(Account.inventory_type.is_(None), Account.inventory_type != InventoryType.PICKUP.value),
     )
     scope = scope_filter(session, user)

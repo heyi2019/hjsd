@@ -18,7 +18,7 @@ from app.finance import transfers
 TODAY = date(2026, 10, 17)
 
 
-def test_cashflows_module_creates_pending_cashflow(seeded_db):
+def test_cashflows_module_creates_approved_cashflow(seeded_db):
     flow = cashflows.create_cashflow(
         seeded_db,
         pool_id=1,
@@ -32,13 +32,12 @@ def test_cashflows_module_creates_pending_cashflow(seeded_db):
     )
 
     assert flow.amount == Decimal("180.00")
-    assert flow.status == "PENDING"
+    assert flow.status == "APPROVED"
     assert flow.category == "客户收款"
 
 
 def test_finance_facade_re_exports_cashflow_entries():
     assert finance_service.create_cashflow is cashflows.create_cashflow
-    assert finance_service.approve_cashflow is cashflows.approve_cashflow
     assert finance_service.create_deposit is cashflows.create_deposit
 
 
@@ -176,29 +175,7 @@ def test_get_cashflow_checks_order_visible(seeded_db):
     assert fetched.id == flow.id
 
 
-# ----------------------------------------------------------- approve / reject / reverse
-
-
-def test_approve_cashflow_rejects_non_pending(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
-    with pytest.raises(Validation, match="只有待审核流水可以审核"):
-        cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
-
-
-def test_reject_cashflow_rejects_non_pending(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
-    with pytest.raises(Validation, match="只有待审核流水可以驳回"):
-        cashflows.reject_cashflow(seeded_db, flow.id, actor="pytest", reason="x")
-
-
-def test_reverse_cashflow_rejects_non_approved(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    with pytest.raises(Validation, match="只有已审核流水可以冲销"):
-        cashflows.reverse_cashflow(
-            seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
-        )
+# ----------------------------------------------------------- reverse
 
 
 def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
@@ -218,7 +195,6 @@ def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
 
 def test_reverse_cashflow_in_direction(seeded_db):
     flow = _make_flow(seeded_db, direction="IN", nature="BUSINESS_IN")
-    cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
     reversal = cashflows.reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
     )
@@ -301,7 +277,6 @@ def test_list_cashflows_user_filter(seeded_db):
 
 def test_list_cashflows_filters(seeded_db):
     flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
 
     rows, total = cashflows.list_cashflows(seeded_db, direction="OUT")
     assert total >= 1 and all(r["direction"] == "OUT" for r in rows)
@@ -338,15 +313,8 @@ def test_list_cashflows_transfer_source(seeded_db):
     assert all(r["source"] == "TRANSFER" for r in transfer_rows)
 
 
-def test_reject_cashflow_success(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    rejected = cashflows.reject_cashflow(seeded_db, flow.id, actor="pytest", reason="不合理")
-    assert rejected.status == "REJECTED"
-
-
 def test_reverse_cashflow_out_direction(seeded_db):
     flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
     reversal = cashflows.reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
     )
@@ -356,7 +324,6 @@ def test_reverse_cashflow_out_direction(seeded_db):
 
 def test_reverse_cashflow_rejects_already_reversed(seeded_db):
     flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    cashflows.approve_cashflow(seeded_db, flow.id, actor="pytest")
     cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
     with pytest.raises(Validation, match="该流水已冲销"):
         cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")

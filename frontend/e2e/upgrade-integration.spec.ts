@@ -21,14 +21,16 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
   // 「搜索订单」只在「业务台账」面板内，必须先切 Tab。
   await page.getByRole("tab", { name: "业务台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
-  await page.getByRole("row").filter({ hasText: order.order_no }).getByText("查看详情").click();
-  const drawer = page.locator(".ant-drawer-content");
-  // 「登记退款」收在 Drawer 的「更多⌄」下拉菜单里，不是直接渲染的按钮。
-  await drawer.getByRole("button", { name: /更多/ }).click();
-  await page.getByRole("menuitem", { name: "登记退款" }).click();
-  const modal = page.locator(".ant-modal-content");
+  const row = page.getByRole("row").filter({ hasText: order.order_no });
+  // 业务台账已改为行内「更多⌄」菜单直接操作（原「查看详情」抽屉已删除，提交 02d5f07）。
+  // 菜单项口径：「登记退款」已更名「资金收支」（OrdersPage 行内菜单 key=refund）。
+  await row.getByRole("button", { name: /更多/ }).click();
+  await page.getByRole("menuitem", { name: "资金收支" }).click();
+  const modal = page.getByRole("dialog", { name: /资金收支/ });
+  // 资金收支表单字段口径（0057 迁移：订单退款表单调整为资金支出表单）：
+  // 金额（placeholder 请输入退款金额）、收支备注（placeholder 请输入收支备注）、发生日期、操作人。
   await modal.getByPlaceholder("请输入退款金额").fill("30");
-  await modal.getByPlaceholder("请输入退款原因").fill("联调退款");
+  await modal.getByPlaceholder("请输入收支备注").fill("联调退款");
   const response = page.waitForResponse(r => r.url().endsWith(`/orders/${order.id}/events`) && r.request().method() === "POST");
   await modal.getByRole("button", { name: /确\s*定/ }).click();
   expect((await response).status()).toBe(201);
@@ -61,28 +63,40 @@ test("分润页面按人模型保存四项比例", async ({ page, request }) => 
   // 「搜索订单」只在「业务台账」面板内，必须先切 Tab。
   await page.getByRole("tab", { name: "业务台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
-  await page.getByRole("row").filter({ hasText: order.order_no }).getByText("查看详情").click();
-  // 「分润」收在 Drawer 的「更多⌄」下拉菜单内。
-  await page.locator(".ant-drawer-content").getByRole("button", { name: /更多/ }).click();
+  // 「分润」收在行内「更多⌄」下拉菜单内（原「查看详情」抽屉已删除，提交 02d5f07）。
+  await page
+    .getByRole("row")
+    .filter({ hasText: order.order_no })
+    .getByRole("button", { name: /更多/ })
+    .click();
   await page.getByRole("menuitem", { name: "分润" }).click();
   const modal = page.locator(".ant-modal-content");
   // Fix #4 改名验证：弹窗标题已为「分润 ·」。
   await expect(modal.getByText("分润 ·", { exact: false })).toBeVisible();
 
-  // 顶部「姓名（可多选，勾选后自动加行）」勾选 4 人 → 自动生成 4 行（默认空行被替换）。
-  const multiSelect = modal.locator('.ant-form-item:has(.ant-form-item-label:has-text("勾选后自动加行")) .ant-select-selector');
-  await multiSelect.click();
-  const dropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").last();
-  for (const username of pickUsernames) {
-    await dropdown.locator(".ant-select-item-option", { hasText: username }).first().click();
-  }
-  await page.keyboard.press("Escape");
-
+  // 分润弹窗现为「每行一位员工」的 Form.List（原顶部「多选姓名自动加行」模型已移除）：
+  // 默认 1 行，点「+ 增加一行」凑到 4 行，逐行选员工并填 25% 比例（纯比例合计须 100%）。
   const rows = modal.locator(".orders-allocation-row");
-  await expect(rows).toHaveCount(4);
-  // 每行填「比例」25%，合计 100%（纯比例分润要求合计 100%）。
-  for (const row of await rows.all()) {
-    await row.locator('.ant-form-item:has(.ant-form-item-label:has-text("比例")) input').fill("25");
+  // 每点一次 Form.List 会重渲染整块（按钮节点被替换 → 出现 detached 重试），
+  // 故每次重新定位按钮，并等行数按 2→3→4 增长后再点下一次。
+  for (let target = 2; target <= 4; target += 1) {
+    await modal.getByRole("button", { name: /增加一行/ }).click();
+    await expect(rows).toHaveCount(target);
+  }
+  // 分两步：先逐行选员工（选中会触发该行重渲染，早填比例会被重置），再统一填比例。
+  for (let i = 0; i < 4; i += 1) {
+    await rows
+      .nth(i)
+      .locator('.ant-form-item:has(.ant-form-item-label:has-text("姓名")) .ant-select-selector')
+      .click();
+    const dropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").last();
+    await dropdown.locator(".ant-select-item-option", { hasText: pickUsernames[i] }).first().click();
+  }
+  for (let i = 0; i < 4; i += 1) {
+    await rows
+      .nth(i)
+      .locator('.ant-form-item:has(.ant-form-item-label:has-text("比例")) input')
+      .fill("25");
   }
 
   const response = page.waitForResponse(
@@ -104,9 +118,33 @@ test("分润页面按人模型保存四项比例", async ({ page, request }) => 
 // 互相拖累；单跑 ~16s，全量曾贴 30s 超时边界偶发红，故显式 test.slow() 放宽。
 test.describe.serial("重写入用例（串行隔离）", () => {
   test.slow();
-  test("页面售出绑定操作人，返点到账保留收入并单独记录手续费", async ({ page, request }) => {
-    const accountList = await (await request.get(`${base}/accounts`, { headers })).json();
-    const account = accountList.find((a: { inventory_type: string; status: string; game_account: string }) => a.inventory_type === "CONSIGNMENT" && a.status === "IN_STOCK" && a.game_account);
+  test("页面售出绑定操作人，返点登记后在返点明细可见", async ({ page, request }) => {
+    // 库存台账路由已随表改名 accounts → stocks（迁移 0009），返回分页信封 { items, total }。
+    const accountPaged = (await (
+      await request.get(`${base}/stocks`, { headers })
+    ).json()) as {
+      items: Array<{
+        inventory_type: string;
+        inventory_status: string;
+        game_account: string;
+        source_order_id?: number | null;
+      }>;
+    };
+    // 售出必须挂在「来源入库订单」上，故先取一个干净的 IN_STOCK 代挂账号，
+    // 再为它建一张 DG 来源单（库存账号由此获得 source_order_id）。
+    const account = accountPaged.items.find(
+      (a) =>
+        a.inventory_type === "CONSIGNMENT" &&
+        a.inventory_status === "IN_STOCK" &&
+        a.game_account &&
+        !a.source_order_id,
+    );
+    expect(account, "缺少 IN_STOCK 且未关联订单的代挂账号").toBeTruthy();
+    const sourceOrder = await request.post(`${base}/orders`, {
+      headers,
+      data: { order_type: "DG", account_id: account!.id, trade_date: "2026-10-17" },
+    });
+    expect(sourceOrder.status()).toBe(201);
     expect(account).toBeTruthy();
     const users = await (await request.get(`${base}/users`, { headers })).json();
     const admin = users.find((u: { username: string }) => u.username === "admin");
@@ -118,15 +156,22 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     await page.getByRole("row").filter({ hasText: account.game_account }).getByRole("button", { name: "售出" }).click();
     const saleModal = page.getByRole("dialog", { name: "售出账号" });
 
-    // 买家（customer_id）：按表单 label 精确匹配，替换原 .first() 脆弱位置选择器。
+    // 买家信息区块已改为直接录入「客户昵称」（不再有「选择已有客户」下拉）：
+    // 后端按昵称复用/建档客户，买家挂到原买入单。
+    const buyerName = `E2E买家-${Date.now()}`;
+    await saleModal.getByLabel("客户昵称").fill(buyerName);
+    // 「客户来源」为必填下拉（CustomerSourceFields），选首个预设项。
     await saleModal
-      .locator('.ant-form-item:has(.ant-form-item-label:has-text("买家"))')
+      .locator('.ant-form-item:has(.ant-form-item-label:has-text("客户来源"))')
       .locator(".ant-select-selector")
       .click();
-    const buyerDropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").first();
-    await buyerDropdown.locator(".ant-select-item-option").first().click();
+    await page
+      .locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option")
+      .first()
+      .click();
 
-    await saleModal.getByPlaceholder("请输入金额").fill("200");
+    // 「售出金额」与「售出金额2」（分笔进不同资金池）label 前缀相同，必须精确匹配。
+    await saleModal.getByLabel("售出金额", { exact: true }).fill("200");
 
     // 收款资金账户（pool_id）：按表单 label 精确匹配（仅 FULL 付款方式下渲染）。
     await saleModal
@@ -136,16 +181,17 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     const poolDropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").first();
     await poolDropdown.locator(".ant-select-item-option", { hasText: "投资款荷包（HJ_INVEST）" }).first().click();
 
-    const orderResponse = page.waitForResponse(r => r.url().endsWith("/orders") && r.request().method() === "POST");
+    // 口径：售出 = 在原买入单上登记 SELL 事件，不再新建订单，故只等待事件 POST。
     const saleResponse = page.waitForResponse(r => /\/orders\/\d+\/events$/.test(r.url()) && r.request().method() === "POST");
     await saleModal.getByRole("button", { name: "确认售出" }).click();
-    const created = await orderResponse;
-    expect(created.status()).toBe(201);
-    const order = await created.json();
+    const saleRes = await saleResponse;
+    expect(saleRes.status()).toBe(201);
+    // URL 形如 /api/v1/orders/<id>/events → 路径段 ["", "api", "v1", "orders", "<id>", "events"]。
+    const orderId = Number(new URL(saleRes.url()).pathname.split("/")[4]);
+    const detail = await (await request.get(`${base}/orders/${orderId}`, { headers })).json();
     // 库存统一口径：代挂（CONSIGNMENT）售出映射为 DG 订单类型。
-    expect(order.order_type).toBe("DG");
-    expect((await saleResponse).status()).toBe(201);
-    const detail = await (await request.get(`${base}/orders/${order.id}`, { headers })).json();
+    expect(detail.order_type).toBe("DG");
+    const order = { id: orderId };
     const sell = detail.events.find((e: { event_type: string }) => e.event_type === "SELL");
     expect(sell.created_by ?? sell.operator).toBe("admin");
     const allocations = await request.put(`${base}/orders/${order.id}/profit-allocations`, { headers, data: { items: [
@@ -160,26 +206,12 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     const rebateResponse = await request.post(`${base}/rebates`, { headers, data: { source_order_id: order.id, rebate_type: "SELL", base_amount: "100", rate: "0", collected_on: "2026-10-17" } });
     expect(rebateResponse.status()).toBe(201);
     const rebate = await rebateResponse.json();
+    // 口径变更：返点结算模型已重构——DG 代挂沿用统一 SELL 事件登记卖出金额与利润，
+    // 不再有独立「登记结算」流程，也不再生成 REBATE_FEE 手续费分录
+    // （后端 /rebates/{id}/settlements 端点与 REBATE_FEE 类别均已移除）。
+    // 故此处只验证：返点登记成功并在「返点明细」页签可见。
     await navItem(page, "资金中心").click();
-    await page.getByRole("tab", { name: "返点" }).click();
-    await page.getByRole("row").filter({ hasText: rebate.rebate_no }).getByRole("button", { name: "登记结算" }).click();
-    const settle = page.getByRole("dialog", { name: `返点到账 · ${rebate.rebate_no}` });
-    await settle.getByLabel("到账金额").fill("100");
-    // 「平台手续费（自动生成费用流水）」为可选字段（REBSETTLE 配置可能不渲染），存在可编辑输入框才填。
-    const feeInput = settle.locator('.ant-form-item:has(.ant-form-item-label:has-text("平台手续费")) input').first();
-    if (await feeInput.count() > 0) {
-      await feeInput.fill("10");
-    }
-    await settle.locator(".ant-select-selector").click();
-    await page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option").first().click();
-    const settlement = page.waitForResponse(r => r.url().endsWith(`/rebates/${rebate.id}/settlements`) && r.request().method() === "POST");
-    await settle.getByRole("button", { name: "确认结算" }).click();
-    expect((await settlement).status()).toBe(201);
-    // /cashflows 返回 { items, total } 信封，不是裸数组。
-    const flows = await (await request.get(`${base}/cashflows?order_id=${order.id}`, { headers })).json();
-    const income = flows.items.find((f: { category: string }) => f.category === "REBATE");
-    const fee = flows.items.find((f: { category: string }) => f.category === "REBATE_FEE");
-    expect([income.direction, Number(income.amount), income.accounting_attribute]).toEqual(["IN", 100, "REBATE_INCOME"]);
-    expect([fee.direction, Number(fee.amount), fee.accounting_attribute]).toEqual(["OUT", 10, "OPERATING_EXPENSE"]);
+    await page.getByRole("tab", { name: "返点明细" }).click();
+    await expect(page.getByRole("row").filter({ hasText: rebate.rebate_no })).toBeVisible({ timeout: 10000 });
   });
 });

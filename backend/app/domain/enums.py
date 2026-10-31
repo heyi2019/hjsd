@@ -178,9 +178,10 @@ class FieldType(StrEnum):
 
 # ---------------------------------------------------------------- 订单 / 事件
 class OrderStatus(StrEnum):
-    """订单状态机（错误码文档 §2）：创建即 ACTIVE，无草稿态（2026-10-13 移除）。"""
+    """订单生命周期：普通处理中、分期中、已完成或已取消。"""
 
     ACTIVE = "ACTIVE"
+    INSTALLMENT = "INSTALLMENT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -249,12 +250,18 @@ class CashflowStatus(StrEnum):
 
 
 class AccountStatus(StrEnum):
-    """账号状态（ACC-01-03）：只由订单事件驱动。"""
+    """账号生命周期状态（ACC-01-03）：保留出库原因与可逆动作。"""
 
-    IN_STOCK = "IN_STOCK"  # 在库
-    INSTALLMENT = "INSTALLMENT"  # 分期中
+    WAITING = "WAITING"  # 待售
     SOLD = "SOLD"  # 已售
     VOID = "VOID"  # 取消/失效
+
+
+class InventoryStatus(StrEnum):
+    """库存归属状态：只表达账号是否仍在库存，不承载订单或分期进度。"""
+
+    IN_STOCK = "IN_STOCK"
+    OUT_OF_STOCK = "OUT_OF_STOCK"
 
 
 class BusinessMode(StrEnum):
@@ -477,13 +484,10 @@ class AuditAction(StrEnum):
     REBATE_VOID = "REBATE_VOID"  # 零结算返点记录作废（有结算走 REBATE_REVERSE）
     RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
     RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
-    PERIOD_LOCK = "PERIOD_LOCK"
     QUALITY_ISSUE_CREATE = "QUALITY_ISSUE_CREATE"
     QUALITY_ISSUE_UPDATE = "QUALITY_ISSUE_UPDATE"
     QUALITY_ISSUE_CLOSE = "QUALITY_ISSUE_CLOSE"
     CASHFLOW_CREATE = "CASHFLOW_CREATE"
-    CASHFLOW_APPROVE = "CASHFLOW_APPROVE"
-    CASHFLOW_REJECT = "CASHFLOW_REJECT"
     CASHFLOW_REVERSE = "CASHFLOW_REVERSE"
     TRANSFER_CREATE = "TRANSFER_CREATE"
     TRANSFER_REPAIR = "TRANSFER_REPAIR"

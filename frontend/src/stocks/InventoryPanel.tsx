@@ -1,14 +1,13 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
 import { DownloadOutlined } from "@ant-design/icons";
 import { Card, Dropdown, Form, Input, Segmented, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState, type Key } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Key } from "react";
 import { stocksApi, employeesApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { money, today } from "../shared/lib/format";
-import {
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessForm,
   ErrorBanner,
@@ -17,24 +16,20 @@ import {
   Select,
   StatRow,
   StatusTag,
-  useCompactLayout,
-} from "../shared/ui";
+  useCompactLayout, } from "../shared/ui";
 import { InventorySaleModal } from "./InventorySaleModal";
 import { InventoryConsignmentModal } from "./InventoryConsignmentModal";
 import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "./InventoryPlatformOffsaleModal";
 import { InventoryRebateModal } from "./InventoryRebateModal";
-import { InventoryDetail } from "./InventoryDetail";
-import type { InventoryPartyLink } from "./InventoryDetailView";
+import { OrderDetail } from "./OrderDetail";
+import type { InventoryPartyLink } from "./OrderDetailView";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
 import "./InventoryPanel.css";
-import {
-  BUSINESS_MODE_LABEL,
+import { BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
-  PROFILE_ACCOUNT_TYPES,
   VALUE_ADDED_SERVICE_LABEL,
   inventoryAge,
-  isEditableAccountType,
-} from "./inventory-logic";
+  isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
@@ -53,7 +48,7 @@ function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
   if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
   if (row.status !== "SOLD") {
-    items.push({ key: "description", label: "账号描述" }, { key: "images", label: "账号图片" });
+    items.push({ key: "description", label: "描述" }, { key: "images", label: "作图" });
   }
   return items;
 }
@@ -127,7 +122,7 @@ export function MobileInventoryList({
           <article key={row.id} className="data-mobile-card">
             <div className="data-mobile-card__topline">
               <span className="data-mobile-card__title">{row.stock_no || row.game_account || `账号 ${row.id}`}</span>
-              <StatusTag status={row.status} label={row.status === "VOID" ? "下架" : undefined} />
+              <StatusTag status={row.inventory_status ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} />
             </div>
             <dl className="data-mobile-card__meta">
               <div><dt>游戏/产品类型</dt><dd>{row.game_type || "-"}</dd></div>
@@ -142,9 +137,10 @@ export function MobileInventoryList({
             </dl>
             <div className="data-mobile-card__actions">
               <PermissionButton permission="order.create" type="link" size="small" onClick={() => onDetail(row)}>详情</PermissionButton>
-              <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "IN_STOCK"} onClick={() => onSale(row)}>售出</PermissionButton>
+              <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "WAITING"} onClick={() => onSale(row)}>售出</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" onClick={() => onRebate(row)}>返点</PermissionButton>
+              <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>作废</PermissionButton>
               {isEditableAccountType(row.inventory_type) ? (
                 <>
                   <PermissionButton permission="order.create" type="link" size="small" disabled={editingAccount !== null} onClick={() => onEdit(row)}>编辑</PermissionButton>
@@ -189,6 +185,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   const [exporting, setExporting] = useState(false);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  // 内联编辑：标记当前正在编辑（且已展开）的行；与 editingAccount（草稿副本）配合，决定展开区是否进入编辑态。
+  const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const compact = useCompactLayout();
   const [savingAccount, setSavingAccount] = useState(false);
@@ -205,7 +203,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   const valueAddedOptions = useOptionSet("VALUE_ADDED_SERVICE");
   const load = useCallback(async () => {
     try {
-      const list = await stocksApi.list({ status: "IN_STOCK" });
+      const list = await stocksApi.list({ status: "WAITING" });
       setRows(list ?? []);
       setError(null);
     } catch (err) {
@@ -221,8 +219,24 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     if (refreshKey > 0) setPage(1);
   }, [refreshKey]);
 
+  // 横向滚动记忆：手风琴展开/收起会以 key 重建整张 Table，旧滚动位置归零。
+  // 展开前抓取 .ant-table-body 的 scrollLeft，重建后用 useLayoutEffect 还原（绘制前写回，无闪烁）。
+  const scrollLeftRef = useRef(0);
+  function captureScroll() {
+    const body = document.querySelector<HTMLElement>(".inventory-table .ant-table-body");
+    if (body) scrollLeftRef.current = body.scrollLeft;
+  }
+  function expandTo(ids: Key[]) {
+    captureScroll();
+    setExpandedAccountIds(ids);
+  }
+  useLayoutEffect(() => {
+    const body = document.querySelector<HTMLElement>(".inventory-table .ant-table-body");
+    if (body && scrollLeftRef.current) body.scrollLeft = scrollLeftRef.current;
+  }, [expandedAccountIds]);
+
   const visibleRows = (rows ?? []).filter((row) => {
-    const matchesStatus = row.status === "IN_STOCK";
+    const matchesStatus = row.status === "WAITING";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
     const matchesType = !inventoryType || row.inventory_type === inventoryType;
     const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
@@ -240,11 +254,28 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     setProfileTarget({ account, mode });
   }
 
-  function openEditor(account: Account) {
+  async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
-    void employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause)));
-    void loadExecution(account);
+    await Promise.all([
+      employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause))),
+      loadExecution(account),
+    ]);
+    // 桌面：直接就地展开该行进入内联编辑（不弹窗）；移动端无内联表格，复用详情弹窗承载编辑态。
+    if (compact) {
+      setDetailTarget(account);
+    } else {
+      expandTo([String(account.id)]);
+    }
+    setInlineEditId(account.id);
+  }
+
+  function cancelInlineEdit() {
+    setInlineEditId(null);
+    setEditingAccount(null);
+    setEventDrafts({});
+    invEditExtraForm.resetFields();
+    setDetailTarget(null);
   }
 
   async function openDetail(account: Account) {
@@ -310,14 +341,10 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         note: "账号下架，冲销买入",
       });
       appMessage.success("账号已下架");
-      const accountId = voidTarget.account.id;
+      // 下架后账号转 VOID 并退出在库统计，与售出同理，只丢缓存。
+      dropExecutionCache(voidTarget.account.id);
       setVoidTarget(null);
       voidForm.resetFields();
-      setExecutionDetails((current) => {
-        const next = { ...current };
-        delete next[accountId];
-        return next;
-      });
       await load();
       // 作废会改订单/流水状态，同步通知上层重拉台账与分期列表。
       onOrdersChanged?.();
@@ -361,13 +388,15 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       title: "未售时长",
       width: 68,
 
-      key: "inventoryAge",
+      // key 必须与 scopes.py 的 ListColumn 注册（inventory_age）一致，
+      // 否则 arrangeColumns 按 columnKey 匹配不到，隐藏/调序配置对它无效。
+      key: "inventory_age",
       render: (_value, row) => {
         const age = inventoryAge(row);
         return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);
       },
     },
-    { title: "状态", dataIndex: "status", width: 68, render: (v: string) => <StatusTag status={v} label={v === "VOID" ? "下架" : undefined} /> },
+    { title: "状态", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
     {
       title: "成本",
       dataIndex: "cost_amount",
@@ -386,7 +415,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
             type="link"
             size="small"
             aria-label="售出"
-            disabled={row.status !== 'IN_STOCK'}
+            disabled={row.status !== 'WAITING'}
             onClick={(event) => {
               event.stopPropagation();
               setSaleTarget(row);
@@ -418,6 +447,19 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
             }}
           >
             返点
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            type="link"
+            size="small"
+            aria-label="作废"
+            disabled={row.status === "SOLD" || row.status === "VOID"}
+            onClick={(event) => {
+              event.stopPropagation();
+              void openVoid(row);
+            }}
+          >
+            作废
           </PermissionButton>
           {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton
@@ -473,6 +515,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         await stocksApi.updateExecution(id, { profile, events });
         setEditingAccount(null);
         setEventDrafts({});
+        setInlineEditId(null);
+        setDetailTarget(null);
         try {
           const detail = await stocksApi.executionDetail(id);
           setExecutionDetails((current) => ({ ...current, [id]: detail }));
@@ -489,6 +533,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       setEditingAccount(null);
       setEventDrafts({});
       invEditExtraForm.resetFields();
+      setInlineEditId(null);
+      setDetailTarget(null);
       appMessage.success("修改已保存");
     } catch (err) {
       setError(normalizeError(err));
@@ -505,13 +551,14 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   }
 
   async function handleExpand(expanded: boolean, row: Account) {
-    const rowKey = String(row.id);
-    setExpandedAccountIds((current) => expanded ? Array.from(new Set([...current, rowKey])) : current.filter((id) => id !== rowKey));
+    // 手风琴：一次只展开一行。多行同时展开会各自挂载一份完整明细（3 张子表 + 图片组），DOM 与页面长度随之翻倍。
+    if (!expanded && inlineEditId === row.id) cancelInlineEdit();
+    expandTo(expanded ? [String(row.id)] : []);
     if (expanded) await loadExecution(row);
   }
 
-  async function loadExecution(row: Account) {
-    if (executionDetails[row.id] || executionLoading[row.id]) return;
+  async function loadExecution(row: Account, force = false) {
+    if (!force && (executionDetails[row.id] || executionLoading[row.id])) return;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
       const detail = await stocksApi.executionDetail(row.id);
@@ -521,6 +568,23 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     } finally {
       setExecutionLoading((current) => ({ ...current, [row.id]: false }));
     }
+  }
+
+  /** 只丢弃详情缓存：用于账号已离开在库列表（售出/下架）的场景，重拉已无展示方，纯属浪费请求。 */
+  function dropExecutionCache(accountId: number) {
+    setExecutionDetails((current) => {
+      if (!(accountId in current)) return current;
+      const next = { ...current };
+      delete next[accountId];
+      return next;
+    });
+  }
+
+  /** 写操作后让详情缓存失效并立即重拉，避免展开区停在写之前的快照。
+   *  必须 force：此时 useState 尚未提交，闭包里的 executionDetails 仍是旧值，不加 force 会被命中缓存直接 return。 */
+  function refreshExecution(row: Account) {
+    dropExecutionCache(row.id);
+    void loadExecution(row, true);
   }
 
   function openPartyCard(party: InventoryPartyLink) {
@@ -567,6 +631,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           <Space wrap>
             <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
             <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
+            <Select allowClear placeholder="按增值服务筛选" className="ui-control-width-inventory" value={valueAddedService} options={valueAddedOptions ?? []} onChange={(value) => { setValueAddedService(value); setPage(1); }} />
             <Input
               allowClear
               value={keyword}
@@ -615,6 +680,11 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           />
         ) : (
           <DataTable<Account>
+            // key 绑定展开集：antd 受控 expandedRowKeys 在「换一行展开」时不回收旧行的展开区
+            // （实测：极简 antd Table 同样复现；换 record 引用、分两步 setState 均无效），
+            // 必须以重建 Table 的方式让旧展开行真正卸载，手风琴才成立。
+            // 已知代价：展开/收起会重建表格，横向滚动位置回零。
+            key={`account-ledger-${expandedAccountIds.join("|")}`}
             className="inventory-table"
             columns={arrangeColumns(columns)}
             rows={orderedRows}
@@ -626,7 +696,21 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
             expandable={{
               expandedRowKeys: expandedAccountIds,
               expandedRowRender: (row) => (
-                <InventoryDetail row={row} detail={executionDetails[row.id]} loading={Boolean(executionLoading[row.id])} onPartyClick={openPartyCard} />
+                <OrderDetail
+                  row={row}
+                  detail={executionDetails[row.id]}
+                  loading={Boolean(executionLoading[row.id])}
+                  onPartyClick={openPartyCard}
+                  editing={inlineEditId === row.id ? editingAccount : undefined}
+                  onEdit={setEditingAccount}
+                  eventDrafts={eventDrafts}
+                  onEventEdit={updateEventDraft}
+                  employees={employees}
+                  extraForm={invEditExtraForm}
+                  onSave={saveInline}
+                  onCancel={cancelInlineEdit}
+                  saving={savingAccount}
+                />
             ),
               expandRowByClick: true,
               onExpand: (expanded, row) => void handleExpand(expanded, row),
@@ -644,9 +728,12 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         account={saleTarget}
         onClose={() => setSaleTarget(null)}
         onCreated={async () => {
+          const account = saleTarget;
           setSaleTarget(null);
           await load();
-          // 售出会在业务台账生成新订单号，同步通知上层重拉台账，避免两边数据不同步。
+          // 售出后账号离开在库列表，展开区已无承载方，只丢本地缓存即可（重拉纯属浪费请求）。
+          if (account) dropExecutionCache(account.id);
+          // 售出会在原买入订单上登记 SELL（不再新建订单），同步通知上层重拉台账，避免两边数据不同步。
           onOrdersChanged?.();
         }}
       />
@@ -654,13 +741,11 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         account={consignmentTarget}
         onClose={() => setConsignmentTarget(null)}
         onCreated={async () => {
-          const accountId = consignmentTarget?.id;
+          const account = consignmentTarget;
           setConsignmentTarget(null);
           await load();
-          if (accountId != null) {
-            const detail = await stocksApi.executionDetail(accountId);
-            setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
-          }
+          // 寄售后账号仍在库，展开区可能正展示它 —— 必须重拉，原逻辑是手动补写一次 detail，等价但这里统一由 refreshExecution 收口。
+          if (account) refreshExecution(account);
           onOrdersChanged?.();
         }}
       />
@@ -668,12 +753,15 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         account={rebateTarget}
         onClose={() => setRebateTarget(null)}
         onCreated={async () => {
+          const account = rebateTarget;
           setRebateTarget(null);
           await load();
+          // 返点会新增一条资金流水，展开区「资金明细」必须同步，否则停在写前快照。
+          if (account) refreshExecution(account);
           onOrdersChanged?.();
         }}
       />
-      <BusinessActionModal
+      <BusinessActionModal size="compact"
         title="系统下架登记"
         open={Boolean(voidTarget)}
         okText="确认下架"
@@ -716,6 +804,8 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
             })));
             appMessage.success("代挂订单已取消，账号已出库");
             await load();
+            // 取消代挂订单会改写 orders/events 状态，账号仍在库，展开区需重拉。
+            refreshExecution(target.account);
             onOrdersChanged?.();
           } catch (cause) {
             setError(normalizeError(cause));
@@ -732,40 +822,29 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           onOrdersChanged?.();
         }}
       />
-      <BusinessActionModal className="inventory-edit-modal" title="编辑账号及执行明细" open={Boolean(editingAccount)} width={1200} okText="保存修改" cancelText="取消" confirmLoading={savingAccount} okButtonProps={{ disabled: Boolean(editingAccount && executionLoading[editingAccount.id]) }} onOk={() => void saveInline()} onCancel={() => { if (!savingAccount) { setEditingAccount(null); setEventDrafts({}); invEditExtraForm.resetFields(); } }}>
-        {editingAccount ? <>
-          <div className="inventory-edit-core" aria-label="核心账号资料">
-            <label>
-              <span>游戏账号/产品</span>
-              <Input aria-label="编辑游戏账号/产品" value={editingAccount.game_account ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_account: e.target.value })} />
-            </label>
-            <label>
-              <span>游戏/产品类型</span>
-              <Input aria-label="编辑游戏/产品类型" value={editingAccount.game_type ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, game_type: e.target.value })} />
-            </label>
-            <label>
-              <span>平台</span>
-              <Input aria-label="编辑平台" value={editingAccount.platform ?? ""} onChange={(e) => setEditingAccount({ ...editingAccount, platform: e.target.value })} />
-            </label>
-          </div>
-          <BusinessForm scope="INVEDIT" form={invEditExtraForm}>
-            <FieldConfigScope scope="INVEDIT" active={Boolean(editingAccount)}>
-              <CustomFieldSection section="OPERATION" testIdSuffix="inv-edit-operation" />
-              <CustomFieldSection testIdSuffix="inv-edit" />
-            </FieldConfigScope>
-          </BusinessForm>
-          <InventoryDetail row={editingAccount} detail={executionDetails[editingAccount.id]} loading={Boolean(executionLoading[editingAccount.id])} editing={editingAccount} onEdit={setEditingAccount} eventDrafts={eventDrafts} onEventEdit={updateEventDraft} employees={employees} onPartyClick={openPartyCard} />
-        </> : null}
-      </BusinessActionModal>
       <BusinessActionModal
         className="inventory-detail-modal"
-        title="库存详情"
+        title={inlineEditId === detailTarget?.id ? "编辑账号" : "库存详情"}
         open={Boolean(detailTarget)}
         footer={null}
         width="min(1200px, calc(100vw - 24px))"
-        onCancel={() => setDetailTarget(null)}
+        onCancel={() => cancelInlineEdit()}
       >
-        {detailTarget ? <InventoryDetail row={detailTarget} detail={executionDetails[detailTarget.id]} loading={Boolean(executionLoading[detailTarget.id])} onPartyClick={openPartyCard} /> : null}
+        {detailTarget ? <OrderDetail
+          row={detailTarget}
+          detail={executionDetails[detailTarget.id]}
+          loading={Boolean(executionLoading[detailTarget.id])}
+          onPartyClick={openPartyCard}
+          editing={inlineEditId === detailTarget.id ? editingAccount : undefined}
+          onEdit={setEditingAccount}
+          eventDrafts={eventDrafts}
+          onEventEdit={updateEventDraft}
+          employees={employees}
+          extraForm={invEditExtraForm}
+          onSave={saveInline}
+          onCancel={cancelInlineEdit}
+          saving={savingAccount}
+        /> : null}
       </BusinessActionModal>
       <InventoryProfileModal
         target={profileTarget}

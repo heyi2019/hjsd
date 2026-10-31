@@ -7,7 +7,7 @@ test("五类业务写入并按业务规则作废测试订单", async ({ request 
   const accountsResponse = await request.get(`${apiBase}/stocks`, { headers });
   expect(accountsResponse.ok()).toBe(true);
   const accounts = (await accountsResponse.json()).items;
-  const inStock = accounts.filter((item: { status: string }) => item.status === "IN_STOCK");
+  const inStock = accounts.filter((item: { inventory_status: string }) => item.inventory_status === "IN_STOCK");
   const accountFor = (inventoryType: string) => {
     const account = inStock.find((item: { inventory_type?: string }) => item.inventory_type === inventoryType);
     expect(account, `缺少 ${inventoryType} 测试账号`).toBeTruthy();
@@ -48,8 +48,8 @@ test("自营分期出售：买入、分期收款、结清后交付", async ({ re
   expect(accountsResponse.ok()).toBe(true);
   const accounts = (await accountsResponse.json()).items;
   const account = accounts.find(
-    (item: { status: string; inventory_type?: string }) =>
-      item.status === "IN_STOCK" && item.inventory_type === "RECOVERY",
+    (item: { inventory_status: string; inventory_type?: string }) =>
+      item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
   );
   expect(account, "缺少 RECOVERY 测试账号").toBeTruthy();
 
@@ -163,10 +163,9 @@ test("资金闭环：独立流水审核冲销、资金池划转与日对账", as
   });
   expect(flow.status()).toBe(201);
   const flowBody = await flow.json();
-  expect(flowBody.status).toBe("PENDING");
+  // 口径：资金流水已取消审核/驳回流程，录入即入账（提交 3f7c115），创建即 APPROVED。
+  expect(flowBody.status).toBe("APPROVED");
 
-  const approved = await request.post(`${apiBase}/cashflows/${flowBody.id}/approve`, { headers });
-  expect(approved.status()).toBe(200);
   const reversal = await request.post(`${apiBase}/cashflows/${flowBody.id}/reverse`, {
     headers,
     data: { reversed_on: "2026-10-17", reason: "E2E 冲销" },

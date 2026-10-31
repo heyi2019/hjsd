@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import (
     PERM_ORDER_CREATE,
-    PERM_POLICY_APPROVE,
     PERM_POLICY_MANAGE,
     CurrentUser,
     require_permissions,
@@ -23,9 +22,7 @@ manage_access = require_permissions(PERM_POLICY_MANAGE)
 # 注意：require_permissions 返回的已是 Depends 对象，直接作默认值，不要再包一层。
 # 规则配置只对规则管理员开放（2026-10-26 起取消独立的「审核」权限：保存即发布，
 # 发布人取当前登录用户，无单独审批环节）。
-policy_read_access = require_permissions(
-    PERM_POLICY_MANAGE, PERM_POLICY_APPROVE, require_all=False
-)
+policy_read_access = require_permissions(PERM_POLICY_MANAGE)
 # 订单自身的规则快照/利润分配属于订单数据，沿用订单读取门控并继续由 Service 做范围隔离。
 order_policy_read_access = require_permissions(PERM_ORDER_CREATE)
 
@@ -121,23 +118,6 @@ def update_version(
     """只允许改草稿版本；已发布版本必须新建（BAS-06-02）。"""
     return schemas.PolicyVersionOut.model_validate(
         service.update_version_draft(db, version_id, config=payload.config, actor=user.username)
-    )
-
-
-@router.post(
-    "/policy-versions/{version_id}/approve", response_model=schemas.PolicyVersionOut
-)
-def approve_version(
-    version_id: int,
-    payload: schemas.PolicyVersionApprove,
-    db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = manage_access,
-) -> schemas.PolicyVersionOut:
-    """发布规则版本。发布后只影响生效日后的新计算，不重算历史。
-    2026-10-26 起取消独立「审核」权限：保存即发布，发布人取当前登录用户。"""
-    approver = payload.approver or user.username
-    return schemas.PolicyVersionOut.model_validate(
-        service.approve_version(db, version_id, approver=approver, note=payload.note)
     )
 
 

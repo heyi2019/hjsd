@@ -28,12 +28,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 # 先装依赖（利用层缓存）
 # 用阿里云 pypi 镜像：ECS 直连 pypi.org 实测仅 ~15kB/s，慢到不可用；镜像可达且快。
-# requirements.txt 仅含运行时依赖；pandas/numpy(160MB) 与 pytest 系已移到 requirements-dev.txt。
+# 生产安装用 requirements.lock.txt（由 requirements.txt 经 pip-compile 生成，精确锁定
+# 全部运行时依赖及传递依赖）；pandas/numpy(160MB) 与 pytest 系在 requirements-dev.txt，不进生产镜像。
+# 改运行时依赖须先改 requirements.txt，再 pip-compile 重新生成 requirements.lock.txt。
 # --break-system-packages：alpine 的 python3 由 apk 管理，pip 默认拒绝写入系统 site-packages。
 # 装完卸载 pip 与 py3-pip：运行期不再需要包管理器，省约 10MB。
-COPY requirements.txt .
+COPY requirements.lock.txt .
 RUN pip install --no-cache-dir --break-system-packages \
-        -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt \
+        -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.lock.txt \
     && pip uninstall -y --break-system-packages pip \
     && apk del py3-pip \
     && rm -rf /root/.cache/pip /tmp/* /var/cache/apk/*

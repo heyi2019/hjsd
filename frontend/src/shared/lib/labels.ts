@@ -93,11 +93,6 @@ export const FIELD_TYPE_LABEL: Record<string, string> = {
   MULTI_SELECT: "多选",
 };
 
-export function labelOf(value: string | null | undefined, labels: Record<string, string>): string {
-  if (!value) return "-";
-  return labels[value] ?? value;
-}
-
 export function orderTypeLabel(code: string | null | undefined, names?: Record<string, string>): string {
   if (!code) return "-";
   return names?.[code] ?? ORDER_TYPE_LABEL[code] ?? code;
@@ -199,13 +194,10 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   REBATE_VOID: "作废返点",
   RECONCILIATION_CREATE: "登记对账",
   RECONCILIATION_RESOLVE: "处置对账差异",
-  PERIOD_LOCK: "锁定账期",
   QUALITY_ISSUE_CREATE: "新建质量工单",
   QUALITY_ISSUE_UPDATE: "更新质量工单",
   QUALITY_ISSUE_CLOSE: "关闭质量工单",
   CASHFLOW_CREATE: "登记资金流水",
-  CASHFLOW_APPROVE: "审核通过流水",
-  CASHFLOW_REJECT: "驳回流水",
   CASHFLOW_REVERSE: "冲销流水",
   TRANSFER_CREATE: "发起资金划转",
   TRANSFER_REPAIR: "修复单边划转",

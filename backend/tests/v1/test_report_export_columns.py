@@ -29,7 +29,7 @@ def _header(csv_text: str) -> list[str]:
 
 def _finance_rows(seeded_db) -> None:
     """在种子池上造两笔已审核流水，使资金属性分析报表非空。"""
-    from app.finance.cashflows import approve_cashflow, create_cashflow
+    from app.finance.cashflows import create_cashflow
 
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None, "种子池 HJ_INVEST 缺失"
@@ -37,7 +37,7 @@ def _finance_rows(seeded_db) -> None:
         ("IN", "100.00", "SELF_REVENUE"),
         ("OUT", "40.00", "SELF_DIRECT_COST"),
     ):
-        flow = create_cashflow(
+        create_cashflow(
             seeded_db,
             pool_id=pool.id,
             occurred_on=date(2026, 10, 17),
@@ -50,7 +50,6 @@ def _finance_rows(seeded_db) -> None:
             actor="pytest",
             note="导出列配置测试",
         )
-        approve_cashflow(seeded_db, flow.id, actor="finance")
 
 
 def _set_visibility(seeded_client, headers, scope: str, hidden: set[str]) -> None:

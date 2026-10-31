@@ -138,8 +138,14 @@ test.describe("UI visual regression", () => {
       expect(overflow.entryOverflow).toBe(false);
       expect(overflow.passwordWidth).toBeGreaterThanOrEqual(viewport.width <= 900 ? 110 : 140);
       expect(overflow.columns).toBe(viewport.width >= 1440 ? 4 : viewport.width <= 640 ? 1 : 2);
-      const paymentRows = modal.locator(".payment-info-fields > .ant-form-item .ant-form-item-row");
-      await expect(paymentRows.first()).toHaveCSS("flex-wrap", "nowrap");
+      // 费用/支付区现由 .recovery-fees > .recovery-fee-row（AdaptiveFormGrid）承载，
+      // 旧 .payment-info-fields 结构已废弃并从样式表中清除。此处验证同等意图：
+      // 费用行按网格横排、字段不被压塌，行内不产生横向溢出。
+      const feeRow = modal.locator(".recovery-fee-row").first();
+      await expect(feeRow).toBeVisible();
+      await expect
+        .poll(() => feeRow.evaluate((node) => node.scrollWidth > node.clientWidth + 1))
+        .toBe(false);
       const submit = modal.getByRole("button", { name: "创建订单" });
       const body = modal.locator(".ant-modal-body");
       const bodyCanScroll = await body.evaluate((node) => node.scrollHeight > node.clientHeight);

@@ -75,7 +75,6 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("FUNDRELEASE", "释放", GROUP_FUND),
     FormScope("FUNDLOSS", "损失", GROUP_FUND),
     FormScope("FUNDREPAIR", "划转修复", GROUP_FUND),
-    FormScope("FUNDLOCK", "月结锁定", GROUP_FUND),
     FormScope("FUNDCANCEL", "取消押金", GROUP_FUND),
     # ---- 工作室（迁移 0019）----
     FormScope("STUDIOEXP", "工作室收支登记", GROUP_STUDIO),

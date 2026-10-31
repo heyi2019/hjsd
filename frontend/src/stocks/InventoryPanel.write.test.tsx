@@ -32,7 +32,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
 });
 
 const accounts = [
-  { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "IN_STOCK", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
+  { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
   { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
@@ -128,8 +128,8 @@ describe("InventoryPanel：写入与长路径", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+    // 内联编辑：点「编辑」就地展开该行进入编辑态（无弹窗），核心字段可直接改。
     const input = await screen.findByLabelText("编辑游戏账号/产品");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "updated-account" } });
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({

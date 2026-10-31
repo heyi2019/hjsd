@@ -587,10 +587,12 @@ class TestCreateOrderValidation:
     def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="必须大于 0"):
+            # BUY 金额允许为 0（提号表单金额选填以 0 兜底，events.post_event 放行 0），
+            # 故用 COST（金额必须为正）验证“非法金额=业务错误”的语义。
             order_service.post_event(
                 seeded_db,
                 order.id,
-                event_type="BUY",
+                event_type="COST",
                 amount=Decimal("0"),
                 occurred_on=D,
                 actor="pytest",
@@ -683,7 +685,7 @@ class TestCreateOrderValidation:
 
     def test_dfq_can_link_inventory_account_for_recovery_sale(self, seeded_db):
         account = Account(
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -699,7 +701,7 @@ class TestCreateOrderValidation:
         account = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -712,7 +714,7 @@ class TestCreateOrderValidation:
 
     def test_order_rejects_existing_account_without_context(self, seeded_db):
         account = Account(
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -727,7 +729,7 @@ class TestCreateOrderValidation:
         account = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -748,7 +750,7 @@ class TestCreateOrderValidation:
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(
             game_account="scope-account",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="another-operator",
             updated_by="another-operator",
@@ -879,7 +881,7 @@ class TestCreateOrderValidation:
         assert account.business_mode == "DISTRIBUTION"
         assert account.inventory_type is None
         assert account.value_added_service == "ADVANCE_PURCHASE"
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
 
     def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
         account = stocks_service.create_account(
@@ -1028,7 +1030,7 @@ class TestGetAndListOrders:
         )
         account = seeded_db.get(Account, order.account_id)
         assert account is not None
-        assert account.status == AccountStatus.IN_STOCK.value
+        assert account.status == AccountStatus.WAITING.value
 
         cancelled = order_service.cancel_order(
             seeded_db,
@@ -1452,7 +1454,7 @@ class TestAccountEffect:
         account = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -1476,7 +1478,7 @@ class TestAccountEffect:
         account = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -1489,7 +1491,7 @@ class TestAccountEffect:
             occurred_on=D, actor="pytest",
         )
         assert account.cost_amount == 500
-        assert account.status == AccountStatus.IN_STOCK.value
+        assert account.status == AccountStatus.WAITING.value
 
         order_service.post_event(
             seeded_db, order.id, event_type="CANCEL", amount="500.00",
@@ -1503,7 +1505,7 @@ class TestAccountEffect:
         account = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -1523,13 +1525,13 @@ class TestAccountEffect:
         )
 
         assert account.cost_amount == Decimal("400.00")
-        assert account.status == AccountStatus.IN_STOCK.value
+        assert account.status == AccountStatus.WAITING.value
 
     def test_cancel_sell_restores_stock_without_reducing_cost(self, seeded_db):
         account = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",
@@ -1554,13 +1556,13 @@ class TestAccountEffect:
         )
 
         assert account.cost_amount == Decimal("500.00")
-        assert account.status == AccountStatus.IN_STOCK.value
+        assert account.status == AccountStatus.WAITING.value
 
     def test_cancel_pickup_sell_ends_without_returning_to_inventory(self, seeded_db):
         account = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
-            status=AccountStatus.IN_STOCK.value,
+            status=AccountStatus.WAITING.value,
             cost_amount=to_money("0"),
             created_by="pytest",
             updated_by="pytest",

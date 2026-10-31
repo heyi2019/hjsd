@@ -1,16 +1,14 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { Form, Input, Radio, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import {
-  stocksApi,
+import { stocksApi,
   rebatesApi,
   employeesApi,
   type Account,
   type AccountExecutionDetail,
   type EmployeeOption,
-  type Rebate,
-} from "../shared/api/catalog";
+  type Rebate, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";

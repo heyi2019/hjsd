@@ -31,9 +31,9 @@ beforeEach(() => {
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.stocksApi.list), [
-    { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "IN_STOCK", cost_amount: "0.00" },
-    { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "IN_STOCK", cost_amount: "0.00" },
-    { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "IN_STOCK", cost_amount: "0.00" },
+    { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
+    { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
+    { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "WAITING", cost_amount: "0.00" },
   ]);
   resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([
@@ -53,6 +53,15 @@ beforeEach(() => {
 async function openModal(user = "admin") {
   return openTypedModal("HS", user);
 }
+
+it("设置面板改板块名后，建单同步显示后端覆盖标题", async () => {
+  // 复刻「设置里把『资金明细』改名为『资金明细改名』→ 后端落库 → 建单读配置即时同步」
+  vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({ FINANCE: "资金明细改名" });
+  await openTypedModal("HS");
+  // 未覆盖前的硬编码 fallback 不再出现，取而代之的是后端配置的新名
+  expect(await screen.findByText("资金明细改名")).toBeInTheDocument();
+  expect(screen.queryByText("资金明细")).not.toBeInTheDocument();
+});
 
 async function openTypedModal(orderType: string, user = "admin") {
   const onCreated = vi.fn();

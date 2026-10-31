@@ -225,7 +225,7 @@ class TestCreateInstallmentValidation:
 
         assert contract.order_id == order.id
         seeded_db.refresh(account)
-        assert account.status == "INSTALLMENT"
+        assert account.status == "SOLD"
         assert account.updated_by == "contract-creator"
 
     def test_finance_can_collect_installment_payment_with_pool_scope(
@@ -529,7 +529,7 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
     assert result["refund_amount"] == Decimal("100.00")
     assert contract.status == InstallmentStatus.CANCELLED.value
     assert sale.status == "CANCELLED"
-    assert account.status == AccountStatus.IN_STOCK.value
+    assert account.status == AccountStatus.WAITING.value
     assert cancel is not None
     assert cancel.offset_event_id == payment.id
     assert cancel.amount == Decimal("100.00")
@@ -584,7 +584,7 @@ def test_cancel_dfq_refunds_customer_without_reversing_historical_buy(seeded_db)
     ("order_type", "contract_type", "business_mode", "inventory_type", "expected_status"),
     [
         ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP", AccountStatus.VOID.value),
-        ("DG", "CONSIGNMENT_SALE", "DISTRIBUTION", "CONSIGNMENT", AccountStatus.IN_STOCK.value),
+        ("DG", "CONSIGNMENT_SALE", "DISTRIBUTION", "CONSIGNMENT", AccountStatus.WAITING.value),
     ],
 )
 def test_cancel_distribution_installment_uses_business_specific_account_result(
@@ -1437,7 +1437,7 @@ class TestInstallmentsApi:
         assert recovered.installment_id == contract.id
         seeded_db.refresh(account)
         seeded_db.refresh(contract)
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         assert contract.status == InstallmentStatus.CLOSED.value
 
     def test_dfq_overdue_recovery_materializes_account_and_auto_links_resale(self, seeded_db):
@@ -1476,7 +1476,7 @@ class TestInstallmentsApi:
         assert order.account_id is not None
         account = seeded_db.get(Account, order.account_id)
         assert account is not None
-        assert account.status == "IN_STOCK"
+        assert account.status == "WAITING"
         assert account.inventory_type == "RECOVERY"
         assert account.cost_amount == Decimal("800.00")
 

@@ -9,9 +9,7 @@ import pytest
 from app.stocks import service as stocks_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.trade import RebateSettlement
 from app.finance import rebates
-from app.finance import service as finance_service
 from app.finance.rebates import _rebate_rate_from_snapshot
 from app.orders import service as orders_service
 
@@ -109,23 +107,6 @@ def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
     return order.id
 
 
-def _rebate_and_settlement(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db,
-        source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY",
-        base_amount=Decimal("1000"),
-        rate=Decimal("5"),
-        collected_on=TODAY,
-        actor="pytest",
-    )
-    settle = rebates.settle_rebate(
-        seeded_db, record.id, gross_amount=Decimal("10"),
-        settled_on=TODAY, pool_id=1, actor="pytest",
-    )
-    return record, settle
-
-
 def test_rebate_module_creates_record_directly(seeded_db):
     record = rebates.create_rebate(
         seeded_db,
@@ -139,13 +120,6 @@ def test_rebate_module_creates_record_directly(seeded_db):
 
     assert record.rebate_no.endswith("-RB01")
     assert record.rate == Decimal("5.00")
-
-
-@pytest.mark.skip(reason="返点结算服务已删除")
-def test_finance_facade_re_exports_rebate_module_entries():
-    assert finance_service.create_rebate is rebates.create_rebate
-    assert finance_service.settle_rebate is rebates.settle_rebate
-    assert finance_service.get_rebate is rebates.get_rebate
 
 
 # ----------------------------------------------------- 费率快照解析分支
@@ -231,110 +205,12 @@ def test_create_rebate_sell_dfq_allows_created_order(seeded_db):
 
 
 # ----------------------------------------------------- settle_rebate 订单不可见 (201-202)
-@pytest.mark.skip(reason="返点结算服务已删除")
-def test_settle_rebate_order_hidden(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    with pytest.raises(NotFound):
-        rebates.settle_rebate(
-            seeded_db, record.id, gross_amount=Decimal("10"),
-            settled_on=TODAY, pool_id=1, actor="pytest",
-            user=_restricted_user(),
-        )  # 199-205
 
 
 # ----------------------------------------------------- list_rebate_settlements 未知 (336)
-@pytest.mark.skip(reason="返点结算服务已删除")
-def test_list_rebate_settlements_unknown(seeded_db):
-    with pytest.raises(NotFound):
-        rebates.list_rebate_settlements(seeded_db, 999999)  # 334-339
 
 
 # ----------------------------------------------------- reverse_rebate_settlement 各类校验
-@pytest.mark.skip(reason="返点冲销服务已删除")
-def test_reverse_rebate_settlement_unknown_record(seeded_db):
-    with pytest.raises(NotFound):
-        rebates.reverse_rebate_settlement(
-            seeded_db, 999999, 1, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 368-373
-
-
-@pytest.mark.skip(reason="返点冲销服务已删除")
-def test_reverse_rebate_settlement_unknown_settlement(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    with pytest.raises(NotFound):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, 999999, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 381-385
-
-
-@pytest.mark.skip(reason="返点冲销服务已删除")
-def test_reverse_rebate_settlement_already_reversed(seeded_db):
-    record, settle = _rebate_and_settlement(seeded_db)
-    reversal = rebates.reverse_rebate_settlement(
-        seeded_db, record.id, settle.id, reversed_on=TODAY, actor="pytest", reason="x"
-    )
-    with pytest.raises(Validation, match="冲销记录不能再次冲销"):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, reversal.id, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 387
-
-
-@pytest.mark.skip(reason="返点冲销服务已删除")
-def test_reverse_rebate_settlement_missing_cashflow(seeded_db):
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    settle = RebateSettlement(
-        rebate_record_id=record.id, settled_on=TODAY, settlement_no="X-MISSING",
-        gross_amount=Decimal("10"), platform_fee=Decimal("0"),
-        net_amount=Decimal("10"), cashflow_id=None,
-        created_by="pytest", updated_by="pytest",
-    )
-    seeded_db.add(settle)
-    seeded_db.flush()
-    with pytest.raises(Validation, match="返点结算缺少资金流水"):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, settle.id, reversed_on=TODAY, actor="pytest", reason="x"
-        )  # 394-395
-
-
-@pytest.mark.skip(reason="返点冲销服务已删除")
-def test_reverse_rebate_settlement_not_visible(seeded_db):
-    from app.domain.trade import Order
-
-    # 受限用户用已存在的用户 id=2（满足 orders.owner_id 外键），
-    # 但池授权为空：能看订单、看不到现金流所在资金池 1，从而触发 400。
-    vis_user = CurrentUser(
-        id=2, username="vis", roles=(), owner_scope="SELF", pool_ids=frozenset()
-    )
-    order_id = _order_with_buy(seeded_db)
-    order = seeded_db.get(Order, order_id)
-    order.owner_id = 2
-    seeded_db.flush()
-    record = rebates.create_rebate(
-        seeded_db, source_order_id=order_id, rebate_type="BUY",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
-        collected_on=TODAY, actor="pytest",
-    )
-    settle = rebates.settle_rebate(
-        seeded_db, record.id, gross_amount=Decimal("10"),
-        settled_on=TODAY, pool_id=1, actor="pytest",
-    )
-    with pytest.raises(NotFound):
-        rebates.reverse_rebate_settlement(
-            seeded_db, record.id, settle.id, reversed_on=TODAY, actor="pytest",
-            reason="x", user=vis_user,
-        )  # 399-400
 
 
 # 注：429 / 463 为外键保证的防御分支（cashflow_id / fee_cashflow_id 指向

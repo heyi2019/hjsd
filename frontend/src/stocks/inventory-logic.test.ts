@@ -8,13 +8,14 @@ describe("库存纯逻辑", () => {
 
   it("按在库天数返回绿色、橙色、红色等级", () => {
     const now = new Date("2026-10-17T12:00:00");
-    expect(inventoryAge({ status: "IN_STOCK", buy_date: "2026-10-15" }, now)).toEqual({ days: 2, color: "green" });
-    expect(inventoryAge({ status: "IN_STOCK", buy_date: "2026-09-20" }, now)).toEqual({ days: 27, color: "orange" });
-    expect(inventoryAge({ status: "IN_STOCK", buy_date: "2026-09-01" }, now)).toEqual({ days: 46, color: "red" });
+    expect(inventoryAge({ status: "WAITING", buy_date: "2026-10-15" }, now)).toEqual({ days: 2, color: "green" });
+    expect(inventoryAge({ status: "WAITING", buy_date: "2026-09-20" }, now)).toEqual({ days: 27, color: "orange" });
+    expect(inventoryAge({ status: "WAITING", buy_date: "2026-09-01" }, now)).toEqual({ days: 46, color: "red" });
   });
 
   it("非在库状态不计算未售时长", () => {
     expect(inventoryAge({ status: "SOLD", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
+    expect(inventoryAge({ status: "SOLD", inventory_status: "OUT_OF_STOCK", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
   });
 
   it("返点类型优先使用业务类型", () => {

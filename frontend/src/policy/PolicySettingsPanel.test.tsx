@@ -36,7 +36,6 @@ const activeVersions = [
 beforeEach(() => {
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: definitions, total: definitions.length });
   vi.mocked(catalog.policyApi.versions).mockResolvedValue({ items: activeVersions, total: activeVersions.length });
-  vi.mocked(catalog.policyApi.approve).mockResolvedValue(activeVersions[0]);
   vi.mocked(catalog.policyApi.createVersion).mockResolvedValue(activeVersions[0]);
 });
 
@@ -74,8 +73,7 @@ it("设置配置：填写生效期和结构化字段后提交，生成新版本�
     config: { rate: "5" },
     note: undefined,
   }));
-  // 保存即发布：不再有独立审核环节，创建版本后立即发布（发布人取当前登录用户）
-  await waitFor(() => expect(vi.mocked(catalog.policyApi.approve)).toHaveBeenCalledWith(1, {}));
+  // 保存即发布：创建版本后直接为 ACTIVE，无独立审批环节
 });
 
 it("设置配置：按返点方向分别填写时提交 rates 子对象（引擎真实支持的形状）", async () => {

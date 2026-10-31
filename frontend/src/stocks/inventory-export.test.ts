@@ -11,7 +11,7 @@ const account = {
   game_type: "手游",
   game_account: "acc,1",
   platform: "A平台",
-  status: "IN_STOCK",
+  status: "WAITING",
   cost_amount: "100.00",
   created_by: "admin",
   account_description: "高段位\n账号",

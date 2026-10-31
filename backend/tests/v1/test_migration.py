@@ -209,6 +209,25 @@ def test_postgres_baseline_translates_sqlite_ddl_and_preserves_identity_ids():
     assert "pg_get_serial_sequence" in source
 
 
+def test_postgres_baseline_casts_json_null_check_for_postgresql():
+    """PostgreSQL JSON columns must compare against a typed JSON null literal."""
+    import importlib.util
+
+    migration_path = BACKEND_DIR / "alembic" / "versions" / "0001_baseline.py"
+    spec = importlib.util.spec_from_file_location("migration_0001_json", migration_path)
+    migration = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(migration)
+
+    translated = migration._postgresql_sql(
+        "CREATE TABLE orders (account_snapshot JSON, "
+        "CONSTRAINT ck_orders_account_snapshot_type_valid "
+        "CHECK (order_type = 'DFQ' OR account_snapshot IS NULL OR account_snapshot = 'null'))"
+    )
+
+    assert "account_snapshot = 'null'::json" in translated
+
+
 def test_order_cancel_amount_is_incoming_finance_flow(migration_env):
     """取消交易的冲销金额应记录为退款入账，而非原始支出。"""
     env, db_file = migration_env

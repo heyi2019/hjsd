@@ -11,7 +11,8 @@ on:
     branches: [test]
 
 permissions:
-  contents: write
+  contents: write   # 推送 main 触发部署
+  actions: read     # 读取其他 workflow run 状态（轮询 4 gate 必需；显式声明 permissions 会重置其他权限为 none）
 
 jobs:
   wait-and-merge:

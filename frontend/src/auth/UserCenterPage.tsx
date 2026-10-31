@@ -8,13 +8,14 @@ import { useState } from "react";
 import { ErrorBanner } from "../shared/ui";
 import { normalizeError } from "../shared/api/client";
 import { DEV_ROLES, ROLE_PERMISSIONS, useSession } from "../shared/state/session";
+import { PERMISSION_LABEL } from "../shared/lib/labels";
 
 export function UserCenterPage({ onClose }: { onClose?: () => void }) {
   const { user, changePassword, logout } = useSession();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
-  const roleLabel = DEV_ROLES.find((r) => r.value === user)?.label ?? user;
+  const roleLabel = DEV_ROLES.find((r) => r.value === user)?.label ?? "未设置角色";
   const permissions = ROLE_PERMISSIONS[user] ?? [];
 
   const submit = async (values: { old_password: string; new_password: string; confirm_password: string }) => {
@@ -42,7 +43,7 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
         <dl className="user-center__meta">
           <div>
             <dt>当前角色</dt>
-            <dd>{roleLabel}（{user}）</dd>
+          <dd>{roleLabel}</dd>
           </div>
           <div>
             <dt>权限范围</dt>
@@ -51,14 +52,14 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
         </dl>
         <ul className="user-center__perms" aria-label="权限点列表">
           {permissions.map((p) => (
-            <li key={p}>{p}</li>
+            <li key={p}>{PERMISSION_LABEL[p] ?? "其他权限"}</li>
           ))}
         </ul>
       </Card>
 
       <Card title="修改密码" className="user-center__card">
         <ErrorBanner error={error} />
-        <Form form={form} layout="vertical" onFinish={submit}>
+        <Form form={form} layout="vertical" className="user-center__password-form" onFinish={submit}>
           <Form.Item name="old_password" label="当前密码" rules={[{ required: true }]}>
             <Input.Password autoComplete="current-password" />
           </Form.Item>
@@ -73,7 +74,14 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
             <Input.Password autoComplete="new-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={submitting}>保存新密码</Button>
-          <Button type="link" onClick={() => { onClose?.(); void logout(); }}>退出登录</Button>
+          <Button
+            type="primary"
+            danger
+            className="user-center__logout"
+            onClick={() => { onClose?.(); void logout(); }}
+          >
+            退出登录
+          </Button>
         </Form>
       </Card>
     </div>

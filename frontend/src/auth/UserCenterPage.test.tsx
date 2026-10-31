@@ -38,10 +38,14 @@ afterEach(async () => {
 describe("UserCenterPage：账号信息与修改密码", () => {
   it("展示当前角色与权限点列表", () => {
     renderLight(<UserCenterPage />, { user: "admin" });
-    expect(screen.getByText(/系统管理员（admin）/)).toBeTruthy();
+    expect(screen.getByText("系统管理员", { exact: true })).toBeTruthy();
+    expect(screen.queryByText("admin", { exact: true })).toBeNull();
     // admin 拥有全部权限点（以「权限点列表」区域为准，避免撞顶栏同名按钮）
     const list = screen.getByLabelText("权限点列表");
     expect(list.querySelectorAll("li").length).toBeGreaterThan(0);
+    expect(list.textContent).not.toMatch(/[a-z-]+\.[a-z-]+/);
+    expect(document.querySelector(".user-center__password-form")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /退出登录/ })).toHaveClass("user-center__logout");
   });
 
   it("两次新密码不一致时不发请求，错误落入横幅", async () => {

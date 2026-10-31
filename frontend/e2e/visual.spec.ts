@@ -100,6 +100,25 @@ test.describe("UI visual regression", () => {
     await expect(page.getByRole("dialog", { name: "更多" })).toBeHidden();
   });
 
+  test("紧凑宽度下业务页内容不被导航行的剩余高度推下去", async ({ page }) => {
+    // 1904px Retina 截图对应约 952 CSS px；此时 AppShell 会切换为顶部横向导航。
+    await page.setViewportSize({ width: 952, height: 704 });
+
+    for (const path of ["/#/business/ledger", "/#/customers", "/#/funds", "/#/operations"]) {
+      await page.goto(path);
+      await expect(page.locator(".topbar")).toBeVisible();
+
+      const gap = await page.evaluate(() => {
+        const sidebar = document.querySelector<HTMLElement>(".sidebar");
+        const main = document.querySelector<HTMLElement>(".main");
+        if (!sidebar || !main) return Number.POSITIVE_INFINITY;
+        return main.getBoundingClientRect().top - sidebar.getBoundingClientRect().bottom;
+      });
+
+      expect(gap, `${path} 的导航与内容之间出现悬空间距`).toBeLessThanOrEqual(1);
+    }
+  });
+
   test("回收页响应式表单：四种视口不溢出", async ({ page }) => {
     for (const viewport of [
       { width: 1920, height: 1080 },

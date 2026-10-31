@@ -3,7 +3,12 @@
  * 使用标准媒体查询覆盖关键壳层，开发与生产构建共享同一套布局规则。
  */
 @media (max-width: 960px) {
-  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  /* 单列时不要把 app-shell 的剩余视口高度分摊给导航行，否则业务页会被整体向下推，
+     在 Retina 紧凑宽度下表现为导航下方大块空白。 */
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
   .sidebar {
     position: static;
     width: 100%;

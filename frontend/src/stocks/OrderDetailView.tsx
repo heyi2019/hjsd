@@ -1,5 +1,5 @@
-import { Space, Tabs } from "antd";
-import type { Account, AccountExecutionEvent } from "../shared/api/catalog";
+import { Space } from "antd";
+import type { Account, AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/catalog";
 import { BusinessForm, PermissionButton } from "../shared/ui";
 import { FieldConfigScope } from "../orders/ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
@@ -7,6 +7,7 @@ import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
 import { OrderDetailFinanceSection } from "./OrderDetailFinanceSection";
 import { OrderDetailOperationSection } from "./OrderDetailOperationSection";
 import { OrderDetailProfileSection } from "./OrderDetailProfileSection";
+import { OrderDetailPartySection } from "./OrderDetailPartySection";
 import type {
   OrderDetailField,
   OrderDetailMeta,
@@ -22,6 +23,8 @@ export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } f
 
 type OrderDetailViewProps = {
   meta: OrderDetailMeta;
+  detail?: AccountExecutionDetail | null;
+  account?: Account | null;
   executionRows: InventoryExecutionRow[];
   financeRows: InventoryFinanceRow[];
   expenseCount: number;
@@ -46,6 +49,8 @@ type OrderDetailViewProps = {
  *  - 只读态（行展开 / 库存详情弹窗）：5 板块分栏，默认落在游戏账号信息。 */
 export function OrderDetailView({
   meta,
+  detail,
+  account,
   editing,
   onEdit,
   eventDrafts,
@@ -70,10 +75,10 @@ export function OrderDetailView({
   if (editing) {
     return (
       <div className="inventory-detail inventory-detail--editing">
-        <OrderDetailProfileSection meta={meta} editing account={editing} onEdit={onEdit} />
+        <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} />
         <BusinessForm scope="INVEDIT" form={extraForm as never}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
-            <OrderDetailDeliverySection meta={meta} editing />
+            <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} editing />
             <OrderDetailOperationSection meta={meta} editing />
           </FieldConfigScope>
         </BusinessForm>
@@ -94,6 +99,7 @@ export function OrderDetailView({
           flowCount={flowCount}
           editing
         />
+        <OrderDetailPartySection meta={meta} />
         <div className="inventory-detail__footer">
           <Space>
             <PermissionButton permission="order.create" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
@@ -106,35 +112,20 @@ export function OrderDetailView({
 
   return (
     <div className="inventory-detail">
-      <Tabs
-        className="inventory-detail__tabs"
-        size="small"
-        defaultActiveKey="profile"
-        // forceRender：五个板块一次性挂载。既有用例会同时断言不同板块的字段，
-        // 若不预渲染，未激活板块尚未进入 DOM，断言会失效。
-        items={[
-          { key: "profile", label: "游戏账号信息", forceRender: true, children: <OrderDetailProfileSection meta={meta} /> },
-          { key: "delivery", label: "交付信息", forceRender: true, children: <OrderDetailDeliverySection meta={meta} /> },
-          { key: "operation", label: "运营信息", forceRender: true, children: <OrderDetailOperationSection meta={meta} /> },
-          {
-            key: "finance",
-            label: "资金明细",
-            forceRender: true,
-            children: (
-              <OrderDetailFinanceSection
-                rows={financeRows}
-                extraFields={extraFieldsBySection("FINANCE")}
-                expenseCount={expenseCount}
-                incomeCount={incomeCount}
-                totalExpense={totalExpense}
-                totalIncome={totalIncome}
-                flowCount={flowCount}
-              />
-            ),
-          },
-          { key: "execution", label: "操作明细", forceRender: true, children: <OrderDetailExecutionSection rows={executionRows} employees={employees} /> },
-        ]}
+      <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
+      <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
+      <OrderDetailOperationSection meta={meta} />
+      <OrderDetailFinanceSection
+        rows={financeRows}
+        extraFields={extraFieldsBySection("FINANCE")}
+        expenseCount={expenseCount}
+        incomeCount={incomeCount}
+        totalExpense={totalExpense}
+        totalIncome={totalIncome}
+        flowCount={flowCount}
       />
+      <OrderDetailExecutionSection rows={executionRows} employees={employees} />
+      <OrderDetailPartySection meta={meta} />
     </div>
   );
 }

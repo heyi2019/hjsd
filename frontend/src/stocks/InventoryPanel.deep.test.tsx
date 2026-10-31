@@ -131,16 +131,16 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
-  it("更多菜单 → 账号描述：打开描述编辑弹窗", async () => {
+  it("更多菜单 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "账号描述");
-    expect((await screen.findAllByText("账号描述")).length).toBeGreaterThan(0);
+    await clickMore(rowOf(1), "描述");
+    expect((await screen.findAllByText("描述")).length).toBeGreaterThan(0);
   });
 
-  it("更多菜单 → 账号图片：打开图片编辑弹窗", async () => {
+  it("更多菜单 → 作图：打开图片编辑弹窗", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "账号图片");
-    expect((await screen.findAllByText("账号图片")).length).toBeGreaterThan(0);
+    await clickMore(rowOf(1), "作图");
+    expect((await screen.findAllByText("作图")).length).toBeGreaterThan(0);
   });
 
   it("非代挂在库账号不展示下架入口", async () => {
@@ -148,8 +148,8 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     fireEvent.click(within(rowOf(1)).getByRole("button", { name: /更多/ }));
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("下架")).toBeNull();
-    expect(within(menu).getByText("账号描述")).toBeInTheDocument();
-    expect(within(menu).getByText("账号图片")).toBeInTheDocument();
+    expect(within(menu).getByText("描述")).toBeInTheDocument();
+    expect(within(menu).getByText("作图")).toBeInTheDocument();
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {

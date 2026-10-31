@@ -37,6 +37,7 @@ export function OrderDetailExecutionSection({
       render: (value: InventoryExecutionCategory) => OPERATION_CATEGORY_LABEL[value],
     },
     { title: "动作", dataIndex: "action", key: "action" },
+    { title: "平台", dataIndex: "platform", key: "platform", render: (value: string) => value || "-" },
     { title: "动作时间", dataIndex: "occurredAt", key: "occurredAt" },
     {
       title: "操作人",
@@ -80,8 +81,10 @@ export function OrderDetailExecutionSection({
 
   return (
     <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
-      {editing ? <InventorySectionHeading title="操作明细" /> : null}
-      {sortedRows.length ? <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "100%" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
+      <InventorySectionHeading title="操作明细" />
+      <div className="inventory-detail__meta">
+        {sortedRows.length ? <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "100%" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
+      </div>
     </div>
   );
 }

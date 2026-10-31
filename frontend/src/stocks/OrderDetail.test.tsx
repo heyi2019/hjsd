@@ -46,9 +46,8 @@ describe("OrderDetail", () => {
 
     render(<OrderDetail row={account} detail={detail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    expect(within(panel).getByText("HS0001")).toBeInTheDocument();
     expect(within(panel).getByText("渠道 / 区服")).toBeInTheDocument();
-    // 新版分为五板块（只读态用 Tab 分栏，全部 forceRender 挂载）：游戏账号信息在 Tab 标签与板块内标题各出现一次。
+    // 第一部分为竖向堆叠的多个板块：游戏账号信息为板块内标题。
     expect(within(panel).getAllByText("游戏账号信息").length).toBeGreaterThanOrEqual(1);
     expect(within(panel).getByText("操作明细")).toBeInTheDocument();
     // 资金明细与操作明细均含「操作人」列，合并校验至少出现一次。
@@ -88,10 +87,14 @@ describe("OrderDetail", () => {
   it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    expect(within(panel).getByText("登记与流转信息")).toBeInTheDocument();
+    // 已移除的冗余分组不应再出现
+    expect(within(panel).queryByText("登记与流转信息")).toBeNull();
     expect(within(panel).queryByText("其他补充信息")).toBeNull();
-    expect(within(panel).queryByText("订单扩展字段")).toBeNull();
+    expect(within(panel).queryByText("主订单信息")).toBeNull();
+    // 账号补充资料（描述 / 作图）现置于运营信息板块
     expect(within(panel).getByText("账号补充资料")).toBeInTheDocument();
+    expect(within(panel).getByText("描述")).toBeInTheDocument();
+    expect(within(panel).getByText("作图")).toBeInTheDocument();
     expect(panel.querySelector(".inventory-detail__meta")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
@@ -104,32 +107,25 @@ describe("OrderDetail", () => {
     expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
   });
 
-  it("其他补充信息按左标签右内容单列展示", () => {
-    const detail = {
-      orders: [{
-        order_id: 1,
-        order_no: "HS0001",
-        order_type: "HS",
-        created_at: "2026-10-15T10:19:00",
-        note: "订单备注内容",
-        extra_values: { source_note: "来源说明" },
-        events: [],
-      }],
-    } as unknown as AccountExecutionDetail;
-    render(<OrderDetail row={account} detail={detail} loading={false} />);
-    const table = document.querySelector(".inventory-detail__order-supplement");
-    expect(table).toBeTruthy();
-    expect(table?.querySelectorAll("tbody > tr")).toHaveLength(2);
-  });
-
-  it("在桌面详情中让描述、图片、备注各占整行", () => {
+  it("账号补充资料（标签 描述/作图）置于运营信息，游戏账号信息不再含该组", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    for (const label of ["账号描述", "账号图片", "备注"]) {
-      const node = screen.getByText(label);
-      const row = node.closest("tr") ?? node.parentElement?.parentElement;
-      expect(row).toBeTruthy();
-      expect(row?.textContent ?? "").not.toContain("有无二次");
-    }
+    const profileSection = document.querySelector(".inventory-detail__section--profile") as HTMLElement;
+    const operationSection = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
+    // 游戏账号信息不再包含账号补充资料
+    expect(profileSection.textContent).not.toContain("账号补充资料");
+    // 账号补充资料组位于运营信息，标签为「描述 / 作图」，不再使用旧名「账号描述 / 账号图片」
+    const groups = Array.from(operationSection.querySelectorAll(".inventory-detail__meta-group"));
+    const supplementGroup = groups.find((g) => g.textContent?.includes("账号补充资料")) as HTMLElement;
+    expect(supplementGroup.textContent).toContain("描述");
+    expect(supplementGroup.textContent).toContain("作图");
+    expect(supplementGroup.textContent).not.toContain("账号描述");
+    expect(supplementGroup.textContent).not.toContain("账号图片");
+    expect(supplementGroup.textContent).not.toContain("有无二次");
+    // 游戏账号信息（走建单）：账号资料组含 有无二次 与 账号备注
+    const accountGroup = Array.from(profileSection.querySelectorAll(".inventory-detail__meta-group"))
+      .find((g) => g.textContent?.includes("账号资料") && !g.textContent?.includes("补充")) as HTMLElement;
+    expect(accountGroup.textContent).toContain("有无二次");
+    expect(accountGroup.textContent).toContain("账号备注");
   });
 
   it("编辑执行明细时操作员选择器保持可读宽度", () => {

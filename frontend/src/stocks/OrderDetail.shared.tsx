@@ -1,6 +1,12 @@
 import { Descriptions, Typography } from "antd";
 import type { ReactNode } from "react";
-import type { Account, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
+import type {
+  Account,
+  AccountExecutionDetail,
+  AccountExecutionEvent,
+  AccountExecutionOrder,
+  EmployeeOption,
+} from "../shared/api/catalog";
 
 export type InventoryFinanceRow = {
   key: string;
@@ -37,6 +43,7 @@ export type InventoryExecutionRow = {
   operator: string;
   amount: string;
   note: string;
+  platform: string;
   event: AccountExecutionEvent;
 };
 
@@ -74,10 +81,12 @@ export type OrderDetailMeta = {
   valueAddedService?: string | null;
   // 注册与流转信息
   orderNo: string;
+  sourceOrderNo?: string | null;
   createdBy: string;
   registeredAt: string;
   soldAt: string;
   removedAt: string;
+  removedPlatform: string;
   recoveryPlatform: string;
   salePlatform: string;
   consignmentSummary: string;
@@ -86,7 +95,6 @@ export type OrderDetailMeta = {
   channelRegion: string;
   boundPhone: string;
   secondary: string;
-  showProfileFields: boolean;
   accountDescription: string;
   accountImages: string[];
   note: string;
@@ -97,6 +105,8 @@ export type OrderDetailMeta = {
   // 运营状态（板块3 展示）
   operationStatusLabel: string;
   hasActiveConsignment: boolean;
+  // 运营操作人（只读态为空，编辑态由表单字段配置填充）
+  operationOperators?: string;
 };
 
 /** 编辑态下单个事件的草稿值，由上层 InventoryPanel 持有。 */
@@ -125,4 +135,31 @@ export function InventoryExtraFieldsGroup({ section, fields }: { section: string
 /** 编辑态才出现的板块内标题。只读态标题由 Tab 标签承载，板块内不重复。 */
 export function InventorySectionHeading({ title }: { title: ReactNode }) {
   return <div className="inventory-detail__section-heading"><Typography.Text strong>{title}</Typography.Text></div>;
+}
+
+/** 建单来源单：优先匹配 source_order_no，否则取首个非 DG（寄售）单，再回落首单。
+ *  与「售出=统一动作」口径一致——账号资料/买号交付统一取创建（收购）单，而非代挂运营单。 */
+export function findCreationOrder(
+  detail?: AccountExecutionDetail | null,
+  sourceOrderNo?: string | null,
+): AccountExecutionOrder | undefined {
+  if (!detail?.orders?.length) return undefined;
+  return (
+    detail.orders.find((order) => order.order_no === sourceOrderNo)
+    ?? detail.orders.find((order) => order.order_type !== "DG")
+    ?? detail.orders[0]
+  );
+}
+
+/** 卖号交付单：优先取含 SELL 事件的单，否则取首个非创建单的 DG（代挂售出）单。无售出则为 undefined。 */
+export function findSellOrder(
+  detail?: AccountExecutionDetail | null,
+  creationOrder?: AccountExecutionOrder,
+): AccountExecutionOrder | undefined {
+  if (!detail?.orders?.length) return undefined;
+  return (
+    detail.orders.find((order) => order.events.some((event) => event.event_type === "SELL"))
+    ?? detail.orders.find((order) => order !== creationOrder && order.order_type === "DG")
+    ?? undefined
+  );
 }

@@ -63,7 +63,7 @@ beforeEach(() => {
 describe("InventoryProfileModal：三档模式与图片读取", () => {
   it("description 模式：输入描述后保存只提交 account_description", async () => {
     renderModal({ account, mode: "description" });
-    expect(await screen.findByText("账号描述")).toBeInTheDocument();
+    expect(await screen.findByText("描述")).toBeInTheDocument();
     const area = screen.getByPlaceholderText("补充账号等级、资源、限制等信息");
     await ui.clear(area);
     await ui.type(area, "满级账号");
@@ -80,7 +80,7 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
   it("images 模式：已有图片 URL 直接沿用，不经 FileReader", async () => {
     const withImages = { ...account, account_images: ["https://cdn/1.png"] } as unknown as Account;
     renderModal({ account: withImages, mode: "images" });
-    expect(await screen.findByText("账号图片")).toBeInTheDocument();
+    expect(await screen.findByText("作图")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
     expect(vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1]).toEqual({
@@ -90,7 +90,7 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
 
   it("images 模式：上传新图后保存走 FileReader 生成 data URL", async () => {
     renderModal({ account, mode: "images" });
-    await screen.findByText("账号图片");
+    await screen.findByText("作图");
     await attachImage("image-bytes", "shot.png");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
@@ -141,13 +141,13 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     renderModal({ account: many, mode: "all" });
     await screen.findByText("编辑账号资料");
     const modal = modalEl();
-    expect(within(modal).getAllByText(/账号图片\d/).length).toBe(9);
+    expect(within(modal).getAllByText(/作图\d/).length).toBe(9);
   });
 
   it("保存失败时回调 onError 而非 onSaved", async () => {
     vi.mocked(catalog.stocksApi.updateProfile).mockRejectedValue(new Error("save boom"));
     renderModal({ account, mode: "description" });
-    await screen.findByText("账号描述");
+    await screen.findByText("描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(onError).toHaveBeenCalled());
     expect(onSaved).not.toHaveBeenCalled();

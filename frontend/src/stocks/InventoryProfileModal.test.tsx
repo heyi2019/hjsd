@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe("InventoryProfileModal", () => {
-  it("按账号描述模式提交资料并回传更新结果", async () => {
+  it("按描述模式提交资料并回传更新结果", async () => {
     const onSaved = vi.fn();
     renderLight(
       <InventoryProfileModal

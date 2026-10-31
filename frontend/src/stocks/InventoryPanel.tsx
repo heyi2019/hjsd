@@ -53,7 +53,7 @@ function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
   if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
   if (row.status !== "SOLD") {
-    items.push({ key: "description", label: "账号描述" }, { key: "images", label: "账号图片" });
+    items.push({ key: "description", label: "描述" }, { key: "images", label: "作图" });
   }
   return items;
 }

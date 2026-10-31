@@ -1,4 +1,4 @@
-import { Descriptions, Typography } from "antd";
+import { Descriptions, Image, Space, Typography } from "antd";
 import { StatusTag } from "../shared/ui";
 import { CustomFieldSection } from "../orders/ConfigurableField";
 import {
@@ -41,11 +41,29 @@ export function OrderDetailOperationSection({
             <Descriptions.Item label="运营状态">
               <StatusTag status={meta.operationStatusLabel} color={meta.hasActiveConsignment ? "processing" : meta.operationStatusLabel === "已下架" ? "default" : "success"} label={meta.operationStatusLabel} />
             </Descriptions.Item>
+            <Descriptions.Item label="运营操作人">{meta.operationOperators ?? "-"}</Descriptions.Item>
             {meta.consignmentSummary !== "-" ? <Descriptions.Item label="寄售平台 / 寄售时间" className="inventory-detail__datetime inventory-detail__multiline">{meta.consignmentSummary}</Descriptions.Item> : null}
           </Descriptions>
         </div>
         <InventoryExtraFieldsGroup section="BUSINESS" fields={extraFieldsBySection("BUSINESS")} />
         <InventoryExtraFieldsGroup section="OPERATION" fields={extraFieldsBySection("OPERATION")} />
+        <div className="inventory-detail__meta-group">
+          <div className="inventory-detail__meta-group-title">账号补充资料</div>
+          <Descriptions className="inventory-detail__meta-table inventory-detail__long-meta" size="small" bordered column={4}>
+            <Descriptions.Item label="描述" span={4}>{meta.accountDescription}</Descriptions.Item>
+            <Descriptions.Item label="作图" span={4}>
+              {meta.accountImages.length ? (
+                <Image.PreviewGroup>
+                  <Space wrap>
+                    {meta.accountImages.slice(0, 9).map((src, index) => (
+                      <Image key={`${src}-${index}`} src={src} alt={`作图 ${index + 1}`} width={64} height={64} preview />
+                    ))}
+                  </Space>
+                </Image.PreviewGroup>
+              ) : "-"}
+            </Descriptions.Item>
+          </Descriptions>
+        </div>
       </div>
     </div>
   );

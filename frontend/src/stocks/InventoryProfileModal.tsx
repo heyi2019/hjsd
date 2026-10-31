@@ -60,7 +60,7 @@ export function InventoryProfileModal({
     });
     setImages((account.account_images ?? []).slice(0, 9).map((url, index) => ({
       uid: `${account.id}-${index}`,
-      name: `账号图片${index + 1}`,
+      name: `作图${index + 1}`,
       status: "done",
       url,
     })));
@@ -105,7 +105,7 @@ export function InventoryProfileModal({
   return (
     <BusinessActionModal size="compact"
       open={Boolean(target)}
-      title={target?.mode === "images" ? "账号图片" : target?.mode === "description" ? "账号描述" : "编辑账号资料"}
+      title={target?.mode === "images" ? "作图" : target?.mode === "description" ? "描述" : "编辑账号资料"}
       okText="保存"
       cancelText="取消"
       confirmLoading={saving}
@@ -142,7 +142,7 @@ export function InventoryProfileModal({
           <Input aria-label="绑定手机号" placeholder="绑定手机号" value={form.boundPhone} onChange={(event) => setForm((current) => ({ ...current, boundPhone: event.target.value }))} />
           <Input aria-label="平台" placeholder="平台" value={form.platform} onChange={(event) => setForm((current) => ({ ...current, platform: event.target.value }))} />
           <Select allowClear value={form.hasSecondary == null ? undefined : form.hasSecondary ? "有" : "无"} placeholder="有无二次" options={[{ value: "有", label: "有二次" }, { value: "无", label: "无二次" }]} onChange={(value) => setForm((current) => ({ ...current, hasSecondary: value == null ? undefined : value === "有" }))} />
-          <Input.TextArea rows={4} maxLength={2000} showCount value={form.description} placeholder="账号描述" onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+          <Input.TextArea rows={4} maxLength={2000} showCount value={form.description} placeholder="描述" onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
           <Upload listType="picture-card" accept="image/*" maxCount={9} fileList={images} beforeUpload={() => false} onChange={({ fileList }) => setImages(fileList.slice(0, 9))}>
             <span aria-hidden="true">＋</span>
             <div>添加图片</div>

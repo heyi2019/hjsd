@@ -9,7 +9,6 @@ import {
   accountFinancialFlows,
   financeTypeLabel,
   rebateTypeLabel,
-  PROFILE_ACCOUNT_TYPES,
 } from "./inventory-logic";
 import {
   OrderDetailView,
@@ -32,6 +31,11 @@ function dateTimeMinute(value: string | null | undefined): string {
 function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
   const event = detail?.orders.flatMap((order) => order.events).find((item) => item.event_type === eventType);
   return dateTimeMinute(event?.occurred_at ?? event?.occurred_on);
+}
+
+function eventPlatform(detail: AccountExecutionDetail | undefined, eventType: string): string {
+  const order = detail?.orders.find((item) => item.events.some((event) => event.event_type === eventType));
+  return order?.account_platform ?? "-";
 }
 
 function consignmentSummary(detail: AccountExecutionDetail | undefined, accountStatus?: string): string {
@@ -59,6 +63,31 @@ function orderPlatformValues(order: AccountExecutionDetail["orders"][number]): s
       .filter((counterparty) => counterparty.role === "PLATFORM")
       .map((counterparty) => counterparty.display_name),
   ].filter((platform): platform is string => Boolean(platform));
+}
+
+/** 下架分两类：平台下架（PLATFORM）只取消指定平台的上架记录；系统下架（SYSTEM）按 ERP 出库、账号退出库存。
+ *  操作明细「平台」列据此取值：平台下架显示具体平台，系统下架显示「本系统」。 */
+function consignmentPlatformOf(order: AccountExecutionDetail["orders"][number]): string {
+  const configured = order.extra_values?.consignment_platform;
+  if (configured) return String(configured);
+  return orderPlatformValues(order).join("、") || "-";
+}
+
+function eventPlatformLabel(
+  detail: AccountExecutionDetail | undefined,
+  order: AccountExecutionDetail["orders"][number],
+  eventType: string,
+): string {
+  if (eventType !== "CANCEL") return order.account_platform || "-";
+  const scope = order.extra_values?.platform_unlist_scope;
+  if (scope === "SYSTEM") return "本系统";
+  if (scope === "PLATFORM") return consignmentPlatformOf(order);
+  // 系统下架会把该账号仍在架的 DG 单统一标记为 SYSTEM；其 CANCEL 事件可能落在被冲销的源单上，
+  // 此时以账号内是否存在 SYSTEM 下架记录判定，避免把源单的买入平台误当作下架平台。
+  const systemUnlisted = (detail?.orders ?? []).some(
+    (item) => item.order_type === "DG" && item.extra_values?.platform_unlist_scope === "SYSTEM",
+  );
+  return systemUnlisted ? "本系统" : consignmentPlatformOf(order);
 }
 
 function transactionPlatforms(detail: AccountExecutionDetail | undefined, kinds: Set<string>, includeSellEvent = false): string {
@@ -227,6 +256,7 @@ export function OrderDetail({
       amount: event.amount,
       operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",
       note: event.note || "-",
+      platform: eventPlatformLabel(detail, order, event.event_type),
       event,
     }))
   )) ?? [];
@@ -254,10 +284,12 @@ export function OrderDetail({
     inventoryType: row.inventory_type ? (INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type) : null,
     valueAddedService: row.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service) : null,
     orderNo: detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
+    sourceOrderNo: row.source_order_no ?? null,
     createdBy: row.created_by || "-",
     registeredAt: dateTimeMinute(detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
     soldAt: eventDate(detail, "SELL"),
     removedAt: eventDate(detail, "CANCEL"),
+    removedPlatform: eventPlatform(detail, "CANCEL"),
     recoveryPlatform: transactionPlatforms(detail, new Set(["HS", "TH"])),
     salePlatform: transactionPlatforms(detail, new Set(["DG", "DFQ"]), true),
     consignmentSummary: consignmentSummary(detail, row.status),
@@ -265,7 +297,6 @@ export function OrderDetail({
     channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
     boundPhone: row.bound_phone || "-",
     secondary: row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无",
-    showProfileFields: PROFILE_ACCOUNT_TYPES.has(row.inventory_type ?? ""),
     accountDescription: row.account_description || "-",
     accountImages: row.account_images ?? [],
     note: row.note || "-",
@@ -279,6 +310,8 @@ export function OrderDetail({
   return (
     <OrderDetailView
       meta={meta}
+      detail={detail}
+      account={row}
       editing={editing}
       onEdit={onEdit}
       eventDrafts={eventDrafts}

@@ -32,7 +32,7 @@ describe("InventoryPanel：账号台账展开", () => {
 
     // 默认「最新在前」按 id 倒序，首行是 id=12。
     await ui.click(collapsedIcons()[0]);
-    await screen.findByText("登记与流转信息");
+    await screen.findByText("当前运营状态");
     expect(document.querySelectorAll(".inventory-detail")).toHaveLength(1);
 
     // 展开态互斥：此时仅剩的 collapsed 图标属于另一行。
@@ -48,7 +48,7 @@ describe("InventoryPanel：账号台账展开", () => {
     await screen.findByText("acc-1");
 
     await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
-    await screen.findByText("登记与流转信息");
+    await screen.findByText("当前运营状态");
     const callsBeforeWrite = vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length;
     expect(callsBeforeWrite).toBeGreaterThan(0);
 
@@ -71,14 +71,14 @@ describe("InventoryPanel：账号台账展开", () => {
     await screen.findByText("acc-1");
 
     await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
-    await screen.findByText("登记与流转信息");
+    await screen.findByText("当前运营状态");
     const callsAfterFirstExpand = vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length;
 
     await ui.click(document.querySelector(".ant-table-row-expand-icon-expanded") as HTMLElement);
     await waitFor(() => expect(document.querySelector(".inventory-detail")).toBeNull());
 
     await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
-    await screen.findByText("登记与流转信息");
+    await screen.findByText("当前运营状态");
     expect(vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length).toBe(callsAfterFirstExpand);
   });
 });

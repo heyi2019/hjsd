@@ -66,14 +66,14 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
   });
 
-  it("更多菜单收纳下架、取消交易、账号描述和账号图片", async () => {
+  it("更多菜单收纳下架、取消交易、描述和作图", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
     const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
     await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
 
-    for (const label of ["账号描述", "账号图片"]) {
+    for (const label of ["描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
   });
@@ -235,7 +235,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("暂无账号")).toBeInTheDocument();
   });
 
-  it("编辑账号时默认只展示核心资料输入，低频资料收纳到更多资料", async () => {
+  it("编辑账号时可编辑核心资料（游戏账号/产品、游戏/产品类型）", async () => {
     vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -244,13 +244,9 @@ describe("InventoryPanel：账号台账", () => {
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
     expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑游戏/产品类型")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑平台")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑账号密码")).not.toBeVisible();
-    expect(screen.getByLabelText("编辑绑定手机号")).not.toBeVisible();
-
-    await ui.click(screen.getByText("更多账号资料"));
-    expect(screen.getByLabelText("编辑账号密码")).toBeVisible();
-    expect(screen.getByLabelText("编辑绑定手机号")).toBeVisible();
+    // 账号密码 / 绑定手机号在编辑态以只读描述呈现，不再提供可编辑输入。
+    expect(screen.queryByLabelText("编辑账号密码")).toBeNull();
+    expect(screen.queryByLabelText("编辑绑定手机号")).toBeNull();
   });
 
   it("库存编辑展示运营信息自定义字段", async () => {
@@ -332,38 +328,24 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
-    expect(await screen.findByText("登记与流转信息")).toBeInTheDocument();
-    const detailPanel = document.querySelector(".inventory-detail") as HTMLElement;
-    const accountSummary = detailPanel.querySelector(".inventory-detail__meta") as HTMLElement;
-    expect(within(accountSummary).getByText("建档操作人")).toBeInTheDocument();
-    // 新版板块1「游戏账号信息」直接展示账号基本资料（业务 / 平台 / 成本等）。
-    expect(within(accountSummary).getByText("业务")).toBeInTheDocument();
-    expect(within(accountSummary).queryByText("类型", { exact: true })).toBeNull();
-    expect(within(accountSummary).queryByText("游戏/产品类型", { exact: true })).toBeNull();
-    expect(within(accountSummary).getByText("平台")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("成本")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("登记时间")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("出售时间")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("下架时间")).toBeInTheDocument();
+    const detailPanel = (await screen.findByText("当前运营状态")).closest(".inventory-detail") as HTMLElement;
+    const accountSummary = detailPanel;
+    // 新版只读详情：账号基本资料（业务 / 平台 / 成本 / 登记时间 / 出售时间 / 建档操作人）已不在面板展示，仅保留于 CSV 导出；
+    // 面板按板块聚焦：运营信息含「寄售平台 / 寄售时间」与「账号补充资料（描述 / 作图）」，游戏账号信息含 ACCOUNT_PRODUCT 扩展（高段位账号）。
     expect(within(accountSummary).getByText("寄售平台 / 寄售时间")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("账号描述")).toBeInTheDocument();
+    expect(within(accountSummary).getByText("描述")).toBeInTheDocument();
     expect(within(accountSummary).getByText("高段位账号")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("账号图片")).toBeInTheDocument();
-    expect(within(accountSummary).getAllByRole("img", { name: /账号图片/ })).toHaveLength(2);
+    expect(within(accountSummary).getByText("作图")).toBeInTheDocument();
+    expect(within(accountSummary).getAllByRole("img", { name: /作图/ })).toHaveLength(2);
     expect(within(accountSummary).queryByText("订单时间", { exact: true })).toBeNull();
-    expect(within(accountSummary).getByText("2026-10-15 10:19")).toBeInTheDocument();
-    expect(within(accountSummary).queryByText("2026-10-01 09:30", { exact: true })).toBeNull();
-    expect(within(accountSummary).getByText("2026-10-16 16:45")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("2026-10-17 11:35")).toBeInTheDocument();
     expect(within(accountSummary).getByText("寄售平台A / 2026-10-12 09:10")).toBeInTheDocument();
-    expect(within(accountSummary).getAllByText("寄售平台A").length).toBeGreaterThan(0);
+    // 回收(RECOVERY)类型的账号同样可寄售，寄售记录以 DG 单承载，与账号 inventory_type 无关。
+    expect(within(accountSummary).getAllByText(/寄售平台A/).length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
-    // 展开区已按板块分栏：先切到「操作明细」页签，否则该板块未激活、不在无障碍树内，ByRole 查询取不到表头。
-    await ui.click(screen.getByRole("tab", { name: "操作明细" }));
     const executionTable = detailPanel.querySelector(".inventory-execution-table") as HTMLElement;
     const executionHeaders = within(executionTable).getAllByRole("columnheader");
-    for (const name of ["动作", "动作时间", "金额", "操作人", "备注"]) {
+    for (const name of ["动作", "平台", "动作时间", "金额", "操作人", "备注"]) {
       const header = executionHeaders.find((item) => item.textContent?.trim() === name);
       expect(header).toHaveAccessibleName(name);
     }
@@ -371,7 +353,8 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(executionTable).getAllByText("admin").length).toBeGreaterThan(0);
     expect(executionTable.querySelector(".ant-pagination")).toBeNull();
     expect(within(detailPanel).getByText("2026-10-15 10:20")).toBeInTheDocument();
-    expect(within(detailPanel).getAllByText("2026-10-17 11:35").length).toBe(2);
+    // 下架时间已收进操作明细表（CANCEL 行的动作时间），不再有独立字段，故只出现一次。
+    expect(within(detailPanel).getAllByText("2026-10-17 11:35").length).toBe(1);
     const executionList = detailPanel.querySelector(".inventory-execution-list") as HTMLElement;
     expect(within(executionList).queryByText("订单号", { exact: true })).toBeNull();
     expect(within(executionList).queryByText("类型", { exact: true })).toBeNull();
@@ -382,7 +365,6 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(detailPanel).getByText("资金明细")).toBeInTheDocument();
     expect(within(detailPanel).queryByText("资金流水", { exact: true })).toBeNull();
     expect(within(detailPanel).queryByText("流水时间", { exact: true })).toBeNull();
-    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     const financePanel = detailPanel.querySelector(".inventory-finance-list") as HTMLElement;
     const financeSummary = financePanel.querySelector(".inventory-finance-summary") as HTMLElement;
     expect(within(financeSummary).getByText("支出")).toBeInTheDocument();

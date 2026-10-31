@@ -13,7 +13,7 @@ import { installmentsApi,
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { INSTALLMENT_STATUS_LABEL, money, today } from "../shared/lib/format";
-import { orderTypeLabel } from "../shared/lib/labels";
+import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { DataTable,
   BusinessActionModal,
@@ -53,18 +53,6 @@ const SCHEDULE_STATUS_LABEL: Record<string, string> = {
   PAID: "已收",
   OVERDUE: "逾期",
   WAIVED: "已减免",
-};
-
-const BUSINESS_MODE_LABEL: Record<string, string> = {
-  SELF: "自营",
-  DISTRIBUTION: "分销",
-};
-
-const ORDER_TYPE_LABEL: Record<string, string> = {
-  HS: "回收",
-  TH: "提号",
-  DG: "代挂",
-  DFQ: "代分期",
 };
 
 function ContractTable({

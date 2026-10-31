@@ -22,7 +22,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.installments import service as installments_service
+from app.value_added_services import service as installments_service
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.orders import schemas, service
 

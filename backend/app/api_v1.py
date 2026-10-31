@@ -29,7 +29,7 @@ from app.quality.router import router as quality_router
 from app.notifications.router import router as notifications_router
 from app.reporting.router import router as reporting_router
 from app.finance.router import router as finance_router
-from app.installments.router import router as installments_router
+from app.value_added_services.router import router as installments_router
 from app.orders.router import router as orders_router
 from app.orders.form_fields_router import router as order_form_fields_router
 from app.parties.router import router as parties_router

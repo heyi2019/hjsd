@@ -29,7 +29,7 @@ from app.domain.enums import (
     OrderStatus,
 )
 from app.stocks import service as stocks_service
-from app.installments import service as installments_service
+from app.value_added_services import service as installments_service
 from app.finance import service as finance_service
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog

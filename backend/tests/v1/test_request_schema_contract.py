@@ -36,7 +36,7 @@ from app.foundation.schemas import (
     PoolUpdate,
     RouteIn,
 )
-from app.installments.schemas import (
+from app.value_added_services.schemas import (
     DefaultIn,
     DeliverIn,
     EarlySettlementIn,

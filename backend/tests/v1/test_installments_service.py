@@ -38,7 +38,7 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.trade import InstallmentSchedule, OrderEvent
-from app.installments import service as installment_service
+from app.value_added_services import service as installment_service
 from app.orders import service as orders_service
 
 TODAY = date(2026, 10, 12)

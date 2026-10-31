@@ -1,4 +1,4 @@
-"""installments.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
+"""value_added_services.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
 from __future__ import annotations
 
 from datetime import date
@@ -20,7 +20,7 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.domain.trade import InstallmentSchedule
-from app.installments import schemas, service
+from app.value_added_services import schemas, service
 from app.lists.export import build_list_csv, csv_file_response
 from app.parties import service as parties_service
 

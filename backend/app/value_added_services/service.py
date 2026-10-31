@@ -1,11 +1,11 @@
-"""installments.service：分期合约建档 / 还款 / 结清 / 回收的统一入口。
+"""value_added_services.service：分期合约建档 / 还款 / 结清 / 回收的统一入口。
 
 本模块是兼容层（facade），只做符号再导出，不含业务逻辑：
-- 共用工具 → `app.installments._shared`
-- 建档与列表 → `app.installments.create`
-- 还款/减免/展期 → `app.installments.repayment`
-- 提前结清/违约 → `app.installments.settlement`
-- 回收/出售/交付/逾期 → `app.installments.recovery`
+- 共用工具 → `app.value_added_services._shared`
+- 建档与列表 → `app.value_added_services.create`
+- 还款/减免/展期 → `app.value_added_services.repayment`
+- 提前结清/违约 → `app.value_added_services.settlement`
+- 回收/出售/交付/逾期 → `app.value_added_services.recovery`
 """
 from __future__ import annotations
 

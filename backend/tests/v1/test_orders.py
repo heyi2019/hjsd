@@ -12,7 +12,7 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.installments import service as installment_service
+from app.value_added_services import service as installment_service
 from app.orders import service
 from app.parties import service as parties_service
 

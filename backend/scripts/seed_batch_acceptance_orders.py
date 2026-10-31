@@ -15,7 +15,7 @@ from app.core.database import get_session_factory
 from app.domain.enums import EventType, InstallmentContractType, RebateType
 from app.domain.trade import Order
 from app.finance import rebates as rebates_service
-from app.installments import service as installments_service
+from app.value_added_services import service as installments_service
 from app.orders import service as orders_service
 
 

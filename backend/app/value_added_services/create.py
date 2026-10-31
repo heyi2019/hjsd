@@ -1,4 +1,4 @@
-"""installments.create：分期合约建档、回收出售关联与合约列表（BAS-03）。
+"""value_added_services.create：分期合约建档、回收出售关联与合约列表（BAS-03）。
 
 建档只落合约与期次计划，金额与状态后续由还款/交付动作推进。
 """
@@ -12,12 +12,11 @@ from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 from app.core.audit import record_audit
 from app.core.business_numbering import installment_no as order_installment_no
-from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
 from app.domain.users import User
 from app.foundation import service as foundation_service
-from app.installments.schemas import ScheduleCreate
+from app.value_added_services.schemas import ScheduleCreate
 from app.orders import service as orders_service
 from app.orders.amounts import order_amounts
 from app.parties import service as parties_service
@@ -45,7 +44,6 @@ from app.domain.enums import (
     InstallmentStatus,
     PolicyType,
     ScheduleStatus,
-    SequenceKey,
 )
 from app.domain.trade import (
     Account,
@@ -361,10 +359,8 @@ def create_installment(
     if per_period_amount + adjustment < 0:
         raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
 
-    # 分期合约号（用户口径 2026-10-28）：统一「订单号-INS序号」衍生。
-    # 分期合约号沿用订单编号（FQ0001 → FQ0001-INS01）；
-    # 自营分期以独立 FQ 序列为分期订单号，合约号同式衍生（FQ0001 → FQ0001-INS01）。
-    installment_no_value = order_installment_no(allocate_number(session, SequenceKey.INSTALLMENT.value))
+    # 分期合约号统一由业务订单号派生；一笔订单只允许一条分期合约。
+    installment_no_value = order_installment_no(order.order_no)
     installment = Installment(
         inst_no=installment_no_value,
         order_id=order.id,

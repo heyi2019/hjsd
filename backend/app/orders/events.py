@@ -58,7 +58,7 @@ def _auto_link_recovered_installment_sale(
     note: str | None,
 ) -> None:
     """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。"""
-    from app.installments.service import link_recovered_sale
+    from app.value_added_services.service import link_recovered_sale
 
     link_recovered_sale(
         session,

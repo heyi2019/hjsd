@@ -20,7 +20,7 @@ from app.domain.enums import (
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
 from app.finance import service as finance_service
-from app.installments import service as installment_service
+from app.value_added_services import service as installment_service
 from app.orders import service as orders_service
 from app.parties import service as parties_service
 
@@ -72,9 +72,8 @@ class TestA04DgConsignmentSale:
             actor="pytest",
         )
         seeded_db.commit()
-        # 分期合约号统一走独立 FQ 序列（2026-10-28 口径），不再由订单号衍生
-        assert contract.inst_no.startswith("FQ")
-        assert contract.inst_no.endswith("-INS01")
+        # 分期合约号由业务订单号派生：一个订单只有一个分期合约号。
+        assert contract.inst_no == f"{order.order_no}-FQ"
         assert installment_service.total_receivable(contract) == Decimal("1200.00")
 
         installment_service.pay(
@@ -191,8 +190,8 @@ class TestA05HsStockSale:
         )
         seeded_db.commit()
 
-        # 用户口径 2026-10-28：自营分期合约号 = 分期订单号（FQ 序列）-INS 衍生
-        assert contract.inst_no == "FQ0001-INS01"
+        # 用户口径：自营分期合约号 = 业务订单号-FQ
+        assert contract.inst_no == f"{order.order_no}-FQ"
 
         # 创建合约不新增 BUY 支出
         buys = seeded_db.scalars(

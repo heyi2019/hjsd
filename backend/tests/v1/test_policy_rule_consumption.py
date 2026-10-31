@@ -22,7 +22,7 @@ import pytest
 from app.stocks import service as account_service
 from app.core.errors import Validation
 from app.finance import service as finance_service
-from app.installments import service as installment_service
+from app.value_added_services import service as installment_service
 from app.orders import service as order_service
 from app.policy import service as policy_service
 

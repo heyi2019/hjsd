@@ -67,9 +67,6 @@ class SequenceKey(StrEnum):
     ORDER_HS = "ORDER_HS"
     ORDER_TH = "ORDER_TH"
     ORDER_DG = "ORDER_DG"
-    # 分期订单独立编号域（自营分期，关联回收/提号/代挂来源订单）；
-    # 分期合约号统一「订单号-INS序号」衍生：自营 FQ0001-INS01。
-    INSTALLMENT = "INSTALLMENT"
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
     LEAD = "LEAD"

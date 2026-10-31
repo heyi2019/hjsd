@@ -14,7 +14,7 @@ from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool, event
+from sqlalchemy import engine_from_config, pool, event, text
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
@@ -55,6 +55,23 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    if settings.alembic_url.startswith("postgresql"):
+        # Alembic 默认把 version_num 建成 VARCHAR(32)，但正式迁移 revision
+        # `0065_allow_split_cashflow_per_event` 已超过 32 字符。先在独立事务
+        # 中创建/扩容版本表，确保新库和存量 PostgreSQL 都能写入版本戳。
+        with connectable.begin() as bootstrap:
+            bootstrap.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS alembic_version "
+                    "(version_num VARCHAR(64) NOT NULL)"
+                )
+            )
+            bootstrap.execute(
+                text(
+                    "ALTER TABLE alembic_version "
+                    "ALTER COLUMN version_num TYPE VARCHAR(64)"
+                )
+            )
     # 覆盖 database.py 的全局 connect 监听：SQLite 的 batch 重建父表（orders）
     # 需临时关闭外键。PostgreSQL 不认识 PRAGMA，不能注册这条监听。
     if settings.alembic_url.startswith("sqlite"):

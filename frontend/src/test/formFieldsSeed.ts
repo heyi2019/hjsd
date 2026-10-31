@@ -422,7 +422,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "ORDER_HS", label: "回收编号" },
     { value: "ORDER_TH", label: "提号编号" },
     { value: "ORDER_DG", label: "代挂编号" },
-    { value: "INSTALLMENT", label: "分期订单" },
+    { value: "INSTALLMENT", label: "分期合约号" },
     { value: "CUSTOMER", label: "客户" },
     { value: "COUNTERPARTY", label: "合作方" },
     { value: "LEAD", label: "需求" },

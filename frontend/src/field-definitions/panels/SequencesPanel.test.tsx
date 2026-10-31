@@ -25,10 +25,10 @@ describe("SequencesPanel", () => {
     // 编号域中文标签可见；分组标签与业务字典一致
     expect(screen.getAllByText("回收编号").length).toBeGreaterThan(0);
     expect(screen.getAllByText("支出流水").length).toBeGreaterThan(0);
-    // 静态口径条目：库存编号 / 分期合约编号（非独立发放域，无 document_sequences 行也展示）
+    // 静态口径条目：库存编号 / 分期合约号（无 document_sequences 行也展示）
     expect(screen.getByText("库存编号")).toBeInTheDocument();
-    expect(screen.getByText("分期合约编号")).toBeInTheDocument();
-    expect(screen.getByText(/自营分期合约使用分期订单号衍生/)).toBeInTheDocument();
+    expect(screen.getByText("分期合约号")).toBeInTheDocument();
+    expect(screen.getByText("编号格式 业务订单编号-FQ")).toBeInTheDocument();
     // 只读面板：不提供任何新增/编辑/重置入口
     expect(screen.queryByRole("button", { name: /新建|编辑|重置|保存/ })).toBeNull();
   });

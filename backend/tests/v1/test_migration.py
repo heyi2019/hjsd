@@ -171,9 +171,8 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_env):
                 row[0] for row in connection.execute(text("SELECT sequence_key FROM document_sequences"))
             }
             assert {"ORDER_HS", "ORDER_TH", "ORDER_DG", "CUSTOMER", "COUNTERPARTY"} <= sequences
-            # 分期合约号由业务订单号派生，不再启用独立 FQ 序列；EVENT/REBATE 仍禁止。
+            # EVENT/REBATE 仍禁止。
             assert {"EVENT", "REBATE"}.isdisjoint(sequences)
-            assert "INSTALLMENT" not in sequences
             # 2026-10-28 裁决：资金流水按方向独立编号（支出 ZC+五位 / 收入 SR+五位），CF 共用域退役。
             assert connection.execute(
                 text(

@@ -185,6 +185,7 @@ function resolveOperationStatus(
 export function OrderDetail({
   row,
   detail,
+  contextOrderNo,
   loading,
   editing,
   onEdit,
@@ -199,6 +200,8 @@ export function OrderDetail({
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
+  /** 业务台账从订单行展开时，优先使用当前订单作为详情上下文；库存中心不传则沿用账号来源单。 */
+  contextOrderNo?: string | null;
   loading: boolean;
   editing?: Account | null;
   onEdit?: (account: Account) => void;
@@ -212,6 +215,9 @@ export function OrderDetail({
   saving?: boolean;
 }) {
   if (loading && !detail) return <Spin size="small" />;
+
+  const sourceOrderNo = contextOrderNo ?? row.source_order_no;
+  const contextOrder = detail?.orders.find((order) => order.order_no === sourceOrderNo);
 
   const financialFlows = accountFinancialFlows(detail);
   const rebateItems = detail?.orders.flatMap((order) => (
@@ -283,10 +289,10 @@ export function OrderDetail({
     businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,
     inventoryType: row.inventory_type ? (INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type) : null,
     valueAddedService: row.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service) : null,
-    orderNo: detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
-    sourceOrderNo: row.source_order_no ?? null,
+    orderNo: contextOrder?.order_no ?? detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
+    sourceOrderNo: sourceOrderNo ?? null,
     createdBy: row.created_by || "-",
-    registeredAt: dateTimeMinute(detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
+    registeredAt: dateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
     soldAt: eventDate(detail, "SELL"),
     removedAt: eventDate(detail, "CANCEL"),
     removedPlatform: eventPlatform(detail, "CANCEL"),

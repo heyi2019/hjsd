@@ -121,6 +121,25 @@ describe("OrdersPage：四类业务台账", () => {
     for (const label of ["订单号", "对方 / 来源", "游戏/产品类型", "游戏账号/产品", "平台", "金额", "库存状态", "最新动作", "状态", "日期", "操作"]) {
       expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
     }
+    for (const [label, width] of Object.entries({
+      "订单号": "110px",
+      "对方 / 来源": "160px",
+      "游戏/产品类型": "140px",
+      "游戏账号/产品": "140px",
+      "平台": "72px",
+      "金额": "126px",
+      "库存状态": "102px",
+      "最新动作": "198px",
+      "状态": "111px",
+      "关联": "111px",
+      "日期": "144px",
+      "操作": "220px",
+    })) {
+      const ledgerColumnStyles = Array.from(document.querySelectorAll(".orders-ledger .ant-table col"))
+        .map((column) => column.getAttribute("style") ?? "");
+      expect(ledgerColumnStyles).toContain(`width: ${width};`);
+    }
+    expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
     for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "¥1,234.00", "在库"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     }
@@ -175,6 +194,68 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.getByText("操作明细")).toBeInTheDocument();
     expect(screen.getByText("参与方信息")).toBeInTheDocument();
     expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
+  });
+
+  it("同一账号有多张订单时，业务台账展开使用当前订单的详情上下文", async () => {
+    const olderOrder = {
+      ...orders[0],
+      id: 8,
+      order_no: "TH-2026-0174",
+      order_type: "TH",
+      account_id: 1,
+    };
+    const selectedOrder = {
+      ...orders[0],
+      id: 9,
+      order_no: "TH-2026-0179",
+      order_type: "TH",
+      account_id: 1,
+    };
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([olderOrder, selectedOrder]);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: {
+        id: 1,
+        stock_no: "KU_00001",
+        source_order_no: "TH-2026-0174",
+        game_account: "seller-001",
+        game_type: "原神",
+        platform: "安卓",
+        status: "IN_STOCK",
+        cost_amount: "1234.00",
+        created_by: "admin",
+        created_at: "2026-10-01T09:30:00",
+      },
+      orders: [
+        {
+          order_id: 8,
+          order_no: "TH-2026-0174",
+          order_type: "TH",
+          trade_date: "2026-10-01",
+          created_at: "2026-10-01T09:30:00",
+          status: "ACTIVE",
+          extra_values: { intermediary_platform: "旧平台" },
+          events: [],
+        },
+        {
+          order_id: 9,
+          order_no: "TH-2026-0179",
+          order_type: "TH",
+          trade_date: "2026-10-02",
+          created_at: "2026-10-02T09:30:00",
+          status: "ACTIVE",
+          extra_values: { intermediary_platform: "选中平台" },
+          events: [],
+        },
+      ],
+    } as never);
+
+    renderLight(<OrdersPage />);
+    await screen.findAllByText("TH-2026-0179");
+    const row = screen.getAllByText("TH-2026-0179").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+
+    expect(await screen.findByText("选中平台")).toBeInTheDocument();
+    expect(screen.queryByText("旧平台")).toBeNull();
   });
 
   it("操作列提供更多菜单入口", async () => {

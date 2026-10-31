@@ -621,26 +621,30 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
 
   const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
   const ledgerColumns: ColumnsType<Order> = [
-    { title: "订单号", dataIndex: "order_no" },
-    { title: "对方 / 来源", key: "party", render: (_, order) => [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
-    { title: "游戏/产品类型", dataIndex: "account_game_type", render: (v: string | null) => v || "-" },
-    { title: "游戏账号/产品", dataIndex: "account_game_account", render: (v: string | null) => v || "-" },
-    { title: "平台", dataIndex: "account_platform", render: (v: string | null) => v || "-" },
-    { title: "金额", dataIndex: "event_total", render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "库存状态", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} optionSet="INVENTORY_STATUS" /> : "-" },
-    { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
+    { title: "订单号", dataIndex: "order_no", width: 110, ellipsis: true },
+    { title: "对方 / 来源", key: "party", width: 160, ellipsis: true, render: (_, order) => [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
+    { title: "游戏/产品类型", dataIndex: "account_game_type", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "游戏账号/产品", dataIndex: "account_game_account", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "平台", dataIndex: "account_platform", width: 72, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
+    { title: "库存状态", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} optionSet="INVENTORY_STATUS" /> : "-" },
+    { title: "最新动作", dataIndex: "last_event_type", width: 198, ellipsis: true, render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
+    { title: "状态", dataIndex: "status", width: 111, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
     {
       title: "关联",
       dataIndex: "link_status",
+      width: 111,
+      ellipsis: true,
       render: (v: string | undefined) => (
         <StatusTag status={v ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", v ?? "LINKED", LINK_STATUS_LABEL)} />
       ),
     },
-    { title: "日期", dataIndex: "trade_date" },
+    { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
     {
       title: "操作",
       key: "actions",
+      width: 220,
+      ellipsis: true,
       render: (_, order) => (
         <Space size={2}>
           <PermissionButton permission="order.update" type="link" onClick={() => openEditOrder(order)}>编辑订单</PermissionButton>
@@ -801,6 +805,7 @@ export function OrdersPage({ initialTab, active = true, onNavigate }: { initialT
                         <OrderDetail
                           row={detail.account}
                           detail={detail}
+                          contextOrderNo={order.order_no}
                           loading={Boolean(ledgerDetailLoading[accountId])}
                           onPartyClick={(party: InventoryPartyLink) => onNavigate?.(
                             party.entityType === "customer"

@@ -707,7 +707,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} onNavigate={onNavigate} />,
+            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} onNavigate={onNavigate} />,
           },
           {
             key: "ledger",

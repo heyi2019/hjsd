@@ -78,6 +78,15 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类业务台账", () => {
+  it("业务中心重新激活时刷新库存列表", async () => {
+    const { rerender } = renderLight(<OrdersPage active={false} />);
+    await screen.findByRole("tab", { name: "库存中心" });
+    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
+
+    rerender(<OrdersPage active />);
+    await waitFor(() => expect(vi.mocked(catalog.stocksApi.list)).toHaveBeenCalled());
+  });
+
   it("顶部不再重复展示业务中心标题与说明", async () => {
     renderLight(<OrdersPage />);
     await screen.findByRole("tab", { name: "业务台账" });

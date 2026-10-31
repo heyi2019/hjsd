@@ -34,6 +34,7 @@ import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { filterRetiredValueAddedServiceOptions } from "../shared/lib/retiredProducts";
 import { useListViewColumns } from "../shared/lib/listColumns";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
@@ -167,7 +168,7 @@ export function MobileInventoryList({
   );
 }
 
-export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: { refreshKey?: number; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [rows, setRows] = useState<Account[]>([]);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
@@ -212,7 +213,13 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     }
   }, []);
 
+  useReloadOnActive(active, load);
+
+  const previousRefreshKey = useRef(refreshKey);
   useEffect(() => {
+    if (refreshKey === previousRefreshKey.current) return;
+    previousRefreshKey.current = refreshKey;
+    setPage(1);
     void load();
   }, [load, refreshKey]);
 

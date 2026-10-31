@@ -13,7 +13,7 @@
   align-items: flex-start;
   gap: 12px 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-bottom: var(--border-w) solid var(--color-border);
 }
 
 .config-center__group {
@@ -27,7 +27,7 @@
 .config-center__group-title {
   font-weight: 600;
   font-size: 13px;
-  color: var(--ant-color-text-secondary, #8c8c8c);
+  color: var(--color-text-secondary);
   margin: 0 4px 0 0;
 }
 
@@ -38,29 +38,24 @@
   width: auto;
   text-align: center;
   padding: 5px 12px;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border: var(--border-w) solid var(--color-border);
   background: transparent;
   border-radius: 6px;
   cursor: pointer;
-  color: var(--ant-color-text, #1f1f1f);
+  color: var(--color-text-primary);
   font-size: 14px;
 }
 
 .config-center__item:hover {
-  background: var(--ant-color-fill-tertiary, #f5f5f5);
-  border-color: var(--ant-color-primary, #1677ff);
+  background: var(--brand-soft);
+  border-color: var(--color-primary);
 }
 
 .config-center__item--active {
-  background: var(--ant-color-primary-bg, #e6f4ff);
-  color: var(--ant-color-primary, #1677ff);
-  border-color: var(--ant-color-primary, #1677ff);
+  background: var(--brand-soft);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
   font-weight: 600;
-}
-
-.config-center__tag {
-  margin-inline-start: 6px;
-  transform: scale(0.85);
 }
 
 .config-center__content {

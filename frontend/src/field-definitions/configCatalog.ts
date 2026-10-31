@@ -21,7 +21,16 @@ import {
   usersApi,
 } from "../shared/api/catalog";
 
-type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
+export type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
+
+export const CONFIG_GROUP_LABEL: Record<ConfigGroupCode, string> = {
+  FIELD: "字段配置",
+  MASTER: "业务主数据",
+  POLICY: "业务规则",
+  GOV: "数据治理",
+  ORG: "组织与权限",
+  OPS: "作业与外观",
+};
 
 interface SettingsItemMeta {
   /** 与 SettingsPage 的 Tab key 一致，用于跳转。 */

@@ -6,7 +6,7 @@
  * 复用单一事实源 configCatalog.ts 的 SETTINGS_ITEMS 注册表（分组 / 标签 / 权限 / 只读），
  * 右侧直接挂载各配置项既有的面板组件（BusinessDictionaryPanel / OrderTypesPanel …），
  * 不重写任何配置逻辑；跨面板跳转（如表单字段里的「配置游戏类型」）改为在本中心内切换选中项。 */
-import { Card, Tag, Typography } from "antd";
+import { Card, Typography } from "antd";
 import { useState, type ReactElement } from "react";
 import {
   CONFIG_GROUP_LABEL,
@@ -14,6 +14,7 @@ import {
   type ConfigGroupCode,
 } from "../configCatalog";
 import { useSession } from "../../shared/state/session";
+import { StatusTag } from "../../shared/ui";
 import { PANEL_REGISTRY } from "./panelRegistry";
 import "./ConfigCenterPanel.css";
 
@@ -53,7 +54,7 @@ export function ConfigCenterPanel() {
                 onClick={() => setSelected(item.key)}
               >
                 <span>{item.label}</span>
-                {item.readOnly ? <Tag className="config-center__tag">只读</Tag> : null}
+                {item.readOnly ? <StatusTag status="DISABLED" label="只读" /> : null}
               </button>
             ))}
           </div>

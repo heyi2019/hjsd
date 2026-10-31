@@ -220,12 +220,14 @@ function filterBusinessOrders(
   mode: BusinessModeFilterKey,
   keyword: string,
   link: string,
+  gameType: string,
 ): Order[] {
   const normalizedKeyword = keyword.trim().toLowerCase();
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
     && (link === "all" || (order.link_status ?? "LINKED") === link)
+    && (gameType === "all" || order.account_game_type === gameType)
     && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
   ));
 }
@@ -264,6 +266,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
+  const [gameTypeFilter, setGameTypeFilter] = useState("all");
   // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
   const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
@@ -271,6 +274,16 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
   const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
+  const gameTypeOptions = useMemo(() => {
+    const values = Array.from(new Set(orders
+      .map((order) => order.account_game_type)
+      .filter((value): value is string => Boolean(value))))
+      .sort((a, b) => a.localeCompare(b, "zh-CN"));
+    return [
+      { value: "all", label: "全部游戏类型" },
+      ...values.map((value) => ({ value, label: value })),
+    ];
+  }, [orders]);
   // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
   const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
@@ -613,7 +626,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   }, [active, initialMine]);
 
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter, gameTypeFilter)
     .slice()
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
@@ -723,6 +736,17 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                     className="orders-ledger-search"
                     onChange={(event) => {
                       setKeyword(event.target.value);
+                      setPage(1);
+                    }}
+                  />
+                  <Typography.Text strong>游戏类型筛选</Typography.Text>
+                  <Select
+                    aria-label="游戏类型筛选"
+                    className="ui-filter-select"
+                    value={gameTypeFilter}
+                    options={gameTypeOptions}
+                    onChange={(value) => {
+                      setGameTypeFilter(value);
                       setPage(1);
                     }}
                   />

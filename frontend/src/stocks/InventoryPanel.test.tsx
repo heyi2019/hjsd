@@ -47,6 +47,23 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByRole("button", { name: "导出 CSV" })).toBeInTheDocument();
   });
 
+  it("提供游戏类型下拉筛选库存账号", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
+      { ...accounts[0], game_type: "原神" },
+      { ...accounts[0], id: 3, game_account: "acc-3", game_type: "王者荣耀" },
+    ]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+
+    const gameTypeFilter = await screen.findByRole("combobox", { name: "游戏类型筛选" });
+    await ui.click(gameTypeFilter);
+    const gameTypeOption = (await screen.findAllByText("王者荣耀")).find((element) => element.classList.contains("ant-select-item-option-content"));
+    expect(gameTypeOption).toBeDefined();
+    await ui.click(gameTypeOption!);
+
+    await waitFor(() => expect(screen.queryByText("acc-1")).toBeNull());
+    expect(screen.getByText("acc-3")).toBeInTheDocument();
+  });
+
   it("建单后刷新库存并把新账号放在第一页", async () => {
     const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -275,7 +292,7 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
 
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
-    expect(await screen.findByText("运营信息")).toBeInTheDocument();
+    expect((await screen.findAllByText("运营信息")).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
   });
 

@@ -124,6 +124,33 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.queryByText("HS-2026-0001")).toBeNull();
   });
 
+  it("业务台账提供游戏类型下拉筛选", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      ...orders,
+      {
+        id: 3,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        capital_type: "ZERO",
+        trade_date: "2026-10-03",
+        status: "ACTIVE",
+        account_game_type: "王者荣耀",
+        account_game_account: "seller-003",
+      },
+    ]);
+
+    await openLedger();
+    const gameTypeFilter = screen.getByRole("combobox", { name: "游戏类型筛选" });
+    await ui.click(gameTypeFilter);
+    const gameTypeOption = (await screen.findAllByText("王者荣耀")).find((element) => element.classList.contains("ant-select-item-option-content"));
+    expect(gameTypeOption).toBeDefined();
+    await ui.click(gameTypeOption!);
+
+    const ledger = screen.getByRole("tabpanel", { name: "业务台账" });
+    await waitFor(() => expect(within(ledger).queryByText("HS-2026-0001")).toBeNull());
+    expect(within(ledger).getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
+  });
+
   it("业务台账统一展示通用字段", async () => {
     await openLedger();
 

@@ -170,6 +170,7 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
   const [rows, setRows] = useState<Account[]>([]);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
+  const [gameTypeFilter, setGameTypeFilter] = useState<string | undefined>(undefined);
   const [keyword, setKeyword] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -199,6 +200,11 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
+  const gameTypeOptions = Array.from(new Set((rows ?? [])
+    .map((row) => row.game_type)
+    .filter((value): value is string => Boolean(value))))
+    .sort((a, b) => a.localeCompare(b, "zh-CN"))
+    .map((value) => ({ value, label: value }));
   const load = useCallback(async () => {
     try {
       const list = await stocksApi.list({ status: "WAITING" });
@@ -242,7 +248,8 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
   const inventoryRows = (rows ?? []).filter((row) => {
     const matchesStatus = row.status === "WAITING";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
-    return matchesStatus && matchesBusiness;
+    const matchesGameType = !gameTypeFilter || row.game_type === gameTypeFilter;
+    return matchesStatus && matchesBusiness && matchesGameType;
   });
   const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
   const normalizedKeyword = keyword.trim().toLowerCase();
@@ -641,6 +648,14 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
             aria-label="搜索库存账号"
             className="ui-control-width-inventory"
             onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+          />
+          <Typography.Text strong>游戏类型筛选</Typography.Text>
+          <Select
+            aria-label="游戏类型筛选"
+            className="ui-filter-select"
+            value={gameTypeFilter ?? "all"}
+            options={[{ value: "all", label: "全部游戏类型" }, ...gameTypeOptions]}
+            onChange={(value) => { setGameTypeFilter(value === "all" ? undefined : value); setPage(1); }}
           />
           <Typography.Text strong>类型筛选</Typography.Text>
           <Segmented

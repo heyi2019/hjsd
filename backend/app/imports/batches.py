@@ -1,7 +1,6 @@
 """imports 批次生命周期：创建、列表、未关联划转、回滚、更正与驳回。"""
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -9,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
+from app.core.time import now_second
 from app.core.numbering import allocate_number
 from app.domain.enums import (
     AuditAction,
@@ -168,7 +168,7 @@ def rollback_batch(
         if row.status != ImportRowStatus.IMPORTED.value:
             row.status = ImportRowStatus.ROLLED_BACK.value
     batch.status = ImportBatchStatus.ROLLED_BACK.value
-    batch.rolled_back_at = datetime.now()
+    batch.rolled_back_at = now_second()
     batch.rolled_back_by = actor
     batch.rollback_reason = text
     batch.updated_by = actor

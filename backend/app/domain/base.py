@@ -10,15 +10,21 @@ from datetime import datetime
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time import now_second
+
 
 class TimestampMixin:
     """创建/更新时间由数据库时钟统一兜底，避免应用时钟漂移。"""
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
+        DateTime, nullable=False, default=now_second, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+        DateTime,
+        nullable=False,
+        default=now_second,
+        server_default=func.now(),
+        onupdate=now_second,
     )
 
 

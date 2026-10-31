@@ -70,6 +70,17 @@ def test_account_list_supports_limit_and_offset(seeded_client, seeded_db):
     assert response.json()["items"][0]["game_account"] == "page-account-2"
 
 class TestCreateAccountGuards:
+    def test_account_records_inventory_entry_time_to_second(self, seeded_db, seeded_client):
+        account = _account(seeded_db, "inventory-entry-time")
+        seeded_db.flush()
+
+        assert account.inventory_entry_at is not None
+        assert account.inventory_entry_at.microsecond == 0
+        listed = seeded_client.get("/api/v1/stocks", headers={"X-Dev-User": "admin"})
+        assert listed.status_code == 200, listed.text
+        item = next(row for row in listed.json()["items"] if row["id"] == account.id)
+        assert item["inventory_entry_at"] is not None
+
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
         account = service.create_account(
             seeded_db,

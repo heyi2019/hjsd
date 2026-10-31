@@ -30,7 +30,7 @@ from app.domain.trade import (
     OrderEvent,
     Reconciliation,
 )
-from app.installments import service as installments_service
+from app.value_added_services import service as installments_service
 from app.quality import issues
 from app.quality import service as quality_service
 

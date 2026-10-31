@@ -6,7 +6,6 @@ import binascii
 import hashlib
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import NotFound, PermissionDenied, Validation
+from app.core.time import now_second
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
@@ -266,7 +266,7 @@ def delete_attachment(
     item = get_attachment(session, attachment_id, user)
     target = _load_target(session, item.entity_type, item.entity_id)
     _assert_permission(user, target, write=True)
-    item.deleted_at = datetime.now()
+    item.deleted_at = now_second()
     item.updated_by = user.username
     session.flush()
     record_audit(

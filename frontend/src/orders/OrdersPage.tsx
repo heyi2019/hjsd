@@ -1,5 +1,5 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-/** 业务中心：库存中心 + 业务台账 + 分期回款。 */
+/** 业务中心：库存中心 + 订单台账 + 分期回款。 */
 import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Spin, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
@@ -21,13 +21,14 @@ import {
 } from "../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, LINK_STATUS_LABEL, VALUE_ADDED_SERVICE_LABEL, orderTypeLabel } from "../shared/lib/labels";
+import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, orderTypeLabel } from "../shared/lib/labels";
 import { filterRetiredOrderTypeOptions } from "../shared/lib/retiredProducts";
-import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
-import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { ACCOUNT_STATUS_LABEL, executionActionLabel, formatDateTimeMinute, formatElapsedTime, money, today } from "../shared/lib/format";
+import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
-import { useListViewColumns } from "../shared/lib/listColumns";
+import { columnKey, orderMobileFields as arrangeMobileFields, useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
+import { InventoryCancellationDialog, type InventoryCancellationOffset, type InventoryCancellationValues } from "../stocks/InventoryCancellationDialog";
 import { OrderDetail } from "../stocks/OrderDetail";
 import type { InventoryPartyLink } from "../stocks/OrderDetailView";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -62,6 +63,7 @@ function MobileOrderList(props: {
   orders: Order[];
   emptyText: string;
   onSelect: (order: Order) => void;
+  fieldOrder?: string[];
 }) {
   if (!props.orders.length) return <div className="orders-mobile-empty muted">{props.emptyText}</div>;
   return (
@@ -73,20 +75,31 @@ function MobileOrderList(props: {
             <StatusTag status={order.status} optionSet="ORDER_STATUS" />
           </div>
           <dl className="orders-mobile-card__meta">
-            <div><dt>对方 / 来源</dt><dd>{[order.party_name, order.party_source].filter(Boolean).join(" · ") || "-"}</dd></div>
-            <div><dt>游戏/产品类型</dt><dd>{order.account_game_type || "-"}</dd></div>
-            <div><dt>游戏账号/产品</dt><dd>{order.account_game_account || "-"}</dd></div>
-            <div><dt>平台</dt><dd>{order.account_platform || "-"}</dd></div>
-            <div><dt>金额</dt><dd>{formatOrderAmount(order)}</dd></div>
-            <div><dt>账号周期</dt><dd>{order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-"}</dd></div>
-            <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
-            <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
+            {getOrderMobileFields(order, props.fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
           <PermissionButton permission="order.update" type="link" onClick={() => props.onSelect(order)}>编辑订单</PermissionButton>
         </article>
       ))}
     </div>
   );
+}
+
+function getOrderMobileFields(order: Order, fieldOrder?: string[]) {
+  return arrangeMobileFields([
+    { key: "party", label: "对方 / 来源", value: [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
+    { key: "account_game_type", label: "游戏/产品类型", value: order.account_game_type || "-" },
+    { key: "account_game_account", label: "游戏账号/产品", value: order.account_game_account || "-" },
+    { key: "account_platform", label: "平台", value: order.account_platform || "-" },
+    { key: "inventory_operator", label: "入库负责人", value: order.inventory_operator || "-" },
+    { key: "inventory_entry_at", label: "入库时间", value: formatDateTimeMinute(order.inventory_entry_at) },
+    { key: "sale_operator", label: "售卖负责人", value: order.sale_operator || "-" },
+    { key: "sale_at", label: "售卖时间", value: formatDateTimeMinute(order.sale_at) },
+    { key: "in_hand_time", label: "在手时间", value: formatElapsedTime(order.inventory_entry_at, order.sale_at) },
+    { key: "event_total", label: "金额", value: formatOrderAmount(order) },
+    { key: "account_status", label: "账号周期", value: order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-" },
+    { key: "last_event_type", label: "最新动作", value: order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-" },
+    { key: "trade_date", label: "日期", value: order.trade_date || "-" },
+  ], fieldOrder);
 }
 
 type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
@@ -219,22 +232,23 @@ function filterBusinessOrders(
   type: BusinessFilterKey,
   mode: BusinessModeFilterKey,
   keyword: string,
-  link: string,
+  gameType: string,
+  inventoryStatus: string,
 ): Order[] {
   const normalizedKeyword = keyword.trim().toLowerCase();
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
-    && (link === "all" || (order.link_status ?? "LINKED") === link)
+    && (gameType === "all" || order.account_game_type === gameType)
+    && (inventoryStatus === "all" || order.account_status === inventoryStatus)
     && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
   ));
 }
 
-function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey, link: string): number {
+function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey): number {
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
-    && (link === "all" || (order.link_status ?? "LINKED") === link)
   )).length;
 }
 
@@ -254,7 +268,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportCsv(), `业务台账-${today()}.csv`);
+      downloadBlob(await ordersApi.exportCsv(), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -263,18 +277,33 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
-  const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
-  // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
+  const [gameTypeFilter, setGameTypeFilter] = useState("all");
+  const [inventoryStatusFilter, setInventoryStatusFilter] = useState("all");
+  // 业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
-  const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
   // 退款责任方：库里 REFUND_RESPONSIBILITY 是可编辑纯字典，此前下拉写死字面量导致改词典无效。
   const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
+  const inventoryStatusOptions: Opt[] = [
+    { value: "all", label: "全部库存状态" },
+    ...(["WAITING", "SOLD", "VOID"] as const).map((value) => ({ value, label: ACCOUNT_STATUS_LABEL[value] })),
+  ];
+  const gameTypeOptions = useMemo(() => {
+    const values = Array.from(new Set(orders
+      .map((order) => order.account_game_type)
+      .filter((value): value is string => Boolean(value))))
+      .sort((a, b) => a.localeCompare(b, "zh-CN"));
+    return [
+      { value: "all", label: "全部游戏类型" },
+      ...values.map((value) => ({ value, label: value })),
+    ];
+  }, [orders]);
   // 建关联时的关系下拉：值集受后端 CHECK 约束，label 由词典承载（措辞较长，见 0009 的 ORDER_RELATION_TYPE）。
   const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
   const [keyword, setKeyword] = useState("");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
@@ -305,7 +334,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [cancelPools, setCancelPools] = useState<Pool[]>([]);
   const [cancelEmployees, setCancelEmployees] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
-  const [cancelForm] = Form.useForm();
+  const [cancelForm] = Form.useForm<InventoryCancellationValues & { cancelled_on: string; offset_event_id?: number; cancel_amount?: string; operator_user_ids?: number[] }>();
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundForm] = Form.useForm();
@@ -437,7 +466,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         cancelForm.setFieldsValue({
           cancelled_on: today(),
           offset_event_id: first?.event.id,
-          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first ? first.remaining.toFixed(2) : undefined,
+          amount: first ? first.remaining.toFixed(2) : undefined,
           pool_id: first?.event.pool_id ?? undefined,
         });
         const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
@@ -473,7 +502,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
     setSelectedOrder(null);
   };
 
-  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; cancel_amount?: string; refund_amount?: string; pool_id?: number; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; amount?: string; cancel_amount?: string; pool_id?: number; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const installment = cancelInstallmentTarget;
     const order = cancelOrderTarget;
     if (!installment && !order) return;
@@ -493,7 +522,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         const reversible = cancelableEventsForScope(order, cancelScope);
         const selected = reversible.find((item) => item.event.id === Number(values.offset_event_id)) ?? reversible[0];
         if (selected) {
-          const amountValue = cancelScope === "INVREFUND" ? values.refund_amount : values.cancel_amount;
+          const amountValue = ["INVREFUND", "ORDERCANC"].includes(cancelScope) ? values.amount : values.cancel_amount;
           const amount = (amountValue ?? "").trim() || selected.remaining.toFixed(2);
           if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
             appMessage.error("请输入有效的冲销金额");
@@ -613,7 +642,14 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   }, [active, initialMine]);
 
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
+    .filter((order) => {
+      if (!dateRange) return true;
+      const tradeDate = dayjs(order.trade_date);
+      return tradeDate.isValid()
+        && !tradeDate.isBefore(dateRange[0], "day")
+        && !tradeDate.isAfter(dateRange[1], "day");
+    })
     .slice()
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
@@ -631,27 +667,25 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
     { title: "游戏/产品类型", dataIndex: "account_game_type", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "游戏账号/产品", dataIndex: "account_game_account", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "平台", dataIndex: "account_platform", width: 72, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "入库负责人", dataIndex: "inventory_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
+    { title: "售卖负责人", dataIndex: "sale_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "售卖时间", dataIndex: "sale_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
+    { title: "在手时间", key: "in_hand_time", width: 120, ellipsis: true, render: (_v, order) => formatElapsedTime(order.inventory_entry_at, order.sale_at) },
     { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
     { title: "账号周期", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", width: 198, ellipsis: true, render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", width: 111, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
-    {
-      title: "关联",
-      dataIndex: "link_status",
-      width: 111,
-      ellipsis: true,
-      render: (v: string | undefined) => (
-        <StatusTag status={v ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", v ?? "LINKED", LINK_STATUS_LABEL)} />
-      ),
-    },
     { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
     {
       title: "操作",
       key: "actions",
       width: 220,
       ellipsis: true,
-      render: (_, order) => (
-        <Space size={2}>
+      render: (_, order) => {
+        const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
+        return (
+          <Space size={2}>
           <PermissionButton permission="order.update" type="link" onClick={() => openEditOrder(order)}>编辑订单</PermissionButton>
           <PermissionGate permission="order.event.post">
             <Dropdown
@@ -662,7 +696,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   { key: "refund", label: "资金收支", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
-                    label: order.order_type === "DG" ? "系统下架" : "取消交易",
+                    label: canOffsaleConsignment ? "下架" : order.order_type === "DG" ? "取消" : "取消交易",
                     danger: true,
                     disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status),
                   },
@@ -671,7 +705,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   if (key === "allocation") void openAllocations(order);
                   if (key === "refund") void openRefund(order);
                   if (key === "cancel") {
-                    if (order.order_type === "DG") openSystemOffsale();
+                    if (canOffsaleConsignment) openSystemOffsale();
                     else void openCancelTransaction(order);
                   }
                 },
@@ -681,9 +715,19 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
             </Dropdown>
           </PermissionGate>
         </Space>
-      ),
+        );
+      },
     },
   ];
+  const mobileLedgerFieldOrder = arrangeLedgerColumns(ledgerColumns).map(columnKey);
+  const sharedCancellationEvent = cancelOrderTarget
+    ? cancelableEventsForScope(cancelOrderTarget, cancelScope)[0]
+    : undefined;
+  const hasSharedCancellation = Boolean(sharedCancellationEvent);
+  const sharedCancellationPool = sharedCancellationEvent
+    ? cancelPools.find((pool) => pool.id === sharedCancellationEvent.event.pool_id)
+    : undefined;
+  const sharedUsesWalletLabels = sharedCancellationPool?.code === "HJ_INVEST";
 
   return (
     <section className="ui-stack orders-page">
@@ -707,11 +751,11 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} onNavigate={onNavigate} />,
+            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} onNavigate={onNavigate} />,
           },
           {
             key: "ledger",
-            label: "业务台账",
+            label: "订单台账",
             children: (
               <Card className="glass">
                 <Space wrap className="ui-filter-bar ui-filter-bar--spaced">
@@ -720,9 +764,43 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                     value={keyword}
                     placeholder="搜索订单号 / 游戏账号/产品 / 对方 / 备注"
                     aria-label="搜索订单"
-                    className="orders-ledger-search"
+                    className="ui-ledger-search"
                     onChange={(event) => {
                       setKeyword(event.target.value);
+                      setPage(1);
+                    }}
+                  />
+                  <DatePicker.RangePicker
+                    aria-label="订单日期区间"
+                    placeholder={["开始日期", "结束日期"]}
+                    format="YYYY-MM-DD"
+                    size="small"
+                    classNames={{ popup: { root: "compact-date-range-picker" } }}
+                    value={dateRange}
+                    onChange={(value) => {
+                      setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null);
+                      setPage(1);
+                    }}
+                  />
+                  <Typography.Text strong>游戏类型筛选</Typography.Text>
+                  <Select
+                    aria-label="游戏类型筛选"
+                    className="ui-filter-select"
+                    value={gameTypeFilter}
+                    options={gameTypeOptions}
+                    onChange={(value) => {
+                      setGameTypeFilter(value);
+                      setPage(1);
+                    }}
+                  />
+                  <Typography.Text strong>库存状态筛选</Typography.Text>
+                  <Select
+                    aria-label="库存状态筛选"
+                    className="ui-filter-select"
+                    value={inventoryStatusFilter}
+                    options={inventoryStatusOptions}
+                    onChange={(value) => {
+                      setInventoryStatusFilter(value);
                       setPage(1);
                     }}
                   />
@@ -730,10 +808,10 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   <Segmented
                     value={orderTypeFilter}
                     options={[
-                      { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter, linkStatusFilter)}` },
+                      { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter)}` },
                       ...orderBusinessOptions.map((item) => ({
                         value: item.value,
-                        label: `${item.label} ${countBusinessOrders(orders, item.value as BusinessFilterKey, businessModeFilter, linkStatusFilter)}`,
+                        label: `${item.label} ${countBusinessOrders(orders, item.value as BusinessFilterKey, businessModeFilter)}`,
                       })),
                     ]}
                     onChange={(value) => {
@@ -741,9 +819,6 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                       setPage(1);
                     }}
                   />
-                  <PermissionButton permission="finance.read" size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
-                    导出 CSV
-                  </PermissionButton>
                   <Typography.Text strong>业务筛选</Typography.Text>
                   <Segmented
                     value={businessModeFilter}
@@ -753,20 +828,6 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                     ]}
                     onChange={(value) => {
                       setBusinessModeFilter(value as BusinessModeFilterKey);
-                      setPage(1);
-                    }}
-                  />
-                  <Typography.Text strong>关联筛选</Typography.Text>
-                  <Select
-                    aria-label="关联状态筛选"
-                    className="ui-filter-select"
-                    value={linkStatusFilter}
-                    options={[
-                      { value: "all", label: "全部关联状态" },
-                      ...linkStatusOptions.map(({ value, label }) => ({ value, label })),
-                    ]}
-                    onChange={(value) => {
-                      setLinkStatusFilter(value);
                       setPage(1);
                     }}
                   />
@@ -783,9 +844,9 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                       setPage(1);
                     }}
                   />
-                  <Typography.Text type="secondary">
-                    状态由对应业务流程更新，点击订单后继续处理付款、入库、售出或回款
-                  </Typography.Text>
+                  <PermissionButton permission="finance.read" size="small" loading={ledgerExporting} onClick={() => void exportLedger()}>
+                    导出
+                  </PermissionButton>
                 </Space>
                 <DataTable<Order>
                   columns={arrangeLedgerColumns(ledgerColumns)}
@@ -830,6 +891,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   orders={filteredOrders}
                   emptyText="暂无业务订单"
                   onSelect={(order) => openEditOrder(order)}
+                  fieldOrder={mobileLedgerFieldOrder}
                 />
               </Card>
             ),
@@ -842,10 +904,34 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         ]}
       />
 
+      <InventoryCancellationDialog
+        open={hasSharedCancellation}
+        title={cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+        amount={sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00"}
+        pools={cancelPools}
+        employees={cancelOrderTarget?.order_type === "DG" ? undefined : cancelEmployees}
+        offsetEvents={cancelOrderTarget && cancelOrderTarget.order_type !== "DG" ? cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }): InventoryCancellationOffset => ({
+          value: event.id,
+          label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining.toFixed(2))}）`,
+          remaining: remaining.toFixed(2),
+          pool_id: event.pool_id ?? undefined,
+        })) : undefined}
+        form={cancelForm}
+        scope={cancelScope}
+        submitting={cancelSubmitting}
+        okText="确认取消交易"
+        amountLabel={cancelScope === "INVREFUND" && sharedUsesWalletLabels ? "入账金额" : cancelScope === "INVREFUND" ? "退回金额" : "退款金额"}
+        accountLabel={cancelScope === "INVREFUND" && sharedUsesWalletLabels ? "入账账户" : cancelScope === "INVREFUND" ? "收款账户" : "付款账户"}
+        onCancel={closeCancelTransaction}
+        onFinish={(values) => void submitCancelTransaction({ ...values, cancelled_on: today() })}
+        description={cancelScope === "INVREFUND"
+          ? <p className="muted">将冲销来源订单的买入流水（¥{money(sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00")}），退回金额进入所选收款账户；订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。</p>
+          : <p className="muted">将冲销来源订单的售出流水（¥{money(sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00")}），退款金额将从所选付款账户支出；订单状态变为「取消」，历史轨迹保留。</p>}
+      />
 
       <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
-        open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
+        open={Boolean(cancelInstallmentTarget || (cancelOrderTarget && !hasSharedCancellation))}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
         okText="确认取消交易"
@@ -866,6 +952,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
             <div className="order-cancel-meta">
               <CfgItem
+                alwaysActive
                 name="offset_event_id"
                 label={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
                 fixedLabel={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
@@ -886,7 +973,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   }}
                 />
               </CfgItem>
-              <CfgItem name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
+              <CfgItem alwaysActive name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
                 <MoneyInput aria-label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} placeholder={cancelScope === "INVREFUND" ? "请输入入账金额" : "请输入退款金额"} />
               </CfgItem>
               <CfgItem alwaysActive name="pool_id" label={cancelScope === "INVREFUND" ? "入账账户" : "收款账户"} rules={[{ required: true, message: cancelScope === "INVREFUND" ? "请选择入账账户" : "请选择收款账户" }]}>
@@ -895,10 +982,10 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
               <ResponsibleEmployeeSelect name="operator_user_ids" label={cancelScope === "INVREFUND" ? "入账操作人" : "退款操作人"} employees={cancelEmployees} className="order-cancel-employee" />
             </div>
           ) : null}
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
+          <CfgItem alwaysActive name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
-          <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
+          <CfgItem alwaysActive name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />

@@ -60,6 +60,7 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
             "platform": row.platform,
             "status": row.status,
             "inventory_status": row.inventory_status,
+            "inventory_entry_at": row.inventory_entry_at,
             "cost_amount": to_money(row.cost_amount),
             "account_description": row.account_description,
             "account_images": row.account_images or [],

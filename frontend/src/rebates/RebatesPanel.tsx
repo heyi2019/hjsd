@@ -13,7 +13,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { today } from "../shared/lib/format";
+import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
@@ -161,6 +161,7 @@ export function RebatesPanel() {
       render: (v: string) => <MoneyText value={v} />,
     },
     { title: "费率", dataIndex: "rate", align: "right", render: (v: string) => `${v}%` },
+    { title: "返点时间", dataIndex: "created_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     {
       title: "操作",
       key: "actions",

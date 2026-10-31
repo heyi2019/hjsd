@@ -134,22 +134,19 @@ export function filterBusinessOrders(
   type: BusinessFilterKey,
   mode: BusinessModeFilterKey,
   keyword: string,
-  link: string,
 ): Order[] {
   const normalizedKeyword = keyword.trim().toLowerCase();
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
-    && (link === "all" || (order.link_status ?? "LINKED") === link)
     && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
   ));
 }
 
-export function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey, link: string): number {
+export function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey): number {
   return orders.filter((order) => (
     (type === "all" || order.order_type === type)
     && orderMatchesBusinessMode(order, mode)
-    && (link === "all" || (order.link_status ?? "LINKED") === link)
   )).length;
 }
 

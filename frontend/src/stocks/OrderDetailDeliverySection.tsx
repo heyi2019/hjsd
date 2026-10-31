@@ -54,7 +54,7 @@ function DeliverySubSection({
   const mainFields = Object.entries(DELIVERY_FIELD_MAP).map(([key, { fallback }]) => {
     let value: ReactNode = "-";
     if (key === "bound_phone" || key === "bound_phone_owner") {
-      value = (account?.[key as keyof Account] as string) || "-";
+      value = (account?.[key as keyof Account] as string) || (extraValues[key] as string) || "-";
     } else {
       const raw = extraValues[key];
       if (raw == null || raw === "") {
@@ -73,7 +73,7 @@ function DeliverySubSection({
   return (
     <div className="inventory-detail__meta-group">
       <div className="inventory-detail__meta-group-title">{title}</div>
-      <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+      <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))
           .map((field) => (
@@ -81,7 +81,7 @@ function DeliverySubSection({
           ))}
       </Descriptions>
       {deliveryItems.length ? (
-        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
           {deliveryItems.map((item) => (
             <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
               {formatExtraDisplayValue(item.value) || "-"}

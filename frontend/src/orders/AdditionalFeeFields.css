@@ -1,9 +1,3 @@
-.recovery-fee-add-row {
-  display: flex;
-  justify-content: flex-end;
-  padding: var(--space-2) 0 0;
-}
-
 .additional-expense-list {
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);

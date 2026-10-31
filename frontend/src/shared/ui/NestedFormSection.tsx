@@ -9,6 +9,7 @@ import "./NestedFormSection.css";
 export function NestedFormSection(props: {
   title?: ReactNode;
   description?: ReactNode;
+  extra?: ReactNode;
   children: ReactNode;
   className?: string;
   headerClassName?: string;
@@ -22,10 +23,11 @@ export function NestedFormSection(props: {
 
   return (
     <section className={classes}>
-      {(props.title || props.description) && (
+      {(props.title || props.description || props.extra) && (
         <div className={headerClasses}>
           {props.title && <div className={titleClasses}>{props.title}</div>}
           {props.description && <div className={descriptionClasses}>{props.description}</div>}
+          {props.extra}
         </div>
       )}
       {props.children}

@@ -18,6 +18,7 @@ beforeEach(() => {
 vi.mock("../shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/api/catalog")>();
   const METHODS = [
+    "all",
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
@@ -82,6 +83,24 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 }
 
 describe("FundsPage：资金池卡片", () => {
+  it("资金池列表按列表字段配置排序", async () => {
+    vi.mocked(catalog.listColumnsApi.all).mockResolvedValueOnce([{
+      code: "FUND_POOLS",
+      label: "资金中心·资金池",
+      columns: [
+        { key: "available", label: "可用余额", locked: false, is_visible: true, sort_order: 0 },
+        { key: "pool_code", label: "资金池", locked: false, is_visible: true, sort_order: 10 },
+      ],
+    }]);
+
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    const headers = Array.from(document.querySelectorAll(".ant-table-thead tr:first-child th"))
+      .map((header) => header.textContent?.trim())
+      .filter(Boolean);
+    expect(headers[0]).toBe("可用余额");
+  });
+
   it("渲染资金池与可用余额", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();

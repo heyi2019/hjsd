@@ -31,9 +31,9 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposition, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
-from app.installments import service as installment_service
-from app.installments import router as installments_router
-from app.installments import schemas
+from app.value_added_services import service as installment_service
+from app.value_added_services import router as installments_router
+from app.value_added_services import schemas
 from app.orders import service as orders_service
 from app.reporting import service as reporting_service
 

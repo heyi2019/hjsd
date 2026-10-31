@@ -183,12 +183,18 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
         await collectFullPayment({ sourceOrderId, values, isConsignment });
         appMessage.success("账号已售出");
       }
-      // 交付负责人是订单级字段，售出后在来源单上登记（merge 进订单 form_extra，不动其它字段）。
+      // 售出表单的交付信息是卖号交付的事实来源；统一 merge 到来源订单，详情直接复用这一组字段。
+      const deliveryFormExtra: Record<string, unknown> = {};
+      for (const key of ["bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_type", "compensation_type"]) {
+        const value = values[key];
+        if (value !== undefined && value !== null && value !== "") deliveryFormExtra[key] = value;
+      }
       const deliveryResponsibleIds = Array.isArray(values.delivery_responsible_ids)
         ? (values.delivery_responsible_ids as unknown[]).filter((id): id is number => typeof id === "number")
         : [];
-      if (deliveryResponsibleIds.length > 0) {
-        await ordersApi.patch(sourceOrderId, { form_extra: { delivery_responsible_ids: deliveryResponsibleIds } });
+      if (deliveryResponsibleIds.length > 0) deliveryFormExtra.delivery_responsible_ids = deliveryResponsibleIds;
+      if (Object.keys(deliveryFormExtra).length > 0) {
+        await ordersApi.patch(sourceOrderId, { form_extra: deliveryFormExtra });
       }
       form.resetFields();
       props.onClose();

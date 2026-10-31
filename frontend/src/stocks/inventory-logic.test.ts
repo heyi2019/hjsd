@@ -13,6 +13,20 @@ describe("库存纯逻辑", () => {
     expect(inventoryAge({ status: "WAITING", buy_date: "2026-09-01" }, now)).toEqual({ days: 46, color: "red" });
   });
 
+  it("按精确到分的入库时间计算未售时长", () => {
+    expect(inventoryAge({ status: "WAITING", inventory_entry_at: "2026-10-10T09:30:00" }, new Date("2026-10-17T12:00:00"))).toEqual({
+      days: 7,
+      color: "green",
+    });
+  });
+
+  it("未售时长计算保留入库时间的时分秒", () => {
+    expect(inventoryAge({ status: "WAITING", inventory_entry_at: "2026-10-10T09:30:00" }, new Date("2026-10-17T09:29:59"))).toEqual({
+      days: 6,
+      color: "green",
+    });
+  });
+
   it("非在库状态不计算未售时长", () => {
     expect(inventoryAge({ status: "SOLD", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
     expect(inventoryAge({ status: "SOLD", inventory_status: "OUT_OF_STOCK", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();

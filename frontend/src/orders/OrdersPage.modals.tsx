@@ -50,6 +50,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
           {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
             <div className="order-cancel-meta">
               <CfgItem
+                alwaysActive
                 name="offset_event_id"
                 label={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
                 fixedLabel={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
@@ -70,7 +71,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
                   }}
                 />
               </CfgItem>
-              <CfgItem name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
+              <CfgItem alwaysActive name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
                 <MoneyInput aria-label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} placeholder={cancelScope === "INVREFUND" ? "请输入入账金额" : "请输入退款金额"} />
               </CfgItem>
               <CfgItem alwaysActive name="pool_id" label={cancelScope === "INVREFUND" ? "入账账户" : "收款账户"} rules={[{ required: true, message: cancelScope === "INVREFUND" ? "请选择入账账户" : "请选择收款账户" }]}>
@@ -79,10 +80,10 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
               <ResponsibleEmployeeSelect name="operator_user_ids" label={cancelScope === "INVREFUND" ? "入账操作人" : "退款操作人"} employees={cancelEmployees} className="order-cancel-employee" />
             </div>
           ) : null}
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
+          <CfgItem alwaysActive name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
-          <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
+          <CfgItem alwaysActive name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />

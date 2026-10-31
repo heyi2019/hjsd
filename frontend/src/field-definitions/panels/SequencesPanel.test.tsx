@@ -25,12 +25,25 @@ describe("SequencesPanel", () => {
     // 编号域中文标签可见；分组标签与业务字典一致
     expect(screen.getAllByText("回收编号").length).toBeGreaterThan(0);
     expect(screen.getAllByText("支出流水").length).toBeGreaterThan(0);
-    // 静态口径条目：库存编号 / 分期合约编号（非独立发放域，无 document_sequences 行也展示）
+    // 静态口径条目：库存编号 / 分期合约号（无 document_sequences 行也展示）
     expect(screen.getByText("库存编号")).toBeInTheDocument();
-    expect(screen.getByText("分期合约编号")).toBeInTheDocument();
-    expect(screen.getByText(/自营分期合约使用分期订单号衍生/)).toBeInTheDocument();
+    expect(screen.getByText("分期合约号")).toBeInTheDocument();
+    expect(screen.getByText("编号格式 业务订单编号-FQ")).toBeInTheDocument();
     // 只读面板：不提供任何新增/编辑/重置入口
     expect(screen.queryByRole("button", { name: /新建|编辑|重置|保存/ })).toBeNull();
+  });
+
+  it("分期合约号按业务订单号派生，不展示独立流水序列", async () => {
+    vi.mocked(catalog.sequencesApi.list).mockResolvedValue([
+      { sequence_key: "INSTALLMENT", prefix: "FQ", padding: 4, current_value: 0, next_number: "FQ0001" },
+    ]);
+    const { SequencesPanel } = await import("./SequencesPanel");
+    renderLight(<SequencesPanel />, { user: "admin" });
+
+    expect(await screen.findByText("编号格式 业务订单编号-FQ")).toBeInTheDocument();
+    expect(screen.queryByText(/FQ\+4位流水/)).toBeNull();
+    expect(screen.queryByText(/当前值 0/)).toBeNull();
+    expect(screen.queryByText("FQ0001")).toBeNull();
   });
 
   it("静态分组外的动态编号域落入「自定义编号域」兜底组（不静默丢失）", async () => {

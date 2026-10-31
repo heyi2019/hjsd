@@ -53,6 +53,10 @@ const orders = [
     party_source: "同行推荐",
     event_total: "1234.00",
     last_event_type: "BUY",
+    inventory_operator: "入库员",
+    inventory_entry_at: "2026-10-01T09:30:00",
+    sale_operator: "售卖员",
+    sale_at: "2026-10-17T16:45:00",
   },
   { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
 ];
@@ -73,14 +77,62 @@ beforeEach(() => {
 
 async function openLedger(user?: string) {
   renderLight(<OrdersPage />, user ? { user } : undefined);
-  await screen.findByRole("tab", { name: "业务台账" });
+  await screen.findByRole("tab", { name: "订单台账" });
   await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
 }
 
-describe("OrdersPage：四类业务台账", () => {
+describe("OrdersPage：四类订单台账", () => {
+  it("订单台账使用订单语义名称", async () => {
+    renderLight(<OrdersPage />);
+    expect(await screen.findByRole("tab", { name: "订单台账" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "业务台账" })).toBeNull();
+  });
+
+  it("订单台账不提供关联筛选和关联列", async () => {
+    renderLight(<OrdersPage />);
+    await screen.findByRole("tab", { name: "订单台账" });
+
+    expect(screen.queryByText("关联筛选")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "关联状态筛选" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "关联" })).toBeNull();
+  });
+
+  it("订单台账把导出按钮放在筛选栏最后并使用简短文案", async () => {
+    await openLedger();
+    const exportButton = screen.getByRole("button", { name: /导出/ });
+    expect(exportButton).toHaveTextContent("导出");
+    expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
+    const filterBar = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注").closest(".ui-filter-bar")!;
+    const buttons = filterBar.querySelectorAll("button");
+    expect(buttons[buttons.length - 1]).toBe(exportButton);
+  });
+
+  it("订单台账筛选栏不展示流程提示文字", async () => {
+    await openLedger();
+
+    expect(screen.queryByText("状态由对应业务流程更新，点击订单后继续处理付款、入库、售出或回款")).toBeNull();
+  });
+
+  it("搜索框右侧提供订单日期区间筛选", async () => {
+    await openLedger();
+
+    const search = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注");
+    const startDate = screen.getAllByLabelText("订单日期区间")[0];
+    expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("业务中心重新激活时刷新库存列表", async () => {
+    const { rerender } = renderLight(<OrdersPage active={false} />);
+    await screen.findByRole("tab", { name: "库存中心" });
+    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
+
+    rerender(<OrdersPage active />);
+    await waitFor(() => expect(vi.mocked(catalog.stocksApi.list)).toHaveBeenCalled());
+  });
+
   it("顶部不再重复展示业务中心标题与说明", async () => {
     renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "业务台账" });
+    await screen.findByRole("tab", { name: "订单台账" });
     expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
     expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
     expect(screen.queryByText(/待处理/)).toBeNull();
@@ -92,6 +144,20 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("进行中").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("已完成").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("订单台账展示入库和售卖责任时间", async () => {
+    await openLedger();
+
+    for (const label of ["入库负责人", "入库时间", "售卖负责人", "售卖时间"]) {
+      expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
+    }
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
+    expect(within(row).getByText("入库员")).toBeInTheDocument();
+    expect(within(row).getByText("2026-10-01 09:30")).toBeInTheDocument();
+    expect(within(row).getByText("售卖员")).toBeInTheDocument();
+    expect(within(row).getByText("2026-10-17 16:45")).toBeInTheDocument();
+    expect(within(row).getByText("16天7小时15分")).toBeInTheDocument();
   });
 
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
@@ -115,7 +181,50 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.queryByText("HS-2026-0001")).toBeNull();
   });
 
-  it("业务台账统一展示通用字段", async () => {
+  it("订单台账提供游戏类型下拉筛选", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      ...orders,
+      {
+        id: 3,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        capital_type: "ZERO",
+        trade_date: "2026-10-03",
+        status: "ACTIVE",
+        account_game_type: "王者荣耀",
+        account_game_account: "seller-003",
+      },
+    ]);
+
+    await openLedger();
+    const gameTypeFilter = screen.getByRole("combobox", { name: "游戏类型筛选" });
+    await ui.click(gameTypeFilter);
+    const gameTypeOption = (await screen.findAllByText("王者荣耀")).find((element) => element.classList.contains("ant-select-item-option-content"));
+    expect(gameTypeOption).toBeDefined();
+    await ui.click(gameTypeOption!);
+
+    const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
+    await waitFor(() => expect(within(ledger).queryByText("HS-2026-0001")).toBeNull());
+    expect(within(ledger).getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
+  });
+
+  it("订单台账提供库存状态下拉筛选", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      { ...orders[0], account_status: "WAITING" },
+      { ...orders[1], id: 3, order_no: "TH-2026-0003", account_status: "SOLD" },
+    ]);
+
+    await openLedger();
+    const inventoryStatusFilter = screen.getByRole("combobox", { name: "库存状态筛选" });
+    await ui.click(inventoryStatusFilter);
+    await ui.click(screen.getByText("已售", { selector: ".ant-select-item-option-content" }));
+
+    const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
+    await waitFor(() => expect(within(ledger).queryByText("HS-2026-0001")).toBeNull());
+    expect(within(ledger).getAllByText("TH-2026-0003").length).toBeGreaterThan(0);
+  });
+
+  it("订单台账统一展示通用字段", async () => {
     await openLedger();
 
     for (const label of ["订单号", "对方 / 来源", "游戏/产品类型", "游戏账号/产品", "平台", "金额", "账号周期", "最新动作", "状态", "日期", "操作"]) {
@@ -131,7 +240,6 @@ describe("OrdersPage：四类业务台账", () => {
       "账号周期": "102px",
       "最新动作": "198px",
       "状态": "111px",
-      "关联": "111px",
       "日期": "144px",
       "操作": "220px",
     })) {
@@ -196,7 +304,7 @@ describe("OrdersPage：四类业务台账", () => {
     expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
   });
 
-  it("同一账号有多张订单时，业务台账展开使用当前订单的详情上下文", async () => {
+  it("同一账号有多张订单时，订单台账展开使用当前订单的详情上下文", async () => {
     const olderOrder = {
       ...orders[0],
       id: 8,
@@ -273,7 +381,7 @@ describe("OrdersPage：四类业务台账", () => {
     expect(await screen.findByText("取消交易")).toBeInTheDocument();
   });
 
-  it("代挂订单的操作入口显示系统下架而不是取消交易", async () => {
+  it("待售代挂订单的操作入口显示下架而不是取消", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       ...orders,
       {
@@ -284,6 +392,7 @@ describe("OrdersPage：四类业务台账", () => {
         trade_date: "2026-10-03",
         status: "ACTIVE",
         account_id: 9,
+        account_status: "WAITING",
       },
     ]);
     await openLedger("admin");
@@ -292,9 +401,43 @@ describe("OrdersPage：四类业务台账", () => {
     expect(row).not.toBeNull();
     fireEvent.click(within(row as HTMLElement).getByText("更多"));
 
-    fireEvent.click(await screen.findByText("系统下架"));
+    fireEvent.click(await screen.findByText("下架"));
     expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText("取消交易")).toBeNull();
+    expect(screen.queryByText("取消")).toBeNull();
+  });
+
+  it("已售代挂改走取消，不再引导到下架", async () => {
+    const soldConsignment = {
+      id: 4,
+      order_no: "DG-2026-0004",
+      order_type: "DG",
+      capital_type: "ZERO",
+      trade_date: "2026-10-04",
+      status: "COMPLETED",
+      account_id: 10,
+      account_status: "SOLD",
+    };
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([...orders, soldConsignment]);
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...soldConsignment,
+      events: [{ id: 401, order_id: 4, event_no: "EV-401", event_type: "SELL", amount: "500.00", is_posted: true }],
+    } as never);
+    await openLedger("admin");
+
+    const row = screen.getAllByText("DG-2026-0004").find((element) => element.closest("tr"))?.closest("tr");
+    expect(row).not.toBeNull();
+    fireEvent.click(within(row as HTMLElement).getByText("更多"));
+
+    expect(await screen.findByText("取消")).toBeInTheDocument();
+    expect(screen.queryByText("下架")).toBeNull();
+    fireEvent.click(screen.getByText("取消"));
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByText("售出取消交易 · DG-2026-0004")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("退款金额")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("付款账户")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("取消原因")).toBeInTheDocument();
+    expect(within(modal).queryByLabelText("售出流水")).toBeNull();
+    expect(within(modal).queryByLabelText("退款操作人")).toBeNull();
   });
 
   it("加载失败时展示错误条", async () => {
@@ -305,8 +448,8 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("业务中心保留库存、台账与分期回款视图，不展示独立返点页签", async () => {
     renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "业务台账" });
-    for (const label of ["库存中心", "业务台账", "分期与回款"]) {
+    await screen.findByRole("tab", { name: "订单台账" });
+    for (const label of ["库存中心", "订单台账", "分期与回款"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
@@ -314,7 +457,7 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("新建订单菜单提供回收、提号、代挂三个表单", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务台账" });
+    await screen.findByRole("tab", { name: "订单台账" });
     await ui.click(screen.getByRole("button", { name: /新建订单/ }));
     for (const label of ["新建回收订单", "新建提号订单", "新建代挂订单"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
@@ -323,7 +466,7 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("移除没有明确业务含义的通用登记事件入口", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务台账" });
+    await screen.findByRole("tab", { name: "订单台账" });
     expect(screen.queryByRole("button", { name: /登记事件/ })).toBeNull();
   });
 
@@ -345,9 +488,31 @@ describe("OrdersPage：四类业务台账", () => {
     ));
   });
 
-  it("忽略已废弃的业务中心页签参数并回到业务台账", async () => {
+  it("未售且有买入流水的订单取消复用库存中心的退款弹窗", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...orders[0],
+      events: [{ id: 101, event_no: "EV-101", event_type: "BUY", amount: "100.00", pool_id: 3, is_posted: true }],
+    } as never);
+    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+      { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
+    ] as never);
+
+    await openLedger("admin");
+    fireEvent.click(screen.getAllByText("更多")[0]);
+    fireEvent.click(await screen.findByText("取消交易"));
+
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("收款账户")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("取消原因")).toBeInTheDocument();
+    expect(modal).toHaveTextContent("订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。");
+    expect(within(modal).queryByLabelText("入账金额")).toBeNull();
+    expect(within(modal).queryByLabelText("入账账户")).toBeNull();
+  });
+
+  it("忽略已废弃的业务中心页签参数并回到订单台账", async () => {
     renderLight(<OrdersPage initialTab={"th" as "inventory"} />);
-    const tab = await screen.findByRole("tab", { name: "业务台账" });
+    const tab = await screen.findByRole("tab", { name: "订单台账" });
     expect(tab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("HS-2026-0001")).length).toBeGreaterThan(0);
   });

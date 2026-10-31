@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
+from app.core.time import now_second
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CashflowStatus, Direction, ReconciliationStatus
@@ -218,7 +219,7 @@ def resolve_reconciliation(
         raise Validation("该对账记录已核销", details={"reconciliation_id": item.id})
     item.status = ReconciliationStatus.RESOLVED.value
     item.resolved_by = actor
-    item.resolved_at = datetime.now()
+    item.resolved_at = now_second()
     item.reason = f"{item.reason}; {text_reason}" if item.reason else text_reason
     if form_extra:
         item.form_extra = {**(item.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDCLEAR", values=form_extra)}

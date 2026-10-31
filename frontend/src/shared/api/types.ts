@@ -164,6 +164,11 @@ export interface Order {
   party_source?: string | null;
   party_created_by?: string | null;
   party_created_at?: string | null;
+  inventory_entry_at?: string | null;
+  inventory_operator?: string | null;
+  sale_at?: string | null;
+  sale_operator?: string | null;
+  in_hand_time?: string | null;
   event_total?: string | null;
   last_event_type?: string | null;
   last_event_amount?: string | null;
@@ -203,6 +208,7 @@ export interface OrderCashflow {
   flow_no: string;
   pool_id: number;
   occurred_on: string;
+  occurred_at?: string | null;
   nature: string;
   category: string;
   direction: string;
@@ -347,6 +353,8 @@ export interface Account {
   platform?: string | null;
   status: string;
   inventory_status?: string;
+  inventory_entry_at?: string | null;
+  inventory_operator?: string | null;
   cost_amount: string;
   buy_date?: string | null;
   created_by: string;
@@ -538,6 +546,7 @@ export interface Cashflow {
   flow_no: string;
   pool_id: number;
   occurred_on: string;
+  occurred_at?: string | null;
   nature: string;
   fund_nature?: string;
   accounting_attribute?: string;

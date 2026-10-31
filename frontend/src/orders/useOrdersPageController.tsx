@@ -5,9 +5,8 @@ import { useCallback, useState } from "react";
 import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, type Installment, type Order, type OrderType, type Pool } from "../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { LINK_STATUS_LABEL } from "../shared/lib/labels";
 import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
-import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../shared/ui";
@@ -28,13 +27,13 @@ export function useOrdersPageController(params: {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
+  // 订单台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
   const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
   const [ledgerExporting, setLedgerExporting] = useState(false);
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportCsv(), `业务台账-${today()}.csv`);
+      downloadBlob(await ordersApi.exportCsv(), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -43,10 +42,8 @@ export function useOrdersPageController(params: {
   };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
-  const [linkStatusFilter, setLinkStatusFilter] = useState<string>("all");
-  // 关联状态、业务类型、业务模式和责任方均来自后端选项词典。
+  // 业务类型、业务模式和责任方均来自后端选项词典。
   type Opt = { value: string; label: string };
-  const linkStatusOptions: Opt[] = useOptionSet("ORDER_LINK_STATUS") ?? [];
   const orderBusinessOptions: Opt[] = useOptionSet("ORDER_BUSINESS") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
@@ -367,7 +364,7 @@ export function useOrdersPageController(params: {
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   // 台账展示按最新在前（后端 list_orders 按 id 升序返回，这里只调展示顺序，不动接口）。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, linkStatusFilter)
+  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword)
     .slice()
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
@@ -389,19 +386,14 @@ export function useOrdersPageController(params: {
     { title: "账号周期", dataIndex: "account_status", render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
-    {
-      title: "关联",
-      dataIndex: "link_status",
-      render: (v: string | undefined) => (
-        <StatusTag status={v ?? "LINKED"} label={configurableLabel("ORDER_LINK_STATUS", v ?? "LINKED", LINK_STATUS_LABEL)} />
-      ),
-    },
     { title: "日期", dataIndex: "trade_date" },
     {
       title: "操作",
       key: "actions",
-      render: (_, order) => (
-        <Space size={2}>
+      render: (_, order) => {
+        const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
+        return (
+          <Space size={2}>
           <PermissionButton permission="order.update" type="link" onClick={() => openEditOrder(order)}>编辑订单</PermissionButton>
           <PermissionGate permission="order.event.post">
             <Dropdown
@@ -412,7 +404,7 @@ export function useOrdersPageController(params: {
                   { key: "refund", label: "资金收支", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
-                    label: order.order_type === "DG" ? "系统下架" : "取消交易",
+                    label: canOffsaleConsignment ? "下架" : order.order_type === "DG" ? "取消" : "取消交易",
                     danger: true,
                     disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status),
                   },
@@ -421,7 +413,7 @@ export function useOrdersPageController(params: {
                   if (key === "allocation") void openAllocations(order);
                   if (key === "refund") void openRefund(order);
                   if (key === "cancel") {
-                    if (order.order_type === "DG") openSystemOffsale();
+                    if (canOffsaleConsignment) openSystemOffsale();
                     else void openCancelTransaction(order);
                   }
                 },
@@ -431,7 +423,8 @@ export function useOrdersPageController(params: {
             </Dropdown>
           </PermissionGate>
         </Space>
-      ),
+        );
+      },
     },
   ];
 
@@ -473,7 +466,6 @@ export function useOrdersPageController(params: {
     keyword,
     ledgerExporting,
     ledgerSortDesc,
-    linkStatusFilter,
     load,
     loadError,
     loading,
@@ -513,7 +505,6 @@ export function useOrdersPageController(params: {
     setKeyword,
     setLedgerExporting,
     setLedgerSortDesc,
-    setLinkStatusFilter,
     setLoadError,
     setLoading,
     setOrderTypeFilter,
@@ -531,7 +522,6 @@ export function useOrdersPageController(params: {
     types,
     users,
     ledgerColumns,
-    linkStatusOptions,
     orderBusinessOptions,
     orderBusinessModeOptions,
     profitRoleOptions,

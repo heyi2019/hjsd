@@ -47,7 +47,8 @@ def cashflow_no(
 
 
 def installment_no(order_no: str) -> str:
-    return f"{order_no}-INS01"
+    """分期合约号：每个业务订单只有一个，直接由订单号派生。"""
+    return f"{order_no}-FQ"
 
 
 def rebate_no(session: Session, *, order_no: str, order_id: int) -> str:

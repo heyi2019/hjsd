@@ -1,12 +1,12 @@
 /** 配置中心（设置页首个页签）：顶部页签菜单 + 下方渲染对应「现有配置页面」。
  *
- * 设计意图（用户裁决 2026-10-31）：配置中心仅聚合「字段配置」与「业务主数据」两组配置项到一页，
- * 顶部按类别列出这两组配置项，点击即在下方切换显示对应的现有面板，不再各自独立成 Tab。
+ * 设计意图（用户裁决 2026-10-31）：配置中心聚合字段、业务主数据与编号管理配置项到一页，
+ * 顶部按类别列出这些配置项，点击即在下方切换显示对应的现有面板，不再各自独立成 Tab。
  *
  * 复用单一事实源 configCatalog.ts 的 SETTINGS_ITEMS 注册表（分组 / 标签 / 权限 / 只读），
  * 右侧直接挂载各配置项既有的面板组件（BusinessDictionaryPanel / OrderTypesPanel …），
  * 不重写任何配置逻辑；跨面板跳转（如表单字段里的「配置游戏类型」）改为在本中心内切换选中项。 */
-import { Card, Typography } from "antd";
+import { Card } from "antd";
 import { useState, type ReactElement } from "react";
 import {
   CONFIG_GROUP_LABEL,
@@ -18,8 +18,8 @@ import { StatusTag } from "../../shared/ui";
 import { PANEL_REGISTRY } from "./panelRegistry";
 import "./ConfigCenterPanel.css";
 
-/** 分组展示顺序：按需求仅聚合「字段配置」与「业务主数据」两组（其余分组不进入配置中心）。 */
-const GROUP_ORDER: ConfigGroupCode[] = ["FIELD", "MASTER"];
+/** 分组展示顺序：配置中心仅聚合字段、业务主数据与编号管理（其余分组不进入配置中心）。 */
+const GROUP_ORDER: ConfigGroupCode[] = ["FIELD", "MASTER", "SEQUENCE"];
 
 export function ConfigCenterPanel() {
   const { can } = useSession();
@@ -62,9 +62,6 @@ export function ConfigCenterPanel() {
       </nav>
       <section className="config-center__content" data-testid="center-content">
         <Card className="glass" title={SETTINGS_ITEMS.find((i) => i.key === selected)?.label ?? "配置"}>
-          <Typography.Paragraph type="secondary" className="ui-card-hint">
-            本页为对应配置项的现有页面，编辑入口与独立设置页签一致。
-          </Typography.Paragraph>
           {renderPanel(selected)}
         </Card>
       </section>

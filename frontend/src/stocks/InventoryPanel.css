@@ -1,3 +1,57 @@
+.inventory-filters {
+  align-items: center;
+  padding-top: var(--space-2);
+}
+
+/* 取消交易的金额和收款账户始终保持同一行，避免紧凑弹窗误触发窄屏规则。 */
+.adaptive-form-grid.inventory-void-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-3);
+}
+
+/* 取消弹窗需要给两列字段留出可用输入宽度，标签也从内容区左侧开始排列。 */
+.inventory-void-modal .ant-modal {
+  --resizable-modal-width: min(720px, calc(100vw - 32px));
+}
+
+.inventory-void-modal .ant-form-vertical .ant-form-item-label {
+  flex: 0 0 108px !important;
+  width: 108px !important;
+  max-width: 108px !important;
+  text-align: left;
+}
+
+.inventory-void-modal .ant-form-vertical .ant-form-item-row {
+  gap: var(--space-2);
+}
+
+/* 库存取消与订单台账取消共用：先明确影响，再填写资金与原因。 */
+.inventory-void-modal .inventory-cancellation-note {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+.inventory-void-modal .inventory-cancellation-note .muted {
+  margin: 0;
+}
+
+.inventory-void-modal .inventory-void-fields {
+  margin-bottom: var(--space-3);
+}
+
+.inventory-void-modal .inventory-void-fields .ant-form-item {
+  margin-bottom: 0;
+}
+
+.inventory-void-modal .inventory-void-fields .ant-form-item-row {
+  align-items: center;
+}
+
 .inventory-refund-meta {
   display: flex;
   flex-direction: column;

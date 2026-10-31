@@ -31,9 +31,11 @@ class AccountOut(BaseModel):
     extra_values: dict[str, object] = Field(default_factory=dict)
     status: str
     inventory_status: str
+    inventory_entry_at: datetime
     cost_amount: Decimal
     buy_date: date | None = None
     created_by: str
+    inventory_operator: str | None = None
     created_at: datetime
 
 
@@ -86,6 +88,7 @@ class AccountInventoryOut(BaseModel):
     platform: str | None = None
     status: str
     inventory_status: str
+    inventory_entry_at: datetime
     cost_amount: Decimal
     account_description: str | None = None
     account_images: list[str] = Field(default_factory=list)

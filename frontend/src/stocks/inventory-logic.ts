@@ -54,7 +54,7 @@ export function rebateTypeLabel(rebateType?: string | null, channel?: string | n
 }
 
 export function inventoryAge(
-  row: Pick<Account, "status" | "inventory_status" | "buy_date">,
+  row: Pick<Account, "status" | "inventory_status" | "inventory_entry_at" | "buy_date" | "created_at">,
   now = new Date(),
 ): {
   days: number;
@@ -62,10 +62,11 @@ export function inventoryAge(
 } | null {
   const inventoryStatus = row.inventory_status
     ?? (row.status === "WAITING" || row.status === "IN_STOCK" ? "IN_STOCK" : row.status);
-  if (inventoryStatus !== "IN_STOCK" || !row.buy_date) return null;
-  const buyDate = new Date(`${row.buy_date}T00:00:00`);
-  if (!Number.isFinite(buyDate.getTime())) return null;
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const days = Math.max(0, Math.floor((today.getTime() - buyDate.getTime()) / DAY_IN_MS));
+  // inventory_entry_at 是统一口径；旧接口/测试数据暂时回退，避免历史客户端数据直接变成空值。
+  const inventoryDate = row.inventory_entry_at ?? row.buy_date ?? row.created_at;
+  if (inventoryStatus !== "IN_STOCK" || !inventoryDate) return null;
+  const entryDate = new Date(inventoryDate.includes("T") ? inventoryDate : `${inventoryDate}T00:00:00`);
+  if (!Number.isFinite(entryDate.getTime())) return null;
+  const days = Math.max(0, Math.floor((now.getTime() - entryDate.getTime()) / DAY_IN_MS));
   return { days, color: days <= 7 ? "green" : days <= 30 ? "orange" : "red" };
 }

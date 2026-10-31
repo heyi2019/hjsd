@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
+from app.core.time import now_second
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
 from app.core.security import CurrentUser
@@ -318,7 +319,7 @@ def lose_deposit(
         deposit_id=deposit.id,
         status=CashflowStatus.APPROVED.value,
         reviewed_by=actor,
-        reviewed_at=datetime.now(),
+        reviewed_at=now_second(),
         note=text_reason,
         form_extra=validate_form_extra(session, order_type_code="FUNDLOSS", values=form_extra) or None,
         created_by=actor,

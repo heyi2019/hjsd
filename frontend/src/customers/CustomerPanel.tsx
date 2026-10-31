@@ -7,9 +7,9 @@ import { customersApi, orderFormFieldsApi } from "../shared/api/catalog";
 import type { Customer, CustomerBusiness, CustomerDetail, CustomerInstallment, OrderFormField } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { money, today } from "../shared/lib/format";
+import { formatDateTimeMinute, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
-import { useListViewColumns } from "../shared/lib/listColumns";
+import { columnKey, useListViewColumns } from "../shared/lib/listColumns";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
@@ -233,6 +233,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     { title: "微信", key: "wechat", render: (_v, row) => renderContact(row, "wechat") },
     { title: "QQ", key: "qq", render: (_v, row) => renderContact(row, "qq") },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
+    { title: "建立时间", dataIndex: "created_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     {
       title: "扩展字段",
       key: "extra_values",
@@ -280,6 +281,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       ),
     },
   ];
+  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   const currentDate = today();
   const newThisMonthCount = rows.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
@@ -366,6 +368,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         onDetail={(row) => void openDetail(row)}
         onMerge={setMergeTarget}
         renderPhone={(row) => renderContact(row, "phone")}
+        fieldOrder={mobileFieldOrder}
         onDisable={async (row) => {
           await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
           appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");

@@ -26,11 +26,11 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
   await page.goto("/");
   await navItem(page, "业务中心").click();
   // 业务中心默认落 URL 指定的 Tab（导航进来是 #/business/inventory 库存中心），
-  // 「搜索订单」只在「业务台账」面板内，必须先切 Tab。
-  await page.getByRole("tab", { name: "业务台账" }).click();
+  // 「搜索订单」只在「订单台账」面板内，必须先切 Tab。
+  await page.getByRole("tab", { name: "订单台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
   const row = page.getByRole("row").filter({ hasText: order.order_no });
-  // 业务台账已改为行内「更多⌄」菜单直接操作（原「查看详情」抽屉已删除，提交 02d5f07）。
+  // 订单台账已改为行内「更多⌄」菜单直接操作（原「查看详情」抽屉已删除，提交 02d5f07）。
   // 菜单项口径：「登记退款」已更名「资金收支」（OrdersPage 行内菜单 key=refund）。
   await row.getByRole("button", { name: /更多/ }).click();
   await page.getByRole("menuitem", { name: "资金收支" }).click();
@@ -76,8 +76,8 @@ test("分润页面按人模型保存四项比例", async ({ page, request }) => 
   await page.goto("/");
   await navItem(page, "业务中心").click();
   // 业务中心默认落 URL 指定的 Tab（导航进来是 #/business/inventory 库存中心），
-  // 「搜索订单」只在「业务台账」面板内，必须先切 Tab。
-  await page.getByRole("tab", { name: "业务台账" }).click();
+  // 「搜索订单」只在「订单台账」面板内，必须先切 Tab。
+  await page.getByRole("tab", { name: "订单台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
   // 「分润」收在行内「更多⌄」下拉菜单内（原「查看详情」抽屉已删除，提交 02d5f07）。
   await page

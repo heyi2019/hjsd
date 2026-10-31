@@ -299,6 +299,13 @@
   box-shadow: var(--e2) !important;
 }
 
+/* 业务列表日期区间：筛选弹层保持紧凑，避免双月日历占满工作区。 */
+.compact-date-range-picker .ant-picker-panel-container {
+  transform: translateX(12%) scale(0.72);
+  transform-origin: top right;
+}
+
+
 /* Apple 弹簧入场（覆盖 antd 默认 zoom/slide 动效）：仅在用户未要求减弱动效时生效。
    ⚠ 只允许覆盖「入场态」（*-enter-active 类）：rc-motion 靠离场动画的 animationend
    才给弹层加 hidden；若把根容器动画整条 !important 钉死，关闭时动画名不变、

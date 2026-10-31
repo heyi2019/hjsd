@@ -168,7 +168,7 @@
     background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
   }
   .ant-table-wrapper .ant-table-thead > tr > th:first-child { z-index: 3; }
-  /* 业务台账移动端保留核心字段，详情信息进入卡片，避免核心动作被推到屏外。 */
+  /* 订单台账移动端保留核心字段，详情信息进入卡片，避免核心动作被推到屏外。 */
   .orders-ledger .ant-table { min-width: 0 !important; width: 100%; }
   .orders-ledger .ant-table-thead > tr > th:nth-child(4),
   .orders-ledger .ant-table-tbody > tr > td:nth-child(4) { display: none; }
@@ -273,7 +273,7 @@
   .ant-table-tbody .ant-space { flex-wrap: wrap; }
   /* 全站表格默认 white-space: nowrap（legacy 基础样式），长文本列会按 max-content 把表撑宽
      （实测「投资款荷包（HJ_INVEST）」单列即占 328px）。
-     只在明确打了 ui-col-wrap 的列放开换行，不做全局放开——全局会连带把业务台账移动卡片
+     只在明确打了 ui-col-wrap 的列放开换行，不做全局放开——全局会连带把订单台账移动卡片
      的「对方/来源」这类标签折成两行。 */
   .ant-table-thead > tr > th.ui-col-wrap,
   .ant-table-tbody > tr > td.ui-col-wrap { white-space: normal; word-break: break-word; min-width: 120px; }

@@ -129,7 +129,7 @@ const A11Y_FN = `
 const PAGES = [
   { key: "dashboard", name: "工作台", nav: "工作台" },
   { key: "business-default", name: "业务中心（默认落点）", nav: "业务中心" },
-  { key: "business-ledger", name: "业务中心·业务台账", nav: "业务中心", tab: "业务台账" },
+  { key: "business-ledger", name: "业务中心·订单台账", nav: "业务中心", tab: "订单台账" },
   { key: "customers", name: "客户中心", nav: "客户中心" },
   { key: "funds", name: "资金中心", nav: "资金中心" },
   { key: "operations", name: "经营中心", nav: "经营中心" },

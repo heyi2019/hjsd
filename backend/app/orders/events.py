@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -15,6 +15,7 @@ from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
+from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
     AuditAction,
@@ -58,7 +59,7 @@ def _auto_link_recovered_installment_sale(
     note: str | None,
 ) -> None:
     """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。"""
-    from app.installments.service import link_recovered_sale
+    from app.value_added_services.service import link_recovered_sale
 
     link_recovered_sale(
         session,
@@ -401,7 +402,7 @@ def post_event(
         note=note,
         form_extra=event_form_extra or None,
         is_posted=True,
-        posted_at=datetime.now(),
+        posted_at=now_second(),
         created_by=actor,
         updated_by=actor,
     )

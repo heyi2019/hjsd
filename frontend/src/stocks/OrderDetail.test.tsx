@@ -105,6 +105,8 @@ describe("OrderDetail", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
     expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
+    const accountTable = panel.querySelector(".inventory-detail__section--profile .inventory-detail__meta-table");
+    expect(accountTable?.querySelectorAll("tbody > tr")).toHaveLength(1);
   });
 
   it("账号补充资料（标签 描述/作图）置于运营信息，游戏账号信息不再含该组", () => {

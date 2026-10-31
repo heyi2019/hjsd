@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
-from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
@@ -16,6 +15,11 @@ from app.core.money import to_money
 from app.domain.foundation import Pool
 from app.foundation import service as foundation_service
 from ._common import _required_text
+from .cancellation_model import (
+    apply_cancellation_account_effect,
+    get_cancellation_offset,
+    opposite_cancellation_direction,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -23,6 +27,7 @@ from app.core.errors import (
     NotFound,
     Validation,
 )
+from app.core.time import now_second
 from app.core.state_machine import (
     ACCOUNT_TRANSITIONS,
     ORDER_TRANSITIONS,
@@ -32,9 +37,7 @@ from app.domain.enums import (
     AccountStatus,
     AuditAction,
     CapitalType,
-    Direction,
     EventType,
-    InventoryType,
     PoolStatus,
 )
 from app.domain.trade import (
@@ -199,54 +202,9 @@ def _assert_event_allowed(
 
 
 
-def _opposite_direction(
-    offset_event_id: int | None,
-    session: Session,
-    *,
-    order_id: int | None = None,
-) -> str:
-    if offset_event_id is None:
-        return Direction.IN.value
-    offset = _get_offset_event(session, offset_event_id, order_id=order_id)
-    if offset.event_type in {EventType.BUY.value, EventType.COST.value}:
-        return Direction.IN.value
-    return Direction.OUT.value
-
-
-def _get_offset_event(
-    session: Session, offset_event_id: int, *, order_id: int | None = None
-) -> OrderEvent:
-    offset = session.get(OrderEvent, offset_event_id)
-    if offset is None:
-        raise NotFound(
-            f"被冲销事件 {offset_event_id} 不存在",
-            details={"offset_event_id": offset_event_id},
-        )
-    if order_id is not None and offset.order_id != order_id:
-        raise Validation(
-            "冲销事件必须属于同一订单",
-            details={
-                "order_id": order_id,
-                "offset_event_id": offset_event_id,
-                "offset_order_id": offset.order_id,
-            },
-        )
-    if not offset.is_posted:
-        raise Validation(
-            "只能冲销已登记事件",
-            details={"offset_event_id": offset_event_id},
-        )
-    if offset.event_type not in {
-        EventType.BUY.value,
-        EventType.COST.value,
-        EventType.SELL.value,
-        EventType.PAYMENT.value,
-    }:
-        raise Validation(
-            "只能冲销有金额的业务事件",
-            details={"offset_event_id": offset_event_id, "event_type": offset.event_type},
-        )
-    return offset
+# 兼容既有 events/service 内部调用路径；实际取消规则统一由 cancellation_model 管理。
+_get_offset_event = get_cancellation_offset
+_opposite_direction = opposite_cancellation_direction
 
 
 def _post_deliver(
@@ -310,7 +268,7 @@ def _post_deliver(
         pool_id=None,
         delivery_mode=delivery_mode,
         is_posted=True,
-        posted_at=datetime.now(),
+        posted_at=now_second(),
         note=note,
         form_extra={
             **(dict(form_extra) if form_extra else {}),
@@ -431,29 +389,14 @@ def _apply_account_effect(
     elif event_type == EventType.SELL.value:
         account.status = transition(ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号")
     elif event_type == EventType.CANCEL.value:
-        if offset_event is not None and offset_event.event_type == EventType.SELL.value:
-            if cancel_fully_consumed:
-                account.status = transition(
-                    ACCOUNT_TRANSITIONS,
-                    account.status,
-                    "CANCEL_SELL_END" if account.inventory_type == InventoryType.PICKUP.value else "CANCEL_SELL",
-                    entity="账号",
-                )
-            if actor is not None:
-                account.updated_by = actor
-            return
-        if offset_event is not None and offset_event.event_type == EventType.PAYMENT.value:
-            # 分期收款取消只产生原路退款现金流，不改写账号成本。
-            if actor is not None:
-                account.updated_by = actor
-            return
-        account.cost_amount = to_money(account.cost_amount) - amount
-        if offset_event is None or (
-            offset_event.event_type == EventType.BUY.value and cancel_fully_consumed
-        ):
-            account.status = transition(
-                ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号"
-            )
+        apply_cancellation_account_effect(
+            account,
+            amount,
+            offset_event=offset_event,
+            cancel_fully_consumed=cancel_fully_consumed,
+            actor=actor,
+        )
+        return
     if actor is not None:
         account.updated_by = actor
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 from sqlalchemy import func, select
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
+from app.core.time import now_second
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
 from app.core.security import CurrentUser, owner_scope_filter
@@ -221,7 +222,7 @@ def reverse_cashflow(
         note=f"冲销 {flow.flow_no}",
         form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
         reviewed_by=actor,
-        reviewed_at=datetime.now(),
+        reviewed_at=now_second(),
         created_by=actor,
         updated_by=actor,
     )

@@ -11,11 +11,12 @@ from app.domain.enums import (
     InventoryType,
     InventoryStatus,
 )
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     event,
     Index,
     Integer,
@@ -28,6 +29,7 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
 )
+from app.core.time import now_second
 
 class Account(Base, AuditMixin):
     """游戏账号台账：每行就是一个可独立交易的产品实体。
@@ -87,6 +89,13 @@ class Account(Base, AuditMixin):
     # 独立库存口径：只表达在库/出库；status 保留账号生命周期原因，订单和分期另有各自状态。
     inventory_status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=InventoryStatus.IN_STOCK.value
+    )
+    # 统一库存口径：所有业务类型都从进入库存的时间开始计算未售时长。
+    inventory_entry_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=now_second,
+        server_default="CURRENT_TIMESTAMP",
     )
     buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)

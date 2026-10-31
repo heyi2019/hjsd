@@ -12,7 +12,7 @@ import pytest
 
 from app.core.money import to_money
 from app.finance import service as finance_service
-from app.installments import service as installment_service
+from app.value_added_services import service as installment_service
 from app.orders import service as order_service
 from app.parties import service as party_service
 

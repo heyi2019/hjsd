@@ -8,10 +8,10 @@
 from __future__ import annotations
 
 from datetime import date
-from datetime import datetime
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
+from app.core.time import now_second
 from sqlalchemy import (
     func,
     select,
@@ -373,7 +373,7 @@ def make_snapshot(
         "version": version.version,
         "effective_from": version.effective_from.isoformat(),
         "config": dict(version.config or {}),
-        "captured_at": datetime.now().isoformat(),
+        "captured_at": now_second().isoformat(),
     }
     return version.id, snapshot
 

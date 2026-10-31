@@ -130,7 +130,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
         onClose={() => setCreateOpen(false)}
         onCreated={() => {
           setCreateOpen(false);
-          // 建单成功后同步刷新「今日关注」计数；业务台账的刷新由 OrdersPage 的 active 重拉机制负责。
+          // 建单成功后同步刷新「今日关注」计数；订单台账的刷新由 OrdersPage 的 active 重拉机制负责。
           void loadSummary();
         }}
         initialOrderType={createType}

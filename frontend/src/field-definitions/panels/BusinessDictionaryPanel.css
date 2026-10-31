@@ -3,6 +3,13 @@
   vertical-align: top !important;
 }
 
+/* 一级列表标签：文字加粗并上下左右居中（以账号流转标题为样板） */
+.business-dictionary .ant-descriptions-item-label {
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
 .business-dictionary__entry {
   display: block;
   padding: 3px 0;
@@ -20,7 +27,7 @@
 
 .business-dictionary__group {
   display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr);
+  grid-template-columns: 5.5rem minmax(0, 1fr);
   width: 100%;
   min-width: 0;
 }
@@ -29,8 +36,9 @@
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
+  justify-content: center;
   min-width: 0;
-  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  padding: var(--space-3);
   background: transparent;
   border-right: var(--border-w) solid color-mix(in srgb, var(--color-border) 78%, transparent);
   line-height: 1.35;
@@ -47,7 +55,7 @@
 
 .business-dictionary__action-line {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
+  grid-template-columns: 6.5rem minmax(0, 1fr);
   width: 100%;
   min-width: 0;
   align-items: center;
@@ -66,6 +74,15 @@
 
 .business-dictionary__tertiary {
   min-width: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.business-dictionary__category-name {
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -77,6 +94,14 @@
 
 .business-dictionary__tertiary--empty {
   visibility: hidden;
+}
+
+.business-dictionary__category-desc {
+  color: var(--color-text-secondary);
+  font-size: 0.72em;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
 }
 
 .business-dictionary__group-body .business-dictionary__entry {

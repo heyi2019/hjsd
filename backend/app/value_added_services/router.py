@@ -1,4 +1,4 @@
-"""installments.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
+"""value_added_services.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
 from __future__ import annotations
 
 from datetime import date
@@ -20,8 +20,9 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.domain.trade import InstallmentSchedule
-from app.installments import schemas, service
-from app.lists.export import build_list_csv, csv_file_response
+from app.value_added_services import schemas, service
+from app.lists import service as list_columns_service
+from app.lists.export import build_list_csv, csv_file_response, detail_json
 from app.parties import service as parties_service
 
 router = APIRouter(tags=["HS-01 分期合约"])
@@ -33,6 +34,17 @@ post_payment = require_permissions(
 )
 post_delivery = require_permissions(PERM_ORDER_EVENT_POST)
 default_manage = require_permissions(PERM_ORDER_UPDATE)
+
+INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
+    ("installment_note", "备注", True),
+    ("installment_delivery_mode", "交付方式", True),
+    ("installment_delivered_on", "交付时间", True),
+    ("installment_first_due_on", "首期到期日", True),
+    ("installment_extra_values", "合约扩展字段", True),
+    ("installment_form_extra", "操作扩展字段", True),
+    ("installment_schedule", "期次明细", True),
+    ("installment_dispositions", "处置记录", True),
+]
 
 
 def _actor(user: CurrentUser) -> str:
@@ -73,8 +85,35 @@ def export_installments_csv(
 ) -> Response:
     """分期与回款按可见列导出 CSV：同 /installments 口径，天然全量。"""
     outputs = list_installments(status=status, order_id=order_id, db=db, _user=_user)
-    rows = [output.model_dump() for output in outputs]
-    csv_text, meta = build_list_csv(db, "INSTALLMENT", rows)
+    rows = [output.model_dump(mode="json") for output in outputs]
+    value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
+    for row, output in zip(rows, outputs, strict=True):
+        schedules = db.scalars(
+            select(InstallmentSchedule)
+            .where(InstallmentSchedule.installment_id == output.id)
+            .order_by(InstallmentSchedule.period_no)
+        ).all()
+        dispositions = service.list_dispositions(db, output.id, _user)
+        row["installment_note"] = row.get("note")
+        row["installment_delivery_mode"] = row.get("delivery_mode")
+        row["installment_delivered_on"] = row.get("delivered_on")
+        row["installment_first_due_on"] = row.get("first_due_on")
+        row["installment_extra_values"] = detail_json(row.get("extra_values") or {}, value_labels)
+        row["installment_form_extra"] = detail_json(row.get("form_extra") or {}, value_labels)
+        row["installment_schedule"] = detail_json(
+            [schemas.ScheduleOut.model_validate(item).model_dump(mode="json") for item in schedules],
+            value_labels,
+        )
+        row["installment_dispositions"] = detail_json(
+            [schemas.DispositionOut.model_validate(item).model_dump(mode="json") for item in dispositions],
+            value_labels,
+        )
+    csv_text, meta = build_list_csv(
+        db,
+        "INSTALLMENT",
+        rows,
+        extra_columns=INSTALLMENT_DETAIL_EXPORT_COLUMNS,
+    )
     record_audit(
         db,
         action=AuditAction.LIST_EXPORT,

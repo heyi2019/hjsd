@@ -12,7 +12,7 @@ import { ListColumnsPanel } from "./ListColumnsPanel";
 
 const ledger: catalog.ListScopeConfig = {
   code: "LEDGER",
-  label: "业务台账",
+  label: "订单台账",
   columns: [
     { key: "order_no", label: "订单号", locked: true, is_visible: true, sort_order: 0 },
     { key: "party", label: "对方 / 来源", locked: false, is_visible: true, sort_order: 10 },
@@ -134,7 +134,7 @@ describe("ListColumnsPanel", () => {
 
   it("切换列表后展示目标列表的列", async () => {
     renderLight(<ListColumnsPanel />);
-    await waitFor(() => expect(screen.getByText("业务台账")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("订单台账")).toBeInTheDocument());
 
     const master = screen.getByTestId("list-columns-master");
     await userEvent.click(within(master).getByRole("combobox"));

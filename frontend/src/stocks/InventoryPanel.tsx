@@ -1,15 +1,14 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 库存：以账号为载体的状态与成本（ACC-01 / RPT-01-01）。回收、提号、代挂账号从这里追踪。 */
-import { DownloadOutlined } from "@ant-design/icons";
-import { Card, Dropdown, Form, Input, Segmented, Space, Typography } from "antd";
+import { Card, DatePicker, Dropdown, Form, Input, Segmented, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Key } from "react";
-import { stocksApi, employeesApi, ordersApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption } from "../shared/api/catalog";
+import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type Pool } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { money, today } from "../shared/lib/format";
+import { formatDateTimeMinute, money, today } from "../shared/lib/format";
 import { DataTable,
   BusinessActionModal,
-  BusinessForm,
   ErrorBanner,
   MoneyText,
   PermissionButton,
@@ -24,17 +23,16 @@ import { InventoryRebateModal } from "./InventoryRebateModal";
 import { OrderDetail } from "./OrderDetail";
 import type { InventoryPartyLink } from "./OrderDetailView";
 import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryProfileModal";
+import { InventoryCancellationDialog, type InventoryCancellationValues } from "./InventoryCancellationDialog";
 import "./InventoryPanel.css";
 import { BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
-  VALUE_ADDED_SERVICE_LABEL,
   inventoryAge,
   isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { filterRetiredValueAddedServiceOptions } from "../shared/lib/retiredProducts";
-import { useListViewColumns } from "../shared/lib/listColumns";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+import { columnKey, orderMobileFields, useListViewColumns } from "../shared/lib/listColumns";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 
 function inventoryCellValue(value: string | null | undefined) {
@@ -48,6 +46,7 @@ function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   const hasActiveConsignment = Boolean(detail?.orders.some((order) => order.order_type === "DG" && order.status !== "CANCELLED"));
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
   if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
+  if (canPlatformOffsale) items.push({ key: "void", label: "取消", danger: true });
   if (row.status !== "SOLD") {
     items.push({ key: "description", label: "描述" }, { key: "images", label: "作图" });
   }
@@ -101,6 +100,7 @@ export function MobileInventoryList({
   executionDetails = {},
   onLoadExecution = () => undefined,
   editingAccount,
+  fieldOrder,
 }: {
   rows: Account[];
   onDetail: (row: Account) => void;
@@ -113,12 +113,24 @@ export function MobileInventoryList({
   executionDetails?: Record<number, AccountExecutionDetail>;
   onLoadExecution?: (row: Account) => void | Promise<void>;
   editingAccount: number | null;
+  fieldOrder?: string[];
 }) {
   if (rows.length === 0) return <div className="data-mobile-empty">暂无账号</div>;
   return (
     <div className="data-mobile-list">
       {rows.map((row) => {
         const age = inventoryAge(row);
+        const fields = orderMobileFields([
+          { key: "game_type", label: "游戏/产品类型", value: row.game_type || "-" },
+          { key: "game_account", label: "游戏账号/产品", value: row.game_account || "-" },
+          { key: "source_order_no", label: "订单号", value: row.source_order_no || "-" },
+          { key: "business_mode", label: "业务", value: row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-" },
+          { key: "inventory_type", label: "业务类型", value: row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-" },
+          { key: "inventory_entry_at", label: "入库时间", value: formatDateTimeMinute(row.inventory_entry_at) },
+          { key: "inventory_operator", label: "入库负责人", value: row.inventory_operator || row.created_by || "-" },
+          { key: "inventory_age", label: "未售时长", value: age ? `${age.days}天` : "-" },
+          { key: "cost_amount", label: "成本", value: <MoneyText value={row.cost_amount} /> },
+        ], fieldOrder);
         return (
           <article key={row.id} className="data-mobile-card">
             <div className="data-mobile-card__topline">
@@ -126,22 +138,13 @@ export function MobileInventoryList({
               <StatusTag status={row.inventory_status ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} />
             </div>
             <dl className="data-mobile-card__meta">
-              <div><dt>游戏/产品类型</dt><dd>{row.game_type || "-"}</dd></div>
-              <div><dt>游戏账号/产品</dt><dd>{row.game_account || "-"}</dd></div>
-              <div><dt>订单号</dt><dd>{row.source_order_no || "-"}</dd></div>
-              <div><dt>业务</dt><dd>{row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-"}</dd></div>
-              <div><dt>业务类型</dt><dd>{row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-"}</dd></div>
-              <div><dt>增值服务</dt><dd>{row.value_added_service ? VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service : "-"}</dd></div>
-              <div><dt>平台</dt><dd>{row.platform || "-"}</dd></div>
-              <div><dt>未售时长</dt><dd>{age ? `${age.days}天` : "-"}</dd></div>
-              <div><dt>成本</dt><dd><MoneyText value={row.cost_amount} /></dd></div>
+              {fields.map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
             </dl>
             <div className="data-mobile-card__actions">
               <PermissionButton permission="order.create" type="link" size="small" onClick={() => onDetail(row)}>详情</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status !== "WAITING"} onClick={() => onSale(row)}>售出</PermissionButton>
               <PermissionButton permission="order.create" type="link" size="small" disabled={row.status === "SOLD"} onClick={() => onConsign(row)}>寄售</PermissionButton>
               <PermissionButton permission="order.event.post" type="link" size="small" onClick={() => onRebate(row)}>返点</PermissionButton>
-              <PermissionButton permission="order.event.post" type="link" size="small" disabled={row.status === "SOLD" || row.status === "VOID"} onClick={() => onVoid(row)}>作废</PermissionButton>
               {isEditableAccountType(row.inventory_type) ? (
                 <>
                   <PermissionButton permission="order.create" type="link" size="small" disabled={editingAccount !== null} onClick={() => onEdit(row)}>编辑</PermissionButton>
@@ -167,12 +170,13 @@ export function MobileInventoryList({
   );
 }
 
-export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: { refreshKey?: number; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [rows, setRows] = useState<Account[]>([]);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
-  const [valueAddedService, setValueAddedService] = useState<string | undefined>(undefined);
+  const [gameTypeFilter, setGameTypeFilter] = useState<string | undefined>(undefined);
   const [keyword, setKeyword] = useState("");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [page, setPage] = useState(1);
@@ -192,16 +196,21 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
   const compact = useCompactLayout();
   const [savingAccount, setSavingAccount] = useState(false);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
+  const [voidPools, setVoidPools] = useState<Pool[]>([]);
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   const [voiding, setVoiding] = useState(false);
-  const [voidForm] = Form.useForm();
+  const [voidForm] = Form.useForm<InventoryCancellationValues>();
   const [invEditExtraForm] = Form.useForm();
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  // T20：筛选项从「选项词典」配置读取（库存状态 / 业务 / 类型 / 增值服务）。
+  // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
-  const valueAddedOptions = filterRetiredValueAddedServiceOptions(useOptionSet("VALUE_ADDED_SERVICE") ?? []);
+  const gameTypeOptions = Array.from(new Set((rows ?? [])
+    .map((row) => row.game_type)
+    .filter((value): value is string => Boolean(value))))
+    .sort((a, b) => a.localeCompare(b, "zh-CN"))
+    .map((value) => ({ value, label: value }));
   const load = useCallback(async () => {
     try {
       const list = await stocksApi.list({ status: "WAITING" });
@@ -212,7 +221,13 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     }
   }, []);
 
+  useReloadOnActive(active, load);
+
+  const previousRefreshKey = useRef(refreshKey);
   useEffect(() => {
+    if (refreshKey === previousRefreshKey.current) return;
+    previousRefreshKey.current = refreshKey;
+    setPage(1);
     void load();
   }, [load, refreshKey]);
 
@@ -236,15 +251,26 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     if (body && scrollLeftRef.current) body.scrollLeft = scrollLeftRef.current;
   }, [expandedAccountIds]);
 
-  const visibleRows = (rows ?? []).filter((row) => {
+  const inventoryRows = (rows ?? []).filter((row) => {
     const matchesStatus = row.status === "WAITING";
     const matchesBusiness = !businessMode || row.business_mode === businessMode;
+    const matchesGameType = !gameTypeFilter || row.game_type === gameTypeFilter;
+    return matchesStatus && matchesBusiness && matchesGameType;
+  });
+  const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const visibleRows = inventoryRows.filter((row) => {
     const matchesType = !inventoryType || row.inventory_type === inventoryType;
-    const matchesValueAdded = !valueAddedService || row.value_added_service === valueAddedService;
+    const rowDate = row.inventory_entry_at ?? row.buy_date ?? row.created_at;
+    const matchesDate = !dateRange || (
+      Boolean(rowDate)
+      && !dayjs(rowDate).isBefore(dateRange[0], "day")
+      && !dayjs(rowDate).isAfter(dateRange[1], "day")
+    );
     const text = [row.game_account, row.game_type, row.channel_region, row.platform]
       .filter(Boolean).join(" ").toLowerCase();
-    const matchesKeyword = !keyword.trim() || text.includes(keyword.trim().toLowerCase());
-    return matchesStatus && matchesBusiness && matchesType && matchesValueAdded && matchesKeyword;
+    const matchesKeyword = !normalizedKeyword || text.includes(normalizedKeyword);
+    return matchesType && matchesDate && matchesKeyword;
   });
   // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
   const orderedRows = [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id));
@@ -286,15 +312,19 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
 
   async function openVoid(account: Account) {
     try {
-      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
+      const [detail, poolList] = await Promise.all([
+        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
+        poolsApi.list(),
+      ]);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      setVoidPools(poolList.filter((pool) => pool.status === "ACTIVE"));
       const buy = findCancelableBuy(detail);
       if (!buy) {
         appMessage.warning("未找到可冲销的买入流水，无法下架");
         return;
       }
       setVoidTarget({ account, ...buy });
-      voidForm.setFieldsValue({ reason: undefined });
+      voidForm.setFieldsValue({ amount: buy.amount, pool_id: undefined, reason: undefined });
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -315,7 +345,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     }
   }
 
-  async function submitVoid(values: { reason: string; form_extra?: Record<string, unknown> }) {
+  async function submitVoid(values: { amount: string; pool_id: number; reason: string; form_extra?: Record<string, unknown> }) {
     if (!voidTarget) return;
     setVoiding(true);
     try {
@@ -333,8 +363,9 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       );
       await ordersApi.postEvent(voidTarget.orderId, {
         event_type: "CANCEL",
-        amount: voidTarget.amount,
+        amount: values.amount,
         occurred_on: today(),
+        pool_id: Number(values.pool_id),
         portion: voidTarget.portion,
         offset_event_id: voidTarget.eventId,
         reason: values.reason.trim(),
@@ -361,6 +392,10 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       void openPlatformOffsale(row);
       return;
     }
+    if (key === "void") {
+      void openVoid(row);
+      return;
+    }
     if (key === "description") {
       openProfile(row, "description");
       return;
@@ -374,17 +409,10 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
     { title: "游戏/产品类型", dataIndex: "game_type", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
     { title: "游戏账号/产品", dataIndex: "game_account", width: 120, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
     { title: "订单号", dataIndex: "source_order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+    { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
+    { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.created_by) },
     { title: "业务", dataIndex: "business_mode", width: 56, ellipsis: true, render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : inventoryCellValue(v)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
-    {
-      title: "增值服务",
-      dataIndex: "value_added_service",
-      width: 64,
-      ellipsis: true,
-
-      render: (v: string | null) => v ? VALUE_ADDED_SERVICE_LABEL[v] ?? v : inventoryCellValue(v),
-    },
-    { title: "平台", dataIndex: "platform", width: 60, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
     {
       title: "未售时长",
       width: 68,
@@ -397,7 +425,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);
       },
     },
-    { title: "状态", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
+    { title: "状态", key: "status", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
     {
       title: "成本",
       dataIndex: "cost_amount",
@@ -449,19 +477,6 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           >
             返点
           </PermissionButton>
-          <PermissionButton
-            permission="order.event.post"
-            type="link"
-            size="small"
-            aria-label="作废"
-            disabled={row.status === "SOLD" || row.status === "VOID"}
-            onClick={(event) => {
-              event.stopPropagation();
-              void openVoid(row);
-            }}
-          >
-            作废
-          </PermissionButton>
           {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton
               permission="order.create"
@@ -501,6 +516,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       ),
     },
   ];
+  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   async function saveInline() {
     if (!editingAccount) return;
@@ -625,46 +641,79 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
         ]}
       />
 
-      <Card
-        className="glass"
-        title="账号台账"
-        extra={
-          <Space wrap>
-            <Select allowClear placeholder="按业务筛选" className="ui-control-width-inventory" value={businessMode} options={businessOptions ?? []} onChange={(value) => { setBusinessMode(value); setPage(1); }} />
-            <Select allowClear placeholder="按类型筛选" className="ui-control-width-inventory" value={inventoryType} options={inventoryTypeOptions ?? []} onChange={(value) => { setInventoryType(value); setPage(1); }} />
-            <Select allowClear placeholder="按增值服务筛选" className="ui-control-width-inventory" value={valueAddedService} options={valueAddedOptions ?? []} onChange={(value) => { setValueAddedService(value); setPage(1); }} />
-            <Input
-              allowClear
-              value={keyword}
-              placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
-              aria-label="搜索库存账号"
-              className="ui-control-width-inventory"
-              onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
-            />
-            <PermissionButton
-              permission="report.read"
-              aria-label="导出"
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              onClick={() => void handleExport()}
-            >
-              导出
-            </PermissionButton>
-            <Space size={8}>
-              <Typography.Text type="secondary">排序</Typography.Text>
-              <Segmented
-                aria-label="库存排序"
-                value={sortDesc ? "desc" : "asc"}
-                options={[
-                  { value: "desc", label: "最新在前" },
-                  { value: "asc", label: "最旧在前" },
-                ]}
-                onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
-              />
-            </Space>
-          </Space>
-        }
-      >
+      <Card className="glass">
+        <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
+          <Input
+            allowClear
+            value={keyword}
+            placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
+            aria-label="搜索库存账号"
+            className="ui-ledger-search"
+            onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
+          />
+          <DatePicker.RangePicker
+            aria-label="库存日期区间"
+            placeholder={["开始日期", "结束日期"]}
+            format="YYYY-MM-DD"
+            size="small"
+            classNames={{ popup: { root: "compact-date-range-picker" } }}
+            value={dateRange}
+            onChange={(value) => {
+              setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null);
+              setPage(1);
+            }}
+          />
+          <Typography.Text strong>游戏类型筛选</Typography.Text>
+          <Select
+            aria-label="游戏类型筛选"
+            className="ui-filter-select"
+            value={gameTypeFilter ?? "all"}
+            options={[{ value: "all", label: "全部游戏类型" }, ...gameTypeOptions]}
+            onChange={(value) => { setGameTypeFilter(value === "all" ? undefined : value); setPage(1); }}
+          />
+          <Typography.Text strong>类型筛选</Typography.Text>
+          <Segmented
+            aria-label="库存类型筛选"
+            value={inventoryType ?? "all"}
+            options={[
+              { value: "all", label: `全部 ${countInventoryRows()}` },
+              ...(inventoryTypeOptions ?? []).map((item) => ({
+                value: item.value,
+                label: `${item.label} ${countInventoryRows(item.value)}`,
+              })),
+            ]}
+            onChange={(value) => { setInventoryType(value === "all" ? undefined : String(value)); setPage(1); }}
+          />
+          <Typography.Text strong>业务筛选</Typography.Text>
+          <Segmented
+            aria-label="库存业务筛选"
+            value={businessMode ?? "all"}
+            options={[
+              { value: "all", label: "全部业务" },
+              ...(businessOptions ?? []).map((item) => ({ value: item.value, label: item.label })),
+            ]}
+            onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
+          />
+          <Typography.Text strong>排序</Typography.Text>
+          <Segmented
+            aria-label="库存排序"
+            value={sortDesc ? "desc" : "asc"}
+            options={[
+              { value: "desc", label: "最新在前" },
+              { value: "asc", label: "最旧在前" },
+            ]}
+            onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
+          />
+          <PermissionButton
+            permission="report.read"
+            aria-label="导出"
+            size="small"
+            loading={exporting}
+            onClick={() => void handleExport()}
+          >
+            导出
+          </PermissionButton>
+        </Space>
         {compact ? (
           <MobileInventoryList
             rows={orderedRows}
@@ -678,6 +727,7 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
             executionDetails={executionDetails}
             onLoadExecution={loadExecution}
             editingAccount={editingAccount ? editingAccount.id : null}
+          fieldOrder={mobileFieldOrder}
           />
         ) : (
           <DataTable<Account>
@@ -764,29 +814,22 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
           onOrdersChanged?.();
         }}
       />
-      <BusinessActionModal size="compact"
+      <InventoryCancellationDialog
         title="系统下架登记"
         open={Boolean(voidTarget)}
         okText="确认下架"
-        cancelText="返回"
-        confirmLoading={voiding}
-        okButtonProps={{ danger: true }}
-        onOk={() => voidForm.submit()}
+        submitting={voiding}
+        form={voidForm}
+        scope="INVOID"
+        amount={voidTarget?.amount ?? "0.00"}
+        pools={voidPools}
         onCancel={() => { if (!voiding) { setVoidTarget(null); voidForm.resetFields(); } }}
-      >
-        {voidTarget ? <BusinessForm scope="INVOID" form={voidForm} onFinish={(values) => void submitVoid(values as { reason: string; form_extra?: Record<string, unknown> })}>
-          <p className="muted">
+        onFinish={(values) => void submitVoid(values)}
+        description={voidTarget ? <p className="muted">
             将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
             这是 ERP 系统下架，不影响已登记的寄售平台历史记录。下架不可撤销，历史轨迹保留。
-          </p>
-          <FieldConfigScope scope="INVOID" active={Boolean(voidTarget)}>
-          <CfgItem name="reason" label="下架原因" rules={[{ required: true, message: "请填写下架原因" }]}>
-            <Input.TextArea aria-label="下架原因" rows={3} placeholder="请输入下架原因" />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="inv-void" />
-          </FieldConfigScope>
-        </BusinessForm> : null}
-      </BusinessActionModal>
+          </p> : null}
+      />
       <InventoryPlatformOffsaleModal
         account={platformOffsaleTarget?.account ?? null}
         records={platformOffsaleTarget?.records ?? []}

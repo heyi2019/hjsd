@@ -84,7 +84,8 @@ def r1_inventory_health(
             continue
         orders = order_by_account.get(account.id, [])
         holding_days = (
-            (today - account.buy_date).days if account.buy_date else None
+            (today - account.inventory_entry_at.date()).days
+            if account.inventory_entry_at else None
         )
         expected_price = ZERO
         for order in orders:

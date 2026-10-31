@@ -20,6 +20,33 @@ export function today(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/** 数据库保留到秒，业务页面统一展示到分钟。 */
+export function formatDateTimeMinute(value: string | null | undefined): string {
+  if (!value) return "-";
+  const normalized = value.replace("T", " ");
+  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
+}
+
+/** 计算入库到出库的实际在手时长，按分钟展示。 */
+export function formatElapsedTime(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): string {
+  if (!start || !end) return "-";
+  const startAt = new Date(start).getTime();
+  const endAt = new Date(end).getTime();
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt < startAt) return "-";
+  const totalMinutes = Math.floor((endAt - startAt) / 60_000);
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts: string[] = [];
+  if (days) parts.push(`${days}天`);
+  if (hours) parts.push(`${hours}小时`);
+  if (minutes || parts.length === 0) parts.push(`${minutes}分`);
+  return parts.join("");
+}
+
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   ACTIVE: "进行中",
   INSTALLMENT: "分期中",

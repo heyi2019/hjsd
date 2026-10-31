@@ -26,7 +26,6 @@ import { InventoryProfileModal, type InventoryProfileTarget } from "./InventoryP
 import "./InventoryPanel.css";
 import { BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
-  VALUE_ADDED_SERVICE_LABEL,
   inventoryAge,
   isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
@@ -126,8 +125,6 @@ export function MobileInventoryList({
           { key: "source_order_no", label: "订单号", value: row.source_order_no || "-" },
           { key: "business_mode", label: "业务", value: row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-" },
           { key: "inventory_type", label: "业务类型", value: row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-" },
-          { key: "value_added_service", label: "增值服务", value: row.value_added_service ? VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service : "-" },
-          { key: "platform", label: "平台", value: row.platform || "-" },
           { key: "inventory_age", label: "未售时长", value: age ? `${age.days}天` : "-" },
           { key: "cost_amount", label: "成本", value: <MoneyText value={row.cost_amount} /> },
         ], fieldOrder);
@@ -395,15 +392,6 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
     { title: "订单号", dataIndex: "source_order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
     { title: "业务", dataIndex: "business_mode", width: 56, ellipsis: true, render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : inventoryCellValue(v)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
-    {
-      title: "增值服务",
-      dataIndex: "value_added_service",
-      width: 64,
-      ellipsis: true,
-
-      render: (v: string | null) => v ? VALUE_ADDED_SERVICE_LABEL[v] ?? v : inventoryCellValue(v),
-    },
-    { title: "平台", dataIndex: "platform", width: 60, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
     {
       title: "未售时长",
       width: 68,

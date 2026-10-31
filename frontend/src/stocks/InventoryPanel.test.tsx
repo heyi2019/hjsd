@@ -66,6 +66,16 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("acc-3")).toBeInTheDocument();
   });
 
+  it("库存中心不展示已移除的增值服务和平台字段", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByRole("columnheader", { name: "库存编号" });
+
+    expect(screen.queryByRole("columnheader", { name: "增值服务" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "平台" })).toBeNull();
+    expect(screen.queryByText("增值服务")).toBeNull();
+    expect(screen.queryByText("平台")).toBeNull();
+  });
+
   it("建单后刷新库存并把新账号放在第一页", async () => {
     const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -430,12 +440,10 @@ describe("InventoryPanel：账号台账", () => {
           { key: "source_order_no", is_visible: true, sort_order: 30 },
           { key: "business_mode", is_visible: true, sort_order: 40 },
           { key: "inventory_type", is_visible: true, sort_order: 50 },
-          { key: "value_added_service", is_visible: true, sort_order: 60 },
-          { key: "platform", is_visible: true, sort_order: 70 },
-          { key: "inventory_age", is_visible: false, sort_order: 80 },
-          { key: "status", is_visible: true, sort_order: 90 },
-          { key: "cost_amount", is_visible: true, sort_order: 100 },
-          { key: "actions", is_visible: true, sort_order: 110 },
+          { key: "inventory_age", is_visible: false, sort_order: 60 },
+          { key: "status", is_visible: true, sort_order: 70 },
+          { key: "cost_amount", is_visible: true, sort_order: 80 },
+          { key: "actions", is_visible: true, sort_order: 90 },
         ],
       },
     ] as unknown as catalog.ListScopeConfig[]);
@@ -448,7 +456,7 @@ describe("InventoryPanel：账号台账", () => {
       expect(screen.queryByRole("columnheader", { name: "未售时长" })).toBeNull(),
     );
     // 相邻普通列仍正常显示，证明只是未售时长被控
-    expect(screen.getByRole("columnheader", { name: "平台" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "平台" })).toBeNull();
     expect(screen.getByRole("columnheader", { name: "成本" })).toBeInTheDocument();
   });
 

@@ -60,8 +60,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("source_order_no", "订单号"),
             ListColumn("business_mode", "业务"),
             ListColumn("inventory_type", "业务类型"),
-            ListColumn("value_added_service", "增值服务"),
-            ListColumn("platform", "平台"),
             ListColumn("inventory_age", "未售时长"),
             ListColumn("status", "状态"),
             ListColumn("cost_amount", "成本"),

@@ -12,20 +12,31 @@ branch_labels = None
 depends_on = None
 
 
+def _find_status_constraint(table_name: str) -> str:
+    """Resolve the status CHECK by definition across accounts/stocks naming history."""
+    inspector = sa.inspect(op.get_bind())
+    for constraint in inspector.get_check_constraints(table_name):
+        name = constraint.get("name")
+        sqltext = (constraint.get("sqltext") or "").upper()
+        if name and "STATUS IN" in sqltext and "INVENTORY_STATUS" not in sqltext:
+            return name
+    raise RuntimeError(f"无法定位 {table_name} 的 status CHECK 约束")
+
+
 def upgrade() -> None:
     # 历史账号的 INSTALLMENT 代表已签约出库，统一归入账号周期 SOLD；
     # 分期进度由 installments.status 记录，订单阶段由 orders.status 记录。
     op.execute(sa.text("UPDATE stocks SET status = 'SOLD' WHERE status = 'INSTALLMENT'"))
 
     with op.batch_alter_table("stocks", naming_convention={}) as batch_op:
-        batch_op.drop_constraint(conv("ck_accounts_account_status_valid"), type_="check")
+        batch_op.drop_constraint(conv(_find_status_constraint("stocks")), type_="check")
         batch_op.create_check_constraint(
-            conv("ck_accounts_account_status_valid"),
+            conv("ck_stocks_account_status_valid"),
             "status IN ('IN_STOCK', 'SOLD', 'VOID')",
         )
 
     with op.batch_alter_table("orders", naming_convention={}) as batch_op:
-        batch_op.drop_constraint(conv("ck_orders_order_status_valid"), type_="check")
+        batch_op.drop_constraint(conv(_find_status_constraint("orders")), type_="check")
         batch_op.create_check_constraint(
             conv("ck_orders_order_status_valid"),
             "status IN ('ACTIVE', 'INSTALLMENT', 'COMPLETED', 'CANCELLED')",
@@ -51,15 +62,15 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("orders", naming_convention={}) as batch_op:
-        batch_op.drop_constraint(conv("ck_orders_order_status_valid"), type_="check")
+        batch_op.drop_constraint(conv(_find_status_constraint("orders")), type_="check")
         batch_op.create_check_constraint(
             conv("ck_orders_order_status_valid"),
             "status IN ('ACTIVE', 'COMPLETED', 'CANCELLED')",
         )
     with op.batch_alter_table("stocks", naming_convention={}) as batch_op:
-        batch_op.drop_constraint(conv("ck_accounts_account_status_valid"), type_="check")
+        batch_op.drop_constraint(conv(_find_status_constraint("stocks")), type_="check")
         batch_op.create_check_constraint(
-            conv("ck_accounts_account_status_valid"),
+            conv("ck_stocks_account_status_valid"),
             "status IN ('IN_STOCK', 'INSTALLMENT', 'SOLD', 'VOID')",
         )
 

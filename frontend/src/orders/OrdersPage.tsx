@@ -28,7 +28,7 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
 import { columnKey, orderMobileFields as arrangeMobileFields, useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
-import { InventoryCancellationDialog, type InventoryCancellationValues } from "../stocks/InventoryCancellationDialog";
+import { InventoryCancellationDialog, type InventoryCancellationOffset, type InventoryCancellationValues } from "../stocks/InventoryCancellationDialog";
 import { OrderDetail } from "../stocks/OrderDetail";
 import type { InventoryPartyLink } from "../stocks/OrderDetailView";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -724,6 +724,10 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
     ? cancelableEventsForScope(cancelOrderTarget, cancelScope)[0]
     : undefined;
   const hasSharedCancellation = Boolean(sharedCancellationEvent);
+  const sharedCancellationPool = sharedCancellationEvent
+    ? cancelPools.find((pool) => pool.id === sharedCancellationEvent.event.pool_id)
+    : undefined;
+  const sharedUsesWalletLabels = sharedCancellationPool?.code === "HJ_INVEST";
 
   return (
     <section className="ui-stack orders-page">
@@ -905,12 +909,19 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         title={cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
         amount={sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00"}
         pools={cancelPools}
+        employees={cancelOrderTarget?.order_type === "DG" ? undefined : cancelEmployees}
+        offsetEvents={cancelOrderTarget && cancelOrderTarget.order_type !== "DG" ? cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }): InventoryCancellationOffset => ({
+          value: event.id,
+          label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining.toFixed(2))}）`,
+          remaining: remaining.toFixed(2),
+          pool_id: event.pool_id ?? undefined,
+        })) : undefined}
         form={cancelForm}
         scope={cancelScope}
         submitting={cancelSubmitting}
-        okText="确认取消"
-        amountLabel={cancelScope === "INVREFUND" ? "退回金额" : "退款金额"}
-        accountLabel={cancelScope === "INVREFUND" ? "收款账户" : "付款账户"}
+        okText="确认取消交易"
+        amountLabel={cancelScope === "INVREFUND" && sharedUsesWalletLabels ? "入账金额" : cancelScope === "INVREFUND" ? "退回金额" : "退款金额"}
+        accountLabel={cancelScope === "INVREFUND" && sharedUsesWalletLabels ? "入账账户" : cancelScope === "INVREFUND" ? "收款账户" : "付款账户"}
         onCancel={closeCancelTransaction}
         onFinish={(values) => void submitCancelTransaction({ ...values, cancelled_on: today() })}
         description={cancelScope === "INVREFUND"
@@ -941,6 +952,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
             <div className="order-cancel-meta">
               <CfgItem
+                alwaysActive
                 name="offset_event_id"
                 label={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
                 fixedLabel={cancelScope === "INVREFUND" ? "入库流水" : "售出流水"}
@@ -961,7 +973,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   }}
                 />
               </CfgItem>
-              <CfgItem name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
+              <CfgItem alwaysActive name={cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"} label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} rules={requiredMoneyRules(cancelScope === "INVREFUND" ? "入账金额" : "退款金额")} tooltip="留空或填剩余可冲金额为全额冲销；小于剩余金额即为部分冲销">
                 <MoneyInput aria-label={cancelScope === "INVREFUND" ? "入账金额" : "退款金额"} placeholder={cancelScope === "INVREFUND" ? "请输入入账金额" : "请输入退款金额"} />
               </CfgItem>
               <CfgItem alwaysActive name="pool_id" label={cancelScope === "INVREFUND" ? "入账账户" : "收款账户"} rules={[{ required: true, message: cancelScope === "INVREFUND" ? "请选择入账账户" : "请选择收款账户" }]}>
@@ -970,10 +982,10 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
               <ResponsibleEmployeeSelect name="operator_user_ids" label={cancelScope === "INVREFUND" ? "入账操作人" : "退款操作人"} employees={cancelEmployees} className="order-cancel-employee" />
             </div>
           ) : null}
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
+          <CfgItem alwaysActive name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
             <Input placeholder="YYYY-MM-DD" />
           </CfgItem>
-          <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
+          <CfgItem alwaysActive name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />

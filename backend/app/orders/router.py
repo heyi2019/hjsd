@@ -2,12 +2,10 @@
 
 金额类动作全部走 Service 事务；列表页只提供查询，不做直接登记。
 """
-from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -15,7 +13,6 @@ from app.core.database import get_db
 from app.core.errors import PermissionDenied, Validation
 from app.core.schemas import PageOut
 from app.core.security import (
-    PERM_AUDIT_READ,
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
@@ -24,22 +21,19 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.foundation import AuditLog
-from app.domain.attachments import Attachment
 from app.domain.enums import AuditAction
-from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
-from app.domain.trade import (
-    Account,
-    Cashflow,
-    Installment,
-    InstallmentSchedule,
-    OrderEvent,
-    RebateRecord,
-)
-from app.domain.users import User
 from app.installments import service as installments_service
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.orders import schemas, service
+
+from .router_output import (
+    _actor,
+    _order_output,
+    _operator_names,
+    _event_output,
+    _order_detail_output,
+    _order_list_payload,
+)
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
 
@@ -50,295 +44,6 @@ post_events = require_permissions(
 )
 update_orders = require_permissions(PERM_ORDER_UPDATE)
 read_finance = require_permissions(PERM_FINANCE_READ)
-
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
-
-
-def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
-    """按订单权限输出详情，避免财务/查看权限读取 DFQ 游戏密码。"""
-    output = schemas.OrderOut.model_validate(order)
-    # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
-    output.extra_values = dict(order.form_extra or {})
-    if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
-        snapshot = dict(output.account_snapshot)
-        if "game_password" in snapshot:
-            snapshot["game_password"] = None
-        output.account_snapshot = snapshot
-    return output
-
-
-def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
-    ids = {user_id for event in events for user_id in (event.operator_user_ids or [])}
-    if not ids:
-        return {}
-    users = db.scalars(select(User).where(User.id.in_(ids))).all()
-    return {user.id: user.display_name or user.username for user in users}
-
-
-def _event_output(event: OrderEvent, operator_names: dict[int, str] | None = None) -> schemas.EventOut:
-    """把审计字段映射为事件响应字段，避免 ORM 属性名泄漏到 API。"""
-    selected_operators = _selected_operator_label(event, operator_names)
-    return schemas.EventOut.model_validate(
-        {
-            "id": event.id,
-            "event_no": event.event_no,
-            "order_id": event.order_id,
-            "event_type": event.event_type,
-            "amount": event.amount,
-            "occurred_on": event.occurred_on,
-            "pool_id": event.pool_id,
-            "offset_event_id": event.offset_event_id,
-            "portion": event.portion,
-            "delivery_mode": event.delivery_mode,
-            "is_posted": event.is_posted,
-            "posted_at": event.posted_at,
-            "reason": event.reason,
-            "refund_responsibility": event.refund_responsibility,
-            "operator_user_ids": event.operator_user_ids,
-            "note": event.note,
-            "form_extra": event.form_extra,
-            "created_at": event.created_at,
-            # created_by 是审计操作者；业务上的操作人以表单勾选员工为准。
-            "operator": selected_operators or event.created_by,
-        }
-    )
-
-
-def _selected_operator_label(
-    event: OrderEvent | None, operator_names: dict[int, str] | None
-) -> str:
-    if event is None:
-        return ""
-    return "、".join(
-        operator_names[user_id]
-        for user_id in (event.operator_user_ids or [])
-        if operator_names and user_id in operator_names
-    )
-
-
-def _order_detail_output(
-    db: Session, order, user: CurrentUser
-) -> schemas.OrderDetailOut:
-    """订单详情统一返回主字段和执行事件，避免前端再拼接隐式查询。"""
-    output = schemas.OrderDetailOut.model_validate(order)
-    # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
-    output.extra_values = dict(order.form_extra or {})
-    if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
-        snapshot = dict(output.account_snapshot)
-        if "game_password" in snapshot:
-            snapshot["game_password"] = None
-        output.account_snapshot = snapshot
-    events = db.scalars(
-        select(OrderEvent)
-        .where(OrderEvent.order_id == order.id)
-        .order_by(OrderEvent.occurred_on, OrderEvent.id)
-    ).all()
-    operator_names = _operator_names(db, events)
-    event_by_id = {event.id: event for event in events}
-    output.events = [_event_output(event, operator_names) for event in events]
-    output.links = [
-        schemas.OrderLinkOut.model_validate(item)
-        for item in service.list_order_links(db, order.id, user)
-    ]
-    if user.has(PERM_FINANCE_READ):
-        cashflows = db.scalars(
-            select(Cashflow)
-            .where(Cashflow.order_id == order.id)
-            .order_by(Cashflow.occurred_on, Cashflow.id)
-        ).all()
-        output.cashflows = [
-            schemas.OrderCashflowOut.model_validate(
-                {
-                    "flow_no": item.flow_no,
-                    "pool_id": item.pool_id,
-                    "occurred_on": item.occurred_on,
-                    "nature": item.nature,
-                    "category": item.category,
-                    "direction": item.direction,
-                    "amount": item.amount,
-                    "status": item.status,
-                    "order_event_id": item.order_event_id,
-                    "note": item.note,
-                    "operator": _selected_operator_label(event_by_id.get(item.order_event_id), operator_names)
-                    or item.created_by,
-                }
-            )
-            for item in cashflows
-        ]
-        rebates = db.scalars(
-            select(RebateRecord)
-            .where(RebateRecord.source_order_id == order.id)
-            .order_by(RebateRecord.id)
-        ).all()
-        output.rebates = [
-            schemas.OrderRebateOut.model_validate(
-                {
-                    "id": item.id,
-                    "rebate_no": item.rebate_no,
-                    "rebate_type": item.rebate_type,
-                    "channel": item.channel,
-                    "rate": item.rate,
-                    "base_amount": item.base_amount,
-                    "link_status": item.link_status,
-                    "status": item.status,
-                    "collected_on": item.collected_on,
-                    "note": item.note,
-                    "created_at": item.created_at,
-                    "operator": item.created_by,
-                }
-            )
-            for item in rebates
-        ]
-    installment = db.scalar(
-        select(Installment).where(Installment.order_id == order.id)
-    )
-    if installment is not None:
-        output.installment = schemas.OrderInstallmentOut.model_validate(installment)
-        schedules = db.scalars(
-            select(InstallmentSchedule)
-            .where(InstallmentSchedule.installment_id == installment.id)
-            .order_by(InstallmentSchedule.period_no)
-        ).all()
-        output.installment_schedule = [
-            schemas.OrderScheduleOut.model_validate(item) for item in schedules
-        ]
-    attachment_refs = [("order", order.order_no)]
-    attachment_refs.extend(("order_event", event.event_no) for event in events)
-    if installment is not None:
-        attachment_refs.append(("installment", installment.inst_no))
-    if user.has(PERM_FINANCE_READ):
-        attachment_refs.extend(("cashflow", item.flow_no) for item in cashflows)
-    if attachment_refs:
-        output.attachments = [
-            schemas.AttachmentOut.model_validate(item)
-            for item in db.scalars(
-                select(Attachment)
-                .where(
-                    Attachment.deleted_at.is_(None),
-                    or_(*(
-                        (Attachment.entity_type == entity_type)
-                        & (Attachment.entity_id == entity_id)
-                        for entity_type, entity_id in attachment_refs
-                    )),
-                )
-                .order_by(Attachment.created_at, Attachment.id)
-            ).all()
-        ]
-    if user.has(PERM_AUDIT_READ):
-        audit_rows = db.scalars(
-            select(AuditLog)
-            .where(
-                AuditLog.entity_type == "order",
-                AuditLog.entity_id == order.order_no,
-            )
-            .order_by(AuditLog.id)
-        ).all()
-        output.audit = [
-            schemas.OrderAuditOut.model_validate(
-                {
-                    "id": item.id,
-                    "action": item.action,
-                    "entity_type": item.entity_type,
-                    "entity_id": item.entity_id,
-                    "actor": item.actor,
-                    "reason": item.reason,
-                    "request_id": item.request_id,
-                    "occurred_at": item.occurred_at,
-                }
-            )
-            for item in audit_rows
-        ]
-    return output
-
-
-def _order_list_payload(db: Session, orders: list) -> list[dict]:
-    """组装工作台摘要，避免列表页为每一行再请求详情。"""
-    # 表单字段自定义值落订单 form_extra 列，列表直接从行数据回显。
-    extra_values = {
-        item.id: dict(item.form_extra or {}) for item in orders
-    }
-    order_ids = [item.id for item in orders]
-    account_ids = [item.account_id for item in orders if item.account_id is not None]
-    accounts = (
-        {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
-        if account_ids else {}
-    )
-
-    parties: dict[int, tuple[str, str, str | None, str, datetime]] = {}
-    if order_ids:
-        for role, customer in db.execute(
-            select(OrderCustomerRole, Customer)
-            .join(Customer, Customer.id == OrderCustomerRole.customer_id)
-            .where(OrderCustomerRole.order_id.in_(order_ids))
-        ).all():
-            parties.setdefault(role.order_id, (customer.display_name, role.role, customer.source, customer.created_by, customer.created_at))
-        for role, counterparty in db.execute(
-            select(OrderCounterpartyRole, Counterparty)
-            .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
-            .where(OrderCounterpartyRole.order_id.in_(order_ids))
-        ).all():
-            parties.setdefault(role.order_id, (counterparty.display_name, role.role, counterparty.source, counterparty.created_by, counterparty.created_at))
-
-    events_by_order: dict[int, list[OrderEvent]] = {}
-    if order_ids:
-        for event in db.scalars(
-            select(OrderEvent)
-            .where(OrderEvent.order_id.in_(order_ids), OrderEvent.is_posted.is_(True))
-            .order_by(OrderEvent.occurred_on.desc(), OrderEvent.id.desc())
-        ).all():
-            events_by_order.setdefault(event.order_id, []).append(event)
-
-    installments = (
-        {item.order_id: item for item in db.scalars(select(Installment).where(Installment.order_id.in_(order_ids))).all()}
-        if order_ids else {}
-    )
-
-    payloads: list[dict] = []
-    for order in orders:
-        account = accounts.get(order.account_id)
-        snapshot = order.account_snapshot or {}
-        events = events_by_order.get(order.id, [])
-        installment = installments.get(order.id)
-        latest = events[0] if events else None
-        party = parties.get(order.id)
-        payloads.append({
-            "id": order.id,
-            "order_no": order.order_no,
-            "order_type": order.order_type,
-            "capital_type": order.capital_type,
-            "trade_date": order.trade_date,
-            "account_id": order.account_id,
-            "status": order.status,
-            "link_status": order.link_status,
-            "owner_id": order.owner_id,
-            "note": order.note,
-            "extra_values": extra_values.get(order.id, {}),
-            "created_at": order.created_at,
-            # DFQ 使用订单文本快照；HS / TH / DG 从库存实体展示安全的业务字段，
-            # 不把快照中的 game_password 原样带入列表响应。
-            "account_game_type": (account.game_type if account else None) or snapshot.get("game_type"),
-            "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),
-            "account_channel_region": (account.channel_region if account else None) or snapshot.get("channel_region"),
-            "account_business_mode": account.business_mode if account else None,
-            "account_platform": account.platform if account else snapshot.get("platform"),
-            "account_status": account.status if account else None,
-            "party_name": party[0] if party else None,
-            "party_role": party[1] if party else None,
-            "party_source": party[2] if party else None,
-            "party_created_by": party[3] if party else None,
-            "party_created_at": party[4] if party else None,
-            "event_total": sum((event.amount for event in events), 0),
-            "last_event_type": latest.event_type if latest else None,
-            "last_event_amount": latest.amount if latest else None,
-            "last_event_on": latest.occurred_on if latest else None,
-            "installment_principal": installment.principal if installment else None,
-            "installment_paid": installment.paid_amount if installment else None,
-            "installment_periods": installment.periods if installment else None,
-            "installment_status": installment.status if installment else None,
-        })
-    return payloads
 
 
 @router.get("/orders", response_model=PageOut[schemas.OrderListOut])

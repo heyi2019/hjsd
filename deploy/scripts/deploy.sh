@@ -100,12 +100,9 @@ else
 fi
 
 echo "==> 执行数据库迁移"
-# 迁移已压平为单基线 0001：存量库若仍带旧版本戳（0002~0023），
-# `alembic upgrade head` 会报 Can't locate revision 并退出。
-# 与 Dockerfile CMD 保持同一兜底：upgrade 失败时交 stamp_baseline.py,
-# 只有确认「库结构与 ORM 等价」才对齐版本戳；结构真的落后则打印缺口清单并报错退出
-# （绝不把落后的库伪装成已迁移）。首次部署空库时 upgrade 直接成功，不会走到兜底。
-docker compose run --rm backend sh -c 'alembic upgrade head || python scripts/stamp_baseline.py'
+# 保留完整的 0001→0071 迁移链，兼容 ECS 现有 PostgreSQL 的 0064 版本戳；
+# 不得在迁移失败时用 stamp_baseline.py 掩盖错误，否则会把结构未完成的库伪装成已升级。
+docker compose run --rm backend alembic upgrade head
 
 # 数据库版本「随推送版本来」：迁移完成后把当前发布版本戳记进 db_version 审计表，
 # 可追溯「哪个发布版本动了库、落到哪个 schema 态」。版本优先级：脚本 --version >

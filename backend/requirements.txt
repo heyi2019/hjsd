@@ -7,6 +7,7 @@ anyio==4.14.0
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
 alembic>=1.13.0
+psycopg[binary]>=3.2.0
 pydantic==2.9.2
 pydantic-settings==2.4.0
 # FastAPI 解析 multipart/form-data 的隐式依赖，卸载后上传类端点会 500，勿删

@@ -82,7 +82,7 @@ class Order(Base, AuditMixin):
             name="order_commission_type_valid",
         ),
         CheckConstraint(
-            "account_snapshot IS NULL OR account_snapshot = 'null' "
+            "account_snapshot IS NULL OR CAST(account_snapshot AS TEXT) = 'null' "
             "OR order_type IN ('HS', 'TH', 'DG', 'DFQ')",
             name="order_account_snapshot_type_valid",
         ),

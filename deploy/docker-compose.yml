@@ -4,6 +4,23 @@
 #   docker compose build
 #   docker compose up -d
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-heijin_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-erp_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - erp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   backend:
     # 镜像 tag 取 deploy.sh 从 backend/app/version.py 解析出的版本；本地直接 compose up 时回落 latest。
     image: heijin-backend:${APP_VERSION:-latest}
@@ -13,7 +30,10 @@ services:
     env_file:
       - .env            # 生产环境变量（含 JWT_SECRET_KEY / DATABASE_URL / CORS_ORIGINS）
     volumes:
-      - erp_db:/app/data   # 当前正式库为 ECS 上的 SQLite v1 文件
+      - erp_db:/app/data   # 保留原 SQLite 备份与附件；正式业务库已切到 PostgreSQL
+    depends_on:
+      db:
+        condition: service_healthy
     expose:
       - "8123"
     restart: unless-stopped
@@ -48,3 +68,4 @@ services:
 
 volumes:
   erp_db:
+  erp_pgdata:

@@ -25,20 +25,21 @@ from pathlib import Path
 # 让脚本在「任意调用目录」（本地直跑 / 容器内 / docker compose run）都能 import app 包。
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Text, create_engine, text
 
 from app.core.settings import get_settings  # noqa: E402
 from app.version import __version__ as CODE_VERSION  # noqa: E402
 
-_DDL = """
-CREATE TABLE IF NOT EXISTS db_version (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    app_version       VARCHAR(32)  NOT NULL,
-    alembic_revision  VARCHAR(64)  NOT NULL,
-    applied_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    notes             TEXT
+_AUDIT_METADATA = MetaData()
+_DB_VERSION = Table(
+    "db_version",
+    _AUDIT_METADATA,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("app_version", String(32), nullable=False),
+    Column("alembic_revision", String(64), nullable=False),
+    Column("applied_at", DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+    Column("notes", Text, nullable=True),
 )
-"""
 
 
 def _resolve_app_version(arg: str | None) -> str:
@@ -70,8 +71,8 @@ def main() -> int:
     engine = create_engine(settings.sqlalchemy_url)
 
     # 防御性建表：正常部署顺序下已由迁移 0003 建好，此处兜底避免脚本前置依赖过强。
-    with engine.begin() as conn:
-        conn.execute(text(_DDL))
+    # 使用 SQLAlchemy 元数据而不是 SQLite 专用 AUTOINCREMENT，保证 PostgreSQL 也可执行。
+    _AUDIT_METADATA.create_all(engine, checkfirst=True)
 
     app_version = _resolve_app_version(args.version)
     alembic_revision = _resolve_revision(engine, args.revision)

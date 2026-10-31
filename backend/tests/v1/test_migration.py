@@ -234,13 +234,13 @@ def test_distribution_installment_types_are_merged_into_stock_sale():
     """历史提号/代挂分期迁移后统一按库存分期出售处理（压平后逻辑并入 0002_squash）。"""
     import importlib.util
 
-    migration_path = BACKEND_DIR / "alembic" / "versions" / "0002_squash_0001_to_head.py"
-    spec = importlib.util.spec_from_file_location("migration_squash", migration_path)
+    migration_path = BACKEND_DIR / "alembic" / "versions" / "0056_merge_distribution_installment_types.py"
+    spec = importlib.util.spec_from_file_location("migration_0056", migration_path)
     migration = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(migration)
 
-    assert migration.m56_LEGACY_CONTRACT_TYPES == ("PICKUP_SALE", "CONSIGNMENT_SALE")
+    assert migration.LEGACY_CONTRACT_TYPES == ("PICKUP_SALE", "CONSIGNMENT_SALE")
     source = migration_path.read_text(encoding="utf-8")
     assert "SET contract_type = 'STOCK_SALE'" in source
     assert "WHERE contract_type IN ('PICKUP_SALE', 'CONSIGNMENT_SALE')" in source

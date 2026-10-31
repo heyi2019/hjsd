@@ -5,7 +5,7 @@
 
 本迁移仅建表（审计历史），不写死任何版本值；具体版本在部署时由
 `scripts/stamp_db_version.py` 读取当前 APP_VERSION 与 alembic head 后插入。
-down_revision = 0002_squash（压平终态）；本文件为新的唯一 head。
+down_revision = 0071_rename_account_waiting_status；本文件为新的唯一 head。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0003_db_version_audit"
-down_revision = "0002_squash"
+down_revision = "0071_rename_account_waiting_status"
 branch_labels = None
 depends_on = None
 

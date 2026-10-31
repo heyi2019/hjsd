@@ -29,7 +29,7 @@ class OptionSet(Base, AuditMixin):
     group: Mapped[str] = mapped_column(String(64), nullable=False, server_default="GENERAL")
     # editable=False 表示后端死枚举（只读，值受 CHECK 约束），True 为纯字典可增删改
     editable: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=sa.text("1")
+        Boolean, nullable=False, server_default=sa.true()
     )
     options: Mapped[list | None] = mapped_column(JSON, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -31,6 +31,40 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V1.0.1
+
+**发布时间：** 2026-10-31 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.1` |
+| 前端构建版本 | `1.0.1` |
+| 后端 API 版本 | `1.0.1`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | Alembic `0071`（生产 PostgreSQL 当前从 `0064` 继续升级） |
+
+### 本次内容
+
+V1.0.0 之后的维护性发布，修复依赖锁与 CI/CD 标签链路，使全自动 CD（推 `test` → 4 个 CI gate 全绿 → 自动合 `main` → 自动部署 + 锁版 tag）真正闭环。
+
+修复项：
+
+- **依赖锁修复**：`backend/requirements.lock.txt` 中 `websockets==17.4` 在部署用的阿里云 PyPI 镜像上缺货（仅到 17.3），导致 `pip install -r requirements.lock.txt` 构建失败、部署中断。降级为 `websockets==17.3`（与 uvicorn 约束兼容）修复。
+- **CI/CD 标签链路修复**（让「自动合 main 后自动部署 + 锁版 tag」闭环）：
+  - `auto-merge-test-to-main.yml` 合并 `main` 后，因默认 `GITHUB_TOKEN` 推送不点燃下游 push 事件，改用 `gh workflow run deploy-production.yml --ref main` 显式触发部署。
+  - `deploy-production.yml` 的 `Tag release` 步骤补充 git 提交者身份（避免 `empty ident name` 打 tag 失败），并将 tag 名由 `env:` 字面量 `v${APP_VERSION}` 改为 shell 内展开，修复打出非法 tag 名 `v${APP_VERSION}` 的缺陷，正确生成 `v1.0.1`。
+- **版本一致性**：同步 `.env.example` 的 `APP_VERSION=1.0.1`，消除与 `version.py` 漂移；前后端三处版本经 `scripts/ops/bump_version.sh` 统一为 `1.0.1`，CI 版本一致性测试通过。
+
+### 发布前检查
+
+- 4 个 CI gate（lint / frontend / coverage / frontend-e2e）在 `test` 全绿；`auto-merge` 成功合入 `main`；`deploy-production` 部署成功并打 `v1.0.1` tag。
+- 生产 `docker images | grep heijin-backend` 显示 `1.0.1`；`curl /api/v1/health` 的 `app_version` 为 `1.0.1`。
+
+### 回滚
+
+- 与 V1.0.0 同机制；回退目标为 `v1.0.1` 镜像 tag + 部署前数据库备份。
+
+---
+
 ## V1.0.0（首发）
 
 **发布时间：** 2026-10-27 CST（Asia/Shanghai）

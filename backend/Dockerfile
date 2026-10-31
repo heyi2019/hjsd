@@ -45,10 +45,8 @@ COPY . .
 
 EXPOSE 8123
 
-# 启动时：先执行迁移（幂等），再起服务。
+# 启动时：先执行完整迁移链（幂等），再起服务。
 # DATABASE_URL 等由 compose 的 env_file 注入，优先级高于任何 .env。
-# 迁移已压平为单基线 0001，旧库（版本戳 0002~0023）无法再 upgrade；
-# 故 upgrade 失败时交给 stamp_baseline.py：只有确认库结构与 ORM 等价才对齐版本戳，
-# 结构真的落后则报错退出，避免把缺表的库伪装成已迁移。
+# 迁移失败必须阻止服务启动，不能用 stamp_baseline.py 把未完成的结构伪装成已升级。
 # 注意：下面的 python3 显式写出（不仅依赖 python 软链），避免软链若被移除时启动直接失败。
-CMD ["sh", "-c", "alembic upgrade head || python3 scripts/stamp_baseline.py && uvicorn app.main:app --host 0.0.0.0 --port 8123 --workers 2"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8123 --workers 2"]

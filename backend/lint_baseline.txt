@@ -22,3 +22,4 @@ tests/v1/conftest.py :: 'app.domain.trade' imported but unused
 tests/v1/test_backup_restore.py :: 'app.domain.foundation' imported but unused
 tests/v1/test_backup_restore.py :: 'app.domain.parties' imported but unused
 tests/v1/test_backup_restore.py :: 'app.domain.trade' imported but unused
+app/orders/mutations.py :: '.cancellation_model.cancel_order' imported but unused

@@ -23,6 +23,7 @@ from app.domain.enums import (
     AuditAction,
 )
 
+from .cancellation_model import cancel_order  # re-exported through orders.service
 from ._shared import (
     _audit_value,
     get_order,

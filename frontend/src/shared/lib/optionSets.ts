@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { optionSetsApi, type OptionItem } from "../api/catalog";
 
-export type OptionSetMap = Record<string, OptionItem[]>;
+type OptionSetMap = Record<string, OptionItem[]>;
 
 let cache: OptionSetMap | null = null;
 let inflight: Promise<OptionSetMap> | null = null;
@@ -40,7 +40,7 @@ export function clearOptionSetsCache(): void {
 }
 
 /** 组件用：返回全量 code→options 映射（加载中为 null）。 */
-export function useOptionSets(): OptionSetMap | null {
+function useOptionSets(): OptionSetMap | null {
   const [map, setMap] = useState<OptionSetMap | null>(cache);
   useEffect(() => {
     let active = true;
@@ -68,7 +68,7 @@ export function useOptionSet(code: string): OptionItem[] | null {
  * 未加载完成或未命中返回 null，调用方回落原硬编码映射（保证零行为变化）。
  * 用于表格 render 这类非 hook 上下文（`labels.ts` 的展示映射、StatusTag 等）。
  */
-export function optionLabelSync(code: string, value: string | null | undefined): string | null {
+function optionLabelSync(code: string, value: string | null | undefined): string | null {
   if (!value || !cache) return null;
   const found = (cache[code] ?? []).find((item) => item.value === value);
   return found?.label ?? null;

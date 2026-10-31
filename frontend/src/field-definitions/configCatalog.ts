@@ -21,9 +21,9 @@ import {
   usersApi,
 } from "../shared/api/catalog";
 
-export type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
+type ConfigGroupCode = "FIELD" | "MASTER" | "POLICY" | "GOV" | "ORG" | "OPS";
 
-export interface SettingsItemMeta {
+interface SettingsItemMeta {
   /** 与 SettingsPage 的 Tab key 一致，用于跳转。 */
   key: string;
   label: string;

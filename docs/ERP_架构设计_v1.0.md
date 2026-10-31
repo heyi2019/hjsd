@@ -41,7 +41,7 @@ frontend/src/
 ├── shared/ui/            # antd-adapter.css
 ├── system-shell.css      # 工作台外壳样式
 ├── app/                  # AppShell、导航、路由守卫（按参考工程组织）
-├── pools/ orders/ accounts/ installments/ rebates/ quality/ reporting/
+├── pools/ stocks/ orders/ installments/ rebates/ quality/ reporting/
 │   ├── pages/            # 各领域页面
 │   ├── components/       # 领域组件
 │   └── index.ts          # 领域出口
@@ -52,7 +52,13 @@ frontend/src/
 
 ## 后端复用规范
 
-后端目录按 `business-line-erp/backend/app` 作为目标结构：`core`、`foundation`、`customers`、`finance`、`orders`、`accounts`、`installments`、`rebates`、`reporting`、`quality`、`migration` 十一个领域包，以及 `tests/api`、`tests/domain`、`tests/services` 和 `database/migrations`。现有 `models_new` / `services_new` 仅为过渡实现，开发时按领域迁入；不复制参考工程的业务模型、权限、多组织或外部集成代码。
+后端目录 `backend/app` 的**实际结构**（2026-11-01 实测）：
+
+- 基础设施：`core/`（settings / database / money / errors / security / audit / numbering / state_machine）、`domain/`（全部 ORM 与枚举）
+- 领域包：`foundation`、`parties`、`orders`（含 `form_fields_router`）、`stocks`、`value_added_services`、`finance`、`reporting`、`policy`、`quality`、`notifications`、`imports`、`audit`、`auth`（含 `admin_router` / `teams_router`）、`attachments`、`options`、`lists`、`search`
+- 两个易误记的命名：**分期域包名是 `value_added_services`**，路由前缀仍为 `/installments`，不存在 `app/installments/`；**人员与团队没有独立包**，路由挂在 `auth` 包内
+- 测试在 `backend/tests/v1`（单一目录，不存在 `tests/api|domain|services` 分层）；迁移在 `backend/alembic/versions`
+- 早期过渡实现 `models_new` / `services_new` 已全部迁入领域包并删除；不复制参考工程的业务模型、权限、多组织或外部集成代码
 
 ## 核心关系
 
@@ -67,7 +73,7 @@ erDiagram
   ORDER ||--o{ ORDER_CUSTOMER_ROLE : has
   COUNTERPARTY ||--o{ ORDER_COUNTERPARTY_ROLE : participates
   ORDER ||--o{ ORDER_COUNTERPARTY_ROLE : has
-  ORDER ||--o| INSTALLMENT : "HS STOCK_SALE or DFQ ADVANCE_PURCHASE"
+  ORDER ||--o| INSTALLMENT : "HS STOCK_SALE / TH PICKUP_SALE / DG CONSIGNMENT_SALE"
   INSTALLMENT ||--o{ INSTALLMENT_SCHEDULE : plans
   ORDER ||--o| REBATE_RECORD : sources
   REBATE_RECORD ||--o{ REBATE_SETTLEMENT : settles
@@ -78,11 +84,11 @@ erDiagram
 | 领域 | 核心表 | 规则 |
 |---|---|---|
 | 资金 | pools / cashflow / deposits | OWNED/CUSTODY/THIRD_PART；押金不计损益；新 INTERNAL 成对 |
-| 订单 | order_type_defs / orders / order_events | HS/TH/DG/DFQ 为首批业务；订单汇总由事件派生 |
-| 账号 | accounts | HS 关联库存账号；DFQ 只保留订单账号文本快照、不关联库存；渠道多值；BUY+COST 按业务规则累加成本 |
+| 订单 | order_type_defs / orders / order_events | HS/TH/DG 为首批业务；订单汇总由事件派生 |
+| 账号 | stocks | HS/TH/DG 均关联库存账号；`stock_no` 为 KU_ 五位编号；`game_account` 不唯一（可反复收购）；`status` 与 `inventory_status` 两条轴；BUY+COST 按业务规则累加成本 |
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注等复购资料；客户可跨订单多角色；联系方式非唯一 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台；与客户分离，按业务角色关联 |
-| 分期 | installments / installment_schedules | `installments` 支持 HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE；一单一合约，HS 从库存账号取数、DFQ 从订单账号快照取数；`installment_schedules` 为期次计划明细；PAYMENT→换绑→DELIVER |
+| 分期 | installments / installment_schedules | `installments` 三类合约 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，均从所属订单取库存信息、不单独存 account_id；`installment_schedules` 为期次明细；PAYMENT→换绑→DELIVER |
 | 返点 | rebate_records / rebate_settlements | HS0001-RB01 返点记录，HS0001-RB01-CF-01 分次到账 |
 | 经营规则 | policy_definitions / policy_versions / order_profit_allocations | 费率、提成、分期、跌价等版本化；已发生业务保存快照 |
 | 活字段 | field_definitions / entity_extra_values | 可增、停用、排序；历史值不可删除 |
@@ -94,7 +100,7 @@ erDiagram
 | EventService | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL、池路由、编号和现金流派生；DELIVER 不派生现金流 |
 | LedgerService | 池余额、库存、经营损益、权益、划转对称性 |
 | TransferService | 新跨池划转一次生成两条流水和同一 transfer_id |
-| InstallmentService | HS 分期出售和 DFQ 代分期合约、应收/已收/剩余、逾期及断分期处置；结清后生成无现金流 DELIVER 释放库存 |
+| InstallmentService | 三类分期合约、应收/已收/剩余、逾期与违约、回收/转售处置；结清后生成无现金流 DELIVER 释放库存 |
 | RebateService | 返点记录、手续费、分次到账和来源订单 |
 | QualityService | 未关联、单边划转、库存缺账号、呆滞、断分期异常 |
 | PolicyService（P1） | 经营规则版本、生效区间、快照、多人利润分配与手工覆盖审计 |

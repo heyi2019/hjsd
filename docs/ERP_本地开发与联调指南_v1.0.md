@@ -1,6 +1,6 @@
 # ERP 本地开发与联调指南 v1.0
 
-> 本文是工程启动契约。业务规则以 [PRD](ERP_PRD_v1.2_当前实现版.md)、[ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)、[数据字典](ERP_数据字典_v1.0.md) 为准；本文不覆盖业务口径。
+> 本文是工程启动契约。业务规则以 [PRD](ERP_PRD_v1.2_当前实现版.md)、[ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)、[数据字典](ERP_数据字典_v2.0.md) 为准；本文不覆盖业务口径。
 
 ## 1. 前置条件
 
@@ -22,7 +22,7 @@
 cd backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
+.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8123
 ```
 
 如果未手动激活虚拟环境，启动时使用 `.venv/bin/python -m uvicorn ...`；不要使用系统 Python 直接执行后端脚本。
@@ -37,7 +37,7 @@ npm ci
 npm run dev
 ```
 
-浏览器访问 Vite 输出的地址（默认 `http://localhost:5173`）。前端请求基址只从 `VITE_API_BASE` 读取，不得散落硬编码 URL；本地默认后端端口为 `8123`。
+浏览器访问 Vite 输出的地址。**前端 dev 端口未在 `vite.config.ts` 中固定**，`npm run dev`（即 `vite --host`）默认落在 5173，需要多项目并存时用 `npm run dev -- --port 5188` 之类显式指定；`host` 已设为 `0.0.0.0`，局域网可直接访问。前端请求统一走同源 `/api/v1`，由 Vite 代理到 `127.0.0.1:${VITE_BACKEND_PORT:-8123}`，不得散落硬编码 URL。
 
 ### 测试与构建
 

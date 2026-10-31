@@ -4,7 +4,7 @@
 
 ## 1. 建表顺序
 
-`pools` → `order_type_defs` → `order_type_pools` → `policy_definitions` → `policy_versions` → `customers` / `counterparties` → `accounts` → `orders` → `order_customer_roles` / `order_counterparty_roles` → `order_profit_allocations` → `order_events` → `cashflow` → `installments` → `installment_schedules` → `rebate_records` → `rebate_settlements` → `deposits` → `field_definitions` → `entity_extra_values`。
+`pools` → `order_type_defs` → `order_type_pools` → `policy_definitions` → `policy_versions` → `customers` / `counterparties` → `stocks` → `orders` → `order_customer_roles` / `order_counterparty_roles` → `order_profit_allocations` → `order_events` → `cashflow` → `installments` → `installment_schedules` → `rebate_records` → `rebate_settlements` → `deposits` → `order_form_fields` / `form_extra`。
 
 ## 2. DDL 约束清单
 
@@ -13,7 +13,7 @@
 | pools | `id`, `code UNIQUE` | ownership: OWNED/CUSTODY/THIRD_PART；有流水禁止删除 |
 | order_type_defs | `id`, `code UNIQUE` | capital_type 为已登记类型 |
 | order_type_pools | `UNIQUE(order_type_id, portion)` | FK 业务、池 |
-| accounts | `id`, `inventory_no UNIQUE`, `game_account UNIQUE NULL` | `inventory_no` 是 ACC 库存编号；业务归属与入库类型由 `business_mode` / `inventory_type` 表示；手机号非唯一；不保留 `region`、`channels` 遗留字段 |
+| stocks | `id`, `stock_no`（KU_ 五位） | `stock_no` 为库存编号语义键；`game_account` **不唯一**（同一账号可反复收购，每次独立实体）；业务归属与来源由 `business_mode` / `inventory_type` 表示；手机号非唯一 |
 | customers | `id`, `customer_no UNIQUE` | 联系方式非唯一；停用客户不得作为新订单参与方 |
 | order_customer_roles | `id`, `UNIQUE(order_id, customer_id, role)` | FK order/customer；角色为 SELLER/BUYER/CONSIGNOR/INSTALLMENT_CUSTOMER |
 | counterparties | `id`, `counterparty_no UNIQUE` | type 为 PEER/SUPPLIER/PLATFORM；停用合作方不得作为新订单参与方 |
@@ -21,7 +21,7 @@
 | orders | `id`, `order_no UNIQUE` | FK account nullable；order_type 必须存在主数据 |
 | order_events | `id`, `event_no UNIQUE` | FK order/pool/offset_event；金额>0 |
 | cashflow | `id`, `flow_no UNIQUE`, `order_id NULL`, `order_event_id UNIQUE NULL`, `deposit_id NULL` | pool 必填；来源订单与押金可直接追溯；新 INTERNAL 需 transfer_id |
-| installments | `id`, `inst_no UNIQUE`, `order_id UNIQUE` | `contract_type` 为 STOCK_SALE/ADVANCE_PURCHASE；`delivery_mode` 为 PLATFORM_OPERATOR/CUSTOMER_SELF；前者仅已买入 HS，后者仅 DFQ；总应收勾稽 |
+| installments | `id`, `inst_no UNIQUE`, `order_id UNIQUE` | `contract_type` 为 STOCK_SALE/PICKUP_SALE/CONSIGNMENT_SALE；`delivery_mode` 为 PLATFORM_OPERATOR/CUSTOMER_SELF；三类合约分别仅接受 HS / TH / DG 订单；总应收勾稽 |
 | installment_schedules | `id`, `UNIQUE(installment_id, period_no)` | FK installments；期次应收/实收/到期日/状态；支持部分收款与逾期 |
 | rebate_records | `id`, `rebate_no UNIQUE` | 新数据 source_order 必填 |
 | rebate_settlements | `id`, `settlement_no UNIQUE`, `cashflow_id UNIQUE` | gross - fee = net |
@@ -38,12 +38,12 @@
 - `orders(order_type, trade_date)`、`orders(link_status)`；
 - `customers(phone)`、`customers(wechat)`、`customers(qq)`、`counterparties(type,status)`；
 - `order_events(order_id, event_type, occurred_on)`；
-- `accounts(status)`、`rebate_records(source_order_id)`、`installments(status,next_pay_date)`、`installment_schedules(installment_id,due_on,status)`。
+- `stocks(status, inventory_status)`、`rebate_records(source_order_id)`、`installments(status,next_pay_date)`、`installment_schedules(installment_id,due_on,status)`。
 
 ## 4. 历史参考迁移流程（P2）
 
 1. 备份旧 `heijin.db` 和原始 JSON；数据导入只写新 ERP 的参考记录区，不覆盖新业务数据。
-2. 写种子池 `HJ_INVEST`、`HJ_PROFIT`，写 HS/TH/DG/DFQ 和默认路由。
+2. 写种子池 `HJ_INVEST`、`HJ_PROFIT`，写 HS/TH/DG 和默认路由。
 3. 迁移账户、主业务订单、返点、分期、需求、现金流；每阶段输出行数与异常数。
 4. 订单/返点/分期无可靠关联时分别标 UNLINKED/ORPHAN；不得自动匹配。
 5. “八月利润转入”写 `UNLINKED_TRANSFER`；不得补造源池流水。

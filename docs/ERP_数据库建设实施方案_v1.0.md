@@ -1,6 +1,6 @@
 # 宜游轩 ERP · 数据库建设实施方案 v1.0
 
-> 版本：v1.0 ｜ **依据**：[PRD v1.2](ERP_PRD_v1.2_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md) → [DDL 与迁移方案](ERP_数据库DDL与迁移方案_v1.0.md) / [数据字典](ERP_数据字典_v1.0.md)。数据导入仅为 P2。
+> 版本：v1.0 ｜ **依据**：[PRD v1.2](ERP_PRD_v1.2_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md) → [DDL 与迁移方案](ERP_数据库DDL与迁移方案_v1.0.md) / [数据字典](ERP_数据字典_v2.0.md)。数据导入仅为 P2。
 
 ## 1. 建设目标与现状
 
@@ -23,8 +23,8 @@
 
 1. 初始化迁移框架、环境配置、SQLite 外键和基础审计字段。
 2. 建 `pools`、`order_type_defs`、`order_type_pools`、`customers`、`counterparties` 等主数据；客户与合作方分别按 `CUS`、`CP` 编号。
-3. 建 `accounts`、`orders`、`order_customer_roles`、`order_counterparty_roles`、`order_events`、`cashflow`，实现订单客户/合作方多角色关联与事件→现金流一对一。
-4. 建 `installments` 与 `installment_schedules`：以 `contract_type` 区分 HS 的 STOCK_SALE 与 DFQ 的 ADVANCE_PURCHASE；一单一合约，期次计划支持 PAYMENT、逾期、换绑、断分期处置，结清交付以无现金流 DELIVER 记录。
+3. 建 `stocks`、`orders`、`order_customer_roles`、`order_counterparty_roles`、`order_events`、`cashflow`，实现订单客户/合作方多角色关联与事件→现金流一对一。
+4. 建 `installments` 与 `installment_schedules`：以 `contract_type` 区分 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，期次计划支持 PAYMENT、逾期、换绑、断分期处置，结清交付以无现金流 DELIVER 记录。
 5. 建 `rebate_records`、`rebate_settlements`，支持 `HS0001-RB01` 与分次到账。
 6. 建 `deposits`，关联押金缴纳、退回的现金流。
 7. 建 `field_definitions`、`entity_extra_values`，实现非核算活字段。
@@ -36,10 +36,10 @@
 |---|---|---|
 | 资金池 | pools / cashflow | 每笔现金流必有 pool；池 code 不改；有流水不删 |
 | 订单 | orders / order_events | 订单号、事件号不改不复用；有资金事件派生唯一 cashflow |
-| 账号 | accounts | `inventory_no` 是 ACC 库存编号；`game_account` 只是游戏账号文本；HS 买入必须关联库存账号，DFQ 买入只保留订单账号快照，不关联库存账号；手机号不作关联键 |
+| 账号 | stocks | `stock_no` 是 KU_ 五位库存编号；`game_account` 只是游戏账号文本且不唯一；HS/TH/DG 均关联库存账号；手机号不作关联键 |
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注为客户资料；联系方式非唯一；新建返回重复候选，管理员合并后来源置 `MERGED`；停用/合并后不可新关联，历史关系保留 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台与客户分离；仅允许匹配的业务角色参与订单；停用后不可新关联 |
-| 分期 | installments / installment_schedules | `ADVANCE_PURCHASE` 仅 DFQ，`STOCK_SALE` 仅已买入 HS；一单一合约；期次计划与总应收、已收、剩余应收勾稽 |
+| 分期 | installments / installment_schedules | `STOCK_SALE` 仅 HS、`PICKUP_SALE` 仅 TH、`CONSIGNMENT_SALE` 仅 DG；一单一合约；期次计划与总应收、已收、剩余应收勾稽 |
 | 返点 | rebate_records / rebate_settlements | 新归集必须来源订单；结算毛额−手续费=净额 |
 | 押金 | deposits | 可退押金不进经营损益；缴退均关联现金流 |
 | 活字段 | field_definitions / entity_extra_values | 不得覆盖固定核算字段；有历史值只能停用 |
@@ -65,7 +65,7 @@
 ## 7. M0 验收清单（新业务 P0）
 
 - [ ] 所有表、外键、唯一索引、检查约束由迁移脚本创建。
-- [ ] 新增 HS/TH/DG/DFQ、资金池、路由无需改 Schema。
+- [ ] 新增 HS/TH/DG、资金池、路由无需改 Schema。
 - [ ] 事件、现金流、订单、账号、分期、返点、押金、客户/合作方参与关系、活字段写入均有事务测试。
 - [ ] 新 INTERNAL 逐对相等；可退押金不进入损益；TH 的 PICKUP 实体可追踪但不计入自营库存资产。
 

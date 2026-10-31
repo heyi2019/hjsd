@@ -388,7 +388,9 @@ export function InventoryPanel({ refreshKey = 0, onOrdersChanged, onNavigate }: 
       title: "未售时长",
       width: 68,
 
-      key: "inventoryAge",
+      // key 必须与 scopes.py 的 ListColumn 注册（inventory_age）一致，
+      // 否则 arrangeColumns 按 columnKey 匹配不到，隐藏/调序配置对它无效。
+      key: "inventory_age",
       render: (_value, row) => {
         const age = inventoryAge(row);
         return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);

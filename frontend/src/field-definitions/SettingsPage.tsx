@@ -1,44 +1,45 @@
-/** 设置页入口：只负责响应式布局与主数据/管理面板编排。 */
-import { Tabs } from "antd";
-import { useEffect, useState, type ReactElement } from "react";
-import { AppearancePanel } from "../app/AppearancePanel";
-import { ImportWorkbench } from "../imports/ImportWorkbench";
-import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
-import { TeamsPanel } from "../users/TeamsPanel";
-import { UsersPanel } from "../users/UsersPanel";
-import { useSession } from "../shared/state/session";
-import { BusinessDictionaryPanel } from "./panels/BusinessDictionaryPanel";
-import { ConfigAuditPanel } from "./panels/ConfigAuditPanel";
-import { GameTypeSettingsPanel } from "./panels/GameTypeSettingsPanel";
-import { IntermediaryPlatformSettingsPanel } from "./panels/IntermediaryPlatformSettingsPanel";
-import { OrderTypesPanel } from "./panels/OrderTypesPanel";
-import { OrderFormFieldsPanel } from "./panels/OrderFormFieldsPanel";
-import { ListColumnsPanel } from "./panels/ListColumnsPanel";
-import { PartySourceSettingsPanel } from "./panels/PartySourceSettingsPanel";
-import { PoolsAndRoutesPanel } from "./panels/PoolsAndRoutesPanel";
-import { SequencesPanel } from "./panels/SequencesPanel";
+/** 设置页入口：仅保留「配置中心」与少数非业务配置类页签。
+ * 原业务配置类独立页签（业务类型 / 表单字段 / 列表字段 / 编号序列 / 资金池 /
+ * 游戏与渠道 / 中介业务配置 / 参与方来源）已聚合进「配置中心」（用户裁决 2026-10-31）。
+ *
+ * 第一性原理：标签 / 权限 / 只读一律取自 configCatalog.ts 单一事实源，组件挂载复用
+ * panels/panelRegistry.tsx，消除与注册表重复的硬编码。仅两处必要的显式逻辑：
+ *   1. 「配置中心」为容器页签（渲染 ConfigCenterPanel），非注册表项，置于业务字典之后；
+ *   2. 「导入」页签需要父级 batchId 状态以跨 Tab 保留批次选择，单独特判（其余通用项走 PANEL_REGISTRY）。
 
-/** 子面板可跳到任意设置 Tab。 */
-type TabNavigate = (key: string, params?: { scope?: string }) => void;
+ * 注：账期锁定（period-locks）已由 dev 彻底移除（面板与注册表项均删除），
+ * 故 SETTINGS_TAB_ORDER 不含该项。 */
+import { Tabs } from "antd";
+import { useEffect, useState } from "react";
+import { useSession } from "../shared/state/session";
+import { SETTINGS_ITEMS } from "./configCatalog";
+import { PANEL_REGISTRY } from "./panels/panelRegistry";
+import { ConfigCenterPanel } from "./panels/ConfigCenterPanel";
+import { ImportWorkbench } from "../imports/ImportWorkbench";
+
 interface TabItem {
   key: string;
   label: string;
-  render: (nav: TabNavigate) => ReactElement;
+  render: () => React.ReactElement;
 }
+
+/** 设置页左侧页签顺序（不含容器类「配置中心」）；标签 / 权限 / 只读取自 configCatalog。 */
+const SETTINGS_TAB_ORDER = [
+  "business-dictionary",
+  "policies",
+  "imports",
+  "users",
+  "teams",
+  "config-audit",
+  "appearance",
+] as const;
 
 export function SettingsPage() {
   const { can } = useSession();
   const [compact, setCompact] = useState(false);
   const [activeTab, setActiveTab] = useState("business-dictionary");
-  /** 子面板跳转到表单字段时待消费的作用域。 */
-  const [pendingScope, setPendingScope] = useState<string | null>(null);
   // 导入的批次选择提升到父级：SettingsPage 的 Tab 非挂载，切换后回到导入页仍能保留上次所选批次。
   const [importBatchId, setImportBatchId] = useState<number | null>(null);
-
-  const navigate: TabNavigate = (key, params) => {
-    if (params?.scope) setPendingScope(params.scope);
-    setActiveTab(key);
-  };
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 960px)");
@@ -49,36 +50,27 @@ export function SettingsPage() {
     return () => media.removeEventListener?.("change", sync);
   }, []);
 
-  // 表单字段面板挂载后即消费掉跳转作用域，避免下次进入时被强制拉回上次目标。
-  useEffect(() => {
-    if (activeTab === "form-fields" && pendingScope) setPendingScope(null);
-  }, [activeTab, pendingScope]);
+  const renderTab = (key: string): React.ReactElement => {
+    // 导入页签需父级 batchId 状态以跨 Tab 保留批次选择；其余通用项统一走注册表。
+    if (key === "imports") {
+      return <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} />;
+    }
+    return PANEL_REGISTRY[key]?.(() => {}) ?? null;
+  };
 
+  const standaloneTabs: TabItem[] = SETTINGS_TAB_ORDER
+    .map((key) => SETTINGS_ITEMS.find((i) => i.key === key))
+    .filter(
+      (item): item is NonNullable<typeof item> =>
+        !!item && (!item.permission || can(item.permission)),
+    )
+    .map((item) => ({ key: item.key, label: item.label, render: () => renderTab(item.key) }));
+
+  // 「配置中心」为容器页签，置于「业务字典」之后。
   const items: TabItem[] = [
-    { key: "business-dictionary", label: "业务字典", render: () => <BusinessDictionaryPanel /> },
-    { key: "order-types", label: "业务类型", render: () => <OrderTypesPanel /> },
-    { key: "form-fields", label: "表单字段", render: (nav) => <OrderFormFieldsPanel initialScope={pendingScope ?? undefined} onConfigureGameTypes={() => nav("game-types")} onConfigureIntermediaryPlatforms={() => nav("intermediary-platforms")} onConfigurePools={() => nav("pools")} onConfigurePartySources={() => nav("party-sources")} /> },
-    // 列表字段：哪些列显示 + 列的先后顺序（业务台账 / 库存中心 / 分期与回款）。
-    { key: "list-columns", label: "列表字段", render: () => <ListColumnsPanel /> },
-    // 编号序列与业务类型同源（sequence_prefix），读取门控与后端 manage_order_types 一致。
-    ...(can("order-type.manage") ? [{ key: "sequences", label: "编号序列", render: () => <SequencesPanel /> }] : []),
-    // 资金池与资金路由合并为一个页签：池是主体、路由是去向，页内用视图切换。
-    { key: "pools", label: "资金池", render: () => <PoolsAndRoutesPanel /> },
-    { key: "game-types", label: "游戏与渠道配置", render: () => <GameTypeSettingsPanel /> },
-    { key: "intermediary-platforms", label: "中介业务配置", render: () => <IntermediaryPlatformSettingsPanel /> },
-    { key: "party-sources", label: "参与方来源", render: () => <PartySourceSettingsPanel /> },
-    { key: "policies", label: "经营规则", render: () => <PolicySettingsPanel /> },
-    ...(can("import.manage") ? [{ key: "imports", label: "导入", render: () => <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} /> }] : []),
-    ...(can("user.manage")
-      ? [
-          { key: "users", label: "人员与权限", render: () => <UsersPanel /> },
-          { key: "teams", label: "团队管理", render: () => <TeamsPanel /> },
-        ]
-      : []),
-    ...(can("audit.read")
-      ? [{ key: "config-audit", label: "改动追溯", render: () => <ConfigAuditPanel /> }]
-      : []),
-    { key: "appearance", label: "外观", render: () => <AppearancePanel /> },
+    ...standaloneTabs.filter((t) => t.key === "business-dictionary"),
+    { key: "config-center", label: "配置中心", render: () => <ConfigCenterPanel /> },
+    ...standaloneTabs.filter((t) => t.key !== "business-dictionary"),
   ];
 
   return (
@@ -91,7 +83,7 @@ export function SettingsPage() {
         items={items.map(({ render, ...item }) => ({
           ...item,
           // 隐藏 Tab 不挂载，避免打开设置页时提前请求所有管理数据。
-          children: activeTab === item.key ? render(navigate) : null,
+          children: activeTab === item.key ? render() : null,
         }))}
       />
     </section>

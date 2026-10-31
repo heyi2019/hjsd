@@ -394,4 +394,38 @@ describe("InventoryPanel：账号台账", () => {
     expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });
+
+  it("未售时长列受列表字段配置控制：配置隐藏后列头消失、其余列不受影响", async () => {
+    // 模拟「设置→配置中心→字段配置→列表字段→库存中心」里把 inventory_age 设为隐藏。
+    // 修复前该列 key 为 inventoryAge（与注册表 inventory_age 不符），隐藏/调序均不生效。
+    vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([
+      {
+        code: "INVENTORY",
+        columns: [
+          { key: "stock_no", is_visible: true, sort_order: 0 },
+          { key: "game_type", is_visible: true, sort_order: 10 },
+          { key: "game_account", is_visible: true, sort_order: 20 },
+          { key: "source_order_no", is_visible: true, sort_order: 30 },
+          { key: "business_mode", is_visible: true, sort_order: 40 },
+          { key: "inventory_type", is_visible: true, sort_order: 50 },
+          { key: "value_added_service", is_visible: true, sort_order: 60 },
+          { key: "platform", is_visible: true, sort_order: 70 },
+          { key: "inventory_age", is_visible: false, sort_order: 80 },
+          { key: "status", is_visible: true, sort_order: 90 },
+          { key: "cost_amount", is_visible: true, sort_order: 100 },
+          { key: "actions", is_visible: true, sort_order: 110 },
+        ],
+      },
+    ] as unknown as catalog.ListScopeConfig[]);
+
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByRole("columnheader", { name: "库存编号" });
+    // 配置隐藏 inventory_age 后，未售时长列头应消失
+    await waitFor(() =>
+      expect(screen.queryByRole("columnheader", { name: "未售时长" })).toBeNull(),
+    );
+    // 相邻普通列仍正常显示，证明只是未售时长被控
+    expect(screen.getByRole("columnheader", { name: "平台" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "成本" })).toBeInTheDocument();
+  });
 });

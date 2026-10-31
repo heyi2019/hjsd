@@ -224,11 +224,6 @@ def save_config(
         if key in seen:
             raise Validation("列重复提交", details={"column_key": key})
         seen.add(key)
-        if key in known and known[key].locked and not item["is_visible"]:
-            raise Validation(
-                "锁定列不可隐藏",
-                details={"column_key": key, "label": known[key].label},
-            )
 
     rows = _rows_for_scope(session, scope_code)
     before = {

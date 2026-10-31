@@ -7,7 +7,7 @@
 - 枚举值按 option_sets / 自定义列选项快照翻中文；
 - 行 dict 由各业务 router 组装：筛选、脱敏、池权限、派生列都以列表接口同口径复用，
   这里只做「列 × 行 → CSV」；无 total 时不写合计行；
-- `actions` 等纯 UI 列不导出（注册表里锁定是为了「不可隐藏」，不是数据列）。
+- `actions` 等纯 UI 列不导出（非数据列，仅行内操作入口）。
 """
 from __future__ import annotations
 

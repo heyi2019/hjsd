@@ -85,7 +85,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   },
   {
     key: "game-types",
-    label: "游戏与渠道配置",
+    label: "游戏与渠道",
     summary: "产品分类选项，建单与库存共用",
     group: "MASTER",
     entityTypes: ["GameTypeOption"],

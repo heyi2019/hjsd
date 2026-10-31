@@ -49,26 +49,35 @@ beforeEach(() => {
   }));
 });
 
+/** 进入配置中心并等待其渲染。 */
+async function openConfigCenter() {
+  await ui.click(screen.getByRole("tab", { name: "配置中心" }));
+  await screen.findByTestId("center-nav-order-types");
+}
+
 describe("SettingsPage.deep", () => {
-  it("管理员可见全部条件 Tab（导入/人员与权限/团队管理）", async () => {
+  it("管理员可见全部条件 Tab（导入/人员与权限/团队管理），业务配置类已聚合进配置中心", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
     expect(screen.getByRole("tab", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "人员与权限" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "团队管理" })).toBeInTheDocument();
-    // 基础 Tab 始终存在
-    expect(screen.getByRole("tab", { name: "游戏与渠道配置" })).toBeInTheDocument();
+    // 配置中心为聚合入口
+    expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "外观" })).toBeInTheDocument();
+    // 原独立业务配置页签已移除
+    expect(screen.queryByRole("tab", { name: "业务类型" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "游戏与渠道" })).toBeNull();
   });
 
-  it("查看人(viewer)屏蔽 import.manage / user.manage 条件 Tab", async () => {
+  it("查看人(viewer)屏蔽 import.manage / user.manage 条件 Tab，配置中心仍可见", async () => {
     renderLight(<SettingsPage />, { user: "viewer" });
     await screen.findByRole("tab", { name: "业务字典" });
     expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "团队管理" })).toBeNull();
-    // 无权限不应引入未授权面板
-    expect(screen.getByRole("tab", { name: "业务类型" })).toBeInTheDocument();
+    // 配置中心（含无权限字段/主数据项）仍可作为入口
+    expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
   });
 
   it("紧凑屏宽下 tabPosition 切换为 top（ant-tabs-top）", async () => {
@@ -97,28 +106,31 @@ describe("SettingsPage.deep", () => {
   });
 
 
-  it("切换 Tab 仅挂载激活面板：点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
+  it("切换 Tab 仅挂载激活面板：配置中心内点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
+    await openConfigCenter();
     // 惰性挂载的证据是「面板内容不在 DOM」。
     expect(screen.queryByText("托管池")).toBeNull();
-    await ui.click(screen.getByRole("tab", { name: "资金池" }));
+    await ui.click(screen.getByTestId("center-nav-pools"));
     await waitFor(() => expect(vi.mocked(catalog.poolsApi.list)).toHaveBeenCalled());
     // 资金池内容可见（托管池）
     expect(await screen.findByText("托管池")).toBeInTheDocument();
   });
 
-  it("遍历基础 Tab 均挂载对应面板（业务类型/游戏类型/经营规则/外观）", async () => {
+  it("配置中心内可遍历业务类型与游戏类型，设置页仍可打开经营规则与外观", async () => {
     // AppearancePanel 依赖 GlassProvider，需走 renderApp（含 AllProviders）。
     renderApp(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
 
-    await ui.click(screen.getByRole("tab", { name: "业务类型" }));
+    await openConfigCenter();
+    await ui.click(screen.getByTestId("center-nav-order-types"));
     expect(await screen.findByText("HS")).toBeInTheDocument();
 
-    await ui.click(screen.getByRole("tab", { name: "游戏与渠道配置" }));
+    await ui.click(screen.getByTestId("center-nav-game-types"));
     await waitFor(() => expect(vi.mocked(catalog.gameTypesApi.list)).toHaveBeenCalled());
 
+    // 回到设置页主 Tab（非业务配置类仍独立存在）
     await ui.click(screen.getByRole("tab", { name: "经营规则" }));
     await waitFor(() => expect(vi.mocked(catalog.policyApi.list)).toHaveBeenCalled());
 

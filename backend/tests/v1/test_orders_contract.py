@@ -33,7 +33,7 @@ from app.installments import service as installments_service
 from app.finance import service as finance_service
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderFormField, OrderLink
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import schemas, service as order_service

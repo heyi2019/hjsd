@@ -98,15 +98,24 @@ echo "==> 构建镜像"
 docker compose build
 fi
 
-if docker compose run --rm backend test -f /app/data/heijin_erp_v1.db; then
-  echo "==> 迁移前备份正式库"
+if [[ "${DATABASE_URL:-}" == postgresql* ]]; then
+  echo "==> 迁移前备份 PostgreSQL 正式库（不打包/不备份开发 SQLite）"
+  pg_backup_dir="${ERP_PG_BACKUP_DIR:-../backups}"
+  mkdir -p "$pg_backup_dir"
+  pg_backup_file="$pg_backup_dir/heijin_erp_pg_$(date +%Y%m%d_%H%M%S).dump"
+  docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$pg_backup_file"
+  sha256sum "$pg_backup_file" > "$pg_backup_file.sha256"
+  find "$pg_backup_dir" -maxdepth 1 -type f -name 'heijin_erp_pg_*.dump' -mtime +30 -delete
+  echo "BACKUP_OK path=$pg_backup_file sha256=$(awk '{print $1}' "$pg_backup_file.sha256")"
+elif docker compose run --rm backend test -f /app/data/heijin_erp_v1.db; then
+  echo "==> 迁移前备份本地 SQLite 开发库"
   docker compose run --rm backend \
     python /app/scripts/backup_db.py \
     --db /app/data/heijin_erp_v1.db \
     --out-dir /app/data/backups \
     --keep 30
 else
-  echo "==> 首次部署：正式库尚不存在，跳过备份"
+  echo "==> SQLite 开发库不存在，跳过本地备份"
 fi
 
 echo "==> 执行数据库迁移"

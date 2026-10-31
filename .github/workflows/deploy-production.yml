@@ -83,6 +83,10 @@ jobs:
           gzip -t "output/heijin-images-${APP_VERSION}-amd64.tar.gz"
           gzip -t output/heijin-source.tar.gz
           gzip -t output/heijin-deploy.tgz
+          if tar -tzf output/heijin-source.tar.gz | grep -E '(^|/)(data/|.*\.db($|\.))'; then
+            echo 'Refusing to package development database/data files' >&2
+            exit 1
+          fi
           echo "DEPLOY_PACKAGE_SHA256=$(shasum -a 256 output/heijin-deploy.tgz | awk '{print $1}')" >> "$GITHUB_ENV"
 
       - name: Configure SSH

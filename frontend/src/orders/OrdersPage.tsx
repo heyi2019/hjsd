@@ -26,7 +26,7 @@ import { filterRetiredOrderTypeOptions } from "../shared/lib/retiredProducts";
 import { ACCOUNT_STATUS_LABEL, executionActionLabel, money, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
-import { useListViewColumns } from "../shared/lib/listColumns";
+import { columnKey, orderMobileFields as arrangeMobileFields, useListViewColumns } from "../shared/lib/listColumns";
 import { InventoryPanel } from "../stocks/InventoryPanel";
 import { OrderDetail } from "../stocks/OrderDetail";
 import type { InventoryPartyLink } from "../stocks/OrderDetailView";
@@ -62,6 +62,7 @@ function MobileOrderList(props: {
   orders: Order[];
   emptyText: string;
   onSelect: (order: Order) => void;
+  fieldOrder?: string[];
 }) {
   if (!props.orders.length) return <div className="orders-mobile-empty muted">{props.emptyText}</div>;
   return (
@@ -73,20 +74,27 @@ function MobileOrderList(props: {
             <StatusTag status={order.status} optionSet="ORDER_STATUS" />
           </div>
           <dl className="orders-mobile-card__meta">
-            <div><dt>对方 / 来源</dt><dd>{[order.party_name, order.party_source].filter(Boolean).join(" · ") || "-"}</dd></div>
-            <div><dt>游戏/产品类型</dt><dd>{order.account_game_type || "-"}</dd></div>
-            <div><dt>游戏账号/产品</dt><dd>{order.account_game_account || "-"}</dd></div>
-            <div><dt>平台</dt><dd>{order.account_platform || "-"}</dd></div>
-            <div><dt>金额</dt><dd>{formatOrderAmount(order)}</dd></div>
-            <div><dt>账号周期</dt><dd>{order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-"}</dd></div>
-            <div><dt>最新动作</dt><dd>{order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-"}</dd></div>
-            <div><dt>日期</dt><dd>{order.trade_date || "-"}</dd></div>
+            {getOrderMobileFields(order, props.fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
           <PermissionButton permission="order.update" type="link" onClick={() => props.onSelect(order)}>编辑订单</PermissionButton>
         </article>
       ))}
     </div>
   );
+}
+
+function getOrderMobileFields(order: Order, fieldOrder?: string[]) {
+  return arrangeMobileFields([
+    { key: "party", label: "对方 / 来源", value: [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
+    { key: "account_game_type", label: "游戏/产品类型", value: order.account_game_type || "-" },
+    { key: "account_game_account", label: "游戏账号/产品", value: order.account_game_account || "-" },
+    { key: "account_platform", label: "平台", value: order.account_platform || "-" },
+    { key: "event_total", label: "金额", value: formatOrderAmount(order) },
+    { key: "account_status", label: "账号周期", value: order.account_status ? ACCOUNT_STATUS_LABEL[order.account_status] ?? order.account_status : "-" },
+    { key: "last_event_type", label: "最新动作", value: order.last_event_type ? executionActionLabel(order.last_event_type, order.order_type) : "-" },
+    { key: "link_status", label: "关联", value: order.link_status ?? "-" },
+    { key: "trade_date", label: "日期", value: order.trade_date || "-" },
+  ], fieldOrder);
 }
 
 type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
@@ -697,6 +705,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
       ),
     },
   ];
+  const mobileLedgerFieldOrder = arrangeLedgerColumns(ledgerColumns).map(columnKey);
 
   return (
     <section className="ui-stack orders-page">
@@ -854,6 +863,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
                   orders={filteredOrders}
                   emptyText="暂无业务订单"
                   onSelect={(order) => openEditOrder(order)}
+                  fieldOrder={mobileLedgerFieldOrder}
                 />
               </Card>
             ),

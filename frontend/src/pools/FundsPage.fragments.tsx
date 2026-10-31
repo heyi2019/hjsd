@@ -2,6 +2,7 @@
 import { Space } from "antd";
 import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import { configurableLabel } from "../shared/lib/optionSets";
+import { orderMobileFields } from "../shared/lib/listColumns";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import type { Cashflow, Deposit, Pool, PoolBalance } from "../shared/api/catalog";
 
@@ -29,7 +30,7 @@ export const deriveCashflowNature = (fundNature: string, direction: string): str
   fundNature === "EXTERNAL" ? "EXTERNAL_IN" : fundNature === "INTERNAL" ? "INTERNAL" : direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT";
 
 /** 移动端（≤640px）资金池总览卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
-export function MobilePoolList({ rows, balances }: { rows: Pool[]; balances: Record<number, PoolBalance> }) {
+export function MobilePoolList({ rows, balances, fieldOrder }: { rows: Pool[]; balances: Record<number, PoolBalance>; fieldOrder?: string[] }) {
   if (rows.length === 0) return <div className="data-mobile-empty">尚未配置资金池</div>;
   return (
     <div className="data-mobile-list">
@@ -40,11 +41,13 @@ export function MobilePoolList({ rows, balances }: { rows: Pool[]; balances: Rec
             <StatusTag status={row.status} optionSet="POOL_STATUS" />
           </div>
           <dl className="data-mobile-card__meta">
-            <div><dt>归属</dt><dd>{POOL_OWNERSHIP_LABEL[row.ownership] ?? row.ownership}</dd></div>
-            <div><dt>收入</dt><dd><MoneyText value={balances[row.id]?.income} /></dd></div>
-            <div><dt>支出</dt><dd><MoneyText value={balances[row.id]?.expense} /></dd></div>
-            <div><dt>押金</dt><dd><MoneyText value={balances[row.id]?.deposit_held} /></dd></div>
-            <div><dt>可用余额</dt><dd><MoneyText value={balances[row.id]?.available} strong /></dd></div>
+            {orderMobileFields([
+              { key: "ownership", label: "归属", value: POOL_OWNERSHIP_LABEL[row.ownership] ?? row.ownership },
+              { key: "income", label: "收入", value: <MoneyText value={balances[row.id]?.income} /> },
+              { key: "expense", label: "支出", value: <MoneyText value={balances[row.id]?.expense} /> },
+              { key: "deposit_held", label: "押金", value: <MoneyText value={balances[row.id]?.deposit_held} /> },
+              { key: "available", label: "可用余额", value: <MoneyText value={balances[row.id]?.available} strong /> },
+            ], fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
         </article>
       ))}
@@ -56,9 +59,11 @@ export function MobilePoolList({ rows, balances }: { rows: Pool[]; balances: Rec
 export function MobileCashflowList({
   rows,
   onReverse,
+  fieldOrder,
 }: {
   rows: Cashflow[];
   onReverse: (row: Cashflow) => void;
+  fieldOrder?: string[];
 }) {
   if (rows.length === 0) return <div className="data-mobile-empty">暂无资金流水</div>;
   return (
@@ -73,15 +78,18 @@ export function MobileCashflowList({
             />
           </div>
           <dl className="data-mobile-card__meta">
-            <div><dt>订单号</dt><dd>{row.order_no || "—"}</dd></div>
-            <div><dt>日期</dt><dd>{row.occurred_on}</dd></div>
-            <div><dt>类别</dt><dd>{row.category}</dd></div>
-            <div><dt>资金性质</dt><dd>{FUND_NATURE_LABEL[row.fund_nature ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? row.fund_nature ?? "—"}</dd></div>
-            <div><dt>核算属性</dt><dd>{ACCOUNTING_ATTRIBUTE_LABEL[row.accounting_attribute ?? ""] ?? row.accounting_attribute ?? "—"}</dd></div>
-            <div><dt>收支</dt><dd>{row.direction === "IN" ? "收入" : "支出"}</dd></div>
-            <div><dt>金额</dt><dd><MoneyText value={row.amount} strong /></dd></div>
-            <div><dt>来源</dt><dd>{row.source || "—"}</dd></div>
-            {row.note ? <div><dt>备注</dt><dd>{row.note}</dd></div> : null}
+            {orderMobileFields([
+              { key: "order_no", label: "订单号", value: row.order_no || "—" },
+              { key: "occurred_on", label: "日期", value: row.occurred_on },
+              { key: "category", label: "类别", value: row.category },
+              { key: "fund_nature", label: "资金性质", value: FUND_NATURE_LABEL[row.fund_nature ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? row.fund_nature ?? "—" },
+              { key: "accounting_attribute", label: "核算属性", value: ACCOUNTING_ATTRIBUTE_LABEL[row.accounting_attribute ?? ""] ?? row.accounting_attribute ?? "—" },
+              { key: "direction", label: "收支", value: row.direction === "IN" ? "收入" : "支出" },
+              { key: "nature", label: "流向", value: row.nature || "—" },
+              { key: "amount", label: "金额", value: <MoneyText value={row.amount} strong /> },
+              { key: "source", label: "来源", value: row.source || "—" },
+              { key: "note", label: "备注", value: row.note || "—" },
+            ], fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
           <Space size={2}>
             {row.status === "APPROVED" && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
@@ -101,12 +109,14 @@ export function MobileDepositList({
   onRelease,
   onLoss,
   onCancel,
+  fieldOrder,
 }: {
   rows: Deposit[];
   pools: Pool[];
   onRelease: (row: Deposit) => void;
   onLoss: (row: Deposit) => void;
   onCancel: (row: Deposit) => void;
+  fieldOrder?: string[];
 }) {
   if (rows.length === 0) return <div className="data-mobile-empty">暂无押金占用</div>;
   return (
@@ -118,20 +128,15 @@ export function MobileDepositList({
             <StatusTag status={row.status} optionSet="DEPOSIT_STATUS" />
           </div>
           <dl className="data-mobile-card__meta">
-            <div><dt>占用金额</dt><dd><MoneyText value={row.paid_amount} /></dd></div>
-            <div><dt>对手方</dt><dd>{row.counterparty_id == null ? "—" : `#${row.counterparty_id}`}</dd></div>
-            <div><dt>来源订单</dt><dd>{row.source_order_id == null ? "—" : `#${row.source_order_id}`}</dd></div>
-            <div><dt>预计释放</dt><dd>{row.expected_release_on || "—"}</dd></div>
-            <div><dt>已释放</dt><dd><MoneyText value={row.returned_amount} /></dd></div>
-            <div><dt>已损失</dt><dd><MoneyText value={row.lost_amount ?? "0.00"} /></dd></div>
-            <div>
-              <dt>剩余</dt>
-              <dd>
-                <MoneyText
-                  value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)}
-                />
-              </dd>
-            </div>
+            {orderMobileFields([
+              { key: "paid_amount", label: "占用金额", value: <MoneyText value={row.paid_amount} /> },
+              { key: "counterparty", label: "对手方", value: row.counterparty_id == null ? "—" : `#${row.counterparty_id}` },
+              { key: "source_order", label: "来源订单", value: row.source_order_id == null ? "—" : `#${row.source_order_id}` },
+              { key: "expected_release_on", label: "预计释放", value: row.expected_release_on || "—" },
+              { key: "returned_amount", label: "已释放", value: <MoneyText value={row.returned_amount} /> },
+              { key: "lost_amount", label: "已损失", value: <MoneyText value={row.lost_amount ?? "0.00"} /> },
+              { key: "remaining", label: "剩余", value: <MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)} /> },
+            ], fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
           <Space size={2}>
             <PermissionButton

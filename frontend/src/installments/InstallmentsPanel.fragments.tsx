@@ -3,6 +3,7 @@ import type { Installment, InstallmentDisposition, Order } from "../shared/api/c
 import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
+import { orderMobileFields } from "../shared/lib/listColumns";
 import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import type { Permission } from "../shared/state/session";
 
@@ -37,6 +38,7 @@ export function MobileInstallmentList({
   onSettle,
   onDefault,
   onResale,
+  fieldOrder,
 }: {
   rows: Installment[];
   orders: Order[];
@@ -49,6 +51,7 @@ export function MobileInstallmentList({
   onSettle: (row: Installment) => void;
   onDefault: (row: Installment) => void;
   onResale: (row: Installment) => void;
+  fieldOrder?: string[];
 }) {
   const receivable = (row: Installment) => Number(row.total_receivable);
 
@@ -65,18 +68,19 @@ export function MobileInstallmentList({
               <StatusTag status={installmentDisplayStatus(row.status)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(row.status), INSTALLMENT_STATUS_LABEL)} />
             </div>
             <dl className="data-mobile-card__meta">
-              <div><dt>订单</dt><dd>{order?.order_no ?? row.order_id}</dd></div>
-              <div><dt>业务</dt><dd>{order ? BUSINESS_MODE_LABEL[order.account_business_mode ?? ""] || "-" : "-"}</dd></div>
-              <div><dt>类型</dt><dd>{order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-"}</dd></div>
-              <div><dt>产品</dt><dd>{order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-"}</dd></div>
-              <div><dt>对方</dt><dd>{order?.party_name || "-"}</dd></div>
-              <div><dt>总应收</dt><dd><MoneyText value={receivable(row).toFixed(2)} /></dd></div>
-              <div><dt>已收</dt><dd><MoneyText value={row.paid_amount} /></dd></div>
-              <div><dt>坏账</dt><dd><MoneyText value={row.bad_debt_amount ?? "0"} /></dd></div>
-              <div>
-                <dt>剩余</dt>
-                <dd><MoneyText value={(receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)).toFixed(2)} /></dd>
-              </div>
+              {orderMobileFields([
+                { key: "order", label: "订单", value: order?.order_no ?? row.order_id },
+                { key: "business", label: "业务", value: order ? BUSINESS_MODE_LABEL[order.account_business_mode ?? ""] || "-" : "-" },
+                { key: "order_type", label: "类型", value: order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-" },
+                { key: "product", label: "产品", value: order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-" },
+                { key: "party", label: "对方", value: order?.party_name || "-" },
+                { key: "receivable", label: "总应收", value: <MoneyText value={receivable(row).toFixed(2)} /> },
+                { key: "service_fee", label: "服务费", value: <MoneyText value={row.service_fee ?? "0"} /> },
+                { key: "per_period_service_fee", label: "每期服务费", value: <MoneyText value={row.per_period_service_fee ?? "0"} /> },
+                { key: "paid_amount", label: "已收", value: <MoneyText value={row.paid_amount} /> },
+                { key: "bad_debt", label: "坏账", value: <MoneyText value={row.bad_debt_amount ?? "0"} /> },
+                { key: "remaining", label: "剩余", value: <MoneyText value={(receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)).toFixed(2)} /> },
+              ], fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
             </dl>
             <Space size={2}>
               <PermissionButton

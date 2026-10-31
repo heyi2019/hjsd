@@ -9,7 +9,7 @@ import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
-import { useListViewColumns } from "../shared/lib/listColumns";
+import { columnKey, useListViewColumns } from "../shared/lib/listColumns";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
@@ -280,6 +280,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       ),
     },
   ];
+  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   const currentDate = today();
   const newThisMonthCount = rows.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
@@ -366,6 +367,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         onDetail={(row) => void openDetail(row)}
         onMerge={setMergeTarget}
         renderPhone={(row) => renderContact(row, "phone")}
+        fieldOrder={mobileFieldOrder}
         onDisable={async (row) => {
           await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
           appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");

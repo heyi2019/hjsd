@@ -31,7 +31,7 @@ import { BUSINESS_MODE_LABEL,
   isEditableAccountType, } from "./inventory-logic";
 import { downloadInventoryCsv } from "./inventory-export";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { useListViewColumns } from "../shared/lib/listColumns";
+import { columnKey, orderMobileFields, useListViewColumns } from "../shared/lib/listColumns";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
@@ -100,6 +100,7 @@ export function MobileInventoryList({
   executionDetails = {},
   onLoadExecution = () => undefined,
   editingAccount,
+  fieldOrder,
 }: {
   rows: Account[];
   onDetail: (row: Account) => void;
@@ -112,12 +113,24 @@ export function MobileInventoryList({
   executionDetails?: Record<number, AccountExecutionDetail>;
   onLoadExecution?: (row: Account) => void | Promise<void>;
   editingAccount: number | null;
+  fieldOrder?: string[];
 }) {
   if (rows.length === 0) return <div className="data-mobile-empty">暂无账号</div>;
   return (
     <div className="data-mobile-list">
       {rows.map((row) => {
         const age = inventoryAge(row);
+        const fields = orderMobileFields([
+          { key: "game_type", label: "游戏/产品类型", value: row.game_type || "-" },
+          { key: "game_account", label: "游戏账号/产品", value: row.game_account || "-" },
+          { key: "source_order_no", label: "订单号", value: row.source_order_no || "-" },
+          { key: "business_mode", label: "业务", value: row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-" },
+          { key: "inventory_type", label: "业务类型", value: row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-" },
+          { key: "value_added_service", label: "增值服务", value: row.value_added_service ? VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service : "-" },
+          { key: "platform", label: "平台", value: row.platform || "-" },
+          { key: "inventory_age", label: "未售时长", value: age ? `${age.days}天` : "-" },
+          { key: "cost_amount", label: "成本", value: <MoneyText value={row.cost_amount} /> },
+        ], fieldOrder);
         return (
           <article key={row.id} className="data-mobile-card">
             <div className="data-mobile-card__topline">
@@ -125,15 +138,7 @@ export function MobileInventoryList({
               <StatusTag status={row.inventory_status ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} />
             </div>
             <dl className="data-mobile-card__meta">
-              <div><dt>游戏/产品类型</dt><dd>{row.game_type || "-"}</dd></div>
-              <div><dt>游戏账号/产品</dt><dd>{row.game_account || "-"}</dd></div>
-              <div><dt>订单号</dt><dd>{row.source_order_no || "-"}</dd></div>
-              <div><dt>业务</dt><dd>{row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-"}</dd></div>
-              <div><dt>业务类型</dt><dd>{row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-"}</dd></div>
-              <div><dt>增值服务</dt><dd>{row.value_added_service ? VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service : "-"}</dd></div>
-              <div><dt>平台</dt><dd>{row.platform || "-"}</dd></div>
-              <div><dt>未售时长</dt><dd>{age ? `${age.days}天` : "-"}</dd></div>
-              <div><dt>成本</dt><dd><MoneyText value={row.cost_amount} /></dd></div>
+              {fields.map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
             </dl>
             <div className="data-mobile-card__actions">
               <PermissionButton permission="order.create" type="link" size="small" onClick={() => onDetail(row)}>详情</PermissionButton>
@@ -411,7 +416,7 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
         return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);
       },
     },
-    { title: "状态", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
+    { title: "状态", key: "status", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
     {
       title: "成本",
       dataIndex: "cost_amount",
@@ -515,6 +520,7 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
       ),
     },
   ];
+  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   async function saveInline() {
     if (!editingAccount) return;
@@ -713,6 +719,7 @@ export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged,
             executionDetails={executionDetails}
             onLoadExecution={loadExecution}
             editingAccount={editingAccount ? editingAccount.id : null}
+          fieldOrder={mobileFieldOrder}
           />
         ) : (
           <DataTable<Account>

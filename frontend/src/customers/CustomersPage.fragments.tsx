@@ -2,6 +2,7 @@ import { DatePicker, Input, InputNumber, Space, Switch } from "antd";
 import type { ReactNode } from "react";
 import { PermissionButton, Select, StatusTag } from "../shared/ui";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
+import { orderMobileFields } from "../shared/lib/listColumns";
 import type { Counterparty, Customer, OrderFormField } from "../shared/api/catalog";
 
 /** 订单客户角色兜底文案：词典 ORDER_CUSTOMER_ROLE 未加载/未配置时兜底。
@@ -29,6 +30,7 @@ export function MobileCustomerList(props: {
   onDisable: (row: Customer) => void;
   /** 手机号脱敏时由父级注入「查看」入口，移动端不重复实现取数逻辑。 */
   renderPhone: (row: Customer) => ReactNode;
+  fieldOrder?: string[];
 }) {
   if (!props.rows.length) return <div className="customers-mobile-empty muted">暂无客户档案</div>;
   return (
@@ -36,7 +38,12 @@ export function MobileCustomerList(props: {
       {props.rows.map((row) => (
         <article className="customers-mobile-card" key={row.id}>
           <div className="customers-mobile-card__topline"><strong>{row.customer_no} · {row.display_name}</strong><StatusTag status={row.status} optionSet="CUSTOMER_STATUS" /></div>
-          <dl><div><dt>联系人</dt><dd>{row.contact_name || "-"}</dd></div><div><dt>手机</dt><dd>{props.renderPhone(row)}</dd></div></dl>
+          <dl>
+            {orderMobileFields([
+              { key: "display_name", label: "联系人", value: row.contact_name || row.display_name || "-" },
+              { key: "phone", label: "手机", value: props.renderPhone(row) },
+            ], props.fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
+          </dl>
           <Space size="small">
             <PermissionButton permission="customer.read" size="small" onClick={() => props.onDetail(row)}>详情</PermissionButton>
             <PermissionButton permission="customer.merge" size="small" disabled={row.status !== "ACTIVE"} onClick={() => props.onMerge(row)}>合并</PermissionButton>

@@ -12,6 +12,7 @@ import {
 } from "./InventoryPanel.test.fixtures";
 import { buildInventoryCsv } from "./inventory-export";
 import { resolveMockOnce } from "../test/mock-api";
+import { refreshListColumns } from "../shared/lib/listColumns";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -438,6 +439,7 @@ describe("InventoryPanel：账号台账", () => {
         ],
       },
     ] as unknown as catalog.ListScopeConfig[]);
+    refreshListColumns();
 
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByRole("columnheader", { name: "库存编号" });
@@ -448,5 +450,25 @@ describe("InventoryPanel：账号台账", () => {
     // 相邻普通列仍正常显示，证明只是未售时长被控
     expect(screen.getByRole("columnheader", { name: "平台" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "成本" })).toBeInTheDocument();
+  });
+
+  it("状态列使用列表字段注册键参与排序", async () => {
+    vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([
+      {
+        code: "INVENTORY",
+        columns: [
+          { key: "status", is_visible: true, sort_order: 0 },
+          { key: "stock_no", is_visible: true, sort_order: 10 },
+        ],
+      },
+    ] as unknown as catalog.ListScopeConfig[]);
+    refreshListColumns();
+
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByRole("columnheader", { name: "状态" });
+    const headers = Array.from(document.querySelectorAll(".ant-table-thead tr:first-child th"))
+      .map((header) => header.textContent?.trim())
+      .filter(Boolean);
+    expect(headers[0]).toBe("状态");
   });
 });

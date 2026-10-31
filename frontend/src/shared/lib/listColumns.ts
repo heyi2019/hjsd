@@ -55,6 +55,16 @@ export function columnKey(column: { key?: unknown; dataIndex?: unknown }): strin
   return "";
 }
 
+/** 移动端卡片字段按列表配置排列；配置未提供时保持页面定义顺序。 */
+export function orderMobileFields<T extends { key: string }>(fields: T[], configuredKeys?: string[]): T[] {
+  if (!configuredKeys?.length) return fields;
+  const order = new Map(configuredKeys.map((key, index) => [key, index]));
+  return fields
+    .filter((field) => order.has(field.key))
+    .slice()
+    .sort((a, b) => (order.get(a.key) as number) - (order.get(b.key) as number));
+}
+
 export interface ListViewColumns {
   /** 配置是否已加载（未加载时按原样渲染，避免闪烁） */
   ready: boolean;

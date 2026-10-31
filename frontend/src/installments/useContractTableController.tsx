@@ -312,6 +312,7 @@ export function useContractTableController(params: { contractType: string; reloa
     },
     {
       title: "坏账",
+      key: "bad_debt",
       dataIndex: "bad_debt_amount",
       align: "right",
       render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,

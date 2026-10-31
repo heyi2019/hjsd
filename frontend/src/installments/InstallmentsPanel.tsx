@@ -8,6 +8,7 @@ import { today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { columnKey } from "../shared/lib/listColumns";
 
 
 import { CONTRACT_TYPE_LABEL, DISPOSITION_LABEL, MobileInstallmentList } from "./InstallmentsPanel.fragments";
@@ -55,6 +56,7 @@ function ContractTable({
     totalPaid,
     totalReceivable,
   } = controller;
+  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
@@ -111,6 +113,7 @@ function ContractTable({
             onSettle={(row) => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
             onDefault={(row) => { defaultForm.resetFields(); setDefaultTarget(row); }}
             onResale={(row) => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
+            fieldOrder={mobileFieldOrder}
           />
         ) : (
           <DataTable<Installment>

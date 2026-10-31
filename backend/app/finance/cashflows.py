@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 from sqlalchemy import func, select

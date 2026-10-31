@@ -1,7 +1,6 @@
 """quality 异常工单服务（QLT-02）。"""
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select

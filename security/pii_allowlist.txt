@@ -40,4 +40,6 @@ docs/ERP_API接口规范_v1.1.md :: phone
 frontend/e2e/business-write.spec.ts :: phone
 frontend/src/customers/CustomersPage.test.tsx :: phone
 frontend/src/stocks/InventoryProfileModal.deep.test.tsx :: phone
+# 合成交付明细手机号，仅用于前端展示字段测试，非真实 PII。
+frontend/src/stocks/OrderDetailDeliverySection.test.tsx :: phone
 tests/fixtures/v1_acceptance_seed.json :: phone

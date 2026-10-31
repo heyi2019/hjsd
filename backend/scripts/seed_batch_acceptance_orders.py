@@ -23,6 +23,8 @@ ACTOR = "admin"
 TODAY = date(2026, 10, 18)
 PAST = date(2026, 10, 17)
 MARKER = "[批量验收]"
+# 当前 head 已移除 DFQ，夹具实际覆盖 24 笔 HS/TH/DG 订单；旧值 30 是历史 DFQ 夹具遗留。
+EXPECTED_ORDER_COUNT = 24
 
 
 def account(session, tag: str, *, mode: str, inventory_type: str):
@@ -255,8 +257,10 @@ def main() -> None:
             actor=ACTOR,
             note=f"{MARKER} 卖出返点",
         )
-        if len(created) != 30:
-            raise RuntimeError(f"批量验收订单数量错误：期望 30，实际 {len(created)}")
+        if len(created) != EXPECTED_ORDER_COUNT:
+            raise RuntimeError(
+                f"批量验收订单数量错误：期望 {EXPECTED_ORDER_COUNT}，实际 {len(created)}"
+            )
         session.commit()
         print(f"OK: 已创建 {len(created)} 笔批量验收订单")
         print("订单号：" + ",".join(item.order_no for item in created))

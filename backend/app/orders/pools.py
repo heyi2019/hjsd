@@ -1,0 +1,122 @@
+"""orders.pools：资金池余额卡片（FIN-01 / ORD-02-04）。
+
+优先级：事件显式池 > 业务默认路由 > 阻断 `POOL_ROUTE_MISSING`。
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from decimal import Decimal
+from typing import Any
+from app.core.money import to_money
+from app.core.security import CurrentUser
+from app.domain.foundation import Pool
+from sqlalchemy import (
+    func,
+    select,
+)
+from sqlalchemy.orm import Session
+from app.core.errors import NotFound
+from app.domain.trade import Cashflow
+from app.domain.enums import (
+    CashflowStatus,
+    Direction,
+    Nature,
+)
+
+# --------------------------------------------------------------------- 池余额
+def pool_balances(
+    session: Session, pool_ids: Iterable[int], user: CurrentUser | None = None
+) -> dict[int, dict[str, Any]]:
+    """批量资金池卡片：一次分组聚合覆盖全部池，避免逐池 7 次查询。
+
+    口径与 ``pool_balance`` 完全一致，只是把「每池 5 次标量聚合 + 1 次押金」
+    压成「一次 group by + 一次押金 group by」；池数量不再放大 SQL 条数。
+    """
+    from app.domain.trade import Deposit
+
+    ids = list(dict.fromkeys(pool_ids))
+    if not ids:
+        return {}
+    pools = {pool.id: pool for pool in session.scalars(select(Pool).where(Pool.id.in_(ids)))}
+    for pool_id in ids:
+        if pool_id not in pools or (
+            user is not None and not user.can_see_pool(pool_id)
+        ):
+            raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
+
+    # (direction, nature) -> 已审金额合计；同一池多个 nature 会返回多行。
+    cells: dict[int, dict[tuple[str, str], Decimal]] = {}
+    for pool_id, direction, nature, amount in session.execute(
+        select(
+            Cashflow.pool_id,
+            Cashflow.direction,
+            Cashflow.nature,
+            func.coalesce(func.sum(Cashflow.amount), 0),
+        )
+        .where(
+            Cashflow.pool_id.in_(ids),
+            Cashflow.status == CashflowStatus.APPROVED.value,
+        )
+        .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
+    ):
+        cells.setdefault(pool_id, {})[(direction, nature)] = to_money(amount or 0)
+    deposits = {
+        pool_id: to_money(amount or 0)
+        for pool_id, amount in session.execute(
+            select(
+                Deposit.pool_id,
+                func.coalesce(
+                    func.sum(
+                        Deposit.paid_amount
+                        - Deposit.returned_amount
+                        - Deposit.lost_amount
+                    ),
+                    0,
+                ),
+            )
+            .where(Deposit.pool_id.in_(ids))
+            .group_by(Deposit.pool_id)
+        )
+    }
+
+    result: dict[int, dict[str, Any]] = {}
+    for pool_id in ids:
+        bucket = cells.get(pool_id, {})
+
+        def total(direction: str, nature: str | None = None) -> Decimal:
+            if nature is not None:
+                return bucket.get((direction, nature), Decimal("0.00"))
+            return sum(
+                (amount for (d, _n), amount in bucket.items() if d == direction),
+                Decimal("0.00"),
+            )
+
+        income = total(Direction.IN.value, Nature.BUSINESS_IN.value)
+        expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value)
+        transfer_in = total(Direction.IN.value, Nature.INTERNAL.value)
+        transfer_out = total(Direction.OUT.value, Nature.INTERNAL.value)
+        # 现金头寸包含 INTERNAL 划转；经营收入/支出仍只统计 BUSINESS_*，避免把划转算进损益。
+        cash_balance = total(Direction.IN.value) - total(Direction.OUT.value)
+        deposit_held = deposits.get(pool_id, Decimal("0.00"))
+        pool = pools[pool_id]
+        result[pool_id] = {
+            "pool_id": pool.id,
+            "pool_code": pool.code,
+            "pool_name": pool.name,
+            "income": income,
+            "expense": expense,
+            "transfer_in": transfer_in,
+            "transfer_out": transfer_out,
+            "cash_balance": cash_balance,
+            "deposit_held": deposit_held,
+            "available": cash_balance - deposit_held,
+        }
+    return result
+
+
+def pool_balance(
+    session: Session, pool_id: int, user: CurrentUser | None = None
+) -> dict[str, Any]:
+    """资金池卡片：经营收支、内部划转、押金占用与可用余额（单池）。"""
+    return pool_balances(session, [pool_id], user=user)[pool_id]

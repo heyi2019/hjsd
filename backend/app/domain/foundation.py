@@ -1,7 +1,7 @@
 """domain.foundation：M0 底座表（SYS-01-01 / BAS-02 / BAS-03）。
 
 表：`pools`、`order_type_defs`、`order_type_pools`、`document_sequences`、`audit_logs`。
-严格依据《ERP_数据字典_v1.0.md》《ERP_数据库DDL与迁移方案_v1.0.md》：
+表结构以本模块 ORM 定义为准：
 
 - `pools.code` 创建后不可改（V18）；有流水只能停用不能删（V17）；
 - `ownership` 决定是否计入权益（V30）；

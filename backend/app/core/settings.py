@@ -1,6 +1,6 @@
 """core.settings：v1 唯一配置入口。
 
-约束（来源：ERP_本地开发与联调指南_v1.0.md §1、ERP_PRD_v1.0.md V15/V17/V18）：
+约束（工程启动契约）：
 1. 必须读取**仓库根目录** `.env`（`.env.example` 只是模板，不得当成已生效配置）。
 2. v1 数据库与旧 `heijin.db` / `heijin_v2.db` 物理隔离：一旦指向旧库文件名立即报错。
 3. `.env` 不入库；缺文件时回落到安全默认值 + APP_ENV=development。

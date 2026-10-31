@@ -1,6 +1,6 @@
 import axios from "axios";
 
-/** 后端基址：本地联调 8123（8000 被 Docker 占用），与 docs/ERP_本地开发与联调指南_v1.0.md 一致。 */
+/** 后端基址：本地联调 8123（8000 被 Docker 占用）；后端绑 0.0.0.0，局域网可直连。 */
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/api/v1";
 
 /** dev 直通用户：后端以 `X-Dev-User` 识别；切换角色即可验证权限显隐。 */

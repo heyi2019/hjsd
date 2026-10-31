@@ -60,7 +60,7 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
 # 每个规则预置 1 条已发布默认版本，使配置直接就位。
 # REBATE/INSTALLMENT 的默认值由库内真实业务数据反推（rebate_records.rate 区间 3~10、
 # installments.periods 众数 3）。
-# COMMISSION/WRITE_DOWN/REFUND 库内无对应历史流水；按 ERP_页面原型_v1.0.md:139 纪律
+# COMMISSION/WRITE_DOWN/REFUND 库内无对应历史流水；按「不猜值」纪律
 # 「未配置提成规则显示待配置，不猜值」，config 置空（{}）表示待配置，而非填假值 0。
 # 例外：COMMISSION 的分润比例是业务既定口径（买入动作 30 / 卖出动作 30 / 运营动作 0 /
 # 公司 40，合计 100），不是猜值，故直接预置；且 create_version 拒绝空 config，
@@ -135,7 +135,7 @@ def main() -> int:
                 target_config = DEFAULT_VERSION_CONFIG.get(code, {"placeholder": True})
                 if not target_config:
                     # 待配置规则（WRITE_DOWN / REFUND）：create_version 拒绝空 config，
-                    # 这里跳过而不是塞假值（ERP_页面原型_v1.0.md:139 不猜值纪律）。
+                    # 这里跳过而不是塞假值（不猜值纪律）。
                     skipped_versions.append(f"{code}(待配置，不预置版本)")
                 elif latest is None:
                     created_versions.append(code)

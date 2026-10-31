@@ -1,6 +1,6 @@
 """domain.enums：v1 封闭枚举与编号域。
 
-取值以《ERP_数据字典_v1.0.md》为准：
+取值以本模块定义为唯一来源，数据库 CHECK 约束与之同步：
 - `capital_type`、`ownership`、业务 code 等核算枚举保持封闭；
 - `pool_type` 是**注册表**（V31），扩展登记新值即可，不改表。
 """

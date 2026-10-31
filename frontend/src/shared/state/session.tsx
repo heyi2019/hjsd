@@ -1,4 +1,4 @@
-/** 权限点：与 docs/ERP_权限矩阵_v1.0.md 一致。
+/** 权限点：以后端 `core/security.py` 的 `PERM_*` 为唯一来源。
  * 前端只用它控制按钮显隐；后端仍会二次鉴权，隐藏菜单不构成权限控制。 */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";

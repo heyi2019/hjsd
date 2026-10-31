@@ -1,6 +1,6 @@
 """core.errors：统一异常与错误码。
 
-错误码与 HTTP 映射严格执行《ERP_接口错误码与状态机_v1.0.md》，
+错误码与 HTTP 状态映射由本模块的 `AppError` 层级唯一决定，
 业务代码只允许抛 `AppError` 子类，禁止在路由里手工拼 HTTPException 状态码。
 """
 from __future__ import annotations

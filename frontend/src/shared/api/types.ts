@@ -1,5 +1,5 @@
 /** 全部 v1 接口 DTO 类型定义（从 catalog.ts 拆分而来）。
- * 路径与 docs/ERP_API接口规范_v1.1.md 一致；金额一律以字符串传输，前端不做浮点数计算。 */
+ * 路径以后端 `/api/v1` 实际路由为准；金额一律以字符串传输，前端不做浮点数计算。 */
 
 export interface PageResponse<T> {
   items: T[];

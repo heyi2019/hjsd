@@ -8,7 +8,7 @@
 
 外部既有 `from app.parties import service as parties_service` 的调用方式保持不变。
 
-规则来源：CUS-01、BAS-02-05、BAS-04、《ERP_接口错误码与状态机_v1.0.md》。
+规则来源：CUS-01、BAS-02-05、BAS-04。
 """
 from __future__ import annotations
 

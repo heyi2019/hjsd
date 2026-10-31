@@ -73,11 +73,17 @@ beforeEach(() => {
 
 async function openLedger(user?: string) {
   renderLight(<OrdersPage />, user ? { user } : undefined);
-  await screen.findByRole("tab", { name: "业务台账" });
+  await screen.findByRole("tab", { name: "订单台账" });
   await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
 }
 
-describe("OrdersPage：四类业务台账", () => {
+describe("OrdersPage：四类订单台账", () => {
+  it("订单台账使用订单语义名称", async () => {
+    renderLight(<OrdersPage />);
+    expect(await screen.findByRole("tab", { name: "订单台账" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "业务台账" })).toBeNull();
+  });
+
   it("业务中心重新激活时刷新库存列表", async () => {
     const { rerender } = renderLight(<OrdersPage active={false} />);
     await screen.findByRole("tab", { name: "库存中心" });
@@ -89,7 +95,7 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("顶部不再重复展示业务中心标题与说明", async () => {
     renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "业务台账" });
+    await screen.findByRole("tab", { name: "订单台账" });
     expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
     expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
     expect(screen.queryByText(/待处理/)).toBeNull();
@@ -124,7 +130,7 @@ describe("OrdersPage：四类业务台账", () => {
     expect(screen.queryByText("HS-2026-0001")).toBeNull();
   });
 
-  it("业务台账提供游戏类型下拉筛选", async () => {
+  it("订单台账提供游戏类型下拉筛选", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       ...orders,
       {
@@ -146,12 +152,12 @@ describe("OrdersPage：四类业务台账", () => {
     expect(gameTypeOption).toBeDefined();
     await ui.click(gameTypeOption!);
 
-    const ledger = screen.getByRole("tabpanel", { name: "业务台账" });
+    const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
     await waitFor(() => expect(within(ledger).queryByText("HS-2026-0001")).toBeNull());
     expect(within(ledger).getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
   });
 
-  it("业务台账统一展示通用字段", async () => {
+  it("订单台账统一展示通用字段", async () => {
     await openLedger();
 
     for (const label of ["订单号", "对方 / 来源", "游戏/产品类型", "游戏账号/产品", "平台", "金额", "账号周期", "最新动作", "状态", "日期", "操作"]) {
@@ -232,7 +238,7 @@ describe("OrdersPage：四类业务台账", () => {
     expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
   });
 
-  it("同一账号有多张订单时，业务台账展开使用当前订单的详情上下文", async () => {
+  it("同一账号有多张订单时，订单台账展开使用当前订单的详情上下文", async () => {
     const olderOrder = {
       ...orders[0],
       id: 8,
@@ -341,8 +347,8 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("业务中心保留库存、台账与分期回款视图，不展示独立返点页签", async () => {
     renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "业务台账" });
-    for (const label of ["库存中心", "业务台账", "分期与回款"]) {
+    await screen.findByRole("tab", { name: "订单台账" });
+    for (const label of ["库存中心", "订单台账", "分期与回款"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
@@ -350,7 +356,7 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("新建订单菜单提供回收、提号、代挂三个表单", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务台账" });
+    await screen.findByRole("tab", { name: "订单台账" });
     await ui.click(screen.getByRole("button", { name: /新建订单/ }));
     for (const label of ["新建回收订单", "新建提号订单", "新建代挂订单"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
@@ -359,7 +365,7 @@ describe("OrdersPage：四类业务台账", () => {
 
   it("移除没有明确业务含义的通用登记事件入口", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务台账" });
+    await screen.findByRole("tab", { name: "订单台账" });
     expect(screen.queryByRole("button", { name: /登记事件/ })).toBeNull();
   });
 
@@ -381,9 +387,9 @@ describe("OrdersPage：四类业务台账", () => {
     ));
   });
 
-  it("忽略已废弃的业务中心页签参数并回到业务台账", async () => {
+  it("忽略已废弃的业务中心页签参数并回到订单台账", async () => {
     renderLight(<OrdersPage initialTab={"th" as "inventory"} />);
-    const tab = await screen.findByRole("tab", { name: "业务台账" });
+    const tab = await screen.findByRole("tab", { name: "订单台账" });
     expect(tab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("HS-2026-0001")).length).toBeGreaterThan(0);
   });

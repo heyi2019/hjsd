@@ -34,7 +34,7 @@ class ListScope:
 LIST_SCOPES: tuple[ListScope, ...] = (
     ListScope(
         code="LEDGER",
-        label="业务台账",
+        label="订单台账",
         columns=(
             ListColumn("order_no", "订单号"),
             ListColumn("party", "对方 / 来源"),

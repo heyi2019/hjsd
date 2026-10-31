@@ -126,13 +126,13 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
         <EntryCard
           title="订单总数"
           value={String(orders.length)}
-          description="点击进入业务中心 · 业务台账"
+          description="点击进入业务中心 · 订单台账"
           onClick={() => onNavigate?.("business")}
         />
         <EntryCard
           title="进行中"
           value={String(activeCount)}
-          description="点击进入业务中心 · 业务台账"
+          description="点击进入业务中心 · 订单台账"
           onClick={() => onNavigate?.("business")}
         />
       </EntryRow>

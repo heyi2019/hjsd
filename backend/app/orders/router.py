@@ -99,7 +99,7 @@ def export_orders_csv(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> Response:
-    """业务台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。"""
+    """订单台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。"""
     orders = service.list_orders(
         db,
         order_type=order_type,
@@ -128,7 +128,7 @@ def export_orders_csv(
         actor=_user.username,
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
-    return csv_file_response(csv_text, f"业务台账-{date.today().isoformat()}.csv")
+    return csv_file_response(csv_text, f"订单台账-{date.today().isoformat()}.csv")
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)

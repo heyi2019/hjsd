@@ -28,13 +28,13 @@ export function useOrdersPageController(params: {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  // 台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
+  // 订单台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
   const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
   const [ledgerExporting, setLedgerExporting] = useState(false);
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportCsv(), `业务台账-${today()}.csv`);
+      downloadBlob(await ordersApi.exportCsv(), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {

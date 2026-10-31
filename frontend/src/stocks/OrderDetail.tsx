@@ -199,7 +199,7 @@ export function OrderDetail({
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
-  /** 业务台账从订单行展开时，优先使用当前订单作为详情上下文；库存中心不传则沿用账号来源单。 */
+  /** 订单台账从订单行展开时，优先使用当前订单作为详情上下文；库存中心不传则沿用账号来源单。 */
   contextOrderNo?: string | null;
   loading: boolean;
   editing?: Account | null;

@@ -21,7 +21,7 @@ import { navItem } from "./support/api-stub";
 const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
   {
     nav: "业务中心",
-    tabs: ["库存中心", "业务台账", "分期与回款"],
+    tabs: ["库存中心", "订单台账", "分期与回款"],
   },
   {
     nav: "客户中心",

@@ -37,7 +37,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByText("账号台账")).not.toBeInTheDocument();
   });
 
-  it("筛选栏沿用业务台账的分组布局", async () => {
+  it("筛选栏沿用订单台账的分组布局", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
 
     await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");

@@ -6,7 +6,7 @@ import type { ListScopeConfig } from "../api/catalog";
 
 const config: ListScopeConfig = {
   code: "LEDGER",
-  label: "业务台账",
+  label: "订单台账",
   columns: [
     { key: "trade_date", label: "日期", locked: false, is_visible: true, sort_order: 0 },
     { key: "order_no", label: "订单号", locked: true, is_visible: true, sort_order: 10 },
@@ -77,7 +77,7 @@ describe("applyColumnConfig", () => {
     const original = [{ dataIndex: "order_no", width: 220 }];
     const result = applyColumnConfig(original, {
       code: "LEDGER",
-      label: "业务台账",
+      label: "订单台账",
       columns: [
         {
           key: "order_no",

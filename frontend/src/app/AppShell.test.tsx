@@ -114,7 +114,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 
     const inventoryTab = await screen.findByRole("tab", { name: "库存中心" }, { timeout: 10_000 });
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "业务台账" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "false");
   });
 
   it("逐个点击每个导航项都能切换到对应页面（无白屏、无抛错）", async () => {
@@ -168,7 +168,7 @@ describe("AppShell：角色展示与退出", () => {
     expect(within(topbar).queryByRole("button", { name: "我的收益" })).toBeNull();
 
     await ui.click(within(dashboard).getByRole("button", { name: /我的订单/ }));
-    expect(await screen.findByRole("tab", { name: "业务台账" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true");
     expect(vi.mocked(catalog.ordersApi.list)).toHaveBeenCalledWith({ mine: true });
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));

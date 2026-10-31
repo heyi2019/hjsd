@@ -1,5 +1,5 @@
 import { appMessage, appModal } from "../shared/ui/appFeedback";
-/** 业务中心：库存中心 + 业务台账 + 分期回款。 */
+/** 业务中心：库存中心 + 订单台账 + 分期回款。 */
 import { Alert, Card, DatePicker, Descriptions, Drawer, Dropdown, Form, Input, Segmented, Space, Spin, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
@@ -264,7 +264,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportCsv(), `业务台账-${today()}.csv`);
+      downloadBlob(await ordersApi.exportCsv(), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -733,7 +733,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           },
           {
             key: "ledger",
-            label: "业务台账",
+            label: "订单台账",
             children: (
               <Card className="glass">
                 <Space wrap className="ui-filter-bar ui-filter-bar--spaced">

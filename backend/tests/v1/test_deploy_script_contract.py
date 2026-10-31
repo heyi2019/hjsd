@@ -10,6 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SOURCE_SCRIPT = PROJECT_ROOT / "deploy" / "scripts" / "deploy.sh"
+COMPOSE_FILE = PROJECT_ROOT / "deploy" / "docker-compose.yml"
 
 
 def _release_tree(
@@ -95,3 +96,9 @@ def test_explicit_app_version_overrides_deploy_env_file(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "发布版本 V1.0.1" in result.stdout
+
+
+def test_backend_runtime_receives_explicit_release_version():
+    """运行中的 API 健康信息必须与导入镜像的发布版本一致。"""
+    compose = COMPOSE_FILE.read_text(encoding="utf-8")
+    assert "APP_VERSION: ${APP_VERSION:-latest}" in compose

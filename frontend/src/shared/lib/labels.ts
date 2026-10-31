@@ -63,6 +63,35 @@ export const USER_ROLE_LABEL: Record<string, string> = {
   VIEWER: "查看人",
 };
 
+/** 用户中心展示用权限名称：权限编码只保留在鉴权和接口层，不直接展示给用户。 */
+export const PERMISSION_LABEL: Record<string, string> = {
+  "customer.read": "查看客户",
+  "customer.contact.read": "查看客户联系人",
+  "customer.create": "新建客户",
+  "customer.update": "编辑客户",
+  "customer.contact.write": "维护客户联系人",
+  "customer.merge": "合并客户",
+  "counterparty.read": "查看合作方",
+  "counterparty.manage": "管理合作方",
+  "order.create": "新建订单",
+  "order.update": "编辑订单",
+  "order.event.post": "登记订单事件",
+  "finance.read": "查看资金",
+  "deposit.post": "登记押金",
+  "finance.transfer": "资金划转",
+  "finance.order.event.post": "过账订单资金事件",
+  "policy.manage": "管理经营规则",
+  "field-definition.manage": "管理字段配置",
+  "audit.read": "查看审计记录",
+  "pool.manage": "管理资金池",
+  "order-type.manage": "管理业务类型",
+  "option-set.manage": "管理选项词典",
+  "report.read": "查看报表",
+  "report.export": "导出报表",
+  "import.manage": "管理导入",
+  "user.manage": "管理用户",
+};
+
 export const OWNER_SCOPE_LABEL: Record<string, string> = {
   SELF: "本人",
   TEAM: "团队",

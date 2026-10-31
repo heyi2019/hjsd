@@ -3,6 +3,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# CI/回滚可显式传入版本；先暂存，避免下面加载 ECS .env 时被遗留的
+# APP_VERSION 覆盖。未显式传入时，版本仍只从 backend/app/version.py 解析。
+requested_app_version="${APP_VERSION:-}"
+
 if [ ! -f .env ]; then
   echo "✗ 缺少 deploy/.env"
   echo "  请先执行： cp env/.env.production.example .env"
@@ -14,6 +18,12 @@ fi
 set -a
 . ./.env
 set +a
+
+if [ -n "$requested_app_version" ]; then
+  APP_VERSION="$requested_app_version"
+else
+  unset APP_VERSION || true
+fi
 
 # 版本号唯一事实源是 backend/app/version.py：这里解析后导出，供镜像 tag 与容器内 /health 使用。
 # 不从 .env 读，避免"改了代码忘改配置"导致线上显示旧版本。

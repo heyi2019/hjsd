@@ -45,8 +45,14 @@ def _release_tree(
     return script, fake_bin
 
 
-def _run(script: Path, fake_bin: Path) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}"}
+def _run(
+    script: Path, fake_bin: Path, *, extra_env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        **(extra_env or {}),
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+    }
     return subprocess.run([str(script)], text=True, capture_output=True, env=env, check=False)
 
 
@@ -76,3 +82,16 @@ def test_deploy_uses_admin_password_from_deploy_env_file(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "未设置 ADMIN_PASSWORD" not in result.stdout
+
+
+def test_explicit_app_version_overrides_deploy_env_file(tmp_path):
+    """CI 传入的发布版本必须优先于 ECS .env 中遗留的旧版本。"""
+    script, fake_bin = _release_tree(tmp_path, backup_exit=0)
+    script.parent.parent.joinpath(".env").write_text(
+        "APP_ENV=production\nAPP_VERSION=1.0.0\n", encoding="utf-8"
+    )
+
+    result = _run(script, fake_bin, extra_env={"APP_VERSION": "1.0.1"})
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "发布版本 V1.0.1" in result.stdout

@@ -95,13 +95,13 @@ export function OrderDetailProfileSection({
               );
             })}
           </div>
-          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
             {readOnly.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>{field.value}</Descriptions.Item>)}
           </Descriptions>
           {accountExtraItems.length ? (
             <div className="inventory-detail__meta-group">
               <div className="inventory-detail__meta-group-title">{sectionLabels["ACCOUNT_PRODUCT"] ?? "账号 / 产品补充信息"}</div>
-              <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+              <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
                 {accountExtraItems.map((item) => (
                   <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
                     {formatExtraDisplayValue(item.value) || "-"}
@@ -121,7 +121,7 @@ export function OrderDetailProfileSection({
       <div className="inventory-detail__meta">
         <div className="inventory-detail__meta-group">
           <div className="inventory-detail__meta-group-title">账号资料</div>
-          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
             {accountProfileFields.map((field) => {
               const map = ACCOUNT_FIELD_MAP[field.key];
               if (!map || !isFieldActive(creationConfig, map.cfgKey)) return null;
@@ -136,7 +136,7 @@ export function OrderDetailProfileSection({
         {accountExtraItems.length ? (
           <div className="inventory-detail__meta-group">
             <div className="inventory-detail__meta-group-title">{sectionLabels["ACCOUNT_PRODUCT"] ?? "账号 / 产品补充信息"}</div>
-            <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+            <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
               {accountExtraItems.map((item) => (
                 <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
                   {formatExtraDisplayValue(item.value) || "-"}

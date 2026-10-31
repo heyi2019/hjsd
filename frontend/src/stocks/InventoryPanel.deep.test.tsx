@@ -152,6 +152,41 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     expect(within(menu).getByText("作图")).toBeInTheDocument();
   });
 
+  it("取消弹窗要求退回金额和收款账户，并按填写值冲销", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: inStockRow,
+      orders: [{
+        order_id: 21,
+        order_type: "HS",
+        status: "ACTIVE",
+        events: [{ id: 31, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
+      }],
+    } as unknown as AccountExecutionDetail);
+    vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
+    await openPanel([inStockRow]);
+    await clickMore(rowOf(1), "取消");
+
+    const modal = await screen.findByRole("dialog");
+    const amount = within(modal).getByLabelText("退回金额");
+    const account = within(modal).getByLabelText("收款账户");
+    expect(within(modal).getByText("取消原因")).toBeInTheDocument();
+    expect(within(modal).queryByText("下架原因")).toBeNull();
+    expect(amount.closest(".adaptive-form-grid")).toBe(account.closest(".adaptive-form-grid"));
+    expect(amount.closest(".adaptive-form-grid")).toHaveClass("inventory-void-fields");
+
+    await ui.clear(amount);
+    await ui.type(amount, "80");
+    await ui.click(account.closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText("利润池（HJ_PROFIT）", { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消交易");
+    await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
+
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({ amount: "80", pool_id: 3, event_type: "CANCEL" }),
+    ));
+  });
+
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {
     vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
     await openPanel([consignmentRow]);

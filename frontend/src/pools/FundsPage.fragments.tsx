@@ -2,6 +2,7 @@
 import { Space } from "antd";
 import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import { configurableLabel } from "../shared/lib/optionSets";
+import { formatDateTimeMinute } from "../shared/lib/format";
 import { orderMobileFields } from "../shared/lib/listColumns";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
 import type { Cashflow, Deposit, Pool, PoolBalance } from "../shared/api/catalog";
@@ -81,6 +82,7 @@ export function MobileCashflowList({
             {orderMobileFields([
               { key: "order_no", label: "订单号", value: row.order_no || "—" },
               { key: "occurred_on", label: "日期", value: row.occurred_on },
+              { key: "occurred_at", label: "建立时间", value: formatDateTimeMinute(row.occurred_at) },
               { key: "category", label: "类别", value: row.category },
               { key: "fund_nature", label: "资金性质", value: FUND_NATURE_LABEL[row.fund_nature ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? row.fund_nature ?? "—" },
               { key: "accounting_attribute", label: "核算属性", value: ACCOUNTING_ATTRIBUTE_LABEL[row.accounting_attribute ?? ""] ?? row.accounting_attribute ?? "—" },

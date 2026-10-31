@@ -390,8 +390,10 @@ export function useOrdersPageController(params: {
     {
       title: "操作",
       key: "actions",
-      render: (_, order) => (
-        <Space size={2}>
+      render: (_, order) => {
+        const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
+        return (
+          <Space size={2}>
           <PermissionButton permission="order.update" type="link" onClick={() => openEditOrder(order)}>编辑订单</PermissionButton>
           <PermissionGate permission="order.event.post">
             <Dropdown
@@ -402,7 +404,7 @@ export function useOrdersPageController(params: {
                   { key: "refund", label: "资金收支", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
                   {
                     key: "cancel",
-                    label: order.order_type === "DG" ? "系统下架" : "取消交易",
+                    label: canOffsaleConsignment ? "下架" : order.order_type === "DG" ? "取消" : "取消交易",
                     danger: true,
                     disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status),
                   },
@@ -411,7 +413,7 @@ export function useOrdersPageController(params: {
                   if (key === "allocation") void openAllocations(order);
                   if (key === "refund") void openRefund(order);
                   if (key === "cancel") {
-                    if (order.order_type === "DG") openSystemOffsale();
+                    if (canOffsaleConsignment) openSystemOffsale();
                     else void openCancelTransaction(order);
                   }
                 },
@@ -421,7 +423,8 @@ export function useOrdersPageController(params: {
             </Dropdown>
           </PermissionGate>
         </Space>
-      ),
+        );
+      },
     },
   ];
 

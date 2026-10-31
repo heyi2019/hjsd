@@ -15,6 +15,7 @@ from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
+from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
     AuditAction,
@@ -401,7 +402,7 @@ def post_event(
         note=note,
         form_extra=event_form_extra or None,
         is_posted=True,
-        posted_at=datetime.now(),
+        posted_at=now_second(),
         created_by=actor,
         updated_by=actor,
     )

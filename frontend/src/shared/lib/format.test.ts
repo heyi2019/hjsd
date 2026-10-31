@@ -3,6 +3,8 @@ import {
   ACCOUNT_STATUS_LABEL,
   EVENT_TYPE_LABEL,
   executionActionLabel,
+  formatDateTimeMinute,
+  formatElapsedTime,
   INSTALLMENT_STATUS_LABEL,
   ORDER_STATUS_LABEL,
   money,
@@ -56,6 +58,27 @@ describe("today：本地日期字符串", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 12, 0, 0)); // 本地时间 2026-01-05
     expect(today()).toBe("2026-01-05");
+  });
+});
+
+
+describe("formatDateTimeMinute：时间展示统一到分钟", () => {
+  it("保留日期和时分，隐藏秒与小数", () => {
+    expect(formatDateTimeMinute("2026-11-01T12:34:56.789")).toBe("2026-11-01 12:34");
+  });
+
+  it("空时间显示横线", () => {
+    expect(formatDateTimeMinute(null)).toBe("-");
+  });
+});
+
+describe("formatElapsedTime：在手时间", () => {
+  it("按售出时间减入库时间展示天小时分钟", () => {
+    expect(formatElapsedTime("2026-10-01T09:30:00", "2026-10-17T16:45:00")).toBe("16天7小时15分");
+  });
+
+  it("缺少售出时间时显示横线", () => {
+    expect(formatElapsedTime("2026-10-01T09:30:00", null)).toBe("-");
   });
 });
 

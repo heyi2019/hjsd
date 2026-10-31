@@ -5,7 +5,6 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Mapping
 
 from sqlalchemy.orm import Session
@@ -13,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.core.request_context import get_request_id
+from app.core.time import now_second
 
 DEFAULT_ACTOR = "system"
 
@@ -42,7 +42,7 @@ def record_audit(
         # 显式写本地时间：原 server_default=func.now() 是 UTC，与查询端本地日期边界错位
         # （本地凌晨运行时记录落在 UTC 昨日，按本地“今天”过滤会漏掉）。审计按本地工作日历查，
         # 故落库即固化为本地时间，保证“今天发生的事”能被“今天”过滤命中。
-        occurred_at=datetime.now(),
+        occurred_at=now_second(),
     )
     session.add(entry)
     session.flush()

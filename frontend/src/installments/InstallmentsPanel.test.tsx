@@ -68,6 +68,14 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(screen.getAllByText("HS-2026-0010").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("提供分期合约日期区间筛选", async () => {
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+
+    await screen.findByText("HS0001-INS01");
+    expect(screen.getByPlaceholderText("开始日期")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("结束日期")).toBeInTheDocument();
+  });
+
   it("坏账列使用列表配置键参与排序", async () => {
     vi.mocked(catalog.listColumnsApi.all).mockResolvedValueOnce([{
       code: "INSTALLMENT",

@@ -24,6 +24,7 @@ from app.core.errors import (
     Validation,
 )
 from app.domain.trade import (
+    Account,
     Order,
     OrderFormField,
 )
@@ -268,6 +269,12 @@ def create_order(
     )
     session.add(order)
     session.flush()
+    # 入库时间以建单成功时间为准，而不是账号资料开始填写的时间。
+    # 数据库存储精确到秒，前端展示时再收敛到分钟；若后续建单流程失败，外层事务会整体回滚。
+    if order.account_id is not None:
+        account = session.get(Account, order.account_id)
+        if account is not None:
+            account.inventory_entry_at = order.created_at.replace(microsecond=0)
 
     role_records: list[dict[str, Any]] = []
     for customer_id, role, customer in customer_participants:

@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -186,6 +186,7 @@ class TestR1Inventory:
             business_mode="SELF",
             inventory_type="RECOVERY",
             status=AccountStatus.WAITING.value,
+            inventory_entry_at=datetime.combine(D, datetime.min.time()),
             buy_date=D,
             cost_amount=to_money("0"),
             created_by="pytest",
@@ -227,9 +228,9 @@ class TestR1Inventory:
 
         # 非库存状态账号被 continue 排除
         assert sold.id not in items
-        # 无 buy_date → holding_days None、无挂单 → business/owner None
+        # 入库时间独立于买入日期；新建但未产生买入流水的账号从入库当天开始计时
         idle = items[no_buy_date.id]
-        assert idle["holding_days"] is None
+        assert idle["holding_days"] == 0
         assert idle["business"] is None
         assert idle["owner_id"] is None
         # 在库账号：成本按 BUY 累加（0+1000+800=1800）；
@@ -241,7 +242,7 @@ class TestR1Inventory:
         assert held["total_cost"] == 1800
         assert held["expected_price"] == 1500
         assert held["expected_profit"] == -300
-        assert held["holding_days"] == (date.today() - D).days
+        assert held["holding_days"] == (date.today() - in_stock.inventory_entry_at.date()).days
 
 
 # --------------------------------------------------------------------- R2 月度

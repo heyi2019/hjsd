@@ -2,6 +2,7 @@ import { DatePicker, Input, InputNumber, Space, Switch } from "antd";
 import type { ReactNode } from "react";
 import { PermissionButton, Select, StatusTag } from "../shared/ui";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
+import { formatDateTimeMinute } from "../shared/lib/format";
 import { orderMobileFields } from "../shared/lib/listColumns";
 import type { Counterparty, Customer, OrderFormField } from "../shared/api/catalog";
 
@@ -42,6 +43,7 @@ export function MobileCustomerList(props: {
             {orderMobileFields([
               { key: "display_name", label: "联系人", value: row.contact_name || row.display_name || "-" },
               { key: "phone", label: "手机", value: props.renderPhone(row) },
+              { key: "created_at", label: "建立时间", value: formatDateTimeMinute(row.created_at) },
             ], props.fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
           <Space size="small">

@@ -218,6 +218,28 @@ export function BusinessDictionaryPanel() {
             desc="订单利润分润：按参与方分配订单利润，支持按比例或按金额两种口径。"
           />
         </Descriptions.Item>
+        <Descriptions.Item label="取消模型">
+          <EntryLine
+            name="取消原则"
+            desc="取消不删除已登记记录；对已有资金流水建立反向流水，并记录取消原因、实际登录操作人和操作时间。"
+          />
+          <EntryLine
+            name="回收/提号未售出"
+            desc="建单入库时已支出买入款；取消时登记退回金额和收款钱包，资金回到公司，账号退出库存。"
+          />
+          <EntryLine
+            name="代挂未售出"
+            desc="未发生本方买入支出；取消时只记录取消原因，不产生资金流水。"
+          />
+          <EntryLine
+            name="已售出"
+            desc="人工确认售出即代表已收款；取消时冲销售出流水，登记退款金额和付款钱包，普通账号回库存，提号账号结束。"
+          />
+          <EntryLine
+            name="全额与部分"
+            desc="取消用于全额反向处理并结束该笔交易；部分退钱走退款流程，订单仍保持已售出。"
+          />
+        </Descriptions.Item>
       </Descriptions>
     </Card>
   );

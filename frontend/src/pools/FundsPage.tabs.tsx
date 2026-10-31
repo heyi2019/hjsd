@@ -4,7 +4,7 @@ import { Card, Input, Space, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { columnKey, useListViewColumns } from "../shared/lib/listColumns";
-import { today } from "../shared/lib/format";
+import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
@@ -90,6 +90,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
+    { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "类别", dataIndex: "category" },
     {
       title: "资金性质",

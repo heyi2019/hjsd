@@ -46,7 +46,19 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByText("增值服务筛选")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "增值服务筛选" })).not.toBeInTheDocument();
     expect(screen.getByText("排序")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导出 CSV" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /导出/ })).toHaveTextContent("导出");
+    expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
+    const filterBar = screen.getByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台").closest(".ui-filter-bar")!;
+    const buttons = filterBar.querySelectorAll("button");
+    expect(buttons[buttons.length - 1]).toHaveTextContent("导出");
+  });
+
+  it("搜索框右侧提供库存日期区间筛选", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+
+    const search = await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
+    const startDate = screen.getByPlaceholderText("开始日期");
+    expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("提供游戏类型下拉筛选库存账号", async () => {
@@ -74,6 +86,21 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByRole("columnheader", { name: "平台" })).toBeNull();
     expect(screen.queryByText("增值服务")).toBeNull();
     expect(screen.queryByText("平台")).toBeNull();
+  });
+
+  it("库存中心展示入库时间和入库负责人", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([{
+      ...accounts[0],
+      inventory_entry_at: "2026-10-01T09:30:00",
+      created_by: "admin",
+    }]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+
+    expect(await screen.findByRole("columnheader", { name: "入库时间" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "入库负责人" })).toBeInTheDocument();
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    expect(within(row).getByText("2026-10-01 09:30")).toBeInTheDocument();
+    expect(within(row).getByText("admin")).toBeInTheDocument();
   });
 
   it("建单后刷新库存并把新账号放在第一页", async () => {
@@ -104,7 +131,7 @@ describe("InventoryPanel：账号台账", () => {
     );
 
     renderLight(<InventoryPanel />, { user: "admin" });
-    expect(await screen.findByRole("button", { name: "导出 CSV" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
     for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
@@ -128,6 +155,17 @@ describe("InventoryPanel：账号台账", () => {
     for (const label of ["描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("将取消放进更多菜单，不在行内单独展示", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    expect(within(stockRow).queryByRole("button", { name: "作废" })).toBeNull();
+
+    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
+    expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
   });
 
   it("系统下架只对代挂账号开放，平台下架对在库账号开放", async () => {

@@ -13,6 +13,8 @@
 .inventory-row-actions .ant-space-item:first-child .ant-btn-link { font-weight: 650; color: var(--color-primary-text); }
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
 .inventory-detail {
+  width: min(100%, 1200px);
+  box-sizing: border-box;
   margin: 0;
   padding: var(--space-4) 0;
   border: 0;
@@ -21,8 +23,8 @@
   box-shadow: none;
 }
 .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
-  /* 保留展开容器的水平留白，让四个详情表格与外层容器之间有明确间距。 */
-  width: auto;
+  /* 展开详情与弹窗保持同一紧凑宽度，避免随主表横向铺满。 */
+  width: min(100%, 1200px);
   margin-inline: 0;
 }
 .inventory-detail__meta {

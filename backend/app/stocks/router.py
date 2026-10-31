@@ -197,6 +197,7 @@ def _account_output(
     *,
     include_credentials: bool = False,
     extra_values: dict[str, object] | None = None,
+    inventory_operator: str | None = None,
 ) -> AccountOut:
     """统一补齐库存来源订单；业务与类型以标准导入的账号字段为准。"""
     output = AccountOut.model_validate(account)
@@ -206,6 +207,8 @@ def _account_output(
     if source_order is not None:
         output.source_order_id = source_order.id
         output.source_order_no = source_order.order_no
+    # 入库负责人优先取建单表单中的业务负责人；没有选择时回退到实际登录账号。
+    output.inventory_operator = inventory_operator or account.created_by
     return output
 
 
@@ -218,6 +221,16 @@ def _account_outputs(
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
     source_orders = _source_orders(db, [account.id for account in accounts], user)
+    responsible_ids = {
+        int(item)
+        for order in source_orders.values()
+        for item in ((order.form_extra or {}).get("business_responsible_ids") or [])
+        if isinstance(item, int) and item > 0
+    }
+    user_names = {
+        item.id: item.display_name or item.username
+        for item in db.scalars(select(User).where(User.id.in_(responsible_ids))).all()
+    } if responsible_ids else {}
     extra_values = parties_service.get_extra_values_bulk(
         db, entity_type="account", entity_ids=[account.id for account in accounts]
     )
@@ -227,6 +240,14 @@ def _account_outputs(
             source_orders.get(account.id),
             include_credentials=include_credentials,
             extra_values=extra_values.get(account.id),
+            inventory_operator=(
+                "、".join(
+                    user_names[item]
+                    for item in ((source_orders.get(account.id).form_extra or {}).get("business_responsible_ids") or [])
+                    if isinstance(item, int) and item in user_names
+                )
+                if source_orders.get(account.id) else None
+            ),
         )
         for account in accounts
     ]

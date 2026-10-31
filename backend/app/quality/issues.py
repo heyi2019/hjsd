@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
+from app.core.time import now_second
 from app.core.numbering import allocate_number
 from app.domain.enums import AuditAction, QualityIssueStatus, SequenceKey
 from app.domain.quality import QualityIssue
@@ -139,7 +140,7 @@ def close_issue(
     issue.resolution = resolution.strip()
     issue.evidence = evidence.strip() if evidence else None
     issue.closed_by = actor
-    issue.closed_at = datetime.now()
+    issue.closed_at = now_second()
     issue.updated_by = actor
     session.flush()
     record_audit(
@@ -175,7 +176,7 @@ def batch_close_issues(
     closed = [row.issue_no for row in rows if row.status == QualityIssueStatus.CLOSED.value]
     if closed:
         raise Conflict("已关闭质量工单不可重复关闭", details={"issue_no": closed})
-    closed_at = datetime.now()
+    closed_at = now_second()
     for issue_id in issue_ids:
         issue = by_id[issue_id]
         issue.status = QualityIssueStatus.CLOSED.value

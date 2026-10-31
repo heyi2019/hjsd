@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { auditApi, type AuditLogRow } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
+import { formatDateTimeMinute } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 
@@ -46,7 +47,7 @@ export function AuditPanel() {
   }, []);
   const { arrange: arrangeColumns } = useListViewColumns("AUDIT_LOG");
   const columns: ColumnsType<AuditLogRow> = [
-    { title: "时间", dataIndex: "occurred_at" },
+    { title: "时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "操作人", dataIndex: "actor" },
     { title: "动作", dataIndex: "action", render: (v: string) => configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) },
     { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL)},

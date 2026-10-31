@@ -1,8 +1,9 @@
 /** 分期：按业务合约类型分列，展示库存分期出售的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, Segmented, Space, Tabs, Typography } from "antd";
+import { Button, Card, DatePicker, Segmented, Space, Tabs, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import { useState } from "react";
+import type { Dayjs } from "dayjs";
 import { installmentsApi, type Installment, type Schedule } from "../shared/api/catalog";
 import { today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -22,7 +23,12 @@ function ContractTable({
   contractType: string;
   reloadKey: number;
 }) {
-  const controller = useContractTableController({ contractType, reloadKey });
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const controller = useContractTableController({
+    contractType,
+    reloadKey,
+    dateRange: dateRange ? [dateRange[0].format("YYYY-MM-DD"), dateRange[1].format("YYYY-MM-DD")] : null,
+  });
   const {
     arrangeColumns,
     cancelForm,
@@ -79,6 +85,15 @@ function ContractTable({
         className="glass"
         extra={
           <Space size={8}>
+            <DatePicker.RangePicker
+              aria-label="分期日期区间"
+              placeholder={["开始日期", "结束日期"]}
+              format="YYYY-MM-DD"
+              size="small"
+              classNames={{ popup: { root: "compact-date-range-picker" } }}
+              value={dateRange}
+              onChange={(value) => setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null)}
+            />
             <Typography.Text type="secondary">排序</Typography.Text>
             <Segmented
               aria-label="分期合约排序"

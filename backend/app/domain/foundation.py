@@ -28,6 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.time import now_second
 from app.domain.base import AuditMixin, TimestampMixin
 from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
 
@@ -190,7 +191,7 @@ class AuditLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     occurred_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, server_default=func.now()
+        DateTime, nullable=False, default=now_second, server_default=func.now()
     )
     actor: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
     action: Mapped[str] = mapped_column(String(64), nullable=False)

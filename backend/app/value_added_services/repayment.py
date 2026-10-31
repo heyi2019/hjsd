@@ -20,20 +20,18 @@ from app.core.errors import (
 )
 from app.core.money import to_money
 from app.core.state_machine import (
-    ACCOUNT_TRANSITIONS,
     INSTALLMENT_TRANSITIONS,
     ORDER_TRANSITIONS,
     transition,
 )
+from app.orders.cancellation_model import apply_installment_cancellation_account_effect
 from app.domain.enums import (
     AuditAction,
     EventType,
-    InstallmentContractType,
     InstallmentStatus,
     ScheduleStatus,
 )
 from app.domain.trade import (
-    Account,
     Installment,
     InstallmentSchedule,
     Order,
@@ -250,19 +248,12 @@ def cancel_installment(
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "CANCEL", entity="分期合约"
     )
-    account_status: str | None = None
-    if order.account_id is not None:
-        account = session.get(Account, order.account_id)
-        if account is None:
-            raise NotFound("分期合约关联账号不存在", details={"account_id": order.account_id})
-        action = (
-            "CANCEL_SELL_END"
-            if installment.contract_type == InstallmentContractType.PICKUP_SALE.value
-            else "CANCEL_STOCK"
-        )
-        account.status = transition(ACCOUNT_TRANSITIONS, account.status, action, entity="账号")
-        account.updated_by = actor
-        account_status = account.status
+    account_status = apply_installment_cancellation_account_effect(
+        session,
+        order,
+        contract_type=installment.contract_type,
+        actor=actor,
+    )
     installment.updated_by = actor
     session.flush()
     record_audit(

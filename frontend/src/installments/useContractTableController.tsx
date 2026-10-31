@@ -15,8 +15,8 @@ import { useSession } from "../shared/state/session";
 import { SCHEDULE_STATUS_LABEL } from "./InstallmentsPanel.fragments";
 import type { Permission } from "../shared/state/session";
 
-export function useContractTableController(params: { contractType: string; reloadKey: number }) {
-  const { contractType, reloadKey } = params;
+export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null }) {
+  const { contractType, reloadKey, dateRange } = params;
   const [rows, setRows] = useState<Installment[]>([]);
   const [sortDesc, setSortDesc] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -249,8 +249,13 @@ export function useContractTableController(params: { contractType: string; reloa
   // 总应收只采用后端下发值，前端不再自行推导第二套口径。
   const receivable = (row: Installment) => Number(row.total_receivable);
 
-  const totalReceivable = rows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
-  const totalPaid = rows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);
+  const visibleRows = rows.filter((row) => {
+    if (!dateRange) return true;
+    const tradeDate = orders.find((order) => order.id === row.order_id)?.trade_date;
+    return Boolean(tradeDate) && tradeDate! >= dateRange[0] && tradeDate! <= dateRange[1];
+  });
+  const totalReceivable = visibleRows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
+  const totalPaid = visibleRows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const columns: ColumnsType<Installment> = [
@@ -467,7 +472,7 @@ export function useContractTableController(params: { contractType: string; reloa
 
 
   return {
-    rows,
+    rows: visibleRows,
     setRows,
     sortDesc,
     setSortDesc,

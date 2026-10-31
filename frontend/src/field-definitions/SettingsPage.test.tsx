@@ -17,6 +17,7 @@ vi.mock("../shared/api/client", async (importOriginal) => ({
   checkBackendHealth: vi.fn(),
 }));
 import { renderLight } from "../test/render";
+import { screen } from "@testing-library/react";
 import { SettingsPage } from "./SettingsPage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -46,4 +47,14 @@ it("业务字典按账号流转、资金动作和账务动作三层结构渲染"
   expect(document.querySelectorAll(".business-dictionary__group").length).toBeGreaterThanOrEqual(3);
   // 动作行数量健康，防止整段误删
   expect(document.querySelectorAll(".business-dictionary__action-line").length).toBeGreaterThan(10);
+});
+
+it("业务字典在分润规则下方展示取消模型", async () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  const profitRule = await screen.findByText("分润规则");
+  const cancellationModel = screen.getByText("取消模型");
+  expect(profitRule.compareDocumentPosition(cancellationModel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText("回收/提号未售出")).toBeInTheDocument();
+  expect(screen.getByText("已售出")).toBeInTheDocument();
 });

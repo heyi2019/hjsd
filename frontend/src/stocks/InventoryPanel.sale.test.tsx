@@ -328,14 +328,18 @@ it("代挂售出复用买号交付信息块，交付负责人提交落库到来�
     expect(screen.getByText("交易平台")).toBeInTheDocument();
     expect(screen.getByText("中介类型")).toBeInTheDocument();
     expect(screen.getByText("包赔类型")).toBeInTheDocument();
+    await ui.click(screen.getByLabelText("交易平台"));
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await ui.click(screen.getByLabelText("资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
-    // 交付负责人（默认当前员工 id=1）随售出提交 merge 进来源单 form_extra。
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({ form_extra: { delivery_responsible_ids: [1] } })));
+    // 售出表单中的交付字段（含交付负责人）随售出提交 merge 进来源单 form_extra，详情的卖号交付直接复用。
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({
+      form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "盼之" }),
+    })));
   });
 
 it("提号库存从库存中心售出时统一按库存分期出售，确立时收首付", async () => {
@@ -390,6 +394,22 @@ describe("库存售出三表单分支", () => {
     renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
     expect(await screen.findByText("售出回收账号")).toBeInTheDocument();
     expect(screen.getByText("买家信息")).toBeInTheDocument();
+  });
+
+  it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {
+    const deliveryLabels = ["换绑手机号", "手机号绑定人", "交易平台", "中介类型", "包赔类型", "交付负责人"];
+    const cases = [
+      [RecoverySaleModal, accounts[0]],
+      [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }],
+      [ConsignmentSaleModal, { ...accounts[0], inventory_type: "CONSIGNMENT" }],
+    ] as const;
+
+    for (const [Modal, account] of cases) {
+      const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+      expect(await screen.findByText("交付信息")).toBeInTheDocument();
+      for (const label of deliveryLabels) expect(screen.getByText(label)).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("提号售出标题为『售出提号账号』", async () => {

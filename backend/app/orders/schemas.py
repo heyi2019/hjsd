@@ -189,6 +189,10 @@ class OrderListOut(OrderOut):
     party_source: str | None = None
     party_created_by: str | None = None
     party_created_at: datetime | None = None
+    inventory_entry_at: datetime | None = None
+    inventory_operator: str | None = None
+    sale_at: datetime | None = None
+    sale_operator: str | None = None
     event_total: Decimal | None = None
     last_event_type: str | None = None
     last_event_amount: Decimal | None = None

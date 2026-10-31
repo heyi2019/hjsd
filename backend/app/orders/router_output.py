@@ -25,6 +25,7 @@ from app.domain.trade import (
     Cashflow,
     Installment,
     InstallmentSchedule,
+    Order,
     OrderEvent,
     RebateRecord,
 )
@@ -95,6 +96,18 @@ def _selected_operator_label(
         for user_id in (event.operator_user_ids or [])
         if operator_names and user_id in operator_names
     )
+
+
+def _form_responsible_label(
+    form_extra: dict | None,
+    user_names: dict[int, str],
+    fallback: str | None,
+) -> str | None:
+    values = (form_extra or {}).get("business_responsible_ids")
+    if not isinstance(values, list):
+        return fallback
+    labels = [user_names[item] for item in values if isinstance(item, int) and item in user_names]
+    return "、".join(labels) if labels else fallback
 
 
 def _order_detail_output(
@@ -244,6 +257,24 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
         if account_ids else {}
     )
+    source_orders_by_account: dict[int, Order] = {}
+    if account_ids:
+        for source_order in db.scalars(
+            select(Order)
+            .where(Order.account_id.in_(account_ids), Order.order_type.in_(("HS", "TH", "DG")))
+            .order_by(Order.id)
+        ).all():
+            source_orders_by_account.setdefault(source_order.account_id, source_order)
+    inventory_responsible_ids = {
+        item
+        for source_order in source_orders_by_account.values()
+        for item in ((source_order.form_extra or {}).get("business_responsible_ids") or [])
+        if isinstance(item, int) and item > 0
+    }
+    inventory_operator_names = {
+        item.id: item.display_name or item.username
+        for item in db.scalars(select(User).where(User.id.in_(inventory_responsible_ids))).all()
+    } if inventory_responsible_ids else {}
 
     parties: dict[int, tuple[str, str, str | None, str, datetime]] = {}
     if order_ids:
@@ -269,6 +300,11 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         ).all():
             events_by_order.setdefault(event.order_id, []).append(event)
 
+    operator_names = _operator_names(
+        db,
+        [event for events in events_by_order.values() for event in events],
+    )
+
     installments = (
         {item.order_id: item for item in db.scalars(select(Installment).where(Installment.order_id.in_(order_ids))).all()}
         if order_ids else {}
@@ -281,7 +317,15 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
         latest = events[0] if events else None
+        sale_event = next((event for event in events if event.event_type == "SELL"), None)
         party = parties.get(order.id)
+        installment = installments.get(order.id)
+        sale_at = sale_event.created_at if sale_event else installment.created_at if installment else None
+        sale_operator = (
+            (_selected_operator_label(sale_event, operator_names) or sale_event.created_by)
+            if sale_event else installment.created_by if installment else None
+        )
+        inventory_entry_at = account.inventory_entry_at if account else None
         payloads.append({
             "id": order.id,
             "order_no": order.order_no,
@@ -308,6 +352,17 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "party_source": party[2] if party else None,
             "party_created_by": party[3] if party else None,
             "party_created_at": party[4] if party else None,
+            "inventory_entry_at": inventory_entry_at,
+            "inventory_operator": (
+                _form_responsible_label(
+                    source_orders_by_account.get(account.id).form_extra if account and source_orders_by_account.get(account.id) else None,
+                    inventory_operator_names,
+                    account.created_by if account else None,
+                )
+                if account else None
+            ),
+            "sale_at": sale_at,
+            "sale_operator": sale_operator,
             "event_total": sum((event.amount for event in events), 0),
             "last_event_type": latest.event_type if latest else None,
             "last_event_amount": latest.amount if latest else None,

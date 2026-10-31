@@ -7,7 +7,7 @@ BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 登记、状态机、路由缺�
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -37,6 +37,7 @@ from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormFiel
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import schemas, service as order_service
+from app.orders.router_output import _order_list_payload
 
 D = date(2026, 10, 4)
 
@@ -120,6 +121,64 @@ def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db,
     assert account is not None
     assert account.inventory_type == inventory_type
     assert account.cost_amount == Decimal("110.00" if order_type != "DG" else "0.00")
+
+def test_order_success_time_is_inventory_entry_time(seeded_db):
+    account = stocks_service.create_account(
+        seeded_db,
+        game_account="inventory-entry-from-order",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
+    )
+    account.inventory_entry_at = datetime(2026, 1, 1, 8, 0)
+    seeded_db.flush()
+
+    order = order_service.create_order(
+        seeded_db,
+        order_type="HS",
+        trade_date=D,
+        actor="pytest",
+        account_id=account.id,
+    )
+
+    assert account.inventory_entry_at == order.created_at.replace(microsecond=0)
+
+
+def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamps(seeded_db):
+    order = _order(seeded_db)
+    account = seeded_db.get(Account, order.account_id)
+    assert account is not None
+    account.inventory_entry_at = datetime(2026, 10, 1, 9, 30, 0)
+    account.created_by = "inventory-user"
+    seeded_db.flush()
+
+    order_service.post_event(
+        seeded_db,
+        order.id,
+        event_type="BUY",
+        amount="100.00",
+        occurred_on=D,
+        actor="inventory-user",
+        pool_id=1,
+    )
+    sale, _ = order_service.post_event(
+        seeded_db,
+        order.id,
+        event_type="SELL",
+        amount="150.00",
+        occurred_on=D,
+        actor="sale-user",
+        pool_id=2,
+    )
+    sale.created_at = datetime(2026, 10, 17, 16, 45, 0)
+    seeded_db.flush()
+
+    row = _order_list_payload(seeded_db, [order])[0]
+
+    assert row["inventory_entry_at"] == datetime(2026, 10, 1, 9, 30, 0)
+    assert row["inventory_operator"] == "inventory-user"
+    assert row["sale_at"] == datetime(2026, 10, 17, 16, 45, 0)
+    assert row["sale_operator"] == "sale-user"
 
 def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_engine, headers, monkeypatch):
     from fastapi.testclient import TestClient

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
+from app.core.time import now_second
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus
 from app.domain.imports import ImportBatch, ImportRow
 from app.domain.trade import Account, Order
@@ -80,7 +81,7 @@ def assign_mapping(
     row.mapped_order_id = order_id
     row.mapped_account_id = account_id
     row.mapped_by = actor
-    row.mapped_at = datetime.now()
+    row.mapped_at = now_second()
     row.mapping_basis = text_basis
     row.status = (
         ImportRowStatus.MAPPED.value
@@ -177,7 +178,7 @@ def commit_batch(session: Session, batch_id: int, *, actor: str = "system") -> d
             row.issue_note = row.issue_note or f"导入行未映射：{batch.source_name} 第 {row.row_no} 行"
 
     batch.status = ImportBatchStatus.COMMITTED.value
-    batch.committed_at = datetime.now()
+    batch.committed_at = now_second()
     batch.unmapped_count = unmapped
     batch.updated_by = actor
     session.flush()
@@ -319,7 +320,7 @@ def reconciliation_report(session: Session, batch_id: int) -> dict[str, Any]:
         "batch_no": batch.batch_no,
         "source_name": batch.source_name,
         "status": batch.status,
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": now_second().isoformat(),
         "rows": {
             "source_total": len(rows),
             "imported": len(imported),

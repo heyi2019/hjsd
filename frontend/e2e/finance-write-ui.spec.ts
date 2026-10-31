@@ -114,9 +114,10 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await dialog.getByLabel("类别").fill("E2E_UI_FLOW");
     await dialog.getByLabel("金额").fill("10.00");
     await dialog.getByLabel("摘要").fill("E2E 独立流水 UI");
-    await dialog.getByRole("button", { name: "提交审核" }).click();
+    // 口径：资金流水已取消审核/驳回流程，录入即入账（3f7c115）。按钮文案为「提交」。
+    await dialog.getByRole("button", { name: "提交" }).click();
 
-    await expect(page.getByText("独立资金流水已提交，等待审核")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("独立资金流水已提交，已入账")).toBeVisible({ timeout: 10000 });
     expect(errors).toEqual([]);
   });
 
@@ -147,10 +148,13 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
 
     // 业务规则：买号返点（BUY）只能关联回收（HS）订单。故新建 HS 订单作为来源。
     // HS 订单需绑定 IN_STOCK 的 RECOVERY 账号（与 business-write 夹具一致）。
+    // 库存台账路由已随表改名 accounts → stocks（迁移 0009），返回分页信封 { items, total }。
     const accounts = (await request
-      .get(`${API_BASE}/accounts`, { headers: ADMIN })
-      .then((r) => r.json())) as Array<{ id: number; status: string; inventory_type?: string }>;
-    const account = accounts.find(
+      .get(`${API_BASE}/stocks`, { headers: ADMIN })
+      .then((r) => r.json())) as {
+      items: Array<{ id: number; status: string; inventory_type?: string }>;
+    };
+    const account = accounts.items.find(
       (a) => a.status === "IN_STOCK" && a.inventory_type === "RECOVERY",
     );
     expect(account, "缺少 RECOVERY 测试账号").toBeTruthy();
@@ -171,7 +175,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
 
     await page.goto("/");
     await navItem(page, "资金中心").click();
-    await page.getByRole("tab", { name: "返点", exact: true }).click();
+    await page.getByRole("tab", { name: "返点明细", exact: true }).click();
     await page.getByRole("button", { name: "新增返点记录" }).click();
 
     const dialog = page.getByRole("dialog");

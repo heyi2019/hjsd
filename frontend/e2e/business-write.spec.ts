@@ -163,10 +163,9 @@ test("资金闭环：独立流水审核冲销、资金池划转与日对账", as
   });
   expect(flow.status()).toBe(201);
   const flowBody = await flow.json();
-  expect(flowBody.status).toBe("PENDING");
+  // 口径：资金流水已取消审核/驳回流程，录入即入账（提交 3f7c115），创建即 APPROVED。
+  expect(flowBody.status).toBe("APPROVED");
 
-  const approved = await request.post(`${apiBase}/cashflows/${flowBody.id}/approve`, { headers });
-  expect(approved.status()).toBe(200);
   const reversal = await request.post(`${apiBase}/cashflows/${flowBody.id}/reverse`, {
     headers,
     data: { reversed_on: "2026-10-17", reason: "E2E 冲销" },

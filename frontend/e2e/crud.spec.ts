@@ -24,8 +24,11 @@ test.describe("real-backend CRUD round-trip", () => {
     const auth = AUTH_HEADERS;
 
     // 0) 清理残留：把此前运行的 联测_CRUD_ 测试客户置 DISABLED
-    const pre = await request.get(`${API_BASE}/customers`, { headers: auth });
-    for (const c of await pre.json()) {
+    // GET /customers 返回分页信封 { items, total }（PageOut），不再返回裸数组。
+    const pre = (await (
+      await request.get(`${API_BASE}/customers`, { headers: auth })
+    ).json()) as { items: Array<{ id: number; display_name: string }> };
+    for (const c of pre.items) {
       if (typeof c.display_name === "string" && c.display_name.startsWith(TEST_PREFIX)) {
         await request.patch(`${API_BASE}/customers/${c.id}/status`, {
           headers: auth,
@@ -46,9 +49,11 @@ test.describe("real-backend CRUD round-trip", () => {
 
     // 2) Read：新客户已落库并出现在列表
     const list = await request.get(`${API_BASE}/customers`, { headers: auth });
-    const customers = await list.json();
+    const customers = (await list.json()) as {
+      items: Array<{ id: number; display_name: string }>;
+    };
     expect(
-      customers.some(
+      customers.items.some(
         (c: { id: number; display_name: string }) =>
           c.id === id && c.display_name.startsWith(TEST_PREFIX),
       ),

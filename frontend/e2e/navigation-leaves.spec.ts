@@ -29,7 +29,9 @@ const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
   },
   {
     nav: "资金中心",
-    tabs: ["总览", "流水", "押金", "对账", "异常", "返点"],
+    // 与 FundsPage.tsx 的 Tabs items 保持一致：原「返点」已更名「返点明细」，
+    // 并新增「工作室支出」页签。增删 Tab 时需同步此列表。
+    tabs: ["总览", "流水", "押金", "对账", "异常", "返点明细", "工作室支出"],
   },
   {
     nav: "经营中心",

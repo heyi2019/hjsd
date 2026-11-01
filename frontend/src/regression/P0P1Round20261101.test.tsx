@@ -394,6 +394,32 @@ it("P1/FE-053：报表导出成功后显示可核对的结果反馈", async () =
   expect(revokeUrl).toHaveBeenCalledWith("blob:report");
 });
 
+it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async () => {
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValueOnce({
+    items: [{
+      order_id: 11,
+      order_no: "HS-2026-0011",
+      order_type: "HS",
+      trade_date: "2026-11-01",
+      status: "COMPLETED",
+      income: "600.00",
+      buy_amount: "400.00",
+      direct_cost: "50.00",
+      rebate: "10.00",
+      net_profit: "160.00",
+    }],
+    total: { income: "600.00", buy_amount: "400.00", direct_cost: "50.00", rebate: "10.00", net_profit: "160.00" },
+  } as never);
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<ReportsPage />, { user: "admin" });
+  await user.click(await screen.findByRole("tab", { name: /订单利润/ }));
+
+  expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
+  expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
+  expect(screen.getByText(/净利 = 收入 - 账号采购成本 - 直接成本 \+ 返点/)).toBeInTheDocument();
+  expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
+});
+
 it("P1/FE-194：客户 CSV 导出完成后给出成功反馈", async () => {
   vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
     { id: 1, customer_no: "CUS-0001", display_name: "测试客户", status: "ACTIVE" },
@@ -652,7 +678,7 @@ it("P1/FE-114/165：附件未选对象时保护上传入口并给出前置提示
 });
 
 it("P1/FE-104/110/160：质量摘要失败不显示零，全部关闭时禁用批量动作", async () => {
-  vi.mocked(catalog.qualityApi.summary).mockRejectedValueOnce({ isAxiosError: true, message: "quality summary down" });
+  vi.mocked(catalog.qualityApi.summary).mockRejectedValueOnce(new Error("quality summary down"));
   vi.mocked(catalog.qualityApi.list).mockResolvedValueOnce({
     items: [{ id: 1, issue_no: "QLT-closed", severity: "LOW", title: "已关闭", entity_type: "order", entity_id: "1", status: "CLOSED", message: "done" }],
   });

@@ -811,6 +811,7 @@ export interface OrderProfitRow {
   trade_date: string;
   status: string;
   income: string;
+  buy_amount: string;
   direct_cost: string;
   rebate: string;
   net_profit: string;
@@ -819,7 +820,7 @@ export interface OrderProfitRow {
 export interface OrderProfitReport {
   from?: string | null;
   to?: string | null;
-  total: { income: string; buy_amount?: string; direct_cost: string; rebate: string; net_profit: string };
+  total: { income: string; buy_amount: string; direct_cost: string; rebate: string; net_profit: string };
   items: OrderProfitRow[];
 }
 

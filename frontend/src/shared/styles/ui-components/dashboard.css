@@ -1,0 +1,321 @@
+/* ── EntryCard / EntryRow ─────────────────────────────────── */
+/* 可点击入口卡（工作台速览区）：玻璃材质与 StatCard 同源，差异只在
+ * cursor/焦点态/tone。纵向节奏仍由父级 .ui-stack gap 独占，卡内不带 margin。 */
+.ui-entry-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+.ui-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition:
+    transform var(--dur) var(--ease-spring),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+.ui-entry-card:hover {
+  border-color: var(--brand-border);
+  box-shadow: var(--shadow-raised);
+}
+/* 直接操纵（Apple HIG）：可点卡片悬浮轻抬、按下即时缩量，松手弹簧回弹。
+   与 interactions.css 的按钮/导航反馈同源；仅供「减弱动效」未开启的用户。 */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-entry-card:hover { transform: translateY(-2px); }
+  .ui-entry-card:active {
+    transform: scale(0.98);
+    transition-duration: var(--dur-fast);
+    transition-timing-function: var(--ease);
+  }
+}
+.ui-entry-card:focus-visible {
+  outline: var(--border-w-2) solid var(--color-primary);
+  outline-offset: var(--space-1);
+}
+.ui-entry-card__title {
+  font: var(--font-caption);
+  color: var(--color-text-secondary);
+}
+.ui-entry-card__value {
+  font-family: var(--font-sans);
+  font-size: var(--fs-title-2);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ui-entry-card__desc { font: var(--font-caption-2); }
+.ui-entry-card--primary {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--glass-border));
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--glass));
+}
+.ui-entry-card--warn {
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--glass-border));
+}
+.ui-entry-card--warn .ui-entry-card__value { color: var(--color-warning); }
+
+/* 工作台：一个明确的主动作，两个低权重导航入口；不虚构尚未加载的数据。 */
+.dashboard-page .ui-page-header { padding-block: var(--space-3) var(--space-2); }
+.dashboard-page .ui-page-header__title {
+  font-size: clamp(30px, 3vw, 42px);
+  letter-spacing: -0.05em;
+}
+.dashboard-page .ui-page-header__desc {
+  max-width: 34rem;
+  color: var(--color-text-secondary);
+}
+.dashboard-page .ui-entry-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.dashboard-page .ui-entry-card {
+  min-height: 104px;
+  justify-content: center;
+  padding: var(--space-4) var(--space-5);
+  border-radius: 20px;
+}
+.dashboard-page .ui-entry-card--primary {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 16%, var(--glass)), var(--glass));
+  box-shadow: var(--shadow-raised);
+}
+.dashboard-note {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  border-inline-start: var(--border-w-2) solid var(--color-primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--glass));
+}
+.dashboard-note__eyebrow {
+  color: var(--color-primary-text);
+  font: var(--font-caption);
+  font-weight: 600;
+}
+.dashboard-note strong { color: var(--color-text-primary); font: var(--font-body-s); }
+.dashboard-note .muted { font: var(--font-caption-2); }
+
+/* 工作台入口组：所有业务复用相同的标题、内容与卡片高度。 */
+.dashboard-entry-group {
+  --dashboard-accent: var(--color-primary);
+  display: grid;
+  grid-template-rows: var(--sz-42) var(--sz-106);
+  gap: var(--space-2);
+  min-width: 0;
+  position: relative;
+  padding: var(--space-3);
+  border: var(--border-w) solid color-mix(in srgb, var(--dashboard-accent) 26%, var(--glass-border));
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--dashboard-accent) 10%, var(--glass)),
+    color-mix(in srgb, var(--dashboard-accent) 3%, var(--glass))
+  );
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--dashboard-accent) 50%, transparent), var(--card-top-hi), 0 var(--space-3) var(--space-6) color-mix(in srgb, var(--dashboard-accent) 9%, transparent);
+}
+.dashboard-entry-group--sell { --dashboard-accent: var(--color-primary); }
+.dashboard-entry-group--self-owned { --dashboard-accent: var(--color-success); }
+.dashboard-entry-group--distribution { --dashboard-accent: var(--color-warning); }
+.dashboard-entry-group--service { --dashboard-accent: var(--color-service); }
+
+/* 只有售出承担主推视觉；其余入口用留白承托业务色。 */
+.dashboard-entry-group--self-owned,
+.dashboard-entry-group--distribution,
+.dashboard-entry-group--service {
+  border-color: color-mix(in srgb, var(--dashboard-accent) 14%, var(--glass-border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--dashboard-accent) 4%, var(--glass)),
+    var(--glass)
+  );
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--dashboard-accent) 44%, transparent), var(--card-top-hi), var(--shadow-soft);
+}
+
+.dashboard-entry-group::before {
+  content: "";
+  position: absolute;
+  inset-block-start: var(--space-4);
+  inset-inline-start: var(--space-3);
+  width: var(--space-6);
+  height: calc(var(--space-1) + 1px);
+  border-radius: var(--radius-pill);
+  background: var(--dashboard-accent);
+  box-shadow: 0 0 0 var(--space-half) color-mix(in srgb, var(--dashboard-accent) 12%, transparent);
+}
+
+.dashboard-entry-group--no-accent::before { display: none; }
+
+/* 右侧业务组保持白色中性视觉，避免三组业务色叠在一起。 */
+.dashboard-entry-group--neutral {
+  border: var(--border-w) solid var(--glass-border);
+  background: var(--glass);
+  box-shadow: var(--card-top-hi), var(--shadow-soft);
+}
+
+.dashboard-entry-group--neutral .ui-entry-card {
+  border: var(--border-w) solid var(--glass-border);
+  background: var(--glass);
+  box-shadow: var(--card-top-hi), var(--shadow-soft);
+}
+
+.dashboard-entry-group--neutral .ui-entry-card::before { opacity: 0.28; }
+.dashboard-entry-group--neutral .ui-entry-card::after {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.dashboard-entry-group__heading {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--space-1);
+}
+
+.dashboard-entry-group__heading h2 {
+  margin: 0;
+  color: color-mix(in srgb, var(--dashboard-accent) 50%, var(--color-text-primary));
+  font: var(--font-card-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-entry-group__items {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+  height: 100%;
+  gap: var(--space-2);
+}
+
+.dashboard-entry-group--distribution .dashboard-entry-group__items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-page .ui-entry-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  justify-content: flex-end;
+  padding: var(--space-4);
+  border-color: color-mix(in srgb, var(--color-text-primary) 8%, var(--glass-border));
+  background: var(--glass);
+  box-shadow: var(--card-top-hi), var(--shadow-soft);
+}
+
+.dashboard-page .ui-entry-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 18%, transparent), transparent 30%),
+    radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 12%, transparent), transparent 28%);
+  filter: blur(var(--space-3));
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.dashboard-page .ui-entry-card::after {
+  content: "›";
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  color: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 76%, var(--color-text-secondary));
+  font-size: var(--fs-title-3);
+  font-weight: 500;
+  opacity: 0.78;
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.dashboard-page .ui-entry-card:hover::after,
+.dashboard-page .ui-entry-card:focus-visible::after {
+  transform: translate(var(--space-1), 0);
+}
+
+.dashboard-page .ui-entry-card__title {
+  position: relative;
+  z-index: 1;
+  color: var(--color-text-primary);
+  font: var(--font-body-m);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  transform: translateY(calc(var(--space-2) * -1));
+}
+
+.dashboard-page .ui-entry-card__eyebrow {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  margin-block-end: var(--space-half);
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 86%, var(--color-text-primary));
+  background: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 12%, transparent);
+  font: var(--font-caption-2);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-entry-group--sell .ui-entry-card--primary {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary) 15%, var(--glass)),
+    color-mix(in srgb, var(--color-primary) 4%, var(--glass))
+  );
+  box-shadow: var(--card-top-hi), var(--shadow-raised);
+}
+
+.dashboard-entry-group--sell .ui-entry-card--primary {
+  border-color: color-mix(in srgb, var(--color-primary) 26%, var(--glass-border));
+}
+
+.dashboard-entry-group .ui-entry-card {
+  min-height: var(--sz-106);
+  height: var(--sz-106);
+  box-sizing: border-box;
+  border-color: color-mix(in srgb, var(--dashboard-accent) 26%, var(--glass-border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--dashboard-accent) 13%, var(--glass)),
+    color-mix(in srgb, var(--dashboard-accent) 3.5%, var(--glass))
+  );
+}
+
+.dashboard-entry-group .ui-entry-card__title {
+  color: color-mix(in srgb, var(--dashboard-accent) 50%, var(--color-text-primary));
+}
+
+.dashboard-entry-group--self-owned .ui-entry-card,
+.dashboard-entry-group--distribution .ui-entry-card,
+.dashboard-entry-group--service .ui-entry-card {
+  border-color: color-mix(in srgb, var(--dashboard-accent) 16%, var(--glass-border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--dashboard-accent) 6%, var(--glass)),
+    var(--glass)
+  );
+}
+
+.dashboard-entry-group--self-owned .ui-entry-card__title,
+.dashboard-entry-group--distribution .ui-entry-card__title,
+.dashboard-entry-group--service .ui-entry-card__title,
+.dashboard-entry-group--self-owned .dashboard-entry-group__heading h2,
+.dashboard-entry-group--distribution .dashboard-entry-group__heading h2,
+.dashboard-entry-group--service .dashboard-entry-group__heading h2 {
+  color: var(--color-text-primary);
+}
+
+/* 中性右侧卡片覆盖业务渐变，只保留左下与右上的角落光晕。 */
+.dashboard-entry-group--neutral .ui-entry-card {
+  border-color: var(--glass-border);
+  background: var(--glass);
+}
+
+.th-business-page .ui-page-header__desc { max-width: 42rem; }
+@media (max-width: 640px) {
+  .dashboard-entry-group--distribution .dashboard-entry-group__items { grid-template-columns: 1fr; }
+}

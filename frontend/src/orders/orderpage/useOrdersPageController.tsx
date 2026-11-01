@@ -14,7 +14,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
-import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, filterBusinessOrders, formatOrderAmount } from "./helpers";
+import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationRows, filterBusinessOrders, formatOrderAmount, type AllocationFormRow, type AllocationMode } from "./helpers";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -114,6 +114,10 @@ export function useOrdersPageController(params: {
   const [allocationForm] = Form.useForm();
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
+  /** 分润口径：按操作四项（买号/售出/运营/公司）或按人自由分配。默认按操作。 */
+  const [allocationMode, setAllocationMode] = useState<AllocationMode>("ACTION");
+  /** 按操作分配时的动作执行人候选，来自订单已过账事件的 operator_user_ids。 */
+  const [allocationCandidates, setAllocationCandidates] = useState<{ BUY: number[]; SELL: number[] }>({ BUY: [], SELL: [] });
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
@@ -155,20 +159,35 @@ export function useOrdersPageController(params: {
         policyApi.allocations(order.id),
         employeesApi.list(),
       ]);
+      // 已过账事件的执行人：按操作分润时，买号/售出收益人只能是这些人。
+      const candidatesFor = (eventType: "BUY" | "SELL") => {
+        const posted = (order.events ?? []).filter(
+          (event) => event.event_type === eventType && event.is_posted,
+        );
+        return [...new Set(posted.flatMap((event) => event.operator_user_ids ?? []))];
+      };
+      const candidates = { BUY: candidatesFor("BUY"), SELL: candidatesFor("SELL") };
+      const typed = result.items.filter((item) => item.allocation_type);
+      const mode: AllocationMode = typed.length > 0 || result.items.length === 0 ? "ACTION" : "PERSON";
       setActionOrder(order);
       setUsers(userResult.filter((item) => item.is_active));
+      setAllocationCandidates(candidates);
+      setAllocationMode(mode);
       setAllocationProfit(result.order_profit ?? "0");
-      // 分润按「姓名」录入：存量行直接映射成姓名（COMPANY / 无收益人 → 公司归属），
-      // 不再暴露 BUY/SELL/OPERATION/COMPANY 四个动作位——那种结构只允许一人拿运营份额。
+      // 分润两种录入口径：按操作四项（买号/售出/运营/公司）或按人头自由分配。
+      // 存量行带 allocation_type 说明是按操作口径，原样回显；否则按人。
       // 角色必须原样带回表单：不回填就会在保存时被默认值 OWNER 覆盖掉。
-      const rows = result.items.map((item) => ({
-        employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
-        role: item.role || "OWNER",
-        allocation_rate: item.allocation_rate,
-        allocation_amount: item.allocation_amount ?? "",
-      }));
+      const rows: AllocationFormRow[] =
+        mode === "ACTION"
+          ? buildActionAllocationRows(result.items, candidates)
+          : result.items.map((item) => ({
+              employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
+              role: item.role || "OWNER",
+              allocation_rate: item.allocation_rate,
+              allocation_amount: item.allocation_amount ?? "",
+            }));
       allocationForm.setFieldsValue({
-        allocations: rows.length > 0 ? rows : [{ employee: undefined, role: "OWNER", allocation_rate: "", allocation_amount: "" }],
+        allocations: rows,
       });
       setAllocationOpen(true);
     } catch (error) {
@@ -516,8 +535,10 @@ export function useOrdersPageController(params: {
     onNavigate,
     actionOrder,
     activeTab,
+    allocationCandidates,
     allocationForm,
     allocationIsLoss,
+    allocationMode,
     allocationOpen,
     allocationProfit,
     allocationSubmitting,

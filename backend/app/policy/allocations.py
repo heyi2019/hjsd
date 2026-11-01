@@ -233,7 +233,9 @@ def _set_action_allocations(
     if len(normalized_items) != 4 or any(not item.get("allocation_type") for item in normalized_items):
         raise Validation("利润分配必须且只能包含买号、售出、运营和公司归属四项")
     has_typed_items = True
-    action_actor_ids: dict[str, int] = {}
+    # 动作执行人候选：事件上的 operator_user_ids 优先（可多人），
+    # 没有再回退事件的 created_by（录入账号，通常只有一个）。
+    action_actor_ids: dict[str, list[int]] = {}
     if has_typed_items:
         for action_type in ("BUY", "SELL"):
             action = session.scalar(
@@ -248,26 +250,38 @@ def _set_action_allocations(
             if action is None and action_type == "BUY" and order.account_id is not None:
                 action = session.scalar(select(OrderEvent).join(Order, Order.id == OrderEvent.order_id).where(Order.account_id == order.account_id, OrderEvent.event_type == "BUY", OrderEvent.is_posted.is_(True)).order_by(OrderEvent.id.desc()))
             if action is not None:
-                actor_id = session.scalar(select(User.id).where(User.username == action.created_by))
-                if actor_id is None:
-                    raise Validation(
-                        f"{action_type} 动作执行人不存在，无法绑定收益人",
-                        details={"event_id": action.id, "actor": action.created_by},
+                candidates = [
+                    int(uid) for uid in (action.operator_user_ids or []) if uid is not None
+                ]
+                if candidates:
+                    existing = set(
+                        session.scalars(select(User.id).where(User.id.in_(candidates))).all()
                     )
-                action_actor_ids[action_type] = actor_id
+                    candidates = [uid for uid in candidates if uid in existing]
+                if not candidates:
+                    actor_id = session.scalar(
+                        select(User.id).where(User.username == action.created_by)
+                    )
+                    if actor_id is None:
+                        raise Validation(
+                            f"{action_type} 动作执行人不存在，无法绑定收益人",
+                            details={"event_id": action.id, "actor": action.created_by},
+                        )
+                    candidates = [int(actor_id)]
+                action_actor_ids[action_type] = candidates
             elif action_type == "SELL":
                 contract = session.scalar(select(Installment).where(Installment.order_id == order.id, Installment.contract_type == "STOCK_SALE"))
                 if contract is not None:
                     actor_id = session.scalar(select(User.id).where(User.username == contract.created_by))
                     if actor_id is None:
                         raise Validation("售出动作执行人不存在，无法绑定收益人")
-                    action_actor_ids[action_type] = actor_id
+                    action_actor_ids[action_type] = [int(actor_id)]
             elif action_type == "BUY" and order.order_type in {"HS", "TH", "DG"}:
                 # 回收、提号、代挂都属于买号业务动作；DG 沿用标准 SELL
                 # 资金事件，因此其买号收益人取建单操作人员。
                 creator_id = session.scalar(select(User.id).where(User.username == order.created_by))
                 if creator_id is not None:
-                    action_actor_ids[action_type] = creator_id
+                    action_actor_ids[action_type] = [int(creator_id)]
     for item in normalized_items:
         rate = to_money(item.get("allocation_rate"))
         role = str(item.get("role") or "").upper()
@@ -291,13 +305,19 @@ def _set_action_allocations(
             if allocation_type in {"BUY", "SELL"} and allocation_type not in action_actor_ids and item.get("user_id") is not None:
                 raise Validation(f"{allocation_type} 收益人必须绑定对应动作执行人", details={"field": "user_id"})
             if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids:
-                expected_user_id = action_actor_ids[allocation_type]
-                if item.get("user_id") is not None and int(item["user_id"]) != expected_user_id:
+                candidates = action_actor_ids[allocation_type]
+                if item.get("user_id") is None:
+                    # 只有唯一执行人时自动绑定；多人协作时由人工指定，不替用户猜。
+                    if len(candidates) == 1:
+                        item["user_id"] = candidates[0]
+                elif int(item["user_id"]) not in candidates:
                     raise Validation(
-                        f"{allocation_type} 收益人必须绑定对应动作执行人",
-                        details={"field": "user_id", "expected_user_id": expected_user_id},
+                        f"{allocation_type} 收益人必须绑定对应动作执行人，且必须是该动作的执行人",
+                        details={
+                            "field": "user_id",
+                            "allowed_user_ids": candidates,
+                        },
                     )
-                item["user_id"] = expected_user_id
         if item.get("user_id") is not None:
             user_ids.add(int(item["user_id"]))
         total += rate
@@ -331,11 +351,8 @@ def _set_action_allocations(
         allocation_type = str(item["allocation_type"]).upper() if item.get("allocation_type") else None
         row = OrderProfitAllocation(
             order_id=order_id,
-            user_id=(
-                action_actor_ids.get(allocation_type)
-                if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids
-                else (int(item["user_id"]) if item.get("user_id") is not None else None)
-            ),
+            # 收益人已在上面归一化：单一执行人自动填、多人由人工指定。
+            user_id=int(item["user_id"]) if item.get("user_id") is not None else None,
             role=str(item["role"]).upper(),
             allocation_type=allocation_type,
             allocation_rate=to_money(item.get("allocation_rate")),

@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { validateAllocations } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessForm } from "../../shared/ui";
@@ -173,8 +173,10 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
 export function AllocationModal({ controller }: { controller: OrdersPageController }) {
   const {
     actionOrder,
+    allocationCandidates,
     allocationForm,
     allocationIsLoss,
+    allocationMode,
     allocationOpen,
     allocationProfit,
     allocationSubmitting,
@@ -184,6 +186,24 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     setAllocationOpen,
     setAllocationSubmitting,
   } = controller;
+  const isAction = allocationMode === "ACTION";
+  const actionKinds: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
+  /** 本单是否有已过账的买号/售出动作；没有的动作位不给填人。 */
+  const hasPosted = (kind: AllocationType) =>
+    (kind === "BUY" || kind === "SELL") &&
+    (actionOrder?.events ?? []).some((event) => event.event_type === kind && event.is_posted);
+  const staffOptions = employeeOptions.filter((option) => option.value !== "COMPANY");
+  /** 买号/售出只能选该动作的执行人；没登记执行人时退回全部员工，由后端兜底校验。 */
+  const optionsFor = (kind?: AllocationType) => {
+    if (kind === "BUY" || kind === "SELL") {
+      const ids = allocationCandidates[kind];
+      const picked = employeeOptions.filter(
+        (option) => typeof option.value === "number" && ids.includes(option.value),
+      );
+      return picked.length > 0 ? picked : staffOptions;
+    }
+    return staffOptions;
+  };
   return (
       <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
@@ -199,14 +219,16 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           layout="vertical"
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
-            const rows = (values.allocations ?? []).filter(
-              (row) => row.employee !== undefined && row.employee !== null,
-            );
+            const allRows = values.allocations ?? [];
+            // 按操作四项是固定结构，缺人的行也要保留（由后端判断该项是否允许为空）。
+            const rows = isAction
+              ? allRows
+              : allRows.filter((row) => row.employee !== undefined && row.employee !== null);
             if (rows.length === 0) {
               appMessage.error("请先在员工花名册里选择分润对象");
               return;
             }
-            const result = validateAllocations(rows, allocationProfit);
+            const result = validateAllocations(rows, allocationProfit, allocationMode);
             if (!result.ok) {
               appMessage.error(result.error);
               return;
@@ -238,69 +260,92 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
             }
           />
           <Typography.Paragraph type="secondary">
-            每行一位员工：填<strong>比例</strong>按订单利润占比分，填<strong>金额</strong>按固定额分，
-            两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。
+            {isAction
+              ? "按操作分配：买号、售出、运营、公司四项，比例合计须为 100%。买号/售出只能给该动作的执行人；多人协作时由你指定其中一位，其余人记入运营。"
+              : "每行一位员工：填比例按订单利润占比分，填金额按固定额分，两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
               <>
-                {fields.map((field) => (
-                  <AdaptiveFormGrid key={field.key} className="orders-allocation-row">
-                    <Form.Item
-                      name={[field.name, "employee"]}
-                      label="姓名"
-                      rules={[{ required: true, message: "请选择姓名" }]}
-                    >
-                      <Select
-                        placeholder="选择员工"
-                        options={employeeOptions}
-                        className="ui-control-width-200"
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, "role"]}
-                      label="角色"
-                      initialValue="OWNER"
-                    >
-                      <Select
-                        placeholder="选择角色"
-                        options={profitRoleOptions}
-                        className="ui-control-width-120"
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, "allocation_rate"]}
-                      label="比例"
-                      rules={percentRules("比例")}
-                    >
-                      <Input suffix="%" inputMode="decimal" className="ui-control-width-120" />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, "allocation_amount"]}
-                      label="金额"
-                      rules={moneyRules("金额")}
-                    >
-                      <Input prefix="¥" inputMode="decimal" className="ui-control-width-140" />
-                    </Form.Item>
-                    <PermissionButton
-                      permission="policy.manage"
-                      type="link"
-                      danger
-                      disabled={fields.length <= 1}
-                      onClick={() => remove(field.name)}
-                    >
-                      删除
-                    </PermissionButton>
-                  </AdaptiveFormGrid>
-                ))}
-                <PermissionButton
-                  permission="policy.manage"
-                  type="dashed"
-                  block
-                  onClick={() => add({ role: "OWNER", allocation_rate: "", allocation_amount: "" })}
-                >
-                  + 增加一行
-                </PermissionButton>
+                {fields.map((field, index) => {
+                  const kind = isAction ? actionKinds[index] : undefined;
+                  // 公司位不绑人；本单没有的动作位（如代挂无买号）也不给填。
+                  const company = kind === "COMPANY";
+                  const actionMissing = (kind === "BUY" || kind === "SELL") && !hasPosted(kind);
+                  const employeeDisabled = company || actionMissing;
+                  return (
+                    <AdaptiveFormGrid key={field.key} className={`orders-allocation-row${isAction ? " is-action" : ""}`}>
+                      {kind ? (
+                        <span className="orders-allocation-kind">{ALLOCATION_TYPE_LABEL[kind]}</span>
+                      ) : null}
+                      <Form.Item name={[field.name, "allocation_type"]} hidden>
+                        <Input />
+                      </Form.Item>
+                      <Form.Item
+                        name={[field.name, "employee"]}
+                        label="姓名"
+                        rules={employeeDisabled ? [] : [{ required: true, message: "请选择姓名" }]}
+                      >
+                        <Select
+                          placeholder={actionMissing ? "本单无此动作" : "选择员工"}
+                          options={company ? [{ value: "COMPANY", label: "公司（不绑定人员）" }] : optionsFor(kind)}
+                          disabled={employeeDisabled}
+                          className="ui-control-width-200"
+                        />
+                      </Form.Item>
+                      {isAction ? null : (
+                        <Form.Item name={[field.name, "role"]} label="角色" initialValue="OWNER">
+                          <Select
+                            placeholder="选择角色"
+                            options={profitRoleOptions}
+                            className="ui-control-width-120"
+                          />
+                        </Form.Item>
+                      )}
+                      <Form.Item
+                        name={[field.name, "allocation_rate"]}
+                        label="比例"
+                        rules={
+                          isAction
+                            ? [...percentRules("比例"), { required: true, message: "请填写比例" }]
+                            : percentRules("比例")
+                        }
+                      >
+                        <Input suffix="%" inputMode="decimal" className="ui-control-width-120" />
+                      </Form.Item>
+                      {isAction ? null : (
+                        <>
+                          <Form.Item
+                            name={[field.name, "allocation_amount"]}
+                            label="金额"
+                            rules={moneyRules("金额")}
+                          >
+                            <Input prefix="¥" inputMode="decimal" className="ui-control-width-140" />
+                          </Form.Item>
+                          <PermissionButton
+                            permission="policy.manage"
+                            type="link"
+                            danger
+                            disabled={fields.length <= 1}
+                            onClick={() => remove(field.name)}
+                          >
+                            删除
+                          </PermissionButton>
+                        </>
+                      )}
+                    </AdaptiveFormGrid>
+                  );
+                })}
+                {isAction ? null : (
+                  <PermissionButton
+                    permission="policy.manage"
+                    type="dashed"
+                    block
+                    onClick={() => add({ role: "OWNER", allocation_rate: "", allocation_amount: "" })}
+                  >
+                    + 增加一行
+                  </PermissionButton>
+                )}
               </>
             )}
           </Form.List>

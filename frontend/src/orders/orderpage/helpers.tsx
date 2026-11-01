@@ -12,9 +12,29 @@ export const BUSINESS_CREATE_ITEMS = [
   { key: "DG", label: "新建代挂订单" },
 ];
 
+export type AllocationType = "BUY" | "SELL" | "OPERATION" | "COMPANY";
+
+/** 分润录入口径：按人自由分配，或按操作四项（买号/售出/运营/公司）。 */
+export type AllocationMode = "PERSON" | "ACTION";
+
+export const ALLOCATION_TYPE_LABEL: Record<AllocationType, string> = {
+  BUY: "买号",
+  SELL: "售出",
+  OPERATION: "运营",
+  COMPANY: "公司",
+};
+
+export const ALLOCATION_TYPE_ROLE: Record<AllocationType, string> = {
+  BUY: "BUYER",
+  SELL: "SALES",
+  OPERATION: "SERVICE",
+  COMPANY: "OWNER",
+};
+
 export type AllocationFormRow = {
   employee?: number | "COMPANY";
   role?: string;
+  allocation_type?: AllocationType | "";
   allocation_rate?: string;
   allocation_amount?: string;
 };
@@ -22,6 +42,7 @@ export type AllocationFormRow = {
 export type AllocationItem = {
   user_id: number | null;
   role: string;
+  allocation_type?: AllocationType | null;
   allocation_rate: string;
   allocation_amount: string;
 };
@@ -30,10 +51,74 @@ export type AllocationValidation =
   | { ok: true; items: AllocationItem[] }
   | { ok: false; error: string };
 
-export function validateAllocations(rows: AllocationFormRow[], orderProfit: string): AllocationValidation {
+/** 按操作四项构建表单行：买号/售出只有唯一执行人时自动带出，多人协作留空由人工选。 */
+export function buildActionAllocationRows(
+  items: Array<{
+    allocation_type?: AllocationType | null;
+    user_id?: number | null;
+    role?: string;
+    allocation_rate?: string;
+  }>,
+  candidates: { BUY: number[]; SELL: number[] },
+): AllocationFormRow[] {
+  const order: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
+  return order.map((kind) => {
+    const existed = items.find((item) => item.allocation_type === kind);
+    let employee: number | "COMPANY" | undefined;
+    if (existed) {
+      employee = existed.user_id ?? "COMPANY";
+    } else if (kind === "COMPANY") {
+      employee = "COMPANY";
+    } else if (kind === "BUY" || kind === "SELL") {
+      const ids = candidates[kind];
+      employee = ids.length === 1 ? ids[0] : undefined;
+    }
+    return {
+      allocation_type: kind,
+      employee,
+      role: ALLOCATION_TYPE_ROLE[kind],
+      allocation_rate: existed?.allocation_rate ?? "",
+      allocation_amount: "",
+    };
+  });
+}
+
+export function validateAllocations(
+  rows: AllocationFormRow[],
+  orderProfit: string,
+  mode: AllocationMode = "PERSON",
+): AllocationValidation {
   const items: AllocationItem[] = [];
   let rateTotal = 0;
   let amountTotal = 0;
+
+  if (mode === "ACTION") {
+    const kinds = rows.map((row) => row.allocation_type);
+    const expected: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
+    if (rows.length !== 4 || expected.some((kind) => !kinds.includes(kind))) {
+      return { ok: false, error: "按操作分配必须且只能包含买号、售出、运营、公司四项" };
+    }
+    for (const row of rows) {
+      const rate = Number(String(row.allocation_rate ?? "").trim());
+      if (!Number.isFinite(rate) || rate < 0) {
+        return { ok: false, error: `${ALLOCATION_TYPE_LABEL[row.allocation_type as AllocationType]} 的比例需为不小于 0 的数字` };
+      }
+      rateTotal += rate;
+      const kind = row.allocation_type as AllocationType;
+      items.push({
+        user_id: kind === "COMPANY" || row.employee === "COMPANY" ? null : Number(row.employee),
+        role: row.role || ALLOCATION_TYPE_ROLE[kind],
+        allocation_type: kind,
+        allocation_rate: String(rate),
+        allocation_amount: "0",
+      });
+    }
+    if (Math.abs(rateTotal - 100) > 0.001) {
+      return { ok: false, error: "四项比例合计必须为 100%" };
+    }
+    return { ok: true, items };
+  }
+
   for (const row of rows) {
     const rate = String(row.allocation_rate ?? "").trim();
     const amount = String(row.allocation_amount ?? "").trim();

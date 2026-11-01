@@ -168,6 +168,15 @@
 .orders-allocation-row .ant-input-affix-wrapper,
 .orders-allocation-row .ant-input { width: 100%; }
 .orders-allocation-row > .ant-btn { align-self: center; margin: 0; white-space: nowrap; }
+/* 按操作分润：固定四项，每行只有「分配项 + 姓名 + 比例」三列。 */
+.orders-allocation-row.is-action {
+  grid-template-columns: 72px minmax(180px, 1fr) 120px;
+}
+.orders-allocation-kind {
+  align-self: center;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
 .ui-control-width-date { width: var(--control-date-width); }
 .ui-control-width-90 { width: var(--col-w-90); }
 .ui-control-width-100 { width: var(--col-w-100); }

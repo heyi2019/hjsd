@@ -144,8 +144,16 @@ const installmentCancelResult: InstallmentCancelResult = {
   cancel_event_ids: [1],
 };
 
+// 按人头自由分配的存量数据：不带 allocation_type 时弹窗走「按人」视图。
 const allocationRows: ProfitAllocation[] = [
-  { id: 1, order_id: 1, user_id: 9, role: "OWNER", allocation_type: "OPERATION", allocation_rate: "40" },
+  { id: 1, order_id: 1, user_id: 9, role: "OWNER", allocation_type: null, allocation_rate: "40" },
+];
+// 按操作四项的存量数据：带 allocation_type 时弹窗走「买号/售出/运营/公司」视图。
+const actionAllocationRows: ProfitAllocation[] = [
+  { id: 1, order_id: 1, user_id: null, role: "BUYER", allocation_type: "BUY", allocation_rate: "30" },
+  { id: 2, order_id: 1, user_id: null, role: "SALES", allocation_type: "SELL", allocation_rate: "40" },
+  { id: 3, order_id: 1, user_id: 9, role: "SERVICE", allocation_type: "OPERATION", allocation_rate: "20" },
+  { id: 4, order_id: 1, user_id: null, role: "OWNER", allocation_type: "COMPANY", allocation_rate: "10" },
 ];
 
 beforeEach(() => {
@@ -293,6 +301,49 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByDisplayValue("40")).toBeInTheDocument();
     // 姓名下拉（顶部多选 + 行内单选）都显示李四
     expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThan(0);
+  });
+
+  it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
+    // 空分润 → 按操作口径起步：买号、售出、运营、公司四项固定展开。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [],
+      total: 0,
+      order_profit: "5000.00",
+    });
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...order1,
+      events: [
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [9] },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [9] },
+      ],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
+    for (const label of ["买号", "售出", "运营", "公司"]) {
+      expect(within(modal).getByText(label)).toBeInTheDocument();
+    }
+    // 买号/售出各只有唯一执行人（李四），自动带出，不用手选。
+    expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: actionAllocationRows,
+      total: actionAllocationRows.length,
+      order_profit: "5000.00",
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    expect(payload).toHaveLength(4);
+    expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
+    expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ user_id: 9, role: "SERVICE" });
   });
 
   it("分润：既有角色回显并原样提交，不被默认 OWNER 覆盖", async () => {

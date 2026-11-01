@@ -220,7 +220,8 @@ describe("InventoryPanel：账号台账", () => {
 
     const csv = buildInventoryCsv([accounts[0]], { 1: detail });
     expect(csv).toContain("登记时间,出售时间,下架时间,寄售时间,寄售平台");
-    expect(csv).toContain("账号密码,渠道 / 区服,绑定手机号,有无二次,账号描述,账号图片,备注");
+    expect(csv).toContain("渠道 / 区服,绑定手机号,有无二次,账号描述,账号图片,备注");
+    expect(csv).not.toContain("账号密码");
     expect(csv).toContain("执行明细,资金明细,支出笔数,收入笔数,总支出,总收入");
     expect(csv).toContain("EV0001 · 买号 / 2026-10-15 10:20 / 100.00 / 回收登记 / admin");
     expect(csv).toContain("买号本金 / HS0001 / CF0001");

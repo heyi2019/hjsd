@@ -13,7 +13,7 @@ import {
 const INVENTORY_EXPORT_HEADERS = [
   "订单号", "业务", "类型", "游戏/产品类型", "库存编号", "平台", "成本", "库存状态", "未售时长",
   "建档操作人", "登记时间", "出售时间", "下架时间", "寄售时间", "寄售平台",
-  "账号密码", "渠道 / 区服", "绑定手机号", "有无二次", "账号描述", "账号图片", "备注", "执行明细", "资金明细",
+  "渠道 / 区服", "绑定手机号", "有无二次", "账号描述", "账号图片", "备注", "执行明细", "资金明细",
   "支出笔数", "收入笔数", "总支出", "总收入",
 ];
 function csvCell(value: unknown): string {
@@ -108,7 +108,6 @@ export function buildInventoryCsv(
         detailText.removedAt,
         detailText.consignmentAt,
         detailText.consignmentPlatforms,
-        row.game_password,
         row.channel_region,
         row.bound_phone,
         row.has_secondary == null ? "" : row.has_secondary ? "有" : "无",

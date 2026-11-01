@@ -1,4 +1,4 @@
-import { Descriptions, Input, Typography } from "antd";
+import { Descriptions, Input } from "antd";
 import { useMemo } from "react";
 import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
 import {
@@ -57,7 +57,7 @@ export function OrderDetailProfileSection({
     {
       key: "password",
       label: ACCOUNT_FIELD_MAP.password.fallback,
-      value: meta.password === "-" ? meta.password : <Typography.Text copyable>{meta.password}</Typography.Text>,
+      value: meta.password === "-" ? meta.password : "已隐藏",
     },
     { key: "channelRegion", label: ACCOUNT_FIELD_MAP.channelRegion.fallback, value: meta.channelRegion },
     { key: "secondary", label: ACCOUNT_FIELD_MAP.secondary.fallback, value: meta.secondary },

@@ -4,6 +4,8 @@ import { renderLight } from "../test/render";
 import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
+import { OrderDetail } from "../stocks/OrderDetail";
+import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 
@@ -85,4 +87,22 @@ it("P0/FE-074：已结清合约禁止登记收款和终止退款", async () => {
   await screen.findByText("TH0002-FQ");
   expect(screen.getByRole("button", { name: /登记收款/ })).toBeDisabled();
   expect(screen.getByRole("button", { name: /终止分期并退款/ })).toBeDisabled();
+});
+
+it("P1/FE-054：详情和库存 CSV 不得暴露账号密码", () => {
+  const account = {
+    id: 11,
+    game_account: "safe-account",
+    game_password: "secret-password",
+    game_type: "原神",
+    inventory_type: "RECOVERY",
+    status: "WAITING",
+  } as never;
+  renderLight(<OrderDetail row={account} detail={{ orders: [] } as never} loading={false} />, { user: "admin" });
+
+  expect(screen.queryByText("secret-password")).not.toBeInTheDocument();
+  expect(screen.getByText("已隐藏")).toBeInTheDocument();
+  const csv = buildInventoryCsv([account]);
+  expect(csv).not.toContain("账号密码");
+  expect(csv).not.toContain("secret-password");
 });

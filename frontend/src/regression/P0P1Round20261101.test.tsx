@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -17,6 +17,7 @@ import { OrderDetail } from "../stocks/OrderDetail";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
+import { appModal } from "../shared/ui/appFeedback";
 
 vi.mock("../shared/api/catalog");
 
@@ -117,7 +118,12 @@ it("P1/FE-054：详情和库存 CSV 不得暴露账号密码", () => {
   expect(csv).not.toContain("secret-password");
 });
 
-it("P1/FE-023：已有相同游戏账号时阻止重复建单", async () => {
+it("P1/FE-023：重复账号提示复购确认，确认后允许建单", async () => {
+  let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
+  const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
+    confirmConfig = config as typeof confirmConfig;
+    return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
+  });
   vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
     { id: 99, game_account: "duplicate-account", game_type: "王者荣耀", status: "WAITING" },
   ] as never);
@@ -155,8 +161,12 @@ it("P1/FE-023：已有相同游戏账号时阻止重复建单", async () => {
   await user.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
   await user.click(screen.getByRole("button", { name: /创建订单/ }));
 
-  await waitFor(() => expect(catalog.ordersApi.create).not.toHaveBeenCalled());
-  expect((await screen.findAllByText(/已有库存账号/)).length).toBeGreaterThan(0);
+  await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+  expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+  expect(confirmConfig).toMatchObject({ title: "检测到重复游戏账号", okText: "是，继续建单", cancelText: "否，返回修改" });
+  expect((await screen.findAllByText(/是否为复购/)).length).toBeGreaterThan(0);
+  await act(async () => { await confirmConfig?.onOk?.(); });
+  await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
 });
 
 it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0", async () => {

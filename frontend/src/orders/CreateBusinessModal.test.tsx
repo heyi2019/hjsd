@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -10,6 +10,7 @@ import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
 import { allFormFields, seedOrderFormFields } from "../test/formFieldsSeed";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
+import { appModal } from "../shared/ui/appFeedback";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -221,7 +222,12 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
   });
 
-it("FE-023：已有相同游戏账号时原建单测试入口阻止重复提交", async () => {
+it("FE-023：已有相同游戏账号时先确认复购，确认后允许建单", async () => {
+    let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
+    const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
+      confirmConfig = config as typeof confirmConfig;
+      return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
+    });
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
       { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "WAITING" },
     ] as never);
@@ -237,8 +243,12 @@ it("FE-023：已有相同游戏账号时原建单测试入口阻止重复提交"
     await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(catalog.ordersApi.create).not.toHaveBeenCalled());
-    expect((await screen.findAllByText(/已有库存账号/)).length).toBeGreaterThan(0);
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+    expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+    expect(confirmConfig).toMatchObject({ title: "检测到重复游戏账号", okText: "是，继续建单", cancelText: "否，返回修改" });
+    expect((await screen.findAllByText(/是否为复购/)).length).toBeGreaterThan(0);
+    await act(async () => { await confirmConfig?.onOk?.(); });
+    await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
   });
 
 it("FE-123：原建单测试入口的提号来源默认值跟随主数据", async () => {

@@ -66,6 +66,7 @@ export function CreateBusinessModal(props: {
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
+  const repurchaseConfirmedKey = useRef<string | null>(null);
   const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
@@ -75,7 +76,10 @@ export function CreateBusinessModal(props: {
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
   useEffect(() => {
-    if (!props.open) form.resetFields();
+    if (!props.open) {
+      form.resetFields();
+      repurchaseConfirmedKey.current = null;
+    }
   }, [props.open, form]);
 
   // 基础数据随页面挂载即预热并常驻内存：后续每次打开弹窗直接读 state，不再发网络请求。
@@ -127,17 +131,30 @@ export function CreateBusinessModal(props: {
     try {
       const gameAccount = String(values.game_account ?? "").trim();
       const gameType = String(values.game_type ?? "").trim();
-      if (gameAccount && gameType) {
+      const duplicateKey = `${gameType}\u0000${gameAccount}`;
+      if (gameAccount && gameType && repurchaseConfirmedKey.current !== duplicateKey) {
         const existingAccounts = await stocksApi.list();
         const duplicate = existingAccounts.find((account) => (
           account.status !== "VOID"
           && String(account.game_account ?? "").trim() === gameAccount
           && String(account.game_type ?? "").trim() === gameType
         ));
-        if (duplicate) {
-          const message = `已有库存账号「${gameAccount}」，不能重复建单`;
+        if (duplicate && repurchaseConfirmedKey.current !== duplicateKey) {
+          const message = `已有库存账号「${gameAccount}」，请确认是否为复购订单`;
           form.setFields([{ name: "game_account", errors: [message] }]);
           setLoadError({ message });
+          appModal.confirm({
+            title: "检测到重复游戏账号",
+            content: `已有库存账号「${gameAccount}」。请确认该订单是否为复购订单，确认后继续建单。`,
+            okText: "是，继续建单",
+            cancelText: "否，返回修改",
+            onOk: () => {
+              repurchaseConfirmedKey.current = duplicateKey;
+              form.setFields([{ name: "game_account", errors: [] }]);
+              setLoadError(null);
+              return submit(values);
+            },
+          });
           return;
         }
       }

@@ -1,0 +1,358 @@
+/** 工作室收支登记弹窗：2026-11 视觉稿（artifacts/studio_ledger_modal.html）落到真实 antd 组件。
+ *
+ * 作用域铁律：所有规则以 `.studio-ledger-modal` 起头。该 class 由 StudioExpensePanel 通过
+ * BusinessActionModal 的 wrapClassName 注入到遮罩层，只覆盖「记一笔」这一个弹窗。
+ * 全站有 20+ 个弹窗共用 .ant-modal / .ant-form，任何一条漏掉作用域的规则都会外溢。
+ *
+ * 为什么处处 !important：antd-adapter.css 用 `:where(.ant-input, .ant-select-selector, .ant-picker, …)`
+ * 把输入类控件强锁 36px 高（`:where()` 特异度为 0，但带 !important）。!important 只能被
+ * 另一个 !important 且特异度更高者覆盖 —— 去掉前缀类会静默回落到 36px，看不出报错。
+ */
+
+/* ① 玻璃外壳：26px 圆角 + 内高光 + 厚度阴影（分层近似 Liquid Glass，不追求逐像素一致）
+   必须双类 + !important：forms.css 的 .compact-form-modal .ant-modal-content 已用 !important
+   定了底色，同特异度下谁后加载谁赢，不可靠。 */
+.studio-ledger-modal.compact-form-modal .ant-modal-content {
+  /* 玻璃不透明度：compact 基准 ×1.5 已偏实，视觉稿需要「能透出背后内容但仍可读」。
+     实测 ×1.9 时 alpha 越过 1 → 变成纯白实底，玻璃感全失；1.05 保留淡淡的底色透出。 */
+  background: rgb(var(--glass-rgb) / calc(var(--glass-a) * 1.05)) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 26px !important;
+  backdrop-filter: blur(38px) saturate(190%);
+  -webkit-backdrop-filter: blur(38px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    0 30px 70px -24px rgb(8 12 24 / 0.42),
+    0 10px 28px -14px rgb(8 12 24 / 0.26) !important;
+  padding: 16px 22px 18px;
+}
+/* 高度上限：compact 默认 560px 减去 116px chrome 后内容区只有 444px，
+   6 字段表单（含 84px 备注）实测 538px → 底部按钮被滚出可视区（2026-11-02 实测）。
+   抬到 740px：正常态整表 653px，三个字段同时报错再涨 ~50px，700 会把提交按钮顶出可视区。 */
+.studio-ledger-modal.compact-form-modal .ant-modal {
+  --resizable-modal-height: min(740px, calc(100dvh - 40px));
+}
+
+/* ② 头部：图标砖 + 主标题 + 副标题。antd 默认 header 自带下边框与 20px 标题，此处全部改写。 */
+.studio-ledger-modal .ant-modal-header {
+  margin-bottom: 10px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.studio-ledger-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: grab;
+}
+.studio-ledger-head:active {
+  cursor: grabbing;
+}
+.studio-ledger-head__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-info), var(--color-primary));
+  box-shadow:
+    0 6px 16px -4px color-mix(in srgb, var(--color-primary) 60%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.5);
+}
+.studio-ledger-head__icon svg {
+  width: 21px;
+  height: 21px;
+}
+.studio-ledger-head__text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+/* 标题必须在 .ant-modal-title 之后覆盖：compact 规格把标题定在 17px/600，视觉稿是 19px/650。 */
+.studio-ledger-modal .ant-modal-title .studio-ledger-head__title {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: 0.1px;
+  line-height: 1.25;
+}
+.studio-ledger-head__sub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* ③ 字段行：左标签 / 右填写，行距压到 10px（视觉稿把 13px 减半后的值）。
+   margin 必须写 margin-block-end + !important：antd-adapter.css 用
+   `:where(.ant-form-item){ margin-block-end: 0 !important }` 全局清零行距，
+   :where() 特异度为 0 但带 !important，普通声明永远压不过去（实测 10px 被吃成 0）。 */
+.studio-ledger-modal .studio-ledger-form .ant-form-item {
+  margin-block-end: 10px !important;
+}
+.studio-ledger-modal .studio-ledger-form .ant-form-item-row {
+  /* 不能用 center：字段报错时错误文案插在 control 内，行变高后标签会被压到控件下方
+     （实测标签与控件错位一整行高）。改为顶对齐 + 标签自身 padding-top 对齐控件垂直中心。 */
+  align-items: flex-start;
+  gap: 12px;
+}
+/* 标签列宽固定 84px：15px 字号下 4 字标签（「资金池：」）实测 71px，
+   76px 会让文字几乎贴住控件左缘；84px 留 13px 呼吸，且不小于最长字段名。
+   不用 --col-w-* 系列（160/96/…）——那是语义栅格宽度，在 560 弹窗里会把控件挤窄。 */
+.studio-ledger-modal .studio-ledger-form .ant-form-item-label {
+  flex: 0 0 84px !important;
+  width: 84px !important;
+  max-width: 84px !important;
+  padding-inline-end: 0;
+  text-align: right;
+}
+.studio-ledger-modal .studio-ledger-form .ant-form-item-label > label {
+  height: auto;
+  min-height: 0;
+  /* 15px = (50px 控件 − 15px 字号 × 1.3 行高) / 2 ≈ 15px：让标签视觉中心与控件中心重合。
+     报错时行变高、标签不会被推到控件下方（配合 .ant-form-item-row 的顶对齐）。 */
+  padding-top: 15px;
+  /* font-size / color 必须 !important：antd-adapter.css 用
+     `:where(.ant-form-item-label > label){ font: var(--font-body-s) !important }`
+     的 font 简写整体压过 fontSize，实测会停在 15px。 */
+  font-size: 15px !important;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  color: var(--color-text-secondary) !important;
+}
+/* 聚焦/报错行：标签跟随状态色，强化「标签—控件」绑定关系 */
+.studio-ledger-modal .studio-ledger-form .ant-form-item:focus-within .ant-form-item-label > label {
+  color: var(--primary-ink) !important;
+}
+.studio-ledger-modal .studio-ledger-form .ant-form-item-has-error .ant-form-item-label > label {
+  color: var(--color-error) !important;
+}
+/* 多行输入：标签顶对齐到首行基线（垂直居中会让标签悬在 80+px 文本框中央） */
+.studio-ledger-modal .studio-ledger-form .ant-form-item:has(textarea) .ant-form-item-row {
+  align-items: flex-start;
+}
+.studio-ledger-modal .studio-ledger-form .ant-form-item:has(textarea) .ant-form-item-label > label {
+  padding-top: 13px;
+}
+
+/* ④ 控件：统一 50px 触控高 + 14px 圆角（18–22 岁用户以手机为主，44 以上才稳）。
+ *
+ * 底色/描边不照搬视觉稿的「白 52% 玻璃 + 白描边」——视觉稿背后是深蓝渐变，白边框能透出层次；
+ * 真实弹窗底色是近白实底，白底白边叠上去控件会整体消失（2026-11-02 实测截图，控件像浮字）。
+ * 改用语义令牌：--color-surface 实底 + --color-border 可见描边，亮/暗主题自动跟随。 */
+.studio-ledger-modal .studio-ledger-form :is(
+    .ant-input,
+    .ant-select-selector,
+    .ant-picker,
+    .ant-input-affix-wrapper,
+    .ant-input-number
+  ) {
+  height: 50px !important;
+  min-height: 50px !important;
+  border-radius: 14px !important;
+  border-color: var(--color-border) !important;
+  background: var(--color-surface) !important;
+  font-size: 15px;
+  box-shadow: none !important;
+  transition:
+    border-color 160ms var(--ease-spring),
+    box-shadow 220ms var(--ease-spring),
+    background 160ms var(--ease-spring);
+}
+/* affix-wrapper 内的 input 不能跟着长高：外层已是 50px 且含 padding，
+   内层再锁 50px 会把文字顶出边框（与登录页「内外层不同高」同一类缺陷）。 */
+.studio-ledger-modal .studio-ledger-form .ant-input-affix-wrapper > .ant-input {
+  height: auto !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* 控件长到 50px 后，antd 的行容器（.ant-form-item-control-input）仍按 36px 语义高度计算，
+   实测 Select 行的 form-item 只有 37px 高、下拉框溢出到下一行上 —— 行距看起来忽大忽小。
+   容器高度必须跟着控件一起抬，否则「50px 控件」只是视觉假象。 */
+.studio-ledger-modal .studio-ledger-form .ant-form-item-control-input {
+  min-height: 50px;
+}
+.studio-ledger-modal .studio-ledger-form .ant-select {
+  height: 50px;
+}
+.studio-ledger-modal .studio-ledger-form :is(
+    .ant-input,
+    .ant-select-selector,
+    .ant-picker,
+    .ant-input-affix-wrapper,
+    .ant-input-number
+  ):hover {
+  border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-primary)) !important;
+}
+.studio-ledger-modal .studio-ledger-form :is(
+    .ant-input,
+    .ant-select-selector,
+    .ant-picker,
+    .ant-input-affix-wrapper,
+    .ant-input-number
+  ):is(:focus, :focus-within, .ant-select-focused .ant-select-selector) {
+  border-color: var(--color-primary) !important;
+  box-shadow: var(--focus-glow) !important;
+}
+/* 下拉/日期选择器的内容垂直居中：控件长到 50px 后 antd 仍按 36px 的基线排 */
+.studio-ledger-modal .studio-ledger-form .ant-select-single .ant-select-selector .ant-select-selection-item,
+.studio-ledger-modal .studio-ledger-form .ant-select-single .ant-select-selector .ant-select-selection-placeholder {
+  line-height: 48px;
+}
+.studio-ledger-modal .studio-ledger-form .ant-picker-input > input {
+  font-size: 15px;
+}
+
+/* ⑤ 金额：18px 半粗 + 等宽数字（金额是本弹窗最需要一眼读准的字段）。 */
+.studio-ledger-modal .studio-ledger-form .money-input input {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+.studio-ledger-modal .studio-ledger-form .money-input .ant-input-suffix {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* ⑥ 收支分段控件：选中态品牌色实心。
+ * 对比度考量：浅色药丸在玻璃底上对比过弱，年轻人需要「一眼看出选了哪个」（视觉稿已定）。 */
+.studio-ledger-modal .studio-ledger-form .ant-segmented {
+  width: 100%;
+  height: 50px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.studio-ledger-modal .studio-ledger-form .ant-segmented .ant-segmented-item {
+  border-radius: 10px;
+}
+.studio-ledger-modal .studio-ledger-form .ant-segmented .ant-segmented-item-label {
+  height: 40px;
+  line-height: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.studio-ledger-modal .studio-ledger-form .ant-segmented .ant-segmented-item-selected,
+.studio-ledger-modal .studio-ledger-form .ant-segmented .ant-segmented-thumb {
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--color-info), var(--color-primary));
+  box-shadow:
+    0 4px 12px -3px color-mix(in srgb, var(--color-primary) 55%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.35);
+}
+.studio-ledger-modal .studio-ledger-form .ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff;
+}
+/* 滑块跟手：rc-motion 默认 transform 0.3s + cubic-bezier(0.645, 0.045, 0.355, 1)，
+   这条曲线前半段几乎不动（ease-in-out 变体），点完像「卡了一下才滑」，主观拖沓。
+   收到 160ms + 出速快的曲线：起点立刻位移，落点略缓，符合手指点击的时序预期。
+   必须覆盖 [class*="-thumb-motion"] 而不只是 .ant-segmented-thumb —— 0.3s 写在前者身上。 */
+.studio-ledger-modal .studio-ledger-form .ant-segmented .ant-segmented-thumb,
+.studio-ledger-modal .studio-ledger-form .ant-segmented [class*="ant-segmented-thumb-motion"] {
+  transition:
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 160ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  will-change: transform, width;
+}
+
+/* ⑦ 备注：解除全站 36px 高度锁，由 rows 决定；去掉拖拽手柄（弹窗内可自由拉伸会破版）。 */
+.studio-ledger-modal .studio-ledger-form textarea.ant-input {
+  height: auto !important;
+  min-height: 84px !important;
+  padding: 12px 14px;
+  line-height: 1.6;
+  resize: none;
+}
+
+/* ⑧ 提交按钮：52px 品牌渐变（大弹窗里唯一的主行动，拇指可及）。
+ * 宽度必须与控件区等宽：左缩进 = 标签列 84px + 行内 gap 12px，右缘与控件右缘重合。
+ * 满宽会让按钮左缘越过标签列、与上方每个字段错位（2026-11-02 视觉确认）。
+ * 用 calc(100% - 偏移) 而不是 width:auto：Form 内是块级流，auto 会缩成文字宽。 */
+.studio-ledger-modal .studio-ledger-form > .ant-btn[type="submit"] {
+  width: calc(100% - 96px) !important;
+  margin-inline-start: 96px;
+  height: 52px !important;
+  min-height: 52px !important;
+  margin-top: 6px;
+  border-radius: 15px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.3px;
+  background: linear-gradient(135deg, var(--color-info), var(--color-primary));
+  border-color: transparent;
+  box-shadow:
+    0 10px 24px -8px color-mix(in srgb, var(--color-primary) 62%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.36);
+  transition:
+    transform 140ms var(--ease-spring),
+    box-shadow 160ms var(--ease-spring),
+    filter 150ms linear;
+}
+.studio-ledger-modal .studio-ledger-form > .ant-btn[type="submit"]:hover {
+  filter: brightness(1.05);
+  box-shadow:
+    0 14px 28px -8px color-mix(in srgb, var(--color-primary) 72%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.36);
+}
+.studio-ledger-modal .studio-ledger-form > .ant-btn[type="submit"]:active {
+  transform: translateY(1px) scale(0.992);
+}
+
+/* ⑨ 校验提示：12.5px 半粗，紧贴控件（出错当场指出，而不是等提交后滚动定位）。 */
+.studio-ledger-modal .studio-ledger-form .ant-form-item-explain-error {
+  margin-top: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+/* 报错字段必须有红框：上面 ④ 的 border-color 带 !important，会把 antd 自带的错误描边
+   一并压掉（实测报错字段仍是灰边，只靠下方文案区分）。此条放在最后，同特异度靠后覆盖。 */
+.studio-ledger-modal .studio-ledger-form .ant-form-item-has-error :is(
+    .ant-input,
+    .ant-select-selector,
+    .ant-picker,
+    .ant-input-affix-wrapper,
+    .ant-input-number,
+    textarea.ant-input
+  ) {
+  border-color: var(--color-error) !important;
+}
+
+/* ⑩ 无障碍：减弱动效时关闭位移与过渡（视觉稿同样有这一档）。 */
+@media (prefers-reduced-motion: reduce) {
+  .studio-ledger-modal .studio-ledger-form > .ant-btn[type="submit"] {
+    transition: none;
+  }
+  .studio-ledger-modal .studio-ledger-form > .ant-btn[type="submit"]:active {
+    transform: none;
+  }
+}
+
+/* ⑪ 窄屏：单手操作时标签收窄、行距再压一档。
+   圆角必须归零：640px 以下全站弹窗按整页铺满（`.recovery-order-modal .ant-modal-content`
+   固定 100dvh），留 22px 圆角会把四个角切出遮罩缝。 */
+@media (max-width: 640px) {
+  .studio-ledger-modal.compact-form-modal .ant-modal-content {
+    padding: 14px 16px 16px;
+    border-radius: 0 !important;
+  }
+  .studio-ledger-modal .studio-ledger-form .ant-form-item-label {
+    flex: 0 0 72px !important;
+    width: 72px !important;
+    max-width: 72px !important;
+  }
+  .studio-ledger-modal .studio-ledger-form .ant-form-item-label > label {
+    font-size: 14px !important;
+  }
+  /* 标签列收到 72px，按钮缩进同步跟上（72 + 12 gap），否则窄屏又会错位。 */
+  .studio-ledger-modal .studio-ledger-form > .ant-btn[type="submit"] {
+    width: calc(100% - 84px) !important;
+    margin-inline-start: 84px;
+  }
+}

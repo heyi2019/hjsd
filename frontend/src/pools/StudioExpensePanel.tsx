@@ -8,7 +8,7 @@ import { appMessage } from "../shared/ui/appFeedback";
  * - **承载资金池可直接勾选**：页面内选择池，不写入业务配置；费用科目仍落在
  *   `STUDIO_EXPENSE_ITEM` 词典，服务端存储 ⇒ 全员同步。
  */
-import { Card, DatePicker, Form, Input, Space, Typography } from "antd";
+import { Card, DatePicker, Form, Input, Segmented, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
@@ -37,6 +37,8 @@ import { DataTable,
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { DepositSection } from "./FundsPage.tabs";
 import type { FundsPageController } from "./useFundsPageController";
+/** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
+import "./StudioExpensePanel.css";
 
 /** 费用科目词典。 */
 const ITEM_SET_CODE = "STUDIO_EXPENSE_ITEM";
@@ -58,6 +60,36 @@ const INCOME_ITEMS: OptionItem[] = [
 
 /** 单次拉取上限：按日期区间查询，200 条覆盖月度收支足够。 */
 const FETCH_LIMIT = 200;
+
+/** 登记弹窗标题节点：图标砖 + 主副标题。
+ * BusinessActionModal 只对字符串标题包拖拽 handle，传节点则由本节点自行承担（见 .studio-ledger-head 的 grab 光标）。 */
+const REGISTER_TITLE = (
+  <div className="studio-ledger-head">
+    <span className="studio-ledger-head__icon" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 7h18M3 12h18M3 17h12" />
+        <path d="M16 15l2 2 4-4" />
+      </svg>
+    </span>
+    <span className="studio-ledger-head__text">
+      <span className="studio-ledger-head__title">工作室收支登记</span>
+      <span className="studio-ledger-head__sub">登记一笔收入或支出流水</span>
+    </span>
+  </div>
+);
+
+/** 收支两项固定：支出 / 收入属于资金流水的语义约束，不交给表单字段配置改写。 */
+const DIRECTION_OPTIONS = [
+  { value: "OUT", label: "支出" },
+  { value: "IN", label: "收入" },
+];
 
 function dateText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -390,17 +422,22 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
 
       {ctrl ? <DepositSection ctrl={ctrl} /> : null}
 
+      {/* 6 个字段的操作弹窗：compact 560 宽比 full 1200 更贴合体量；
+          studio-ledger-modal 是视觉稿的唯一作用域锚点（样式见 StudioExpensePanel.css）。 */}
       <BusinessActionModal
-        title="工作室收支登记"
+        size="compact"
+        wrapClassName="studio-ledger-modal"
+        title={REGISTER_TITLE}
         open={registerOpen}
         onCancel={() => setRegisterOpen(false)}
         footer={null}
       >
         <InlineError error={write.error} />
         <BusinessForm
+          className="studio-ledger-form"
           layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
+          labelAlign="right"
+          labelCol={{ flex: "84px" }}
           wrapperCol={{ flex: "auto" }}
           scope="STUDIOEXP"
           form={registerForm}
@@ -417,22 +454,24 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
             <DatePicker format="YYYY-MM-DD" />
           </CfgItem>
           <CfgItem name="direction" label="收支" rules={[{ required: true, message: "请选择收支" }]}>
-            <Select
-              options={[
-                { value: "OUT", label: "支出" },
-                { value: "IN", label: "收入" },
-              ]}
-              onChange={(value: string) => {
-                setRegisterDirection(value);
+            {/* 两项互斥且高频：分段控件一步可选，比「点开下拉再选」少一次点击 */}
+            <Segmented
+              block
+              options={DIRECTION_OPTIONS}
+              onChange={(value) => {
+                setRegisterDirection(String(value));
                 registerForm.setFieldValue("category", undefined);
               }}
             />
           </CfgItem>
           <CfgItem name="category" label="科目" rules={[{ required: true, message: "请选择科目" }]}>
-            <Select options={registerDirection === "OUT" ? expenseItems : INCOME_ITEMS} />
+            <Select
+              options={registerDirection === "OUT" ? expenseItems : INCOME_ITEMS}
+              placeholder="请选择科目"
+            />
           </CfgItem>
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
-            <MoneyInput />
+            <MoneyInput placeholder="0.00" />
           </CfgItem>
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} />

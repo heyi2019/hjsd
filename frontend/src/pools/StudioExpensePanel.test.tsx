@@ -84,6 +84,15 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await ui.click(await within(current).findByTitle(title));
 }
 
+/** 收支是分段控件（不是下拉），选项直接可点，不再有下拉弹层。 */
+async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
+  const item = Array.from(modal.querySelectorAll(".ant-segmented-item")).find((el) =>
+    el.textContent?.trim().startsWith(label),
+  );
+  if (!item) throw new Error(`未找到收支分段项：${label}`);
+  await ui.click(item);
+}
+
 async function togglePoolFilter(title: RegExp) {
   await ui.click(screen.getByRole("combobox", { name: "工作室收支资金池" }));
   const dropdowns = document.querySelectorAll(".ant-select-dropdown");
@@ -186,7 +195,8 @@ describe("StudioExpensePanel：工作室支出", () => {
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 2, /房租/);
+    // 收支改为分段控件后，科目从第 3 个下拉前移到第 2 个
+    await pickSelect(modal, 1, /房租/);
     await ui.type(modal.querySelector("#amount") ?? modal, "3000.00");
     await ui.type(modal.querySelector("#note") ?? modal, "10 月工作室房租");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
@@ -211,8 +221,8 @@ describe("StudioExpensePanel：工作室支出", () => {
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 1, /^收入$/);
-    await pickSelect(modal, 2, /货款/);
+    await pickDirection(modal, "收入");
+    await pickSelect(modal, 1, /货款/);
     await ui.type(modal.querySelector("#amount") ?? modal, "800.00");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
     await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());

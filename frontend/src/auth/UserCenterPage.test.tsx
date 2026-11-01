@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { appMessage as message } from "../shared/ui/appFeedback";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,5 +83,16 @@ describe("UserCenterPage：账号信息与修改密码", () => {
     expect(screen.getByLabelText("当前密码")).toHaveValue("wrong-old-pass");
     expect(screen.getByRole("button", { name: /修改密码/ })).toBeEnabled();
     expect(screen.queryByText("登录工作台")).not.toBeInTheDocument();
+  });
+
+  it("退出登录需二次确认，确认后才登出（L1611）", async () => {
+    const ui = userEvent.setup();
+    renderLight(<UserCenterPage />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: /退出登录/ }));
+    // 先弹出确认层，未确认前不登出
+    expect(await screen.findByText("确认退出登录？")).toBeInTheDocument();
+    expect(client.logout).not.toHaveBeenCalled();
+    await ui.click(screen.getByRole("button", { name: /确认退出/ }));
+    await waitFor(() => expect(client.logout).toHaveBeenCalled());
   });
 });

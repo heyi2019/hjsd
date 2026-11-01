@@ -3,7 +3,7 @@ import { appMessage } from "../shared/ui/appFeedback";
  *  区别于 auth/ChangePasswordPage（首登强制改密）：本组件挂载在顶栏「用户中心」Modal 内，
  *  改密走同一 changePassword API（后端校验旧密码），成功后本次会话直接生效。
  *  onClose 由 Modal 容器注入：退出登录需先关弹窗再 logout。 */
-import { Button, Card, Form, Input } from "antd";
+import { Button, Card, Form, Input, Popconfirm } from "antd";
 import { useState } from "react";
 import { ErrorBanner } from "../shared/ui";
 import { normalizeError } from "../shared/api/client";
@@ -74,14 +74,21 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
             <Input.Password autoComplete="new-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={submitting}>修改密码</Button>
-          <Button
-            type="primary"
-            danger
-            className="user-center__logout"
-            onClick={() => { onClose?.(); void logout(); }}
+          <Popconfirm
+            title="确认退出登录？"
+            description="退出后需重新登录，未保存的修改会丢失。"
+            okText="确认退出"
+            cancelText="取消"
+            onConfirm={() => { onClose?.(); void logout(); }}
           >
-            退出登录
-          </Button>
+            <Button
+              type="primary"
+              danger
+              className="user-center__logout"
+            >
+              退出登录
+            </Button>
+          </Popconfirm>
         </Form>
       </Card>
     </div>

@@ -9,6 +9,7 @@ import { Form } from "antd";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
 import { allFormFields, seedOrderFormFields } from "../test/formFieldsSeed";
+import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -24,6 +25,7 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearOptionSetsCache();
   seedOrderFormFields(catalog);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
@@ -217,6 +219,37 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
+  });
+
+it("FE-023：已有相同游戏账号时原建单测试入口阻止重复提交", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
+      { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "WAITING" },
+    ] as never);
+    await openTypedModal("TH");
+    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    const amounts = screen.getAllByPlaceholderText("请输入金额");
+    await ui.type(amounts[0], "1000");
+    await ui.type(amounts[1], "1200");
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(catalog.ordersApi.create).not.toHaveBeenCalled());
+    expect((await screen.findAllByText(/已有库存账号/)).length).toBeGreaterThan(0);
+  });
+
+it("FE-123：原建单测试入口的提号来源默认值跟随主数据", async () => {
+    clearOptionSetsCache();
+    vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
+      items: [{ code: "SUPPLIER_SOURCE", options: [{ value: "自营", label: "自营" }, { value: "其他", label: "其他" }] }],
+    } as never);
+    await loadOptionSets();
+    renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={() => undefined} initialOrderType="TH" />, { user: "admin" });
+    const field = await screen.findByLabelText("供货方来源");
+    await waitFor(() => expect(field.closest(".ant-select")?.querySelector(".ant-select-selection-item")).toHaveTextContent("自营"));
   });
 
 it("订单已创建后不等待列表刷新，提交按钮立即结束 loading", async () => {

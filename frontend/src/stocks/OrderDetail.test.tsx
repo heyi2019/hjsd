@@ -58,6 +58,14 @@ describe("OrderDetail", () => {
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
 
+  it("FE-054：原详情测试入口不展示账号密码明文", () => {
+    const accountWithPassword = { ...account, game_password: "secret-password", game_type: "原神" } as unknown as Account;
+    render(<OrderDetail row={accountWithPassword} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
+    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    expect(within(panel).queryByText("secret-password")).not.toBeInTheDocument();
+    expect(within(panel).getByText("已隐藏")).toBeInTheDocument();
+  });
+
   it("参与方按角色与名称展示，并可打开客户中心卡片", () => {
     const onPartyClick = vi.fn();
     const detail = {

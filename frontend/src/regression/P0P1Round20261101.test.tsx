@@ -501,6 +501,22 @@ it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", a
   expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
 });
 
+it("P1/FE-241：数据中心主数据失败时不显示零统计且禁用快捷入口", async () => {
+  vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+  const onNavigate = vi.fn();
+  renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+
+  const totalCard = await screen.findByRole("button", { name: /订单总数/ });
+  const activeCard = screen.getByRole("button", { name: /进行中/ });
+  expect(totalCard).toHaveTextContent("不可用");
+  expect(activeCard).toHaveTextContent("不可用");
+  expect(totalCard).toHaveAttribute("aria-disabled", "true");
+  expect(activeCard).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(totalCard);
+  expect(onNavigate).not.toHaveBeenCalled();
+  expect(screen.getByText("资金池数量").closest(".ui-stat")).toHaveTextContent("不可用");
+});
+
 it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {
   vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });

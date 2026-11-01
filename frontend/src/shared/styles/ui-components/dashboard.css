@@ -27,6 +27,14 @@
   border-color: var(--brand-border);
   box-shadow: var(--shadow-raised);
 }
+.ui-entry-card--disabled,
+.ui-entry-card--disabled:hover {
+  cursor: not-allowed;
+  opacity: 0.62;
+  border-color: var(--glass-border);
+  box-shadow: var(--shadow-soft);
+  transform: none;
+}
 /* 直接操纵（Apple HIG）：可点卡片悬浮轻抬、按下即时缩量，松手弹簧回弹。
    与 interactions.css 的按钮/导航反馈同源；仅供「减弱动效」未开启的用户。 */
 @media (prefers-reduced-motion: no-preference) {

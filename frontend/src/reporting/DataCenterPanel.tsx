@@ -29,9 +29,9 @@ export function countOngoingOrders(items: Pick<Order, "status">[]): number {
 }
 
 export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
-  const [pools, setPools] = useState<Pool[]>([]);
+  const [pools, setPools] = useState<Pool[] | null>(null);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[] | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -63,16 +63,17 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
     void load();
   }, [load]);
 
-  const rows: PoolRow[] = pools.map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
+  const rows: PoolRow[] = (pools ?? []).map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
 
   const sum = (pick: (b?: PoolBalance) => string | undefined) =>
     rows.reduce((acc, row) => acc + Number(pick(row.balance) ?? 0), 0).toFixed(2);
 
-  const totalAvailable = sum((b) => b?.available);
-  const totalDeposit = sum((b) => b?.deposit_held);
+  const totalAvailable = pools === null ? "不可用" : sum((b) => b?.available);
+  const totalDeposit = pools === null ? "不可用" : sum((b) => b?.deposit_held);
 
   // 业务计数口径：ACTIVE 表示进行中。
-  const activeCount = countOngoingOrders(orders);
+  const activeCount = orders === null ? null : countOngoingOrders(orders);
+  const orderCardsUnavailable = orders === null;
 
   const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
   const columns: ColumnsType<PoolRow> = [
@@ -130,14 +131,16 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
       <EntryRow>
         <EntryCard
           title="订单总数"
-          value={String(orders.length)}
+          value={orders === null ? "不可用" : String(orders.length)}
           description="点击进入业务中心 · 订单台账"
+          disabled={orderCardsUnavailable}
           onClick={() => onNavigate?.("business", "ledger")}
         />
         <EntryCard
           title="进行中"
-          value={String(activeCount)}
+          value={activeCount === null ? "不可用" : String(activeCount)}
           description="点击进入业务中心 · 订单台账"
+          disabled={orderCardsUnavailable}
           onClick={() => onNavigate?.("business", "ledger")}
         />
       </EntryRow>
@@ -151,7 +154,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
       />
       <StatRow
         items={[
-          { label: "资金池数量", kind: "count", amount: String(pools.length) },
+          { label: "资金池数量", kind: "count", amount: pools === null ? "不可用" : String(pools.length) },
         ]}
       />
 
@@ -165,7 +168,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
             pageSize={Math.max(rows.length, 10)}
             total={rows.length}
             rowKey="key"
-            emptyText="尚未配置资金池"
+            emptyText={pools === null ? "资金池数据不可用，请点击重新加载" : "尚未配置资金池"}
             onPageChange={() => undefined}
          />
         </Card>

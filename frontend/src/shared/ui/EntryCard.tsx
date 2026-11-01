@@ -14,16 +14,21 @@ export function EntryCard(props: {
   /** 说明文案：动作卡写清点击后发生什么；统计卡写清点击后去哪里。 */
   description?: string;
   tone?: EntryTone;
+  disabled?: boolean;
   onClick: () => void;
 }) {
-  const activate = () => props.onClick();
+  const activate = () => {
+    if (!props.disabled) props.onClick();
+  };
   return (
     <div
-      className={`ui-entry-card ui-entry-card--${props.tone ?? "plain"}`}
+      className={`ui-entry-card ui-entry-card--${props.tone ?? "plain"}${props.disabled ? " ui-entry-card--disabled" : ""}`}
       role="button"
-      tabIndex={0}
+      aria-disabled={props.disabled || undefined}
+      tabIndex={props.disabled ? -1 : 0}
       onClick={activate}
       onKeyDown={(event) => {
+        if (props.disabled) return;
         // 键盘可达性：div+role=button 不会自发响应 Enter/Space，必须显式处理。
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();

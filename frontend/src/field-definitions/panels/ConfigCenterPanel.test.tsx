@@ -29,6 +29,7 @@ beforeEach(() => {
   ] as never);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([] as never);
   vi.mocked(catalog.optionSetsApi.list).mockResolvedValue({ items: [] } as never);
+  vi.mocked(catalog.optionSetsApi.get).mockResolvedValue({ options: [] } as never);
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 } as never);
   vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([] as never);
   vi.mocked(catalog.sequencesApi.list).mockResolvedValue([] as never);
@@ -38,10 +39,10 @@ beforeEach(() => {
 describe("ConfigCenterPanel", () => {
   it("顶部渲染字段配置、业务主数据与编号管理，默认显示业务类型页面", async () => {
     renderLight(<ConfigCenterPanel />, { user: "admin" });
-    // 仅展示配置中心纳入的三组标题
+    // 仅展示配置中心纳入的四组标题
     expect(await screen.findByText("字段配置")).toBeInTheDocument();
     expect(screen.getByText("业务主数据")).toBeInTheDocument();
-    expect(screen.queryByText("业务规则")).toBeNull();
+    expect(screen.getByText("业务规则")).toBeInTheDocument();
     expect(screen.queryByText("数据治理")).toBeNull();
     expect(screen.queryByText("组织与权限")).toBeNull();
     expect(screen.queryByText("作业与外观")).toBeNull();
@@ -51,6 +52,7 @@ describe("ConfigCenterPanel", () => {
     // 三组导航项均存在
     expect(screen.getByTestId("center-nav-form-fields")).toBeInTheDocument();
     expect(screen.getByTestId("center-nav-order-types")).toBeInTheDocument();
+    expect(screen.getByTestId("center-nav-business-reminders")).toBeInTheDocument();
     expect(screen.getByTestId("center-nav-sequences")).toBeInTheDocument();
   });
 
@@ -61,6 +63,16 @@ describe("ConfigCenterPanel", () => {
 
     expect(screen.getByText(/序列编号由后端按域独立发放/)).toBeInTheDocument();
     expect(screen.getByText("库存编号")).toBeInTheDocument();
+  });
+
+  it("点击业务提醒后展示库存阈值和提醒开关", async () => {
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<ConfigCenterPanel />, { user: "admin" });
+    await ui.click(screen.getByTestId("center-nav-business-reminders"));
+
+    expect(await screen.findByText("库存订单超过多少天提醒")).toBeInTheDocument();
+    expect(screen.getByText("新的分润通知")).toBeInTheDocument();
+    expect(screen.getByText("逾期合约提醒")).toBeInTheDocument();
   });
 
   it("点击顶部页签切换到对应现有页面（业务类型 → 列表字段）", async () => {

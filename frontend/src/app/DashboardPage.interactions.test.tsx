@@ -16,6 +16,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields(catalog);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
   vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
     items: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },

@@ -18,8 +18,8 @@ import { StatusTag } from "../../shared/ui";
 import { PANEL_REGISTRY } from "./panelRegistry";
 import "./ConfigCenterPanel.css";
 
-/** 分组展示顺序：配置中心仅聚合字段、业务主数据与编号管理（其余分组不进入配置中心）。 */
-const GROUP_ORDER: ConfigGroupCode[] = ["FIELD", "MASTER", "SEQUENCE"];
+/** 分组展示顺序：配置中心聚合字段、业务主数据、工作台提醒与编号管理。 */
+const GROUP_ORDER: ConfigGroupCode[] = ["FIELD", "MASTER", "BUSINESS", "SEQUENCE"];
 
 export function ConfigCenterPanel() {
   const { can } = useSession();

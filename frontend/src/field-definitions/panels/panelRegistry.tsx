@@ -25,11 +25,13 @@ import { TeamsPanel } from "../../users/TeamsPanel";
 import { UsersPanel } from "../../users/UsersPanel";
 import { AppearancePanel } from "../../app/AppearancePanel";
 import { ImportWorkbench } from "../../imports/ImportWorkbench";
+import { BusinessReminderSettingsPanel } from "./BusinessReminderSettingsPanel";
 
 export type PanelRenderer = (navigate: (key: string) => void) => ReactElement;
 
 export const PANEL_REGISTRY: Record<string, PanelRenderer> = {
   "business-dictionary": () => <BusinessDictionaryPanel />,
+  "business-reminders": () => <BusinessReminderSettingsPanel />,
   "order-types": () => <OrderTypesPanel />,
   "form-fields": (nav) => (
     <OrderFormFieldsPanel

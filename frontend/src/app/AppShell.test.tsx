@@ -114,6 +114,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 
     const inventoryTab = await screen.findByRole("tab", { name: "库存中心" }, { timeout: 10_000 });
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "业务总览" })).toBeNull();
     expect(screen.getByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "false");
   });
 

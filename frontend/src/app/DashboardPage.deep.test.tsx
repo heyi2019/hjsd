@@ -13,6 +13,9 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
   vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
     items: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
@@ -34,17 +37,17 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     await waitFor(() => expect(catalog.ordersApi.list).toHaveBeenCalledTimes(4));
   });
 
-  it("今日关注计数：ACTIVE 与 非ACTIVE 两分支", async () => {
+  it("业务总览计数：订单总量与完成订单量", async () => {
     const orders = [
       { id: 1, status: "ACTIVE" },
-      { id: 2, status: "CLOSED" },
-      { id: 3, status: "CLOSED" },
+      { id: 2, status: "COMPLETED" },
+      { id: 3, status: "COMPLETED" },
     ] as unknown as Order[];
     vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
     renderLight(<DashboardPage />, { user: "admin" });
-    const activeCard = (await screen.findByText("进行中业务")).closest(".ui-stat") as HTMLElement;
-    const doneCard = (await screen.findByText("已完成业务")).closest(".ui-stat") as HTMLElement;
-    expect(within(activeCard).getByText("1")).toBeInTheDocument();
+    const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
+    const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
+    expect(within(totalCard).getByText("3")).toBeInTheDocument();
     expect(within(doneCard).getByText("2")).toBeInTheDocument();
   });
 
@@ -66,23 +69,23 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
 
     await waitFor(() => expect(catalog.ordersApi.list).toHaveBeenCalledWith({ mine: true }));
     const orderCard = (await screen.findByText("我的订单")).closest(".ui-stat") as HTMLElement;
-    const activeCard = (await screen.findByText("进行中业务")).closest(".ui-stat") as HTMLElement;
+    const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
     const earningsCard = screen.getByText("我的收益").closest(".ui-stat") as HTMLElement;
     expect(within(orderCard).getByText("2")).toBeInTheDocument();
-    expect(within(activeCard).getByText("2")).toBeInTheDocument();
+    expect(within(totalCard).getByText("3")).toBeInTheDocument();
     expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();
   });
 
-  it("汇总接口失败时「今日关注」显示占位「-」而非 0", async () => {
+  it("订单汇总接口失败时业务总览显示占位「-」而非 0", async () => {
     // 经营场景里「0」有确定业务含义；接口失败若渲染成 0，用户会误判为「今天没有业务」。
     vi.mocked(catalog.ordersApi.list).mockRejectedValue(new Error("orders down"));
     renderLight(<DashboardPage />, { user: "admin" });
-    const activeCard = (await screen.findByText("进行中业务")).closest(".ui-stat") as HTMLElement;
-    const doneCard = (await screen.findByText("已完成业务")).closest(".ui-stat") as HTMLElement;
-    expect(within(activeCard).getByText("-")).toBeInTheDocument();
+    const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
+    const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
+    expect(within(totalCard).getByText("-")).toBeInTheDocument();
     expect(within(doneCard).getByText("-")).toBeInTheDocument();
     // 反证：失败态绝不允许回落到 0 计数（改回 String(...length) 本例会红）
-    expect(within(activeCard).queryByText("0")).toBeNull();
+    expect(within(totalCard).queryByText("0")).toBeNull();
     expect(within(doneCard).queryByText("0")).toBeNull();
   });
 

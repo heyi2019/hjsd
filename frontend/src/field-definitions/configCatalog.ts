@@ -21,11 +21,12 @@ import {
   usersApi,
 } from "../shared/api/catalog";
 
-export type ConfigGroupCode = "FIELD" | "MASTER" | "SEQUENCE" | "POLICY" | "GOV" | "ORG" | "OPS";
+export type ConfigGroupCode = "FIELD" | "MASTER" | "BUSINESS" | "SEQUENCE" | "POLICY" | "GOV" | "ORG" | "OPS";
 
 export const CONFIG_GROUP_LABEL: Record<ConfigGroupCode, string> = {
   FIELD: "字段配置",
   MASTER: "业务主数据",
+  BUSINESS: "业务规则",
   SEQUENCE: "编号管理",
   POLICY: "业务规则",
   GOV: "数据治理",
@@ -100,6 +101,14 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "MASTER",
     entityTypes: ["GameTypeOption"],
     count: async () => (await gameTypesApi.list({ include_inactive: true })).length,
+  },
+  {
+    key: "business-reminders",
+    label: "业务提醒",
+    summary: "工作台库存、分润与逾期合约提醒规则",
+    group: "BUSINESS",
+    entityTypes: ["option_set"],
+    count: noCount,
   },
   {
     key: "policies",

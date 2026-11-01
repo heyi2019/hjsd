@@ -191,7 +191,7 @@ beforeEach(() => {
 
 async function openLedger(user = "admin") {
   renderLight(<OrdersPage />, { user });
-  await screen.findByRole("tab", { name: "订单台账" });
+  await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }
 

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -16,6 +16,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields(catalog);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
   vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
     items: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
@@ -23,6 +26,72 @@ beforeEach(() => {
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
+it("工作台展示业务总览指标和业务提醒", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      { id: 1, status: "ACTIVE" },
+      { id: 2, status: "COMPLETED" },
+    ] as never);
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
+      id: 10,
+      status: "WAITING",
+      inventory_entry_at: "2026-09-01T00:00:00",
+      cost_amount: "100.00",
+    } as never]);
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
+    vi.mocked(catalog.notificationsApi.list).mockResolvedValue({
+      items: [{ id: 30, title: "新的分润通知", message: "订单 HS0001 已生成分润", notification_type: "PROFIT_ALLOCATION_SET" } as never],
+      total: 1,
+      unread_total: 1,
+    });
+
+    renderLight(<DashboardPage />, { user: "admin" });
+
+    const overview = await screen.findByRole("region", { name: "业务总览" });
+    for (const [label, value] of [
+      ["在库账号", "1"],
+      ["订单总量", "2"],
+      ["完成订单量", "1"],
+      ["分期合约", "1"],
+      ["逾期合约", "1"],
+      ["在库超期账号", "1"],
+    ]) {
+      const card = within(overview).getByText(label).closest(".ui-stat") as HTMLElement | null;
+      expect(card).not.toBeNull();
+      expect(within(card!).getByText(value)).toBeInTheDocument();
+    }
+    const alerts = await screen.findByRole("region", { name: "业务提醒" });
+    expect(within(alerts).getByText("库存订单入库超过 7 天 1 个")).toBeInTheDocument();
+    expect(within(alerts).getByText("新的分润通知 1 条")).toBeInTheDocument();
+  });
+
+it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
+      id: 10,
+      status: "WAITING",
+      inventory_entry_at: "2026-10-20T00:00:00",
+      cost_amount: "100.00",
+    } as never]);
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
+    vi.mocked(catalog.notificationsApi.list).mockResolvedValue({
+      items: [{ id: 30, title: "新的分润通知", message: "订单 HS0001 已生成分润" } as never],
+      total: 1,
+      unread_total: 1,
+    });
+    vi.mocked(catalog.optionSetsApi.get).mockResolvedValue({
+      options: [
+        { value: "inventory_aging_days", label: "14" },
+        { value: "profit_notifications_enabled", label: "0" },
+        { value: "overdue_installments_enabled", label: "0" },
+      ],
+    } as never);
+
+    renderLight(<DashboardPage />, { user: "admin" });
+
+    const alerts = await screen.findByRole("region", { name: "业务提醒" });
+    expect(within(alerts).getByText("暂无异常事项")).toBeInTheDocument();
+    expect(vi.mocked(catalog.optionSetsApi.get)).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS");
+  });
+
 it("admin 渲染业务入口卡", async () => {
     renderLight(<DashboardPage />, { user: "admin" });
     expect(await screen.findByRole("button", { name: /自营·回收/ })).toBeInTheDocument();

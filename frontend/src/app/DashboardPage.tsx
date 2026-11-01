@@ -1,12 +1,20 @@
 /** 工作台：优先动作 + 当前登录用户的轻量关注卡片。
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useEffect, useRef, useState } from "react";
-import { ordersApi, reportsApi, type Order } from "../shared/api/catalog";
+import { installmentsApi, notificationsApi, optionSetsApi, ordersApi, reportsApi, stocksApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import { inventoryAge } from "../stocks/inventory-logic";
+import { BusinessOverview } from "./BusinessOverview";
+import {
+  BUSINESS_REMINDER_CONFIG_CODE,
+  DEFAULT_BUSINESS_REMINDER_CONFIG,
+  parseBusinessReminderConfig,
+  type BusinessReminderConfig,
+} from "./businessReminderConfig";
 
 export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onPersonalNavigate?: (view: "orders" | "earnings") => void; active?: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -14,11 +22,20 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
   const [orders, setOrders] = useState<Order[]>([]);
   const [personalOrders, setPersonalOrders] = useState<Order[]>([]);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [personalOrdersError, setPersonalOrdersError] = useState<{ message: string; code?: string } | null>(null);
   const [personalEarnings, setPersonalEarnings] = useState<string | null>(null);
   const [earningsError, setEarningsError] = useState<{ message: string; code?: string } | null>(null);
+  const [inventoryCount, setInventoryCount] = useState<number | null>(null);
+  const [inventoryAgingCount, setInventoryAgingCount] = useState<number | null>(null);
+  const [inventoryOverdueCount, setInventoryOverdueCount] = useState<number | null>(null);
+  const [installmentCount, setInstallmentCount] = useState<number | null>(null);
+  const [overdueInstallmentCount, setOverdueInstallmentCount] = useState<number | null>(null);
+  const [newProfitNotificationCount, setNewProfitNotificationCount] = useState<number | null>(null);
+  const [businessReminderConfig, setBusinessReminderConfig] = useState<BusinessReminderConfig>(DEFAULT_BUSINESS_REMINDER_CONFIG);
   const mountedRef = useRef(true);
   const loadSummary = async () => {
+    setSummaryLoading(true);
     const [personalOrdersResult, ordersResult, earningsResult] = await Promise.allSettled([
       ordersApi.list({ mine: true }),
       ordersApi.list(),
@@ -43,6 +60,43 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     } else {
       setEarningsError(normalizeError(earningsResult.reason));
     }
+    const [stockResult, installmentResult, reminderConfigResult] = await Promise.allSettled([
+      stocksApi.list({ status: "WAITING" }),
+      installmentsApi.list(),
+      optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE),
+    ]);
+    const notificationResult = await Promise.allSettled([
+      notificationsApi.list({ limit: 50, unread_only: true }),
+    ]);
+    if (!mountedRef.current) return;
+    const reminderConfig = reminderConfigResult.status === "fulfilled"
+      ? parseBusinessReminderConfig(reminderConfigResult.value?.options)
+      : DEFAULT_BUSINESS_REMINDER_CONFIG;
+    setBusinessReminderConfig(reminderConfig);
+    if (stockResult.status === "fulfilled") {
+      setInventoryCount(stockResult.value.length);
+      setInventoryAgingCount(stockResult.value.filter((item) => (inventoryAge(item)?.days ?? 0) > reminderConfig.inventoryAgingDays).length);
+      setInventoryOverdueCount(stockResult.value.filter((item) => inventoryAge(item)?.color === "red").length);
+    } else {
+      setInventoryCount(null);
+      setInventoryAgingCount(null);
+      setInventoryOverdueCount(null);
+    }
+    if (installmentResult.status === "fulfilled") {
+      setInstallmentCount(installmentResult.value.length);
+      setOverdueInstallmentCount(installmentResult.value.filter((item) => item.status === "OVERDUE").length);
+    } else {
+      setInstallmentCount(null);
+      setOverdueInstallmentCount(null);
+    }
+    if (notificationResult[0].status === "fulfilled") {
+      setNewProfitNotificationCount(notificationResult[0].value.items.filter((item) =>
+        [item.notification_type ?? "", item.title, item.message].some((value) => /分润|利润|提成/.test(value)),
+      ).length);
+    } else {
+      setNewProfitNotificationCount(null);
+    }
+    setSummaryLoading(false);
   };
   useEffect(() => () => {
     mountedRef.current = false;
@@ -103,18 +157,23 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
         </PermissionGate>
       </EntryRow>
 
-      <section className="dashboard-summary" aria-labelledby="dashboard-summary-title">
-        <h2 id="dashboard-summary-title" className="dashboard-summary__title">今日关注</h2>
+      <div className="dashboard-summary">
+        <h2 id="dashboard-summary-title" className="dashboard-summary__title">业务总览</h2>
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
-        <StatRow items={[
-          /* summaryError 非空表示汇总接口失败：此时 orders 仍是初始 []，
-             若照常取 .length 会把「加载失败」显示成「0 笔业务」，用户在经营场景会误判
-             （「0」有确定的业务含义）。StatRow 契约规定 amount 为 null 时显示 "-"，
-             这里直接复用该失败态占位。 */
-          { label: "进行中业务", kind: "count", amount: summaryError ? null : String(orders.filter((order) => order.status === "ACTIVE").length) },
-          { label: "已完成业务", kind: "count", amount: summaryError ? null : String(orders.filter((order) => order.status !== "ACTIVE").length) },
-        ]} />
-      </section>
+        <BusinessOverview
+          orders={orders}
+          inventoryCount={inventoryCount}
+          inventoryAgingCount={inventoryAgingCount}
+          inventoryOverdueCount={inventoryOverdueCount}
+          installmentCount={installmentCount}
+          newProfitNotificationCount={newProfitNotificationCount}
+          overdueInstallmentCount={overdueInstallmentCount}
+          profitNotificationsEnabled={businessReminderConfig.profitNotificationsEnabled}
+          overdueInstallmentsEnabled={businessReminderConfig.overdueInstallmentsEnabled}
+          ordersError={Boolean(summaryError)}
+          loading={summaryLoading}
+        />
+      </div>
 
       <section className="dashboard-summary" aria-labelledby="dashboard-personal-summary-title">
         <h2 id="dashboard-personal-summary-title" className="dashboard-summary__title">我的关注</h2>

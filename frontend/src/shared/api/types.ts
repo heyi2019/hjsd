@@ -997,7 +997,7 @@ export interface QualityMetrics {
   items: QualityMetricRow[];
 }
 
-export interface NotificationItem { id: number; notification_no: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
+export interface NotificationItem { id: number; notification_no?: string; notification_type?: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
 
 export interface SearchResult { id: number; type: string; code: string; title: string; subtitle?: string | null; route: string }
 

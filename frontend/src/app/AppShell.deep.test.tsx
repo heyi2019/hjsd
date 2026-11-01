@@ -165,8 +165,8 @@ describe("AppShell：退出登录", () => {
   });
 });
 
-describe("AppShell：业务中心子页记忆恢复", () => {
-  it("深链到订单台账子页，切走再切回恢复到上次子页", async () => {
+describe("AppShell：业务中心首页落点", () => {
+  it("深链到订单台账子页，切走再切回进入库存中心首页", async () => {
     await renderShell({ user: "admin", initialPath: "/business/orders" });
     const ordersTab = await screen.findByRole("tab", { name: "订单台账" });
     expect(ordersTab).toHaveAttribute("aria-selected", "true");
@@ -177,9 +177,9 @@ describe("AppShell：业务中心子页记忆恢复", () => {
       expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台"),
     );
 
-    // 再点业务中心（不指定子页）→ 应恢复上次记忆的「订单台账」
+    // 再点业务中心（不指定子页）→ 应进入库存中心首页
     await ui.click(screen.getByRole("button", { name: /业务中心/ }));
-    const ordersTab2 = await screen.findByRole("tab", { name: "订单台账" });
-    expect(ordersTab2).toHaveAttribute("aria-selected", "true");
+    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
+    expect(inventoryTab).toHaveAttribute("aria-selected", "true");
   });
 });

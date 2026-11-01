@@ -77,11 +77,18 @@ beforeEach(() => {
 
 async function openLedger(user?: string) {
   renderLight(<OrdersPage />, user ? { user } : undefined);
-  await screen.findByRole("tab", { name: "订单台账" });
+  await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
   await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it("业务中心默认进入库存中心作业页", async () => {
+    renderLight(<OrdersPage />);
+    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
+    expect(inventoryTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: "业务总览" })).toBeNull();
+  });
+
   it("订单台账使用订单语义名称", async () => {
     renderLight(<OrdersPage />);
     expect(await screen.findByRole("tab", { name: "订单台账" })).toBeInTheDocument();
@@ -144,6 +151,50 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("进行中").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("已完成").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      ...orders,
+      { id: 3, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "CANCELLED" },
+    ]);
+
+    await openLedger();
+
+    const expectedStats = [
+      ["订单总量", "3"],
+      ["进行中订单", "1"],
+      ["完成订单量", "1"],
+      ["已取消订单", "1"],
+    ];
+    const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
+    for (const [label, value] of expectedStats) {
+      const card = within(ledger).getByText(label).closest(".ui-stat") as HTMLElement | null;
+      expect(card).not.toBeNull();
+      expect(within(card!).getByText(value)).toBeInTheDocument();
+    }
+  });
+
+  it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
+      id: 10,
+      status: "WAITING",
+      inventory_entry_at: "2026-09-01T00:00:00",
+      cost_amount: "100.00",
+    } as never]);
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{
+      id: 20,
+      status: "OVERDUE",
+      total_receivable: "1030.00",
+      paid_amount: "400.00",
+      bad_debt_amount: "0.00",
+    } as never]);
+
+    renderLight(<OrdersPage />);
+
+    await screen.findByRole("tab", { name: "库存中心" });
+    expect(screen.queryByRole("tab", { name: "业务总览" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "业务提醒" })).toBeNull();
   });
 
   it("订单台账展示入库和售卖责任时间", async () => {
@@ -358,6 +409,7 @@ describe("OrdersPage：四类订单台账", () => {
     } as never);
 
     renderLight(<OrdersPage />);
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await screen.findAllByText("TH-2026-0179");
     const row = screen.getAllByText("TH-2026-0179").find((element) => element.closest("tr"))!.closest("tr")!;
     fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);

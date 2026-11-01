@@ -416,9 +416,20 @@ export function useOrdersPageController(params: {
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
   const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
+  const legacyInitialTab = initialTab as string | undefined;
+  const normalizedInitialTab: BusinessCenterTab = initialTab && ["inventory", "ledger", "collections"].includes(initialTab)
+    ? initialTab
+    : legacyInitialTab === "overview"
+      ? "inventory"
+      : initialTab
+        ? "ledger"
+        : DEFAULT_BUSINESS_CENTER_TAB;
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
-    initialTab === "inventory" ? "inventory" : DEFAULT_BUSINESS_CENTER_TAB,
+    normalizedInitialTab,
   );
+  useEffect(() => {
+    setActiveTab(normalizedInitialTab);
+  }, [normalizedInitialTab]);
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);
 

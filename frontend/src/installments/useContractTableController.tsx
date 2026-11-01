@@ -1,7 +1,7 @@
 import { Form, Space } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi, ordersApi, type Installment, type InstallmentDisposition, type Order, type Schedule } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
@@ -39,6 +39,23 @@ export function useContractTableController(params: { contractType: string; reloa
   const compact = useCompactLayout();
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
+
+  // P2-274：各业务弹窗共享同一份 write.error，上一操作的失败提示会残留到其它弹窗。
+  // 只要「某个业务弹窗由关到开」（含从 A 弹窗切到 B 弹窗）就清空错误态，保证每个弹窗起始干净。
+  // 注意：不能把 write 放进依赖——useAsyncAction 每次渲染返回新对象，一旦放入，失败提示被
+  // setError 写出后，同一次重渲染就会再次触发 effect 把 error 清掉，反而吞掉失败提示
+  // （回归测试 收款提交失败 / P2-274 会因此失败）。write.clearError 本身是稳定引用，可安全调用。
+  const prevTargetsRef = useRef<Record<string, unknown>>({});
+  useEffect(() => {
+    const targets: Record<string, unknown> = {
+      payTarget, deliverTarget, recoverTarget, resaleTarget,
+      cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
+    };
+    const openedNew = Object.keys(targets).some((k) => targets[k] && !prevTargetsRef.current[k]);
+    if (openedNew) write.clearError();
+    prevTargetsRef.current = targets;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget]);
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();

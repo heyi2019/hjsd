@@ -71,7 +71,11 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
         okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >
-        <BusinessForm scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} form={cancelForm} onFinish={submitCancelTransaction}>
+        <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} form={cancelForm} onFinish={submitCancelTransaction}>
           <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
@@ -146,7 +150,11 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
         okText="保存修改"
         onOk={() => void editForm.submit()}
       >
-        <BusinessForm scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
+        <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
           <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
             订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
@@ -181,6 +189,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     allocationProfit,
     allocationSubmitting,
     employeeOptions,
+    loadLedgerDetail,
     profitRoleOptions,
     setActionOrder,
     setAllocationOpen,
@@ -214,9 +223,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
         onOk={() => void allocationForm.submit()}
       >
         <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
           scope="ALLOCATION"
           form={allocationForm}
-          layout="vertical"
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             const allRows = values.allocations ?? [];
@@ -238,6 +250,8 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
             try {
               await policyApi.setAllocations(actionOrder.id, items, values.form_extra);
               appMessage.success("分润已保存");
+              // L266：刷新订单详情，使分润明细在订单展开详情中回显（详情由 ledgerDetails 缓存驱动）。
+              if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder.account_id, true);
               setAllocationOpen(false);
               setActionOrder(null);
             } catch (error) {
@@ -378,9 +392,12 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
         onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
         onOk={() => void refundForm.submit()}
       >
-        <BusinessForm scope="REFUND"
+        <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="REFUND"
           form={refundForm}
-          layout="vertical"
           onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);

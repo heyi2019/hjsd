@@ -67,6 +67,7 @@ export function CreateBusinessModal(props: {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const repurchaseConfirmedKey = useRef<string | null>(null);
+  const initialValuesRef = useRef<Record<string, unknown>>({});
   const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
@@ -124,6 +125,8 @@ export function CreateBusinessModal(props: {
       defaults[gameTypeField] = defaultGameType;
     }
     form.setFieldsValue(defaults);
+    // 以「打开瞬间」的表单值为脏判定基线：仅打开下拉再收起不算脏（P2-198）。
+    initialValuesRef.current = form.getFieldsValue(true);
   }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
@@ -184,6 +187,13 @@ export function CreateBusinessModal(props: {
           ? values[key].filter((id): id is number => typeof id === "number")
           : [];
         if (responsibleIds.length > 0) orderFormExtra[key] = responsibleIds;
+      }
+      // 交付信息随订单持久化：交易平台 / 中介类型 / 包赔类型 / 手机号绑定人。
+      // 与 delivery_responsible_ids 同口径写入 form_extra，供订单详情回显
+      // （账号实体与 account_snapshot 均未回传 bound_phone_owner，详情改读 extra_values）。
+      for (const key of ["intermediary_platform", "intermediary_type", "compensation_type", "bound_phone_owner"]) {
+        const v = values[key];
+        if (v !== undefined && v !== null && v !== "") orderFormExtra[key] = v;
       }
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
@@ -314,7 +324,9 @@ export function CreateBusinessModal(props: {
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
       open={props.open}
       onCancel={() => {
-        if (form.isFieldsTouched()) {
+        const currentValues = form.getFieldsValue(true);
+        const isDirty = JSON.stringify(currentValues) !== JSON.stringify(initialValuesRef.current);
+        if (isDirty) {
           appModal.confirm({
             title: "放弃未保存的建单内容？",
             content: "表单已填写但未提交，关闭后将丢失本次输入。",
@@ -337,13 +349,14 @@ export function CreateBusinessModal(props: {
     >
       <ErrorBanner error={loadError} />
       <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
         scope={orderType}
         form={form}
         id={formId}
-        layout="horizontal"
         scrollToFirstError
-        labelCol={{ flex: "0 0 96px" }}
-        wrapperCol={{ flex: "1 1 auto" }}
         onFinish={submit}
         onValuesChange={(changed) => {
           const clear: Record<string, undefined> = {};

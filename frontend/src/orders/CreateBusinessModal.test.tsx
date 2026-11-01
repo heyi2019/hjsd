@@ -328,4 +328,83 @@ it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 Permi
     await openModal("viewer");
     expect(screen.queryByRole("button", { name: /创建订单/ })).toBeNull();
   });
+
+it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async () => {
+    clearOptionSetsCache();
+    vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
+      items: [
+        { code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }] },
+        { code: "INTERMEDIARY_TYPE", options: [{ value: "包赔", label: "包赔" }] },
+        { code: "COMPENSATION_TYPE", options: [{ value: "shoubao", label: "首保" }] },
+      ],
+    } as never);
+    await loadOptionSets();
+
+    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
+    const onClose = vi.fn();
+    await openTypedModal("HS", "admin");
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.type(screen.getByLabelText("客户昵称"), "张三");
+    await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    // 交付信息
+    await ui.type(screen.getByLabelText("手机号绑定人"), "张三");
+    await ui.click(screen.getByLabelText("交易平台").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByLabelText("中介类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("包赔", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByLabelText("包赔类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("首保", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
+    const formExtra = (payload.form_extra ?? {}) as Record<string, unknown>;
+    expect(formExtra.intermediary_platform).toBe("盼之");
+    expect(formExtra.intermediary_type).toBe("包赔");
+    expect(formExtra.compensation_type).toBe("shoubao");
+    expect(formExtra.bound_phone_owner).toBe("张三");
+  });
+
+  it("P2-198：仅展开下拉未改值，关闭直接关闭不弹放弃确认", async () => {
+    const confirmSpy = vi.spyOn(appModal, "confirm");
+    const onClose = vi.fn();
+    renderLight(
+      <CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />,
+      { user: "admin" },
+    );
+    await screen.findByText("新建回收订单");
+    // 仅展开「支出账户」下拉（默认已注入主账户选项），不选择任何值
+    const selector = screen.getByLabelText("支出账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element;
+    await ui.click(selector);
+    await waitFor(() => expect(screen.getByText("主账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument());
+    await ui.click(selector); // 收起下拉
+    // 点关闭（X）：未改值 → 直接关闭，不应弹确认
+    await ui.click(document.querySelector(".ant-modal-close") as Element);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("P2-198：已改值关闭弹出放弃确认，确认后关闭", async () => {
+    let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
+    const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
+      confirmConfig = config as typeof confirmConfig;
+      return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
+    });
+    const onClose = vi.fn();
+    renderLight(
+      <CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />,
+      { user: "admin" },
+    );
+    await screen.findByText("新建回收订单");
+    await ui.type(screen.getByLabelText("客户昵称"), "改了点东西");
+    await ui.click(document.querySelector(".ant-modal-close") as Element);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect((confirmConfig?.title as string) ?? "").toContain("放弃");
+    await act(async () => { await confirmConfig?.onOk?.(); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

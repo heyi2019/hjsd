@@ -82,8 +82,8 @@ export function useOrdersPageController(params: {
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerDetails, setLedgerDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerDetailLoading, setLedgerDetailLoading] = useState<Record<number, boolean>>({});
-  const loadLedgerDetail = async (accountId: number) => {
-    if (ledgerDetails[accountId] || ledgerDetailLoading[accountId]) return;
+  const loadLedgerDetail = async (accountId: number, force = false) => {
+    if (!force && (ledgerDetails[accountId] || ledgerDetailLoading[accountId])) return;
     setLedgerDetailLoading((current) => ({ ...current, [accountId]: true }));
     try {
       const detail = await stocksApi.executionDetail(accountId);
@@ -412,7 +412,9 @@ export function useOrdersPageController(params: {
         };
       }
       await ordersApi.patch(selectedOrder.id, payload);
-      appMessage.success("订单已更新");
+      // L250：有登记事件的订单只能改备注，成功提示需明确「备注已保存」而非笼统的「订单已更新」，
+      // 让用户清楚知道保存结果，避免误以为需重试/刷新。
+      appMessage.success(orderHasPosted ? "备注已保存" : "订单已更新");
       setEditOpen(false);
       setSelectedOrder(await ordersApi.get(selectedOrder.id));
       await load();
@@ -597,6 +599,7 @@ export function useOrdersPageController(params: {
     mobileLedgerFieldOrder,
     load,
     loadError,
+    loadLedgerDetail,
     loading,
     openAllocations,
     openCancelTransaction,

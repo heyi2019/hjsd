@@ -29,7 +29,7 @@ export function CustomerSourceFields(props: { name: string; otherName: string })
         className="recovery-order-modal__party-field recovery-customer-source-other"
         name={props.otherName}
         label="其他来源"
-        rules={source === "其他" ? [{ required: true, whitespace: true, message: "请输入客户来源" }] : []}
+        rules={source === "其他" ? [{ required: true, whitespace: true, message: "请输入其他来源" }] : []}
       >
         <Input disabled={source !== "其他"} placeholder={source === "其他" ? "请输入来源名称" : "选择其他后可填写"} />
       </CfgItem>

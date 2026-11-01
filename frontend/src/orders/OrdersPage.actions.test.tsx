@@ -68,6 +68,50 @@ vi.mock("./CreateBusinessModal", () => ({
     ) : null,
 }));
 
+// 本文件局部覆盖 rc-motion：尊重传入的 visible（open=false 时弹层真正卸载），
+// 使受控 Dropdown「选中后收起」在 jsdom 中可被观测（否则会落到全局 motion-stub 的
+// 强制 visible:true，弹层永远残留、aria-expanded 恒为 null，无法判定收起）。
+// 注意：打开的 Modal/下拉仍按 open=true 渲染内容，不影响其余用例。
+vi.mock("rc-motion", async () => {
+  const React = await import("react");
+  const CSSMotion = React.forwardRef<unknown, any>(function CSSMotion(
+    { children, visible, ...rest },
+    ref,
+  ) {
+    const isVisible = visible !== undefined ? Boolean(visible) : true;
+    if (!isVisible) return null;
+    const content =
+      typeof children === "function"
+        ? children({ ...rest, visible: true }, ref)
+        : children;
+    if (React.isValidElement(content) && ref) {
+      return React.cloneElement(content as React.ReactElement<any>, { ref });
+    }
+    return (content ?? null) as React.ReactNode;
+  });
+  const CSSMotionList = React.forwardRef<unknown, any>(function CSSMotionList(props, _ref) {
+    const { keys = [], children, className, style } = props;
+    const parsed = (Array.isArray(keys) ? keys : []).map((k: any) =>
+      k && typeof k === "object" ? k : { key: k },
+    );
+    const items = parsed.map((item: any, index: number) => {
+      const nodeRef = React.createRef<unknown>();
+      const rendered =
+        typeof children === "function"
+          ? children({ ...item, index }, nodeRef)
+          : children;
+      return (
+        <React.Fragment key={item?.key ?? index}>
+          {rendered ?? null}
+        </React.Fragment>
+      );
+    });
+    return <div className={className} style={style}>{items}</div>;
+  });
+  const Provider = ({ children }: { children?: React.ReactNode }) => children ?? null;
+  return { CSSMotion, CSSMotionList, Provider, default: CSSMotion };
+});
+
 const order1: Order = {
   id: 1,
   order_no: "HS-2026-0001",
@@ -294,6 +338,25 @@ describe("OrdersPage：操作与筛选分支", () => {
     })));
   });
 
+  it("L250：编辑有登记事件订单仅改备注时提示「备注已保存」并关闭弹窗", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      {
+        ...order1,
+        events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true }],
+      },
+    ]);
+    vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
+    await openLedger();
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /编辑订单/ }));
+    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("备注"), "仅更新备注");
+    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
+    // L250：有登记事件只能改备注，成功提示必须明确「备注已保存」而非笼统「订单已更新」
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("备注已保存"));
+    // 保存后弹窗应关闭
+    await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
+  });
+
   it("分润：打开弹窗按姓名预填已有比例", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
@@ -420,6 +483,21 @@ describe("OrdersPage：操作与筛选分支", () => {
       allocation_amount: "0",
     });
     expect(message.success).toHaveBeenCalledWith("分润已保存");
+  });
+
+  it("L266：分润提交成功后刷新订单详情（详情回显）", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const rates = within(modal).getAllByLabelText("比例");
+    await ui.clear(rates[0]);
+    await ui.type(rates[0], "100");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    expect(message.success).toHaveBeenCalledWith("分润已保存");
+    // L266：分润保存后应按 account_id 强制刷新订单详情（ledgerDetails 缓存），使明细回显
+    await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalledWith(order1.account_id));
   });
 
   it("分润：改成按金额分润时提交 allocation_amount", async () => {
@@ -644,6 +722,23 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /关闭新建弹窗/ }));
     await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
+  });
+
+  it("P2-190：选中新建类型后下拉菜单收起（不浮在弹窗上）", async () => {
+    await openLedger();
+    const trigger = screen.getByRole("button", { name: /新建订单/ });
+    await ui.click(trigger);
+    // 菜单展开：菜单项「新建提号订单」可见
+    expect(await screen.findByText("新建提号订单")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("新建回收订单"));
+    // 选中类型后，CreateBusinessModal 打开（回填 createType）
+    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
+    // 受控下拉：onClick 内 setCreateMenuOpen(false) → open 变 false → 弹层真正卸载
+    // （本文件局部 rc-motion 桩尊重 visible，open=false 时弹层不再残留）。
+    // 这正是 P2-190 修复点：避免「菜单浮在弹窗右上方、与弹窗两个浮层叠加」。
+    await waitFor(() => expect(screen.queryByText("新建提号订单")).toBeNull());
+    // 触发按钮不再处于展开态
+    await waitFor(() => expect(trigger).not.toHaveAttribute("aria-expanded", "true"));
   });
 
   it("新建订单成功回调刷新列表", async () => {

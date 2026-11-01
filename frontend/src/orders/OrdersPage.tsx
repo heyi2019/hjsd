@@ -1,4 +1,5 @@
 /** 业务中心：库存中心、订单台账与分期回款。 */
+import { useState } from "react";
 import { Dropdown, Tabs } from "antd";
 import { InventoryPanel } from "../stocks/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -31,6 +32,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
     setCreateType,
     setInstallmentRefreshKey,
   } = controller;
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
 
   return (
     <section className="ui-stack orders-page">
@@ -40,7 +42,15 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
         onChange={(key) => setActiveTab(key as BusinessCenterTab)}
         tabBarExtraContent={(
           <Dropdown
-            menu={{ items: BUSINESS_CREATE_ITEMS, onClick: ({ key }) => setCreateType(key as BusinessOrderType) }}
+            open={createMenuOpen}
+            onOpenChange={setCreateMenuOpen}
+            menu={{
+              items: BUSINESS_CREATE_ITEMS,
+              onClick: ({ key }) => {
+                setCreateMenuOpen(false);
+                setCreateType(key as BusinessOrderType);
+              },
+            }}
             trigger={["click"]}
           >
             <PermissionButton permission="order.create" type="primary">新建订单</PermissionButton>

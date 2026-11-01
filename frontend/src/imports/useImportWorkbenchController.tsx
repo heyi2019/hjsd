@@ -19,7 +19,10 @@ export function useImportWorkbenchController({
 }: ImportWorkbenchProps) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchesReady, setBatchesReady] = useState(false);
-  const sourceKindOptions = useOptionSet("IMPORT_SOURCE_KIND") ?? IMPORT_SOURCE_KIND_OPTIONS;
+  const sourceKindOptionsRaw = useOptionSet("IMPORT_SOURCE_KIND");
+  // 业务字典为空/未就绪时回落到只读集合，避免「数据类型」下拉空白却残留游离默认值（L278）。
+  const sourceKindOptions =
+    sourceKindOptionsRaw && sourceKindOptionsRaw.length > 0 ? sourceKindOptionsRaw : IMPORT_SOURCE_KIND_OPTIONS;
   const batchStatusOptions = useOptionSet("IMPORT_BATCH_STATUS") ?? [];
   const isBatchControlled = batchIdProp !== undefined;
   const [internalBatchId, setInternalBatchId] = useState<number | null>(null);
@@ -195,6 +198,7 @@ export function useImportWorkbenchController({
       </PermissionButton>
       <Select
         className="ui-control-width-import"
+        aria-label="导入批次"
         value={batchId ?? undefined}
         placeholder="选择导入批次"
         options={batches.map((b) => ({

@@ -312,13 +312,14 @@ describe("ImportWorkbench：操作分支补充", () => {
     expect((await screen.findAllByText(/JSON 文件必须是对象数组/)).length).toBeGreaterThan(0);
   });
 
-  it("下载当前类型导入模板：创建 Blob 链接并触发下载", async () => {
+  it("下载当前类型导入模板：创建 Blob 链接、触发下载并给出成功反馈（L286）", async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     await openWorkbench();
     await openImportModal();
     await ui.click(screen.getByRole("button", { name: /下载当前类型导入模板/ }));
     expect(URL.createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
+    expect(message.success).toHaveBeenCalledWith(expect.stringContaining("已开始下载"));
     clickSpy.mockRestore();
   });
 

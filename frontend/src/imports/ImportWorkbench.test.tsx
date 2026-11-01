@@ -83,6 +83,12 @@ it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {
   expect(screen.getByRole("tab", { name: "导入对账" })).toBeInTheDocument();
 });
 
+it("导入批次选择器带可访问名称（L290）", async () => {
+  renderLight(<ImportWorkbench />, { user: "admin" });
+  await screen.findByText("导入工作台");
+  expect(document.querySelector('[aria-label="导入批次"]')).not.toBeNull();
+});
+
 it("viewer 角色无 import.manage：看不到指派/确认批次/回滚按钮", async () => {
   renderLight(<ImportWorkbench />, { user: "viewer" });
   await screen.findByText("导入工作台");

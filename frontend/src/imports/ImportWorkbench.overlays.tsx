@@ -1,4 +1,5 @@
 import { appMessage } from "../shared/ui/appFeedback";
+import { useEffect } from "react";
 import { Form, Input, Typography, Upload } from "antd";
 
 import { importsApi } from "../shared/api/catalog";
@@ -39,6 +40,11 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
     unlinkedTarget,
   } = controller;
 
+  // 打开新建导入弹窗时清空残留错误，避免工作台历史异常与本次本地校验提示并列（L282）。
+  useEffect(() => {
+    if (importOpen) setError(null);
+  }, [importOpen, setError]);
+
   return (
     <>
       <FormDrawer
@@ -73,6 +79,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         okText="开始导入"
         cancelText="取消"
         confirmLoading={importing}
+        okButtonProps={{ disabled: Boolean(error) }}
         destroyOnHidden
         onCancel={() => {
           setImportOpen(false);
@@ -121,7 +128,12 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
             permission="import.manage"
             type="link"
             className="ui-drawer-hint"
-            onClick={() => downloadImportTemplate(String(importForm.getFieldValue("source_kind") ?? "STANDARD_ORDER"))}
+            onClick={() => {
+              const kind = String(importForm.getFieldValue("source_kind") ?? "STANDARD_ORDER");
+              downloadImportTemplate(kind);
+              const label = sourceKindOptions.find((option) => option.value === kind)?.label ?? kind;
+              appMessage.success(`已开始下载「${label}」导入模板`);
+            }}
           >
             下载当前类型导入模板
           </PermissionButton>

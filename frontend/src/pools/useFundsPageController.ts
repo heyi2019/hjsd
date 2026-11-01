@@ -54,6 +54,7 @@ export function useFundsPageController(active = true) {
   const [cashflowCategory, setCashflowCategory] = useState("");
   const compact = useCompactLayout();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [fundsReady, setFundsReady] = useState(false);
   // T20：资金流水筛选项从「选项词典」配置读取（方向 / 状态 / 资金性质 / 核算属性）。
   const flowDirectionOptions = useOptionSet("FUND_FLOW_DIRECTION");
   const flowStatusOptions = useOptionSet("FUND_FLOW_STATUS");
@@ -143,6 +144,7 @@ export function useFundsPageController(active = true) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setFundsReady(false);
     try {
       const list = await poolsApi.list();
       setPools(list);
@@ -154,6 +156,7 @@ export function useFundsPageController(active = true) {
       await fetchCashflows();
       setReconciliations(await reconciliationsApi.list());
       setError(null);
+      setFundsReady(true);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -352,21 +355,26 @@ export function useFundsPageController(active = true) {
   };
 
   // 只读合计：仅用于统计卡展示，不回流到任何写路径。
-  const totalCash = Object.values(balances)
+  const totalCashValue = Object.values(balances)
     .reduce((sum, balance) => sum + Number(balance.cash_balance), 0)
     .toFixed(2);
-  const totalAvailable = Object.values(balances)
+  const totalAvailableValue = Object.values(balances)
     .reduce((sum, balance) => sum + Number(balance.available), 0)
     .toFixed(2);
-  const totalDeposit = Object.values(balances)
+  const totalDepositValue = Object.values(balances)
     .reduce((sum, balance) => sum + Number(balance.deposit_held), 0)
     .toFixed(2);
   // 自有权益口径（domain/enums.py PoolOwnership：OWNED 计入权益，CUSTODY/THIRD_PART 只计现金头寸）。
   // 归属以资金池主数据为准；权益按现金头寸计、不扣押金占用——押金占用仍是自有资金，只是暂时不可用。
-  const totalOwned = pools
+  const totalOwnedValue = pools
     .filter((pool) => pool.ownership === "OWNED")
     .reduce((sum, pool) => sum + Number(balances[pool.id]?.cash_balance ?? 0), 0)
     .toFixed(2);
+  const unavailableAmount = error ? "不可用" : "—";
+  const totalCash = fundsReady ? totalCashValue : unavailableAmount;
+  const totalAvailable = fundsReady ? totalAvailableValue : unavailableAmount;
+  const totalDeposit = fundsReady ? totalDepositValue : unavailableAmount;
+  const totalOwned = fundsReady ? totalOwnedValue : unavailableAmount;
 
   const visibleCashflows = useMemo(() => {
     const keyword = cashflowKeyword.trim().toLowerCase();
@@ -418,6 +426,7 @@ export function useFundsPageController(active = true) {
     reconciliations,
     loading,
     error,
+    fundsReady,
     compact,
     depositOpen,
     setDepositOpen,

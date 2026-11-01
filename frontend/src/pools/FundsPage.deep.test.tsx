@@ -158,6 +158,21 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.amount).toBe("100.00");
   });
 
+  it("超出转出资金池可用余额时前端拦截且不发起划转", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    await pickSelect(modal, 1, /押金池/);
+    await ui.type(modal.querySelector("#amount") ?? modal, "700.01");
+    await ui.click(screen.getByRole("button", { name: /确认划转/ }));
+
+    await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
+    expect(modal.querySelector("#amount")).toHaveValue("700.01");
+    expect(vi.mocked(catalog.transfersApi.create)).not.toHaveBeenCalled();
+  });
+
   it("对账状态列显示未核销/已核销（对齐后端 ReconciliationStatus 语义）", async () => {
     vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([
       { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },

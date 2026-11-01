@@ -268,9 +268,19 @@ export function useFundsPageController(active = true) {
 
   const submitTransfer = async (values: Record<string, unknown>) => {
     await write.run(async () => {
+      const sourcePoolId = Number(values.source_pool_id);
+      const targetPoolId = Number(values.target_pool_id);
+      const amount = Number(values.amount);
+      const available = balances[sourcePoolId]?.available;
+      if (sourcePoolId === targetPoolId) {
+        throw new Error("转入和转出资金池不能相同");
+      }
+      if (available != null && Number.isFinite(amount) && amount > Number(available) + 0.000001) {
+        throw new Error("转出资金池可用余额不足");
+      }
       await transfersApi.create({
-        source_pool_id: Number(values.source_pool_id),
-        target_pool_id: Number(values.target_pool_id),
+        source_pool_id: sourcePoolId,
+        target_pool_id: targetPoolId,
         amount: values.amount as string,
         occurred_on: values.occurred_on as string,
         note: values.note as string,

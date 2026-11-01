@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -11,6 +11,7 @@ import { TeamsPanel } from "../users/TeamsPanel";
 import { UserCenterPage } from "../auth/UserCenterPage";
 import * as client from "../shared/api/client";
 import { ReportsPage } from "../reporting/ReportsPage";
+import { FundsPage } from "../pools/FundsPage";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
@@ -200,6 +201,37 @@ it("P1/FE-047：重复团队编码前端拦截并保留表单", async () => {
   expect(screen.getByPlaceholderText("团队编码")).toHaveValue(" t01 ");
   expect(catalog.teamsApi.create).not.toHaveBeenCalled();
   errorSpy.mockRestore();
+});
+
+it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
+    { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({ income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" } as never);
+  vi.mocked(catalog.depositsApi.list).mockResolvedValueOnce([] as never);
+  vi.mocked(catalog.cashflowsApi.list).mockResolvedValueOnce({ items: [], total: 0 } as never);
+  vi.mocked(catalog.reconciliationsApi.list).mockResolvedValueOnce([] as never);
+  vi.mocked(catalog.rebatesApi.list).mockResolvedValueOnce([] as never);
+  renderLight(<FundsPage />, { user: "admin" });
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await screen.findByText(/POOL-A/);
+  await user.click(await screen.findByRole("button", { name: /资金池划转/ }));
+  const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+  const selectors = modal.querySelectorAll(".ant-select-selector");
+  const choosePool = async (index: number, title: RegExp) => {
+    await user.click(selectors[index]);
+    const dropdowns = document.querySelectorAll(".ant-select-dropdown");
+    const currentDropdown = dropdowns[dropdowns.length - 1] as HTMLElement;
+    await user.click(await within(currentDropdown).findByTitle(title));
+  };
+  await choosePool(0, /经营主池/);
+  await choosePool(1, /押金池/);
+  await user.type(modal.querySelector("#amount") ?? modal, "700.01");
+  await user.click(screen.getByRole("button", { name: /确认划转/ }));
+
+  await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
+  expect(catalog.transfersApi.create).not.toHaveBeenCalled();
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

@@ -94,4 +94,23 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     expect(screen.getByText("作废返点")).toBeInTheDocument();
     expect(screen.getByText("驳回导入批次")).toBeInTheDocument();
   });
+
+  it("加载失败时记录数标记为不可用并禁用筛选、提供重新加载（L346）", async () => {
+    vi.mocked(catalog.auditApi).list.mockRejectedValue(new Error("审计服务不可用"));
+    vi.mocked(catalog.auditApi).actions.mockResolvedValue(["ROUTE_UPDATE"]);
+    const { ConfigAuditPanel } = await import("./ConfigAuditPanel");
+    const { container } = renderLight(<ConfigAuditPanel />, { user: "admin" });
+
+    // 失败态不再以“共 0 条”误导，记录数标记为不可用
+    expect(await screen.findByText(/记录加载失败，当前记录数不可用/)).toBeInTheDocument();
+    expect(screen.queryByText(/当前筛选下共 0 条/)).not.toBeInTheDocument();
+    // 仍提供重新加载入口
+    expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
+    // 筛选控件在失败态被禁用，避免基于损坏状态构建查询
+    const selects = container.querySelectorAll(".ant-select");
+    expect(selects).toHaveLength(2);
+    selects.forEach((select) => expect(select).toHaveClass("ant-select-disabled"));
+    expect(container.querySelector(".ant-picker")).toHaveClass("ant-picker-disabled");
+    expect(container.querySelector(".ant-input")).toHaveClass("ant-input-disabled");
+  });
 });

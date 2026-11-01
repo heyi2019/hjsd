@@ -102,7 +102,7 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
         <BusinessForm scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
           <CfgItem name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
-          <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></CfgItem>
+          <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额", { allowNegative: true })}><MoneyInput /></CfgItem>
           <CfgItem name="occurred_on" label="划转日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
           <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认划转</PermissionButton>

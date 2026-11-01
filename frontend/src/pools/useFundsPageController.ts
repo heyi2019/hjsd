@@ -1,6 +1,6 @@
 /** 资金中心逻辑层：集中所有状态、表单、写操作与派生计算，视图层（Tabs / Modals）通过 controller 消费。
  *  与 FundsPage.tsx 原组件体一一对应，仅把逻辑从组件作用域移到 hook 作用域，行为不变。 */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { useCompactLayout } from "../shared/ui";
 import { Form } from "antd";
@@ -66,6 +66,25 @@ export function useFundsPageController(active = true) {
   const natureOptionSet = useOptionSet("CASHFLOW_NATURE");
   // 弹窗不会同时打开，故全部写操作后共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
+  // L1527-①：全部资金弹窗共用同一 write.error。任一弹窗开/关切换时清除该错误，
+  // 避免 A 弹窗提交失败后其 alert 在 B 弹窗（或重新打开 A）中残留。
+  // 提交失败停留当前弹窗时 open 态不变，错误仍可见；仅状态切换（开/关）触发清理。
+  useEffect(() => {
+    write.clearError();
+  }, [
+    depositOpen,
+    cashflowOpen,
+    transferOpen,
+    reconciliationOpen,
+    resolveTarget,
+    reverseTarget,
+    returnTarget,
+    lossTarget,
+    cancelTarget,
+    repairTarget,
+    unmatchedTarget,
+    write.clearError,
+  ]);
   const [loading, setLoading] = useState(false);
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();

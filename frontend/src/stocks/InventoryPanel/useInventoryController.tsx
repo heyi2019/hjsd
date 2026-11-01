@@ -461,6 +461,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       downloadInventoryCsv(visibleRows, details);
       if (failedCount) {
         appMessage.warning(`${failedCount} 条明细读取失败，已导出其余可用字段`);
+      } else {
+        appMessage.success("库存 CSV 已导出");
       }
     } finally {
       setExporting(false);

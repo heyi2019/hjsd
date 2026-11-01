@@ -229,4 +229,11 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalled());
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
+
+  it("导出成功后给出完成反馈", async () => {
+    await openPanel([inStockRow]);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce(sellDetail);
+    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
+  });
 });

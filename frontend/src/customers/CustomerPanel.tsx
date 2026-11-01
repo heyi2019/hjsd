@@ -62,6 +62,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         }),
         `客户-${today()}.csv`,
       );
+      appMessage.success("客户 CSV 已导出");
     } catch (err) {
       appMessage.error(normalizeError(err).message);
     } finally {

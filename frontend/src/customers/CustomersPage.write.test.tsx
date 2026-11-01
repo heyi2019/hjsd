@@ -20,7 +20,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search", "exportCsv",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -135,6 +135,18 @@ describe("CustomersPage：权限门控与写操作", () => {
     // 用 toHaveBeenCalledWith 而非 toHaveBeenLastCalledWith：搜索后页面可能再触发一次刷新调用，
     // 断言「关键词确实传给了后端」才是本用例的意图，避免与刷新调用竞争导致偶发红。
     await waitFor(() => expect(vi.mocked(catalog.customersApi.list)).toHaveBeenCalledWith({ keyword: "张三" }));
+  });
+
+  it("客户 CSV 导出完成后给出成功反馈", async () => {
+    const successSpy = vi.spyOn(message, "success");
+    vi.mocked(catalog.customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]));
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("button", { name: "导出客户CSV" }));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
   });
 });
 

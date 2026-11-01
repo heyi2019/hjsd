@@ -16,6 +16,7 @@ import { FundsPage } from "../pools/FundsPage";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { CustomerPanel } from "../customers/CustomerPanel";
+import { InventoryPanel } from "../stocks/InventoryPanel";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
@@ -391,6 +392,40 @@ it("P1/FE-053：报表导出成功后显示可核对的结果反馈", async () =
   expect(anchorClick).toHaveBeenCalled();
   expect(createUrl).toHaveBeenCalled();
   expect(revokeUrl).toHaveBeenCalledWith("blob:report");
+});
+
+it("P1/FE-194：客户 CSV 导出完成后给出成功反馈", async () => {
+  vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
+    { id: 1, customer_no: "CUS-0001", display_name: "测试客户", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]) as never);
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  const successSpy = vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<CustomerPanel />, { user: "admin" });
+
+  await screen.findByText("CUS-0001");
+  await user.click(screen.getByRole("button", { name: "导出客户CSV" }));
+  await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
+});
+
+it("P1/FE-196：库存 CSV 导出完成后给出成功反馈", async () => {
+  vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
+    { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "安卓", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00" },
+  ] as never);
+  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({ account: { id: 1 }, orders: [] } as never);
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:inventory");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  const successSpy = vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<InventoryPanel />, { user: "admin" });
+
+  await screen.findByText("acc-1");
+  await user.click(screen.getByRole("button", { name: /导出/ }));
+  await waitFor(() => expect(successSpy).toHaveBeenCalledWith("库存 CSV 已导出"));
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

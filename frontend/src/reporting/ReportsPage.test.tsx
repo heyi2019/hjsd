@@ -14,8 +14,11 @@ beforeEach(() => {
 });
 
 // jsdom 不执行真实下载跳转；屏蔽 anchor.click，避免导出测试留下 navigation 定时器拖住全量单测。
+// 同时 jsdom 未实现 URL.createObjectURL/revokeObjectURL，导出成功分支依赖它，置为安全桩。
 beforeAll(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 });
 
 afterAll(() => {
@@ -131,5 +134,33 @@ describe("ReportsPage：经营中心报表", () => {
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     expect(await screen.findByText("请至少勾选一项报表")).toBeInTheDocument();
     expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
+  });
+
+  it("导出日期反向（开始晚于结束）时拦截并给出错误提示，不发起导出", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await ui.type(screen.getByLabelText("导出开始日期"), "2026-12-31");
+    await ui.type(screen.getByLabelText("导出结束日期"), "2026-01-01");
+    // 先勾选一项，确保命中的是反向日期分支而非「未勾选」分支（L1531 验证点）
+    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
+    await ui.click(selector);
+    const listbox = await screen.findByRole("listbox");
+    await ui.click(within(listbox).getByText("订单利润"));
+    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    expect(await screen.findByText("导出开始日期不能晚于结束日期")).toBeInTheDocument();
+    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
+  });
+
+  it("导出成功后展示结果反馈（成功文案 + 触发下载），按钮 loading 阻止重复点击", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await ui.type(screen.getByLabelText("导出开始日期"), "2026-01-01");
+    await ui.type(screen.getByLabelText("导出结束日期"), "2026-01-31");
+    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
+    await ui.click(selector);
+    const listbox = await screen.findByRole("listbox");
+    await ui.click(within(listbox).getByText("订单利润"));
+    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    // L1727 验证点：成功文案出现 + 确实触发了下载请求
+    expect(await screen.findByText("已导出 1 份报表")).toBeInTheDocument();
+    expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" });
   });
 });

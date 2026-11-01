@@ -218,7 +218,7 @@ export function AppShell() {
                 以 Modal 弹出挂载 UserCenterPage，不占用侧栏 nav 计数与一级路由。
                 用 .topbar-action 紧凑幽灵按钮（36px，与分段控件/选择器同高），
                 不再复用 .nav-item（44px 会把顶栏整行撑高）。 */}
-            <button type="button" className="topbar-action" onClick={() => setUserCenterOpen(true)}>
+            <button type="button" className="topbar-action" data-user-center-open={userCenterOpen} onClick={() => setUserCenterOpen(true)}>
               用户中心
             </button>
             {/* 当前角色只读展示：角色由管理员配置（生产态=登录账号角色，DEV 态=X-Dev-User 头），
@@ -278,7 +278,11 @@ export function AppShell() {
       <Modal
         open={userCenterOpen}
         title="用户中心"
-        footer={null}
+        footer={
+          <button type="button" className="ant-btn" onClick={() => setUserCenterOpen(false)}>
+            关闭
+          </button>
+        }
         destroyOnHidden
         onCancel={() => setUserCenterOpen(false)}
         className="user-center-modal"

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "../shared/ui/appFeedback";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
+import { consignmentRecords } from "./InventoryPlatformOffsaleModal";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
 import { seedOptionSets } from "../test/formFieldsSeed";
@@ -220,6 +221,21 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
 
     expect(await screen.findByText("本系统")).toBeInTheDocument();
     expect(screen.getByText("2026-10-01 09:30")).toBeInTheDocument();
+  });
+
+  it("FE-129：无平台的初始代挂动作不生成空平台上架记录", () => {
+    const records = consignmentRecords([{
+      order_id: 89,
+      order_no: "DG-89-BASE",
+      order_type: "DG",
+      status: "ACTIVE",
+      created_at: "2026-11-02T10:00:00",
+      trade_date: "2026-11-02",
+      extra_values: {},
+      events: [],
+    }] as unknown as AccountExecutionDetail["orders"]);
+
+    expect(records).toEqual([]);
   });
 
   it("代挂选择本系统下架时直接取消代挂订单并退出库存中心", async () => {

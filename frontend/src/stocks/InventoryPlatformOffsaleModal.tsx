@@ -6,6 +6,7 @@ import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
 
 export type ActiveConsignment = {
   orderId: number;
@@ -24,11 +25,11 @@ function minute(value: string | null | undefined) {
 
 export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsignment[] {
   return orders
-    .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+    .filter(isActiveConsignmentListing)
     .map((order) => ({
       orderId: order.order_id,
       orderNo: order.order_no,
-      platform: String(order.extra_values?.consignment_platform ?? order.account_platform ?? order.counterparties?.filter((party) => party.role === "PLATFORM").map((party) => party.display_name).join("、") ?? "-"),
+      platform: consignmentPlatform(order) ?? "-",
       listedAt: minute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
     }));
 }

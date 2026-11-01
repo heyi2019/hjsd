@@ -2,6 +2,9 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
+import { renderApp } from "../test/render";
+import { MemoryRouter } from "react-router-dom";
+import { AppShell } from "../app/AppShell";
 import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { OrdersPage } from "../orders/OrdersPage";
@@ -41,6 +44,7 @@ import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 import { appMessage, appModal } from "../shared/ui/appFeedback";
 import { buildActionAllocationCandidates, buildActionAllocationRows } from "../orders/orderpage/helpers";
+import { consignmentRecords } from "../stocks/InventoryPlatformOffsaleModal";
 
 vi.mock("../shared/api/catalog");
 
@@ -1252,4 +1256,42 @@ it("P1/FE-260：提成对账人员筛选传递 user_id", async () => {
   await userEvent.setup({ pointerEventsCheck: 0 }).click(filter);
   await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
   await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+});
+
+it("P1/FE-129：无平台初始代挂动作不生成平台上架记录", () => {
+  expect(consignmentRecords([{
+    order_id: 129,
+    order_no: "DG-FE129-BASE",
+    order_type: "DG",
+    status: "ACTIVE",
+    created_at: "2026-11-02T10:00:00",
+    trade_date: "2026-11-02",
+    extra_values: {},
+    events: [],
+  }] as never)).toEqual([]);
+});
+
+it("P1/FE-207：真实用户中心在改密请求悬挂时仍可关闭", async () => {
+  vi.spyOn(client, "changePassword").mockReturnValue(new Promise(() => undefined));
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { profit_base: "0" } } as never);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items: [] } as never);
+  renderApp(
+    <MemoryRouter initialEntries={["/dashboard"]}>
+      <AppShell />
+    </MemoryRouter>,
+    { user: "admin" },
+  );
+
+  fireEvent.click(await screen.findByRole("button", { name: "用户中心" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
+  fireEvent.change(within(dialog).getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
+  fireEvent.change(within(dialog).getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: /修改密码/ }));
+  await waitFor(() => expect(client.changePassword).toHaveBeenCalledWith("wrong-old-pass", "new-pass-12345"));
+  fireEvent.click(within(dialog).getByRole("button", { name: "关闭" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "用户中心" })).toHaveAttribute("data-user-center-open", "false"));
 });

@@ -12,6 +12,7 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
+import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
 
 type ListedPlatform = { key: number; platform: string; listedAt: string };
 
@@ -22,13 +23,10 @@ function dateTimeMinute(value: string): string {
 
 function listedPlatforms(detail: AccountExecutionDetail): ListedPlatform[] {
   return detail.orders
-    .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+    .filter(isActiveConsignmentListing)
     .map((order) => ({
       key: order.order_id,
-      platform: String(order.extra_values?.consignment_platform ?? order.counterparties
-        ?.filter((party) => party.role === "PLATFORM")
-        .map((party) => party.display_name)
-        .join("、") ?? "-"),
+      platform: consignmentPlatform(order) ?? "-",
       listedAt: dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
     }));
 }

@@ -21,6 +21,7 @@ import {
   type InventoryEventDraft,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
+import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
 
 function dateTimeMinute(value: string | null | undefined): string {
   if (!value) return "-";
@@ -41,15 +42,9 @@ function eventPlatform(detail: AccountExecutionDetail | undefined, eventType: st
 function consignmentSummary(detail: AccountExecutionDetail | undefined, accountStatus?: string): string {
   if (accountStatus === "VOID") return "-";
   const records = detail?.orders
-    .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+    .filter((order) => isConsignmentListing(order) && order.status !== "CANCELLED")
     .map((order) => {
-      const configuredPlatform = order.extra_values?.consignment_platform;
-      const platform = configuredPlatform
-        ? String(configuredPlatform)
-        : (order.counterparties ?? [])
-          .filter((counterparty) => counterparty.role === "PLATFORM")
-          .map((counterparty) => counterparty.display_name)
-          .join("、") || "-";
+      const platform = consignmentPlatform(order) ?? "-";
       const listedAt = dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""));
       return `${platform} / ${listedAt}`;
     }) ?? [];
@@ -68,9 +63,7 @@ function orderPlatformValues(order: AccountExecutionDetail["orders"][number]): s
 /** 下架分两类：平台下架（PLATFORM）只取消指定平台的上架记录；系统下架（SYSTEM）按 ERP 出库、账号退出库存。
  *  操作明细「平台」列据此取值：平台下架显示具体平台，系统下架显示「本系统」。 */
 function consignmentPlatformOf(order: AccountExecutionDetail["orders"][number]): string {
-  const configured = order.extra_values?.consignment_platform;
-  if (configured) return String(configured);
-  return orderPlatformValues(order).join("、") || "-";
+  return consignmentPlatform(order) ?? "-";
 }
 
 function eventPlatformLabel(
@@ -267,14 +260,11 @@ export function OrderDetail({
     }))
   )) ?? [];
 
-  const consignmentOrders = (detail?.orders ?? []).filter((order) => order.order_type === "DG" && order.status !== "CANCELLED");
-  const hasActiveConsignment = consignmentOrders.some((order) => {
-    const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
-    return !unlisted;
-  });
+  const consignmentOrders = (detail?.orders ?? []).filter(isConsignmentListing);
+  const hasActiveConsignment = consignmentOrders.some(isActiveConsignmentListing);
   const hasUnlistedConsignment = consignmentOrders.some((order) => {
     const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
-    return Boolean(unlisted);
+    return order.status !== "CANCELLED" && Boolean(unlisted);
   });
   const operationStatusLabel = resolveOperationStatus(row.status, hasActiveConsignment, hasUnlistedConsignment);
 

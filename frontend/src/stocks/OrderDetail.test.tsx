@@ -214,4 +214,49 @@ describe("OrderDetail", () => {
     expect(within(finance).getAllByText("1 笔").length).toBeGreaterThanOrEqual(1);
     expect(within(finance).getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
   });
+
+  it("FE-129：无寄售平台的初始代挂单不应显示为已上架", () => {
+    const consignmentAccount = { ...account, inventory_type: "CONSIGNMENT" } as unknown as Account;
+    const detail = {
+      orders: [{
+        order_id: 129,
+        order_no: "DG-FE129-BASE",
+        order_type: "DG",
+        status: "ACTIVE",
+        created_at: "2026-11-02T10:00:00",
+        trade_date: "2026-11-02",
+        events: [],
+        extra_values: {},
+      }],
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={consignmentAccount} detail={detail} loading={false} />);
+
+    const operation = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
+    expect(within(operation).getByText("待售")).toBeInTheDocument();
+    expect(within(operation).queryByText("寄售中")).toBeNull();
+    expect(within(operation).queryByText("寄售平台 / 寄售时间")).toBeNull();
+  });
+
+  it("FE-129：明确平台的代挂动作才显示寄售中和平台时间", () => {
+    const consignmentAccount = { ...account, inventory_type: "CONSIGNMENT" } as unknown as Account;
+    const detail = {
+      orders: [{
+        order_id: 130,
+        order_no: "DG-FE129-LISTED",
+        order_type: "DG",
+        status: "ACTIVE",
+        created_at: "2026-11-02T10:00:00",
+        trade_date: "2026-11-02",
+        events: [],
+        extra_values: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" },
+      }],
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={consignmentAccount} detail={detail} loading={false} />);
+
+    const operation = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
+    expect(within(operation).getByText("寄售中")).toBeInTheDocument();
+    expect(within(operation).getByText("盼之 / 2026-11-02 10:05")).toBeInTheDocument();
+  });
 });

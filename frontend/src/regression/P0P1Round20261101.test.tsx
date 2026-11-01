@@ -21,6 +21,7 @@ import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoutesPanel";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
+import { SequencesPanel } from "../field-definitions/panels/SequencesPanel";
 import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { InventorySaleModal } from "../stocks/InventorySaleModal";
@@ -232,6 +233,14 @@ it("P1/FE-215：经营规则数据失败时统计不显示零且不开放规则�
   expect(await screen.findByText("经营规则")).toBeInTheDocument();
   expect(screen.getByText("规则总数").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.queryByRole("button", { name: "设置配置" })).toBeNull();
+});
+
+it("P1/FE-219：编号序列数据失败时不伪装成真实空列表", async () => {
+  vi.mocked(catalog.sequencesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "sequences down" });
+  renderLight(<SequencesPanel />, { user: "admin" });
+
+  expect(await screen.findByText("编号序列数据不可用，请点击重新加载")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
 });
 
 it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {

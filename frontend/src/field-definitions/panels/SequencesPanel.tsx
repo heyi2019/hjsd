@@ -136,7 +136,9 @@ export function SequencesPanel() {
       <Typography.Paragraph type="secondary" className="ui-card-hint">
         序列编号由后端按域独立发放，本面板只读；库存编号与分期合约号不独立发放，见条目说明。排查断号 / 跳号时对照「当前值」与业务单据最大编号：不一致说明存在发放失败或手工补号，需复查对应批次的导入与冲销记录。
       </Typography.Paragraph>
-      {items.length > 0 ? (
+      {error ? (
+        <Typography.Paragraph type="warning">编号序列数据不可用，请点击重新加载</Typography.Paragraph>
+      ) : items.length > 0 ? (
         <Descriptions bordered size="small" column={1} labelStyle={{ width: 96 }}>
           {items.map((item) => (
             <Descriptions.Item key={item.label} label={item.label}>

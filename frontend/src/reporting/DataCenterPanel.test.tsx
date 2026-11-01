@@ -135,6 +135,19 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
     const onNavigate = vi.fn();
     renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: /订单总数/ }));
-    expect(onNavigate).toHaveBeenCalledWith("business");
+    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
+  });
+
+  it("进行中统计包含分期订单，并从快捷卡进入订单台账", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+      ...orders,
+      { id: 3, order_no: "TH-2026-0003", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-03", status: "INSTALLMENT" },
+    ]);
+    const onNavigate = vi.fn();
+    renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+    const card = await screen.findByRole("button", { name: /进行中/ });
+    expect(card).toHaveTextContent("2");
+    await ui.click(card);
+    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
 });

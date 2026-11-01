@@ -6,6 +6,8 @@ import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { ReportsPage } from "../reporting/ReportsPage";
+import { DataCenterPanel } from "../reporting/DataCenterPanel";
+import { countOngoingOrders } from "../reporting/DataCenterPanel";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoutesPanel";
@@ -199,4 +201,20 @@ it("P1/FE-063：导入文件类型校验拒绝 PNG", () => {
   expect(isSupportedImportFile({ name: "account-image.png", type: "image/png" })).toBe(false);
   expect(isSupportedImportFile({ name: "orders.csv", type: "text/csv" })).toBe(true);
   expect(isSupportedImportFile({ name: "rows.json", type: "application/json" })).toBe(true);
+});
+
+it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {
+  expect(countOngoingOrders([{ status: "ACTIVE" }, { status: "INSTALLMENT" }, { status: "COMPLETED" }])).toBe(2);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+    { id: 10, order_no: "HS-2026-0001", order_type: "HS", capital_type: "STOCK", trade_date: "2026-10-01", status: "ACTIVE" },
+    { id: 11, order_no: "TH-2026-0002", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-02", status: "INSTALLMENT" },
+    { id: 12, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "COMPLETED" },
+  ]);
+  const onNavigate = vi.fn();
+  renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+  const card = await screen.findByRole("button", { name: /进行中/ });
+  expect(card).toHaveTextContent("2");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(card);
+  expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
 });

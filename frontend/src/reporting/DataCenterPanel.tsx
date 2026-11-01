@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useListViewColumns } from "../shared/lib/listColumns";
+import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import {
   DataTable,
   EntryCard,
@@ -23,7 +24,11 @@ interface PoolRow {
   balance?: PoolBalance;
 }
 
-export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => void }) {
+export function countOngoingOrders(items: Pick<Order, "status">[]): number {
+  return items.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length;
+}
+
+export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [orders, setOrders] = useState<Order[]>([]);
@@ -67,7 +72,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
   const totalDeposit = sum((b) => b?.deposit_held);
 
   // 业务计数口径：ACTIVE 表示进行中。
-  const activeCount = orders.filter((o) => o.status === "ACTIVE").length;
+  const activeCount = countOngoingOrders(orders);
 
   const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
   const columns: ColumnsType<PoolRow> = [
@@ -127,13 +132,13 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
           title="订单总数"
           value={String(orders.length)}
           description="点击进入业务中心 · 订单台账"
-          onClick={() => onNavigate?.("business")}
+          onClick={() => onNavigate?.("business", "ledger")}
         />
         <EntryCard
           title="进行中"
           value={String(activeCount)}
           description="点击进入业务中心 · 订单台账"
-          onClick={() => onNavigate?.("business")}
+          onClick={() => onNavigate?.("business", "ledger")}
         />
       </EntryRow>
 

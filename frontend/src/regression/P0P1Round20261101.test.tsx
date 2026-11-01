@@ -216,6 +216,14 @@ it("P1/FE-047：重复团队编码前端拦截并保留表单", async () => {
   errorSpy.mockRestore();
 });
 
+it("P1/FE-217：团队数据失败时显示错误空态且禁用新增", async () => {
+  vi.mocked(catalog.teamsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "teams down" });
+  renderLight(<TeamsPanel />, { user: "admin" });
+
+  expect(await screen.findByText("团队数据不可用，请点击重新加载")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新增团队/ })).toBeDisabled();
+});
+
 it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },

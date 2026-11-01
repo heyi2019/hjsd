@@ -83,8 +83,9 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
     cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions, flowFundNatureOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense, compact,
-    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, natureOptionSet, loading,
+    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, natureOptionSet, loading, cashflowsReady, error,
   } = ctrl;
+  const cashflowUnavailable = !cashflowsReady || Boolean(error);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
@@ -138,14 +139,14 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   ];
   const mobileFieldOrder = arrangeCashflowColumns(cashflowColumns).map(columnKey);
   return (
-    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
+    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
-        <Select aria-label="流水资金池" allowClear value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
-        <Select aria-label="流水方向" allowClear value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
-        <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
-        <Select aria-label="流水资金性质" allowClear value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
-        <Select aria-label="流水核算属性" allowClear value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
+        <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+        <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
+        <Select aria-label="流水状态" allowClear disabled={cashflowUnavailable} value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
+        <Select aria-label="流水资金性质" allowClear disabled={cashflowUnavailable} value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
+        <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
         <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
         <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
         <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
@@ -157,7 +158,9 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       <Typography.Paragraph type="secondary" className="ui-drawer-hint">
         状态口径：所有流水（含本页手工登记的独立流水）过账即「已入账」，直接计入系统余额。
       </Typography.Paragraph>
-      {cashflowTotal > cashflows.length ? (
+      {cashflowUnavailable ? (
+        <Typography.Text type="warning">资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。</Typography.Text>
+      ) : cashflowTotal > cashflows.length ? (
         <Typography.Text type="warning">
           共匹配 {cashflowTotal} 笔，已加载 {cashflows.length} 笔（单次上限 2000 条，请用日期区间缩小范围）。
         </Typography.Text>
@@ -166,9 +169,9 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       )}
       <StatRow
         items={[
-          { label: "总收入", amount: totalFlowIncome },
-          { label: "总支出", amount: totalFlowExpense },
-          { label: "当前结果", kind: "count", amount: visibleCashflows.length },
+          { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },
+          { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense },
+          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : visibleCashflows.length },
         ]}
       />
       {compact ? (
@@ -184,7 +187,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
           page={1}
           pageSize={10}
           total={visibleCashflows.length}
-          emptyText="暂无资金流水"
+          emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
           loading={loading}
           onPageChange={() => undefined}
         />

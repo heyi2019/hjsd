@@ -59,6 +59,8 @@ beforeEach(() => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.depositsApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([] as never);
   vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({ items: [], total: 0 } as never);
   vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]) as never);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
@@ -549,6 +551,16 @@ it("P1/FE-231：返点数据失败时不显示零统计且禁用新增", async (
   expect(await screen.findByText("返点明细")).toBeInTheDocument();
   expect(screen.getByText("返点记录数").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByRole("button", { name: /新增返点记录/ })).toBeDisabled();
+});
+
+it("P1/FE-229：资金流水数据失败时不显示零统计且禁用新增", async () => {
+  vi.mocked(catalog.cashflowsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "cashflows down" });
+  renderLight(<FundsPage />, { user: "admin" });
+
+  fireEvent.click(screen.getByRole("tab", { name: "流水" }));
+  expect(await screen.findByText("资金明细")).toBeInTheDocument();
+  expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
 });
 
 it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {

@@ -31,6 +31,7 @@ export function useFundsPageController(active = true) {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
+  const [cashflowsReady, setCashflowsReady] = useState(false);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [depositOpen, setDepositOpen] = useState(false);
   const [cashflowOpen, setCashflowOpen] = useState(false);
@@ -102,6 +103,7 @@ export function useFundsPageController(active = true) {
   // 资金流水：筛选全部走服务端（对齐 finance/router.py list_cashflows 的 11 个参数），
   // 避免 2000 条上限把池/方向/状态之外的结果挡在客户端之外。
   const fetchCashflows = useCallback(async () => {
+    setCashflowsReady(false);
     const result = await cashflowsApi.list({
       occurred_from: cashflowFromRef.current || undefined,
       occurred_to: cashflowToRef.current || undefined,
@@ -116,6 +118,7 @@ export function useFundsPageController(active = true) {
     });
     setCashflows(result.items);
     setCashflowTotal(result.total);
+    setCashflowsReady(true);
   }, []);
 
   const [cashflowExporting, setCashflowExporting] = useState(false);
@@ -423,6 +426,7 @@ export function useFundsPageController(active = true) {
     deposits,
     cashflows,
     cashflowTotal,
+    cashflowsReady,
     reconciliations,
     loading,
     error,

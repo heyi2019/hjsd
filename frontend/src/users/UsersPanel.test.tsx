@@ -45,6 +45,14 @@ beforeEach(() => {
 });
 
 describe("UsersPanel：用户管理动作", () => {
+  it("开发态角色不在服务端人员列表时给出明确说明", async () => {
+    renderLight(<UsersPanel />, { user: "admin" });
+
+    expect(await screen.findByText("operator01")).toBeInTheDocument();
+    expect(screen.getByText(/开发态当前角色：admin/)).toBeInTheDocument();
+    expect(screen.getByText(/开发态角色不纳入服务端人员列表/)).toBeInTheDocument();
+  });
+
   it("管理员可以编辑用户并提交更新", async () => {
     renderLight(<UsersPanel />, { user: "admin" });
 

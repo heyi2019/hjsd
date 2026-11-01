@@ -6,6 +6,7 @@ import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { OrdersPage } from "../orders/OrdersPage";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
+import { UsersPanel } from "../users/UsersPanel";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
@@ -117,6 +118,20 @@ it("P1/FE-054：详情和库存 CSV 不得暴露账号密码", () => {
   const csv = buildInventoryCsv([account]);
   expect(csv).not.toContain("账号密码");
   expect(csv).not.toContain("secret-password");
+});
+
+it("P1/FE-090：开发态当前角色不在服务端人员列表时有明确说明", async () => {
+  vi.mocked(catalog.usersApi.list).mockResolvedValueOnce([
+    { id: 7, username: "operator01", display_name: "业务同事", role: "OPERATOR", owner_scope: "SELF", team_ids: [], pool_ids: [], is_active: true },
+  ] as never);
+  vi.mocked(catalog.teamsApi.list).mockResolvedValueOnce([] as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([] as never);
+
+  renderLight(<UsersPanel />, { user: "admin" });
+
+  expect(await screen.findByText("operator01")).toBeInTheDocument();
+  expect(screen.getByText(/开发态当前角色：admin/)).toBeInTheDocument();
+  expect(screen.getByText(/开发态角色不纳入服务端人员列表/)).toBeInTheDocument();
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

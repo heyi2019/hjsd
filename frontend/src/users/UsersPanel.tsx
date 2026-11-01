@@ -1,15 +1,17 @@
 import { appMessage } from "../shared/ui/appFeedback";
-import { Card, Form, Input, Space } from "antd";
+import { Card, Form, Input, Space, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { errorMessage } from "../shared/api/client";
 import { poolsApi, teamsApi, usersApi, type ManagedUser, type Pool, type Team } from "../shared/api/catalog";
 import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
+import { useSession } from "../shared/state/session";
 
 type User = ManagedUser;
 
 export function UsersPanel() {
+  const { user } = useSession();
   const roleOptions = useOptionSet("USER_ROLE") ?? [];
   const scopeOptions = useOptionSet("OWNER_SCOPE") ?? [];
   const [rows, setRows] = useState<User[]>([]);
@@ -38,6 +40,11 @@ export function UsersPanel() {
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   return <Card className="glass" title="用户管理">
+    {import.meta.env.DEV ? (
+      <Typography.Paragraph type="secondary">
+        开发态当前角色：{user}；开发态角色不纳入服务端人员列表，下面仅展示可由后端管理的用户账号。
+      </Typography.Paragraph>
+    ) : null}
     <DataTable<User>
       className="ui-admin-table"
       rows={rows}

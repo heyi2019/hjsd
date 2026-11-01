@@ -7,6 +7,7 @@ import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { OrdersPage } from "../orders/OrdersPage";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { UsersPanel } from "../users/UsersPanel";
+import { TeamsPanel } from "../users/TeamsPanel";
 import { UserCenterPage } from "../auth/UserCenterPage";
 import * as client from "../shared/api/client";
 import { ReportsPage } from "../reporting/ReportsPage";
@@ -21,7 +22,7 @@ import { InventorySaleModal } from "../stocks/InventorySaleModal";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
-import { appModal } from "../shared/ui/appFeedback";
+import { appMessage, appModal } from "../shared/ui/appFeedback";
 import { buildActionAllocationCandidates, buildActionAllocationRows } from "../orders/orderpage/helpers";
 
 vi.mock("../shared/api/catalog");
@@ -181,6 +182,24 @@ it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
   await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
   expect(catalog.ordersApi.addCustomerRole).not.toHaveBeenCalled();
   expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled();
+});
+
+it("P1/FE-047：重复团队编码前端拦截并保留表单", async () => {
+  const errorSpy = vi.spyOn(appMessage, "error").mockImplementation(() => ({} as never));
+  vi.mocked(catalog.teamsApi.list).mockResolvedValueOnce([
+    { id: 1, code: "T01", name: "核心团队", description: "主营", is_active: true },
+  ] as never);
+  renderLight(<TeamsPanel />, { user: "admin" });
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await screen.findByText("T01");
+  await user.type(screen.getByPlaceholderText("团队编码"), " t01 ");
+  await user.type(screen.getByPlaceholderText("团队名称"), "重复团队");
+  await user.click(screen.getByRole("button", { name: /新增团队/ }));
+
+  await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("团队编码已存在"));
+  expect(screen.getByPlaceholderText("团队编码")).toHaveValue(" t01 ");
+  expect(catalog.teamsApi.create).not.toHaveBeenCalled();
+  errorSpy.mockRestore();
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

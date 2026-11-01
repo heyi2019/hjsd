@@ -10,7 +10,20 @@ export function TeamsPanel() {
   const [form] = Form.useForm();
   const load = async () => { try { setRows(await teamsApi.list()); } catch (err) { appMessage.error(errorMessage(err)); } };
   useEffect(() => { void load(); }, []);
-  const submit = async (values: Record<string, string>) => { try { await teamsApi.create(values); appMessage.success("团队已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const submit = async (values: Record<string, string>) => {
+    const code = String(values.code ?? "").trim();
+    const duplicated = rows.some((team) => team.code.trim().toUpperCase() === code.toUpperCase());
+    if (duplicated) {
+      appMessage.error("团队编码已存在");
+      return;
+    }
+    try {
+      await teamsApi.create({ ...values, code });
+      appMessage.success("团队已创建");
+      form.resetFields();
+      await load();
+    } catch (err) { appMessage.error(errorMessage(err)); }
+  };
   const toggle = async (team: Team) => { try { await teamsApi.update(team.id, { is_active: !team.is_active }); appMessage.success(team.is_active ? "团队已停用" : "团队已启用"); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
   return <Card className="glass" title="团队管理">
     <DataTable<Team>

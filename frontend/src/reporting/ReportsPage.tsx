@@ -291,8 +291,8 @@ function InventoryReport() {
       <Note>只统计已采购并进入在库或分期状态的真实占用（RPT-01-01）。</Note>
       <StatRow
         items={[
-          { label: "在库账号", kind: "count", amount: String(data?.items.length ?? 0) },
-          { label: "占用成本合计", amount: data?.total_cost ?? "-" },
+          { label: "在库账号", kind: "count", amount: error ? "不可用" : String(data?.items.length ?? 0) },
+          { label: "占用成本合计", amount: error ? "不可用" : data?.total_cost ?? "-" },
         ]}
       />
       {compact ? (
@@ -305,7 +305,7 @@ function InventoryReport() {
         page={1}
         pageSize={10}
         total={data?.items.length ?? 0}
-        emptyText="暂无在库账号"
+        emptyText={error ? "库存健康数据不可用，请点击重新加载" : "暂无在库账号"}
         onPageChange={() => undefined}
      />
           )}

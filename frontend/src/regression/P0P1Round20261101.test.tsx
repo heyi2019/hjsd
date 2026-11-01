@@ -5,6 +5,7 @@ import { renderLight } from "../test/render";
 import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
+import { ReportsPage } from "../reporting/ReportsPage";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
@@ -58,6 +59,7 @@ beforeEach(() => {
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([
     { id: 10, order_no: "TH-2026-0002", order_type: "TH", capital_type: "DISTRIBUTION", trade_date: "2026-10-01", status: "ACTIVE" },
   ]);
+  vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValue({ generated_on: "2026-10-01", total_cost: "0.00", items: [] });
 });
 
 afterEach(() => {
@@ -148,4 +150,13 @@ it("P1/FE-023：已有相同游戏账号时阻止重复建单", async () => {
 
   await waitFor(() => expect(catalog.ordersApi.create).not.toHaveBeenCalled());
   expect((await screen.findAllByText(/已有库存账号/)).length).toBeGreaterThan(0);
+});
+
+it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0", async () => {
+  vi.mocked(catalog.reportsApi.inventoryHealth).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+  renderLight(<ReportsPage />, { user: "admin" });
+  await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
+  expect(screen.getAllByText("不可用")).toHaveLength(2);
+  expect(screen.getByText("库存健康数据不可用，请点击重新加载")).toBeInTheDocument();
+  expect(screen.queryByText("暂无在库账号")).not.toBeInTheDocument();
 });

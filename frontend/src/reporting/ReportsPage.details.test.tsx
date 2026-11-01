@@ -86,6 +86,9 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     vi.mocked(catalog.reportsApi.inventoryHealth).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<ReportsPage />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
+    expect(screen.getAllByText("不可用")).toHaveLength(2);
+    expect(screen.getByText("库存健康数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.queryByText("暂无在库账号")).not.toBeInTheDocument();
   });
 
   it("R2 月度损益：渲染月份与销售收入", async () => {

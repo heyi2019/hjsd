@@ -116,6 +116,26 @@
   gap: var(--space-2);
 }
 
+.studio-expense-pools--spaced,
+.studio-expense-filters {
+  gap: var(--space-3);
+}
+.studio-expense-pools--single-row,
+.studio-expense-filters--single-row {
+  flex-wrap: nowrap;
+}
+.ui-control-width-studio-pool {
+  width: var(--col-w-280);
+  max-width: 100%;
+}
+
+@media (--bp-sm) {
+  .studio-expense-pools--single-row,
+  .studio-expense-filters--single-row {
+    flex-wrap: wrap;
+  }
+}
+
 /* 筛选栏内的枚举下拉：按语义宽度收敛，避免被 flex 拉满或缩成选项宽度。 */
 .ui-filter-select { width: var(--col-w-160); }
 

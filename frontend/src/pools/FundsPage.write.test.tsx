@@ -18,6 +18,7 @@ beforeEach(() => {
 vi.mock("../shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../shared/api/catalog")>();
   const METHODS = [
+    "all",
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
     "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations", "cancel", "voidRecord",
@@ -54,6 +55,7 @@ const cashflows = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
@@ -77,8 +79,8 @@ describe("FundsPage：资金写路径", () => {
   it("新增押金占用提交后回传金额与日期", async () => {
     resolveMockOnce(vi.mocked(catalog.depositsApi.create), { id: 12 });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
     await waitFor(() => expect(screen.getByText("新增押金占用")).toBeInTheDocument());
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -93,8 +95,8 @@ describe("FundsPage：资金写路径", () => {
 
   it("押金释放按 deposit.post 门控：finance 可见、operator 不可见", async () => {
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await screen.findByText("300.00");
     expect(screen.getAllByRole("button", { name: /释\s*放/ }).length).toBeGreaterThanOrEqual(1);
   });
@@ -104,7 +106,7 @@ describe("FundsPage：资金写路径", () => {
       id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN", unmatched_flow_ids: [1],
     }]);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     await ui.click(await screen.findByRole("button", { name: /查看未达流水/ }));
     expect((await screen.findAllByText("HS0001-CF-BUY-01")).length).toBeGreaterThanOrEqual(2);
@@ -113,8 +115,8 @@ describe("FundsPage：资金写路径", () => {
   it("押金损失登记提交原金额、日期、分类和原因", async () => {
     resolveMockOnce(vi.mocked(catalog.depositsApi.loss), { id: 91 });
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /登记损失/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
@@ -134,7 +136,7 @@ describe("FundsPage：资金写路径", () => {
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.list), { items: [{ ...cashflows[0], transfer_id: "TRF-001" }], total: 1 });
     vi.mocked(catalog.transfersApi.repair).mockResolvedValueOnce({ transfer_id: "TRF-001" });
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "异常" }));
     await ui.click(await screen.findByRole("button", { name: /修复划转/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -155,8 +157,8 @@ describe("FundsPage：资金写路径", () => {
     ] as unknown as Awaited<ReturnType<typeof catalog.depositsApi.list>>);
     resolveMockOnce(vi.mocked(catalog.depositsApi.cancel), { id: 12 });
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /取\s*消/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await waitFor(() => expect(modal).toBeTruthy());

@@ -5,11 +5,12 @@ import { appMessage } from "../shared/ui/appFeedback";
  * - **入账复用「新增独立流水」**：支出 = OUT / BUSINESS_OUT / OPERATING_EXPENSE，
  *   收入 = IN / BUSINESS_IN / SELF_REVENUE，科目落在 `category`。只存在一套入账口径。
  * - **不走审核态**：提交即入账（后端独立流水直接 APPROVED，登记即计入损益，无需审核）。
- * - **承载资金池可勾选**：配置落在选项词典 `STUDIO_EXPENSE_POOL`（value=池 code），
- *   科目字典落在 `STUDIO_EXPENSE_ITEM`；首次保存时自动补建词典，服务端存储 ⇒ 全员同步。
+ * - **承载资金池可直接勾选**：页面内选择池，不写入业务配置；费用科目仍落在
+ *   `STUDIO_EXPENSE_ITEM` 词典，服务端存储 ⇒ 全员同步。
  */
-import { Card, Form, Input, Space, Typography } from "antd";
+import { Card, DatePicker, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import dayjs, { type Dayjs } from "dayjs";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cashflowsApi,
@@ -18,7 +19,7 @@ import { cashflowsApi,
   type OptionItem,
   type Pool, } from "../shared/api/catalog";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
-import { today } from "../shared/lib/format";
+import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { clearOptionSetsCache } from "../shared/lib/optionSets";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { DataTable,
@@ -34,10 +35,9 @@ import { DataTable,
   StatusTag,
   CompactActions, } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { DepositSection } from "./FundsPage.tabs";
+import type { FundsPageController } from "./useFundsPageController";
 
-/** 承载资金池词典：value 存池 code，池改名不影响配置。 */
-const POOL_SET_CODE = "STUDIO_EXPENSE_POOL";
-const POOL_SET_LABEL = "工作室收支承载资金池";
 /** 费用科目词典。 */
 const ITEM_SET_CODE = "STUDIO_EXPENSE_ITEM";
 const ITEM_SET_LABEL = "工作室支出费用科目";
@@ -58,6 +58,14 @@ const INCOME_ITEMS: OptionItem[] = [
 
 /** 单次拉取上限：按日期区间查询，200 条覆盖月度收支足够。 */
 const FETCH_LIMIT = 200;
+
+function dateText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof (value as { format?: unknown }).format === "function") {
+    return (value as Dayjs).format("YYYY-MM-DD");
+  }
+  return "";
+}
 
 async function readOptionSet(code: string): Promise<OptionItem[] | null> {
   try {
@@ -84,16 +92,14 @@ async function writeOptionSet(
   clearOptionSetsCache();
 }
 
-export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
+export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: FundsPageController }) {
   const [flows, setFlows] = useState<Cashflow[]>([]);
   const [poolCodes, setPoolCodes] = useState<string[]>([]);
   const [expenseItems, setExpenseItems] = useState<OptionItem[]>(DEFAULT_EXPENSE_ITEMS);
-  const [configLoaded, setConfigLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
 
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [category, setCategory] = useState<string | undefined>(undefined);
 
@@ -106,23 +112,28 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
   const [reverseForm] = Form.useForm();
   const write = useAsyncAction();
 
+  const from = dateRange?.[0]?.format("YYYY-MM-DD") ?? "";
+  const to = dateRange?.[1]?.format("YYYY-MM-DD") ?? "";
+
   const selectedPools = useMemo(
     () => pools.filter((pool) => poolCodes.includes(pool.code)),
     [pools, poolCodes],
   );
 
+  useEffect(() => {
+    setPoolCodes((current) => {
+      const available = new Set(pools.map((pool) => pool.code));
+      const retained = current.filter((code) => available.has(code));
+      return current.length === 0 && pools.length > 0 ? pools.map((pool) => pool.code) : retained;
+    });
+  }, [pools]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [savedPools, savedItems] = await Promise.all([
-        readOptionSet(POOL_SET_CODE),
-        readOptionSet(ITEM_SET_CODE),
-      ]);
-      const codes = (savedPools ?? []).map((item) => item.value);
-      setPoolCodes(codes);
+      const savedItems = await readOptionSet(ITEM_SET_CODE);
       if (savedItems && savedItems.length > 0) setExpenseItems(savedItems);
-      setConfigLoaded(true);
-      const allowedIds = pools.filter((pool) => codes.includes(pool.code)).map((pool) => pool.id);
+      const allowedIds = pools.filter((pool) => poolCodes.includes(pool.code)).map((pool) => pool.id);
       const scoped: Cashflow[] = [];
       if (allowedIds.length > 0) {
         // 手工登记的工作室收支来源恒为 OTHER（订单回款=ORDER_EVENT、押金/划转/返点各有专属来源），
@@ -158,7 +169,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     } finally {
       setLoading(false);
     }
-  }, [category, from, pools, status, to]);
+  }, [category, dateRange, pools, poolCodes, status]);
 
   useEffect(() => {
     void load();
@@ -169,7 +180,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     await write.run(async () => {
       await cashflowsApi.create({
         pool_id: Number(values.pool_id),
-        occurred_on: values.occurred_on as string,
+        occurred_on: dateText(values.occurred_on),
         direction,
         nature: direction === "OUT" ? "BUSINESS_OUT" : "BUSINESS_IN",
         fund_nature: "BUSINESS",
@@ -191,7 +202,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
     const targetId = reverseTarget.id;
     await write.run(async () => {
       await cashflowsApi.reverse(targetId, {
-        reversed_on: values.reversed_on as string,
+        reversed_on: dateText(values.reversed_on),
         reason: values.reason as string,
         form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       });
@@ -203,16 +214,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
   };
 
   const submitConfig = async (values: Record<string, unknown>) => {
-    const codes = (values.pool_codes as string[] | undefined) ?? [];
     await write.run(async () => {
-      await writeOptionSet(
-        POOL_SET_CODE,
-        POOL_SET_LABEL,
-        codes.map((code) => ({
-          value: code,
-          label: pools.find((pool) => pool.code === code)?.name ?? code,
-        })),
-      );
       const inputItems = (values.items as string[] | undefined) ?? [];
       if (inputItems.length > 0) {
         await writeOptionSet(
@@ -221,7 +223,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           inputItems.map((value) => ({ value, label: value })),
         );
       }
-      appMessage.success("工作室支出配置已保存");
+      appMessage.success("工作室费用科目已保存");
       setConfigOpen(false);
       await load();
     });
@@ -240,6 +242,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
   const [registerDirection, setRegisterDirection] = useState<string>("OUT");
 
   const columns: ColumnsType<Cashflow> = [
+    { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
     {
       title: "资金池",
@@ -263,6 +266,8 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       dataIndex: "status",
       render: (v: string) => <StatusTag status={v} optionSet="FUND_FLOW_STATUS" />,
     },
+    { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => v === "OTHER" ? "手工登记" : v || "—" },
+    { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
@@ -274,7 +279,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
               permission="deposit.post"
               size="small"
               onClick={() => {
-                reverseForm.setFieldsValue({ reversed_on: today() });
+                reverseForm.setFieldsValue({ reversed_on: dayjs(today()) });
                 setReverseTarget(row);
               }}
             >
@@ -291,29 +296,56 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
       <Card
         className="glass"
-        title="工作室收支"
         extra={
           <PermissionButton
             permission="option-set.manage"
             size="small"
             onClick={() => {
               configForm.setFieldsValue({
-                pool_codes: poolCodes,
                 items: expenseItems.map((item) => item.value),
               });
               setConfigOpen(true);
             }}
           >
-            配置承载池
+            配置费用科目
           </PermissionButton>
         }
       >
-        <Typography.Paragraph type="secondary" className="ui-card-hint">
-          口径：仅统计已勾选「承载资金池」上手工登记的收支流水（不含订单、押金、划转、返点）；登记即入账，无需审核。
-        </Typography.Paragraph>
-        <div className="ui-filter-bar">
-          <Input aria-label="工作室支出开始日期" value={from} placeholder="开始日期" onChange={(event) => setFrom(event.target.value)} />
-          <Input aria-label="工作室支出结束日期" value={to} placeholder="结束日期" onChange={(event) => setTo(event.target.value)} />
+        <div className="ui-filter-bar studio-expense-pools studio-expense-pools--spaced studio-expense-pools--single-row">
+          <PermissionButton
+            permission="deposit.post"
+            type="primary"
+            onClick={() => {
+              registerForm.setFieldsValue({ occurred_on: dayjs(today()), direction: "OUT" });
+              setRegisterDirection("OUT");
+              setRegisterOpen(true);
+            }}
+          >
+            记一笔
+          </PermissionButton>
+          <Typography.Text strong>承载资金池</Typography.Text>
+          <Select
+            mode="multiple"
+            aria-label="工作室收支资金池"
+            allowClear
+            maxTagCount="responsive"
+            className="ui-control-width-studio-pool"
+            value={poolCodes}
+            placeholder="选择承载资金池"
+            options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))}
+            onChange={(values) => setPoolCodes(values as string[])}
+          />
+        </div>
+        <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
+          <DatePicker.RangePicker
+            aria-label="工作室支出日期区间"
+            placeholder={["开始日期", "结束日期"]}
+            format="YYYY-MM-DD"
+            size="small"
+            classNames={{ popup: { root: "compact-date-range-picker" } }}
+            value={dateRange}
+            onChange={(value) => setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null)}
+          />
           <Select
             aria-label="工作室支出科目"
             allowClear
@@ -330,24 +362,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
             options={[{ value: "APPROVED", label: "已入账" }]}
             onChange={setStatus}
           />
-          <PermissionButton permission="finance.read" onClick={() => void load()}>
-            查询
-          </PermissionButton>
-          <PermissionButton
-            permission="deposit.post"
-            type="primary"
-            onClick={() => {
-              registerForm.setFieldsValue({ occurred_on: today(), direction: "OUT" });
-              setRegisterDirection("OUT");
-              setRegisterOpen(true);
-            }}
-          >
-            记一笔
-          </PermissionButton>
         </div>
-        {configLoaded && selectedPools.length === 0 ? (
+        {selectedPools.length === 0 ? (
           <Typography.Text type="warning">
-            尚未勾选任何承载资金池：请点右上角「配置承载池」，选定用于记录工作室收支的资金池。
+            尚未选择任何承载资金池：请在上方选择用于记录工作室收支的资金池。
           </Typography.Text>
         ) : null}
         <StatRow
@@ -364,11 +382,13 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           page={1}
           pageSize={10}
           total={flows.length}
-          emptyText="暂无工作室支出"
+          emptyText="暂无工作室收支"
           loading={loading}
           onPageChange={() => undefined}
        />
       </Card>
+
+      {ctrl ? <DepositSection ctrl={ctrl} /> : null}
 
       <BusinessActionModal
         title="工作室收支登记"
@@ -377,16 +397,24 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         footer={null}
       >
         <InlineError error={write.error} />
-        <BusinessForm scope="STUDIOEXP" form={registerForm} onFinish={submitRegister}>
+        <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
+          scope="STUDIOEXP"
+          form={registerForm}
+          onFinish={submitRegister}
+        >
           <FieldConfigScope scope="STUDIOEXP" active={registerOpen}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true, message: "请选择资金池" }]}>
             <Select
               options={selectedPools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
-              placeholder={selectedPools.length ? "选择资金池" : "请先在「配置承载池」勾选资金池"}
+              placeholder={selectedPools.length ? "选择资金池" : "请先在上方勾选资金池"}
             />
           </CfgItem>
           <CfgItem name="occurred_on" label="日期" rules={[{ required: true, message: "请输入日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+            <DatePicker format="YYYY-MM-DD" />
           </CfgItem>
           <CfgItem name="direction" label="收支" rules={[{ required: true, message: "请选择收支" }]}>
             <Select
@@ -418,25 +446,17 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
       </BusinessActionModal>
 
       <BusinessActionModal size="compact"
-        title="配置工作室支出"
+        title="配置工作室费用科目"
         open={configOpen}
         onCancel={() => setConfigOpen(false)}
         footer={null}
       >
         <InlineError error={write.error} />
-        <BusinessForm scope="STUDIOEXP" form={configForm} onFinish={submitConfig}>
-          <Form.Item
-            name="pool_codes"
-            label="承载资金池"
-            extra="只有勾选的资金池可用于登记工作室支出，并纳入本页统计。"
-            rules={[{ required: true, message: "请至少勾选一个资金池" }]}
-          >
-            <Select
-              mode="multiple"
-              placeholder="勾选记录工作室支出的资金池"
-              options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))}
-            />
-          </Form.Item>
+        <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="STUDIOEXP" form={configForm} onFinish={submitConfig}>
           <Form.Item name="items" label="费用科目" extra="可直接输入新增科目后回车">
             <Select mode="tags" placeholder="房租 / 日用 / 水电 …" />
           </Form.Item>
@@ -455,10 +475,14 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         footer={null}
       >
         <InlineError error={write.error} />
-        <BusinessForm scope="STUDIOREV" form={reverseForm} onFinish={submitReverse}>
+        <BusinessForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="STUDIOREV" form={reverseForm} onFinish={submitReverse}>
           <FieldConfigScope scope="STUDIOREV" active={Boolean(reverseTarget)}>
           <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true, message: "请输入冲销日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+            <DatePicker format="YYYY-MM-DD" />
           </CfgItem>
           <CfgItem name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
             <Input.TextArea rows={3} />

@@ -62,6 +62,7 @@ const cashflows = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
@@ -94,7 +95,7 @@ describe("FundsPage：资金池卡片", () => {
     }]);
 
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     const headers = Array.from(document.querySelectorAll(".ant-table-thead tr:first-child th"))
       .map((header) => header.textContent?.trim())
       .filter(Boolean);
@@ -103,7 +104,7 @@ describe("FundsPage：资金池卡片", () => {
 
   it("渲染资金池与可用余额", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: /POOL-A/ })).toBeInTheDocument();
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -131,7 +132,7 @@ describe("FundsPage：资金池卡片", () => {
       total: 2,
     } as never);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "异常" }));
 
     expect(await screen.findByText("暂无单边划转异常")).toBeInTheDocument();
@@ -141,7 +142,7 @@ describe("FundsPage：资金池卡片", () => {
   it("FE-229：资金流水失败时统计不可用、筛选和新增入口禁用", async () => {
     vi.mocked(catalog.cashflowsApi.list).mockRejectedValueOnce(new Error("cashflows down"));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
 
     expect(await screen.findByText("资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。")).toBeInTheDocument();
@@ -153,7 +154,7 @@ describe("FundsPage：资金池卡片", () => {
   it("FE-230：对账失败时显示明确空态并禁用新增", async () => {
     vi.mocked(catalog.reconciliationsApi.list).mockRejectedValueOnce(new Error("reconciliations down"));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
 
     expect(await screen.findByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
@@ -162,18 +163,27 @@ describe("FundsPage：资金池卡片", () => {
 });
 
 describe("FundsPage：押金占用", () => {
+  it("删除独立押金页，押金逻辑并入工作室支出", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+
+    expect(screen.queryByRole("tab", { name: "押金" })).not.toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    expect((await screen.findAllByText("押金占用")).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("押金列表渲染金额与剩余（占用-已释放）", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     expect(screen.queryByText("押金编号")).not.toBeInTheDocument();
     expect(screen.getAllByText("300.00").length).toBeGreaterThanOrEqual(1); // 500-200
   });
 
   it("押金明细展示对手方、来源订单和预计释放日", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
-    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     expect(screen.getByText("#99")).toBeInTheDocument();
     expect(screen.getByText("#7")).toBeInTheDocument();
     expect(screen.getByText("2026-11-01")).toBeInTheDocument();
@@ -183,7 +193,7 @@ describe("FundsPage：押金占用", () => {
 describe("FundsPage：资金流水", () => {
   it("资金流水录入不再提供资金池账户选择", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
@@ -192,7 +202,7 @@ describe("FundsPage：资金流水", () => {
 
   it("展示订单号、收支明细及总收入/总支出", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     expect(screen.getByText("HS0001-CF-BUY-01")).toBeInTheDocument();
     expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
@@ -207,7 +217,7 @@ describe("FundsPage：资金流水", () => {
 
   it("流水支持按订单号、流水号或备注关键词筛选", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     const search = screen.getByLabelText("流水搜索");
     await ui.type(search, "SELL");
@@ -217,7 +227,7 @@ describe("FundsPage：资金流水", () => {
 
   it("流水筛选区使用紧凑布局容器", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByText(/POOL-A/);
+    await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     expect(document.querySelector(".funds-cashflow-filters")).toBeInTheDocument();
   });

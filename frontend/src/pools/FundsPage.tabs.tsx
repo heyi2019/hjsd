@@ -1,4 +1,4 @@
-/** 资金中心各 Tab 视图层：overview / cashflows / deposits / reconciliations / controls。
+/** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / controls。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
 import { Card, Input, Space, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -196,7 +196,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 
-export function DepositTab({ ctrl }: { ctrl: FundsPageController }) {
+export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
   const { deposits, compact, setDepositOpen, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [

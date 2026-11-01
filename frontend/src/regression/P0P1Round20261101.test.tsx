@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -270,6 +270,39 @@ it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", a
   await waitFor(() => expect(catalog.cashflowsApi.reverse).toHaveBeenCalledWith(7, expect.objectContaining({ reason: "重复入账" })));
   await waitFor(() => expect(screen.queryByRole("button", { name: /^冲销$/ })).toBeNull());
   expect(screen.getByText("CF-REV-08")).toBeInTheDocument();
+});
+
+it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
+  vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValue({ items: [], total: {} } as never);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } as never);
+  vi.mocked(catalog.reportsApi.dailyFunds).mockResolvedValue({ date: "2026-11-01", total: {}, items: [] } as never);
+  vi.mocked(catalog.reportsApi.financeDimensions).mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" } as never);
+  vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({ items: [], total: {} } as never);
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } } as never);
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<ReportsPage />, { user: "admin" });
+
+  const setRangeOnCurrentTab = async (tab: RegExp) => {
+    await user.click(await screen.findByRole("tab", { name: tab }));
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    fireEvent.change(dateInputs[0], { target: { value: "2026-10-01" } });
+  };
+
+  await setRangeOnCurrentTab(/月度损益 R2/);
+  await waitFor(() => expect(catalog.reportsApi.monthlyPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+  await user.click(screen.getByRole("tab", { name: /提成对账 R3/ }));
+  await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
+  await user.click(screen.getByRole("tab", { name: /业务损益 R5/ }));
+  await waitFor(() => expect(catalog.reportsApi.businessPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+  await user.click(screen.getByRole("tab", { name: /资金属性分析/ }));
+  await waitFor(() => expect(catalog.reportsApi.financeDimensions).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+  await user.click(screen.getByRole("tab", { name: /订单利润/ }));
+  await waitFor(() => expect(catalog.reportsApi.orderProfit).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+  await user.click(screen.getByRole("tab", { name: /资金日报 R4/ }));
+  const dailyDate = screen.getByLabelText("资金日报日期");
+  fireEvent.change(dailyDate, { target: { value: "2026-10-01" } });
+  await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

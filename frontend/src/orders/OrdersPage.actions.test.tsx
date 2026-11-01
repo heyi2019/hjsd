@@ -452,9 +452,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消交易");
     const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
-    expect(within(modal).getByLabelText("入库流水")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     await ui.type(screen.getByLabelText("取消原因"), "重复登记");
-    fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
+    await clickModalOk(modal);
     await waitFor(() =>
       expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
         1,
@@ -471,11 +471,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消交易");
     const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
-    expect(within(modal).getByLabelText("入账金额")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("入账账户")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("入账操作人")).toBeInTheDocument();
-    expect(within(modal).getByLabelText("入账操作人").closest(".ant-form-item")).toHaveClass("order-cancel-employee");
-    await ui.click(within(modal).getByLabelText("入账账户"));
+    expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("收款账户")).toBeInTheDocument();
+    await ui.click(within(modal).getByLabelText("收款账户"));
     await ui.click((await screen.findAllByText("投资款荷包（HJ_INVEST）"))[1]);
     await ui.type(within(modal).getByLabelText("取消原因"), "对方退款");
     await clickModalOk(modal);
@@ -496,14 +494,16 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消交易");
     const modal = await modalOf(/售出取消交易 · HS-2026-0001/);
-    expect(within(modal).getByLabelText("售出流水")).toBeInTheDocument();
-    // 售出取消只允许选择 SELL 流水（SELL EV-102，剩余 500）。
-    expect(within(modal).getByText("售出 · EV-102 · ¥500.00（剩余可冲 ¥500.00）")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("退款金额")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("付款账户")).toBeInTheDocument();
+    expect(within(modal).queryByLabelText("售出流水")).toBeNull();
+    // 售出取消复用统一冲销弹窗，来源 SELL 流水已由页面内部选定。
+    expect(within(modal).getByText(/将冲销来源订单的售出流水（¥500.00）/)).toBeInTheDocument();
     // 部分退款：300 < 售出流水剩余 500。
     await ui.clear(within(modal).getByLabelText("退款金额"));
     await ui.type(within(modal).getByLabelText("退款金额"), "300");
     await ui.type(screen.getByLabelText("取消原因"), "部分冲销");
-    fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
+    await clickModalOk(modal);
     await waitFor(() =>
       expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
         1,

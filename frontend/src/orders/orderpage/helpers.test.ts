@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Order } from "../shared/api/catalog";
+import type { Order } from "../../shared/api/catalog";
 import {
   filterBusinessOrders,
   formatOrderAmount,
   validateAllocations,
-} from "./OrdersPage.helpers";
+} from "./helpers";
 
 const order = (overrides: Partial<Order> = {}): Order => ({
   id: 1,

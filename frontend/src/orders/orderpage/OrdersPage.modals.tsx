@@ -1,17 +1,51 @@
 import dayjs, { type Dayjs } from "dayjs";
-import type { AllocationFormRow } from "./OrdersPage.fragments";
+import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { validateAllocations } from "./OrdersPage.fragments";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "./ConfigurableField";
-import { CreateBusinessModal } from "./CreateBusinessModal";
-import { MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessForm } from "../shared/ui";
-import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
-import { appMessage } from "../shared/ui/appFeedback";
-import { normalizeError } from "../shared/api/client";
-import { executionActionLabel, money, today } from "../shared/lib/format";
-import { ordersApi, policyApi } from "../shared/api/catalog";
-import { requiredMoneyRules, percentRules, moneyRules } from "../shared/lib/validators";
+import { validateAllocations } from "./helpers";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
+import { CreateBusinessModal } from "../CreateBusinessModal";
+import { MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessForm } from "../../shared/ui";
+import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
+import { appMessage } from "../../shared/ui/appFeedback";
+import { normalizeError } from "../../shared/api/client";
+import { executionActionLabel, money, today } from "../../shared/lib/format";
+import { ordersApi, policyApi } from "../../shared/api/catalog";
+import { requiredMoneyRules, percentRules, moneyRules } from "../../shared/lib/validators";
+import { InventoryCancellationDialog } from "../../stocks/InventoryCancellationDialog";
 import type { OrdersPageController } from "./useOrdersPageController";
+
+export function SharedCancellationDialog({ controller }: { controller: OrdersPageController }) {
+  const {
+    cancelForm,
+    cancelOrderTarget,
+    cancelPools,
+    cancelScope,
+    cancelSubmitting,
+    closeCancelTransaction,
+    hasSharedCancellation,
+    sharedCancellationEvent,
+    submitCancelTransaction,
+  } = controller;
+  return (
+    <InventoryCancellationDialog
+      open={hasSharedCancellation}
+      title={cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+      amount={sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00"}
+      pools={cancelPools}
+      form={cancelForm}
+      scope={cancelScope}
+      submitting={cancelSubmitting}
+      okText="确认取消"
+      amountLabel={cancelScope === "INVREFUND" ? "退回金额" : "退款金额"}
+      accountLabel={cancelScope === "INVREFUND" ? "收款账户" : "付款账户"}
+      onCancel={closeCancelTransaction}
+      onFinish={(values) => void submitCancelTransaction({ ...values, cancelled_on: today() })}
+      description={cancelScope === "INVREFUND"
+        ? <p className="muted">将冲销来源订单的买入流水（¥{money(sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00")}），退回金额进入所选收款账户；订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。</p>
+        : <p className="muted">将冲销来源订单的售出流水（¥{money(sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00")}），退款金额将从所选付款账户支出；订单状态变为「取消」，历史轨迹保留。</p>}
+    />
+  );
+}
 
 export function CancelTransactionModal({ controller }: { controller: OrdersPageController }) {
   const {
@@ -24,12 +58,13 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
     cancelSubmitting,
     cancelableEventsForScope,
     closeCancelTransaction,
+    hasSharedCancellation,
     submitCancelTransaction,
   } = controller;
   return (
       <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
-        open={Boolean(cancelOrderTarget || cancelInstallmentTarget)}
+        open={Boolean(cancelInstallmentTarget || (cancelOrderTarget && !hasSharedCancellation))}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
         okText="确认取消交易"
@@ -383,6 +418,7 @@ export function CreateBusinessModalWrapper({ controller }: { controller: OrdersP
 export function OrderModals({ controller }: { controller: OrdersPageController }) {
   return (
     <>
+      <SharedCancellationDialog controller={controller} />
       <CancelTransactionModal controller={controller} />
       <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />

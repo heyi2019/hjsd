@@ -217,12 +217,30 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     }
     return staffOptions;
   };
+  const syncAllocationPair = (index: number, field: "allocation_rate" | "allocation_amount", raw: string) => {
+    const rows = (allocationForm.getFieldValue("allocations") as AllocationFormRow[] | undefined) ?? [];
+    const nextRows = rows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, [field]: raw };
+      const value = Number(raw.trim());
+      const profit = Number(allocationProfit);
+      if (!raw.trim()) {
+        next[field === "allocation_rate" ? "allocation_amount" : "allocation_rate"] = "";
+      } else if (Number.isFinite(value) && value >= 0 && profit > 0) {
+        if (field === "allocation_rate") next.allocation_amount = (profit * value / 100).toFixed(2);
+        else next.allocation_rate = (value / profit * 100).toFixed(2);
+      }
+      return next;
+    });
+    allocationForm.setFieldsValue({ allocations: nextRows });
+  };
   return (
       <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
         fieldCount={21}
         open={allocationOpen}
         confirmLoading={allocationSubmitting}
+        wrapClassName="allocation-modal"
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
       >
@@ -233,6 +251,19 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           wrapperCol={{ flex: "auto" }}
           scope="ALLOCATION"
           form={allocationForm}
+          onValuesChange={(changedValues) => {
+            const changedRows = changedValues.allocations as Record<string, AllocationFormRow | undefined> | undefined;
+            const changedEntry = Object.entries(changedRows ?? {}).find(([, row]) => row != null);
+            if (!changedEntry) return;
+            const [indexText, changedRow] = changedEntry;
+            if (!changedRow) return;
+            const index = Number(indexText);
+            const field = changedRow.allocation_rate !== undefined
+              ? "allocation_rate"
+              : changedRow.allocation_amount !== undefined ? "allocation_amount" : undefined;
+            if (!field) return;
+            syncAllocationPair(index, field, changedRow[field] ?? "");
+          }}
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             const allRows = values.allocations ?? [];
@@ -279,8 +310,8 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           />
           <Typography.Paragraph type="secondary">
             {isAction
-              ? "按操作分配：买号、售出、运营、公司四项，比例合计须为 100%。买号/售出只能给该动作的执行人；多人协作时由你指定其中一位，其余人记入运营。"
-              : "每行一位员工：填比例按订单利润占比分，填金额按固定额分，两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。"}
+              ? "按操作分配：买号、售出、运营、公司四项。比例和金额可任选其一，填写后自动换算另一项；买号/售出只能给该动作的执行人。"
+              : "每行一位员工：比例和金额可任选其一，填写后自动换算另一项。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
@@ -293,15 +324,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                   const employeeDisabled = company || actionMissing;
                   return (
                     <AdaptiveFormGrid key={field.key} className={`orders-allocation-row${isAction ? " is-action" : ""}`}>
-                      {kind ? (
-                        <span className="orders-allocation-kind">{ALLOCATION_TYPE_LABEL[kind]}</span>
-                      ) : null}
                       <Form.Item name={[field.name, "allocation_type"]} hidden>
                         <Input />
                       </Form.Item>
                       <Form.Item
                         name={[field.name, "employee"]}
-                        label="姓名"
+                        label={kind ? ALLOCATION_TYPE_LABEL[kind] : "姓名"}
                         rules={employeeDisabled ? [] : [{ required: true, message: "请选择姓名" }]}
                       >
                         <Select
@@ -329,17 +357,25 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                             : percentRules("比例")
                         }
                       >
-                        <Input suffix="%" inputMode="decimal" className="ui-control-width-120" />
+                        <Input
+                          suffix="%"
+                          inputMode="decimal"
+                          className="ui-control-width-120"
+                        />
                       </Form.Item>
-                      {isAction ? null : (
+                      <Form.Item
+                        name={[field.name, "allocation_amount"]}
+                        label="金额"
+                        rules={moneyRules("金额")}
+                      >
+                        <Input
+                          prefix="¥"
+                          inputMode="decimal"
+                          className="ui-control-width-140"
+                        />
+                      </Form.Item>
+                      {!isAction ? (
                         <>
-                          <Form.Item
-                            name={[field.name, "allocation_amount"]}
-                            label="金额"
-                            rules={moneyRules("金额")}
-                          >
-                            <Input prefix="¥" inputMode="decimal" className="ui-control-width-140" />
-                          </Form.Item>
                           <PermissionButton
                             permission="policy.manage"
                             type="link"

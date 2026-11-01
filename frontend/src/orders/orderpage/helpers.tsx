@@ -91,6 +91,7 @@ export function buildActionAllocationRows(
     user_id?: number | null;
     role?: string;
     allocation_rate?: string;
+    allocation_amount?: string;
   }>,
   candidates: ActionAllocationCandidates,
 ): AllocationFormRow[] {
@@ -111,7 +112,7 @@ export function buildActionAllocationRows(
       employee,
       role: ALLOCATION_TYPE_ROLE[kind],
       allocation_rate: existed?.allocation_rate ?? "",
-      allocation_amount: "",
+      allocation_amount: existed?.allocation_amount ?? "",
     };
   });
 }
@@ -133,22 +134,39 @@ export function validateAllocations(
     }
     for (const row of rows) {
       const rate = Number(String(row.allocation_rate ?? "").trim());
-      if (!Number.isFinite(rate) || rate < 0) {
-        return { ok: false, error: `${ALLOCATION_TYPE_LABEL[row.allocation_type as AllocationType]} 的比例需为不小于 0 的数字` };
+      const amount = Number(String(row.allocation_amount ?? "").trim());
+      const hasRate = String(row.allocation_rate ?? "").trim() !== "";
+      const hasAmount = String(row.allocation_amount ?? "").trim() !== "";
+      if ((!hasRate && !hasAmount) || (hasRate && (!Number.isFinite(rate) || rate < 0)) || (hasAmount && (!Number.isFinite(amount) || amount < 0))) {
+        return { ok: false, error: `${ALLOCATION_TYPE_LABEL[row.allocation_type as AllocationType]} 请输入有效的比例或金额` };
       }
-      rateTotal += rate;
+      if (hasRate) rateTotal += rate;
+      if (hasAmount) amountTotal += amount;
       const kind = row.allocation_type as AllocationType;
       items.push({
-        user_id: kind === "COMPANY" || row.employee === "COMPANY" ? null : Number(row.employee),
+        user_id: kind === "COMPANY" || row.employee == null || row.employee === "COMPANY" ? null : Number(row.employee),
         role: row.role || ALLOCATION_TYPE_ROLE[kind],
         allocation_type: kind,
-        allocation_rate: String(rate),
+        allocation_rate: "0",
         allocation_amount: "0",
       });
     }
-    if (Math.abs(rateTotal - 100) > 0.001) {
+    const useRate = Math.abs(rateTotal - 100) <= 0.001 || amountTotal === 0;
+    if (useRate && Math.abs(rateTotal - 100) > 0.001) {
       return { ok: false, error: "四项比例合计必须为 100%" };
     }
+    if (!useRate) {
+      const profit = Number(orderProfit);
+      if (profit <= 0) return { ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" };
+      if (amountTotal > profit) return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
+    }
+    items.forEach((item, index) => {
+      const row = rows[index];
+      const rate = Number(String(row.allocation_rate ?? "").trim());
+      const amount = Number(String(row.allocation_amount ?? "").trim());
+      item.allocation_rate = useRate ? String(rate) : "0";
+      item.allocation_amount = useRate ? "0" : String(amount);
+    });
     return { ok: true, items };
   }
 
@@ -158,24 +176,33 @@ export function validateAllocations(
     const hasRate = Number(rate) > 0;
     const hasAmount = Number(amount) > 0;
     if (!hasRate && !hasAmount) return { ok: false, error: "每行至少填比例或金额之一" };
-    if (hasRate && hasAmount) return { ok: false, error: "同一行不能同时填比例和金额" };
+    if (hasRate && hasAmount && Number.isFinite(Number(rate)) && Number.isFinite(Number(amount)) && Number(orderProfit) > 0) {
+      const expectedAmount = Number(orderProfit) * Number(rate) / 100;
+      if (Math.abs(expectedAmount - Number(amount)) > 0.01) return { ok: false, error: "比例和金额换算不一致" };
+    }
     if (hasRate) rateTotal += Number(rate);
     if (hasAmount) amountTotal += Number(amount);
     items.push({
       user_id: row.employee === "COMPANY" ? null : Number(row.employee),
       role: row.role || "OWNER",
-      allocation_rate: hasRate ? rate : "0",
-      allocation_amount: hasAmount ? amount : "0",
+      allocation_rate: "0",
+      allocation_amount: "0",
     });
   }
-  if (amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
+  const useRate = Math.abs(rateTotal - 100) <= 0.001 || amountTotal === 0;
+  if (useRate && amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
     return { ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" };
   }
-  if (amountTotal > 0) {
+  if (!useRate && amountTotal > 0) {
     const profit = Number(orderProfit);
     if (profit <= 0) return { ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" };
     if (amountTotal > profit) return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
   }
+  items.forEach((item, index) => {
+    const row = rows[index];
+    item.allocation_rate = useRate ? String(row.allocation_rate ?? "0") : "0";
+    item.allocation_amount = useRate ? "0" : String(row.allocation_amount ?? "0");
+  });
   return { ok: true, items };
 }
 

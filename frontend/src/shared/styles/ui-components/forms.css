@@ -10,20 +10,38 @@
   --resizable-modal-width: min(520px, calc(100vw - 32px));
   --resizable-modal-height: min(560px, calc(100dvh - (var(--space-4) * 4)));
 }
-/* 页脚实测：full 90px（按钮独占一行 + --space-4 上下内边距）→ compact 56px
-   （按钮回归 36px 且不撑满，内边距 --space-3）。132px 的「头部+页脚」预留常量
-   在紧凑弹窗下会多留空白，按实测 chrome（80px）重算为 116px，内容区顶满可用高度。 */
+/* 页脚与表单按钮统一：取消、保存上下排列，同列同宽，取消在上、保存在下。 */
 .compact-form-modal .ant-modal-body {
   max-height: calc(var(--resizable-modal-height) - 116px);
 }
-/* 按钮高度不在此声明：antd-adapter.css 用 .ant-btn{height/min-height:36px !important}
-   全局锁死（实测 full/compact 渲染高均 34px），此处写高度会被 !important 覆盖成死规则。
-   真正生效的差异是宽度：width:100%（实测被 flex 压成约 1096px）→ 96px 语义宽度。 */
+.compact-form-modal .ant-modal-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* compact 页脚也必须覆盖 antd 的相邻按钮偏移：两颗按钮共用同一列、同一左右边缘。 */
+.business-registration-modal.compact-form-modal .ant-modal-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+}
+
 .compact-form-modal .ant-modal-footer .ant-btn {
-  width: auto;
-  min-width: var(--col-w-96);
-  font-size: var(--fs-subheadline);
-  font-weight: 500;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--ui-control-height-lg) * 2);
+  margin: 0;
+  font-size: var(--fs-callout);
+  font-weight: 600;
+}
+.business-registration-modal.compact-form-modal .ant-modal-footer > .ant-btn {
+  grid-column: 1;
+  justify-self: stretch;
+  margin-inline-start: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 /* footer={null} 的弹窗把提交按钮直接放在表单里，表单是自适应网格 → 按钮被 stretch
    撑满整行（实测 510px）。紧凑规格下让它回到语义宽度并靠左对齐。 */
@@ -115,6 +133,11 @@
   padding-block: var(--space-2);
   line-height: 1.55;
 }
+.compact-form-modal .ant-input-textarea-affix-wrapper {
+  height: auto !important;
+  min-height: 0 !important;
+  align-items: stretch;
+}
 /* 多行输入的标签改为顶对齐：Apple 表单里标签与控件首行基线对齐；垂直居中会让
    标签悬在 80+px 高的文本框中央（实测观感失衡）。:has() 不被支持时整条规则丢弃，
    回退到居中，不会破坏布局。 */
@@ -173,9 +196,11 @@
 
 /* 分润弹窗复用建单弹窗的可拖动/缩放尺寸变量。 */
 .allocation-modal .ant-modal {
-  --resizable-modal-width: min(720px, calc(100vw - 48px));
+  /* BusinessActionModal 会把 fieldCount=21 的默认 1200px 写入内联变量；
+     分润是四行编辑表单，固定回收为中等宽度，避免被建单宽度撑满。 */
+  --resizable-modal-width: min(720px, calc(100vw - 48px)) !important;
   --resizable-modal-height: min(760px, calc(100dvh - (var(--space-4) * 6)));
-  width: var(--resizable-modal-width) !important;
+  width: min(720px, calc(100vw - 48px)) !important;
   max-width: calc(100vw - 48px);
   top: calc(var(--space-4) * 3);
   padding-bottom: var(--space-4);
@@ -188,6 +213,24 @@
 .allocation-modal .ant-modal-body {
   min-height: 0;
   overflow-y: auto;
+}
+/* 分润字段数量多，但内容是按行编辑；整张表单保持单列，避免说明和分配行
+   被建单式四列网格拆成左右两块，导致字段上下错位。 */
+.allocation-modal .business-registration-form {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.allocation-modal .business-registration-form > :is(.ant-alert, .ant-typography, .orders-allocation-row) {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.allocation-modal .business-registration-form > .orders-allocation-row {
+  width: 100%;
+}
+.allocation-modal .orders-allocation-row.is-action {
+  grid-template-columns: minmax(0, 1.35fr) minmax(100px, 0.75fr) minmax(110px, 0.85fr);
+}
+.allocation-modal .orders-allocation-row.is-action .ant-form-item .ant-form-item-row {
+  grid-template-columns: max-content minmax(0, 1fr);
 }
  .party-preview {
   display: flex;

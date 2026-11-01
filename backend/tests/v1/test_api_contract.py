@@ -15,6 +15,7 @@ NON_JSON_ROUTES = frozenset(
         ("DELETE", "/api/v1/game-types/{game_type_id}"),
         ("DELETE", "/api/v1/rebates/{rebate_id}"),
         ("GET", "/api/v1/orders/export.csv"),
+        ("GET", "/api/v1/orders/export.xlsx"),
         ("GET", "/api/v1/stocks/export.csv"),
         ("GET", "/api/v1/customers/export.csv"),
         ("GET", "/api/v1/installments/export.csv"),
@@ -57,4 +58,5 @@ def test_every_json_api_route_declares_response_model(app):
     # order-types 路由配置的两个端点已包含在 174 的当前实际基线中，
     # 不再重复叠加计数：GET /order-types/{order_type_id}/routes、
     # GET /order-types/{code}/routes/impact-preview。
-    assert public_routes == 174
+    # → 175（订单台账 xlsx 导出：GET /orders/export.xlsx，非 JSON 已入豁免表）。
+    assert public_routes == 175

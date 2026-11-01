@@ -15,6 +15,8 @@ anyio==4.14.0
     #   watchfiles
 click==8.5.0
     # via uvicorn
+et-xmlfile==2.0.0
+    # via openpyxl
 fastapi==0.116.2
     # via -r backend/requirements.txt
 h11==0.16.0
@@ -27,6 +29,8 @@ mako==1.4.3
     # via alembic
 markupsafe==3.0.4
     # via mako
+openpyxl==3.1.5
+    # via -r backend/requirements.txt
 psycopg==3.3.6
     # via -r backend/requirements.txt
 psycopg-binary==3.3.6

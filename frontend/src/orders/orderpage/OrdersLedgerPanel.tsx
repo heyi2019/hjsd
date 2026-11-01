@@ -1,4 +1,4 @@
-import { Card, DatePicker, Input, Segmented, Space, Spin, Typography } from "antd";
+import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../../stocks/OrderDetail";
@@ -31,6 +31,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     loading,
     mobileLedgerFieldOrder,
     onExportLedger,
+    onExportLedgerXlsx,
     orderBusinessModeOptions,
     orderBusinessOptions,
     orderTypeFilter,
@@ -102,7 +103,24 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             options={[{ value: "desc", label: "最新在前" }, { value: "asc", label: "最旧在前" }]}
             onChange={(value) => { setLedgerSortDesc(value === "desc"); setPage(1); }}
           />
-          <PermissionButton permission="finance.read" size="small" loading={ledgerExporting} onClick={() => void onExportLedger()}>导出</PermissionButton>
+          {/* 导出格式靠下拉选择，触发按钮保持「导出」两字：UI 规范要求筛选栏文案简短 */}
+          <Dropdown
+            disabled={ledgerExporting}
+            trigger={["click"]}
+            menu={{
+              items: [
+                { key: "xlsx", label: "导出 Excel（5 个 sheet：订单 + 详情 + 三类明细）" },
+                { key: "csv", label: "导出 CSV（单表，单行表头）" },
+              ],
+              onClick: ({ key }) => {
+                if (key === "xlsx") void onExportLedgerXlsx();
+                else void onExportLedger();
+              },
+            }}
+          >
+            <PermissionButton permission="finance.read" size="small" loading={ledgerExporting}>导出</PermissionButton>
+          </Dropdown>
+
         </Space>
         <DataTable
           columns={arrangeLedgerColumns(ledgerColumns)}

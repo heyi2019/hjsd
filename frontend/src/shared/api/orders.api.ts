@@ -47,6 +47,11 @@ export const ordersApi = {
     api
       .get<Blob>("/orders/export.csv", { params: { _t: Date.now() }, responseType: "blob" })
       .then((r) => r.data),
+  /** 订单台账 Excel：两个 sheet —— 主订单信息（列表可见列）+ 详情信息（订单详情全字段）。 */
+  exportXlsx: () =>
+    api
+      .get<Blob>("/orders/export.xlsx", { params: { _t: Date.now() }, responseType: "blob" })
+      .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
   links: (orderId: number) =>

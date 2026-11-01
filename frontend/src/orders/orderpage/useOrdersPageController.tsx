@@ -44,6 +44,17 @@ export function useOrdersPageController(params: {
       setLedgerExporting(false);
     }
   };
+  /** 导出 Excel：5 个 sheet（主订单 + 详情 + 操作/资金/返点三类明细），表头为合并单元格。 */
+  const exportLedgerXlsx = async () => {
+    setLedgerExporting(true);
+    try {
+      downloadBlob(await ordersApi.exportXlsx(), `订单台账-${today()}.xlsx`);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setLedgerExporting(false);
+    }
+  };
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [gameTypeFilter, setGameTypeFilter] = useState("all");
@@ -530,7 +541,9 @@ export function useOrdersPageController(params: {
     employeeOptions,
     expandedOrderIds,
     exportLedger,
+    exportLedgerXlsx,
     onExportLedger: exportLedger,
+    onExportLedgerXlsx: exportLedgerXlsx,
     filteredOrders,
     gameTypeFilter,
     gameTypeOptions,

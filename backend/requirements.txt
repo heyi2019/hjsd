@@ -12,3 +12,5 @@ pydantic==2.9.2
 pydantic-settings==2.4.0
 # FastAPI 解析 multipart/form-data 的隐式依赖，卸载后上传类端点会 500，勿删
 python-multipart==0.0.12
+# 主列表导出 xlsx（多 sheet + 合并表头）；纯 Python 无扩展编译，装包约 260KB
+openpyxl==3.1.5

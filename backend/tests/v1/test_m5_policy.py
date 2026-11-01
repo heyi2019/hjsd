@@ -522,6 +522,51 @@ class TestProfitAllocation:
         assert by_type["BUY"]["user_id"] == 1
         assert by_type["SELL"]["user_id"] is None
 
+    def test_action_allocations_use_order_and_sale_responsibles(self, seeded_db):
+        order = self._order(seeded_db)
+        order.form_extra = {
+            "business_responsible_ids": [3],
+            "delivery_responsible_ids": [3],
+        }
+        seeded_db.add_all([
+            OrderEvent(
+                event_no="EVT-TEST-BUY-FORM",
+                order_id=order.id,
+                event_type="BUY",
+                amount=100,
+                occurred_on=date(2026, 6, 1),
+                is_posted=True,
+                created_by="seeduser1",
+                updated_by="seeduser1",
+            ),
+            OrderEvent(
+                event_no="EVT-TEST-SELL-FORM",
+                order_id=order.id,
+                event_type="SELL",
+                amount=200,
+                occurred_on=date(2026, 6, 2),
+                is_posted=True,
+                created_by="seeduser2",
+                updated_by="seeduser2",
+            ),
+        ])
+        seeded_db.flush()
+
+        items = policy_service.set_allocations(
+            seeded_db,
+            order.id,
+            items=[
+                {"allocation_type": "BUY", "user_id": 3, "role": "BUYER", "allocation_rate": "25"},
+                {"allocation_type": "SELL", "user_id": 3, "role": "SALES", "allocation_rate": "25"},
+                {"allocation_type": "OPERATION", "user_id": 2, "role": "SERVICE", "allocation_rate": "25"},
+                {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+            ],
+            actor="pytest",
+        )
+        by_type = {item["allocation_type"]: item for item in items}
+        assert by_type["BUY"]["user_id"] == 3
+        assert by_type["SELL"]["user_id"] == 3
+
     def test_sale_click_binds_seller_after_allocation(self, seeded_db):
         order = order_service.create_order(seeded_db, order_type="DG", trade_date=date(2026, 6, 1), actor="seeduser1")
         items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]

@@ -187,6 +187,9 @@ beforeEach(() => {
   });
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([
     { id: 9, username: "lisi", display_name: "李四", is_active: true },
+    { id: 11, username: "recovery", display_name: "回收员", is_active: true },
+    { id: 22, username: "seller", display_name: "售出员", is_active: true },
+    { id: 33, username: "operator", display_name: "运营员", is_active: true },
   ]);
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([installment]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
@@ -312,9 +315,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     });
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
+      form_extra: {
+        business_responsible_ids: [11],
+        delivery_responsible_ids: [22],
+      },
       events: [
-        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [9] },
-        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [9] },
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [] },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [] },
+        { id: 103, event_no: "EV-103", order_id: 1, event_type: "COST", amount: "100.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33] },
       ],
     });
     await openLedger();
@@ -324,8 +332,10 @@ describe("OrdersPage：操作与筛选分支", () => {
     for (const label of ["买号", "售出", "运营", "公司"]) {
       expect(within(modal).getByText(label)).toBeInTheDocument();
     }
-    // 买号/售出各只有唯一执行人（李四），自动带出，不用手选。
-    expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThanOrEqual(2);
+    // 买号取建单负责人，售出取卖出表单负责人，运营取运营信息中的动作负责人，均自动带出。
+    expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
+    expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
+    expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {

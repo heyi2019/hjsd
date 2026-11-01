@@ -47,9 +47,42 @@ export type AllocationItem = {
   allocation_amount: string;
 };
 
+export type ActionAllocationCandidates = Record<AllocationType, number[]>;
+
 export type AllocationValidation =
   | { ok: true; items: AllocationItem[] }
   | { ok: false; error: string };
+
+function responsibleIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((item): item is number => typeof item === "number" && Number.isInteger(item) && item > 0))];
+}
+
+function postedEventOperatorIds(order: Pick<Order, "events">, eventTypes?: Set<string>): number[] {
+  return [...new Set((order.events ?? [])
+    .filter((event) => event.is_posted && (!eventTypes || eventTypes.has(event.event_type)))
+    .flatMap((event) => responsibleIds(event.operator_user_ids)))];
+}
+
+/** 从订单事实提取四类动作负责人：建单负责人、卖出表单负责人和运营信息中的操作人。 */
+export function buildActionAllocationCandidates(order: Pick<Order, "events" | "form_extra">): ActionAllocationCandidates {
+  const formExtra = order.form_extra ?? {};
+  const businessResponsibleIds = responsibleIds(formExtra.business_responsible_ids);
+  const deliveryResponsibleIds = responsibleIds(formExtra.delivery_responsible_ids);
+  const operationResponsibleIds = responsibleIds(formExtra.operation_responsible_ids);
+  const operationEventTypes = new Set((order.events ?? [])
+    .map((event) => event.event_type)
+    .filter((eventType) => !["BUY", "SELL", "CANCEL"].includes(eventType)));
+  const operationEventOperatorIds = postedEventOperatorIds(order, operationEventTypes);
+  return {
+    BUY: businessResponsibleIds.length ? businessResponsibleIds : postedEventOperatorIds(order, new Set(["BUY"])),
+    SELL: deliveryResponsibleIds.length ? deliveryResponsibleIds : postedEventOperatorIds(order, new Set(["SELL"])),
+    OPERATION: operationResponsibleIds.length
+      ? operationResponsibleIds
+      : operationEventOperatorIds.length ? operationEventOperatorIds : businessResponsibleIds,
+    COMPANY: [],
+  };
+}
 
 /** 按操作四项构建表单行：买号/售出只有唯一执行人时自动带出，多人协作留空由人工选。 */
 export function buildActionAllocationRows(
@@ -59,7 +92,7 @@ export function buildActionAllocationRows(
     role?: string;
     allocation_rate?: string;
   }>,
-  candidates: { BUY: number[]; SELL: number[] },
+  candidates: ActionAllocationCandidates,
 ): AllocationFormRow[] {
   const order: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
   return order.map((kind) => {
@@ -69,7 +102,7 @@ export function buildActionAllocationRows(
       employee = existed.user_id ?? "COMPANY";
     } else if (kind === "COMPANY") {
       employee = "COMPANY";
-    } else if (kind === "BUY" || kind === "SELL") {
+    } else {
       const ids = candidates[kind];
       employee = ids.length === 1 ? ids[0] : undefined;
     }

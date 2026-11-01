@@ -14,7 +14,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
-import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationRows, filterBusinessOrders, formatOrderAmount, type AllocationFormRow, type AllocationMode } from "./helpers";
+import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, filterBusinessOrders, formatOrderAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -116,8 +116,8 @@ export function useOrdersPageController(params: {
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
   /** 分润口径：按操作四项（买号/售出/运营/公司）或按人自由分配。默认按操作。 */
   const [allocationMode, setAllocationMode] = useState<AllocationMode>("ACTION");
-  /** 按操作分配时的动作执行人候选，来自订单已过账事件的 operator_user_ids。 */
-  const [allocationCandidates, setAllocationCandidates] = useState<{ BUY: number[]; SELL: number[] }>({ BUY: [], SELL: [] });
+  /** 按操作分配时的动作执行人候选，来自建单/售出负责人和运营信息中的操作人。 */
+  const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
@@ -159,14 +159,7 @@ export function useOrdersPageController(params: {
         policyApi.allocations(order.id),
         employeesApi.list(),
       ]);
-      // 已过账事件的执行人：按操作分润时，买号/售出收益人只能是这些人。
-      const candidatesFor = (eventType: "BUY" | "SELL") => {
-        const posted = (order.events ?? []).filter(
-          (event) => event.event_type === eventType && event.is_posted,
-        );
-        return [...new Set(posted.flatMap((event) => event.operator_user_ids ?? []))];
-      };
-      const candidates = { BUY: candidatesFor("BUY"), SELL: candidatesFor("SELL") };
+      const candidates = buildActionAllocationCandidates(order);
       const typed = result.items.filter((item) => item.allocation_type);
       const mode: AllocationMode = typed.length > 0 || result.items.length === 0 ? "ACTION" : "PERSON";
       setActionOrder(order);

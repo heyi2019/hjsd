@@ -18,6 +18,7 @@ import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 import { appModal } from "../shared/ui/appFeedback";
+import { buildActionAllocationCandidates, buildActionAllocationRows } from "../orders/orderpage/helpers";
 
 vi.mock("../shared/api/catalog");
 
@@ -167,6 +168,25 @@ it("P1/FE-023：重复账号提示复购确认，确认后允许建单", async (
   expect((await screen.findAllByText(/是否为复购/)).length).toBeGreaterThan(0);
   await act(async () => { await confirmConfig?.onOk?.(); });
   await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
+});
+
+it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {
+  const candidates = buildActionAllocationCandidates({
+    form_extra: {
+      business_responsible_ids: [11],
+      delivery_responsible_ids: [22],
+    },
+    events: [
+      { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [] },
+      { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [] },
+      { id: 3, event_no: "EV-3", order_id: 10, event_type: "COST", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33] },
+    ],
+  });
+  const rows = buildActionAllocationRows([], candidates);
+
+  expect(candidates).toMatchObject({ BUY: [11], SELL: [22], OPERATION: [33], COMPANY: [] });
+  expect(rows.map((row) => row.employee)).toEqual([11, 22, 33, "COMPANY"]);
+  expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
 });
 
 it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0", async () => {

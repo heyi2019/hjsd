@@ -233,11 +233,33 @@ def _set_action_allocations(
     if len(normalized_items) != 4 or any(not item.get("allocation_type") for item in normalized_items):
         raise Validation("利润分配必须且只能包含买号、售出、运营和公司归属四项")
     has_typed_items = True
-    # 动作执行人候选：事件上的 operator_user_ids 优先（可多人），
-    # 没有再回退事件的 created_by（录入账号，通常只有一个）。
+    # 动作执行人候选：建单/卖出表单中的业务负责人是业务事实来源；
+    # 没有表单负责人时，再回退到事件 operator_user_ids / created_by。
     action_actor_ids: dict[str, list[int]] = {}
     if has_typed_items:
         for action_type in ("BUY", "SELL"):
+            configured_key = {
+                "BUY": "business_responsible_ids",
+                "SELL": "delivery_responsible_ids",
+            }[action_type]
+            configured = [
+                int(uid)
+                for uid in ((order.form_extra or {}).get(configured_key) or [])
+                if isinstance(uid, int) and not isinstance(uid, bool) and uid > 0
+            ]
+            if configured:
+                active_ids = set(
+                    session.scalars(
+                        select(User.id).where(User.id.in_(configured), User.is_active.is_(True))
+                    ).all()
+                )
+                if active_ids != set(configured):
+                    raise Validation(
+                        f"{action_type} 动作负责人不存在或已停用，无法绑定收益人",
+                        details={"field": configured_key, "user_ids": configured},
+                    )
+                action_actor_ids[action_type] = list(dict.fromkeys(configured))
+                continue
             action = session.scalar(
                 select(OrderEvent)
                 .where(

@@ -193,9 +193,9 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     (kind === "BUY" || kind === "SELL") &&
     (actionOrder?.events ?? []).some((event) => event.event_type === kind && event.is_posted);
   const staffOptions = employeeOptions.filter((option) => option.value !== "COMPANY");
-  /** 买号/售出只能选该动作的执行人；没登记执行人时退回全部员工，由后端兜底校验。 */
+  /** 买号、售出和运营优先只能选业务事实中的负责人；没有候选时退回全部员工，由后端兜底校验。 */
   const optionsFor = (kind?: AllocationType) => {
-    if (kind === "BUY" || kind === "SELL") {
+    if (kind === "BUY" || kind === "SELL" || kind === "OPERATION") {
       const ids = allocationCandidates[kind];
       const picked = employeeOptions.filter(
         (option) => typeof option.value === "number" && ids.includes(option.value),

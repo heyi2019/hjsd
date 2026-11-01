@@ -1,4 +1,5 @@
 import { Form, Input } from "antd";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Select } from "../../shared/ui";
 import { useOptionSet } from "../../shared/lib/optionSets";
@@ -8,9 +9,16 @@ import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
 /** 提号复用回收页客户信息的结构，只将业务主体替换为供货方。 */
 export function ThSupplierSection(props: { participantExtras?: ReactNode } = {}) {
   const participantTitle = sectionLabel("PARTICIPANT", "供货方信息");
+  const form = Form.useFormInstance();
   const supplierSource = Form.useWatch("supplier_source");
   const configuredOptions = useOptionSet("SUPPLIER_SOURCE");
   const sourceOptions = configuredOptions?.length ? configuredOptions : SUPPLIER_SOURCE_FALLBACK_OPTIONS;
+  useEffect(() => {
+    const current = form.getFieldValue("supplier_source");
+    if (!sourceOptions.some((option) => option.value === current)) {
+      form.setFieldValue("supplier_source", sourceOptions[0]?.value);
+    }
+  }, [form, sourceOptions]);
   return (
     <section className="th-supplier-section recovery-customer-fields" aria-labelledby="supplier-info-title">
       <div id="supplier-info-title" className="recovery-customer-fields__title">{participantTitle}</div>

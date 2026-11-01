@@ -113,7 +113,6 @@ export function CreateBusinessModal(props: {
       defaults.customer_role = "SELLER";
       defaults.counterparty_role = "PEER";
     }
-    if (isTh) defaults.supplier_source = "氪金联盟";
     const defaultGameType = gameTypes.find((item) => item.is_default)?.name;
     const gameTypeField = "game_type";
     if (defaultGameType && form.getFieldValue(gameTypeField) == null) {
@@ -316,9 +315,7 @@ export function CreateBusinessModal(props: {
           order_type: props.initialOrderType,
           ...(isRecovery
             ? { customer_role: "SELLER", counterparty_role: "PEER" }
-            : isTh
-              ? { supplier_source: "氪金联盟" }
-              : {}),
+            : {}),
         }}
       >
         <FieldConfigContext.Provider value={config}>

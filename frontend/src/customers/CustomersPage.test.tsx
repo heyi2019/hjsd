@@ -216,6 +216,32 @@ describe("CustomersPage：客户档案", () => {
     expect(within(drawer).getByText("合作方档案 · CP-0001")).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
   });
+
+  it("已合并（终态）客户行只保留详情，不暴露合并/拉黑/解除拉黑（L1595）", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.customersApi.list).mockResolvedValue([
+      {
+        id: 3,
+        customer_no: "CUS-0010",
+        display_name: "王五",
+        phone: "137****7777",
+        wechat: "",
+        qq: "",
+        status: "MERGED",
+        created_at: "2026-08-01T09:00:00",
+        extra_values: {},
+      },
+    ]);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0010");
+
+    const row = screen.getByText("CUS-0010").closest("tr") as HTMLElement;
+    expect(within(row).getByText("详情")).toBeInTheDocument();
+    // 终态只保留详情，合并/拉黑/解除拉黑均不应出现
+    expect(within(row).queryByText("合并")).not.toBeInTheDocument();
+    expect(within(row).queryByText("拉黑")).not.toBeInTheDocument();
+    expect(within(row).queryByText("解除拉黑")).not.toBeInTheDocument();
+  });
 });
 
 describe("CustomersPage：联系方式脱敏与按需查看", () => {

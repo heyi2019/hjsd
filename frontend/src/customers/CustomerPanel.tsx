@@ -259,30 +259,35 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           <PermissionButton permission="customer.read" size="small" onClick={() => void openDetail(row)}>
             详情
           </PermissionButton>
-          <PermissionButton
-            permission="customer.merge"
-            size="small"
-            disabled={row.status !== "ACTIVE"}
-            onClick={() => setMergeTarget(row)}
-          >
-            合并
-          </PermissionButton>
-          <ConfirmButton
-            permission="customer.update"
-            size="small"
-            title={row.status === "ACTIVE" ? "拉黑该客户" : "解除拉黑"}
-            description={row.status === "ACTIVE"
-              ? "拉黑后不可作为新订单参与方；历史订单、分期与需求保留。"
-              : "解除后可重新作为新订单参与方。"}
-            danger={row.status === "ACTIVE"}
-            onConfirm={async () => {
-              await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
-              appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
-              await load();
-            }}
-          >
-            {row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}
-          </ConfirmButton>
+          {/* 已合并为终态：仅保留详情入口，不再暴露合并 / 拉黑 / 解除拉黑，避免误判终态可再次流转（L1595）。 */}
+          {row.status !== "MERGED" && (
+            <>
+              <PermissionButton
+                permission="customer.merge"
+                size="small"
+                disabled={row.status !== "ACTIVE"}
+                onClick={() => setMergeTarget(row)}
+              >
+                合并
+              </PermissionButton>
+              <ConfirmButton
+                permission="customer.update"
+                size="small"
+                title={row.status === "ACTIVE" ? "拉黑该客户" : "解除拉黑"}
+                description={row.status === "ACTIVE"
+                  ? "拉黑后不可作为新订单参与方；历史订单、分期与需求保留。"
+                  : "解除后可重新作为新订单参与方。"}
+                danger={row.status === "ACTIVE"}
+                onConfirm={async () => {
+                  await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
+                  appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
+                  await load();
+                }}
+              >
+                {row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}
+              </ConfirmButton>
+            </>
+          )}
         </Space>
       ),
     },

@@ -17,6 +17,7 @@ import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoutesPanel";
 import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
+import { InventorySaleModal } from "../stocks/InventorySaleModal";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
@@ -149,6 +150,37 @@ it("P1/FE-046：错误旧密码停留在用户中心并恢复可重试状态", a
   expect(screen.getByLabelText("当前密码")).toHaveValue("wrong-old-pass");
   expect(screen.getByRole("button", { name: /修改密码/ })).toBeEnabled();
   expect(screen.queryByText("登录工作台")).not.toBeInTheDocument();
+});
+
+it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
+  vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
+    { id: 7, display_name: "买家A", status: "DISABLED" },
+  ] as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.employeesApi.list).mockResolvedValueOnce([
+    { id: 1, username: "admin", display_name: "管理员", is_active: true },
+  ] as never);
+  renderLight(
+    <InventorySaleModal
+      account={{ id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", status: "WAITING", inventory_type: "RECOVERY" } as never}
+      onClose={() => undefined}
+      onCreated={() => undefined}
+    />,
+    { user: "admin" },
+  );
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await screen.findByText("买家信息");
+  await user.type(screen.getByLabelText("客户昵称"), "买家A");
+  await user.type(screen.getByLabelText("售出金额"), "350");
+  await user.click(screen.getByLabelText("资金账户"));
+  await user.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await user.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
+  expect(catalog.ordersApi.addCustomerRole).not.toHaveBeenCalled();
+  expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled();
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

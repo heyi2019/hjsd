@@ -171,6 +171,14 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
         source: values.customer_source as string | undefined,
         note: values.note as string | undefined,
       })).customer;
+      if (customer.status === "DISABLED" || customer.status === "MERGED") {
+        setError({
+          message: customer.status === "MERGED"
+            ? "客户已合并，不能作为售出买家"
+            : "客户已拉黑，不能作为售出买家",
+        });
+        return;
+      }
       await ordersApi.addCustomerRole(sourceOrderId, {
         customer_id: customer.id,
         role: buyerRoleOf(resolvedType),

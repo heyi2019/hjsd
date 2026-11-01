@@ -150,6 +150,27 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   }));
 });
 
+it("已拉黑客户不能作为售出买家，且不产生客户或售出副作用", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  resolveMock(vi.mocked(catalog.customersApi.list), [
+    { id: 7, display_name: "买家A", status: "DISABLED" },
+  ]);
+  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  await screen.findByText("买家信息");
+  await ui.type(screen.getByLabelText("客户昵称"), "买家A");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
+  expect(screen.getByLabelText("客户昵称")).toHaveValue("买家A");
+  expect(vi.mocked(catalog.customersApi.create)).not.toHaveBeenCalled();
+  expect(vi.mocked(catalog.ordersApi.addCustomerRole)).not.toHaveBeenCalled();
+  expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
+});
+
 it("售出金额可拆分进两个资金池（售出金额2 + 资金账户2）", async () => {
   const ui = userEvent.setup({ pointerEventsCheck: 0 });
   resolveMock(vi.mocked(catalog.customersApi.list), []);

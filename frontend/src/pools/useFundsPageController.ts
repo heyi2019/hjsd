@@ -33,6 +33,7 @@ export function useFundsPageController(active = true) {
   const [cashflowTotal, setCashflowTotal] = useState(0);
   const [cashflowsReady, setCashflowsReady] = useState(false);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
+  const [reconciliationsReady, setReconciliationsReady] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [cashflowOpen, setCashflowOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -148,6 +149,7 @@ export function useFundsPageController(active = true) {
   const load = useCallback(async () => {
     setLoading(true);
     setFundsReady(false);
+    setReconciliationsReady(false);
     try {
       const list = await poolsApi.list();
       setPools(list);
@@ -158,6 +160,7 @@ export function useFundsPageController(active = true) {
       setDeposits(await depositsApi.list());
       await fetchCashflows();
       setReconciliations(await reconciliationsApi.list());
+      setReconciliationsReady(true);
       setError(null);
       setFundsReady(true);
     } catch (err) {
@@ -428,6 +431,7 @@ export function useFundsPageController(active = true) {
     cashflowTotal,
     cashflowsReady,
     reconciliations,
+    reconciliationsReady,
     loading,
     error,
     fundsReady,

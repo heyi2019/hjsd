@@ -280,7 +280,8 @@ export function DepositTab({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading } = ctrl;
+  const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading, reconciliationsReady, error } = ctrl;
+  const reconciliationUnavailable = !reconciliationsReady || Boolean(error);
   const { arrange: arrangeReconciliationColumns } = useListViewColumns("RECONCILIATIONS");
   const reconciliationColumns: ColumnsType<Reconciliation> = [
     { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
@@ -306,7 +307,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
     },
   ];
   return (
-    <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
+    <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" disabled={reconciliationUnavailable || loading} onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
       <Typography.Paragraph type="secondary" className="ui-card-hint">
         系统余额口径：截至对账日期「已入账」流水的累计；按池内账户对账时另含该账户期初余额。差异 = 账面余额 − 系统余额。
       </Typography.Paragraph>
@@ -316,7 +317,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
         page={1}
         pageSize={10}
         total={reconciliations.length}
-        emptyText="暂无对账记录"
+        emptyText={reconciliationUnavailable ? "资金对账数据不可用，请点击重新加载" : "暂无对账记录"}
         loading={loading}
         onPageChange={() => undefined}
       />

@@ -563,6 +563,16 @@ it("P1/FE-229：资金流水数据失败时不显示零统计且禁用新增", a
   expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
 });
 
+it("P1/FE-230：对账数据失败时显示明确空态且禁用新增", async () => {
+  vi.mocked(catalog.reconciliationsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "reconciliations down" });
+  renderLight(<FundsPage />, { user: "admin" });
+
+  fireEvent.click(screen.getByRole("tab", { name: "对账" }));
+  expect(await screen.findByText("资金对账")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新增对账/ })).toBeDisabled();
+  expect(screen.getByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
+});
+
 it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {
   vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });

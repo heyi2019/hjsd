@@ -138,4 +138,12 @@ describe("InstallmentsPanel：分期合约", () => {
     const deliverButtons = screen.getAllByRole("button", { name: /换绑交付/ });
     expect(deliverButtons.some((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
   });
+
+  it("已结清合约禁止登记收款和终止退款", async () => {
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValueOnce([{ ...installments[0], status: "SETTLED" }]);
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    expect(screen.getByRole("button", { name: /登记收款/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /终止分期并退款/ })).toBeDisabled();
+  });
 });

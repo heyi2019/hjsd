@@ -343,7 +343,7 @@ export function useContractTableController(params: { contractType: string; reloa
           <PermissionButton
             permission="order.event.post"
             size="small"
-            disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
+            disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
             onClick={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
           >
             登记收款
@@ -372,7 +372,7 @@ export function useContractTableController(params: { contractType: string; reloa
             permission="order.event.post"
             size="small"
             danger
-            disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
+            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
             onClick={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
           >
             终止分期并退款

@@ -86,7 +86,7 @@ export function MobileInstallmentList({
               <PermissionButton
                 permission="order.event.post"
                 size="small"
-                disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
+                disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
                 onClick={() => onPay(row)}
               >
                 登记收款
@@ -112,7 +112,7 @@ export function MobileInstallmentList({
                 permission="order.event.post"
                 size="small"
                 danger
-                disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
+                disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
                 onClick={() => onRefund(row)}
               >
                 终止分期并退款

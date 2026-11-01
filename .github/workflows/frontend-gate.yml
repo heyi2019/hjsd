@@ -88,18 +88,19 @@ jobs:
         run: ${{ matrix.command }}
 
   test-react-deep:
-    # 独立 job 而非矩阵元素：矩阵级条件 if 若引用 matrix 上下文存在语法不被识别的风险，
-    # 一旦报错整个 workflow 直接不运行；独立 job 用纯 event 条件零风险。
     # 仅在 main/master 的 push、定时与手动触发时运行，PR 与 test 分支跳过。
-    # 理由：deep 是重型交互回归（大量 userEvent + antd Modal），单层约 200s，
-    # 让每次提交都等它，等于给最长的检查买最短的反馈周期。
-    name: Tests (react-deep)
+    # deep 按业务域拆成 4 个矩阵分片，既保留单分片隔离，又缩短 CI 总等待时间。
+    name: Tests (react-deep-${{ matrix.shard }})
     if: >
       github.event_name != 'pull_request' &&
       (github.event_name != 'push' ||
        github.ref_name == 'main' || github.ref_name == 'master')
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [shell, business, governance, support]
     steps:
       - uses: actions/checkout@v4
 
@@ -113,9 +114,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 走 test:full:deep（分片脚本 deep-only 模式），保留其单层超时保护与耗时输出
-      - name: Run react-deep layer
-        run: npm run test:full:deep
+      - name: Run react-deep shard
+        run: npm run test:react-deep:shard -- ${{ matrix.shard }}
 
   frontend-build:
     name: Frontend build

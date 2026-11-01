@@ -22,6 +22,8 @@ import { defineConfig, devices } from "@playwright/test";
 const E2E_BACKEND_PORT = process.env.ERP_E2E_BACKEND_PORT ?? "8124";
 const E2E_API_BASE =
   process.env.ERP_E2E_API_BASE ?? `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1`;
+const E2E_FRONTEND_PORT = process.env.ERP_E2E_FRONTEND_PORT ?? "5180";
+const E2E_FRONTEND_BASE = `http://127.0.0.1:${E2E_FRONTEND_PORT}`;
 process.env.ERP_E2E_API_BASE = E2E_API_BASE;
 
 export default defineConfig({
@@ -33,7 +35,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:5180",
+    baseURL: E2E_FRONTEND_BASE,
     headless: true,
     trace: "on-first-retry",
   },
@@ -43,9 +45,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `VITE_API_BASE=${E2E_API_BASE} npx vite --port 5180 --strictPort`,
-      url: "http://localhost:5180",
-      // 端口空闲则起新实例；若已有 vite 在 5180 则复用。
+      command: `VITE_API_BASE=${E2E_API_BASE} npx vite --port ${E2E_FRONTEND_PORT} --strictPort`,
+      url: E2E_FRONTEND_BASE,
+      // 端口空闲则起新实例；若已有对应端口的 vite 则复用。
       reuseExistingServer: true,
       timeout: 120000,
     },

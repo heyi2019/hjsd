@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -61,7 +62,9 @@ def load_gates() -> dict[str, int]:
 
 def _run(cmd: list[str]) -> None:
     print("+ " + " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=BACKEND, check=True)
+    environment = os.environ.copy()
+    environment.setdefault("DATABASE_URL", "sqlite:////tmp/heijin_erp_v1.db")
+    subprocess.run(cmd, cwd=BACKEND, env=environment, check=True)
 
 
 def collect_coverage() -> Path:

@@ -16,6 +16,109 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # tests/v1 -> backend
+
+
+def _initial_markers_for_file(filename: str) -> set[str]:
+    """按现有文件命名给存量测试补初始分类，不改变测试行为。
+
+    这是过渡性的文件级分类：后续遇到跨域或命名不准确的文件，可在测试模块内
+    用 pytestmark 补充或覆盖。未能可靠判断的文件保持未分类，避免把业务语义猜错。
+    """
+    markers: set[str] = set()
+
+    if filename in {
+        "test_money.py",
+        "test_money_float_guard.py",
+        "test_numbering.py",
+        "test_state_machine.py",
+        "test_game_types.py",
+        "test_product_alias_compat.py",
+    }:
+        markers.add("unit")
+
+    if (
+        filename.endswith("_contract.py")
+        or filename in {
+            "test_api_contract.py",
+            "test_order_types_api.py",
+            "test_pools_api.py",
+            "test_request_schema_contract.py",
+            "test_orders_router_guard.py",
+            "test_orders_guard.py",
+            "test_parties_policy_guard.py",
+            "test_quality_guard.py",
+            "test_report_export_columns.py",
+            "test_list_columns.py",
+            "test_list_custom_columns.py",
+            "test_list_export_csv.py",
+        }
+    ):
+        markers.add("contract")
+
+    if any(
+        token in filename
+        for token in (
+            "_service.py",
+            "orders.py",
+            "parties.py",
+            "finance_",
+            "reporting_",
+            "installments_",
+            "inventory_execution",
+            "accounts_",
+            "auth_",
+            "backup_restore",
+            "migration",
+            "notifications_",
+            "attachments_",
+            "quality_",
+            "search_",
+            "settings",
+        )
+    ):
+        markers.add("integration")
+
+    if any(
+        token in filename
+        for token in (
+            "bughunt",
+            "_gaps",
+            "unreachable_status_paths",
+            "repair_baseline_schema",
+            "coverage_gate",
+            "deploy_script_contract",
+            "account_stock_no",
+        )
+    ):
+        markers.add("regression")
+
+    if any(
+        token in filename
+        for token in (
+            "auth",
+            "policy",
+            "security",
+            "ratelimit",
+            "permission",
+            "audit",
+        )
+    ):
+        markers.add("security")
+
+    if filename in {"test_backup_restore.py", "test_migration.py", "test_coverage_gate.py"}:
+        markers.add("slow")
+
+    return markers
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """给存量测试提供可查询的初始类型标签。"""
+    for item in items:
+        filename = Path(str(item.fspath)).name
+        for marker in _initial_markers_for_file(filename):
+            item.add_marker(getattr(pytest.mark, marker))
+
+
 # 正常环境：把 backend 根置顶，保证 `import app` 走原始代码。
 # mutmut 会在 sys.path 注入 mutants/ 并移除 backend 根；此时若仍 insert(0, backend)，
 # `import app` 会命中原始 backend/app，导致所有变异失效。故检测到 mutants 已在 sys.path

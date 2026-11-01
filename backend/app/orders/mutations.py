@@ -23,7 +23,6 @@ from app.domain.enums import (
     AuditAction,
 )
 
-from .cancellation_model import cancel_order
 from ._shared import (
     _audit_value,
     get_order,

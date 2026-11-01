@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -16,6 +17,18 @@ LINT_TARGETS = ["app", "tests/v1", "alembic/versions", "scripts", "run_regressio
 # 基线只记「文件 + 消息」，不含行列号——行号漂移不应判定为新增告警
 LINT_BASELINE = ROOT / "lint_baseline.txt"
 LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
+
+
+def regression_environment() -> dict[str, str]:
+    """为回归套件提供隔离的默认数据库，不覆盖显式命令行环境变量。
+
+    根目录 `.env` 用于本地联调时可以指向 PostgreSQL 测试库；配置契约和健康检查
+    回归则要求默认 v1 SQLite 库。通过子进程环境注入 SQLite，既不修改 `.env`，
+    也不让回归套件误连联调库。调用方显式导出 DATABASE_URL 时仍保留其选择。
+    """
+    environment = os.environ.copy()
+    environment.setdefault("DATABASE_URL", "sqlite:////tmp/heijin_erp_v1.db")
+    return environment
 
 GROUPS = {
     "smoke": [
@@ -41,8 +54,8 @@ GROUPS = {
         "tests/v1/test_foundation_pools_service.py",
         "tests/v1/test_order_types_api.py",
         "tests/v1/test_pools_api.py",
-        "tests/v1/test_field_definition_rules_contract.py",
-        "tests/v1/test_live_fields_contract.py",
+        "tests/v1/test_form_extra_scopes.py",
+        "tests/v1/test_order_form_fields.py",
         "tests/v1/test_numbering.py",
         "tests/v1/test_settings.py",
     ],
@@ -70,7 +83,7 @@ GROUPS = {
         "tests/v1/test_finance_cashflows_service.py",
         "tests/v1/test_finance_controls_service.py",
         "tests/v1/test_finance_rebates_service.py",
-        "tests/v1/test_pool_accounts_contract.py",
+        "tests/v1/test_finance_router_contract.py",
         "tests/v1/test_rebate_rules_contract.py",
         "tests/v1/test_money.py",
         "tests/v1/test_money_float_guard.py",
@@ -285,7 +298,12 @@ def main() -> int:
             return 0
         if selected:
             runner = str(PYTHON) if PYTHON.exists() else sys.executable
-            result = subprocess.run([runner, "-m", "pytest", "-q", *paths], cwd=ROOT, check=False)
+            result = subprocess.run(
+                [runner, "-m", "pytest", "-q", *paths],
+                cwd=ROOT,
+                env=regression_environment(),
+                check=False,
+            )
             if result.returncode:
                 return result.returncode
         if frontend_changed:
@@ -298,7 +316,12 @@ def main() -> int:
         return 0
     runner = str(PYTHON) if PYTHON.exists() else sys.executable
     command = [runner, "-m", "pytest", "-q", *paths]
-    return subprocess.run(command, cwd=ROOT, check=False).returncode
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        env=regression_environment(),
+        check=False,
+    ).returncode
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@
     "test:quick": "vitest run --project=quick",
     "test:react": "vitest run --project=react",
     "test:react-deep": "vitest run --project=react-deep",
+    "test:react-deep:shard": "node scripts/test-deep-shard.mjs",
     "test:full": "node scripts/test-full-sharded.mjs",
     "test:full:deep": "node scripts/test-full-sharded.mjs --deep-only",
     "test:full:all": "node scripts/test-full-sharded.mjs --all",

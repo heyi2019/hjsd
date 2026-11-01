@@ -9,6 +9,9 @@ node_modules/
 dist/
 .env
 **/.env.local
+.env.*-test
+.env.*.test
+.env.postgres-test
 frontend/test-results/
 # SQLite 运行产物：由scripts/migrate_v2.py 从原始 JSON 重建，不入版本库
 *.db
@@ -48,6 +51,9 @@ htmlcov/
 
 # 迁移前的临时库备份（带时间戳后缀，*.db 规则匹配不到）
 /backend/data/*.bak*
+
+# 根目录本地数据库备份，不入版本库
+/backups/
 
 # WorkBuddy 记忆目录，与项目代码无关
 .workbuddy/

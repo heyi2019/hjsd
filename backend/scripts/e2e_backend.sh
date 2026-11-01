@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."   # -> backend/
-PY="${ERP_E2E_PYTHON:-python3}"
+if [[ -n "${ERP_E2E_PYTHON:-}" ]]; then
+  PY="$ERP_E2E_PYTHON"
+elif [[ -x "$PWD/.venv/bin/python" ]]; then
+  # 优先使用项目测试虚拟环境，确保 alembic/uvicorn 等开发依赖版本一致。
+  PY="$PWD/.venv/bin/python"
+else
+  PY="python3"
+fi
 # 独立 E2E env 文件注入 DATABASE_URL，绕过仓库根 .env 指向的生产库 heijin_erp_v1.db。
 # 根因：pydantic-settings 在 Settings 类定义时调用 locate_env_file() 读取 env_file；
 # 根目录 .env 里的 DATABASE_URL 会覆盖 export 的环境变量，使 uvicorn 误连生产库。

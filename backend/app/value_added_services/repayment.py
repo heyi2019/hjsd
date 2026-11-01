@@ -173,7 +173,6 @@ def cancel_installment(
         InstallmentStatus.PENDING.value,
         InstallmentStatus.ACTIVE.value,
         InstallmentStatus.OVERDUE.value,
-        InstallmentStatus.SETTLED.value,
     }
     if installment.status not in cancellable:
         raise Conflict(

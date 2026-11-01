@@ -195,6 +195,17 @@ def test_cancel_rejects_closed_contract(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 661-672
 
+def test_cancel_rejects_settled_contract(seeded_db):
+    """已结清合约不得再走退款/终止分期，避免反向冲销已完成交易。"""
+    order = _order(seeded_db, order_type="DG")
+    contract = _contract(seeded_db, order.id)
+    contract.status = InstallmentStatus.SETTLED.value
+    seeded_db.flush()
+    with pytest.raises(Conflict, match="不能取消交易"):
+        installment_service.cancel_installment(
+            seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
+        )
+
 def test_cancel_rejects_non_active_order(seeded_db):
     order = _order(seeded_db, order_type="DG")
     contract = _contract(seeded_db, order.id)

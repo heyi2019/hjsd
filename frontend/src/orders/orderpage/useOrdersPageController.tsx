@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, stocksApi, type AccountExecutionDetail, type Installment, type Order, type OrderType, type Pool } from "../../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
-import { ACCOUNT_STATUS_LABEL, executionActionLabel, formatDateTimeMinute, formatElapsedTime, money, today } from "../../shared/lib/format";
+import { ACCOUNT_STATUS_LABEL, executionActionLabel, formatDateTimeMinute, formatElapsedTime, INSTALLMENT_STATUS_LABEL, money, today } from "../../shared/lib/format";
 import { filterRetiredOrderTypeOptions } from "../../shared/lib/retiredProducts";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
@@ -239,13 +239,11 @@ export function useOrdersPageController(params: {
         setCancelInstallmentTarget(target);
         setCancelOrderTarget(null);
       } else {
-        setCancelOrderTarget(order);
-        setCancelInstallmentTarget(null);
-        // 先把基础日期和默认冲销动作写入表单，账户/操作人异步加载时弹窗仍可正常提交。
+        // 取消弹窗依赖资金账户和操作人主数据；先准备完整上下文，再打开弹窗，
+        // 避免用户在下拉尚未加载时确认导致无请求、无结果的“假提交”。
         const reversible = reversibleEvents(order);
         const first = reversible[0];
         const nextScope: CancelFormScope = first && ["BUY", "COST"].includes(first.event.event_type) ? "INVREFUND" : "ORDERCANC";
-        setCancelScope(nextScope);
         cancelForm.setFieldsValue({
           cancelled_on: today(),
           offset_event_id: first?.event.id,
@@ -266,6 +264,9 @@ export function useOrdersPageController(params: {
         if (first && cancelForm.getFieldValue("pool_id") == null) {
           cancelForm.setFieldValue("pool_id", poolList[0]?.id);
         }
+        setCancelScope(nextScope);
+        setCancelOrderTarget(order);
+        setCancelInstallmentTarget(null);
       }
       if (order.installment_principal) cancelForm.setFieldsValue({ cancelled_on: today() });
     } catch (error) {
@@ -322,7 +323,7 @@ export function useOrdersPageController(params: {
             const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
             if (byDevUser) operatorUserIds = [byDevUser.id];
             else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
-            else {
+            else if (cancelEmployees.length > 0) {
               try {
                 const current = await currentUser();
                 const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
@@ -375,6 +376,7 @@ export function useOrdersPageController(params: {
       snap_game_password: snapshot?.game_password ?? undefined,
       snap_channel_region: snapshot?.channel_region ?? undefined,
       snap_bound_phone: snapshot?.bound_phone ?? undefined,
+      snap_wallet_realname: snapshot?.wallet_realname ?? undefined,
       snap_platform: snapshot?.platform ?? undefined,
       snap_purchase_price: snapshot?.purchase_price ?? undefined,
       snap_note: snapshot?.note ?? undefined,
@@ -401,6 +403,9 @@ export function useOrdersPageController(params: {
           game_password: (values.snap_game_password as string) || null,
           channel_region: (values.snap_channel_region as string) || null,
           bound_phone: (values.snap_bound_phone as string) || null,
+          // 快照整体替换：表单无该控件时沿用原值，避免编辑订单把钱包实名抹掉。
+          wallet_realname:
+            (values.snap_wallet_realname as string) || snapshot.wallet_realname || null,
           platform: (values.snap_platform as string) || null,
           purchase_price: (values.snap_purchase_price as string) || null,
           note: (values.snap_note as string) || null,
@@ -471,7 +476,24 @@ export function useOrdersPageController(params: {
     { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
     { title: "账号周期", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "最新动作", dataIndex: "last_event_type", width: 198, ellipsis: true, render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
-    { title: "状态", dataIndex: "status", width: 111, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
+    {
+      title: "状态",
+      dataIndex: "status",
+      width: 111,
+      ellipsis: true,
+      render: (v: string, order) => (
+        <Space size={4} wrap>
+          <StatusTag status={v} optionSet="ORDER_STATUS" />
+          {v === "INSTALLMENT" && order.installment_status ? (
+            <StatusTag
+              status={order.installment_status}
+              optionSet="INSTALLMENT_STATUS"
+              label={`合约：${INSTALLMENT_STATUS_LABEL[order.installment_status] ?? order.installment_status}`}
+            />
+          ) : null}
+        </Space>
+      ),
+    },
     { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
     {
       title: "操作",

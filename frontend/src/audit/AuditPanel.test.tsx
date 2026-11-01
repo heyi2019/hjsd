@@ -52,4 +52,39 @@ describe("AuditPanel：审计记录", () => {
     await ui.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
     expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
+
+  it("FE-150：选择对象类型后只查询对应审计记录", async () => {
+    const otherRow = { ...rows[0], id: 2, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool", entity_id: "3" } as AuditLogRow;
+    vi.mocked(catalog.auditApi.list).mockImplementation(async (params) =>
+      params?.entity_type === "order"
+        ? { items: [rows[0]], total: 1 }
+        : { items: [rows[0], otherRow], total: 2 },
+    );
+    renderLight(<AuditPanel />, { user: "admin" });
+    await screen.findByText("finance");
+    const entitySelect = document.querySelectorAll(".ui-filter-bar .ant-select")[0] as HTMLElement;
+    await ui.click(entitySelect.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText("订单", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(catalog.auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "order" })));
+    expect(screen.getByText("admin")).toBeInTheDocument();
+    expect(screen.queryByText("finance")).toBeNull();
+  });
+
+  it("FE-151：选择审计动作后只查询对应动作记录", async () => {
+    vi.mocked(catalog.auditApi.actions).mockResolvedValueOnce(["ORDER_CREATE", "POOL_DISABLE"]);
+    const otherRow = { ...rows[0], id: 2, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool", entity_id: "3" } as AuditLogRow;
+    vi.mocked(catalog.auditApi.list).mockImplementation(async (params) =>
+      params?.action === "ORDER_CREATE"
+        ? { items: [rows[0]], total: 1 }
+        : { items: [rows[0], otherRow], total: 2 },
+    );
+    renderLight(<AuditPanel />, { user: "admin" });
+    await screen.findByText("finance");
+    const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
+    await ui.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText("新建订单", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(catalog.auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ORDER_CREATE" })));
+    expect(screen.getByText("admin")).toBeInTheDocument();
+    expect(screen.queryByText("finance")).toBeNull();
+  });
 });

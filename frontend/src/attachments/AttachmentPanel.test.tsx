@@ -17,6 +17,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   vi.mocked(catalog.attachmentsApi.list).mockResolvedValue({ items });
+  vi.mocked(catalog.attachmentsApi.create).mockResolvedValue({ id: 2 } as never);
   vi.mocked(catalog.attachmentsApi.download).mockResolvedValue(new Blob(["x"]));
   vi.mocked(catalog.attachmentsApi.remove).mockResolvedValue(undefined);
   // jsdom 没有 URL.createObjectURL
@@ -50,6 +51,20 @@ describe("AttachmentPanel：附件中心", () => {
     renderLight(<AttachmentPanel />, { user: "admin" });
     expect(screen.getByText("请先填写对象编号后上传附件")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /上传附件/ })).toBeDisabled();
+  });
+
+  it("FE-114/165：填写有效对象后允许选择文件并调用上传", async () => {
+    renderLight(<AttachmentPanel />, { user: "admin" });
+    await ui.type(screen.getByPlaceholderText("对象编号"), "100");
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["fixture"], "fixture.png", { type: "image/png" });
+    await ui.upload(fileInput, file);
+    await waitFor(() => expect(catalog.attachmentsApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      entity_type: "order",
+      entity_id: "100",
+      file_name: "fixture.png",
+      content_type: "image/png",
+    })));
   });
 
   it("点击下载调用接口并触发下载", async () => {

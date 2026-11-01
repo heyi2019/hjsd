@@ -82,6 +82,14 @@ describe("RebatesPanel：返点记录列表", () => {
     renderLight(<RebatesPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
+
+  it("FE-231：返点数据失败时统计不可用并禁用新增", async () => {
+    vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce(new Error("rebates down"));
+    renderLight(<RebatesPanel />, { user: "admin" });
+    expect(await screen.findByText("返点明细")).toBeInTheDocument();
+    expect(screen.getByText("返点记录数").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByRole("button", { name: /新增返点记录/ })).toBeDisabled();
+  });
 });
 
 describe("RebatesPanel：新增返点记录 / 登记到账", () => {

@@ -196,6 +196,7 @@ export interface Order {
     bound_phone?: string | null;
     bound_phone_owner?: string | null;
     has_secondary?: boolean | null;
+    wallet_realname?: string | null;
     platform?: string | null;
     purchase_price?: string | null;
     note?: string | null;
@@ -346,6 +347,8 @@ export interface Account {
   bound_phone?: string | null;
   bound_phone_owner?: string | null;
   has_secondary?: boolean | null;
+  /** 钱包实名：未注销 / 已注销（账号交付前需确认实名是否已解绑）。 */
+  wallet_realname?: string | null;
   account_description?: string | null;
   account_images?: string[] | null;
   extra_values?: Record<string, unknown>;

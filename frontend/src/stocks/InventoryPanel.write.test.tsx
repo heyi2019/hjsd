@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { InventoryPanel } from "./InventoryPanel";
@@ -134,6 +135,28 @@ describe("InventoryPanel：写入与长路径", () => {
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
       game_account: "updated-account",
+    })));
+  });
+
+  it("FE-263：寄售上架复用现有库存账号，不重复创建库存实体", async () => {
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+      account: accounts[0],
+      orders: [],
+    } as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "寄售" }));
+    expect(await screen.findByText("登记寄售")).toBeInTheDocument();
+
+    await ui.click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: "确认上架" }));
+
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+      order_type: "DG",
+      account_id: 1,
+      form_extra_scope: "CONSIGN",
     })));
   });
 });

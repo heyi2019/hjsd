@@ -110,7 +110,7 @@ describe("CustomersPage：写操作提交流（加深覆盖）", () => {
     expect(payload.display_name).toBe("同行甲新");
   });
 
-  it("合作方拉黑：确认后调用 counterpartiesApi.setStatus", async () => {
+  it("FE-259：合作方拉黑使用后端 active 语义并调用状态接口", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("tab", { name: /合作方/ }));

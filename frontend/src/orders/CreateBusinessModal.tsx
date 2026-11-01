@@ -275,6 +275,7 @@ export function CreateBusinessModal(props: {
           bound_phone: values.bound_phone as string | undefined,
           bound_phone_owner: values.bound_phone_owner as string | undefined,
           has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
+          wallet_realname: values.wallet_realname as string | undefined,
           note: values.game_account_note as string | undefined,
           extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
         },

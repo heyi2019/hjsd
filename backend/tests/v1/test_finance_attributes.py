@@ -70,7 +70,8 @@ def test_manual_cashflow_gets_default_fund_and_accounting_attributes(
     ("fund_nature", "attribute"),
     [
         ("BUSINESS", "SELF_REVENUE"),
-        ("BUSINESS", "REBATE_INCOME"),
+        ("BUSINESS", "ADDITIONAL_INCOME"),
+        ("BUSINESS", "ADDITIONAL_EXPENSE"),
         ("EXTERNAL", "DEPOSIT"),
         ("INTERNAL", "INTERNAL_TRANSFER"),
     ],
@@ -98,7 +99,7 @@ def test_order_event_accounting_attribute_undefined_raises() -> None:
 @pytest.mark.parametrize(
     ("nature", "category", "direction", "expected"),
     [
-        ("BUSINESS_IN", "REBATE", "IN", ("BUSINESS", AccountingAttribute.REBATE_INCOME.value)),
+        ("BUSINESS_IN", "REBATE", "IN", ("BUSINESS", AccountingAttribute.ADDITIONAL_INCOME.value)),
         ("BUSINESS_IN", "REBATE_REVERSAL", "IN", ("BUSINESS", AccountingAttribute.REVERSAL.value)),
         ("BUSINESS_IN", "REVERSAL", "IN", ("BUSINESS", AccountingAttribute.REVERSAL.value)),
     ],

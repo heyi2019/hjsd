@@ -164,7 +164,8 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     } as unknown as AccountExecutionDetail);
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "取消");
+    const cancelRow = (await screen.findByText("acc-1")).closest("tr") as HTMLElement;
+    await clickMore(cancelRow, "取消");
 
     const modal = await screen.findByRole("dialog");
     const amount = within(modal).getByLabelText("退回金额");
@@ -185,6 +186,31 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
       21,
       expect.objectContaining({ amount: "80", pool_id: 3, event_type: "CANCEL" }),
     ));
+  });
+
+  it("FE-264：系统下架完整提交关闭弹窗并给出成功结果", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: inStockRow,
+      orders: [{
+        order_id: 21,
+        order_type: "HS",
+        status: "ACTIVE",
+        events: [{ id: 31, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
+      }],
+    } as unknown as AccountExecutionDetail);
+    vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
+    await openPanel([inStockRow]);
+    await clickMore(rowOf(1), "取消");
+    const modal = await screen.findByRole("dialog");
+    await ui.clear(within(modal).getByLabelText("退回金额"));
+    await ui.type(within(modal).getByLabelText("退回金额"), "80");
+    await ui.click(within(modal).getByLabelText("收款账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText("利润池（HJ_PROFIT）", { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(modal).getByLabelText("取消原因"), "系统下架回归");
+    await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
+
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ event_type: "CANCEL", amount: "80", pool_id: 3 })));
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("账号已下架"));
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {
@@ -235,5 +261,16 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce(sellDetail);
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
+  });
+
+  it("FE-258：图片资料保存失败时保留弹窗并显示可重试错误态", async () => {
+    vi.mocked(catalog.stocksApi.updateProfile).mockRejectedValueOnce(new Error("image save timeout"));
+    await openPanel([inStockRow]);
+    await clickMore(rowOf(1), "作图");
+    await ui.click(screen.getByRole("button", { name: /保存/ }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect((await screen.findAllByText("作图")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /保存/ })).toBeInTheDocument();
   });
 });

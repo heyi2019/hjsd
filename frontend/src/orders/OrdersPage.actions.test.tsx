@@ -20,7 +20,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
-    "orderSnapshot", "links", "createLink", "deleteLink",
+    "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -45,6 +45,7 @@ vi.mock("../shared/api/client", async (importOriginal) => {
   return {
     ...actual,
     api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    currentUser: vi.fn(),
   };
 });
 
@@ -159,6 +160,7 @@ const actionAllocationRows: ProfitAllocation[] = [
 beforeEach(() => {
   seedOptionSets(catalog);
   seedOrderFormFields(catalog);
+  vi.mocked(catalog.orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
@@ -193,9 +195,7 @@ beforeEach(() => {
   ]);
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([installment]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
-  vi.mocked(client.api).get.mockResolvedValue({
-    data: { id: 9, username: "lisi", role: "operator", display_name: "李四" },
-  });
+  vi.mocked(client.currentUser).mockResolvedValue({ id: 9, username: "lisi", role: "operator", display_name: "李四" });
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
 });
@@ -522,6 +522,41 @@ describe("OrdersPage：操作与筛选分支", () => {
         expect.objectContaining({ event_type: "CANCEL", offset_event_id: 101, form_extra_scope: "INVREFUND" }),
       )
     );
+  });
+
+  it("FE-252：取消交易依赖的资金账户加载完成后才允许确认", async () => {
+    const cancelOrder = {
+      ...order1,
+      id: 21,
+      order_no: "HS-CANCEL-ASYNC-01",
+      trade_date: "2026-11-01",
+    };
+    let resolvePools!: (value: unknown[]) => void;
+    const poolsPending = new Promise<unknown[]>((resolve) => {
+      resolvePools = resolve;
+    });
+
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([cancelOrder]);
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...cancelOrder,
+      events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true }],
+    });
+    vi.mocked(catalog.poolsApi.list).mockImplementation(() => poolsPending as never);
+    vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+
+    await openLedger();
+    await openRowMenu("HS-CANCEL-ASYNC-01", "取消交易");
+    expect(screen.queryByText(/库存取消交易 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
+
+    resolvePools([{ id: 7, code: "HJ_INVEST", name: "投资款荷包", status: "ACTIVE" }]);
+    const modal = await modalOf(/库存取消交易 · HS-CANCEL-ASYNC-01/);
+    await ui.type(within(modal).getByLabelText("取消原因"), "异步加载回归");
+    await clickModalOk(modal);
+
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({ event_type: "CANCEL", offset_event_id: 2101, pool_id: 7 }),
+    ));
   });
 
   it("库存取消交易：冲销入库流水并进入公司钱包", async () => {

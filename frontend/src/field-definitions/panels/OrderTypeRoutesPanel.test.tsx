@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
 import { seedOptionSets } from "../../test/formFieldsSeed";
@@ -48,6 +49,14 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     expect(screen.getByText("代挂（DG）")).toBeInTheDocument();
   });
 
+  it("FE-262：过账路由业务类型下拉包含代挂 DG", async () => {
+    const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
+    renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
+
+    await userEvent.click(screen.getByRole("combobox", { name: "业务类型" }));
+    expect(await screen.findByText("代挂（DG）", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
   it("份额与资金性质文案来自选项词典；不限性质显示「不限」", async () => {
     const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
@@ -64,7 +73,7 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     expect(within(table).getByText("本方经营")).toBeInTheDocument();
   });
 
-  it("路由读取失败进入错误态并锁定覆盖保存", async () => {
+  it("FE-240：路由读取失败进入错误态并锁定覆盖保存", async () => {
     vi.mocked(catalog.orderTypesApi).routes.mockImplementation((id: number) =>
       id === 1 ? Promise.reject(new Error("boom")) : Promise.resolve(ROUTES[id] ?? []),
     );

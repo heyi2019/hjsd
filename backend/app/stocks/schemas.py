@@ -24,6 +24,7 @@ class AccountOut(BaseModel):
     channel_region: str | None = None
     bound_phone: str | None = None
     has_secondary: bool | None = None
+    wallet_realname: str | None = None
     platform: str | None = None
     note: str | None = None
     account_description: str | None = None
@@ -52,6 +53,7 @@ class AccountProfileUpdate(RequestModel):
     channel_region: str | None = Field(default=None, max_length=128)
     bound_phone: str | None = Field(default=None, max_length=64)
     has_secondary: bool | None = None
+    wallet_realname: str | None = Field(default=None, max_length=16)
     platform: str | None = Field(default=None, max_length=64)
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] | None = Field(default=None, max_length=9)

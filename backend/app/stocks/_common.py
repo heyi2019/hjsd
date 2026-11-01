@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.core.security import CurrentUser, owner_scope_ids
-from app.domain.enums import BusinessMode, InventoryStatus, InventoryType
+from app.domain.enums import BusinessMode, InventoryStatus, InventoryType, WalletRealName
 from app.domain.trade import Account, Order
 
 # 只按独立库存状态统计；分期状态属于 installments，不再占用库存口径。
@@ -32,6 +32,24 @@ def validate_optional_bool(value: object, *, field: str) -> bool | None:
     if not isinstance(value, bool):
         raise Validation(f"{field} 必须为布尔值", details={"field": field})
     return value
+
+
+def validate_wallet_realname(value: object) -> str | None:
+    """钱包实名只接受「未注销 / 已注销」，空值视作未登记。"""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise Validation("钱包实名必须为文本", details={"field": "wallet_realname"})
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if cleaned not in WalletRealName.values():
+        raise Validation(
+            "钱包实名取值无效",
+            details={"field": "wallet_realname", "value": cleaned,
+                     "allowed": list(WalletRealName.values())},
+        )
+    return cleaned
 
 
 def validate_inventory_context(business_mode: str | None, inventory_type: str | None) -> None:

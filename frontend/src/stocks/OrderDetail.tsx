@@ -224,8 +224,9 @@ export function OrderDetail({
   )) ?? [];
   const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
   const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
+  const rebateIncome = rebateItems.reduce((sum, { rebate }) => sum + Number(rebate.base_amount), 0);
   const totalExpense = expenseFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2);
-  const totalIncome = incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2);
+  const totalIncome = (incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0) + rebateIncome).toFixed(2);
 
   const financeRows: InventoryFinanceRow[] = [
     ...financialFlows.map(({ event, cashflow }) => ({
@@ -302,6 +303,7 @@ export function OrderDetail({
     channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
     boundPhone: row.bound_phone || "-",
     secondary: row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无",
+    walletRealname: row.wallet_realname || "-",
     accountDescription: row.account_description || "-",
     accountImages: row.account_images ?? [],
     note: row.note || "-",
@@ -325,7 +327,7 @@ export function OrderDetail({
       executionRows={executionRows}
       financeRows={financeRows}
       expenseCount={expenseFlows.length}
-      incomeCount={incomeFlows.length}
+      incomeCount={incomeFlows.length + rebateItems.length}
       totalExpense={totalExpense}
       totalIncome={totalIncome}
       flowCount={financialFlows.length + rebateItems.length}

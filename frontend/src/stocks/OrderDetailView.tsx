@@ -84,6 +84,7 @@ export function OrderDetailView({
         </BusinessForm>
         <OrderDetailExecutionSection
           rows={executionRows}
+          audit={detail?.audit}
           editing
           eventDrafts={eventDrafts}
           onEventEdit={onEventEdit}
@@ -124,7 +125,7 @@ export function OrderDetailView({
         totalIncome={totalIncome}
         flowCount={flowCount}
       />
-      <OrderDetailExecutionSection rows={executionRows} employees={employees} />
+      <OrderDetailExecutionSection rows={executionRows} audit={detail?.audit} employees={employees} />
       <OrderDetailPartySection meta={meta} />
     </div>
   );

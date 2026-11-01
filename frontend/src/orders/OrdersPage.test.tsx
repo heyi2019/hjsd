@@ -105,7 +105,8 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单台账把导出按钮放在筛选栏最后并使用简短文案", async () => {
-    await openLedger();
+    renderLight(<OrdersPage initialTab="ledger" />);
+    await screen.findAllByText("HS-2026-INSTALLMENT-SETTLED");
     const exportButton = screen.getByRole("button", { name: /导出/ });
     expect(exportButton).toHaveTextContent("导出");
     expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
@@ -175,13 +176,28 @@ describe("OrdersPage：四类订单台账", () => {
     }
   });
 
-  it("订单列表尚未完成时统计卡不显示可信的零", async () => {
+  it("FE-253：订单台账加载未完成时统计卡不显示可信的零", async () => {
     vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
     renderLight(<OrdersPage initialTab="ledger" />);
     const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
     const card = within(ledger).getByText("订单总量").closest(".ui-stat") as HTMLElement;
     expect(within(card).getByText("—")).toBeInTheDocument();
     expect(within(card).queryByText("0")).toBeNull();
+  });
+
+  it("FE-257：分期订单同时展示订单状态与合约结清状态", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
+      ...orders[0],
+      status: "INSTALLMENT",
+      installment_status: "SETTLED",
+      order_no: "HS-2026-INSTALLMENT-SETTLED",
+    }]);
+    renderLight(<OrdersPage initialTab="ledger" />);
+    await screen.findAllByText("HS-2026-INSTALLMENT-SETTLED");
+
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-INSTALLMENT-SETTLED") !== null)!;
+    expect(within(row).getByText("分期中")).toBeInTheDocument();
+    expect(within(row).getByText("合约：已结清")).toBeInTheDocument();
   });
 
   it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {

@@ -96,6 +96,18 @@ describe("DataCenterPanel：资金总览", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
+  it("FE-227：数据中心主数据失败时统计不可用且快捷入口不可点击", async () => {
+    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce(new Error("pools down"));
+    const onNavigate = vi.fn();
+    renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+
+    const totalCard = await screen.findByRole("button", { name: /订单总数/ });
+    expect(totalCard).toHaveTextContent("不可用");
+    expect(totalCard).toHaveAttribute("aria-disabled", "true");
+    await ui.click(totalCard);
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
   it("资金池概览受 finance.read 门控：无权限角色看不到卡片", async () => {
     renderLight(<DataCenterPanel />, { user: "nobody" });
     await screen.findByText("订单总数");

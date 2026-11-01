@@ -114,7 +114,8 @@ describe("OrderDetail", () => {
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
     expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
     const accountTable = panel.querySelector(".inventory-detail__section--profile .inventory-detail__meta-table");
-    expect(accountTable?.querySelectorAll("tbody > tr")).toHaveLength(1);
+    // 账号资料 7 项（游戏类型/账号/密码/区服/有无二次/钱包实名/账号备注）分 2 行网格。
+    expect(accountTable?.querySelectorAll("tbody > tr")).toHaveLength(2);
   });
 
   it("账号补充资料（标签 描述/作图）置于运营信息，游戏账号信息不再含该组", () => {
@@ -162,5 +163,55 @@ describe("OrderDetail", () => {
 
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
     expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
+  });
+
+  it("FE-256：系统下架审计记录在账号详情中可追溯", () => {
+    const detail = {
+      orders: [],
+      audit: [{
+        id: 901,
+        action: "ORDER_CANCEL",
+        entity_type: "order",
+        entity_id: "DG-88",
+        actor: "admin",
+        reason: "系统下架同步取消寄售平台上架",
+        occurred_at: "2026-11-02T10:20:00",
+      }],
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={account} detail={detail} loading={false} />);
+
+    expect(screen.getByText("操作追溯")).toBeInTheDocument();
+    expect(screen.getByText("取消订单")).toBeInTheDocument();
+    expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
+  });
+
+  it("FE-269：返点进入订单详情的收入笔数和总收入", () => {
+    const detail = {
+      orders: [{
+        order_id: 269,
+        order_no: "HS-FE269",
+        order_type: "HS",
+        status: "DONE",
+        created_at: "2026-11-02T10:00:00",
+        events: [],
+        rebates: [{
+          id: 1,
+          rebate_no: "HS-FE269-RB01",
+          rebate_type: "BUY",
+          channel: "买号返点",
+          rate: "10",
+          base_amount: "100.00",
+          status: "OPEN",
+          collected_on: "2026-11-02",
+        }],
+      }],
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={account} detail={detail} loading={false} />);
+    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    const finance = panel.querySelector(".inventory-detail__section--finance") as HTMLElement;
+    expect(within(finance).getAllByText("1 笔").length).toBeGreaterThanOrEqual(1);
+    expect(within(finance).getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
   });
 });

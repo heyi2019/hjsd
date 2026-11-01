@@ -129,6 +129,18 @@ describe("CustomersPage：客户档案", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
+  it("FE-242：客户接口失败时统计显示不可用并保护依赖入口", async () => {
+    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
+    renderLight(<CustomersPage />, { user: "admin" });
+
+    expect(await screen.findByText("客户数据不可用，请点击重新加载")).toBeInTheDocument();
+    const stats = document.querySelector(".ui-stat-row") as HTMLElement;
+    expect(within(stats).getAllByText("不可用")).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "导出客户CSV" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /新建客户/ })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "客户状态" })).toBeDisabled();
+  });
+
   it("业务错误码给出可执行的处置提示", async () => {
     vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({
       isAxiosError: true,

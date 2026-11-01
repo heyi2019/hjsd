@@ -112,6 +112,53 @@ describe("FundsPage：资金池卡片", () => {
     renderLight(<FundsPage />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
+
+  it("FE-228：资金池主数据失败时总览不可用且划转入口禁用", async () => {
+    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce(new Error("pools down"));
+    renderLight(<FundsPage />, { user: "admin" });
+
+    expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
+    expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
+  });
+
+  it("FE-261：完整资金划转配对后不显示单边异常", async () => {
+    vi.mocked(catalog.cashflowsApi.list).mockResolvedValueOnce({
+      items: [
+        { ...cashflows[0], id: 31, transfer_id: "TRF-PAIRED-01", direction: "OUT" },
+        { ...cashflows[0], id: 32, transfer_id: "TRF-PAIRED-01", direction: "IN", pool_id: 2 },
+      ],
+      total: 2,
+    } as never);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "异常" }));
+
+    expect(await screen.findByText("暂无单边划转异常")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /修复划转/ })).not.toBeInTheDocument();
+  });
+
+  it("FE-229：资金流水失败时统计不可用、筛选和新增入口禁用", async () => {
+    vi.mocked(catalog.cashflowsApi.list).mockRejectedValueOnce(new Error("cashflows down"));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+
+    expect(await screen.findByText("资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。")).toBeInTheDocument();
+    expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "流水方向" })).toBeDisabled();
+  });
+
+  it("FE-230：对账失败时显示明确空态并禁用新增", async () => {
+    vi.mocked(catalog.reconciliationsApi.list).mockRejectedValueOnce(new Error("reconciliations down"));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+
+    expect(await screen.findByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增对账/ })).toBeDisabled();
+  });
 });
 
 describe("FundsPage：押金占用", () => {

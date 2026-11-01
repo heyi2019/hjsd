@@ -214,7 +214,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       dropExecutionCache(voidTarget.account.id);
       setVoidTarget(null);
       voidForm.resetFields();
-      await load();
+      // 先关闭提交弹窗，再后台刷新库存；等待列表刷新会让确认按钮长期处于 loading，
+      // 用户无法确认下架是否已经完成。
+      void load();
       // 作废会改订单/流水状态，同步通知上层重拉台账与分期列表。
       onOrdersChanged?.();
     } catch (cause) {

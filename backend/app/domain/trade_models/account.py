@@ -82,6 +82,8 @@ class Account(Base, AuditMixin):
     channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)
     bound_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # 钱包实名状态（已注销 / 未注销）：账号能否安全交付的前置信息，源表为空时留空。
+    wallet_realname: Mapped[str | None] = mapped_column(String(16), nullable=True)
     platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AccountStatus.WAITING.value

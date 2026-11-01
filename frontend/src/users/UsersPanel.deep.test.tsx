@@ -121,4 +121,12 @@ describe("UsersPanel.deep：写路径与失败分支", () => {
     renderLight(<UsersPanel />, { user: "admin" });
     await waitFor(() => expect(message.error).toHaveBeenCalled());
   });
+
+  it("FE-255：人员主数据失败时显示错误态并锁定新增用户", async () => {
+    vi.mocked(client.api).get.mockRejectedValue(new Error("users unavailable"));
+    renderLight(<UsersPanel />, { user: "admin" });
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增用户/ })).toBeDisabled();
+    expect(screen.getByText("用户数据不可用，请点击重新加载")).toBeInTheDocument();
+  });
 });

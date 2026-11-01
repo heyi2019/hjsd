@@ -62,7 +62,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     expect(await screen.findByText("暂无业务类型")).toBeInTheDocument();
   });
 
-  it("加载失败显示错误横幅", async () => {
+  it("FE-211：业务类型主数据失败显示错误空态并禁用新建", async () => {
     vi.mocked(catalog.orderTypesApi.list).mockRejectedValue(new Error("types down"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText(/types down/)).toBeInTheDocument();

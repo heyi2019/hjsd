@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
 import { seedOptionSets } from "../../test/formFieldsSeed";
@@ -93,5 +94,24 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     expect(await screen.findByText("取消押金")).toBeInTheDocument();
     expect(screen.getByText("作废返点")).toBeInTheDocument();
     expect(screen.getByText("驳回导入批次")).toBeInTheDocument();
+  });
+
+  it("FE-176：按动作筛选改动追溯并只保留匹配记录", async () => {
+    const other = { ...ROWS[0], id: 9, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool" } as AuditLogRow;
+    vi.mocked(catalog.auditApi).list.mockImplementation(async (params) =>
+      params?.action === "ROUTE_UPDATE"
+        ? { items: [ROWS[0]], total: 1 }
+        : { items: [ROWS[0], other], total: 2 },
+    );
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const { ConfigAuditPanel } = await import("./ConfigAuditPanel");
+    renderLight(<ConfigAuditPanel />, { user: "admin" });
+    await screen.findByText("配置改动追溯");
+    const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
+    await user.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
+    await user.click(await screen.findByText("更新资金路由", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(catalog.auditApi).list).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ROUTE_UPDATE" })));
+    expect(screen.getByText("admin")).toBeInTheDocument();
+    expect(screen.queryByText("finance")).toBeNull();
   });
 });

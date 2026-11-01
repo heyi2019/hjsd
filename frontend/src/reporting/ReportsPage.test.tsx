@@ -84,7 +84,7 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(catalog.reportsApi.inventoryHealth)).not.toHaveBeenCalled();
   });
 
-  it("提成对账可以按人员筛选", async () => {
+  it("FE-260：提成对账可以按人员筛选并传递 user_id", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true }));

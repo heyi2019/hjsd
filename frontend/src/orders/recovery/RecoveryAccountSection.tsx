@@ -21,6 +21,7 @@ export function RecoveryAccountSection(props: {
     boundPhone: string;
     boundPhoneOwner: string;
     hasSecondary: string;
+    walletRealname: string;
     accountNote: string;
   }>;
   accountExtras?: ReactNode;
@@ -37,6 +38,7 @@ export function RecoveryAccountSection(props: {
     boundPhone: "bound_phone",
     boundPhoneOwner: "bound_phone_owner",
     hasSecondary: "has_secondary",
+    walletRealname: "wallet_realname",
     accountNote: "game_account_note",
     ...props.fieldNames,
   };
@@ -95,6 +97,16 @@ export function RecoveryAccountSection(props: {
       </CfgItem>
       <CfgItem name={fieldNames.hasSecondary} label="有无二次">
         <Select />
+      </CfgItem>
+      <CfgItem name={fieldNames.walletRealname} label="钱包实名">
+        <Select
+          allowClear
+          placeholder="请选择"
+          options={[
+            { value: "未注销", label: "未注销" },
+            { value: "已注销", label: "已注销" },
+          ]}
+        />
       </CfgItem>
       {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} /> : null}
       <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">

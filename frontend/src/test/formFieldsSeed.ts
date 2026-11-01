@@ -72,7 +72,8 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
         { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" },
         { value: "TH_REVENUE", label: "提号/代挂收入" },
         { value: "SERVICE_REVENUE", label: "增值服务收入" },
-        { value: "REBATE_INCOME", label: "返点收入" },
+        { value: "ADDITIONAL_INCOME", label: "附加收入" },
+        { value: "ADDITIONAL_EXPENSE", label: "附加支出" },
         { value: "OPERATING_EXPENSE", label: "运营费用" },
         { value: "DEPOSIT", label: "押金/保证金" },
         { value: "EXTERNAL_FUNDING", label: "外部资金" },
@@ -160,7 +161,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
   ] },
   { code: "FUND_FLOW_ACCOUNTING_ATTRIBUTE", label: "流水核算属性", group: "FUND", editable: false, options: [
-    { value: "SELF_REVENUE", label: "自营收入" }, { value: "SELF_DIRECT_COST", label: "自营直接成本" }, { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" }, { value: "TH_REVENUE", label: "提号/代挂收入" }, { value: "SERVICE_REVENUE", label: "增值服务收入" }, { value: "REBATE_INCOME", label: "返点收入" }, { value: "OPERATING_EXPENSE", label: "运营费用" }, { value: "DEPOSIT", label: "押金/保证金" }, { value: "EXTERNAL_FUNDING", label: "外部资金" }, { value: "INTERNAL_TRANSFER", label: "内部调拨" }, { value: "REVERSAL", label: "冲销" }, { value: "REFUND", label: "退款" },
+    { value: "SELF_REVENUE", label: "自营收入" }, { value: "SELF_DIRECT_COST", label: "自营直接成本" }, { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" }, { value: "TH_REVENUE", label: "提号/代挂收入" }, { value: "SERVICE_REVENUE", label: "增值服务收入" }, { value: "ADDITIONAL_INCOME", label: "附加收入" }, { value: "ADDITIONAL_EXPENSE", label: "附加支出" }, { value: "OPERATING_EXPENSE", label: "运营费用" }, { value: "DEPOSIT", label: "押金/保证金" }, { value: "EXTERNAL_FUNDING", label: "外部资金" }, { value: "INTERNAL_TRANSFER", label: "内部调拨" }, { value: "REVERSAL", label: "冲销" }, { value: "REFUND", label: "退款" },
   ] },
   /* ── 0008 补种：客户 / 订单 / 分期 / 导入 / 规则 / 质量 / 资金 / 系统 ── */
   { code: "CUSTOMER_STATUS", label: "客户状态", group: "CUSTOMER", editable: false, options: [

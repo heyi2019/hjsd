@@ -60,7 +60,9 @@ function DeliverySubSection({
       if (raw == null || raw === "") {
         value = "-";
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw) && employees?.length) {
-        value = raw.map((id) => employees.find((emp) => emp.id === id)?.display_name ?? String(id)).join("、") || "-";
+        value = raw.map((id) => employees.find((emp) => emp.id === id)?.display_name ?? "未知负责人").join("、") || "-";
+      } else if (key === "delivery_responsible_ids" && Array.isArray(raw)) {
+        value = raw.length ? "负责人信息加载中" : "-";
       } else {
         value = formatExtraDisplayValue(raw);
       }

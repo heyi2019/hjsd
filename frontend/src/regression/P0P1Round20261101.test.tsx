@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import * as catalog from "../shared/api/catalog";
@@ -105,4 +106,46 @@ it("P1/FE-054：详情和库存 CSV 不得暴露账号密码", () => {
   const csv = buildInventoryCsv([account]);
   expect(csv).not.toContain("账号密码");
   expect(csv).not.toContain("secret-password");
+});
+
+it("P1/FE-023：已有相同游戏账号时阻止重复建单", async () => {
+  vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
+    { id: 99, game_account: "duplicate-account", game_type: "王者荣耀", status: "WAITING" },
+  ] as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.counterpartiesApi.create).mockResolvedValueOnce({
+    id: 2,
+    display_name: "同行甲",
+    type: "PEER",
+    status: "ACTIVE",
+  } as never);
+  renderLight(
+    <CreateBusinessModal
+      open
+      onClose={() => undefined}
+      onCreated={() => undefined}
+      initialOrderType="TH"
+    />,
+    { user: "admin" },
+  );
+
+  await screen.findByLabelText("供货方昵称");
+  await screen.findByLabelText("游戏账号");
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await user.type(screen.getByLabelText("供货方昵称"), "同行甲");
+  await user.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+  await user.type(screen.getByLabelText("游戏账号"), "duplicate-account");
+  await user.type(screen.getByLabelText("账号密码"), "secret");
+  await user.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  const amounts = screen.getAllByPlaceholderText("请输入金额");
+  await user.type(amounts[0], "1000");
+  await user.type(amounts[1], "1200");
+  await user.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+  await user.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+  await user.click(screen.getByRole("button", { name: /创建订单/ }));
+
+  await waitFor(() => expect(catalog.ordersApi.create).not.toHaveBeenCalled());
+  expect((await screen.findAllByText(/已有库存账号/)).length).toBeGreaterThan(0);
 });

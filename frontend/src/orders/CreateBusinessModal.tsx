@@ -11,6 +11,7 @@ import {
   ordersApi,
   poolsApi,
   employeesApi,
+  stocksApi,
   type Counterparty,
   type Customer,
   type GameTypeOption,
@@ -124,6 +125,22 @@ export function CreateBusinessModal(props: {
   const submit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
+      const gameAccount = String(values.game_account ?? "").trim();
+      const gameType = String(values.game_type ?? "").trim();
+      if (gameAccount && gameType) {
+        const existingAccounts = await stocksApi.list();
+        const duplicate = existingAccounts.find((account) => (
+          account.status !== "VOID"
+          && String(account.game_account ?? "").trim() === gameAccount
+          && String(account.game_type ?? "").trim() === gameType
+        ));
+        if (duplicate) {
+          const message = `已有库存账号「${gameAccount}」，不能重复建单`;
+          form.setFields([{ name: "game_account", errors: [message] }]);
+          setLoadError({ message });
+          return;
+        }
+      }
       const formExtra = (values.form_extra as Record<string, unknown> | undefined) ?? {};
       const accountExtraKeys = new Set(
         Object.values(config)

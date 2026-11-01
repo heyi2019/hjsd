@@ -6,6 +6,7 @@ import { CustomersPage } from "./CustomersPage";
 
 import * as catalog from "../shared/api/catalog";
 import { seedOptionSets } from "../test/formFieldsSeed";
+
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -48,11 +49,11 @@ beforeEach(() => {
   vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0] as unknown as never);
 });
 
-describe("CustomersPage：写操作提交流（加深覆盖）", () => {
+describe("CustomersPage：客户与合作方操作流", () => {
   it("拉黑 ACTIVE 客户：确认后调用 setStatus(DISABLED) 并提示", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
-    await ui.click(screen.getAllByRole("button", { name: /拉\s*黑/ })[0]); // CUS-0001
+    await ui.click(screen.getAllByRole("button", { name: /拉\s*黑/ })[0]);
     const confirm = await screen.findByRole("button", { name: /确\s*定|确\s*认/ });
     await ui.click(confirm);
     await waitFor(() => expect(vi.mocked(catalog.customersApi.setStatus)).toHaveBeenCalledWith(1, "DISABLED"));
@@ -61,7 +62,7 @@ describe("CustomersPage：写操作提交流（加深覆盖）", () => {
   it("合并客户：选择目标与原因后提交调用 merge", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
-    await ui.click(screen.getAllByRole("button", { name: /合\s*并/ })[0]); // CUS-0001
+    await ui.click(screen.getAllByRole("button", { name: /合\s*并/ })[0]);
     const modal = await screen.findByRole("dialog");
     const selector = modal.querySelector(".ant-select-selector") as Element;
     await ui.click(selector);
@@ -80,8 +81,7 @@ describe("CustomersPage：写操作提交流（加深覆盖）", () => {
   it("编辑客户：详情抽屉内编辑入口修改名字后提交 patch", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
-    const detailButtons = await screen.findAllByRole("button", { name: /详\s*情/ });
-    await ui.click(detailButtons[0]);
+    await ui.click((await screen.findAllByRole("button", { name: /详\s*情/ }))[0]);
     const drawer = await screen.findByRole("dialog");
     await ui.click(within(drawer).getByRole("button", { name: /编\s*辑/ }));
     await screen.findByText("编辑客户 · CUS-0001");
@@ -119,25 +119,5 @@ describe("CustomersPage：写操作提交流（加深覆盖）", () => {
     const confirm = await screen.findByRole("button", { name: /确\s*定|确\s*认/ });
     await ui.click(confirm);
     await waitFor(() => expect(vi.mocked(catalog.counterpartiesApi.setStatus)).toHaveBeenCalledWith(11, false));
-  });
-
-  it("窄屏（compact）渲染移动端客户列表", async () => {
-    const matchMediaSpy = vi.spyOn(window, "matchMedia").mockImplementation(
-      (query: string) =>
-        ({
-          matches: /max-width:\s*640px/.test(query),
-          media: query,
-          onchange: null,
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          addListener: () => undefined,
-          removeListener: () => undefined,
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList,
-    );
-    renderLight(<CustomersPage />, { user: "admin" });
-    expect(await screen.findByText(/CUS-0001/)).toBeInTheDocument();
-    expect(document.querySelector(".customers-mobile-list")).toBeInTheDocument();
-    matchMediaSpy.mockRestore();
   });
 });

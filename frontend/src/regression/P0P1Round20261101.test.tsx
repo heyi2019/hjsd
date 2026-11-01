@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
+import { OrdersPage } from "../orders/OrdersPage";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
@@ -217,4 +218,14 @@ it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", a
   expect(card).toHaveTextContent("2");
   await userEvent.setup({ pointerEventsCheck: 0 }).click(card);
   expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
+});
+
+it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {
+  vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
+  renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
+  const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
+  const card = screen.getByText("订单总量").closest(".ui-stat") as HTMLElement;
+  expect(card).toHaveTextContent("—");
+  expect(card).not.toHaveTextContent("0");
+  expect(ledger).toBeInTheDocument();
 });

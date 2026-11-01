@@ -28,6 +28,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     ledgerDetails,
     ledgerExporting,
     ledgerSortDesc,
+    loadError,
     loading,
     mobileLedgerFieldOrder,
     onExportLedger,
@@ -50,13 +51,15 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     openEditOrder,
   } = controller;
 
+  const statValue = (value: number) => (loading ? "—" : loadError ? "不可用" : String(value));
+
   return (
     <section className="ui-stack">
       <StatRow items={[
-        { label: "订单总量", kind: "count", amount: String(filteredOrders.length) },
-        { label: "进行中订单", kind: "count", amount: String(filteredOrders.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length) },
-        { label: "完成订单量", kind: "count", amount: String(filteredOrders.filter((order) => order.status === "COMPLETED").length) },
-        { label: "已取消订单", kind: "count", amount: String(filteredOrders.filter((order) => order.status === "CANCELLED").length) },
+        { label: "订单总量", kind: "count", amount: statValue(filteredOrders.length) },
+        { label: "进行中订单", kind: "count", amount: statValue(filteredOrders.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length) },
+        { label: "完成订单量", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "COMPLETED").length) },
+        { label: "已取消订单", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "CANCELLED").length) },
       ]} />
       <Card className="glass">
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced">

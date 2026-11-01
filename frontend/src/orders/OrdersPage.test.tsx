@@ -175,6 +175,15 @@ describe("OrdersPage：四类订单台账", () => {
     }
   });
 
+  it("订单列表尚未完成时统计卡不显示可信的零", async () => {
+    vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
+    renderLight(<OrdersPage initialTab="ledger" />);
+    const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
+    const card = within(ledger).getByText("订单总量").closest(".ui-stat") as HTMLElement;
+    expect(within(card).getByText("—")).toBeInTheDocument();
+    expect(within(card).queryByText("0")).toBeNull();
+  });
+
   it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
     vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
       id: 10,

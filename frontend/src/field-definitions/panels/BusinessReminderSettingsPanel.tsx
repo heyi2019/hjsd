@@ -52,7 +52,7 @@ export function BusinessReminderSettingsPanel() {
         控制工作台业务总览中的提醒规则。库存提醒按入库天数计算，分润和逾期合约提醒可单独关闭。
       </Typography.Paragraph>
       <PermissionGate permission="option-set.manage">
-        <BusinessForm form={form} layout="vertical" onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading}>
+        <BusinessForm form={form} layout="vertical" onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || Boolean(error)}>
           <Form.Item
             name="inventoryAgingDays"
             label="库存订单超过多少天提醒"

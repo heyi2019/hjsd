@@ -441,3 +441,19 @@ describe("OrderFormFieldsPanel 依赖防护", () => {
     expect(vi.mocked(catalog.orderFormFieldsApi).remove).toHaveBeenCalledWith(91);
   });
 });
+
+describe("OrderFormFieldsPanel 字段键格式校验", () => {
+  it("字段键含大写或非法字符时前端拦截、不提交（L1723）", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("该表单暂无字段配置");
+
+    await ui.type(screen.getByLabelText("字段键"), "TEST_FIELD");
+    await ui.type(screen.getByLabelText("标签"), "测试字段");
+    await ui.click(screen.getByRole("button", { name: /新增字段/ }));
+
+    // 字段下方出现格式提示，且未发起任何创建请求
+    expect(await screen.findByText("仅支持小写字母与下划线，且以小写字母开头")).toBeInTheDocument();
+    expect(vi.mocked(catalog.orderFormFieldsApi).create).not.toHaveBeenCalled();
+  });
+});

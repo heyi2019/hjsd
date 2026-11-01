@@ -416,7 +416,7 @@ export function useOrderFormFieldsPanelController({
         className="ui-form-spaced"
         initialValues={{ field_type: "TEXT", sort_order: 0, section: "EXTRA" }}
       >
-        <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
+        <Form.Item name="field_key" label="字段键" rules={[{ required: true }, { pattern: /^[a-z][a-z0-9_]*$/, message: "仅支持小写字母与下划线，且以小写字母开头" }]}>
           <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
         </Form.Item>
         <Form.Item name="label" label="标签" rules={[{ required: true }]}>

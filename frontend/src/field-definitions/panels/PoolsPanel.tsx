@@ -19,7 +19,7 @@ const POOL_OWNERSHIP_FALLBACK = [
   { value: "CUSTODY", label: "代管" },
   { value: "THIRD_PART", label: "第三方" },
 ];
-import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, InlineError, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function PoolsPanel() {
   const poolTypeOptions = useOptionSet("POOL_TYPE") ?? POOL_TYPE_FALLBACK;
@@ -149,7 +149,8 @@ export function PoolsPanel() {
           </Form.Item>
         </BusinessForm>
       </PermissionGate>
-      <BusinessActionModal title={editing ? `编辑资金池 · ${editing.code}` : "编辑资金池"} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
+      <BusinessActionModal title={editing ? `编辑资金池 · ${editing.code}` : "编辑资金池"} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }}         onOk={() => void editForm.submit()} okText="保存">
+        <InlineError error={editing ? error : null} />
         <BusinessForm form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editing?.code} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>

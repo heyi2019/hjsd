@@ -66,6 +66,8 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     vi.mocked(catalog.orderTypesApi.list).mockRejectedValue(new Error("types down"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText(/types down/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
+    expect(screen.getByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
   });
 
   it("资金池加载失败时静默降级为空，不显示错误", async () => {

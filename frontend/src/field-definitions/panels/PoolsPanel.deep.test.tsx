@@ -123,6 +123,8 @@ describe("PoolsPanel.deep", () => {
       .mockResolvedValue(pools);
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText(/pools down/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增资金池/ })).toBeDisabled();
+    expect(screen.getByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
     await waitFor(() => expect(vi.mocked(catalog.poolsApi.list)).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("托管池")).toBeInTheDocument();

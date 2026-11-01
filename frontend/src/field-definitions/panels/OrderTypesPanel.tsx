@@ -169,7 +169,7 @@ export function OrderTypesPanel() {
       className="glass"
       title="业务类型主数据"
       extra={
-        <PermissionButton permission="order-type.manage" type="primary" onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>
+        <PermissionButton permission="order-type.manage" type="primary" disabled={Boolean(error)} onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>
           新建类型
         </PermissionButton>
       }
@@ -184,7 +184,7 @@ export function OrderTypesPanel() {
         page={1}
         pageSize={Math.max(rows.length, 10)}
         total={rows.length}
-        emptyText="暂无业务类型"
+        emptyText={error ? "业务类型数据不可用，请点击重新加载" : "暂无业务类型"}
         onPageChange={() => undefined}
      />
       <PermissionGate

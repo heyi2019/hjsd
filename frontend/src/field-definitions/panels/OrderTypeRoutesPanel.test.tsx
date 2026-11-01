@@ -64,16 +64,15 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     expect(within(table).getByText("本方经营")).toBeInTheDocument();
   });
 
-  it("单个业务类型路由拉取失败只丢该类型，不整页报错", async () => {
+  it("路由读取失败进入错误态并锁定覆盖保存", async () => {
     vi.mocked(catalog.orderTypesApi).routes.mockImplementation((id: number) =>
       id === 1 ? Promise.reject(new Error("boom")) : Promise.resolve(ROUTES[id] ?? []),
     );
     const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
-    await waitFor(() => expect(screen.getByText("代挂（DG）")).toBeInTheDocument());
-    expect(screen.queryByText("回收（HS）")).toBeNull();
-    // 错误横幅不出现（逐类型容错，失败静默降级）
-    expect(screen.queryByRole("button", { name: /重试/ })).toBeNull();
+    expect((await screen.findAllByText("资金路由数据不可用，请点击重新加载")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /保存路由/ })).toBeDisabled();
+    expect(screen.getByText(/业务类型覆盖不可用/)).toBeInTheDocument();
   });
 });

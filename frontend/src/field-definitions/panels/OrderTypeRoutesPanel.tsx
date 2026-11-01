@@ -75,7 +75,8 @@ export function OrderTypeRoutesPanel() {
       setTypes(visibleTypeRows);
       setPools(poolRows);
       // 业务类型是 4 个量级的小集合，逐个拉路由可换来一张横向可比的表；
-      // 单个失败不拖垮整页，只丢该类型的路由。
+      // 任一类型读取失败都必须进入整页错误态，不能把部分路由伪装成完整覆盖。
+      let routeLoadFailed = false;
       const perType = await Promise.all(
         visibleTypeRows.map(async (type) => {
           try {
@@ -86,12 +87,13 @@ export function OrderTypeRoutesPanel() {
               capitalType: type.capital_type,
             }));
           } catch {
+            routeLoadFailed = true;
             return [] as RouteRow[];
           }
         }),
       );
-      setRoutes(perType.flat());
-      setError(null);
+      setRoutes(routeLoadFailed ? [] : perType.flat());
+      setError(routeLoadFailed ? { message: "资金路由数据不可用，请点击重新加载" } : null);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -200,14 +202,17 @@ export function OrderTypeRoutesPanel() {
       <Card className="glass" title="资金路由一览">
         <Typography.Paragraph type="secondary">
           路由决定各类订单的过账去向：按资金份额（本金/利润/总额）与资金性质匹配目标资金池，优先级大者优先。
-          共 {routes.length} 条路由，覆盖 {new Set(routes.map((row) => row.order_type_code)).size} /{" "}
-          {types.length} 个业务类型。
+          {error
+            ? "业务类型覆盖不可用，请先重新加载。"
+            : <>共 {routes.length} 条路由，覆盖 {new Set(routes.map((row) => row.order_type_code)).size} /{" "}
+              {types.length} 个业务类型。</>}
         </Typography.Paragraph>
         <Space className="ui-filter-bar" wrap>
           <Select
             value={filterType === "all" ? undefined : filterType}
             placeholder="全部业务类型"
             allowClear
+            disabled={Boolean(error)}
             className="ui-control-width-200"
             onChange={(value) => setFilterType(value ?? "all")}
             options={typeOptions}
@@ -220,7 +225,7 @@ export function OrderTypeRoutesPanel() {
           pageSize={Math.max(visible.length, 10)}
           total={visible.length}
           loading={loading}
-          emptyText="暂无资金路由"
+          emptyText={error ? "资金路由数据不可用，请点击重新加载" : "暂无资金路由"}
           onPageChange={() => undefined}
        />
       </Card>
@@ -255,10 +260,10 @@ export function OrderTypeRoutesPanel() {
               <InputNumber min={0} precision={0} />
             </Form.Item>
             <Space wrap>
-              <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
+                <PermissionButton permission="order-type.manage" type="primary" htmlType="submit" disabled={Boolean(error)}>
                 保存路由
               </PermissionButton>
-              <PermissionButton permission="order-type.manage" onClick={() => void runPreview()}>
+              <PermissionButton permission="order-type.manage" disabled={Boolean(error)} onClick={() => void runPreview()}>
                 影响预览
               </PermissionButton>
             </Space>

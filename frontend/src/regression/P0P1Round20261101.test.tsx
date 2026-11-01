@@ -6,6 +6,9 @@ import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { ReportsPage } from "../reporting/ReportsPage";
+import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
+import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
+import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoutesPanel";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
@@ -159,4 +162,34 @@ it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0", async
   expect(screen.getAllByText("不可用")).toHaveLength(2);
   expect(screen.getByText("库存健康数据不可用，请点击重新加载")).toBeInTheDocument();
   expect(screen.queryByText("暂无在库账号")).not.toBeInTheDocument();
+});
+
+it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
+  vi.mocked(catalog.orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });
+  renderLight(<OrderTypesPanel />, { user: "admin" });
+  expect(await screen.findByText(/types down/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
+  expect(screen.getByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
+});
+
+it("P1/FE-239：资金池主数据失败时锁定新增入口", async () => {
+  vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+  renderLight(<PoolsPanel />, { user: "admin" });
+  expect(await screen.findByText(/pools down/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新增资金池/ })).toBeDisabled();
+  expect(screen.getByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
+});
+
+it("P1/FE-240：过账路由失败时显示不可用并锁定保存", async () => {
+  vi.mocked(catalog.orderTypesApi.list).mockResolvedValueOnce([
+    { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
+  ] as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 1, code: "MAIN", name: "主账户", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.orderTypesApi.routes).mockRejectedValueOnce(new Error("routes down"));
+  renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
+  expect((await screen.findAllByText("资金路由数据不可用，请点击重新加载")).length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: /保存路由/ })).toBeDisabled();
+  expect(screen.getByText(/业务类型覆盖不可用/)).toBeInTheDocument();
 });

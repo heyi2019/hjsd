@@ -128,7 +128,7 @@ export function PoolsPanel() {
         page={1}
         pageSize={Math.max(rows.length, 10)}
         total={rows.length}
-        emptyText="暂无资金池"
+        emptyText={error ? "资金池数据不可用，请点击重新加载" : "暂无资金池"}
         onPageChange={() => undefined}
      />
       <PermissionGate
@@ -143,7 +143,7 @@ export function PoolsPanel() {
             <Input placeholder="显示名" />
           </Form.Item>
           <Form.Item>
-            <PermissionButton permission="pool.manage" type="primary" htmlType="submit">
+            <PermissionButton permission="pool.manage" type="primary" htmlType="submit" disabled={Boolean(error)}>
               新增资金池
             </PermissionButton>
           </Form.Item>

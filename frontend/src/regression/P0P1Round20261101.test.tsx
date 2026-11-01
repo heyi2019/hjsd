@@ -252,6 +252,28 @@ it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
   expect(screen.getByRole("button", { name: /新建导入/ })).toBeDisabled();
 });
 
+it("P1/FE-220：导入数据类型字典失败时仍保持完整可选项", async () => {
+  vi.mocked(catalog.importsApi.batches).mockResolvedValueOnce({ items: [], total: 0 } as never);
+  vi.mocked(catalog.optionSetsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "option sets down" });
+  clearOptionSetsCache();
+  renderLight(<ImportWorkbench />, { user: "admin" });
+
+  await screen.findByRole("button", { name: /新建导入/ });
+  fireEvent.click(screen.getByRole("button", { name: /新建导入/ }));
+  const modal = await screen.findByText("导入导入数据");
+  const modalContent = modal.closest(".ant-modal-content") as HTMLElement;
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await user.click(modalContent.querySelector(".ant-select-selector") as Element);
+  const dropdown = await waitFor(() => {
+    const dropdowns = [...document.querySelectorAll(".ant-select-dropdown")];
+    const current = dropdowns[dropdowns.length - 1] as HTMLElement | undefined;
+    if (!current) throw new Error("导入类型下拉未打开");
+    return current;
+  });
+  const options = [...dropdown.querySelectorAll(".ant-select-item-option-content")].map((option) => option.textContent);
+  expect(options).toEqual(expect.arrayContaining(["订单", "资金流水"]));
+});
+
 it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },

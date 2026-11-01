@@ -3,6 +3,15 @@
  *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
 export const RED_LINE_DESC = "导入数据只保留原文与人工映射：不覆盖新单、不自动匹配、不补造单边划转。";
 
+/** 业务字典暂不可用时的只读回落，保证默认值仍属于可选项集合。 */
+export const IMPORT_SOURCE_KIND_OPTIONS = [
+  { value: "STANDARD_ORDER", label: "订单" },
+  { value: "STANDARD_ACCOUNT", label: "账号" },
+  { value: "STANDARD_CASHFLOW", label: "资金流水" },
+  { value: "STANDARD_INSTALLMENT", label: "分期" },
+  { value: "STANDARD_LEAD", label: "需求" },
+];
+
 export function isSupportedImportFile(file: { name: string; type?: string }): boolean {
   const name = file.name.toLowerCase();
   const extensionAllowed = name.endsWith(".json") || name.endsWith(".csv");

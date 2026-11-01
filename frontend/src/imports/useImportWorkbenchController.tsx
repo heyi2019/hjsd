@@ -10,7 +10,7 @@ import { importsApi,
 import { normalizeError } from "../shared/api/client";
 import { ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { type ImportWorkbenchProps } from "./ImportWorkbench.fragments";
+import { IMPORT_SOURCE_KIND_OPTIONS, type ImportWorkbenchProps } from "./ImportWorkbench.fragments";
 
 /** 导入工作台的全部 state / 派生 / 处理器（含行表格列与批次动作条 JSX）。 */
 export function useImportWorkbenchController({
@@ -19,7 +19,7 @@ export function useImportWorkbenchController({
 }: ImportWorkbenchProps) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [batchesReady, setBatchesReady] = useState(false);
-  const sourceKindOptions = useOptionSet("IMPORT_SOURCE_KIND") ?? [];
+  const sourceKindOptions = useOptionSet("IMPORT_SOURCE_KIND") ?? IMPORT_SOURCE_KIND_OPTIONS;
   const batchStatusOptions = useOptionSet("IMPORT_BATCH_STATUS") ?? [];
   const isBatchControlled = batchIdProp !== undefined;
   const [internalBatchId, setInternalBatchId] = useState<number | null>(null);

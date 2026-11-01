@@ -20,7 +20,7 @@ const SearchButton = Button;
 
 export function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
-  const [rows, setRows] = useState<Customer[]>([]);
+  const [rows, setRows] = useState<Customer[] | null>(null);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
@@ -115,7 +115,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
   const handledFocusRef = useRef<number | null>(null);
   useEffect(() => {
     if (focusId == null || handledFocusRef.current === focusId) return;
-    const row = rows.find((item) => item.id === focusId);
+    const row = rows?.find((item) => item.id === focusId);
     if (!row) return;
     handledFocusRef.current = focusId;
     void openDetail(row);
@@ -284,8 +284,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
   const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   const currentDate = today();
-  const newThisMonthCount = rows.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
-  const newTodayCount = rows.filter((row) => customerDateKey(row.created_at) === currentDate).length;
+  const newThisMonthCount = rows?.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
+  const newTodayCount = rows?.filter((row) => customerDateKey(row.created_at) === currentDate).length;
 
   return (
     <Card
@@ -297,11 +297,12 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
             size="small"
             aria-label="导出客户CSV"
             loading={exporting}
+            disabled={Boolean(error) || rows === null}
             onClick={() => void exportCustomers()}
           >
             导出 CSV
           </Button>
-          <PermissionButton permission="customer.create" type="primary" onClick={() => setCreateOpen(true)}>
+          <PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || rows === null} onClick={() => setCreateOpen(true)}>
             新建客户
           </PermissionButton>
         </Space>
@@ -313,9 +314,9 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       </Typography.Paragraph>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: String(rows.length) },
-          { label: "本月新增客户数", kind: "count", amount: String(newThisMonthCount) },
-          { label: "今日新增客户数", kind: "count", amount: String(newTodayCount) },
+          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(rows.length) },
+          { label: "本月新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
+          { label: "今日新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
       />
       <Space wrap className="customer-list-filters customer-list-filters--separated">
@@ -342,6 +343,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           allowClear
           placeholder="全部状态"
           value={statusFilter}
+          disabled={Boolean(error) || rows === null}
           options={customerStatusOptions ?? []}
           onChange={(value) => {
             setStatusFilter(value);
@@ -351,20 +353,20 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       </Space>
       {!compact ? <DataTable<Customer>
         columns={arrangeColumns(columns)}
-        rows={rows}
+        rows={rows ?? []}
         loading={loading}
         page={page}
         pageSize={pageSize}
-        total={rows.length}
+        total={rows?.length ?? 0}
         className="customer-table"
        
-        emptyText="暂无客户档案"
+        emptyText={error || rows === null ? "客户数据不可用，请点击重新加载" : "暂无客户档案"}
         onPageChange={(nextPage, nextSize) => {
           setPage(nextPage);
           setPageSize(nextSize);
         }}
       /> : <MobileCustomerList
-        rows={rows}
+        rows={rows ?? []}
         onDetail={(row) => void openDetail(row)}
         onMerge={setMergeTarget}
         renderPhone={(row) => renderContact(row, "phone")}
@@ -629,7 +631,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         <BusinessForm scope="CUSTOMER" form={mergeForm} colon={false} className="form-no-colon" onFinish={submitMerge}>
           <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
             <Select
-              options={rows
+              options={(rows ?? [])
                 .filter((row) => row.status === "ACTIVE" && row.id !== mergeTarget?.id)
                 .map((row) => ({ value: row.id, label: `${row.customer_no} ${row.display_name}` }))}
             />

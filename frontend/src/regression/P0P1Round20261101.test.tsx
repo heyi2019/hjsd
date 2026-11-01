@@ -14,6 +14,7 @@ import { ACCESS_TOKEN_KEY } from "../shared/api/client";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { FundsPage } from "../pools/FundsPage";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
+import { CustomerPanel } from "../customers/CustomerPanel";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
@@ -515,6 +516,18 @@ it("P1/FE-241：数据中心主数据失败时不显示零统计且禁用快捷�
   fireEvent.click(totalCard);
   expect(onNavigate).not.toHaveBeenCalled();
   expect(screen.getByText("资金池数量").closest(".ui-stat")).toHaveTextContent("不可用");
+});
+
+it("P1/FE-242：客户中心请求失败时不显示零统计且禁用依赖入口", async () => {
+  vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
+  renderLight(<CustomerPanel />, { user: "admin" });
+
+  expect(await screen.findByText("客户数据不可用，请点击重新加载")).toBeInTheDocument();
+  expect(screen.getByText("客户总数").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByText("今日新增客户数").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByRole("button", { name: /新建客户/ })).toBeDisabled();
+  expect(screen.getByRole("combobox", { name: "客户状态" })).toBeDisabled();
 });
 
 it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {

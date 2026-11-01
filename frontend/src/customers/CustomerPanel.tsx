@@ -17,6 +17,11 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { CUSTOMER_ROLE_LABEL, customerDateKey, MobileCustomerList, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
 
 const SearchButton = Button;
+const CUSTOMER_STATUS_OPTIONS = [
+  { value: "ACTIVE", label: "启用中" },
+  { value: "DISABLED", label: "已拉黑" },
+  { value: "MERGED", label: "已合并" },
+];
 
 export function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
@@ -344,7 +349,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           placeholder="全部状态"
           value={statusFilter}
           disabled={Boolean(error) || rows === null}
-          options={customerStatusOptions ?? []}
+          options={customerStatusOptions ?? CUSTOMER_STATUS_OPTIONS}
           onChange={(value) => {
             setStatusFilter(value);
             setPage(1);

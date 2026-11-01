@@ -115,6 +115,14 @@ describe("CustomersPage：客户档案", () => {
     expect(screen.getAllByText("已拉黑").length).toBeGreaterThanOrEqual(1); // DISABLED
   });
 
+  it("客户状态筛选覆盖已合并状态", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("combobox", { name: "客户状态" }));
+    expect(await screen.findByText("已合并", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
   it("后端不可达时显示错误条而不是空白页", async () => {
     vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />);

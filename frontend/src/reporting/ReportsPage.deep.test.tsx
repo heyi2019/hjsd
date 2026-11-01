@@ -166,6 +166,19 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     revokeUrl.mockRestore();
   });
 
+  it("导出日期反向时阻止请求并提示范围错误", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await ui.type(screen.getByLabelText("导出开始日期"), "2026-10-31");
+    await ui.type(screen.getByLabelText("导出结束日期"), "2026-10-01");
+    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
+    await ui.click(selector);
+    const listbox = await screen.findByRole("listbox");
+    await ui.click(within(listbox).getByText("订单利润"));
+    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    expect(await screen.findByText("导出开始日期不能晚于结束日期")).toBeInTheDocument();
+    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
+  });
+
   it("统计周期变更触发报表重新请求（R2 月度损益）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("月度损益 R2");

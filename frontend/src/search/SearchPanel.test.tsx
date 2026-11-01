@@ -34,6 +34,19 @@ describe("SearchPanel：全局搜索", () => {
     await waitFor(() => expect(catalog.searchApi.query).toHaveBeenCalledWith("HS"));
   });
 
+  it("结果入口是可访问链接，清空关键词后清理旧结果", async () => {
+    renderLight(<SearchPanel />, { user: "admin" });
+    const input = screen.getByPlaceholderText(/订单号/);
+    await ui.type(input, "HS");
+    await ui.click(screen.getByRole("button", { name: /搜索/ }));
+    expect(await screen.findByRole("link", { name: /打开订单/ })).toHaveAttribute("href", "/orders/HS-001");
+
+    await ui.clear(input);
+    await ui.click(screen.getByRole("button", { name: /搜索/ }));
+    expect(screen.queryByText("HS-001")).not.toBeInTheDocument();
+    expect(catalog.searchApi.query).toHaveBeenCalledTimes(1);
+  });
+
   it("查询失败展示错误横幅", async () => {
     vi.mocked(catalog.searchApi.query).mockRejectedValue(new Error("search failed"));
     renderLight(<SearchPanel />, { user: "admin" });

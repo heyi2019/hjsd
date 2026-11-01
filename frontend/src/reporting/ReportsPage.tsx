@@ -143,6 +143,11 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
       setExportSuccess(null);
       return;
     }
+    if (exportFrom && exportTo && exportFrom > exportTo) {
+      setExportError("导出开始日期不能晚于结束日期");
+      setExportSuccess(null);
+      return;
+    }
     setExporting(true);
     setExportError(null);
     setExportSuccess(null);

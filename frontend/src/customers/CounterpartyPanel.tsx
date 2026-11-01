@@ -12,6 +12,11 @@ import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButto
 import { appMessage } from "../shared/ui/appFeedback";
 import { MobileCounterpartyList, collectExtras } from "./CustomersPage.fragments";
 
+const COUNTERPARTY_STATUS_OPTIONS = [
+  { value: "ACTIVE", label: "进行中" },
+  { value: "DISABLED", label: "已拉黑" },
+];
+
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
@@ -160,7 +165,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={statusFilter} options={counterpartyStatusOptions ?? []} onChange={(value) => setStatusFilter(value)} />
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
       </Space>
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。

@@ -27,6 +27,7 @@ import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { InventorySaleModal } from "../stocks/InventorySaleModal";
 import { buildInventoryCsv } from "../stocks/inventory-export";
+import { SearchPanel } from "../search/SearchPanel";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 import { appMessage, appModal } from "../shared/ui/appFeedback";
@@ -590,6 +591,20 @@ it("P1/FE-242：客户中心请求失败时不显示零统计且禁用依赖入�
   expect(screen.getByText("今日新增客户数").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByRole("button", { name: /新建客户/ })).toBeDisabled();
   expect(screen.getByRole("combobox", { name: "客户状态" })).toBeDisabled();
+});
+
+it("P1/FE-164/198：全局搜索结果可进入且清空后不保留旧结果", async () => {
+  vi.mocked(catalog.searchApi.query).mockResolvedValueOnce({
+    items: [{ id: 12, type: "order", code: "HS0006", title: "订单", subtitle: null, route: "/orders/12" }],
+  });
+  renderLight(<SearchPanel />, { user: "admin" });
+  const input = screen.getByPlaceholderText(/订单号/);
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await user.type(input, "HS0006");
+  await user.click(screen.getByRole("button", { name: /搜索/ }));
+  expect(await screen.findByRole("link", { name: /打开订单/ })).toHaveAttribute("href", "/orders/12");
+  await user.clear(input);
+  expect(screen.queryByText("HS0006")).not.toBeInTheDocument();
 });
 
 it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {

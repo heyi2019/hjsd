@@ -42,7 +42,8 @@
 .inventory-detail .ant-table-wrapper {
   width: 100%;
   max-width: none;
-  overflow-x: clip;
+  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
+  overflow-x: auto;
   overflow-y: clip;
 }
 .inventory-detail__section > .ui-table-wrap {
@@ -104,17 +105,17 @@
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
-  overflow-x: clip;
-  overflow-y: clip;
+  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
+  overflow-x: auto;
+  overflow-y: auto;
 }
 .inventory-execution-table .ant-table,
 .inventory-finance-table .ant-table {
   width: 100% !important;
-  min-width: 0 !important;
   table-layout: fixed;
 }
 .inventory-execution-table .ant-table-content,
-.inventory-finance-table .ant-table-content { overflow-x: clip !important; }
+.inventory-finance-table .ant-table-content { overflow-x: auto !important; }
 .inventory-execution-table th,
 .inventory-execution-table td,
 .inventory-finance-table th,
@@ -142,8 +143,9 @@
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
-  overflow-x: clip;
-  overflow-y: clip;
+  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
+  overflow-x: auto;
+  overflow-y: auto;
 }
 .inventory-finance-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
 .inventory-finance-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }

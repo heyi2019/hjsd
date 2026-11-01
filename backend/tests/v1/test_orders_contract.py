@@ -177,7 +177,8 @@ def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamp
 
     assert row["inventory_entry_at"] == datetime(2026, 10, 1, 9, 30, 0)
     assert row["inventory_operator"] == "inventory-user"
-    assert row["sale_at"] == datetime(2026, 10, 17, 16, 45, 0)
+    # 售卖时间取卖出事件的业务发生日 D，与 created_at 无关（created_at 是写入时刻）。
+    assert row["sale_at"] == datetime(2026, 10, 4, 0, 0, 0)
     assert row["sale_operator"] == "sale-user"
 
 def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_engine, headers, monkeypatch):

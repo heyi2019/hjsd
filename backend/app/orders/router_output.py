@@ -320,7 +320,13 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         sale_event = next((event for event in events if event.event_type == "SELL"), None)
         party = parties.get(order.id)
         installment = installments.get(order.id)
-        sale_at = sale_event.created_at if sale_event else installment.created_at if installment else None
+        # 售卖时间取卖出事件的业务发生日（occurred_on），不用记录创建时刻 created_at；
+        # created_at 是入库写入时间，用它会让历史导入单全部显示成导入当天。
+        sale_at = (
+            datetime.combine(sale_event.occurred_on, datetime.min.time())
+            if sale_event
+            else installment.created_at if installment else None
+        )
         sale_operator = (
             (_selected_operator_label(sale_event, operator_names) or sale_event.created_by)
             if sale_event else installment.created_by if installment else None

@@ -21,6 +21,7 @@ import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { CustomerPanel } from "../customers/CustomerPanel";
 import { CounterpartyPanel } from "../customers/CounterpartyPanel";
 import { InventoryPanel } from "../stocks/InventoryPanel";
+import { InventoryProfileModal } from "../stocks/InventoryProfileModal";
 import { InventoryConsignmentModal } from "../stocks/InventoryConsignmentModal";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
@@ -1294,4 +1295,24 @@ it("P1/FE-207：真实用户中心在改密请求悬挂时仍可关闭", async (
   await waitFor(() => expect(client.changePassword).toHaveBeenCalledWith("wrong-old-pass", "new-pass-12345"));
   fireEvent.click(within(dialog).getByRole("button", { name: "关闭" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "用户中心" })).toHaveAttribute("data-user-center-open", "false"));
+});
+
+it("P2/FE-274：库存作图空图片集不允许伪装保存成功", async () => {
+  const onClose = vi.fn();
+  const onSaved = vi.fn();
+  const onError = vi.fn();
+  renderLight(
+    <InventoryProfileModal
+      target={{ account: { id: 901, account_images: [] } as never, mode: "images" }}
+      onClose={onClose}
+      onSaved={onSaved}
+      onError={onError}
+    />,
+    { user: "admin" },
+  );
+  await screen.findByText("作图");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: /保存/ }));
+  expect(catalog.stocksApi.updateProfile).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+  expect(await screen.findByRole("alert")).toHaveTextContent("请至少添加一张图片");
 });

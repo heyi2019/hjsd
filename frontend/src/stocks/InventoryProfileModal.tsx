@@ -3,7 +3,7 @@ import { Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { stocksApi, type Account } from "../shared/api/catalog";
-import { BusinessActionModal, Select } from "../shared/ui";
+import { BusinessActionModal, InlineError, Select } from "../shared/ui";
 
 export type InventoryProfileTarget = {
   account: Account;
@@ -43,6 +43,7 @@ export function InventoryProfileModal({
   });
   const [images, setImages] = useState<UploadFile[]>([]);
   const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState<{ message: string } | null>(null);
 
   useEffect(() => {
     if (!target) return;
@@ -64,6 +65,7 @@ export function InventoryProfileModal({
       status: "done",
       url,
     })));
+    setValidationError(null);
   }, [target]);
 
   async function imageValues(): Promise<string[]> {
@@ -75,11 +77,17 @@ export function InventoryProfileModal({
 
   async function save() {
     if (!target) return;
+    setValidationError(null);
     setSaving(true);
     try {
+      const imagePayload = target.mode === "description" ? null : await imageValues();
+      if (target.mode === "images" && !imagePayload?.length) {
+        setValidationError({ message: "请至少添加一张图片" });
+        return;
+      }
       const payload = target.mode === "description"
         ? { account_description: form.description }
-        : target.mode === "images" ? { account_images: await imageValues() } : {
+        : target.mode === "images" ? { account_images: imagePayload ?? [] } : {
             game_account: form.gameAccount,
             game_type: form.gameType,
             game_password: form.gamePassword,
@@ -88,7 +96,7 @@ export function InventoryProfileModal({
             platform: form.platform,
             has_secondary: form.hasSecondary,
             account_description: form.description,
-            account_images: await imageValues(),
+            account_images: imagePayload ?? [],
             note: form.note,
           };
       const updated = await stocksApi.updateProfile(target.account.id, payload);
@@ -112,6 +120,7 @@ export function InventoryProfileModal({
       onCancel={onClose}
       onOk={() => void save()}
     >
+      <InlineError error={validationError} />
       {target?.mode === "images" ? (
         <Upload
           listType="picture-card"

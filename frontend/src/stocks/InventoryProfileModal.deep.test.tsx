@@ -88,6 +88,16 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     });
   });
 
+  it("FE-274：图片模式为空时阻止保存并提示至少添加一张图片", async () => {
+    renderModal({ account, mode: "images" });
+    await screen.findByText("作图");
+    await ui.click(screen.getByRole("button", { name: /保存/ }));
+
+    expect(catalog.stocksApi.updateProfile).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("请至少添加一张图片");
+  });
+
   it("images 模式：上传新图后保存走 FileReader 生成 data URL", async () => {
     renderModal({ account, mode: "images" });
     await screen.findByText("作图");

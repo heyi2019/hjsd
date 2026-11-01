@@ -46,6 +46,12 @@ describe("AttachmentPanel：附件中心", () => {
     expect(catalog.attachmentsApi.list).not.toHaveBeenCalled();
   });
 
+  it("未输入对象编号时明确提示上传前置条件", async () => {
+    renderLight(<AttachmentPanel />, { user: "admin" });
+    expect(screen.getByText("请先填写对象编号后上传附件")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /上传附件/ })).toBeDisabled();
+  });
+
   it("点击下载调用接口并触发下载", async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     renderLight(<AttachmentPanel />, { user: "admin" });

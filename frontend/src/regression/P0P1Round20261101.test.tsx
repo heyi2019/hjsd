@@ -28,6 +28,7 @@ import { OrderDetail } from "../stocks/OrderDetail";
 import { InventorySaleModal } from "../stocks/InventorySaleModal";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { SearchPanel } from "../search/SearchPanel";
+import { AttachmentPanel } from "../attachments/AttachmentPanel";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 import { appMessage, appModal } from "../shared/ui/appFeedback";
@@ -605,6 +606,12 @@ it("P1/FE-164/198：全局搜索结果可进入且清空后不保留旧结果", 
   expect(await screen.findByRole("link", { name: /打开订单/ })).toHaveAttribute("href", "/orders/12");
   await user.clear(input);
   expect(screen.queryByText("HS0006")).not.toBeInTheDocument();
+});
+
+it("P1/FE-114/165：附件未选对象时保护上传入口并给出前置提示", () => {
+  renderLight(<AttachmentPanel />, { user: "admin" });
+  expect(screen.getByText("请先填写对象编号后上传附件")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /上传附件/ })).toBeDisabled();
 });
 
 it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {

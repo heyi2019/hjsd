@@ -22,6 +22,7 @@ import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoutesPanel";
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
 import { SequencesPanel } from "../field-definitions/panels/SequencesPanel";
+import { ImportWorkbench } from "../imports/ImportWorkbench";
 import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { InventorySaleModal } from "../stocks/InventorySaleModal";
@@ -241,6 +242,14 @@ it("P1/FE-219：编号序列数据失败时不伪装成真实空列表", async (
 
   expect(await screen.findByText("编号序列数据不可用，请点击重新加载")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
+});
+
+it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
+  vi.mocked(catalog.importsApi.batches).mockRejectedValueOnce({ isAxiosError: true, message: "batches down" });
+  renderLight(<ImportWorkbench />, { user: "admin" });
+
+  expect(await screen.findByText("batches down")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新建导入/ })).toBeDisabled();
 });
 
 it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {

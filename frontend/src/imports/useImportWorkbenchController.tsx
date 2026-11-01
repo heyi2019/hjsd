@@ -18,6 +18,7 @@ export function useImportWorkbenchController({
   onBatchIdChange,
 }: ImportWorkbenchProps) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
+  const [batchesReady, setBatchesReady] = useState(false);
   const sourceKindOptions = useOptionSet("IMPORT_SOURCE_KIND") ?? [];
   const batchStatusOptions = useOptionSet("IMPORT_BATCH_STATUS") ?? [];
   const isBatchControlled = batchIdProp !== undefined;
@@ -51,11 +52,13 @@ export function useImportWorkbenchController({
   const current = batches.find((b) => b.id === batchId) ?? null;
 
   const loadBatches = useCallback(async () => {
+    setBatchesReady(false);
     try {
       const data = await importsApi.batches();
       setBatches(data.items);
       if (batchId === null) setBatchId(data.items[0]?.id ?? null);
       setError(null);
+      setBatchesReady(true);
     } catch (err) {
       setError(normalizeError(err));
     }
@@ -185,6 +188,7 @@ export function useImportWorkbenchController({
       <PermissionButton
         permission="import.manage"
         type="primary"
+        disabled={!batchesReady}
         onClick={() => setImportOpen(true)}
       >
         新建导入
@@ -243,6 +247,7 @@ export function useImportWorkbenchController({
 
   return {
     batches,
+    batchesReady,
     setBatches,
     sourceKindOptions,
     batchStatusOptions,

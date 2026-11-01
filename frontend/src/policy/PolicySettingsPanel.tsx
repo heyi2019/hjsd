@@ -36,6 +36,8 @@ export function PolicySettingsPanel() {
   const [definitions, setDefinitions] = useState<PolicyDefinition[]>([]);
   const [definitionId, setDefinitionId] = useState<number | null>(null);
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
+  const [definitionsReady, setDefinitionsReady] = useState(false);
+  const [versionsReady, setVersionsReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -48,11 +50,13 @@ export function PolicySettingsPanel() {
   const current = definitions.find((d) => d.id === definitionId) ?? null;
 
   const loadDefinitions = useCallback(async () => {
+    setDefinitionsReady(false);
     try {
       const data = await policyApi.list();
       setDefinitions(data.items);
       setDefinitionId((prev) => prev ?? data.items[0]?.id ?? null);
       setError(null);
+      setDefinitionsReady(true);
     } catch (err) {
       setError(normalizeError(err));
     }
@@ -65,13 +69,16 @@ export function PolicySettingsPanel() {
   const loadVersions = useCallback(async () => {
     if (definitionId === null) {
       setVersions([]);
+      setVersionsReady(true);
       return;
     }
     setLoading(true);
+    setVersionsReady(false);
     try {
       const data = await policyApi.versions(definitionId);
       setVersions(data.items);
       setError(null);
+      setVersionsReady(true);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -159,6 +166,8 @@ export function PolicySettingsPanel() {
     setResolveOpen(true);
   };
 
+  const policyDataReady = definitionsReady && versionsReady;
+
   return (
     <section className="ui-stack">
       <PageHeader
@@ -174,10 +183,10 @@ export function PolicySettingsPanel() {
 
       <StatRow
         items={[
-          { label: "规则总数", kind: "count", amount: String(definitions.length) },
-          { label: "已发布", kind: "count", amount: String(versions.filter((v) => v.status === "ACTIVE").length) },
-          { label: "草稿版本", kind: "count", amount: String(versions.filter((v) => v.status === "DRAFT").length) },
-          { label: "当前规则", kind: "count", amount: current ? current.name : "-" },
+          { label: "规则总数", kind: "count", amount: policyDataReady ? String(definitions.length) : error ? "不可用" : "—" },
+          { label: "已发布", kind: "count", amount: policyDataReady ? String(versions.filter((v) => v.status === "ACTIVE").length) : error ? "不可用" : "—" },
+          { label: "草稿版本", kind: "count", amount: policyDataReady ? String(versions.filter((v) => v.status === "DRAFT").length) : error ? "不可用" : "—" },
+          { label: "当前规则", kind: "count", amount: policyDataReady && current ? current.name : error ? "不可用" : "—" },
         ]}
       />
 
@@ -197,7 +206,7 @@ export function PolicySettingsPanel() {
               versions={versions}
               loading={loading}
               scopeOptions={scopeOptions}
-              canManage={canManage}
+              canManage={canManage && policyDataReady && !error}
               onOpenEditor={() => setEditorOpen(true)}
               onOpenResolve={openResolve}
               onSupersede={setSupersedeTarget}

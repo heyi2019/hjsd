@@ -38,6 +38,7 @@ import { DataTable,
   useCompactLayout, } from "../shared/ui";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useListViewColumns } from "../shared/lib/listColumns";
+import { appMessage } from "../shared/ui/appFeedback";
 
 const REPORT_NAMES = [
   "inventory-health",
@@ -111,6 +112,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
   const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "r1");
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
@@ -138,10 +140,14 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
   const exportSelected = async () => {
     if (selectedReports.length === 0) {
       setExportError("请至少勾选一项报表");
+      setExportSuccess(null);
       return;
     }
     setExporting(true);
+    setExportError(null);
+    setExportSuccess(null);
     let lastError: string | null = null;
+    let successCount = 0;
     try {
       for (const name of selectedReports) {
         try {
@@ -152,6 +158,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
           anchor.download = `${name}.csv`;
           anchor.click();
           URL.revokeObjectURL(url);
+          successCount += 1;
         } catch (err) {
           lastError = normalizeError(err).message;
         }
@@ -159,7 +166,13 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     } finally {
       setExporting(false);
     }
-    setExportError(lastError);
+    if (lastError) {
+      setExportError(lastError);
+    } else {
+      const message = `已导出 ${successCount} 份报表`;
+      setExportSuccess(message);
+      appMessage.success(message);
+    }
   };
   const tabItems = [
     { key: "r1", label: "库存 R1", render: () => <InventoryReport /> },
@@ -206,6 +219,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
           导出列与「设置 → 列表字段」一致：被隐藏的列不导出，表头与枚举值均为中文（取自选项词典）；合计行独有字段仍保留在末尾。
         </Typography.Text>
         {exportError ? <Typography.Text type="danger">{exportError}</Typography.Text> : null}
+        {exportSuccess ? <Typography.Text type="success">{exportSuccess}</Typography.Text> : null}
       </Card>
       <Tabs
         activeKey={activeTab}

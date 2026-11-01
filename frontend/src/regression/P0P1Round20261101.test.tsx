@@ -10,6 +10,7 @@ import { UsersPanel } from "../users/UsersPanel";
 import { TeamsPanel } from "../users/TeamsPanel";
 import { UserCenterPage } from "../auth/UserCenterPage";
 import * as client from "../shared/api/client";
+import { ACCESS_TOKEN_KEY } from "../shared/api/client";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { FundsPage } from "../pools/FundsPage";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
@@ -47,6 +48,7 @@ const settledInstallment = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
   clearOptionSetsCache();
   seedOrderFormFields(catalog);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
@@ -55,6 +57,7 @@ beforeEach(() => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({ items: [], total: 0 } as never);
+  vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]) as never);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
   ]);
@@ -305,6 +308,24 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
   await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
 });
 
+it("P1/FE-053：报表导出成功后显示可核对的结果反馈", async () => {
+  vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]) as never);
+  const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:report");
+  const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<ReportsPage />, { user: "admin" });
+  const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
+  await user.click(selector);
+  await user.click(await screen.findByText("订单利润", { selector: ".ant-select-item-option-content" }));
+  await user.click(screen.getByRole("button", { name: /导出/ }));
+
+  await waitFor(() => expect(screen.getByText(/已导出 1 份报表/)).toBeInTheDocument());
+  expect(anchorClick).toHaveBeenCalled();
+  expect(createUrl).toHaveBeenCalled();
+  expect(revokeUrl).toHaveBeenCalledWith("blob:report");
+});
+
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {
   const confirmSpy = vi.spyOn(appModal, "confirm");
   vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
@@ -431,7 +452,7 @@ it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0", async
 it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
   vi.mocked(catalog.orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });
   renderLight(<OrderTypesPanel />, { user: "admin" });
-  expect(await screen.findByText(/types down/)).toBeInTheDocument();
+  expect(await screen.findByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
   expect(screen.getByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
 });
@@ -439,7 +460,7 @@ it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
 it("P1/FE-239：资金池主数据失败时锁定新增入口", async () => {
   vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
   renderLight(<PoolsPanel />, { user: "admin" });
-  expect(await screen.findByText(/pools down/)).toBeInTheDocument();
+  expect(await screen.findByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /新增资金池/ })).toBeDisabled();
   expect(screen.getByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
 });

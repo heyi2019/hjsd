@@ -140,6 +140,50 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.reason).toBe("重复入账");
   });
 
+  it("冲销成功后原流水不再提供重复冲销入口，并展示反向流水", async () => {
+    const approved = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+    const reversal = { ...approved, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
+    let mainListCalls = 0;
+    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
+      if (params?.direction) return { items: [], total: 0 };
+      mainListCalls += 1;
+      return mainListCalls === 1 ? { items: [approved], total: 1 } : { items: [approved, reversal], total: 2 };
+    });
+    resolveMockOnce(vi.mocked(catalog.cashflowsApi.reverse), reversal);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await screen.findByText("CF-A-07");
+    await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
+    const modal = modalContent();
+    await ui.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
+    await ui.type(modal.querySelector("#reason") ?? modal, "重复入账");
+    await ui.click(screen.getByRole("button", { name: /确认冲销/ }));
+
+    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.reverse)).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^冲\s*销$/ })).toBeNull());
+    expect(screen.getByText("CF-REV-08")).toBeInTheDocument();
+  });
+
+  it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
+    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
+    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => params?.direction ? { items: [], total: 0 } : { items: approved, total: 1 });
+    vi.mocked(catalog.cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByText(/POOL-A/);
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await screen.findByText("CF-A-07");
+    await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
+    const modal = modalContent();
+    await ui.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
+    await ui.type(modal.querySelector("#reason") ?? modal, "重复入账");
+    await ui.click(screen.getByRole("button", { name: /确认冲销/ }));
+
+    await waitFor(() => expect(screen.getByText(/冲销接口暂时不可用/)).toBeInTheDocument());
+    expect(modal.querySelector("#reason")).toHaveValue("重复入账");
+    expect(screen.getByRole("button", { name: /确认冲销/ })).toBeEnabled();
+  });
+
   it("资金池划转提交调用 transfersApi.create", async () => {
     resolveMockOnce(vi.mocked(catalog.transfersApi.create), { id: 200, transfer_id: "TRF-200" });
     renderLight(<FundsPage />, { user: "admin" });

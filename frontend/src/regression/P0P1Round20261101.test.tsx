@@ -54,6 +54,7 @@ beforeEach(() => {
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({ items: [], total: 0 } as never);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
   ]);
@@ -75,6 +76,10 @@ beforeEach(() => {
     { id: 10, order_no: "TH-2026-0002", order_type: "TH", capital_type: "DISTRIBUTION", trade_date: "2026-10-01", status: "ACTIVE" },
   ]);
   vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValue({ generated_on: "2026-10-01", total_cost: "0.00", items: [] });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 afterEach(() => {
@@ -158,7 +163,7 @@ it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
   vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
     { id: 7, display_name: "买家A", status: "DISABLED" },
   ] as never);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+  vi.mocked(catalog.poolsApi.list).mockResolvedValue([
     { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
   ] as never);
   vi.mocked(catalog.employeesApi.list).mockResolvedValueOnce([
@@ -232,6 +237,39 @@ it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () =
 
   await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
   expect(catalog.transfersApi.create).not.toHaveBeenCalled();
+});
+
+it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
+  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+  const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
+  let mainListCalls = 0;
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({ income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" } as never);
+  vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
+    if (params?.direction) return { items: [], total: 0 } as never;
+    mainListCalls += 1;
+    return (mainListCalls === 1 ? { items: [original], total: 1 } : { items: [original, reversal], total: 2 }) as never;
+  });
+  vi.mocked(catalog.cashflowsApi.reverse).mockResolvedValueOnce(reversal as never);
+  vi.mocked(catalog.depositsApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as never);
+  renderLight(<FundsPage />, { user: "admin" });
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await screen.findByText(/POOL-A/);
+  await user.click(screen.getByRole("tab", { name: "流水" }));
+  await screen.findByText("CF-A-07");
+  await user.click(screen.getByRole("button", { name: /冲销/ }));
+  const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+  await user.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
+  await user.type(modal.querySelector("#reason") ?? modal, "重复入账");
+  await user.click(screen.getByRole("button", { name: /确认冲销/ }));
+
+  await waitFor(() => expect(catalog.cashflowsApi.reverse).toHaveBeenCalledWith(7, expect.objectContaining({ reason: "重复入账" })));
+  await waitFor(() => expect(screen.queryByRole("button", { name: /^冲销$/ })).toBeNull());
+  expect(screen.getByText("CF-REV-08")).toBeInTheDocument();
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

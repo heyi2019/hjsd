@@ -123,7 +123,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       width: 170,
       render: (_v, row) => (
         <Space size={2}>
-          {row.status === "APPROVED" && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
+          {row.status === "APPROVED" && !row.reversal_of_id && !cashflows.some((flow) => flow.reversal_of_id === row.id) && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
             <PermissionButton
               permission="deposit.post"
               size="small"

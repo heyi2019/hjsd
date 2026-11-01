@@ -24,6 +24,7 @@ import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoute
 import { PolicySettingsPanel } from "../policy/PolicySettingsPanel";
 import { SequencesPanel } from "../field-definitions/panels/SequencesPanel";
 import { ImportWorkbench } from "../imports/ImportWorkbench";
+import { RowsTab } from "../imports/ImportWorkbench.tabs";
 import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { InventorySaleModal } from "../stocks/InventorySaleModal";
@@ -611,6 +612,28 @@ it("P1/FE-063：导入文件类型校验拒绝 PNG", () => {
   expect(isSupportedImportFile({ name: "account-image.png", type: "image/png" })).toBe(false);
   expect(isSupportedImportFile({ name: "orders.csv", type: "text/csv" })).toBe(true);
   expect(isSupportedImportFile({ name: "rows.json", type: "application/json" })).toBe(true);
+});
+
+it("P1/FE-188：错误大批次原始行按页渲染，避免首屏冻结", () => {
+  const rows = Array.from({ length: 3229 }, (_, index) => ({
+    id: index + 1,
+    batch_id: 1,
+    row_no: index + 1,
+    raw: { 行号: `行-${index + 1}` },
+    status: "PENDING",
+    unlinked_transfer: false,
+  })) as unknown as import("../shared/api/catalog").ImportRow[];
+  renderLight(
+    <RowsTab
+      columns={[{ title: "行号", dataIndex: "row_no" }, { title: "原始内容", dataIndex: ["raw", "行号"] }]}
+      rows={rows}
+      loading={false}
+    />,
+    { user: "admin" },
+  );
+  const body = document.querySelector("tbody") as HTMLElement;
+  expect(within(body).queryByText("行-3229")).not.toBeInTheDocument();
+  expect(body.querySelectorAll("tr").length).toBeLessThanOrEqual(21);
 });
 
 it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {

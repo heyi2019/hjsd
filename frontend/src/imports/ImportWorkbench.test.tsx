@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { ImportWorkbench } from "./ImportWorkbench";
+import { RowsTab } from "./ImportWorkbench.tabs";
 import { resolveMock } from "../test/mock-api";
 
 import * as catalog from "../shared/api/catalog";
+import type { ImportRow } from "../shared/api/catalog";
 import { seedOptionSets } from "../test/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -125,4 +127,30 @@ it("导入对账 Tab：切换后渲染对账 StatCard（源总行/已导入）",
   const panel = screen.getByRole("tabpanel", { name: "导入对账" });
   expect(within(panel).getByText("源总行")).toBeInTheDocument();
   expect(within(panel).getByText("已导入")).toBeInTheDocument();
+});
+
+it("大批次原始行使用分页，首屏不一次渲染全部 3229 行", () => {
+  const rows = Array.from({ length: 3229 }, (_, index) => ({
+    id: index + 1,
+    batch_id: 1,
+    row_no: index + 1,
+    raw: { 行号: `行-${index + 1}` },
+    status: "PENDING",
+    unlinked_transfer: false,
+  })) as unknown as ImportRow[];
+
+  renderLight(
+    <RowsTab
+      columns={[{ title: "行号", dataIndex: "row_no" }, { title: "原始内容", dataIndex: ["raw", "行号"] }]}
+      rows={rows}
+      loading={false}
+    />,
+    { user: "admin" },
+  );
+
+  const body = document.querySelector("tbody") as HTMLElement;
+  expect(within(body).getByText("1")).toBeInTheDocument();
+  expect(within(body).queryByText("3229")).not.toBeInTheDocument();
+  expect(within(body).queryByText("行-3229")).not.toBeInTheDocument();
+  expect(body.querySelectorAll("tr").length).toBeLessThanOrEqual(21);
 });

@@ -164,7 +164,7 @@ it("登记返点弹窗展示关联订单的返点明细", async () => {
   expect(await screen.findByText("返点明细")).toBeInTheDocument();
   expect(screen.getByText("HS0001-RB01")).toBeInTheDocument();
   expect(screen.getByText("何一")).toBeInTheDocument();
-  expect(document.querySelector(".adaptive-business-modal.recovery-order-modal")).toBeTruthy();
+  expect(document.querySelector(".adaptive-business-modal.business-registration-modal")).toBeTruthy();
   expect(document.querySelectorAll(".rebate-core-fields > .ant-form-item")).toHaveLength(4);
   expect(screen.getByLabelText("操作人")).toBeInTheDocument();
   expect(document.querySelector(".inventory-rebate-details .ant-table-pagination")).toBeNull();

@@ -2,7 +2,7 @@
  *  全部通过 controller 消费 useFundsPageController 暴露的表单、目标状态与写处理器。 */
 import { Input, Modal as AntdModal, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { BusinessActionModal, BusinessForm, DataTable, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatusTag } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatusTag, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
@@ -17,10 +17,14 @@ const Modal = BusinessActionModal;
 export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
   const { depositOpen, setDepositOpen, depositForm, submitDeposit, write, pools } = ctrl;
   return (
-    <Modal title="新增押金占用" open={depositOpen} onCancel={() => setDepositOpen(false)} footer={null}>
+    <Modal title="新增押金占用" fieldCount={7} open={depositOpen} onCancel={() => setDepositOpen(false)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDDEPOSIT" active={depositOpen}>
-        <BusinessForm scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
             <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </CfgItem>
@@ -33,11 +37,11 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
           <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
             <MoneyInput />
           </CfgItem>
-          <CfgItem name="paid_on" label="占用日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="paid_on" label="占用日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
-          <CfgItem name="expected_release_on" label="预计释放日期">
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="expected_release_on" label="预计释放日期" getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="note" label="说明">
             <Input.TextArea rows={2} />
@@ -45,7 +49,7 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             提交
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -54,12 +58,16 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
 export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
   const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, cashflowAttributeOptions } = ctrl;
   return (
-    <Modal title="新增独立资金流水" open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
+    <Modal title="新增独立资金流水" fieldCount={8} open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDFLOW" active={cashflowOpen}>
-        <BusinessForm scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
-          <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
           <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select /></CfgItem>
           <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
             <Select
@@ -80,7 +88,7 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></CfgItem>
           <CfgItem name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -89,17 +97,21 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
 export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
   const { transferOpen, setTransferOpen, transferForm, submitTransfer, write, pools } = ctrl;
   return (
-    <Modal title="资金池划转" open={transferOpen} onCancel={() => setTransferOpen(false)} footer={null}>
+    <Modal title="资金池划转" fieldCount={5} open={transferOpen} onCancel={() => setTransferOpen(false)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDTRANSFER" active={transferOpen}>
-        <BusinessForm scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer} initialValues={{ occurred_on: today() }}>
           <CfgItem name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></CfgItem>
-          <CfgItem name="occurred_on" label="划转日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="occurred_on" label="划转日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
           <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认划转</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -108,19 +120,23 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
 export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
   const { reconciliationOpen, setReconciliationOpen, reconciliationForm, submitReconciliation, write, pools } = ctrl;
   return (
-    <Modal title="新增资金对账" open={reconciliationOpen} onCancel={() => setReconciliationOpen(false)} footer={null}>
+    <Modal title="新增资金对账" fieldCount={7} open={reconciliationOpen} onCancel={() => setReconciliationOpen(false)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDRECON" active={reconciliationOpen}>
-        <BusinessForm scope="FUNDRECON" form={reconciliationForm} onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDRECON" form={reconciliationForm} onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
-          <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
           <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
           <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>
           <CfgItem name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></CfgItem>
           <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已入账流水）"><Input.TextArea rows={2} /></CfgItem>
           <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>提交对账</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -129,13 +145,17 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
 export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
   const { resolveTarget, setResolveTarget, resolveForm, resolveReconciliation, write } = ctrl;
   return (
-    <Modal title="核销对账差异" open={Boolean(resolveTarget)} onCancel={() => setResolveTarget(null)} footer={null}>
+    <Modal title="核销对账差异" fieldCount={1} open={Boolean(resolveTarget)} onCancel={() => setResolveTarget(null)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDCLEAR" active={Boolean(resolveTarget)}>
-        <BusinessForm scope="FUNDCLEAR" form={resolveForm} onFinish={resolveReconciliation}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDCLEAR" form={resolveForm} onFinish={resolveReconciliation}>
           <CfgItem name="reason" label="处理说明" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认核销</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -144,16 +164,20 @@ export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
 export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
   const { reverseTarget, setReverseTarget, reverseForm, reverseCashflow, write } = ctrl;
   return (
-    <Modal title="冲销资金流水" open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)} footer={null}>
+    <Modal title="冲销资金流水" fieldCount={2} open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDREVERSE" active={Boolean(reverseTarget)}>
-        <BusinessForm scope="FUNDREVERSE" form={reverseForm} onFinish={reverseCashflow}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDREVERSE" form={reverseForm} onFinish={reverseCashflow}>
           <Typography.Paragraph type="secondary" className="ui-drawer-hint">
             冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，
             状态直接为「已入账」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
           </Typography.Paragraph>
-          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="冲销原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} />
@@ -161,7 +185,7 @@ export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认冲销
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -170,7 +194,7 @@ export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
 export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
   const { returnTarget, setReturnTarget, returnForm, submitReturn, write } = ctrl;
   return (
-    <Modal title="押金释放" open={Boolean(returnTarget)} onCancel={() => setReturnTarget(null)} footer={null}>
+    <Modal title="押金释放" fieldCount={2} open={Boolean(returnTarget)} onCancel={() => setReturnTarget(null)} footer={null}>
       <InlineError error={write.error} />
       {returnTarget ? (
         <Typography.Paragraph type="secondary">
@@ -181,7 +205,11 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
         释放后相应减少押金占用，操作不可撤销；释放金额不得超过剩余可释放额。
       </Typography.Paragraph>
       <FieldConfigScope scope="FUNDRELEASE" active={Boolean(returnTarget)}>
-        <BusinessForm scope="FUNDRELEASE" form={returnForm} onFinish={submitReturn}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDRELEASE" form={returnForm} onFinish={submitReturn}>
           <CfgItem
             name="amount"
             label="释放金额"
@@ -201,13 +229,13 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
           >
             <MoneyInput />
           </CfgItem>
-          <CfgItem name="released_on" label="释放日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="released_on" label="释放日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             确认释放
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -216,19 +244,23 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
 export function LossModal({ ctrl }: { ctrl: FundsPageController }) {
   const { lossTarget, setLossTarget, lossForm, submitLoss, write } = ctrl;
   return (
-    <Modal title="登记押金损失" open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)} footer={null}>
+    <Modal title="登记押金损失" fieldCount={4} open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)} footer={null}>
       <InlineError error={write.error} />
       <Typography.Paragraph type="warning">
         登记损失后该押金占用相应扣减，操作不可撤销，请核对金额与费用分类。
       </Typography.Paragraph>
       <FieldConfigScope scope="FUNDLOSS" active={Boolean(lossTarget)}>
-        <BusinessForm scope="FUNDLOSS" form={lossForm} onFinish={submitLoss}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDLOSS" form={lossForm} onFinish={submitLoss}>
           <CfgItem name="amount" label="损失金额" rules={requiredMoneyRules("损失金额")}><MoneyInput /></CfgItem>
-          <CfgItem name="lost_on" label="损失日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
+          <CfgItem name="lost_on" label="损失日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
           <CfgItem name="category" label="费用分类" rules={[{ required: true }]}><Input /></CfgItem>
           <CfgItem name="reason" label="损失原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认损失</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -237,7 +269,7 @@ export function LossModal({ ctrl }: { ctrl: FundsPageController }) {
 export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
   const { cancelTarget, setCancelTarget, cancelForm, submitCancelDeposit, write } = ctrl;
   return (
-    <Modal title="取消押金" open={Boolean(cancelTarget)} onCancel={() => setCancelTarget(null)} footer={null}>
+    <Modal title="取消押金" fieldCount={2} open={Boolean(cancelTarget)} onCancel={() => setCancelTarget(null)} footer={null}>
       <InlineError error={write.error} />
       {cancelTarget ? (
         <Typography.Paragraph type="secondary">
@@ -249,9 +281,13 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
         DEPOSIT_CANCEL 冲正流水把资金池占用冲平，操作不可撤销；已发生退还或损失的押金请改用释放 / 登记损失。
       </Typography.Paragraph>
       <FieldConfigScope scope="FUNDCANCEL" active={Boolean(cancelTarget)}>
-        <BusinessForm scope="FUNDCANCEL" form={cancelForm} onFinish={submitCancelDeposit}>
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDCANCEL" form={cancelForm} onFinish={submitCancelDeposit}>
+          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请填写取消原因" }]}>
             <Input.TextArea rows={3} />
@@ -259,7 +295,7 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
           <PermissionButton permission="deposit.post" type="primary" danger htmlType="submit" loading={write.pending}>
             确认取消
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );
@@ -268,19 +304,23 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
 export function RepairModal({ ctrl }: { ctrl: FundsPageController }) {
   const { repairTarget, setRepairTarget, repairForm, submitRepair, write, pools } = ctrl;
   return (
-    <Modal title="修复单边划转" open={Boolean(repairTarget)} onCancel={() => setRepairTarget(null)} footer={null}>
+    <Modal title="修复单边划转" fieldCount={2} open={Boolean(repairTarget)} onCancel={() => setRepairTarget(null)} footer={null}>
       <Typography.Paragraph type="secondary">
         划转号：{repairTarget?.transfer_id}；现有流水：{repairTarget?.flow_no}
       </Typography.Paragraph>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDREPAIR" active={Boolean(repairTarget)}>
-        <BusinessForm scope="FUNDREPAIR" form={repairForm} onFinish={submitRepair}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDREPAIR" form={repairForm} onFinish={submitRepair}>
           <CfgItem name="counterpart_pool_id" label="缺失对端资金池" rules={[{ required: true }]}>
             <Select options={pools.filter((pool) => pool.id !== repairTarget?.pool_id).map((pool) => ({ value: pool.id, title: `${pool.name}（${pool.code}）`, label: `${pool.name}（${pool.code}）` }))} />
           </CfgItem>
           <CfgItem name="reason" label="修复原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <PermissionButton permission="finance.transfer" type="primary" htmlType="submit" loading={write.pending}>确认修复</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigScope>
     </Modal>
   );

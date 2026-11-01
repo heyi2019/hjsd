@@ -13,7 +13,7 @@ import { customersApi,
   type Pool, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { AdaptiveFormGrid, BusinessActionModal, BusinessForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
+import { AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
 import { InstallmentScheduleFields, resizeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
@@ -217,8 +217,9 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   return (
     <BusinessActionModal
       title={title}
+      fieldCount={21}
       open={open}
-      className="inventory-sale-modal recovery-order-modal"
+      className="inventory-sale-modal"
       destroyOnHidden
       onCancel={props.onClose}
       footer={
@@ -230,7 +231,11 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
-        <BusinessForm scope="SALE" form={form} onFinish={submit}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="SALE" form={form} onFinish={submit}>
           <RecoveryCustomerSection title={buyerInfoTitle} />
           <DeliveryInfoSection showIntermediary employees={employees} />
           <section className="inventory-sale-cashflow" aria-labelledby="inventory-sale-cashflow-title">
@@ -303,7 +308,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
             <AdditionalFeeFields pools={pools} />
           </section>
           <CustomFieldSection testIdSuffix="inventory-sale" />
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>
   );

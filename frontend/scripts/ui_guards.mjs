@@ -12,9 +12,12 @@ const walk = (dir) =>
     return statSync(full).isDirectory() ? walk(full) : [full];
   });
 
-/** 页面文件：排除组件库本体，否则守卫会自己告自己。 */
+/** 页面文件：排除组件库本体，否则守卫会自己告自己。
+ * 同时排除 *.test.tsx：测试夹具常用裸 <Button> / <Table> / <Tag> 模拟外部提交入口与
+ * 表格渲染，它们不产出产品 UI，不应被「页面不得绕过组件库」系列规则管辖。
+ * 规则 11 / 13 / 14 早已显式排除测试文件，此处统一口径（2026-11-02）。 */
 const pages = () =>
-  walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")) && !f.includes(join("auth", "UserCenterPage")));
+  walk(SRC).filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f) && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")) && !f.includes(join("auth", "UserCenterPage")));
 
 /** 计数语义的 label：必须显式 kind: "count"，否则被 MoneyText 渲染成 "1.00"。 */
 const COUNT_LABELS = [
@@ -45,7 +48,10 @@ const BANNED = [
   ["no-antd-statistic", (t) => t.includes("<Statistic"), "须用 StatCard / StatRow"],
   ["no-antd-tag", (t) => /<Tag[ >]/.test(t), "须用 StatusTag"],
   ["no-raw-button", (t) => /<Button[ >]/.test(t), "写操作须用 PermissionButton 权限门控"],
-  ["no-raw-table", (t) => /<Table(?:<[^>]+>)?[ >]/.test(t), "须用 DataTable 统一列表壳"],
+  // 禁止裸 <Table>：注意「标签后紧跟空格/尖括号」的写法会被 JSX 多行排版绕过
+  // （`<Table` 换行接属性时其后是换行符，旧正则 `[ >]` 不匹配）——2026-11 实测
+  // 三处裸表因此从未被本规则拦到。改用「标签名后不得紧跟标识符字符」判定。
+  ["no-raw-table", (t) => /<Table(?![\w.])/.test(t), "须用 DataTable 统一列表壳"],
 ];
 for (const [rule, probe, hint] of BANNED) {
   for (const file of pages()) {
@@ -229,11 +235,40 @@ if (definedKf.size === 0) {
 // 规则 11：页面与共享 UI 不得使用 JSX 内联 style。
 // 统一样式必须进入令牌 / 共享 CSS，避免同一控件在不同页面出现不可追踪的局部变体。
 // 测试 motion stub 是 React style 转发夹具，属于测试基础设施，明确排除。
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")))) {
-  const text = readFileSync(file, "utf8");
-  if (/<[A-Za-z][^>]*\bstyle\s*=/.test(text)) {
-    fail("no-inline-style", `${relative(process.cwd(), file)} → 样式必须迁移到共享 CSS / 设计令牌`);
+// 排除条件必须同时覆盖两种写法：src/test/ 目录下的公共夹具，以及任意 *.test.tsx
+// 内的用例内联夹具（撑高 2000px 测滚动、透传 style 的 mock 组件）。此前只排了目录，
+// 与规则 13/14 的排除口径不一致，导致测试文件被产品规则拦下（2026-11-02 修正）。
+//
+// 显式豁免（2026-11-02 用户裁决「让守卫放过它」）：按「文件 → {上限, 理由}」登记。
+// **上限是硬约束**——豁免不是放开：命中数一旦超过声明上限即报错，防止一个口子
+// 演变成整页内联样式。登记的理由只允许是「静态 CSS 类无法表达的字段级动态值」；
+// 「写起来快」「懒得提类名」不构成理由。视觉定稿后应回收到 CSS 并删除条目。
+const INLINE_STYLE_ALLOWLIST = new Map([
+  [
+    "src/pools/StudioExpensePanel.tsx",
+    {
+      max: 2,
+      reason:
+        "工作室收支登记弹窗视觉稿落地（2026-11-02 用户指定）：金额控件宽度与标签列宽需按字段实时取值，"
+        + "静态类名无法表达；其余样式一律落 StudioExpensePanel.css，本豁免不含页面复选/筛选区。",
+    },
+  ],
+]);
+for (const [rel, entry] of INLINE_STYLE_ALLOWLIST) {
+  // 自检：路径写错或文件改名会让豁免静默失效（守卫报绿但实际没放行）。
+  if (!existsSync(join(process.cwd(), rel))) {
+    fail("no-inline-style", `豁免清单指向的文件不存在：${rel}（${entry.reason}）`);
   }
+}
+for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+  const text = readFileSync(file, "utf8");
+  const rel = relative(process.cwd(), file).replaceAll("\\", "/");
+  const hits = [...text.matchAll(/<[A-Za-z][^>]*\bstyle\s*=/g)].length;
+  if (hits === 0) continue;
+  const allowance = INLINE_STYLE_ALLOWLIST.get(rel);
+  if (allowance && hits <= allowance.max) continue;
+  const quota = allowance ? `（豁免上限 ${allowance.max} 处，实有 ${hits} 处）` : "";
+  fail("no-inline-style", `${rel} → 样式必须迁移到共享 CSS / 设计令牌${quota}`);
 }
 
 // 规则 12：前端样式只能使用当前品牌语义，禁止保留旧视觉别名或开发兜底入口。
@@ -282,9 +317,9 @@ let wiredCount = 0;
 for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
   const rel = relative(process.cwd(), file).replaceAll("\\", "/");
   const text = readFileSync(file, "utf8");
-  // 业务表单统一使用共享 BusinessForm；保留对原生 antd Form 的识别以覆盖
+  // 业务表单统一使用共享 BusinessRegistrationForm；保留对原生 antd Form 的识别以覆盖
   // 登录、查询等非业务表单和 Form.List/Form.Item 的宿主文件。
-  if (!(/<(?:Form|BusinessForm)[\s>]/.test(text) && /onFinish=/.test(text))) continue;
+  if (!(/<(?:Form|BusinessRegistrationForm)[\s>]/.test(text) && /onFinish=/.test(text))) continue;
   if (WIRED_RE.test(text) && CONFIG_MODULE_RE.test(text)) {
     wiredCount++;
     continue;

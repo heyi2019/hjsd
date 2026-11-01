@@ -14,6 +14,9 @@
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
 .inventory-detail {
   width: min(100%, 1200px);
+  max-height: 36rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   box-sizing: border-box;
   margin: 0;
   padding: var(--space-4) 0;
@@ -53,8 +56,7 @@
   box-sizing: border-box;
   transform: none;
 }
-.inventory-detail__section > .ui-table-wrap.inventory-execution-table,
-.inventory-detail__section > .ui-table-wrap.inventory-finance-table {
+.inventory-detail__section > .ui-table-wrap.ui-datatable--inline {
   margin-inline: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -100,34 +102,12 @@
 .inventory-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
 .inventory-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
 .inventory-execution-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
-.inventory-execution-table {
-  box-sizing: border-box;
-  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
-  border-radius: var(--radius-sm);
-  overflow-x: clip;
-  overflow-y: clip;
+/* 内联表视觉统一收进 .ui-datatable--inline（shared/styles/ui-components/tables.css）。
+   此处只保留详情页独有的布局补偿：抵消卡片内边距，让表格贴到卡片左右边缘。 */
+.inventory-detail__section .ui-datatable--inline .ant-table-container {
+  margin-inline-start: calc(var(--space-5) * -2);
+  width: calc(100% + var(--space-5) * 2);
 }
-.inventory-execution-table .ant-table,
-.inventory-finance-table .ant-table {
-  width: 100% !important;
-  min-width: 0 !important;
-  table-layout: fixed;
-}
-.inventory-execution-table .ant-table-content,
-.inventory-finance-table .ant-table-content { overflow-x: clip !important; }
-.inventory-execution-table th,
-.inventory-execution-table td,
-.inventory-finance-table th,
-.inventory-finance-table td { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.inventory-execution-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
-.inventory-execution-table .ant-table-container,
-.inventory-finance-table .ant-table-container { margin-inline-start: calc(var(--space-5) * -2); width: calc(100% + var(--space-5) * 2); }
-.inventory-execution-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
-.inventory-execution-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
-.inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
-.inventory-execution-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
-.inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
-.inventory-execution-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
 .inventory-finance-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
 .inventory-finance-list > .inventory-detail__meta { padding: var(--space-3); display: grid; gap: var(--space-3); }
 .inventory-execution-list > .inventory-detail__meta { padding: var(--space-3); }
@@ -137,30 +117,13 @@
 .inventory-finance-summary__item--expense { border-inline-start: var(--border-w-3) solid var(--color-error); }
 .inventory-finance-summary__item--income { border-inline-start: var(--border-w-3) solid var(--color-success); }
 .inventory-finance-summary__item strong, .inventory-finance-summary__item--amount .ui-money { color: var(--color-text-primary); font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; }
-.inventory-finance-table {
-  margin-top: 0;
-  box-sizing: border-box;
-  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
-  border-radius: var(--radius-sm);
-  overflow-x: clip;
-  overflow-y: clip;
-}
-.inventory-finance-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
-.inventory-finance-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
-.inventory-finance-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
-.inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
-.inventory-finance-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
-.inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
-.inventory-finance-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
-.inventory-finance-table__amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
-.inventory-finance-table__amount .ui-money { font-weight: 700; }
-/* 流水表字号对齐运营信息「作图」标签（--font-caption-2，12px）。 */
-.inventory-finance-table .ant-table-thead > tr > th,
-.inventory-finance-table .ant-table-tbody > tr > td { font-size: var(--fs-caption-2); }
+/* 金额单元格：右对齐 + 等宽数字，与上方汇总卡数值列对齐。 */
+.inventory-detail__cell-amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
+.inventory-detail__cell-amount .ui-money { font-weight: 700; }
 @media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
-  .inventory-detail { padding: var(--space-3) 0; }
+  .inventory-detail { max-height: 28rem; padding: var(--space-3) 0; }
   .inventory-detail__edit-grid, .inventory-edit-more__fields { grid-template-columns: 1fr; }
   .inventory-edit-more__note { grid-column: auto; }
 }

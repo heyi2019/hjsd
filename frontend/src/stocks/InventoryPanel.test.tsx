@@ -414,7 +414,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(accountSummary).getAllByText(/寄售平台A/).length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
-    const executionTable = detailPanel.querySelector(".inventory-execution-table") as HTMLElement;
+    const executionTable = detailPanel.querySelector(".inventory-execution-list .ui-datatable--inline") as HTMLElement;
     const executionHeaders = within(executionTable).getAllByRole("columnheader");
     for (const name of ["动作", "平台", "动作时间", "金额", "操作人", "备注"]) {
       const header = executionHeaders.find((item) => item.textContent?.trim() === name);
@@ -451,8 +451,11 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financePanel).queryByText("CF0001", { exact: true })).toBeNull();
     expect(within(executionTable).queryByText("EV0001", { exact: true })).toBeNull();
     expect(within(financeSummary).getByText("100.00")).toBeInTheDocument();
-    expect(within(financeSummary).getByText("350.00")).toBeInTheDocument();
-    const financeTable = financePanel.querySelector(".inventory-finance-table") as HTMLElement;
+    // 总收入 = IN 流水（售出回款 350）+ 返点登记额（夹具 base_amount 1000）。
+    // 返点当前按 base_amount 计入收入（登记即收入）；口径争议见返点基数/费率待裁决，
+    // 若口径改为「基数×费率」，此处应同步改成 400.00。
+    expect(within(financeSummary).getByText("1,350.00")).toBeInTheDocument();
+    const financeTable = financePanel.querySelector(".ui-datatable--inline") as HTMLElement;
     expect(financeTable.querySelector(".ant-pagination")).toBeNull();
     expect(within(financeTable).getByText("100.00")).toBeInTheDocument();
     expect(within(financeTable).getByText("350.00")).toBeInTheDocument();

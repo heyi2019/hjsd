@@ -5,7 +5,7 @@ import type { Pool } from "../shared/api/catalog";
 import {
   AdaptiveFormGrid,
   BusinessActionModal,
-  BusinessForm,
+  BusinessRegistrationForm,
   MoneyInput,
   Select,
 } from "../shared/ui";
@@ -48,7 +48,11 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
       onOk={() => props.form.submit()}
       onCancel={props.onCancel}
     >
-      <BusinessForm scope={props.scope} form={props.form} onFinish={props.onFinish}>
+      <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope={props.scope} form={props.form} onFinish={props.onFinish}>
         <div className="inventory-cancellation-note">{props.description}</div>
         <FieldConfigScope scope={props.scope} active={props.open}>
           <AdaptiveFormGrid className="inventory-void-fields">
@@ -78,7 +82,7 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
           </CfgItem>
           <CustomFieldSection testIdSuffix={props.scope === "INVOID" ? "inv-void" : props.scope === "INVREFUND" ? "inv-refund" : "order-cancel"} />
         </FieldConfigScope>
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
   );
 }

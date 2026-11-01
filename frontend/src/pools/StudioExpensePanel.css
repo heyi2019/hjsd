@@ -335,7 +335,7 @@
 }
 
 /* ⑪ 窄屏：单手操作时标签收窄、行距再压一档。
-   圆角必须归零：640px 以下全站弹窗按整页铺满（`.recovery-order-modal .ant-modal-content`
+   圆角必须归零：640px 以下全站弹窗按整页铺满（`.business-registration-modal .ant-modal-content`
    固定 100dvh），留 22px 圆角会把四个角切出遮罩缝。 */
 @media (max-width: 640px) {
   .studio-ledger-modal.compact-form-modal .ant-modal-content {

@@ -622,6 +622,10 @@
 /* 行距沿用 antd Form.Item 自带 margin-bottom，仅控制列距。 */
 .form-cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-3); }
 
+.customer-create-modal .customer-create-note {
+  margin: 0;
+}
+
 /* 竖排表单标签：清除 antd 残留的冒号/尾部空格（::after 注入的字符 + 右外边距），
    否则「名字」右侧会凭空多一段空白。必填星号（::before）保留。 */
 .form-no-colon .ant-form-item-label > label::after { content: none !important; }

@@ -1,7 +1,7 @@
 import { Form, Input } from "antd";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Select } from "../../shared/ui";
+import { BusinessRegistrationSection, Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
 import type { EmployeeOption } from "../../shared/api/catalog";
 import { CfgItem, sectionLabel } from "../ConfigurableField";
@@ -55,10 +55,7 @@ export function RecoveryAccountSection(props: {
     }
   }, [channelRegions, fieldNames.channelRegion, form, selectedChannelRegion]);
   return (
-    <section className="recovery-account-section recovery-entry-fields" aria-labelledby="game-account-info-title">
-      <div id="game-account-info-title" className="recovery-entry-fields__title">
-        {accountTitle}
-      </div>
+    <BusinessRegistrationSection className="account-section" title={accountTitle}>
       <CfgItem name={fieldNames.gameType} label="游戏类型" rules={[{ required: true, message: "游戏类型必填" }]}>
         {props.gameTypes?.length ? (
           <Select
@@ -109,12 +106,12 @@ export function RecoveryAccountSection(props: {
         />
       </CfgItem>
       {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} /> : null}
-      <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">
+      <CfgItem name={fieldNames.accountNote} label="账号备注" className="account-note">
         <Input placeholder="可选填" />
       </CfgItem>
       {props.accountExtras}
       {props.children}
       <DeliveryInfoSection showIntermediary={props.showIntermediaryDelivery} employees={props.employees} />
-    </section>
+    </BusinessRegistrationSection>
   );
 }

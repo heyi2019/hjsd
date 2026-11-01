@@ -115,6 +115,7 @@ export function statusColor(status: string): string {
     case "PAID":
     case "SETTLED":
     case "IN_STOCK":
+    case "WAITING":
       return "green";
     case "DRAFT":
     case "PENDING":
@@ -126,10 +127,12 @@ export function statusColor(status: string): string {
     case "DEFAULTED":
     case "LOST":
     case "DISABLED":
+    case "VOID":
       return "red";
     case "COMPLETED":
     case "DELIVERED":
     case "RETURNED":
+    case "SOLD":
       return "cyan";
     default:
       return "default";

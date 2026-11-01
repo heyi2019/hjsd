@@ -2,7 +2,7 @@
 /** 表单字段配置面板：按表单作用域（33 个业务表单）配置字段的
  *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
-import { Card, Segmented, Space, Typography } from "antd";
+import { Segmented, Space, Typography } from "antd";
 import { type OrderFormField } from "../../shared/api/catalog";
 import { DataTable, ErrorBanner, Select } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
@@ -45,7 +45,7 @@ export function OrderFormFieldsPanel({
   } = controller;
 
   return (
-    <Card className="glass" title="表单字段配置">
+    <section className="order-form-fields-panel">
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
       <div className="order-form-fields__container">
         <Space className="ui-toolbar-spaced" align="center">
@@ -124,6 +124,6 @@ export function OrderFormFieldsPanel({
         </div>
       ) : null}
       <SectionManagementCard controller={controller} />
-    </Card>
+    </section>
   );
 }

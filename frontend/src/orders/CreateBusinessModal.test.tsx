@@ -246,7 +246,7 @@ it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", a
   });
 
 it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单", async () => {
-    let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
+    let confirmConfig: { title?: string; onOk?: () => void | Promise<void> } | undefined;
     const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
       confirmConfig = config as typeof confirmConfig;
       return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
@@ -389,7 +389,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
   });
 
   it("P2-198：已改值关闭弹出放弃确认，确认后关闭", async () => {
-    let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
+    let confirmConfig: { title?: string; onOk?: () => void | Promise<void> } | undefined;
     const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
       confirmConfig = config as typeof confirmConfig;
       return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;

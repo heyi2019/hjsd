@@ -12,7 +12,7 @@ import { stocksApi,
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
-import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
@@ -155,6 +155,7 @@ export function InventoryRebateModal(props: {
   return (
     <BusinessActionModal
       title="登记返点"
+      fieldCount={5 + Object.keys(config).length}
       open={open}
       destroyOnHidden
       onCancel={props.onClose}
@@ -169,14 +170,14 @@ export function InventoryRebateModal(props: {
       <InventoryAccountSummary account={props.account} />
       {loading ? <Spin size="small" /> : (
         <FieldConfigContext.Provider value={config}>
-          <BusinessForm
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
             scope="INVREBATE"
             form={form}
             className="inventory-rebate-form ui-form-spaced"
-            layout="horizontal"
-            labelAlign="left"
-            labelCol={{ flex: "120px" }}
-            wrapperCol={{ flex: "auto" }}
             onFinish={submit}
           >
             <CfgItem
@@ -208,13 +209,13 @@ export function InventoryRebateModal(props: {
               <CfgItem name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
                 <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
               </CfgItem>
-              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}>
-                <Input placeholder="YYYY-MM-DD" />
+              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+                <DateField />
               </CfgItem>
               <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
             </div>
             <CustomFieldSection testIdSuffix="inventory-rebate" />
-          </BusinessForm>
+          </BusinessRegistrationForm>
         </FieldConfigContext.Provider>
       )}
       {!loading ? (
@@ -278,21 +279,26 @@ export function InventoryRebateModal(props: {
       ) : null}
       <BusinessActionModal
         title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"}
+        fieldCount={5 + Object.keys(config).length}
         open={Boolean(editTarget)}
         onCancel={() => setEditTarget(null)}
         footer={null}
       >
         <FieldConfigContext.Provider value={config}>
-          <BusinessForm scope="INVREBATE" form={editForm} onFinish={submitEdit}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
             <div className="rebate-core-fields">
               <CfgItem name="base_amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
               <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
-              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]}><Input /></CfgItem>
+              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
               <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
             </div>
             <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
             <PermissionButton permission="order.event.post" type="primary" htmlType="submit">保存</PermissionButton>
-          </BusinessForm>
+          </BusinessRegistrationForm>
         </FieldConfigContext.Provider>
       </BusinessActionModal>
     </BusinessActionModal>

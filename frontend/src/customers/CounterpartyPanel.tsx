@@ -8,7 +8,7 @@ import { normalizeError } from "../shared/api/client";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag, useCompactLayout } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag, useCompactLayout } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { MobileCounterpartyList, collectExtras } from "./CustomersPage.fragments";
 
@@ -188,9 +188,13 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           await load();
         }}
       />}
-      <BusinessActionModal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
+      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
-        <BusinessForm scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
           <CfgItem name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
           </CfgItem>
@@ -210,12 +214,13 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             建档
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
 
       <BusinessActionModal
         title={editTarget ? `编辑合作方 · ${editTarget.counterparty_no}` : "编辑合作方"}
+        fieldCount={6}
         open={Boolean(editTarget)}
         onCancel={() => {
           setEditTarget(null);
@@ -225,10 +230,13 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         destroyOnHidden
       >
         <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
-        <BusinessForm
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
           scope="COUNTERPARTY"
           form={editForm}
-          layout="vertical"
           colon={false}
           className="form-no-colon"
           onFinish={submitEdit}
@@ -269,7 +277,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             保存
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
 

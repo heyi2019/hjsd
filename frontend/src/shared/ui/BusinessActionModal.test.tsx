@@ -59,7 +59,7 @@ describe("BusinessActionModal", () => {
       { user: "admin" },
     );
 
-    expect(document.querySelector(".adaptive-business-modal.recovery-order-modal")).toBeTruthy();
+    expect(document.querySelector(".adaptive-business-modal.business-registration-modal")).toBeTruthy();
     expect(document.querySelector(".resizable-modal__drag-handle")).toHaveTextContent("资金收支");
     expect(screen.getByText("内容")).toBeInTheDocument();
   });
@@ -72,13 +72,12 @@ describe("BusinessActionModal", () => {
       { user: "admin" },
     );
 
-    // 紧凑规格仍保留 recovery-order-modal 的滚动/防溢出外壳，只追加尺寸与页脚覆盖类。
-    expect(document.querySelector(".adaptive-business-modal.recovery-order-modal.compact-form-modal")).toBeTruthy();
+    expect(document.querySelector(".adaptive-business-modal.business-registration-modal.compact-form-modal")).toBeTruthy();
     const modal = document.querySelector<HTMLElement>(".ant-modal");
-    expect(modal?.style.width).toBe("560px");
+    expect(modal?.style.width).toBe("520px");
   });
 
-  it("size=compact 时显式 width 优先于默认 560", () => {
+  it("size=compact 时显式 width 优先于默认 520", () => {
     renderLight(
       <BusinessActionModal open size="compact" width={720} title="锁定账期" onCancel={() => undefined}>
         <div>内容</div>
@@ -87,6 +86,38 @@ describe("BusinessActionModal", () => {
     );
 
     expect(document.querySelector<HTMLElement>(".ant-modal")?.style.width).toBe("720px");
+  });
+
+  it.each([
+    [2, "520px", "business-form-layout-1x5"],
+    [7, "600px", "business-form-layout-2x5"],
+    [12, "900px", "business-form-layout-3x5"],
+    [17, "1080px", "business-form-layout-4x5"],
+    [20, "1200px", "business-form-layout-build-order"],
+  ])("按字段数量 %s 使用标准宽度 %s", (fieldCount, expectedWidth, fieldLayout) => {
+    renderLight(
+      <BusinessActionModal open fieldCount={fieldCount} title="字段表单" onCancel={() => undefined}>
+        <div>内容</div>
+      </BusinessActionModal>,
+      { user: "admin" },
+    );
+
+    const modal = document.querySelector<HTMLElement>(".ant-modal");
+    expect(modal?.style.width).toBe(expectedWidth);
+    expect(modal?.style.getPropertyValue("--resizable-modal-width")).toBe(expectedWidth);
+    if (fieldLayout) expect(document.querySelector<HTMLElement>(".adaptive-business-modal")).toHaveClass(fieldLayout);
+  });
+
+  it("20 个及以上字段使用建单式完整布局", () => {
+    renderLight(
+      <BusinessActionModal open fieldCount={21} title="建单表单" onCancel={() => undefined}>
+        <div>内容</div>
+      </BusinessActionModal>,
+      { user: "admin" },
+    );
+
+    expect(document.querySelector<HTMLElement>(".adaptive-business-modal"))
+      .toHaveClass("business-form-layout-build-order");
   });
 
   it("compact 弹窗内按钮不插入中文字符间距（autoInsertSpace=false）", () => {

@@ -466,10 +466,8 @@ export function useOrdersPageController(params: {
   const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
   const ledgerColumns: ColumnsType<Order> = [
     { title: "订单号", dataIndex: "order_no", width: 110, ellipsis: true },
-    { title: "对方 / 来源", key: "party", width: 160, ellipsis: true, render: (_, order) => [order.party_name, order.party_source].filter(Boolean).join(" · ") || "-" },
     { title: "游戏/产品类型", dataIndex: "account_game_type", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "游戏账号/产品", dataIndex: "account_game_account", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "平台", dataIndex: "account_platform", width: 72, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "入库负责人", dataIndex: "inventory_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "售卖负责人", dataIndex: "sale_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },

@@ -1,5 +1,5 @@
 import { Form, Input } from "antd";
-import { AdaptiveFormGrid, NestedFormSection, Select } from "../shared/ui";
+import { AdaptiveFormGrid, BusinessRegistrationGroup, Select } from "../shared/ui";
 import { CfgItem, sectionLabel } from "./ConfigurableField";
 import { useOptionSet } from "../shared/lib/optionSets";
 import type { EmployeeOption } from "../shared/api/catalog";
@@ -24,7 +24,7 @@ export function DeliveryInfoSection(props: { showIntermediary?: boolean; employe
   };
 
   return (
-    <NestedFormSection className="nested-form-section--card delivery-info-section" title={deliveryTitle}>
+    <BusinessRegistrationGroup className="delivery-info-section" title={deliveryTitle}>
       <AdaptiveFormGrid>
         <CfgItem name="bound_phone" label="换绑手机号"><Input placeholder="可选填" /></CfgItem>
         <CfgItem name="bound_phone_owner" label="手机号绑定人"><Input placeholder="可选填" /></CfgItem>
@@ -47,6 +47,6 @@ export function DeliveryInfoSection(props: { showIntermediary?: boolean; employe
         </> : null}
         <ResponsibleEmployeeSelect className="delivery-info-section__responsibles" name="delivery_responsible_ids" label="交付负责人" employees={props.employees ?? []} />
       </AdaptiveFormGrid>
-    </NestedFormSection>
+    </BusinessRegistrationGroup>
   );
 }

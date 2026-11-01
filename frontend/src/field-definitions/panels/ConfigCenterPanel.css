@@ -62,3 +62,13 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+
+/* 子面板去掉重复卡片后，保留主操作的右侧锚点。 */
+.config-center__content .order-types-panel__actions {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-4);
+  z-index: 1;
+  margin: 0;
+}
+.config-center__content > .ant-card { position: relative; }

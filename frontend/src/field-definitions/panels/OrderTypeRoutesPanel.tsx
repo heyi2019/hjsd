@@ -23,7 +23,7 @@ import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
 import { useSession } from "../../shared/state/session";
-import { BusinessForm, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const PORTION_LABEL: Record<string, string> = {
   PRINCIPAL: "本金",
@@ -238,9 +238,12 @@ export function OrderTypeRoutesPanel() {
         }
       >
         <Card className="glass" title="覆盖资金路由">
-          <BusinessForm
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
             form={form}
-            layout="vertical"
             onFinish={submitRoute}
             initialValues={{ portion: "PRINCIPAL", priority: 0 }}
           >
@@ -267,7 +270,7 @@ export function OrderTypeRoutesPanel() {
                 影响预览
               </PermissionButton>
             </Space>
-          </BusinessForm>
+          </BusinessRegistrationForm>
           {preview ? (
             <Typography.Paragraph className="ui-form-spaced">
               <strong>影响结果：</strong>

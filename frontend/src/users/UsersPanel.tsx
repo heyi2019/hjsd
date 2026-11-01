@@ -3,7 +3,7 @@ import { Card, Form, Input, Space, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { errorMessage, normalizeError, type NormalizedError } from "../shared/api/client";
 import { poolsApi, teamsApi, usersApi, type ManagedUser, type Pool, type Team } from "../shared/api/catalog";
-import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useSession } from "../shared/state/session";
@@ -88,7 +88,7 @@ export function UsersPanel() {
             </ConfirmButton><PermissionButton permission="user.manage" size="small" onClick={() => setResetting(user)}>重置密码</PermissionButton></Space> },
       ]}
     />
-    <BusinessForm form={form} layout="inline" onFinish={submit}>
+    <BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
       <Form.Item name="username" rules={[{ required: true }]}><Input placeholder="用户名" /></Form.Item>
       <Form.Item name="display_name" rules={[{ required: true }]}><Input placeholder="姓名" /></Form.Item>
       <Form.Item name="password" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
@@ -97,20 +97,28 @@ export function UsersPanel() {
       <Form.Item name="team_ids"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
       <Form.Item name="pool_ids"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金池" className="ui-control-min-180" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={Boolean(loadError)}>新增用户</PermissionButton>
-    </BusinessForm>
-    <BusinessActionModal title={`编辑用户：${editing?.username ?? ""}`} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
-      <BusinessForm form={editForm} onFinish={updateUser}>
+    </BusinessRegistrationForm>
+    <BusinessActionModal title={`编辑用户：${editing?.username ?? ""}`} fieldCount={5} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
+      <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={editForm} onFinish={updateUser}>
         <Form.Item name="display_name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
         <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} /></Form.Item>
         <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopeOptions} /></Form.Item>
         <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} /></Form.Item>
         <Form.Item name="pool_ids" label="可见资金池"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
     <BusinessActionModal size="compact" title={`重置密码：${resetting?.username ?? ""}`} open={Boolean(resetting)} onCancel={() => setResetting(null)} onOk={() => resetForm.submit()} destroyOnHidden>
-      <BusinessForm form={resetForm} onFinish={resetPassword}>
+      <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={resetForm} onFinish={resetPassword}>
         <Form.Item name="password" label="新密码" rules={[{ required: true, min: 8, message: "密码至少 8 位" }]}><Input.Password placeholder="新密码（至少 8 位）" autoComplete="new-password" /></Form.Item>
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
   </Card>;
 }

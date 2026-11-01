@@ -86,7 +86,7 @@ export function OrderDetailExecutionSection({
       <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
         <InventorySectionHeading title="操作明细" />
         <div className="inventory-detail__meta">
-          {sortedRows.length ? <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "100%" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
+          {sortedRows.length ? <DataTable className="ui-datatable--inline" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "100%" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
         </div>
       </div>
       {audit.length ? (
@@ -94,7 +94,6 @@ export function OrderDetailExecutionSection({
           <InventorySectionHeading title="操作追溯" />
           <div className="inventory-detail__meta">
             <DataTable
-              className="inventory-audit-table"
               rows={audit}
               page={1}
               pageSize={10}

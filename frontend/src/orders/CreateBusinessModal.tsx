@@ -20,7 +20,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, PermissionButton } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
@@ -322,6 +322,7 @@ export function CreateBusinessModal(props: {
   return (
     <BusinessActionModal
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
+      fieldCount={21}
       open={props.open}
       onCancel={() => {
         const currentValues = form.getFieldsValue(true);
@@ -348,7 +349,7 @@ export function CreateBusinessModal(props: {
       width={1200}
     >
       <ErrorBanner error={loadError} />
-      <BusinessForm
+      <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -384,7 +385,7 @@ export function CreateBusinessModal(props: {
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
   );
 }

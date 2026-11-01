@@ -1,6 +1,6 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
-import { DatePicker, Form, Table } from "antd";
+import { DatePicker, Form } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi,
@@ -9,7 +9,7 @@ import { ordersApi,
   type AccountExecutionDetail, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
@@ -102,13 +102,13 @@ export function InventoryConsignmentModal(props: {
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
-        <BusinessForm
-          scope="CONSIGN"
-          form={form}
+        <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }}
+          scope="CONSIGN"
+          form={form}
           onFinish={submit}
         >
           <CfgItem
@@ -128,21 +128,25 @@ export function InventoryConsignmentModal(props: {
           <p className="muted">每次确认只登记一个平台；可继续选择下一个平台并填写其上架时间。</p>
           <section aria-label="已上架记录">
             <h4>已上架记录</h4>
-            <Table<ListedPlatform>
+            <DataTable<ListedPlatform>
               size="small"
               pagination={false}
               rowKey="key"
-              dataSource={listed}
+              rows={listed}
+              page={1}
+              pageSize={10}
+              total={listed.length}
+              onPageChange={() => undefined}
+              emptyText="暂无上架记录"
               columns={[
                 { title: "上架平台", dataIndex: "platform" },
                 { title: "上架时间", dataIndex: "listedAt", width: 180 },
               ]}
-              locale={{ emptyText: "暂无上架记录" }}
             />
           </section>
           <CustomFieldSection section="OPERATION" testIdSuffix="inventory-consignment-operation" />
           <CustomFieldSection testIdSuffix="inventory-consignment" />
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>
   );

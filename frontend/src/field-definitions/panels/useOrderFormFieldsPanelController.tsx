@@ -8,7 +8,7 @@ import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { buildGroupedScopeOptions, useFormScopes } from "../formScopes";
-import { BusinessForm, ConfirmButton, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessRegistrationForm, ConfirmButton, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 import {
   CONDITION_OP_OPTIONS,
@@ -408,7 +408,7 @@ export function useOrderFormFieldsPanelController({
 
   const editorForm = (
     <PermissionGate permission="field-definition.manage">
-      <BusinessForm
+      <BusinessRegistrationForm
         form={form}
         id={editorFormId}
         layout="inline"
@@ -544,7 +544,7 @@ export function useOrderFormFieldsPanelController({
             <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
           </Form.Item>
         )}
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </PermissionGate>
   );
 

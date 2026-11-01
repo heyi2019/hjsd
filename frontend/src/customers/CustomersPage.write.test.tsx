@@ -96,6 +96,18 @@ describe("CustomersPage：权限门控与写操作", () => {
     expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五" });
   });
 
+  it("新建客户弹窗采用订单式分区与底部全宽建档按钮", async () => {
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("button", { name: /新建/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.closest(".customer-create-modal")).toBeTruthy();
+    expect(within(dialog).getByText("客户信息")).toBeInTheDocument();
+    expect(dialog.querySelector("#customer-create-form")).toBeInTheDocument();
+    expect(dialog.querySelector(".ant-modal-footer .ant-btn")).toHaveTextContent("建档");
+  });
+
   it("重复候选不拦截，只提示（创建仍成功）", async () => {
     const warningSpy = vi.spyOn(message, "warning");
     resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });

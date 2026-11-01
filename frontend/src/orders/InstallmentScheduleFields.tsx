@@ -1,5 +1,5 @@
 import { DatePicker, Form } from "antd";
-import { NestedFormField } from "../shared/ui";
+import { BusinessRegistrationField } from "../shared/ui";
 import "./InstallmentScheduleFields.css";
 
 export type InstallmentScheduleItem = { due_on?: unknown };
@@ -29,9 +29,9 @@ export function InstallmentScheduleFields(props: { name: string }) {
   return <Form.List name={props.name} initialValue={[{}]}>{(fields) => (
     <div className="installment-schedule-list">
       {fields.map((field, index) => <div className="installment-schedule-row" key={field.key}>
-        <NestedFormField label={`第 ${index + 1} 期到期日`} required>
+        <BusinessRegistrationField label={`第 ${index + 1} 期到期日`} required>
           <Form.Item noStyle name={[field.name, "due_on"]} rules={[{ required: true, message: "请选择到期日" }]}><DatePicker aria-label={`第 ${index + 1} 期到期日`} className="ui-control-full" placeholder="请选择日期" /></Form.Item>
-        </NestedFormField>
+        </BusinessRegistrationField>
       </div>)}
     </div>
   )}</Form.List>;

@@ -17,16 +17,19 @@ import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
+  DateField,
   ErrorBanner,
   InlineError,
   MoneyInput,
   MoneyText,
   ConfirmButton,
   BusinessActionModal,
-  BusinessForm,
+  BusinessRegistrationForm,
   PermissionButton,
   Select,
   StatRow,
+  dateValueFromEvent,
+  dateValueProps,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
@@ -249,25 +252,33 @@ export function RebatesPanel() {
         />
       </Card>
 
-      <BusinessActionModal title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"} open={Boolean(editTarget)} onCancel={() => setEditTarget(null)} footer={null}>
+      <BusinessActionModal title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => setEditTarget(null)} footer={null}>
         <InlineError error={write.error} />
-        <BusinessForm scope="INVREBATE" form={editForm} onFinish={submitEdit}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
           <div className="rebate-core-fields">
             <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}><MoneyInput /></CfgItem>
             <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
-            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}><Input /></CfgItem>
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>
           <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
           <CustomFieldSection testIdSuffix="rebate-edit" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>保存</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
 
-      <BusinessActionModal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <BusinessActionModal title="新增返点记录" fieldCount={6} open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="REBATE" active={createOpen}>
-        <BusinessForm scope="INVREBATE" form={form}
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={form}
           onFinish={submitCreate}
           initialValues={{ collected_on: today(), rebate_type: "BUY" }}
         >
@@ -288,8 +299,8 @@ export function RebatesPanel() {
             <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}>
               <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
             </CfgItem>
-            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}>
-              <Input placeholder="YYYY-MM-DD" />
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+              <DateField />
             </CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>
@@ -300,7 +311,7 @@ export function RebatesPanel() {
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             创建
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
     </section>

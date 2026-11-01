@@ -4,7 +4,7 @@ import { Alert, DatePicker, Form, Input, Typography } from "antd";
 import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
-import { MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessForm } from "../../shared/ui";
+import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
@@ -64,6 +64,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
   return (
       <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+        fieldCount={6}
         open={Boolean(cancelInstallmentTarget || (cancelOrderTarget && !hasSharedCancellation))}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
@@ -71,7 +72,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
         okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >
-        <BusinessForm
+        <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -118,15 +119,15 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
               <ResponsibleEmployeeSelect name="operator_user_ids" label={cancelScope === "INVREFUND" ? "入账操作人" : "退款操作人"} employees={cancelEmployees} className="order-cancel-employee" />
             </div>
           ) : null}
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
   );
 }
@@ -144,13 +145,14 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
   return (
       <BusinessActionModal
         title={selectedOrder ? `编辑订单 · ${selectedOrder.order_no}` : "编辑订单"}
+        fieldCount={7}
         open={editOpen}
         confirmLoading={editSubmitting}
         onCancel={() => { if (!editSubmitting) setEditOpen(false); }}
         okText="保存修改"
         onOk={() => void editForm.submit()}
       >
-        <BusinessForm
+        <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -164,8 +166,10 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
             label="成交日期"
             rules={orderHasPostedEvents ? [] : [{ required: true, message: "请输入成交日期" }]}
             extra={orderHasPostedEvents ? "已有登记事件，成交日期不可修改" : undefined}
+            getValueFromEvent={dateValueFromEvent}
+            getValueProps={dateValueProps}
           >
-            <Input placeholder="YYYY-MM-DD" disabled={orderHasPostedEvents} />
+            <DateField disabled={orderHasPostedEvents} />
           </CfgItem>
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="订单备注（选填）" />
@@ -173,7 +177,7 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
 
           <CustomFieldSection testIdSuffix="order-edit" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
   );
 }
@@ -216,13 +220,13 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
   return (
       <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
+        fieldCount={21}
         open={allocationOpen}
-        width={720}
         confirmLoading={allocationSubmitting}
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
       >
-        <BusinessForm
+        <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -366,7 +370,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>
             <CustomFieldSection testIdSuffix="order-allocation" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
   );
 }
@@ -387,12 +391,13 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
   return (
       <BusinessActionModal
         title={actionOrder ? `资金收支 · ${actionOrder.order_no}` : "资金收支"}
+        fieldCount={5}
         open={refundOpen}
         confirmLoading={refundSubmitting}
         onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
         onOk={() => void refundForm.submit()}
       >
-        <BusinessForm
+        <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -437,7 +442,7 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
           </CfgItem>
             <CustomFieldSection testIdSuffix="order-refund" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         <div className="ui-form-spaced">
           <Typography.Text strong>资金明细</Typography.Text>
           {actionOrder?.cashflows?.length ? actionOrder.cashflows.map((flow) => (

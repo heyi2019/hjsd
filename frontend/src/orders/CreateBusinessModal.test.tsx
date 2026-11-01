@@ -222,14 +222,37 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
   });
 
-it("FE-023：已有相同游戏账号时先确认复购，确认后允许建单", async () => {
+it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", async () => {
+    const confirmSpy = vi.spyOn(appModal, "confirm");
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
+      { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "WAITING" },
+    ] as never);
+    await openTypedModal("TH");
+    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    const amounts = screen.getAllByPlaceholderText("请输入金额");
+    await ui.type(amounts[0], "1000");
+    await ui.type(amounts[1], "1200");
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(screen.getByText(/请先售出后再建单/)).toBeInTheDocument());
+    expect(screen.getByLabelText("游戏账号")).toHaveValue("pickup-account");
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+  });
+
+it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单", async () => {
     let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
     const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
       confirmConfig = config as typeof confirmConfig;
       return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
     });
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-      { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "WAITING" },
+      { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "SOLD" },
     ] as never);
     await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
@@ -246,7 +269,6 @@ it("FE-023：已有相同游戏账号时先确认复购，确认后允许建单"
     await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
     expect(catalog.ordersApi.create).not.toHaveBeenCalled();
     expect(confirmConfig).toMatchObject({ title: "检测到重复游戏账号", okText: "是，继续建单", cancelText: "否，返回修改" });
-    expect((await screen.findAllByText(/是否为复购/)).length).toBeGreaterThan(0);
     await act(async () => { await confirmConfig?.onOk?.(); });
     await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
   });

@@ -134,18 +134,27 @@ export function CreateBusinessModal(props: {
       const duplicateKey = `${gameType}\u0000${gameAccount}`;
       if (gameAccount && gameType && repurchaseConfirmedKey.current !== duplicateKey) {
         const existingAccounts = await stocksApi.list();
-        const duplicate = existingAccounts.find((account) => (
+        const duplicates = existingAccounts.filter((account) => (
           account.status !== "VOID"
           && String(account.game_account ?? "").trim() === gameAccount
           && String(account.game_type ?? "").trim() === gameType
         ));
+        // 账号只有在历史库存已售出后才允许回流；未知状态也按未售出处理，避免重复进入库存。
+        const unsoldDuplicate = duplicates.find((account) => account.status !== "SOLD");
+        if (unsoldDuplicate) {
+          const message = `已有未售出库存账号「${gameAccount}」，请先售出后再建单`;
+          form.setFields([{ name: "game_account", errors: [message] }]);
+          setLoadError({ message });
+          return;
+        }
+        const duplicate = duplicates.find((account) => account.status === "SOLD");
         if (duplicate && repurchaseConfirmedKey.current !== duplicateKey) {
-          const message = `已有库存账号「${gameAccount}」，请确认是否为复购订单`;
+          const message = `历史库存账号「${gameAccount}」已售出，请确认是否为复购回流订单`;
           form.setFields([{ name: "game_account", errors: [message] }]);
           setLoadError({ message });
           appModal.confirm({
             title: "检测到重复游戏账号",
-            content: `已有库存账号「${gameAccount}」。请确认该订单是否为复购订单，确认后继续建单。`,
+            content: `历史账号「${gameAccount}」已售出，可作为复购回流重新入库。请确认是否继续建单。`,
             okText: "是，继续建单",
             cancelText: "否，返回修改",
             onOk: () => {

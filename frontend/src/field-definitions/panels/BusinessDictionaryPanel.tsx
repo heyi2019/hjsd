@@ -240,6 +240,12 @@ export function BusinessDictionaryPanel() {
             desc="取消用于全额反向处理并结束该笔交易；部分退钱走退款流程，订单仍保持已售出。"
           />
         </Descriptions.Item>
+        <Descriptions.Item label="入库规则">
+          <EntryLine name="首次入库" desc="回收、提号、代挂订单创建成功后，账号进入库存中心并按在库状态管理。" />
+          <EntryLine name="未售出重复账号" desc="按游戏类型 + 游戏账号精确匹配；只要历史账号仍未售出，就禁止重复入库，不能通过确认强行建单。" />
+          <EntryLine name="已售出账号回流" desc="历史账号已售出后，重复建单视为账号回流；经复购确认后允许重新进入库存。" />
+          <EntryLine name="作废记录" desc="已作废账号不参与重复入库校验。" />
+        </Descriptions.Item>
       </Descriptions>
     </Card>
   );

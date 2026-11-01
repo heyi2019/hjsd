@@ -58,3 +58,14 @@ it("业务字典在分润规则下方展示取消模型", async () => {
   expect(screen.getByText("回收/提号未售出")).toBeInTheDocument();
   expect(screen.getByText("已售出")).toBeInTheDocument();
 });
+
+it("业务字典展示账号入库规则：未售出禁止重复，已售出允许回流复购", () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  expect(screen.getByText("入库规则")).toBeInTheDocument();
+  expect(screen.getByText(/只要历史账号仍未售出，就禁止重复入库/)).toBeInTheDocument();
+  expect(screen.getByText(/历史账号已售出后，重复建单视为账号回流/)).toBeInTheDocument();
+  expect(
+    screen.getByText("取消模型").compareDocumentPosition(screen.getByText("入库规则")) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});

@@ -5,7 +5,7 @@ import { importsApi } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessForm, FormDrawer, InlineError, PermissionButton, Select } from "../shared/ui";
 
-import { parseImportText, downloadImportTemplate } from "./ImportWorkbench.fragments";
+import { isSupportedImportFile, parseImportText, downloadImportTemplate } from "./ImportWorkbench.fragments";
 import type { ImportWorkbenchController } from "./useImportWorkbenchController";
 
 /** 导入工作台的 7 个浮层：人工指派 / 新建导入 / 标单边划转 / 跳过 / 回滚 / 驳回 / 更正。 */
@@ -129,7 +129,13 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
             <Upload
               accept=".json,.csv"
               maxCount={1}
-              beforeUpload={() => false}
+              beforeUpload={(file) => {
+                if (!isSupportedImportFile(file)) {
+                  appMessage.error("只支持 JSON 或 CSV 文件");
+                  return Upload.LIST_IGNORE;
+                }
+                return false;
+              }}
               fileList={importFile ? [importFile] : []}
               onChange={({ fileList }) => setImportFile(fileList[0] ?? null)}
               onRemove={() => { setImportFile(null); return true; }}

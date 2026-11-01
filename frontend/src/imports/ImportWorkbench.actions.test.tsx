@@ -259,6 +259,14 @@ describe("ImportWorkbench：操作分支补充", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith("请选择 JSON 或 CSV 文件"));
   });
 
+  it("FE-063：PNG 在上传阶段被拒绝，不进入导入批次", async () => {
+    await openWorkbench();
+    const fileInput = await openImportModal();
+    await attachFile(fileInput, makeFile(["not-a-table"], "account-image.png", { type: "image/png" }));
+    expect(message.error).toHaveBeenCalledWith("只支持 JSON 或 CSV 文件");
+    expect(catalog.importsApi.createBatch).not.toHaveBeenCalled();
+  });
+
   it("新建导入：上传 CSV 后解析为原始行并创建批次", async () => {
     await openWorkbench();
     const fileInput = await openImportModal();

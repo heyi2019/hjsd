@@ -9,6 +9,7 @@ import { ReportsPage } from "../reporting/ReportsPage";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "../field-definitions/panels/OrderTypeRoutesPanel";
+import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
@@ -192,4 +193,10 @@ it("P1/FE-240：过账路由失败时显示不可用并锁定保存", async () =
   expect((await screen.findAllByText("资金路由数据不可用，请点击重新加载")).length).toBeGreaterThan(0);
   expect(screen.getByRole("button", { name: /保存路由/ })).toBeDisabled();
   expect(screen.getByText(/业务类型覆盖不可用/)).toBeInTheDocument();
+});
+
+it("P1/FE-063：导入文件类型校验拒绝 PNG", () => {
+  expect(isSupportedImportFile({ name: "account-image.png", type: "image/png" })).toBe(false);
+  expect(isSupportedImportFile({ name: "orders.csv", type: "text/csv" })).toBe(true);
+  expect(isSupportedImportFile({ name: "rows.json", type: "application/json" })).toBe(true);
 });

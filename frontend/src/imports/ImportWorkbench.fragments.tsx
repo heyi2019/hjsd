@@ -3,6 +3,14 @@
  *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
 export const RED_LINE_DESC = "导入数据只保留原文与人工映射：不覆盖新单、不自动匹配、不补造单边划转。";
 
+export function isSupportedImportFile(file: { name: string; type?: string }): boolean {
+  const name = file.name.toLowerCase();
+  const extensionAllowed = name.endsWith(".json") || name.endsWith(".csv");
+  if (!extensionAllowed) return false;
+  if (!file.type) return true;
+  return file.type === "application/json" || file.type === "text/csv";
+}
+
 export function parseImportText(text: string, filename: string): Record<string, unknown>[] {
   if (filename.toLowerCase().endsWith(".json")) {
     const parsed: unknown = JSON.parse(text);

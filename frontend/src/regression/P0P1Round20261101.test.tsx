@@ -13,6 +13,7 @@ import * as client from "../shared/api/client";
 import { ACCESS_TOKEN_KEY } from "../shared/api/client";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { FundsPage } from "../pools/FundsPage";
+import { RebatesPanel } from "../rebates/RebatesPanel";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { CustomerPanel } from "../customers/CustomerPanel";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
@@ -539,6 +540,15 @@ it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", a
   expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByText("可用余额合计").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
+});
+
+it("P1/FE-231：返点数据失败时不显示零统计且禁用新增", async () => {
+  vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "rebates down" });
+  renderLight(<RebatesPanel />, { user: "admin" });
+
+  expect(await screen.findByText("返点明细")).toBeInTheDocument();
+  expect(screen.getByText("返点记录数").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByRole("button", { name: /新增返点记录/ })).toBeDisabled();
 });
 
 it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {

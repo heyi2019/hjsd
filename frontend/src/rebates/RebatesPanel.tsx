@@ -42,6 +42,7 @@ export function RebatesPanel() {
   const [editTarget, setEditTarget] = useState<Rebate | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [form] = Form.useForm();
@@ -61,6 +62,7 @@ export function RebatesPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setDataReady(false);
     try {
       const [list, orderList, employeeList] = await Promise.all([
         rebatesApi.list(),
@@ -71,6 +73,7 @@ export function RebatesPanel() {
       setOrders(orderList);
       setEmployees(employeeList);
       setError(null);
+      setDataReady(true);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -210,7 +213,7 @@ export function RebatesPanel() {
 
       <StatRow
         items={[
-          { label: "返点记录数", kind: "count", amount: String(rows.length) },
+          { label: "返点记录数", kind: "count", amount: error ? "不可用" : dataReady ? String(rows.length) : "—" },
         ]}
       />
 
@@ -223,6 +226,7 @@ export function RebatesPanel() {
             <PermissionButton
               permission="order.event.post"
               type="primary"
+              disabled={!dataReady || loading || Boolean(error)}
               onClick={() => {
                 form.resetFields();
                 setCreateOpen(true);
@@ -240,7 +244,7 @@ export function RebatesPanel() {
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-          emptyText="暂无返点记录"
+          emptyText={error ? "返点数据不可用，请点击重新加载" : "暂无返点记录"}
           onPageChange={() => undefined}
         />
       </Card>

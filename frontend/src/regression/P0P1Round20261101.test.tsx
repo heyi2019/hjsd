@@ -7,6 +7,8 @@ import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { OrdersPage } from "../orders/OrdersPage";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { UsersPanel } from "../users/UsersPanel";
+import { UserCenterPage } from "../auth/UserCenterPage";
+import * as client from "../shared/api/client";
 import { ReportsPage } from "../reporting/ReportsPage";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
@@ -132,6 +134,21 @@ it("P1/FE-090：开发态当前角色不在服务端人员列表时有明确说�
   expect(await screen.findByText("operator01")).toBeInTheDocument();
   expect(screen.getByText(/开发态当前角色：admin/)).toBeInTheDocument();
   expect(screen.getByText(/开发态角色不纳入服务端人员列表/)).toBeInTheDocument();
+});
+
+it("P1/FE-046：错误旧密码停留在用户中心并恢复可重试状态", async () => {
+  vi.spyOn(client, "changePassword").mockRejectedValueOnce(new Error("原密码错误"));
+  renderLight(<UserCenterPage />, { user: "admin" });
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await user.type(screen.getByLabelText("当前密码"), "wrong-old-pass");
+  await user.type(screen.getByLabelText("新密码"), "new-pass-12345");
+  await user.type(screen.getByLabelText("确认新密码"), "new-pass-12345");
+  await user.click(screen.getByRole("button", { name: /修改密码/ }));
+
+  expect(await screen.findByText(/原密码错误/)).toBeInTheDocument();
+  expect(screen.getByLabelText("当前密码")).toHaveValue("wrong-old-pass");
+  expect(screen.getByRole("button", { name: /修改密码/ })).toBeEnabled();
+  expect(screen.queryByText("登录工作台")).not.toBeInTheDocument();
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {

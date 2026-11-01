@@ -3,6 +3,7 @@ import {
   api,
   DEV_USER_KEY,
   checkBackendHealth,
+  changePassword,
   currentDevUser,
   errorMessage,
   normalizeError,
@@ -100,6 +101,19 @@ describe("checkBackendHealth：启动前置检查", () => {
     const request = vi.spyOn(api, "get").mockResolvedValue({ data: { status: "ok" } } as never);
     await checkBackendHealth();
     expect(request).toHaveBeenCalledWith("/health", { timeout: 3_000 });
+    request.mockRestore();
+  });
+});
+
+describe("changePassword：会话操作超时边界", () => {
+  it("改密请求使用 5 秒超时，避免错误旧密码长时间卡在 loading", async () => {
+    const request = vi.spyOn(api, "post").mockResolvedValue({ data: undefined } as never);
+    await changePassword("old-pass", "new-pass-123");
+    expect(request).toHaveBeenCalledWith(
+      "/auth/change-password",
+      { old_password: "old-pass", new_password: "new-pass-123" },
+      { timeout: 5_000 },
+    );
     request.mockRestore();
   });
 });

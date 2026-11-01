@@ -69,4 +69,18 @@ describe("UserCenterPage：账号信息与修改密码", () => {
     await waitFor(() => expect(changePasswordApi).toHaveBeenCalledWith("old-pass-123", "new-pass-12345"));
     expect(await screen.findByText("密码已更新")).toBeInTheDocument();
   });
+
+  it("错误旧密码留在用户中心，保留表单并恢复提交按钮", async () => {
+    vi.mocked(changePasswordApi).mockRejectedValueOnce(new Error("原密码错误"));
+    renderLight(<UserCenterPage />, { user: "admin" });
+    fireEvent.change(screen.getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
+    fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
+    fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
+    fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
+
+    expect(await screen.findByText(/原密码错误/)).toBeInTheDocument();
+    expect(screen.getByLabelText("当前密码")).toHaveValue("wrong-old-pass");
+    expect(screen.getByRole("button", { name: /修改密码/ })).toBeEnabled();
+    expect(screen.queryByText("登录工作台")).not.toBeInTheDocument();
+  });
 });

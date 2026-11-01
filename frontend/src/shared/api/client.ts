@@ -165,7 +165,8 @@ export async function checkBackendHealth(): Promise<void> {
 }
 
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
-  await api.post("/auth/change-password", { old_password: oldPassword, new_password: newPassword });
+  // 会话安全操作不能沿用普通请求的 15 秒等待；失败或旧密码错误时应尽快回到可重试状态。
+  await api.post("/auth/change-password", { old_password: oldPassword, new_password: newPassword }, { timeout: 5_000 });
 }
 
 export async function logout(): Promise<void> {

@@ -29,6 +29,8 @@ import { InventorySaleModal } from "../stocks/InventorySaleModal";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { SearchPanel } from "../search/SearchPanel";
 import { AttachmentPanel } from "../attachments/AttachmentPanel";
+import { QualityPanel } from "../quality/QualityPanel";
+import { AuditPanel } from "../audit/AuditPanel";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 import { appMessage, appModal } from "../shared/ui/appFeedback";
@@ -612,6 +614,30 @@ it("P1/FE-114/165：附件未选对象时保护上传入口并给出前置提示
   renderLight(<AttachmentPanel />, { user: "admin" });
   expect(screen.getByText("请先填写对象编号后上传附件")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /上传附件/ })).toBeDisabled();
+});
+
+it("P1/FE-104/110/160：质量摘要失败不显示零，全部关闭时禁用批量动作", async () => {
+  vi.mocked(catalog.qualityApi.summary).mockRejectedValueOnce({ isAxiosError: true, message: "quality summary down" });
+  vi.mocked(catalog.qualityApi.list).mockResolvedValueOnce({
+    items: [{ id: 1, issue_no: "QLT-closed", severity: "LOW", title: "已关闭", entity_type: "order", entity_id: "1", status: "CLOSED", message: "done" }],
+  });
+  renderLight(<QualityPanel />, { user: "admin" });
+  expect(await screen.findByText(/quality summary down/)).toBeInTheDocument();
+  expect(screen.getByText("异常总数").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByRole("button", { name: /批量关闭未关闭工单/ })).toBeDisabled();
+});
+
+it("P1/FE-150/151：审计对象与动作下拉在字典失败时仍可用", async () => {
+  vi.mocked(catalog.auditApi.list).mockResolvedValueOnce({ items: [], total: 0 });
+  vi.mocked(catalog.auditApi.actions).mockRejectedValueOnce({ isAxiosError: true, message: "audit actions down" });
+  renderLight(<AuditPanel />, { user: "admin" });
+  await screen.findByText("暂无审计记录");
+  const selects = document.querySelectorAll(".ui-filter-bar .ant-select");
+  expect(selects.length).toBe(2);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(selects[0].querySelector(".ant-select-selector") as Element);
+  expect(await screen.findByText("订单", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(selects[1].querySelector(".ant-select-selector") as Element);
+  expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
 });
 
 it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {

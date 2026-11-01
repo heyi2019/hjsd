@@ -43,4 +43,13 @@ describe("AuditPanel：审计记录", () => {
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(vi.mocked(catalog.auditApi.list).mock.calls.length).toBeGreaterThan(before));
   });
+
+  it("动作字典接口失败时仍保留可读的回落选项", async () => {
+    vi.mocked(catalog.auditApi.actions).mockRejectedValueOnce(new Error("actions down"));
+    renderLight(<AuditPanel />, { user: "admin" });
+    await screen.findByText("admin");
+    const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
+    await ui.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
+    expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
 });

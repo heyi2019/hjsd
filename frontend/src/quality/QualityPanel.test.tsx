@@ -101,6 +101,23 @@ describe("QualityPanel：质量中心", () => {
     expect(await screen.findByText(/quality down/)).toBeInTheDocument();
   });
 
+  it("质量摘要失败时不伪装成零统计", async () => {
+    vi.mocked(catalog.qualityApi.summary).mockRejectedValueOnce(new Error("summary down"));
+    renderLight(<QualityPanel />, { user: "admin" });
+    expect(await screen.findByText(/summary down/)).toBeInTheDocument();
+    expect(screen.getByText("异常总数").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByText("高严重度").closest(".ui-stat")).toHaveTextContent("不可用");
+  });
+
+  it("没有未关闭工单时禁用批量关闭", async () => {
+    vi.mocked(catalog.qualityApi.list).mockResolvedValueOnce({
+      items: rows.map((row) => ({ ...row, status: "CLOSED" })),
+    });
+    renderLight(<QualityPanel />, { user: "admin" });
+    await screen.findByText("QLT-1");
+    expect(screen.getByRole("button", { name: /批量关闭未关闭工单/ })).toBeDisabled();
+  });
+
   it("新建工单：打开弹窗并填写提交", async () => {
     renderLight(<QualityPanel />, { user: "admin" });
     await screen.findByText("QLT-1");

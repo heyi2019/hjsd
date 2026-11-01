@@ -38,7 +38,7 @@ function formatAt(value: string | null | undefined): string {
 export function ConfigAuditPanel() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<AuditLogRow[]>([]);
-  const [actions, setActions] = useState<string[]>([]);
+  const [actions, setActions] = useState<string[]>(Object.keys(AUDIT_ACTION_LABEL));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
 
@@ -59,7 +59,7 @@ export function ConfigAuditPanel() {
     void auditApi
       .actions()
       .then((list) => setActions(list))
-      .catch(() => setActions([]));
+      .catch(() => undefined);
   }, []);
 
   const load = useCallback(async () => {

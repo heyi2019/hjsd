@@ -48,6 +48,7 @@ function renderMetric(value: QualityMetricValue | undefined, formula?: string) {
 export function QualityPanel() {
   const severityOptions = useOptionSet("QUALITY_SEVERITY") ?? [];
   const [summary, setSummary] = useState<QualitySummary | null>(null);
+  const [summaryReady, setSummaryReady] = useState(false);
   const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
   const [metricWindow, setMetricWindow] = useState(6);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -66,11 +67,13 @@ export function QualityPanel() {
   const [updating, setUpdating] = useState(false);
 
   const load = useCallback(async () => {
+    setSummaryReady(false);
     try {
       const [nextSummary, nextRows] = await Promise.all([qualityApi.summary(), qualityApi.list()]);
       setSummary(nextSummary);
       setRows(nextRows.items);
       setError(null);
+      setSummaryReady(true);
     } catch (err) {
       setError(normalizeError(err));
     }
@@ -212,7 +215,7 @@ export function QualityPanel() {
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
-      <StatRow items={[{ label: "异常总数", kind: "count", amount: String(summary?.total ?? 0) }, { label: "高严重度", kind: "count", amount: String(summary?.by_severity?.HIGH ?? 0), tone: "warn" }]} />
+      <StatRow items={[{ label: "异常总数", kind: "count", amount: summaryReady ? String(summary?.total ?? 0) : "不可用" }, { label: "高严重度", kind: "count", amount: summaryReady ? String(summary?.by_severity?.HIGH ?? 0) : "不可用", tone: "warn" }]} />
       <Card
         className="glass"
         title="月度质量指标"
@@ -239,7 +242,7 @@ export function QualityPanel() {
       </Card>
       <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.update" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.update" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
         <DataTable<QualityIssue> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
-        <PermissionButton permission="order.update" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
+        <PermissionButton permission="order.update" disabled={!summaryReady || rows.every((row) => row.status === "CLOSED")} onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
       <BusinessActionModal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={createOpen ? error : null} />

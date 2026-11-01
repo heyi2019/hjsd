@@ -132,6 +132,15 @@ describe("StudioExpensePanel：工作室支出", () => {
     });
   });
 
+  it("已配置承载池但流水列表拉取失败时禁用记一笔入口并展示错误重试", async () => {
+    mockOptionSets(["POOL-A"]);
+    vi.mocked(catalog.cashflowsApi.list).mockRejectedValue(new Error("流水读取失败"));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const recordBtn = await screen.findByRole("button", { name: /记一笔/ });
+    await waitFor(() => expect(recordBtn).toBeDisabled());
+    expect(screen.getByText(/流水读取失败/)).toBeInTheDocument();
+  });
+
   it("登记收入：IN / BUSINESS_IN / SELF_REVENUE，同样自动入账", async () => {
     mockOptionSets(["POOL-A"]);
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 62 });

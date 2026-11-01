@@ -14,6 +14,13 @@ import type { Cashflow } from "../shared/api/catalog";
 
 const Modal = BusinessActionModal;
 
+// 收支方向词典（FUND_FLOW_DIRECTION）不可用时回落的只读集合：保证默认 IN 始终是带名称的 selected option，
+// 避免出现"控件外游离文本 IN"。收入/支出为通用方向，回落安全。
+const FLOW_DIRECTION_FALLBACK = [
+  { value: "IN", label: "收入" },
+  { value: "OUT", label: "支出" },
+];
+
 export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
   const { depositOpen, setDepositOpen, depositForm, submitDeposit, write, pools } = ctrl;
   return (
@@ -22,7 +29,7 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
       <FieldConfigScope scope="FUNDDEPOSIT" active={depositOpen}>
         <BusinessForm scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit} initialValues={{ paid_on: today() }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
-            <Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
+            <Select aria-label="资金池" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </CfgItem>
           <CfgItem name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
             <Input inputMode="numeric" />
@@ -52,7 +59,7 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, cashflowAttributeOptions } = ctrl;
+  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
   return (
     <Modal title="新增独立资金流水" open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
       <InlineError error={write.error} />
@@ -60,7 +67,7 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
         <BusinessForm scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
-          <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select /></CfgItem>
+          <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? FLOW_DIRECTION_FALLBACK} aria-label="收支方向" /></CfgItem>
           <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
             <Select
               onChange={(value: string) => {
@@ -112,7 +119,7 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDRECON" active={reconciliationOpen}>
         <BusinessForm scope="FUNDRECON" form={reconciliationForm} onFinish={submitReconciliation} initialValues={{ reconciled_on: today() }}>
-          <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
+          <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select aria-label="资金池" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]}><Input placeholder="YYYY-MM-DD" /></CfgItem>
           <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
           <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>

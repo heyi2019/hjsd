@@ -1,19 +1,24 @@
 import { appMessage } from "../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
 import { useEffect, useState } from "react";
-import { errorMessage } from "../shared/api/client";
+import { errorMessage, normalizeError } from "../shared/api/client";
 import { poolsApi, teamsApi, usersApi, type ManagedUser, type Pool, type Team } from "../shared/api/catalog";
-import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useSession } from "../shared/state/session";
 
 type User = ManagedUser;
 
+// 角色/数据范围词典不可用时回落的只读集合：保证默认 VIEWER / SELF 始终是带名称的 selected option，
+// 避免出现"控件外游离文本"。来源与对应 *_LABEL 一致。
+const USER_ROLE_FALLBACK = Object.entries(USER_ROLE_LABEL).map(([value, label]) => ({ value, label }));
+const OWNER_SCOPE_FALLBACK = Object.entries(OWNER_SCOPE_LABEL).map(([value, label]) => ({ value, label }));
+
 export function UsersPanel() {
   const { user } = useSession();
-  const roleOptions = useOptionSet("USER_ROLE") ?? [];
-  const scopeOptions = useOptionSet("OWNER_SCOPE") ?? [];
+  const roleOptions = useOptionSet("USER_ROLE") ?? USER_ROLE_FALLBACK;
+  const scopeOptions = useOptionSet("OWNER_SCOPE") ?? OWNER_SCOPE_FALLBACK;
   const [rows, setRows] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
@@ -22,7 +27,8 @@ export function UsersPanel() {
   const [resetForm] = Form.useForm();
   const [editing, setEditing] = useState<User | null>(null);
   const [resetting, setResetting] = useState<User | null>(null);
-  const load = async () => { try { const [users, teamList, poolList] = await Promise.all([usersApi.list(), teamsApi.list(), poolsApi.list()]); setRows(users); setTeams(teamList); setPools(poolList); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const load = async () => { try { const [users, teamList, poolList] = await Promise.all([usersApi.list(), teamsApi.list(), poolsApi.list()]); setRows(users); setTeams(teamList); setPools(poolList); setError(null); } catch (err) { setError(normalizeError(err)); appMessage.error(errorMessage(err)); } };
   useEffect(() => { void load(); }, []);
   const submit = async (values: Record<string, string>) => { try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
   const updateUser = async (values: Record<string, string>) => {
@@ -45,6 +51,7 @@ export function UsersPanel() {
         开发态当前角色：{user}；开发态角色不纳入服务端人员列表，下面仅展示可由后端管理的用户账号。
       </Typography.Paragraph>
     ) : null}
+    <ErrorBanner error={error} onRetry={() => void load()} />
     <DataTable<User>
       className="ui-admin-table"
       rows={rows}
@@ -79,19 +86,19 @@ export function UsersPanel() {
       <Form.Item name="username" rules={[{ required: true }]}><Input placeholder="用户名" /></Form.Item>
       <Form.Item name="display_name" rules={[{ required: true }]}><Input placeholder="姓名" /></Form.Item>
       <Form.Item name="password" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
-      <Form.Item name="role" initialValue="VIEWER"><Select options={roleOptions} className="ui-control-width-140" /></Form.Item>
-      <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} className="ui-control-width-100" /></Form.Item>
-      <Form.Item name="team_ids"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
-      <Form.Item name="pool_ids"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金池" className="ui-control-min-180" /></Form.Item>
-      <PermissionButton permission="user.manage" type="primary" htmlType="submit">新增用户</PermissionButton>
+      <Form.Item name="role" initialValue="VIEWER"><Select options={roleOptions} aria-label="角色" className="ui-control-width-140" /></Form.Item>
+      <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} aria-label="数据范围" className="ui-control-width-100" /></Form.Item>
+      <Form.Item name="team_ids"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
+      <Form.Item name="pool_ids"><Select mode="multiple" aria-label="可见资金池" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金池" className="ui-control-min-180" /></Form.Item>
+      <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={Boolean(error)}>新增用户</PermissionButton>
     </BusinessForm>
     <BusinessActionModal title={`编辑用户：${editing?.username ?? ""}`} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
       <BusinessForm form={editForm} onFinish={updateUser}>
         <Form.Item name="display_name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
-        <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} /></Form.Item>
-        <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopeOptions} /></Form.Item>
-        <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} /></Form.Item>
-        <Form.Item name="pool_ids" label="可见资金池"><Select mode="multiple" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
+        <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} aria-label="角色" /></Form.Item>
+        <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopeOptions} aria-label="数据范围" /></Form.Item>
+        <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} /></Form.Item>
+        <Form.Item name="pool_ids" label="可见资金池"><Select mode="multiple" aria-label="可见资金池" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
       </BusinessForm>
     </BusinessActionModal>
     <BusinessActionModal size="compact" title={`重置密码：${resetting?.username ?? ""}`} open={Boolean(resetting)} onCancel={() => setResetting(null)} onOk={() => resetForm.submit()} destroyOnHidden>

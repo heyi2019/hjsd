@@ -336,6 +336,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           <PermissionButton
             permission="deposit.post"
             type="primary"
+            disabled={Boolean(error)}
             onClick={() => {
               registerForm.setFieldsValue({ occurred_on: today(), direction: "OUT" });
               setRegisterDirection("OUT");
@@ -352,10 +353,10 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
         ) : null}
         <StatRow
           items={[
-            { label: "已入账收入", amount: approvedIncome },
-            { label: "已入账支出", amount: approvedExpense },
-            { label: "净额", amount: netTotal },
-            { label: "笔数", kind: "count", amount: flows.length },
+            { label: "已入账收入", amount: error ? null : approvedIncome },
+            { label: "已入账支出", amount: error ? null : approvedExpense },
+            { label: "净额", amount: error ? null : netTotal },
+            { label: "笔数", kind: "count", amount: error ? null : flows.length },
           ]}
         />
         <DataTable<Cashflow>
@@ -366,6 +367,7 @@ export function StudioExpensePanel({ pools }: { pools: Pool[] }) {
           total={flows.length}
           emptyText="暂无工作室支出"
           loading={loading}
+          pagination={error ? false : undefined}
           onPageChange={() => undefined}
        />
       </Card>

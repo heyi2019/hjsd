@@ -17,6 +17,10 @@ const COUNTERPARTY_STATUS_OPTIONS = [
   { value: "DISABLED", label: "已拉黑" },
 ];
 
+// 类型词典不可用时回落的只读集合：保证默认类型 PEER 始终是带名称的 selected option，
+// 避免出现"控件外游离文本 PEER"。来源与 COUNTERPARTY_TYPE_LABEL 一致（含 PEER/SUPPLIER/PLATFORM 等）。
+const COUNTERPARTY_TYPE_FALLBACK = Object.entries(COUNTERPARTY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
@@ -158,14 +162,14 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       className="glass"
       title="合作方"
       extra={
-        <PermissionButton permission="counterparty.manage" type="primary" onClick={() => setOpen(true)}>
+        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || !counterpartyTypeOptions} onClick={() => setOpen(true)}>
           新建合作方
         </PermissionButton>
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
       </Space>
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。
@@ -195,7 +199,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Input />
           </CfgItem>
           <CfgItem name="type" label="类型" rules={[{ required: true }]}>
-            <Select options={counterpartyTypeOptions ?? []} />
+            <Select options={counterpartyTypeOptions ?? COUNTERPARTY_TYPE_FALLBACK} />
           </CfgItem>
           <CfgItem name="contact_name" label="联系人">
             <Input />
@@ -207,7 +211,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Input />
           </CfgItem>
           <CustomFieldSection testIdSuffix="counterparty-create" />
-          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" disabled={Boolean(error) || !counterpartyTypeOptions}>
             建档
           </PermissionButton>
         </BusinessForm>

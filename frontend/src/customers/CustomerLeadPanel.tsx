@@ -77,9 +77,9 @@ export function CustomerLeadPanel() {
 
   return <section className="ui-stack">
     <ErrorBanner error={error} onRetry={() => void load()} />
-    <StatRow items={[{ label: "需求总数", kind: "count", amount: String(rows.length) }, { label: "待跟进", kind: "count", amount: String(rows.filter((row) => row.status === "OPEN").length), tone: "warn" }]} />
-    <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" onClick={() => setCreateOpen(true)}>新增需求</PermissionButton>}>
-      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" onPageChange={() => undefined}/>
+    <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(rows.length) }, { label: "待跟进", kind: "count", amount: error ? null : String(rows.filter((row) => row.status === "OPEN").length), tone: "warn" }]} />
+    <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || customers.length === 0} onClick={() => setCreateOpen(true)}>新增需求</PermissionButton>}>
+      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" pagination={error ? false : undefined} onPageChange={() => undefined}/>
     </Card>
     <BusinessActionModal title="新增客户需求" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
       <FieldConfigContext.Provider value={config}>
@@ -90,7 +90,7 @@ export function CustomerLeadPanel() {
           <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-create" />
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>创建需求</PermissionButton>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting} disabled={customers.length === 0}>创建需求</PermissionButton>
         </BusinessForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>

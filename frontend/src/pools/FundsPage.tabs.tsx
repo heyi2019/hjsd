@@ -139,7 +139,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   ];
   const mobileFieldOrder = arrangeCashflowColumns(cashflowColumns).map(columnKey);
   return (
-    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
+    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
         <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
@@ -319,6 +319,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
         total={reconciliations.length}
         emptyText={reconciliationUnavailable ? "资金对账数据不可用，请点击重新加载" : "暂无对账记录"}
         loading={loading}
+        pagination={error ? false : undefined}
         onPageChange={() => undefined}
       />
     </Card>

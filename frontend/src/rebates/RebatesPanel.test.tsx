@@ -82,6 +82,13 @@ describe("RebatesPanel：返点记录列表", () => {
     renderLight(<RebatesPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
+
+  it("来源订单为空时禁用新增返点记录入口", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+    renderLight(<RebatesPanel />, { user: "admin" });
+    const addBtn = await screen.findByRole("button", { name: /新增返点记录/ });
+    await waitFor(() => expect(addBtn).toBeDisabled());
+  });
 });
 
 describe("RebatesPanel：新增返点记录 / 登记到账", () => {

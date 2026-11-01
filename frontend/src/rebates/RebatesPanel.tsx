@@ -226,7 +226,7 @@ export function RebatesPanel() {
             <PermissionButton
               permission="order.event.post"
               type="primary"
-              disabled={!dataReady || loading || Boolean(error)}
+              disabled={!dataReady || loading || Boolean(error) || orders.length === 0}
               onClick={() => {
                 form.resetFields();
                 setCreateOpen(true);

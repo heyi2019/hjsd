@@ -56,6 +56,13 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(await screen.findByText(/lead down/)).toBeInTheDocument();
   });
 
+  it("客户列表为空时禁用新增需求入口", async () => {
+    vi.mocked(catalog.customersApi.list).mockResolvedValue([]);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    expect(await screen.findByText("需求总数")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增需求/ })).toBeDisabled();
+  });
+
   it("新增需求填表并提交调用 leadsApi.create", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: /新增需求/ }));

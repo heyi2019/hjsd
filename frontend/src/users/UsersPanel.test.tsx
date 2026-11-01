@@ -87,4 +87,12 @@ describe("UsersPanel：用户管理动作", () => {
     await ui.click(resetDialog.getByRole("button", { name: /OK/ }));
     await waitFor(() => expect(vi.mocked(client.api).post).toHaveBeenCalledWith("/users/7/reset-password", { password: "new-password" }));
   });
+
+  it("接口异常时禁用新增用户并展示错误重试态", async () => {
+    vi.mocked(client.api).get.mockRejectedValue(new Error("拉取失败"));
+    renderLight(<UsersPanel />, { user: "admin" });
+    const addBtn = await screen.findByRole("button", { name: /新增用户/ });
+    await waitFor(() => expect(addBtn).toBeDisabled());
+    expect(screen.getByText(/拉取失败/)).toBeInTheDocument();
+  });
 });

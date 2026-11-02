@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -415,98 +415,6 @@ class TestDatabaseLifecycle:
             for engine in created_engines:
                 engine.dispose()
 
-    def test_sqlite_connect_args_and_engine_cache(self, tmp_path):
-        assert database._sqlite_connect_args() == {"check_same_thread": False}
-        url = f"sqlite:///{tmp_path / 'db1.sqlite'}"
-        first = database.get_engine(url)
-        assert first is not None
-        # 无 url 时走单例缓存（可能已被其它用例构建过）
-        cached = database.get_engine()
-        assert cached is not None
-        first.dispose()
-        if cached is not first:
-            database.dispose_engine()
-
-    def test_foreign_key_pragma_skips_non_sqlite(self):
-        # 非 SQLite 方言直接跳过（事件监听对 PG/MySQL 生效但无需 PRAGMA）
-        class _FakeConnection:
-            __class__ = type("FakeConnection", (), {"__module__": "psycopg"})
-
-        assert database._apply_sqlite_pragmas(_FakeConnection(), None) is None
-
-    def test_sqlite_pragma_statements_order_and_knobs(self):
-        """journal_mode 必须先于 synchronous；0 表示不覆盖，便于回退到 SQLite 默认。"""
-        custom = settings_module.Settings(
-            sqlite_synchronous="full",
-            sqlite_cache_size_kb=0,
-            sqlite_mmap_size_mb=0,
-            sqlite_temp_store="file",
-        )
-        statements = database._sqlite_pragma_statements(custom)
-        assert statements == [
-            "PRAGMA foreign_keys=ON",
-            "PRAGMA journal_mode=WAL",
-            "PRAGMA synchronous=FULL",
-            "PRAGMA temp_store=FILE",
-            "PRAGMA busy_timeout=5000",
-        ]
-        assert statements.index("PRAGMA journal_mode=WAL") < statements.index(
-            "PRAGMA synchronous=FULL"
-        )
-        # 缺省走 WAL 推荐组合
-        default = database._sqlite_pragma_statements(settings_module.Settings())
-        assert "PRAGMA cache_size=-16000" in default
-        assert "PRAGMA mmap_size=67108864" in default
-
-    def test_sqlite_pragmas_are_applied_on_every_connection(self, tmp_path):
-        """连接级参数必须挂 connect 事件：池里每新建一条连接都要重新声明。"""
-        engine = database.build_engine(f"sqlite:///{tmp_path / 'pragma.sqlite'}")
-        cfg = settings_module.get_settings()
-        expect_sync = {"OFF": 0, "NORMAL": 1, "FULL": 2, "EXTRA": 3}[cfg.sqlite_synchronous]
-        try:
-            for _ in range(2):  # 第二次走到池内复用/新建，值仍需一致
-                with engine.connect() as conn:
-                    assert conn.exec_driver_sql("PRAGMA journal_mode").scalar() == "wal"
-                    assert conn.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
-                    assert conn.exec_driver_sql("PRAGMA synchronous").scalar() == expect_sync
-                    expect_temp = 2 if cfg.sqlite_temp_store == "MEMORY" else 1
-                    assert conn.exec_driver_sql("PRAGMA temp_store").scalar() == expect_temp
-                    if cfg.sqlite_cache_size_kb:
-                        assert conn.exec_driver_sql("PRAGMA cache_size").scalar() == (
-                            -cfg.sqlite_cache_size_kb
-                        )
-                    if cfg.sqlite_mmap_size_mb:
-                        assert conn.exec_driver_sql("PRAGMA mmap_size").scalar() == (
-                            cfg.sqlite_mmap_size_mb * 1024 * 1024
-                        )
-                    if cfg.sqlite_busy_timeout_ms:
-                        assert conn.exec_driver_sql("PRAGMA busy_timeout").scalar() == (
-                            cfg.sqlite_busy_timeout_ms
-                        )
-        finally:
-            engine.dispose()
-
-    def test_sqlite_engine_registers_checkin_optimize(self, tmp_path):
-        """统计信息自我维护：optimize 必须挂在池 checkin 上（池化连接不会 close）。"""
-        engine = database.build_engine(f"sqlite:///{tmp_path / 'opt.sqlite'}")
-        try:
-            assert event.contains(engine.pool, "checkin", database._sqlite_optimize_on_checkin)
-            with engine.connect():
-                pass  # 借出后归还，监听真实执行一次
-        finally:
-            engine.dispose()
-
-    def test_sqlite_optimize_is_safe_on_fresh_connection(self):
-        """对全新/无业务数据的连接执行 optimize 不报错（PRAGMA 失败必须静默）。"""
-        import sqlite3 as _sqlite3
-
-        conn = _sqlite3.connect(":memory:")
-        try:
-            database._sqlite_optimize_on_checkin(conn, None)
-            assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        finally:
-            conn.close()
-
     def test_session_factory_defaults_to_engine_singleton(self, tmp_path, monkeypatch):
         engine = create_engine(f"sqlite:///{tmp_path / 'db3.sqlite'}")
         try:
@@ -552,9 +460,13 @@ class TestDatabaseLifecycle:
         with pytest.raises(RuntimeError):
             failed.throw(RuntimeError("boom"))
 
-    def test_describe_engine_reports_sqlite_state(self):
+    def test_describe_engine_exposes_no_secrets(self):
+        """健康检查只暴露排障必需项，且 SQLite 字段随通道下线一并移除。"""
         info = database.describe_engine()
-        assert "sqlite_exists" in info
+        assert info["app_env"]
+        assert info["database"]
+        assert "sqlite_exists" not in info
+        assert "jwt_secret_key" not in info
 
 
 # ------------------------------------------------------------------ 应用入口
@@ -572,24 +484,9 @@ class TestApiV1Health:
         assert health.status_code == 200, health.text
         assert health.json()["status"] == "ok"
         assert health.json()["database_status"] == "ok"
-        # PRAGMA 现值必须从连接上读出：配置写错在 SQLite 里是静默无效，
-        # 只有这里能看到「运行期真正生效的是什么」。
-        # 非 SQLite 后端（如 PostgreSQL）无 PRAGMA，health 按设计返回空字典。
-        pragmas = health.json()["sqlite_pragmas"]
-        if settings_module.get_settings().database_url.startswith("sqlite"):
-            assert set(pragmas) == {
-                "journal_mode",
-                "synchronous",
-                "cache_size",
-                "mmap_size",
-                "temp_store",
-                "foreign_keys",
-            }
-            assert pragmas["foreign_keys"] == "1"
-            assert pragmas["journal_mode"] in {"wal", "memory"}
-            assert pragmas["synchronous"] in {"0", "1", "2", "3"}
-        else:
-            assert pragmas == {}
+        # health 契约随 SQLite 通道下线收紧：响应体只剩库无关字段。
+        assert "sqlite_pragmas" not in health.json()
+        assert "sqlite_exists" not in health.json()
 
     def test_health_reports_database_unavailable(self, client, monkeypatch):
         class BrokenEngine:

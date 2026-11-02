@@ -16,6 +16,7 @@
     "test:fast": "vitest run --project=fast",
     "test:quick": "vitest run --project=quick",
     "test:react": "vitest run --project=react",
+    "test:timing": "node scripts/test-timing.mjs",
     "test:react-deep": "vitest run --project=react-deep",
     "test:react-deep:shard": "node scripts/test-deep-shard.mjs",
     "test:full": "node scripts/test-full-sharded.mjs",

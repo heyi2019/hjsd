@@ -19,15 +19,22 @@ LINT_BASELINE = ROOT / "lint_baseline.txt"
 LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
 
 
-def regression_environment() -> dict[str, str]:
+def regression_environment(db: str = "sqlite") -> dict[str, str]:
     """为回归套件提供隔离的默认数据库，不覆盖显式命令行环境变量。
 
     根目录 `.env` 用于本地联调时可以指向 PostgreSQL 测试库；配置契约和健康检查
     回归则要求默认 v1 SQLite 库。通过子进程环境注入 SQLite，既不修改 `.env`，
     也不让回归套件误连联调库。调用方显式导出 DATABASE_URL 时仍保留其选择。
+
+    db 取值：
+      - "sqlite"（默认）：注入隔离 SQLite，日常回归用，快且不碰真实库；
+      - "env"：不注入，沿用 `.env` / 命令行 DATABASE_URL。生产已切 PostgreSQL，
+        而 SQLite 测不出 CHECK 约束、JSONB、DDL 事务等 PG 语义差异，需要验证
+        「库类型相关行为」时显式 `--db env` 跑一遍。
     """
     environment = os.environ.copy()
-    environment.setdefault("DATABASE_URL", "sqlite:////tmp/heijin_erp_v1.db")
+    if db == "sqlite":
+        environment.setdefault("DATABASE_URL", "sqlite:////tmp/heijin_erp_v1.db")
     return environment
 
 # 三档测试体系（何一裁决）：
@@ -339,6 +346,15 @@ def main() -> int:
     )
     parser.add_argument("--list", action="store_true", help="仅展示将执行的测试文件")
     parser.add_argument(
+        "--db",
+        choices=["sqlite", "env"],
+        default="sqlite",
+        help=(
+            "回归库：sqlite=注入隔离 SQLite（默认，日常用）；"
+            "env=沿用 .env 的 DATABASE_URL，用于验证 PostgreSQL 语义"
+        ),
+    )
+    parser.add_argument(
         "--update-baseline", action="store_true", help="仅用于 lint：把当前存量告警写入基线"
     )
     args = parser.parse_args()
@@ -368,7 +384,7 @@ def main() -> int:
             result = subprocess.run(
                 [runner, "-m", "pytest", "-q", *paths],
                 cwd=ROOT,
-                env=regression_environment(),
+                env=regression_environment(args.db),
                 check=False,
             )
             if result.returncode:
@@ -386,7 +402,7 @@ def main() -> int:
     return subprocess.run(
         command,
         cwd=ROOT,
-        env=regression_environment(),
+        env=regression_environment(args.db),
         check=False,
     ).returncode
 

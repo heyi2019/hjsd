@@ -10,6 +10,7 @@ const account = {
   inventory_type: "RECOVERY",
   game_type: "手游",
   game_account: "acc,1",
+  camp_account: "营地A",
   platform: "A平台",
   status: "WAITING",
   cost_amount: "100.00",
@@ -21,9 +22,9 @@ const account = {
 describe("库存导出", () => {
   it("输出通用库存字段并正确转义 CSV 内容", () => {
     const csv = buildInventoryCsv([account]);
-    expect(csv).toContain("订单号,业务,类型,游戏/产品类型,库存编号,平台,成本,库存状态");
+    expect(csv).toContain("订单号,业务,类型,游戏/产品类型,营地账号,库存编号,平台,成本,库存状态");
     expect(csv).not.toContain(",详情");
-    expect(csv).toContain('HS-2026-0001,自营,回收,手游,KU_00001,A平台,100.00,在库');
+    expect(csv).toContain('HS-2026-0001,自营,回收,手游,营地A,KU_00001,A平台,100.00,在库');
     expect(csv).toContain('"高段位\n账号"');
   });
 

@@ -21,6 +21,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
     "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
+    "markOverdue",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -300,11 +301,62 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true"));
   });
 
+  // 逾期标记是全局动作（后端按 as_of 扫描全部合约），入口从分期面板收敛到
+  // 订单页「分期与回款」Tab 的右上角，这两个用例随功能入口一起从 InstallmentsPanel.flows 迁入。
+  it("切走再切回「分期与回款」会重拉分期列表（切入即刷新）", async () => {
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+    await openLedger();
+    fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
+    await waitFor(() => expect(catalog.installmentsApi.list).toHaveBeenCalled());
+    // 首次切入只靠挂载 load，不自增 refreshKey（避免双请求）
+    expect(vi.mocked(catalog.installmentsApi.list)).toHaveBeenCalledTimes(1);
+    const callsAfterFirstEntry = vi.mocked(catalog.installmentsApi.list).mock.calls.length;
+
+    fireEvent.click(screen.getByRole("tab", { name: "订单台账" }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
+
+    await waitFor(() =>
+      expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsAfterFirstEntry),
+    );
+  });
+
+  it("标记逾期：有新增时提示笔数并刷新分期列表", async () => {
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+    vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
+    await openLedger();
+    fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
+    await waitFor(() => expect(catalog.installmentsApi.list).toHaveBeenCalled());
+    const callsBefore = vi.mocked(catalog.installmentsApi.list).mock.calls.length;
+
+    await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
+
+    await waitFor(() => expect(catalog.installmentsApi.markOverdue).toHaveBeenCalled());
+    expect(message.success).toHaveBeenCalledWith("已标记 3 笔逾期");
+    // installmentRefreshKey 自增 → 分期面板重新 load
+    await waitFor(() => expect(screen.getByRole("tab", { name: "分期与回款" })).toBeInTheDocument());
+    expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  it("标记逾期：无新增时提示当前无新增逾期合约", async () => {
+    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+    vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
+    await openLedger();
+    fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /标记逾期/ })).toBeInTheDocument());
+
+    await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
+
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
+  });
+
   it("移动端订单卡片渲染完整字段", async () => {
     await openLedger();
     const list = screen.getByLabelText("订单列表");
-    // 移动端卡片直接输出 account_status 原始值（未走 StatusTag 映射）
-    for (const value of ["卖家甲 · 同行推荐", "原神", "seller-001", "安卓", "待售"]) {
+    // 卡片字段 = 卡片字段表 ∩ 台账列（fieldOrder 取 arrangeColumns 后的列 key），
+    // 台账重构后已无「对方/来源」与「平台」列，故这两项在卡片上也不再渲染。
+    // 账号状态走 ACCOUNT_STATUS_LABEL 映射（WAITING → 在库），不再输出原始英文枚举。
+    for (const value of ["原神", "seller-001", "在库"]) {
       expect(within(list).getAllByText(value).length).toBeGreaterThan(0);
     }
     expect(within(list).getAllByText("¥1,234.00").length).toBeGreaterThan(0);
@@ -538,12 +590,13 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("-800.00")).toBeInTheDocument();
   });
 
-  it("分润：同一行同时填比例与金额时拦截", () => {
+  it("分润：同一行比例与金额换算不一致时拦截", () => {
+    // 现行口径：允许同一行同时填比例与金额，但两者必须换算一致（5000×50%=2500 ≠ 200）。
     const r = validateAllocations(
       [{ employee: 9, allocation_rate: "50", allocation_amount: "200" }],
       "5000.00",
     );
-    expect(r).toEqual({ ok: false, error: "同一行不能同时填比例和金额" });
+    expect(r).toEqual({ ok: false, error: "比例和金额换算不一致" });
   });
 
   it("分润：保存失败提示错误", async () => {
@@ -583,14 +636,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("refund fail")));
   });
 
-  it("取消交易：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
+  it("取消：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true }],
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
-    const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
+    const modal = await modalOf(/取消 · HS-2026-0001/);
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     await ui.type(screen.getByLabelText("取消原因"), "重复登记");
     await clickModalOk(modal);
@@ -602,7 +655,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     );
   });
 
-  it("FE-252：取消交易依赖的资金账户加载完成后才允许确认", async () => {
+  it("FE-252：取消依赖的资金账户加载完成后才允许确认", async () => {
     const cancelOrder = {
       ...order1,
       id: 21,
@@ -624,10 +677,10 @@ describe("OrdersPage：操作与筛选分支", () => {
 
     await openLedger();
     await openRowMenu("HS-CANCEL-ASYNC-01", "取消");
-    expect(screen.queryByText(/库存取消交易 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/取消 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
 
     resolvePools([{ id: 7, code: "HJ_INVEST", name: "投资款荷包", status: "ACTIVE" }]);
-    const modal = await modalOf(/库存取消交易 · HS-CANCEL-ASYNC-01/);
+    const modal = await modalOf(/取消 · HS-CANCEL-ASYNC-01/);
     await ui.type(within(modal).getByLabelText("取消原因"), "异步加载回归");
     await clickModalOk(modal);
 
@@ -637,14 +690,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     ));
   });
 
-  it("库存取消交易：冲销入库流水并进入公司钱包", async () => {
+  it("取消：冲销入库流水并进入公司钱包", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", pool_id: 7, is_posted: true }],
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
-    const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
+    const modal = await modalOf(/取消 · HS-2026-0001/);
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     expect(within(modal).getByLabelText("收款账户")).toBeInTheDocument();
     await ui.click(within(modal).getByLabelText("收款账户"));
@@ -657,7 +710,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     ));
   });
 
-  it("售出取消交易：按售出流水做部分退款冲销", async () => {
+  it("取消：按售出流水做部分退款冲销", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
       events: [
@@ -667,7 +720,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
-    const modal = await modalOf(/售出取消交易 · HS-2026-0001/);
+    const modal = await modalOf(/取消 · HS-2026-0001/);
     expect(within(modal).getByLabelText("退款金额")).toBeInTheDocument();
     expect(within(modal).getByLabelText("付款账户")).toBeInTheDocument();
     expect(within(modal).queryByLabelText("售出流水")).toBeNull();
@@ -686,20 +739,20 @@ describe("OrdersPage：操作与筛选分支", () => {
     );
   });
 
-  it("取消交易：分期订单按合约取消并提示退款金额", async () => {
+  it("取消：分期订单按合约取消并提示退款金额", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     await openLedger();
     await openRowMenu("HS-2026-0003", "取消");
-    const modal = await modalOf(/分期取消交易 · INS-1/);
+    const modal = await modalOf(/取消 · INS-1/);
     await ui.type(screen.getByLabelText("取消原因"), "提前结清");
-    fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
+    fireEvent.click(screen.getByRole("button", { name: /确认取消/ }));
     await waitFor(() => expect(catalog.installmentsApi.cancel).toHaveBeenCalledWith(11, expect.objectContaining({ reason: "提前结清" })));
     // money() 走千分位格式化
     expect(message.success).toHaveBeenCalledWith(expect.stringContaining("退款已登记：¥3,000.00"));
   });
 
-  it("取消交易：分期订单无可用合约时提示", async () => {
+  it("取消：分期订单无可用合约时提示", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
@@ -708,7 +761,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith("未找到可取消的分期合约"));
   });
 
-  it("取消交易：打开详情失败时提示错误", async () => {
+  it("取消：打开详情失败时提示错误", async () => {
     vi.mocked(catalog.ordersApi.get).mockRejectedValue(new Error("detail fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
@@ -800,12 +853,22 @@ describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () =>
     expect(r).toEqual({ ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" });
   });
 
-  it("同一行比例与金额同填 → 拒绝", () => {
+  it("同一行比例与金额换算不一致 → 拒绝", () => {
     const r = validateAllocations(
       [{ employee: 9, allocation_rate: "50", allocation_amount: "200" }],
       "5000.00",
     );
-    expect(r).toEqual({ ok: false, error: "同一行不能同时填比例和金额" });
+    expect(r).toEqual({ ok: false, error: "比例和金额换算不一致" });
+  });
+
+  it("同一行比例与金额换算一致 → 通过（按金额提交）", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "50", allocation_amount: "2500" }],
+      "5000.00",
+    );
+    expect(r.ok).toBe(true);
+    // 单行比例合计未满 100%，故按金额模式提交：rate 归零、保留金额。
+    if (r.ok) expect(r.items[0]).toMatchObject({ allocation_rate: "0", allocation_amount: "2500" });
   });
 
   it("亏损/无利润单按金额分润 → 拒绝", () => {

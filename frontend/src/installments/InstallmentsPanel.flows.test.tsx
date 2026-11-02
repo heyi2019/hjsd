@@ -101,7 +101,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     await ui.click(screen.getByRole("button", { name: /提前结清/ }));
     const modal = openModal("提前结清");
     await ui.clear(within(modal).getByLabelText("结清日期"));
-    await ui.type(within(modal).getByLabelText("结清日期"), "2026-10-20");
+    await ui.type(within(modal).getByLabelText("结清日期"), "2026-10-20{enter}");
     await ui.click(within(modal).getByRole("button", { name: /确认提前结清/ }));
     await waitFor(() => expect(vi.mocked(catalog.installmentsApi.settleEarly)).toHaveBeenCalledWith(
       1,
@@ -164,36 +164,13 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     ));
     expect(successSpy).toHaveBeenCalledWith("期次展期已登记");
   });
-  it("标记逾期：有新增时提示已标记笔数并刷新列表", async () => {
-    vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
+  it("首屏加载一次分期列表（刷新入口已收敛到订单页/操作后自动重载）", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
-    const callsBefore = vi.mocked(catalog.installmentsApi.list).mock.calls.length;
-    await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
-    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.markOverdue)).toHaveBeenCalled());
-    expect(successSpy).toHaveBeenCalledWith("已标记 3 笔逾期");
-    // reloadKey 自增 → ContractTable 重新 load
-    await waitFor(() =>
-      expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore),
-    );
-  });
-
-  it("标记逾期：无新增时提示当前无新增逾期合约", async () => {
-    vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
-    renderLight(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HS0001-INS01");
-    await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("当前无新增逾期合约"));
-  });
-
-  it("刷新按钮触发列表重新加载", async () => {
-    renderLight(<InstallmentsPanel />, { user: "admin" });
-    await screen.findByText("HS0001-INS01");
-    const callsBefore = vi.mocked(catalog.installmentsApi.list).mock.calls.length;
-    await ui.click(screen.getByRole("button", { name: /刷新/ }));
-    await waitFor(() =>
-      expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore),
-    );
+    expect(vi.mocked(catalog.installmentsApi.list)).toHaveBeenCalledTimes(1);
+    // 逾期标记是全局动作，入口在订单页「分期与回款」Tab 的右上角，不在本面板内。
+    expect(screen.queryByRole("button", { name: /标记逾期/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^刷新$/ })).toBeNull();
   });
 
   it("CLOSED 且已有回收记录 → 行内提供登记出售入口", async () => {

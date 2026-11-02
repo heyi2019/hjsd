@@ -127,7 +127,7 @@ describe("InventoryPanel：账号台账", () => {
       "订单号,业务,类型,游戏/产品类型,营地账号,库存编号,平台,成本,库存状态",
     );
     expect(buildInventoryCsv(accounts)).toContain(
-      "HS-2026-0001,,回收,,KU_00001,A平台,100.00,在库",
+      "HS-2026-0001,,回收,,,KU_00001,A平台,100.00,在库",
     );
 
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -137,7 +137,8 @@ describe("InventoryPanel：账号台账", () => {
     }
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
-    expect(screen.queryByRole("menuitem", { name: "取消" })).toBeNull();
+    // 术语统一后「取消交易」改名「取消」，在库账号（acc-1）可从更多菜单取消。
+    expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();

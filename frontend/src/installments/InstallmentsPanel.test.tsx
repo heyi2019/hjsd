@@ -56,10 +56,12 @@ describe("InstallmentsPanel：分期合约", () => {
   it("只展示分期出售，不展示代分期/提号分期/代挂分期", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "分期出售" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "代分期" })).toBeNull();
-    expect(screen.queryByRole("tab", { name: "提号分期" })).toBeNull();
-    expect(screen.queryByRole("tab", { name: "代挂分期" })).toBeNull();
+    // 代分期（DFQ）下线后本面板专营库存分期出售（contractType=STOCK_SALE），
+    // 不再有分期类型切换页签，故断言「无任何 tab」而非「选中分期出售 tab」。
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    for (const name of ["代分期", "提号分期", "代挂分期"]) {
+      expect(screen.queryByText(name)).toBeNull();
+    }
   });
 
   it("渲染合约号并把 order_id 映射成订单号", async () => {

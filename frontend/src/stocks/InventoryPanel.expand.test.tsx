@@ -44,6 +44,9 @@ describe("InventoryPanel：账号台账展开", () => {
   });
 
   it("展开后登记返点：详情缓存失效并重新拉取执行明细", async () => {
+    // 弹窗打开后会按订单逐个拉取返点列表；夹具只桩了 create 未桩 list，
+    // 自动 mock 返回 undefined 会让表单初始化中途抛错（detail 已到、字段未赋值）。
+    vi.mocked(catalog.rebatesApi.list).mockResolvedValue([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
@@ -56,7 +59,7 @@ describe("InventoryPanel：账号台账展开", () => {
     await ui.click(screen.getByRole("button", { name: "返点" }));
     await screen.findByText("登记返点");
     await ui.click(await screen.findByLabelText("卖号返点"));
-    await ui.type(screen.getByLabelText("返点日期"), "2026-10-20");
+    await ui.type(screen.getByLabelText("返点日期"), "2026-10-20{enter}");
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
     await waitFor(() => expect(vi.mocked(catalog.rebatesApi.create)).toHaveBeenCalled());

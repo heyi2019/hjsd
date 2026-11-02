@@ -180,8 +180,8 @@ function ContractTable({
 
 
 export function InstallmentsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
-  const [reloadKey, setReloadKey] = useState(0);
-  // refreshKey：外部建单生成新合约后由上层递增，触发合约列表重拉。
-  return <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey + refreshKey} />;
+  // refreshKey：外部建单/标记逾期生成新合约后由上层递增，触发合约列表重拉。
+  // 面板内不再有「刷新/标记逾期」按钮：逾期标记是全局动作，入口在订单页「分期与回款」Tab 右上角。
+  return <ContractTable contractType="STOCK_SALE" reloadKey={refreshKey} />;
 }
 

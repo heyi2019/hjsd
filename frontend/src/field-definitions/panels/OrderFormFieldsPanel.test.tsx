@@ -349,7 +349,7 @@ describe("OrderFormFieldsPanel", () => {
     await screen.findByText("自定义字段Z");
 
     await ui.click(screen.getByText("删除"));
-    await ui.click(await screen.findByRole("button", { name: /OK/ }));
+    await ui.click(await screen.findByRole("button", { name: /确认删除/ }));
 
     await waitFor(() =>
       expect(vi.mocked(catalog.orderFormFieldsApi).remove).toHaveBeenCalledWith(40),
@@ -433,7 +433,7 @@ describe("OrderFormFieldsPanel 依赖防护", () => {
     await screen.findByText("来源字段2");
 
     await ui.click(screen.getByText("删除"));
-    await ui.click(await screen.findByRole("button", { name: /OK/ }));
+    await ui.click(await screen.findByRole("button", { name: /确认删除/ }));
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith(expect.stringContaining("无法删除")),

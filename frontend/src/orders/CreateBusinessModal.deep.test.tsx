@@ -2,7 +2,6 @@ import { screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
-import { appModal as Modal } from "../shared/ui/appFeedback";
 import { CreateBusinessModal } from "./CreateBusinessModal";
 import * as catalog from "../shared/api/catalog";
 import { resolveMock } from "../test/mock-api";
@@ -33,12 +32,10 @@ beforeEach(() => {
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
-// antd 静态 Modal.confirm 渲染在 document.body 下，testing-library 的 cleanup 不覆盖，
-// 会导致重试/后续用例出现多份 confirm 残留，需手动移除。
+// antd Modal（含 ConfirmDialog）渲染在 document.body 下，testing-library 的 cleanup 不覆盖，
+// 重试/后续用例会残留多份 modal（其异步挂载时机可能与 afterEach 清理错开），需手动移除。
 afterEach(() => {
   cleanup();
-  // antd 静态 Modal.confirm 渲染在 document.body 下，testing-library 的 cleanup 不覆盖，
-  // 重试/后续用例会残留多份 confirm（其异步挂载时机可能与 afterEach 清理错开）。
   document.body.querySelectorAll('[class*="ant-modal"]').forEach((el) => el.remove());
 });
 
@@ -64,17 +61,16 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
 
   it("已填写表单点关闭触发放弃确认，确认后 onClose", async () => {
     const onClose = vi.fn();
-    // antd 静态 Modal.confirm 在 jsdom 下 OK 按钮的 accessible name 无法稳定定位，
-    // 用 spy 验证组件确实调用了 confirm 且 onOk 触发 onClose（覆盖 onCancel 分支）。
-    const confirmSpy = vi.spyOn(Modal, "confirm").mockImplementation((config) => {
-      (config as { onOk?: () => void }).onOk?.();
-      return { destroy: () => undefined } as unknown as ReturnType<typeof Modal.confirm>;
-    });
     await openTypedModal("HS", onClose);
     await ui.type(screen.getByLabelText("客户昵称"), "李四");
     await ui.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // 放弃确认框出现，未确认前不关闭
+    expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    // 放弃确认用 ConfirmDialog（Modal 级）：rc-motion 测试桩强制 visible 会让 antd Button 渲染
+    // loading 图标并污染 getByRole 的 name，故用正则按文案匹配（真实运行不受影响）。
+    await ui.click(screen.getByRole("button", { name: /放弃/ }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it("客户来源只能从预置选项选择，选择其他后填写具体来源", async () => {

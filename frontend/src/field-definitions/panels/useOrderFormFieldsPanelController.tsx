@@ -1,5 +1,5 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Input, InputNumber, Popconfirm, Space, Switch, Tooltip, Typography } from "antd";
+import { Form, Input, InputNumber, Space, Switch, Tooltip, Typography } from "antd";
 import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -378,28 +378,26 @@ export function useOrderFormFieldsPanelController({
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
-            <Tooltip title={!row.is_custom ? "预置字段不可删除（仅自定义字段可删）" : undefined}>
-              <span>
-                <Popconfirm
-                  title={`删除字段「${row.label}」`}
-                  description="删除后不可恢复；自定义字段的历史值仍保留在订单 form_extra 中。"
-                  onConfirm={async () => {
-                    try {
+              <Tooltip title={!row.is_custom ? "预置字段不可删除（仅自定义字段可删）" : undefined}>
+                <span>
+                  <ConfirmButton
+                    permission="field-definition.manage"
+                    size="small"
+                    danger
+                    disabled={!row.is_custom}
+                    title={`删除字段「${row.label}」`}
+                    description="删除后不可恢复；自定义字段的历史值仍保留在订单 form_extra 中。"
+                    okText="确认删除"
+                    onConfirm={async () => {
                       await orderFormFieldsApi.remove(row.id);
                       appMessage.success("字段已删除");
                       await load(activeType);
-                    } catch (err) {
-                      // 顶部 ErrorBanner 语义是「加载失败」，操作失败需即时可见
-                      appMessage.error(normalizeError(err).message);
-                    }
-                  }}
-                >
-                  <PermissionButton permission="field-definition.manage" size="small" danger disabled={!row.is_custom}>
+                    }}
+                  >
                     删除
-                  </PermissionButton>
-                </Popconfirm>
-              </span>
-            </Tooltip>
+                  </ConfirmButton>
+                </span>
+              </Tooltip>
           </Space>
         </PermissionGate>
       ),

@@ -9,6 +9,7 @@ export { MoneyText } from "./MoneyText";
 export { StatusTag } from "./StatusTag";
 export { PermissionButton, PermissionGate } from "./PermissionButton";
 export { ConfirmButton } from "./ConfirmButton";
+export { ConfirmDialog } from "./ConfirmDialog";
 export { InlineError } from "./InlineError";
 export { FormDrawer } from "./FormDrawer";
 export { ErrorBanner } from "./ErrorBanner";

@@ -1,10 +1,10 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Card, Form, Input, Popconfirm, Space, Typography } from "antd";
+import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi, type OptionItem } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { BusinessForm, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
+import { BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
 export function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
   const [rows, setRows] = useState<OptionItem[]>([]);
@@ -27,7 +27,21 @@ export function OptionDictionarySection({ code, title, description }: { code: st
       <PermissionButton permission="option-set.manage" size="small" onClick={() => { setEditingValue(row.value); form.setFieldsValue({ option: row.label }); }}>编辑</PermissionButton>
       <PermissionButton permission="option-set.manage" size="small" onClick={() => void move(row.value, -1)}>上移</PermissionButton>
       <PermissionButton permission="option-set.manage" size="small" onClick={() => void move(row.value, 1)}>下移</PermissionButton>
-      <Popconfirm title={`删除${title}「${row.label}」？`} onConfirm={async () => { try { await optionSetsApi.update(code, { options: rows.filter((item) => item.value !== row.value) }); await load(); } catch (err) { setError(normalizeError(err)); } }}><PermissionButton permission="option-set.manage" size="small" danger>删除</PermissionButton></Popconfirm>
+      <ConfirmButton
+        permission="option-set.manage"
+        size="small"
+        danger
+        title={`删除${title}「${row.label}」？`}
+        description="删除后不可恢复。"
+        okText="删除"
+        onConfirm={async () => {
+          await optionSetsApi.update(code, { options: rows.filter((item) => item.value !== row.value) });
+          appMessage.success(`${title}已删除`);
+          await load();
+        }}
+      >
+        删除
+      </ConfirmButton>
     </Space></PermissionGate> },
   ];
   return <Card size="small" title={title}>

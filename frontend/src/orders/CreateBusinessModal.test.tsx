@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -10,7 +10,6 @@ import * as catalog from "../shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "../test/mock-api";
 import { allFormFields, seedOrderFormFields } from "../test/formFieldsSeed";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
-import { appModal } from "../shared/ui/appFeedback";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -246,13 +245,8 @@ it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", a
   });
 
 it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单", async () => {
-    let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
-    const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
-      confirmConfig = config as typeof confirmConfig;
-      return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
-    });
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-      { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "SOLD" },
+      { id:99, game_account: "pickup-account", game_type: "王者荣耀", status: "SOLD" },
     ] as never);
     await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
@@ -266,10 +260,12 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+    // 复购确认框出现，未确认前不建单
+    expect(await screen.findByText("检测到重复游戏账号")).toBeInTheDocument();
     expect(catalog.ordersApi.create).not.toHaveBeenCalled();
-    expect(confirmConfig).toMatchObject({ title: "检测到重复游戏账号", okText: "是，继续建单", cancelText: "否，返回修改" });
-    await act(async () => { await confirmConfig?.onOk?.(); });
+    // 复购确认用 ConfirmDialog（Modal 级）：rc-motion 测试桩强制 visible 会让 antd Button 渲染
+    // loading 图标并污染 getByRole 的 name，故用正则按文案匹配（真实运行不受影响）。
+    await ui.click(screen.getByRole("button", { name: /是，继续建单/ }));
     await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
   });
 

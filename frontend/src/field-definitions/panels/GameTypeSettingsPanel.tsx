@@ -1,5 +1,5 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Card, Checkbox, Form, Input, InputNumber, Popconfirm, Space, Table, Typography } from "antd";
+import { Card, Checkbox, Form, Input, InputNumber, Space, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
@@ -111,13 +111,20 @@ export function GameTypeSettingsPanel() {
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
-            <Popconfirm
+            <ConfirmButton
+              permission="order-type.manage"
+              size="small"
+              danger
               title={`删除游戏类型「${row.name}」？`}
               description="删除后不可恢复；默认游戏类型需先取消默认。"
-              onConfirm={() => run(() => gameTypesApi.remove(row.id))}
+              okText="删除"
+              onConfirm={async () => {
+                await gameTypesApi.remove(row.id);
+                await load();
+              }}
             >
-              <PermissionButton permission="order-type.manage" size="small" danger>删除</PermissionButton>
-            </Popconfirm>
+              删除
+            </ConfirmButton>
           </Space>
         </PermissionGate>
       ),

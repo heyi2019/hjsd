@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
 import dayjs from "dayjs";
@@ -20,7 +20,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessForm, ConfirmDialog, ErrorBanner, PermissionButton } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
@@ -67,6 +67,8 @@ export function CreateBusinessModal(props: {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const repurchaseConfirmedKey = useRef<string | null>(null);
+  const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string; duplicateKey: string } | null>(null);
+  const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
@@ -152,18 +154,7 @@ export function CreateBusinessModal(props: {
           const message = `历史库存账号「${gameAccount}」已售出，请确认是否为复购回流订单`;
           form.setFields([{ name: "game_account", errors: [message] }]);
           setLoadError({ message });
-          appModal.confirm({
-            title: "检测到重复游戏账号",
-            content: `历史账号「${gameAccount}」已售出，可作为复购回流重新入库。请确认是否继续建单。`,
-            okText: "是，继续建单",
-            cancelText: "否，返回修改",
-            onOk: () => {
-              repurchaseConfirmedKey.current = duplicateKey;
-              form.setFields([{ name: "game_account", errors: [] }]);
-              setLoadError(null);
-              return submit(values);
-            },
-          });
+          setRepurchasePrompt({ values, gameAccount, duplicateKey });
           return;
         }
       }
@@ -314,15 +305,7 @@ export function CreateBusinessModal(props: {
       open={props.open}
       onCancel={() => {
         if (form.isFieldsTouched()) {
-          appModal.confirm({
-            title: "放弃未保存的建单内容？",
-            content: "表单已填写但未提交，关闭后将丢失本次输入。",
-            className: "heijin-fast-confirm",
-            okText: "放弃",
-            cancelText: "继续编辑",
-            okButtonProps: { danger: true },
-            onOk: () => props.onClose(),
-          });
+          setAbandonConfirmOpen(true);
         } else {
           props.onClose();
         }
@@ -371,6 +354,33 @@ export function CreateBusinessModal(props: {
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
       </BusinessForm>
+      <ConfirmDialog
+        open={Boolean(repurchasePrompt)}
+        title="检测到重复游戏账号"
+        description={`历史账号「${repurchasePrompt?.gameAccount ?? ""}」已售出，可作为复购回流重新入库。请确认是否继续建单。`}
+        okText="是，继续建单"
+        cancelText="否，返回修改"
+        onConfirm={async () => {
+          const prompt = repurchasePrompt;
+          if (!prompt) return;
+          repurchaseConfirmedKey.current = prompt.duplicateKey;
+          form.setFields([{ name: "game_account", errors: [] }]);
+          setLoadError(null);
+          setRepurchasePrompt(null);
+          await submit(prompt.values);
+        }}
+        onCancel={() => setRepurchasePrompt(null)}
+      />
+      <ConfirmDialog
+        open={abandonConfirmOpen}
+        title="放弃未保存的建单内容？"
+        description="表单已填写但未提交，关闭后将丢失本次输入。"
+        okText="放弃"
+        cancelText="继续编辑"
+        danger
+        onConfirm={async () => { setAbandonConfirmOpen(false); props.onClose(); }}
+        onCancel={() => setAbandonConfirmOpen(false)}
+      />
     </BusinessActionModal>
   );
 }

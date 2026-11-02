@@ -1,4 +1,4 @@
-import { Modal, Popconfirm, Space } from "antd";
+import { Modal, Space } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
@@ -10,6 +10,7 @@ import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 
 const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
@@ -227,15 +228,17 @@ export function AppShell() {
               <span className="muted">当前角色{import.meta.env.DEV ? "（开发态）" : ""}</span>
               <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === user)?.label ?? user}</span>
             </span>
-            <Popconfirm
+            <ConfirmButton
+              className="topbar-action topbar-action--logout"
+              type="text"
               title="退出登录"
               description="退出后需要重新登录才能继续操作。"
               okText="退出"
               cancelText="取消"
-              onConfirm={() => void logout()}
+              onConfirm={async () => { void logout(); }}
             >
-              <button type="button" className="topbar-action topbar-action--logout">退出登录</button>
-            </Popconfirm>
+              退出登录
+            </ConfirmButton>
           </Space>
         </header>
         <main className="page-content">

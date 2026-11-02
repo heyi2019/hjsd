@@ -15,18 +15,20 @@ import type { Permission } from "../state/session";
 
 export function ConfirmButton(
   props: {
-    permission: Permission;
+    /** 权限：无权限时隐藏触发按钮。退出登录等无需权限的操作可省略。 */
+    permission?: Permission;
     /** 确认标题：说清「做什么」，例如「停用资金池」。 */
     title: ReactNode;
     /** 后果说明：说清「影响什么 / 能否撤销」，这是确认弹窗唯一有价值的信息。 */
     description?: ReactNode;
     okText?: string;
+    cancelText?: string;
     danger?: boolean;
     onConfirm: () => Promise<void>;
     children: ReactNode;
   } & Omit<ButtonProps, "onClick" | "loading">,
 ) {
-  const { permission, title, description, okText, danger, onConfirm, children, ...rest } = props;
+  const { permission, title, description, okText, cancelText, danger, onConfirm, children, ...rest } = props;
   const [pending, setPending] = useState(false);
   // 受控开关：确认完成后显式关闭。交给 Popconfirm 自行关闭时，
   // 若 onConfirm 的 promise 迟迟不 settle，弹层会一直挂着挡住后续操作。
@@ -45,26 +47,28 @@ export function ConfirmButton(
       setPending(false);
     }
   };
-  return (
-    <PermissionGate permission={permission}>
-      <Popconfirm
-        open={open}
-        onOpenChange={(next) => {
-          if (!pending) setOpen(next);
-        }}
-        title={title}
-        description={description}
-        okText={okText ?? "确认"}
-        cancelText="取消"
-        okButtonProps={{ danger }}
-        // 进行中禁止再次唤出确认，避免叠加提交。
-        disabled={Boolean(rest.disabled) || pending}
-        onConfirm={() => void handleConfirm()}
-      >
-        <Button {...rest} loading={pending}>
-          {children}
-        </Button>
-      </Popconfirm>
-    </PermissionGate>
+  const trigger = (
+    <Popconfirm
+      open={open}
+      onOpenChange={(next) => {
+        if (!pending) setOpen(next);
+      }}
+      title={title}
+      description={description}
+      okText={okText ?? "确认"}
+      cancelText={cancelText ?? "取消"}
+      okButtonProps={{ danger }}
+      // 进行中禁止再次唤出确认，避免叠加提交。
+      disabled={Boolean(rest.disabled) || pending}
+      onConfirm={() => void handleConfirm()}
+    >
+      <Button {...rest} loading={pending}>
+        {children}
+      </Button>
+    </Popconfirm>
   );
+  if (permission) {
+    return <PermissionGate permission={permission}>{trigger}</PermissionGate>;
+  }
+  return trigger;
 }

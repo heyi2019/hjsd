@@ -651,7 +651,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
             <Input.TextArea rows={2} />
           </Form.Item>
           <CompactActions>
-            <PermissionButton permission="customer.merge" type="primary" htmlType="submit">
+            <PermissionButton permission="customer.merge" type="primary" danger htmlType="submit">
               确认合并
             </PermissionButton>
           </CompactActions>

@@ -7,7 +7,7 @@
 | 阅读对象 | 开发、运维、上线执行人 |
 | 编写日期 | 2026-11-03 |
 | 编写人 | 何一 |
-| 数据来源 | 全部为 2026-11-03 01:45 / 02:25 两次实测值，非推演 |
+| 数据来源 | 全部为 2026-11-03 01:45 / 02:25 / 02:39 三次实测值，非推演 |
 
 ## 版本记录
 
@@ -20,7 +20,7 @@
 
 ## 一、现状
 
-### 1.1 本地三库（`container-db-1`，`postgres:16-alpine`，`127.0.0.1:5432`，用户 `erp_app`）
+### 1.1 本地三库（自建容器 `heijin-db-1`，`postgres:16-alpine`，`127.0.0.1:5433`，用户 `erp_app`）
 
 | 库 | 大小 | 表 | 版本 | 业务数据 | 用户 | 审计 | 定位 |
 |---|---:|---:|---|---|---:|---:|---|
@@ -31,7 +31,8 @@
 三库公共基线：`order_form_fields` 259 / `option_sets` 63。
 资金账户 2 个（已审流水带符号求和）：`HJ_INVEST`（投资款荷包）**57,579.17**（259 笔）、`HJ_PROFIT`（利润荷包）**54,253.06**（109 笔）。
 
-> 同实例另有 4 个**他项目**库（`business_line_erp` 841 MB、`berp_trash_20260926_probe` 650 MB、`berp_oct06_probe` 331 MB、`berp_restored_candidate` 75 MB，合计约 1.9 GB）。**不在治理范围**，不评估、不改造、不触碰。
+> **2026-11-03 02:39 起三库已迁出共享容器。** 此前它们寄生在另一项目的 `container-db-1`（`docker compose` 在 `/Users/aries/Developer/business-line-erp`，同卷跑着对方 `business_line_erp` 841 MB）。风险是实打实的：对方一次 `compose down -v` 会连卷带库删掉本项目的**上线母本**。现由本仓库 `deploy/container/compose.yaml` 自建，入口 `deploy/scripts/pg_container.sh`，独立卷 `heijin_pg_data`，端口只绑 `127.0.0.1:5433`。迁出时逐表行数与 7 张关键表 md5 全部对齐才切换。
+> 迁出说明
 
 ### 1.2 生产（阿里云 ECS，SSH 别名 `heijin-prod`）
 
@@ -88,7 +89,7 @@
 
 ---
 
-## 二、已闭环（19 项）
+## 二、已闭环（20 项）
 
 | # | 事项 | 结论 |
 |---:|---|---|
@@ -111,15 +112,15 @@
 | 17 | **生产每日备份可恢复性核验** | ECS `20 3 * * *` 产出的 `heijin_erp_pg_20261102_234642.dump`（198,322 B）经 `pg_restore -l` 解析为 **440 个对象 / 41 条 `TABLE DATA`**，`PGDMP` 头合法——确认 11-02 之前「备的是废弃 SQLite 文件」那类事故已不再复现 |
 | 18 | **剥离后写路径实测** | 剥离只做过只读冒烟，未验过写。在 dev 实跑完整链路：建最小 HS 单 → `HS0056`（接着计数器 55）；建带买入+账号的 HS 单 → `HS0057` / 库存 `KU_00091` / `BUY` 事件 1500 / `BUSINESS_OUT` 流水 1500；再发 `CANCEL` + `offset_event_id` 冲销 → 生成 `HS0057-EV-CANCEL-01`、补偿流水 `BUSINESS_IN` 1500、账户转 `VOID`+`OUT_OF_STOCK`、余额归 0；月报 R2 直接成本净额为 0（`CANCEL` 按 `offset_type` 取负）。验证数据已清空，**dev 回到剥离后基线**（业务表全 0、配置表 259/63、序列 55/35/29/90/18/72） |
 | 19 | **上线包与当前代码的列级一致性** | 演练原先只数表个数（40）和版本戳（`0001`），「表齐但少一列」查不出来——而「老包配新代码上线」正是这种事故：恢复完一切正常，上线后第一个读该列的请求 500。新增 `deploy/scripts/schema_diff.py`（alembic `compare_metadata` 对 ORM 元数据做列级比对，只允许指向 `heijin_erp_drill_*` 临时库），接为演练第 7 项不变量。实测：`011557` 差异 **0 条**（ORM 39 表 + `alembic_version` = 40，故「包结构 = 当前代码」）；反例包（手工 `DROP COLUMN users.must_change_password` 后重打）表数仍 40、其余 6 项全绿，仅第 7 项报 `add_column users.must_change_password` 并 exit 1 |
+| 20 | **迁出共享容器 + PITR 落地并实测回放** | 三库（35 MB）原寄生在本项目之外的 `container-db-1`——同卷跑着对方 841 MB 业务库，对方 `compose down -v` 会连卷删掉上线母本，本项目的归档配置也只能写进对方卷里的 `auto.conf`。已在 `deploy/container/compose.yaml` 自建 `heijin-db-1`（独立卷 `heijin_pg_data`、仅绑 `127.0.0.1:5433`、归档 bind mount 到宿主机）；迁移以**逐表行数**（三库各 40 表）与 **release/dev 7 张关键表 md5** 双闸门对齐后才切 `.env`，旧库保留作回滚。同日开启 `archive_mode`（`wal_level=replica` 早已够）并补上 PITR 缺的另一半——`pg_basebackup`：**实测回放**用基备 + 宿主机归档段恢复到 119 单 / 90 库存 / 370 流水 / 200 事件 / 6 用户 / 259 字段，日志有 `restored log file … from archive`，`in_recovery=false`；对方容器已还原（`archive_mode=off`、目录已删）。 |
 
 ---
 
-## 三、未闭环（3 项）
+## 三、未闭环（2 项）
 
 | # | 事项 | 现状 | 裁决点 |
 |---:|---|---|---|
 | 1 | **上线窗口未定** | 执行单 A 节 10 项已全勾，仅剩此项 | **唯一阻塞上线的事项** |
-| 2 | WAL 归档 / PITR | `wal_level=replica` 已够，差 `archive_mode=on`（实测仍 `off`） | A 暂缓 / B 归档进同一卷 / **C 加宿主机挂载（推荐）**。`archive_mode` 是 postmaster 级，改需重启共享容器 |
 | 3 | `.env.bak-20261102-2115` / `.env.postgres-test` | 含明文口令，本机未跟踪（已被 `.gitignore` 拦住） | 删除或移入凭据管理 |
 
 **角色配置的空白（不影响上线，影响分工）**：FINANCE / AUDITOR / VIEWER 三个角色**无人**。因此押金、划转、财务侧回款目前**只有 ADMIN 可做**，全部压在管理员身上。要么把一名 OPERATOR 转 FINANCE，要么接受集中。
@@ -135,11 +136,13 @@ GitHub Actions（每次 push）
   services.postgres 临时容器（heijin_erp_test，job 结束即销毁）
         │ coverage / lint / frontend gate
         ▼
-本机 Docker PG（container-db-1）
+本机 Docker PG（heijin-db-1，自建 compose，127.0.0.1:5433）
   heijin_erp_dev     开发调试、建单演练（可清空重建）
   heijin_erp_test    pytest（TRUNCATE 闸门 + 黑名单）
   heijin_erp_release 上线母本，只读；每日备份
-        │ pg_dump -Fc（表数闸门 + sha256 + 保留 14 份）
+        │ pg_dump -Fc（每日，表数闸门 + sha256 + 保留 14 份）
+        │ WAL 归档（archive_mode=on，bind mount 到宿主机，每小时巡检 + 保留 14 天）
+        │ pg_basebackup（每周，物理基备，保留 2 份）→ 两者合成 PITR
         ▼
 阿里云 ECS（docker compose）
   heijin_erp（Prod）仅容器网络可达；每日 03:20 备份 + 三重校验
@@ -197,7 +200,16 @@ GitHub Actions（每次 push）
 | 取回 | `pull_backup.sh` | 异地留存 |
 | 测试闸门 | `conftest.py` | 见二-7 |
 
-**WAL / PITR**：当前只有每日 dump，最坏丢 24h。三个方案见三-3，未裁决前不要改 `postgresql.conf`（`archive_mode` 是 postmaster 级，改完必须重启 `container-db-1`，会中断同实例他项目三个库的连接）。
+**WAL / PITR（2026-11-03 已落地并实测回放）**：
+
+| 能力 | 位置 | 要点 |
+|---|---|---|
+| WAL 归档 | 容器启动参数 `-c archive_mode=on -c archive_command='cp %p /wal_archive/%f' -c archive_timeout=5min` | 归档目录由 compose **bind mount** 到宿主机 `backups/pg_wal_live/`，不在数据卷上；`archive_timeout=5min` 把 RPO 压到 5 分钟 |
+| 归档巡检 | `pg_pitr_backup.sh wal`（cron 每小时 :20） | 校验 `archive_mode=on`、`failed_count=0`、`archived_count>0`；`ERP_WAL_KEEP_DAYS`（默认 14 天）执行保留策略 |
+| 物理基备 | `pg_pitr_backup.sh base`（cron 每周日 02:30） | `pg_basebackup -Ft -z -Xs -c fast` 走 unix socket（`pg_hba` 的 replication 规则只对 local 放行）；逐包 `gzip -t`；保留 2 份 |
+
+为什么必须两件：PITR = 物理基备（回放底座）+ WAL 归档（回放增量）。`pg_dump` 逻辑备份**接不了** WAL 回放，所以「有每日 dump」不等于「有 PITR」。
+
 
 ---
 
@@ -218,11 +230,13 @@ GitHub Actions（每次 push）
 13. **`document_sequences` 不是业务表，清空它等于让建单/发库存号/建合作方全部瘫痪。** `allocate_number()` 在序列行不存在时直接抛 `Validation`「编号序列 X 尚未初始化，请先执行基础种子」（`core/numbering.py:62`），而自动补建行的 `ensure_sequence()` 只在**基础种子**里被调用，运行时路径不会补。剥离 dev 时按「业务表」把它一并 `TRUNCATE` 是错的——正确做法是**保留 13 行、只把 `current_value` 归零**（本次保留原值，避免将来回导 rawdata 撞号）。识别方法：一张表里既有 `prefix`/`padding`（配置）又有 `current_value`（计数器），就是混合型，不能当纯业务表清。
 14. **`TRUNCATE` 的级联方向会从子表向父表蔓延，可能连带清掉配置表。** `TRUNCATE orders CASCADE` 会顺着引用关系把 `order_form_fields`(259) 这类被业务表引用的配置一并清空，建单页当场报废。安全做法：**显式列出全部待清表、单事务、不加 `CASCADE`**，并事先用 `pg_constraint` 查询确认「保留表没有任何一个引用待清表」（本次仅 3 条 FK，全部指向保留表内部）。清完必须**逐项比对各配置表行数**，不相等立即从备份恢复。
 15. **验证 dump 必须给 `docker exec` 加 `-i`，否则会误判备份已损坏。** `docker exec deploy-db-1 pg_restore -l < x.dump` 不加 `-i` 时 **stdin 不转发**，容器里的 `pg_restore` 读到 0 字节，报 `input file is too short (read 0, expected 5)`。这条报错指向的是备份文件，实际错在命令——在 ECS 上核验时踩到过，差点把一份完好的 440 对象 / 41 条 `TABLE DATA` 的备份判成废包。正确写法：`docker exec -i … pg_restore -l < file`。同理，**「文件很小」也不等于废备份**：11-01 那两份 1915 字节的包是合法 `PGDMP`，当时生产库业务数据本来就全空，41 张空表压缩后就是这个量级——判废要看 `pg_restore -l` 能否解析，不看字节数。
+16. **别把本项目的库寄存在别人项目的容器里。** 三个库共 35 MB，却跑在另一项目的 `container-db-1` 上：对方 `compose down -v` 会连卷删掉上线母本，对方重建容器本项目跟着闪断，本项目的 `archive_mode` 只能写进对方卷里的 `auto.conf`（像改了别人的配置又不好解释）。迁出成本极低（35 MB、三个 `pg_dump`），迁出收益是把「别人一句话删掉我的母本」这个尾部风险彻底去掉。**判据不是库大小，是谁拥有这个卷。**
+17. **PITR 的前置不是 `archive_mode`，是物理基备。** 开了归档只解决了「增量」，「底座」必须是 `pg_basebackup` 出来的物理备份；`pg_dump` 出的逻辑包无法回放 WAL。只开 `archive_mode` 就宣称「有 PITR」，等于只备了半套。回放演练里还有一个坑：基备自带的 `pg_wal.tar.gz` 通常已覆盖到备份结束点，直接用它能起来，但**证明不了归档链路可用**——要看到日志里出现 `restored log file … from archive` 才算验过。
 
 ---
 
 ## 附：操作边界
 
-- 本文所有写操作**仅限** `heijin_erp_dev` / `heijin_erp_test` / `heijin_erp_release` 三个库；同实例他项目的库一律不触碰。
+- 本文所有写操作**仅限** `heijin_erp_dev` / `heijin_erp_test` / `heijin_erp_release` 三个库（现位于自建容器 `heijin-db-1`）；**共享容器 `container-db-1` 里已无本项目数据**，那边的任何库一律不触碰。
 - 生产库结构的任何变更，唯一路径是第五节覆盖式重建；**禁止 `alembic stamp` 绕过**。
 - `heijin_erp_release` 是母本：**登录不写库，但任何写操作都会让它偏离上线包**。要看数据可以，要演练建单请回 dev。

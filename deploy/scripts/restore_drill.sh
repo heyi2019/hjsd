@@ -19,7 +19,7 @@ export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 
 cd "$(dirname "$0")/../.."
 REPO_ROOT="$(pwd)"
-CONTAINER="${ERP_PG_CONTAINER:-container-db-1}"
+CONTAINER="${ERP_PG_CONTAINER:-heijin-db-1}"
 PGUSER="${ERP_PG_USER:-erp_app}"
 DUMP="${1:-}"
 EXPECT="${2:-}"

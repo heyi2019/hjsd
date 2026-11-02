@@ -2,26 +2,38 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
+import * as client from "../api/client";
 import { DEV_USER_KEY } from "../api/client";
 import { ALL_PERMISSIONS, ROLE_PERMISSIONS, type Permission, useSession } from "./session";
+
+vi.mock("../api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/client")>()),
+  login: vi.fn(),
+}));
 
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
+  // mock 调用记录会跨用例累积；不清空则「不调用真实登录接口」这类断言会被前序用例污染。
+  vi.clearAllMocks();
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
 /** 探针组件：把 session 暴露成可断言的文本，避免在测试里重复写 Context 样板。 */
 function Probe() {
-  const { user, permissions, can, switchUser } = useSession();
+  const { user, permissions, can, switchUser, authenticated, login } = useSession();
   return (
     <div>
       <span data-testid="user">{user}</span>
       <span data-testid="perm-count">{permissions.size}</span>
       <span data-testid="can-create">{String(can("order.create"))}</span>
       <span data-testid="can-update">{String(can("order.update"))}</span>
+      <span data-testid="authenticated">{String(authenticated)}</span>
       <button type="button" onClick={() => switchUser("finance")}>
         切到财务
+      </button>
+      <button type="button" onClick={() => void login("admin", "")}>
+        开发免密登录
       </button>
     </div>
   );
@@ -78,6 +90,18 @@ describe("switchUser：切换角色", () => {
     expect(screen.getByTestId("user").textContent).toBe("finance");
     expect(localStorage.getItem(DEV_USER_KEY)).toBe("finance");
     expect(screen.getByTestId("can-update").textContent).toBe("false");
+  });
+});
+
+describe("开发版免密登录", () => {
+  it("admin 留空密码时直接建立开发会话，不调用真实密码登录接口", async () => {
+    renderLight(<Probe />);
+
+    await ui.click(screen.getByRole("button", { name: "开发免密登录" }));
+
+    expect(screen.getByTestId("user")).toHaveTextContent("admin");
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
+    expect(client.login).not.toHaveBeenCalled();
   });
 });
 

@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { LoginPage } from "./LoginPage";
@@ -31,5 +32,17 @@ describe("LoginPage：后端前置检查", () => {
     renderLight(<LoginPage />, { user: "admin" });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("后端不可达");
+  });
+
+  it("DEV 态 admin 留空密码可以直接登录", async () => {
+    vi.mocked(client.checkBackendHealth).mockResolvedValueOnce(undefined);
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<LoginPage />);
+
+    await ui.type(screen.getByLabelText("用户名"), "admin");
+    await ui.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(client.login).not.toHaveBeenCalled();
+    expect(screen.queryByText("请输入密码")).toBeNull();
   });
 });

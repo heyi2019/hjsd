@@ -56,7 +56,11 @@ export function LoginPage() {
           <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
             <Input autoFocus autoComplete="username" aria-describedby={error ? "login-error" : undefined} />
           </Form.Item>
-          <Form.Item name="password" label="密码" rules={[{ required: true, message: "请输入密码" }]}>
+          <Form.Item
+            name="password"
+            label="密码"
+            rules={[{ required: !import.meta.env.DEV, message: "请输入密码" }]}
+          >
             <Input.Password autoComplete="current-password" aria-describedby={error ? "login-error" : undefined} />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={submitting}>登录</Button>

@@ -854,6 +854,46 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 **现行规范已同步（2026-11-03 00:30）**：`ERP_PRD_v1.3_当前实现版`（0 处）、`ERP_接口错误码与状态机_v2.0`（0 处）、`ERP_PRD_F01_功能规格说明书`、`ERP_数据库建设实施方案_v1.1`、`前端测试用例库`、`前端建单与页面交互测试报告`、`ERP_生产上线执行单` 中的**业务动作用法**已全部改为「取消」。现行规范文档中仍保留「作废」的仅 4 处，全部是普通语义词、与业务动作无关：`README.md:3`「archive 存放已作废文件」、`README.md:34`「62 处 DFQ 已作废」、`ERP_页面原型与交互说明_v1.1.md:3`「相关交互已随该功能下线作废」、`ERP_PRD_F01_功能规格说明书.md:12`「DFQ 相关条目全部作废」（均指**条款/功能失效**，非单据动作）。`ERP_生产上线执行单` 保留的 1 处在已完成的演练记录里（「冒烟 9 项含登录、建单、作废、余额」），属过程留痕不改写。
 
+### 11.13 最终上线包复检与验收预演（2026-11-03 01:00，临时库 `heijin_erp_drill_final`）
+
+**动机**：`release_20261103_002342.dump` 是 00:23 第三次重出的，此前的恢复演练（11.7/11.9）跑的是 23:45 那版。**上线包换过三次、却从没被完整恢复验证过**，这是交付物与验证对象错位，属于必须补的洞。
+
+**做法**：`CREATE DATABASE heijin_erp_drill_final OWNER erp_app` → `pg_restore --no-owner --single-transaction`（退出码 0）→ 逐项校验 → 起后端（`127.0.0.1:8131`，`DATABASE_URL` 指向临时库）跑 API 冒烟 → 用完 `DROP ... WITH (FORCE)`。全程未碰 dev/release/test 三库。
+
+**① 结构与数据（静态）**
+
+| 项 | 期望 | 实测 |
+|---|---|---|
+| 表数 | 40 | ✅ 40（无 `db_version`，符合“上线后由 `stamp_db_version.py` 建”） |
+| 版本戳 | `0001` | ✅ `0001` |
+| 用户 | 2 行 | ✅ `1:admin:ADMIN`、`2:19873133890:ADMIN` |
+| 业务量 | 119/90/370/200 | ✅ 完全一致 |
+| 配置 | 63 选项集 / 259 字段 | ✅ 完全一致 |
+
+**② 术语已进包**：`ORDER_EVENT_TYPE.CANCEL` 标签 = **取消**；`option_sets` / `order_form_fields`（`label`、`options`）/ `order_form_section_labels` / `policy_definitions` 中「取消交易」**零残留**。这等于在交付物层面复核了 11.12。
+
+**③ C2 余额**：`57579.17` / `54253.06`，与执行单期望逐位一致（口径带 `direction`）。
+
+**④ C3 版本戳预检**：`alembic current` → `0001 (head)`，**不含** `Can't locate revision`。
+
+**⑤ C4 业务冒烟（API 层等价）**
+
+| 步骤 | 结果 |
+|---|---|
+| `POST /auth/login`（admin） | ✅ 200，`ADMIN` |
+| `POST /orders`（HS，内联建库 `DRILL_FINAL_1103`） | ✅ **201**，`HS0056`，`account_id=169`，`initial_buy` 1000 进 HJ_INVEST |
+| 库存列表 | ✅ 条数 10→含该账号，`WAITING/IN_STOCK`，`cost=1000.00`；库内已发号 `KU_00091` |
+| `POST /orders/227/cancel` | ⚠️ **422「订单已有登记事件，不能直接取消，请先冲销」** |
+| `POST /cashflows/711/reverse` | ⚠️ **422「业务事件现金流必须通过业务事件冲销」** |
+| `POST /orders/227/events`（`CANCEL` + `offset_event_id=378`） | ✅ **201**，事件 `HS0056-EV-CANCEL-01` |
+| 终态 | ✅ 订单 `CANCELLED`、账号 `VOID`/`OUT_OF_STOCK`（`KU_00091`）、库存列表 10→9 已退出、余额回到 `57579.17`/`54253.06` |
+
+**⑥ 由此修掉执行单的一处真缺陷**：`C4` 原第 3 步写「取消该单 → 订单转 `CANCELLED`」，照做必失败——HS 建单自带 `initial_buy`，建单即产生已登记 `BUY` 事件，`/orders/{id}/cancel` 只会返回 422。已在执行单改为五步并写清「走冲销登记（`CANCEL` + `offset_event_id`）」的路径与两个 422 现象。
+
+**⑦ 顺带确认 `b4118ba` 在真实库生效**：取消路径走的是事件型 `CANCEL`（`apply_cancellation_account_effect`），账号确实进 `VOID` 并退出库存；无流水分支（`_retire_account_on_plain_cancel`）本轮未覆盖（HS 必带采购流水，构造不出该场景，已由单测锁死）。
+
+**⑧ 一处展示缺口（不在本次范围，未改）**：`GET /stocks/inventory` 返回的行里 `stock_no` 为 `null`，而 `stocks.stock_no` 实际已发放 `KU_00091`。属库存视图未带出该列，不影响发号与判重（判重读 `/stocks` 台账）。需要的话单独提。
+
 ---
 
 ## 附：操作边界声明

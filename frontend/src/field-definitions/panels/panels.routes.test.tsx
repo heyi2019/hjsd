@@ -1,11 +1,18 @@
+/**
+ * 资金池页签容器 + 资金路由页——由 2 个碎片文件合并：
+ *   OrderTypeRoutesPanel.test.tsx / PoolsAndRoutesPanel.test.tsx
+ * 合并动因同上（文件级固定成本）；用例与断言逐条保留，各自 describe 隔离。
+ */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../../test/render";
 import { seedOptionSets } from "../../test/formFieldsSeed";
-
 import * as catalog from "../../shared/api/catalog";
 import type { OrderType, OrderTypeRoute, Pool } from "../../shared/api/catalog";
+import { OrderTypeRoutesPanel } from "./OrderTypeRoutesPanel";
+import { PoolsAndRoutesPanel } from "./PoolsAndRoutesPanel";
+
 vi.mock("../../shared/api/catalog");
 
 const TYPES = [
@@ -38,7 +45,6 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
   });
 
   it("跨业务类型摊平路由：两条路由与目标池同屏可见", async () => {
-    const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
     expect(await screen.findByText("资金路由一览")).toBeInTheDocument();
@@ -50,7 +56,6 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
   });
 
   it("FE-262：过账路由业务类型下拉包含代挂 DG", async () => {
-    const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
     await userEvent.click(screen.getByRole("combobox", { name: "业务类型" }));
@@ -58,7 +63,6 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
   });
 
   it("份额与资金性质文案来自选项词典；不限性质显示「不限」", async () => {
-    const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
     await screen.findByText("回收（HS）");
@@ -77,11 +81,58 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     vi.mocked(catalog.orderTypesApi).routes.mockImplementation((id: number) =>
       id === 1 ? Promise.reject(new Error("boom")) : Promise.resolve(ROUTES[id] ?? []),
     );
-    const { OrderTypeRoutesPanel } = await import("./OrderTypeRoutesPanel");
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
     expect((await screen.findAllByText("资金路由数据不可用，请点击重新加载")).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /保存路由/ })).toBeDisabled();
     expect(screen.getByText(/业务类型覆盖不可用/)).toBeInTheDocument();
+  });
+});
+
+/** 资金池页签容器：验证「池定义 / 过账路由」两个视图的默认值与切换后按需挂载。
+ *
+ * 合并前的两个 Tab 各有独立测试（PoolsPanel / OrderTypeRoutesPanel），本 describe 只锁
+ * 容器行为：默认落在池定义、切换后才去拉路由数据（避免合并成一个页签后一次性双请求）。
+ */
+describe("PoolsAndRoutesPanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(catalog.poolsApi).list.mockResolvedValue([
+      { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
+    ] as never);
+    vi.mocked(catalog.orderTypesApi).list.mockResolvedValue([
+      { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
+    ] as never);
+    vi.mocked(catalog.orderTypesApi).routes.mockResolvedValue([
+      {
+        order_type_code: "HS",
+        portion: "PRINCIPAL",
+        pool_code: "HJ_CUSTODY",
+        pool_name: "托管池",
+        fund_nature: null,
+        priority: 0,
+        is_active: true,
+      },
+    ] as never);
+  });
+
+  it("默认进入资金池定义视图，且不预先请求路由数据", async () => {
+    renderLight(<PoolsAndRoutesPanel />, { user: "admin" });
+
+    expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
+    expect(catalog.orderTypesApi.routes).not.toHaveBeenCalled();
+  });
+
+  it("切到过账路由视图才渲染路由表并请求路由数据", async () => {
+    const user = userEvent.setup();
+    renderLight(<PoolsAndRoutesPanel />, { user: "admin" });
+    await screen.findByText("HJ_CUSTODY");
+
+    await user.click(screen.getByText("过账路由"));
+
+    expect(await screen.findByText("资金路由一览")).toBeInTheDocument();
+    await waitFor(() => expect(catalog.orderTypesApi.routes).toHaveBeenCalledWith(1));
+    // 切换后池定义视图卸载，避免两套表格同时存在。
+    expect(screen.queryByText("资金池主数据")).toBeNull();
   });
 });

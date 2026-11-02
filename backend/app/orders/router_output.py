@@ -40,6 +40,30 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
+def _elapsed_label(start: datetime | None, end: datetime | None) -> str:
+    """入库到售出的在手时长，按「X天X小时X分」展示（与前端 formatElapsedTime 同口径）。
+
+    缺任一端或时间倒挂返回 "-"：未售账号的「已持有多久」属库存中心「未售时长」，
+    台账只表达「实际在手过多久」，不按当前时刻推算。
+    """
+    if start is None or end is None or end < start:
+        return "-"
+    try:
+        total_minutes = int((end - start).total_seconds()) // 60
+    except TypeError:  # 一端带时区一端不带（历史导入数据）时不做臆测
+        return "-"
+    days, rest = divmod(total_minutes, 1_440)
+    hours, minutes = divmod(rest, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}天")
+    if hours:
+        parts.append(f"{hours}小时")
+    if minutes or not parts:
+        parts.append(f"{minutes}分")
+    return "".join(parts)
+
+
 def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
     """按订单权限输出详情，避免财务/查看权限读取游戏密码。"""
     output = schemas.OrderOut.model_validate(order)
@@ -401,6 +425,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             ),
             "sale_at": sale_at,
             "sale_operator": sale_operator,
+            "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
             "event_total": sum((event.amount for event in events), 0),
             "cost_amount": total_cost,
             "profit_base": income - total_cost,

@@ -134,12 +134,12 @@ it("回收建单在资金信息后展示交付信息", async () => {
   expect(content.indexOf("交付信息")).toBeLessThan(content.indexOf("客户信息"));
 });
 
-it("回收建单将支出账户紧跟账号号价，不再展示独立资金流水", async () => {
+it("回收建单将资金账户紧跟账号号价，不再展示独立资金流水", async () => {
   const { container } = await openTypedModal("HS");
   const content = container.textContent ?? "";
   expect(screen.getByText("资金明细", { exact: true })).toBeInTheDocument();
   expect(screen.queryByText("资金流水", { exact: true })).toBeNull();
-  expect(screen.getByLabelText("支出账户")).toBeInTheDocument();
+  expect(screen.getByLabelText("资金账户")).toBeInTheDocument();
   expect(content.indexOf("资金明细")).toBeLessThan(content.indexOf("交付信息"));
 });
 
@@ -226,8 +226,7 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
   });
@@ -331,8 +330,7 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -376,8 +374,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
-    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await pickMainPool();
     // 交付信息
     await ui.type(screen.getByLabelText("手机号绑定人"), "张三");
     await ui.click(screen.getByLabelText("交易平台").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
@@ -403,8 +400,8 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
       { user: "admin" },
     );
     await screen.findByText("新建回收订单");
-    // 仅展开「支出账户」下拉（默认已注入主账户选项），不选择任何值
-    const selector = screen.getByLabelText("支出账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element;
+    // 仅展开「资金账户」下拉（默认已注入主账户选项），不选择任何值
+    const selector = screen.getByLabelText("资金账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element;
     await ui.click(selector);
     await waitFor(() => expect(screen.getByText("主账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument());
     await ui.click(selector); // 收起下拉

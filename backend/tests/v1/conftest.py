@@ -5,6 +5,8 @@
   全表，误指业务库即数据全毁，故在会话开始前硬校验；
 - 每个 session 对测试库 `create_all`（幂等）；用例之间 `TRUNCATE ... RESTART IDENTITY`；
 - 种子数据放独立 schema `seed_template`，每用例跨 schema 回放（纯 SQL，无 ORM 开销）；
+- **整个会话独占测试库**（PG advisory lock）：并发跑两个 pytest 会互相 TRUNCATE /
+  DROP 对方的 `seed_template`，故后到者排队等待，超时才报错；
 - `client` 把 `core.database.get_db` 覆盖到测试会话；
 - 登录态用 `X-Dev-User`（dev 直通），或真实 JWT 走 `Authorization: Bearer`。
 """
@@ -12,6 +14,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -227,19 +230,86 @@ def _test_database_url() -> str:
     return url
 
 
+# 同一测试库上并发跑 pytest 会互相拆台：`v1_engine` 起手 TRUNCATE 全表、
+# `seed_template` 是**会话级 schema**（起手 DROP SCHEMA CASCADE + CREATE、收尾再 DROP）、
+# 每个用例收尾还 TRUNCATE 一次。两个进程交错时表现为随机的
+# 「编号序列 STOCK_NO 尚未初始化」或 `INSERT ... SELECT FROM seed_template."attachments"`
+# 的列错误——**单独跑或重跑就绿**，极易误判成代码缺陷。
+# 故用会话级 advisory lock 把整个会话串起来：后到者排队等，而不是破坏对方。
+# 锁随连接结束自动释放（进程被杀也不会留下死锁）。
+_SESSION_LOCK_KEY = 20261103
+_SESSION_LOCK_WAIT_SECONDS = 900
+
+
+def _acquire_session_lock(engine, terminal=None):
+    """拿到「本测试库独占」的 advisory lock；返回持有锁的连接（需在收尾释放）。
+
+    等待/恢复提示走 `terminalreporter.write_line` 而不是 `print`：pytest 在用例
+    通过时默认丢弃捕获的 stdout，排队等了 10 分钟却一个字都不显示，用户会以为卡死。
+    """
+    def notify(message: str) -> None:
+        if terminal is not None:
+            terminal.write_line(message)
+        else:
+            print(message, flush=True)
+
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        # xdist 的 worker 同属一次运行、共享同一个测试库，抢同一把锁会自锁死。
+        # 并行跑需要每个 worker 各自一个库（按分片建库），不在本夹具的保证范围内。
+        return None
+    connection = engine.connect()
+    deadline = time.monotonic() + _SESSION_LOCK_WAIT_SECONDS
+    waited = False
+    while True:
+        acquired = connection.execute(
+            text(f"SELECT pg_try_advisory_lock({_SESSION_LOCK_KEY})")
+        ).scalar()
+        if acquired:
+            if waited:
+                notify("[pytest] 已获得测试库独占，继续执行。")
+            return connection
+        if not waited:
+            notify(
+                "[pytest] 测试库正被另一个 pytest 会话占用，排队等待"
+                f"（最多 {_SESSION_LOCK_WAIT_SECONDS}s）：两个会话同时 TRUNCATE "
+                "全表 / DROP seed_template 会互相拆台，故串行执行。"
+            )
+            waited = True
+        if time.monotonic() >= deadline:
+            connection.close()
+            pytest.exit(
+                f"等待测试库独占超过 {_SESSION_LOCK_WAIT_SECONDS}s：另一个 pytest 会话"
+                "仍在运行。请等它结束，或为本会话换一个独立的 TEST_DATABASE_URL。",
+                returncode=1,
+            )
+        time.sleep(0.5)
+
+
 @pytest.fixture(scope="session")
-def v1_engine():
+def v1_engine(request):
     """会话级测试引擎：连测试库并确保 schema 就绪（create_all 幂等）。
 
     起点必须清一次：SQLite 时代每次都是全新临时文件，天然干净；PG 测试库是
     持久库，上次会话（或本地手工初始化）留下的行会污染第一个用例——实测残留
     `document_sequences.current_value=56` 让「分配应得 HS0001」直接变成 HS0057。
+
+    拿到引擎后立刻申请**会话独占锁**（见 `_acquire_session_lock`）：清库与
+    `seed_template` 的建/拆都必须在独占状态下做，否则并发会话会互相清掉对方的数据。
     """
     engine = create_engine(_test_database_url(), future=True, pool_pre_ping=True)
-    Base.metadata.create_all(bind=engine)
-    _truncate_all(engine)
-    yield engine
-    engine.dispose()
+    terminal = request.config.pluginmanager.get_plugin("terminalreporter")
+    lock_connection = _acquire_session_lock(engine, terminal)
+    try:
+        Base.metadata.create_all(bind=engine)
+        _truncate_all(engine)
+        yield engine
+    finally:
+        if lock_connection is not None:
+            lock_connection.execute(
+                text(f"SELECT pg_advisory_unlock({_SESSION_LOCK_KEY})")
+            )
+            lock_connection.close()
+        engine.dispose()
 
 
 def _truncate_all(engine) -> None:

@@ -141,9 +141,11 @@ stocks = 90，customers = 12，cashflow = 370（occurred_on 2026-07-07 起），
 
 风险不在「可能被清」，而在「**已经清过一次，且容灾全靠人为记得备份**」。
 
-### P1-1　`heijin_erp_migration_test` 孤儿库
+### P1-1　`heijin_erp_migration_test` 孤儿库（✅ 已于 2026-11-03 00:08 删除）
 
-40 张表、业务数据全空、种子停留在压平前的 212/62、全仓 grep 无任何引用。它现在的唯一作用是**在误操作时被当成测试库**。
+40 张表、业务数据全空、种子停留在压平前的 212/62、全仓 grep 无任何引用。它曾经的唯一作用是**在误操作时被当成测试库**。
+
+删除前完成三项确认：归档 `backups/archive_migration_test_20261102_235246.dump` sha256 校验通过 → 真实恢复到临时库（40 表 / `0001` / 零业务行）→ 库内五大业务表逐表计数为 0。随后 `DROP DATABASE … WITH (FORCE)`。
 
 ### P1-2　生产结构落后 10 个迁移，且这些迁移已不在活动链
 
@@ -395,7 +397,7 @@ Prod
 
 | 缺口 | 建议 |
 |---|---|
-| **1. `restore_pg.sh` 未部署到 ECS**（11-02 24:00 核查：ECS `/opt/heijin/deploy/scripts/` 只有 `backup_daily/deploy/export_images/gen_selfsigned/harden_host/pull_backup` 六个，**缺恢复脚本**） | 与 11.8 ③ 同批的遗漏：当时只同步了三件。灾备脚本不在机器上，等于「有备份、没恢复路径」——出事时只能临场敲命令。建议 `scp` 补齐并 `bash -n` 校验（需你许可写生产） |
+| **1. `restore_pg.sh` 未部署到 ECS** → ✅ **已补齐（11-03 00:07）** | ECS `/opt/heijin/deploy/scripts/` 原只有 6 个（缺恢复脚本）。已 `scp` 补齐，`sha256` 双端一致 `c18cff9c…273bca`、`bash -n` 通过、`--help` 实跑正常，现为 7 个 |
 | Dev 库无自动备份 | `cron` 每日 `pg_dump heijin_erp_dev`，保留 14 份，写独立目录 |
 | Release 库无备份策略 | 导入完成后立即 dump，并在每次清洗/合并前后各留一份 |
 | PG 未开 WAL 归档 | 开启 `archive_mode=on` + `archive_command` 到独立卷，获得 PITR；至少要在正式发布前完成 |
@@ -445,7 +447,7 @@ Prod
 
 6. ✅ 测试闸门加 `release/prod` 黑名单 + `TEST != DATABASE` 校验（`591e7f4`）。
 7. ✅ **已复评：无需拆分**。`coverage-gate.yml` 的 postgres 是 GitHub Actions **一次性 service container**，库名 `heijin_erp_test`，job 结束即销毁，两个变量同值不会伤到任何真实数据；`conftest` 的「TEST ≠ DATABASE」校验在 `CI` 环境下按设计跳过。属命名冗余，不是风险。
-8. 删除或归档 `heijin_erp_migration_test`（✅ 已 dump 留档 `archive_migration_test_20261102_235246.dump`，待删除）。
+8. 删除或归档 `heijin_erp_migration_test`（✅ **已完成 11-03 00:08**：归档 `archive_migration_test_20261102_235246.dump` 经真实恢复验证后 `DROP ... WITH (FORCE)`）。
 9. 开启 PG WAL 归档（PITR）。
 
 ### P2（上线后 30 天内）
@@ -839,3 +841,9 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 **阶段 2 / 演练执行（11.7）**：从 `heijin_erp_release` **只读** `pg_dump` 生成上线包；演练用临时库 `heijin_erp_drill`（非本项目四库之一，用完即 `DROP ... WITH (FORCE)`），演练期间后端在 `127.0.0.1:8199` 临时起停，未触碰 8123 开发服务；`heijin_erp_dev` / `test` / `release` / `migration_test` **零写入**（11.7、11.9 两轮）。
 
 **账号对齐（11.10，唯一一次对 `heijin_erp_release` 的写入）**：`UPDATE users` 两行（id=1/2）为生产 dump 中的同名同 id 行，18 列全量覆盖；替换前两行已留档 `backups/release_users_rollback_20261102.json`，可原地回写。取数用的临时库 `berp_prod_stage`、演练库 `heijin_erp_drill3` 均用完即 `DROP`。**生产库自「不想碰」宣告后未再连接**。
+
+**后续两次经用户明确许可的动作（2026-11-03 00:07–00:08）**
+
+- **写生产（仅新增一个文件）**：`scp deploy/scripts/restore_pg.sh` → `/opt/heijin/deploy/scripts/`，`chmod +x`；`sha256` 双端一致、`bash -n` 通过、`--help` 实跑正常。**未改任何已有文件、未启动/停止任何容器、未执行任何 DDL/DML**。
+- **删本地库**：`DROP DATABASE heijin_erp_migration_test WITH (FORCE)`。删除前完成三项确认——归档 sha256 校验通过、归档**真实恢复**验证（40 表 / `0001` / 零业务行）、库内 orders/stocks/cashflow/customers/users 全为 0。
+- **未动**：`heijin_erp_dev` / `test` / `release` 三库，以及 3 个他项目 `berp_*` 探针库。

@@ -70,7 +70,7 @@ export function installmentDisplayStatus(status: string): string {
 }
 
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
-  WAITING: "待售",
+  WAITING: "在库",
   SOLD: "已售",
   VOID: "失效",
 };
@@ -132,8 +132,9 @@ export function statusColor(status: string): string {
     case "COMPLETED":
     case "DELIVERED":
     case "RETURNED":
-    case "SOLD":
       return "cyan";
+    case "SOLD":
+      return "red";
     default:
       return "default";
   }

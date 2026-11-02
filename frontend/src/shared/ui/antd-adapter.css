@@ -23,9 +23,10 @@
 }
 
 :where(.ant-tag-green, .ant-tag-success) {
-  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)) !important;
-  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface)) !important;
+  border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-surface)) !important;
   color: var(--color-success) !important;
+  font-weight: 600;
 }
 
 :where(.ant-tag-orange, .ant-tag-warning) {
@@ -35,9 +36,10 @@
 }
 
 :where(.ant-tag-red, .ant-tag-error) {
-  border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border)) !important;
-  background: color-mix(in srgb, var(--color-error) 12%, var(--color-surface)) !important;
+  border-color: color-mix(in srgb, var(--color-error) 55%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-error) 18%, var(--color-surface)) !important;
   color: var(--color-error) !important;
+  font-weight: 600;
 }
 
 :where(.ant-card-head) {

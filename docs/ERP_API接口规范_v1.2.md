@@ -112,7 +112,7 @@
 
 ### 分期收款与返点结算
 
-- 分期收款（HS 分期出售 / TH 提号分期 / DG 代挂分期）：`PAYMENT`，须同步更新 installment.paid，累计不得超过总应收。
+- 分期收款（业务名称统一为「分期出售」；合约类型按订单类型编码：`HS + STOCK_SALE`、`TH + PICKUP_SALE`；代挂售出仅全款，不建分期合约）：`PAYMENT`，须同步更新 installment.paid，累计不得超过总应收。
 - 返点结算：`{"settled_on":"2026-10-04","gross_amount":"100","platform_fee":"5","net_amount":"95","pool_id":2}`；净额自动入池。
 
 ## 4. 前后端联调与治理

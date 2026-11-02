@@ -24,10 +24,14 @@ export const BUSINESS_TYPE_LABEL: Record<string, string> = {
   CONSIGNMENT: "代挂",
 };
 
+/**
+ * 增值服务只有「分期出售」一种业务名称，不按货源类型拆成「回收分期/提号分期/代挂分期」。
+ * 能否分期由货源类型决定（回收、提号可选分期出售；代挂只做全款），而不是业务类别。
+ */
 export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
-  STOCK_SALE: "分期",
-  PICKUP_SALE: "提号分期",
-  CONSIGNMENT_SALE: "代挂分期",
+  STOCK_SALE: "分期出售",
+  PICKUP_SALE: "分期出售",
+  CONSIGNMENT_SALE: "分期出售",
 };
 
 export const POOL_TYPE_LABEL: Record<string, string> = {

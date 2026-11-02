@@ -198,7 +198,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" }, { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
   ] },
   { code: "INSTALLMENT_CONTRACT_TYPE", label: "分期合约类型", group: "INSTALLMENT", editable: false, options: [
-    { value: "STOCK_SALE", label: "分期出售" }, { value: "PICKUP_SALE", label: "提号分期" }, { value: "CONSIGNMENT_SALE", label: "代挂分期" },
+    { value: "STOCK_SALE", label: "分期出售" }, { value: "PICKUP_SALE", label: "分期出售" }, { value: "CONSIGNMENT_SALE", label: "分期出售" },
   ] },
   { code: "INSTALLMENT_STATUS", label: "分期状态", group: "INSTALLMENT", editable: false, options: [
     { value: "ACTIVE", label: "还款中" }, { value: "OVERDUE", label: "逾期" }, { value: "SETTLED", label: "已结清" }, { value: "DELIVERED", label: "已交付" }, { value: "DEFAULTED", label: "违约" }, { value: "CLOSED", label: "已关闭" }, { value: "CANCELLED", label: "已取消" },

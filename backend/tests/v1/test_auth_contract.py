@@ -911,3 +911,33 @@ def test_bearer_permissions_refresh_after_user_deactivation(client: TestClient):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 401
+
+
+# ------------------------------------------------------------------ 数据范围模型（权限隔离底座）
+
+
+def test_current_user_owner_scope_model():
+    """CurrentUser 的数据范围模型是权限隔离的底座，单独钉住。
+
+    - 管理员 / ALL 范围可见任意资金池；
+    - TEAM 范围按 pool_ids 判定可见性；
+    - SELF 范围（pool_ids 为空）看不到任何具体池。
+    """
+    admin = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
+    assert admin.is_admin is True
+    assert admin.can_see_pool(999) is True
+
+    scoped = CurrentUser.build(
+        id=2, username="op", roles=["OPERATOR"], owner_scope="TEAM",
+        pool_ids=frozenset({1, 2}), team_ids=frozenset({1}),
+    )
+    assert scoped.is_admin is False
+    assert scoped.can_see_pool(1) is True
+    assert scoped.can_see_pool(2) is True
+    assert scoped.can_see_pool(3) is False
+
+    self_only = CurrentUser.build(
+        id=3, username="self", roles=["VIEWER"], owner_scope="SELF",
+    )
+    # SELF 无任何池授权（pool_ids 为空）→ 看不到任何具体池
+    assert self_only.can_see_pool(1) is False

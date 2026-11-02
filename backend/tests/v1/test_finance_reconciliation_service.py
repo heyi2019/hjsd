@@ -299,3 +299,34 @@ def test_create_reconciliation_rejects_difference_without_reason(seeded_db):
             statement_balance=Decimal("100"),
             actor="pytest",
         )
+
+
+# ----------------------------------------------------------- 幂等键精度（pool+date+label）
+
+
+def test_create_reconciliation_allows_distinct_label_same_pool_date(seeded_db):
+    """幂等键是 (pool, date, account_label) 三元组：同池同日期不同账户可分别对账。"""
+    pool = _seed_recon(seeded_db)
+    a = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="账户A", statement_balance=Decimal("70"), actor="pytest",
+    )
+    b = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="账户B", statement_balance=Decimal("70"), actor="pytest",
+    )
+    assert a.id != b.id
+
+
+def test_create_reconciliation_allows_same_label_distinct_date(seeded_db):
+    """同池同账户不同日期可对账（幂等键不跨日期）。"""
+    pool = _seed_recon(seeded_db)
+    a = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="x", statement_balance=Decimal("70"), actor="pytest",
+    )
+    b = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 18),
+        account_label="x", statement_balance=Decimal("70"), actor="pytest",
+    )
+    assert a.id != b.id

@@ -151,6 +151,19 @@ export default defineConfig({
         "src/vite.config.test.ts",
         "**/*.d.ts",
       ],
+      thresholds: {
+        // 门禁基线（2026-11-03 实测 fast+quick+react 三档聚合）：
+        //   lines 82.45 / statements 78.92 / functions 68.86 / branches 75.49（916 例全绿）。
+        // 仅 global 聚合阈值，不设 per-file——大量业务页当前覆盖率本就低，per-file 必炸。
+        // 缓冲约 2~3pt：真实回归（跌破此线）才失败，正常波动不误伤。
+        // CI 仅在 frontend-coverage job 显式跑 --coverage 时才触发本门禁；日常 test:fast/quick/react 不受影响。
+        global: {
+          lines: 80,
+          statements: 76,
+          functions: 66,
+          branches: 72,
+        },
+      },
     },
   },
 });

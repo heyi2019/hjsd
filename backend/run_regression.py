@@ -22,9 +22,9 @@ LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
 def regression_environment() -> dict[str, str]:
     """回归子进程的环境变量：沿用当前环境（含 `.env` 的 DATABASE_URL）。
 
-    历史上这里 `setdefault` 注入 `sqlite:////tmp/heijin_erp_v1.db`，目的是让回归
-    跑在隔离的临时 SQLite 上、不碰联调库。测试夹具迁到 PostgreSQL 后该做法已无意义
-    ——夹具硬性要求 PostgreSQL 且库名含 test，注入 SQLite 只会让它直接 exit。
+    历史上这里 `setdefault` 注入一个隔离临时库地址，目的是让回归跑在隔离库上、
+    不碰联调库。测试夹具迁到 PostgreSQL 后该做法已无意义——夹具硬性要求
+    PostgreSQL 且库名含 test，注入非 PG 地址只会让它直接 exit。
     现在测试库由 `TEST_DATABASE_URL`（其次 `.env` 的 `DATABASE_URL`）决定，
     隔离性由「库名必须含 test + 会话开始 TRUNCATE」保证。
     """
@@ -47,7 +47,7 @@ GROUPS = {
         "tests/v1/test_numbering.py",
         "tests/v1/test_state_machine.py",
     ],
-    # 单元档：不碰数据库与 HTTP，实测 110 passed / 2.3s。
+    # 单元档：不碰数据库与 HTTP，实测 106 passed（空闲机约 2.3s，负载下会延长）。
     # 准入标准（后补须先实测）：单文件 < 1s、不依赖 seeded_db/seeded_client/TestClient。
     "unit": [
         "tests/v1/test_money.py",
@@ -112,12 +112,17 @@ GROUPS = {
         "tests/v1/test_profit_allocation_modes.py",
         "tests/v1/test_unreachable_status_paths.py",
         "tests/v1/test_flow_recycle.py",
+        "tests/v1/test_order_status_contract.py",
+        "tests/v1/test_flow_sale.py",
+        "tests/v1/test_flow_config_driven.py",
+        "tests/v1/test_stock_intake_contract.py",
     ],
     "installments": [
         "tests/v1/test_installments_contract.py",
         "tests/v1/test_m2.py",
         "tests/v1/test_m4.py",
         "tests/v1/test_installments_service.py",
+        "tests/v1/test_flow_installment.py",
     ],
     "finance": [
         "tests/v1/test_finance_contract.py",
@@ -133,6 +138,9 @@ GROUPS = {
         "tests/v1/test_finance_reporting_task5_tail.py",
         "tests/v1/test_finance_transfers_service.py",
         "tests/v1/test_rebate_current_contract.py",
+        "tests/v1/test_finance_reversal_service.py",
+        "tests/v1/test_finance_idempotency_service.py",
+        "tests/v1/test_flow_distribution.py",
     ],
     "parties": [
         "tests/v1/test_parties.py",
@@ -140,11 +148,13 @@ GROUPS = {
         "tests/v1/test_parties_fields_service.py",
         "tests/v1/test_leads_contract.py",
         "tests/v1/test_parties_policy_guard.py",
+        "tests/v1/test_parties_masking.py",
     ],
     "reporting": [
         "tests/v1/test_reporting_contract.py",
         "tests/v1/test_report_export_columns.py",
         "tests/v1/test_reporting_service_gaps.py",
+        "tests/v1/test_reporting_r_consistency.py",
     ],
     "policy": [
         "tests/v1/test_m5_policy.py",

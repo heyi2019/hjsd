@@ -82,17 +82,26 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
-  it("业务中心默认进入库存中心作业页", async () => {
+  // 原 4 条用例（默认进入库存中心 / 台账语义名称 / 不留重复标题 / 页签集合）挂的是同一份
+  // 默认夹具、只读静态 DOM，合并为一次挂载，断言逐条保留。
+  it("业务中心外壳：默认进库存中心、页签只留三视图、不重复标题与流程提示", async () => {
     renderLight(<OrdersPage />);
+
     const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("tab", { name: "业务总览" })).toBeNull();
-  });
 
-  it("订单台账使用订单语义名称", async () => {
-    renderLight(<OrdersPage />);
     expect(await screen.findByRole("tab", { name: "订单台账" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "业务台账" })).toBeNull();
+
+    for (const label of ["库存中心", "订单台账", "分期与回款"]) {
+      expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
+
+    expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
+    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
+    expect(screen.queryByText(/待处理/)).toBeNull();
   });
 
   it("订单台账不提供关联筛选和关联列", async () => {
@@ -116,18 +125,43 @@ describe("OrdersPage：四类订单台账", () => {
     expect(buttons[buttons.length - 1]).toBe(exportButton);
   });
 
-  it("订单台账筛选栏不展示流程提示文字", async () => {
+  // 原 5 条用例（无流程提示 / 日期区间位置 / 订单编号与状态 / 责任时间列 / 默认视图核心列）
+  // 都只用默认夹具 + openLedger 一次进入台账，全是只读断言，合并为一次挂载。
+  it("订单台账默认视图：筛选区、识别列与行内业务数据", async () => {
     await openLedger();
 
+    // 筛选栏不展示流程提示文字
     expect(screen.queryByText("状态由对应业务流程更新，点击订单后继续处理付款、入库、售出或回款")).toBeNull();
-  });
 
-  it("搜索框右侧提供订单日期区间筛选", async () => {
-    await openLedger();
-
+    // 搜索框右侧紧跟订单日期区间筛选
     const search = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注");
     const startDate = screen.getAllByLabelText("订单日期区间")[0];
     expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // 订单编号与库存状态按行渲染
+    expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("库存状态").length).toBeGreaterThanOrEqual(1);
+
+    // 入库 / 售卖责任时间列，且行内取数正确
+    for (const label of ["入库负责人", "入库时间", "售卖负责人", "售卖时间"]) {
+      expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
+    }
+    const dutyRow = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
+    expect(within(dutyRow).getByText("入库员")).toBeInTheDocument();
+    expect(within(dutyRow).getByText("2026-10-01 09:30")).toBeInTheDocument();
+    expect(within(dutyRow).getByText("售卖员")).toBeInTheDocument();
+    expect(within(dutyRow).getByText("2026-10-17 16:45")).toBeInTheDocument();
+    expect(within(dutyRow).getByText("16天7小时15分")).toBeInTheDocument();
+
+    // 默认视图下的核心识别列与取值（完整列清单属配置能力，不在前端锁死）
+    for (const label of ["订单号", "金额", "库存状态", "日期", "操作"]) {
+      expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
+    }
+    expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
+    for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
+      expect(screen.getAllByText(value).length).toBeGreaterThan(0);
+    }
   });
 
   it("业务中心重新激活时刷新库存列表", async () => {
@@ -137,22 +171,6 @@ describe("OrdersPage：四类订单台账", () => {
 
     rerender(<OrdersPage active />);
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.list)).toHaveBeenCalled());
-  });
-
-  it("顶部不再重复展示业务中心标题与说明", async () => {
-    renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "订单台账" });
-    expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
-    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
-    expect(screen.queryByText(/待处理/)).toBeNull();
-  });
-
-  it("加载后渲染订单编号与状态", async () => {
-    await openLedger();
-    expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1);
-    // 订单状态列只存在于台账列表中（订单台账列注册表无 status 列），此处不再断言状态文案。
-    expect(screen.getAllByText("库存状态").length).toBeGreaterThanOrEqual(1);
   });
 
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {
@@ -227,20 +245,6 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByRole("region", { name: "业务提醒" })).toBeNull();
   });
 
-  it("订单台账展示入库和售卖责任时间", async () => {
-    await openLedger();
-
-    for (const label of ["入库负责人", "入库时间", "售卖负责人", "售卖时间"]) {
-      expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
-    }
-    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
-    expect(within(row).getByText("入库员")).toBeInTheDocument();
-    expect(within(row).getByText("2026-10-01 09:30")).toBeInTheDocument();
-    expect(within(row).getByText("售卖员")).toBeInTheDocument();
-    expect(within(row).getByText("2026-10-17 16:45")).toBeInTheDocument();
-    expect(within(row).getByText("16天7小时15分")).toBeInTheDocument();
-  });
-
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       ...orders,
@@ -303,24 +307,6 @@ describe("OrdersPage：四类订单台账", () => {
     const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
     await waitFor(() => expect(within(ledger).queryByText("HS-2026-0001")).toBeNull());
     expect(within(ledger).getAllByText("TH-2026-0003").length).toBeGreaterThan(0);
-  });
-
-  it("订单台账默认视图露出核心识别列，并按行渲染业务数据", async () => {
-    await openLedger();
-
-    // 列的显隐 / 顺序 / 列宽 / 自定义列都由「设置 → 列表列」统一配置（服务端单一事实源），
-    // 所以这里不锁完整列清单，也不锁逐列像素宽度：那两样是配置能力，已由
-    // shared/lib/listColumns.test.ts（覆盖/排序/注入）与后端 test_list_columns.py
-    // （注册表契约、保存、重置）覆盖；写死清单只会让每次产品调列都误报。
-    // 本用例守住两件产品真正在意的事：默认视图下核心识别列必须看得见、列的 render 取数正确。
-    for (const label of ["订单号", "金额", "库存状态", "日期", "操作"]) {
-      expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
-    }
-    // 固定布局与 ellipsis 配套，避免长账号名把列撑变形；与列配置无关，仍守住。
-    expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
-    for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
-      expect(screen.getAllByText(value).length).toBeGreaterThan(0);
-    }
   });
 
   it("行展开直接复用库存中心的订单详情", async () => {
@@ -437,23 +423,18 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByText("旧平台")).toBeNull();
   });
 
-  it("操作列直接提供四个小号操作入口", async () => {
+  // 原两条（操作列四个小号入口 / 行级操作）同一份 admin 夹具，合并为一次挂载。
+  it("操作列直接提供编辑、分润、资金收支、取消四个小号入口", async () => {
     await openLedger("admin");
 
+    // 不再有「更多」收纳入口
     expect(screen.queryAllByRole("button", { name: "更多" })).toHaveLength(0);
     for (const label of ["编辑", "分润", "资金收支", "取消"]) {
       const buttons = screen.getAllByRole("button", { name: label });
       expect(buttons).toHaveLength(2);
       expect(buttons.every((button) => button.classList.contains("ant-btn-sm"))).toBe(true);
+      expect(buttons[0]).toBeInTheDocument();
     }
-  });
-
-  it("行级操作直接提供分润、资金收支和取消", async () => {
-    await openLedger("admin");
-
-    expect(screen.getAllByRole("button", { name: "分润" })[0]).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "资金收支" })[0]).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "取消" })[0]).toBeInTheDocument();
   });
 
   it("待售代挂订单的操作入口显示下架而不是取消", async () => {
@@ -521,15 +502,6 @@ describe("OrdersPage：四类订单台账", () => {
     vi.mocked(catalog.ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
-  });
-
-  it("业务中心保留库存、台账与分期回款视图，不展示独立返点页签", async () => {
-    renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "订单台账" });
-    for (const label of ["库存中心", "订单台账", "分期与回款"]) {
-      expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
   });
 
   it("新建订单菜单提供回收、提号、代挂三个表单", async () => {

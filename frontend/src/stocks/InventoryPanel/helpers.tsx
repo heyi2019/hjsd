@@ -52,26 +52,21 @@ export function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   return items;
 }
 
-/** 从后往前找最近一条仍有余额的 BUY/SELL，避免创建额外数组副本。 */
+/** 从后往前找最近一条后端标记为「仍可冲销」的 BUY/SELL；金额直接用后端下发的余额，不本地相减。 */
 export function findCancelableEvent(detail: AccountExecutionDetail, eventType: "BUY" | "SELL") {
   for (let i = detail.orders.length - 1; i >= 0; i -= 1) {
     const order = detail.orders[i];
     for (let j = order.events.length - 1; j >= 0; j -= 1) {
       const event = order.events[j];
       if (event.event_type !== eventType) continue;
-      const cancelledAmount = order.events
-        .filter((item) => item.event_type === "CANCEL" && item.offset_event_id === event.id)
-        .reduce((sum, item) => sum + Number(item.amount), 0);
-      const remaining = Number(event.amount) - cancelledAmount;
-      if (remaining > 0) {
-        return {
-          orderId: order.order_id,
-          eventId: event.id,
-          amount: remaining.toFixed(2),
-          portion: event.portion,
-          poolId: event.pool_id ?? undefined,
-        };
-      }
+      if (Number(event.cancellable_amount) <= 0) continue;
+      return {
+        orderId: order.order_id,
+        eventId: event.id,
+        amount: event.cancellable_amount,
+        portion: event.portion,
+        poolId: event.pool_id ?? undefined,
+      };
     }
   }
   return null;

@@ -419,6 +419,8 @@ export interface AccountExecutionEvent {
   event_no: string;
   event_type: string;
   amount: string;
+  /** 仍可被冲销的余额（后端按已冲销合计算好并夹底 0），前端不再自行相减。 */
+  cancellable_amount: string;
   occurred_on: string;
   occurred_at?: string | null;
   pool_id?: number | null;

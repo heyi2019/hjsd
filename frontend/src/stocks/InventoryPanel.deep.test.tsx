@@ -160,7 +160,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
         order_id: 21,
         order_type: "HS",
         status: "ACTIVE",
-        events: [{ id: 31, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
+        events: [{ id: 31, event_type: "BUY", amount: "100.00", cancellable_amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
       }],
     } as unknown as AccountExecutionDetail);
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
@@ -171,6 +171,8 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     const modal = await screen.findByRole("dialog");
     const amount = within(modal).getByLabelText("退回金额");
     const account = within(modal).getByLabelText("收款账户");
+    // 弹窗默认值直接取后端 cancellable_amount（不再由前端按 amount − 已冲销 算）。
+    expect((amount as HTMLInputElement).value).toBe("100.00");
     expect(within(modal).getByText("取消原因")).toBeInTheDocument();
     expect(within(modal).queryByText("下架原因")).toBeNull();
     expect(amount.closest(".adaptive-form-grid")).toBe(account.closest(".adaptive-form-grid"));
@@ -196,7 +198,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
         order_id: 21,
         order_type: "HS",
         status: "ACTIVE",
-        events: [{ id: 31, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
+        events: [{ id: 31, event_type: "BUY", amount: "100.00", cancellable_amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
       }],
     } as unknown as AccountExecutionDetail);
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);

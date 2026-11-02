@@ -36,8 +36,8 @@ def test_list_scopes_match_registry(seeded_client, headers):
     payload = response.json()
     assert {item["code"] for item in payload} == {scope.code for scope in LIST_SCOPES}
     ledger = next(item for item in payload if item["code"] == "LEDGER")
-    assert [column["key"] for column in ledger["columns"][:2]] == ["order_no", "party"]
-    assert next(column for column in ledger["columns"] if column["key"] == "account_status")["label"] == "账号周期"
+    assert [column["key"] for column in ledger["columns"][:2]] == ["order_no", "account_game_type"]
+    assert next(column for column in ledger["columns"] if column["key"] == "account_status")["label"] == "库存状态"
     # 缺行默认可见（不播种也能用）
     assert all(column["is_visible"] for column in ledger["columns"])
     assert ledger["columns"][0]["locked"] is False
@@ -46,15 +46,15 @@ def test_list_scopes_match_registry(seeded_client, headers):
 def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     ledger = _scope(seeded_client, headers, "LEDGER")
     columns = ledger["columns"]
-    # 关掉「状态」列，并把「日期」提到第一位，其余保持相对顺序
-    rest = [column for column in columns if column["key"] not in {"status", "trade_date"}]
+    # 关掉「库存状态」列，并把「日期」提到第一位，其余保持相对顺序
+    rest = [column for column in columns if column["key"] not in {"account_status", "trade_date"}]
     trade_date = next(column for column in columns if column["key"] == "trade_date")
-    hidden = next(column for column in columns if column["key"] == "status")
+    hidden = next(column for column in columns if column["key"] == "account_status")
     ordered = [trade_date, *rest, hidden]
     items = [
         {
             "column_key": column["key"],
-            "is_visible": False if column["key"] == "status" else column["is_visible"],
+            "is_visible": False if column["key"] == "account_status" else column["is_visible"],
             "sort_order": index * 10,
         }
         for index, column in enumerate(ordered)
@@ -66,12 +66,12 @@ def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     assert [column["key"] for column in saved["columns"]][0] == "trade_date"
     by_key = {column["key"]: column for column in saved["columns"]}
     # 隐藏列仍出现在清单里（设置页要能重新打开），只是 is_visible=False
-    assert by_key["status"]["is_visible"] is False
+    assert by_key["account_status"]["is_visible"] is False
 
     # 再次读取：顺序与隐藏态已持久化
     reloaded = _scope(seeded_client, headers, "LEDGER")
     assert reloaded["columns"][0]["key"] == "trade_date"
-    assert {column["key"]: column for column in reloaded["columns"]}["status"]["is_visible"] is False
+    assert {column["key"]: column for column in reloaded["columns"]}["account_status"]["is_visible"] is False
 
     actions = [
         row.action
@@ -133,7 +133,7 @@ def test_save_width_and_fixed(seeded_client, headers):
             "column_key": column["key"],
             "is_visible": column["is_visible"],
             "sort_order": index * 10,
-            "width": 180 if column["key"] == "party" else None,
+            "width": 180 if column["key"] == "account_game_type" else None,
             "fixed": "left" if column["key"] == "order_no" else None,
         }
         for index, column in enumerate(ledger["columns"])
@@ -141,12 +141,12 @@ def test_save_width_and_fixed(seeded_client, headers):
     response = _save(seeded_client, headers, "LEDGER", items)
     assert response.status_code == 200, response.text
     by_key = {column["key"]: column for column in response.json()["columns"]}
-    assert by_key["party"]["width"] == 180
+    assert by_key["account_game_type"]["width"] == 180
     assert by_key["order_no"]["fixed"] == "left"
     assert by_key["trade_date"]["width"] is None
 
     reloaded = {column["key"]: column for column in _scope(seeded_client, headers, "LEDGER")["columns"]}
-    assert reloaded["party"]["width"] == 180
+    assert reloaded["account_game_type"]["width"] == 180
     assert reloaded["order_no"]["fixed"] == "left"
 
     # 取消覆盖：传 null 后回到默认
@@ -155,7 +155,7 @@ def test_save_width_and_fixed(seeded_client, headers):
     cleared = _save(seeded_client, headers, "LEDGER", items)
     assert cleared.status_code == 200, cleared.text
     cleared_by_key = {column["key"]: column for column in cleared.json()["columns"]}
-    assert cleared_by_key["party"]["width"] is None
+    assert cleared_by_key["account_game_type"]["width"] is None
     assert cleared_by_key["order_no"]["fixed"] is None
 
 

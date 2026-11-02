@@ -80,7 +80,7 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
     header = _headers(body)
     assert header[0] == "row_type"
     assert "订单号" in header
-    assert "对方 / 来源" in header
+    assert "游戏/产品类型" in header
     assert "操作" not in header  # UI 列不导出
     assert "HS9801" in body  # 明细行带订单号
 

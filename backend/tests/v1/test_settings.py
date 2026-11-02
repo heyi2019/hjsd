@@ -88,8 +88,13 @@ def test_sqlite_path_is_resolved_under_backend(tmp_path):
 
 
 def test_default_database_is_independent_v1_file():
-    """v1 默认库不得是旧 heijin.db / heijin_v2.db。"""
+    """v1 默认库不得是旧 heijin.db / heijin_v2.db（仅 SQLite 默认路径有此约束）。
+
+    已切到 PostgreSQL 等非 SQLite 后端时 sqlite_file 应为 None，跳过该约束。
+    """
     settings = get_settings()
+    if not settings.database_url.startswith("sqlite"):
+        pytest.skip("非 SQLite 后端（如 PostgreSQL）无独立 sqlite 文件约束")
     sqlite_file = settings.sqlite_file
     assert sqlite_file is not None
     assert sqlite_file.name not in {"heijin.db", "heijin_v2.db"}

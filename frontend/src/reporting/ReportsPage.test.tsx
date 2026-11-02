@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
 import { ReportsPage } from "./ReportsPage";
 import { resolveMock } from "../test/mock-api";
@@ -10,21 +10,13 @@ let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
 });
 
 // jsdom 不执行真实下载跳转；屏蔽 anchor.click，避免导出测试留下 navigation 定时器拖住全量单测。
 // 同时 jsdom 未实现 URL.createObjectURL/revokeObjectURL，导出成功分支依赖它，置为安全桩。
-beforeAll(() => {
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
-  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
-  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-});
-
-afterAll(() => {
-  vi.restoreAllMocks();
-});
-
+// 必须在「每个用例」的 beforeEach 内（clearAllMocks 之后）重新挂桩：setup.ts 的 afterEach 会
+// resetAllMocks，清空 beforeAll 桩的 mockReturnValue；若是文件内后续用例（如「导出成功后」）
+// 会读到真实 jsdom Blob 而抛 "cannot read the bytes of a jsdom Blob"，误入错误分支。
 vi.mock("../shared/api/catalog")
 
 vi.mock("../shared/ui", async (importOriginal) => {
@@ -37,6 +29,10 @@ const emptyHealth = { generated_on: "2026-10-01", total_cost: "0.00", items: [] 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // 每个用例重新挂桩，覆盖上一份用例 afterEach(resetAllMocks) 对桩实现的清空。
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   resolveMock(vi.mocked(catalog.reportsApi.inventoryHealth), emptyHealth);
   resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
@@ -114,7 +110,7 @@ describe("ReportsPage：经营中心报表", () => {
     await gotoTab("数据中心");
     expect(await screen.findByText("可用余额合计")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /订单总数/ }));
-    expect(onNavigate).toHaveBeenCalledWith("business");
+    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
 
   it("管理员可从导出工具条按日期范围 + 下拉勾选发起导出", async () => {
@@ -157,10 +153,19 @@ describe("ReportsPage：经营中心报表", () => {
     const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
     await ui.click(selector);
     const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("订单利润"));
+    const option = within(listbox).getByText("订单利润");
+    await ui.click(option);
+    // 等待选项真正被选中（aria-selected=true 反映已提交的选中态）。
+    // 注意：该 Select 用 maxTagCount="responsive"，jsdom 无布局时会把已选标签折叠成
+    // "+ N ..." 溢出指示，无法直接断言可见标签文字；故改等选项 aria-selected，
+    // 避免误判「未选中」而命中「请至少勾选一项」分支。
+    await waitFor(() =>
+      expect(within(listbox).getByText("订单利润").closest(".ant-select-item-option")).toHaveAttribute("aria-selected", "true"),
+    );
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     // L1727 验证点：成功文案出现 + 确实触发了下载请求
-    expect(await screen.findByText("已导出 1 份报表")).toBeInTheDocument();
+    // 成功文案在「页内反馈区」与 antd message 弹层各渲染一份，用 findAllByText 兼容双渲染。
+    expect((await screen.findAllByText("已导出 1 份报表")).length).toBeGreaterThan(0);
     expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" });
   });
 });

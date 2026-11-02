@@ -50,7 +50,7 @@ it("规则定义为系统预置闭集：页面不提供「新建规则」入口"
 it("配置项标注生效状态：返点费率标「参与计算」，计算基数标「仅留痕」", async () => {
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+  await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
 
   // 分方向费率 + 统一费率：后端 rebates.py:167 真读，标 calc
   expect(await screen.findAllByText("参与计算")).toHaveLength(2);
@@ -61,11 +61,11 @@ it("配置项标注生效状态：返点费率标「参与计算」，计算基�
 it("设置配置：填写生效期和结构化字段后提交，生成新版本并立即发布", async () => {
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+  await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
   // 结构化字段由 schema 驱动：REBATE → 统一返点比例（percent 控件）
   const rate = screen.getByLabelText("统一返点比例");
   fireEvent.change(rate, { target: { value: "5" } });
-  await ui.click(screen.getByRole("button", { name: /保存/ }));
+  await ui.click(await screen.findByRole("button", { name: /保存/ }));
 
   await waitFor(() => expect(vi.mocked(catalog.policyApi.createVersion)).toHaveBeenCalledWith(1, {
     effective_from: expect.any(String),
@@ -81,11 +81,11 @@ it("设置配置：按返点方向分别填写时提交 rates 子对象（引擎
   vi.mocked(catalog.policyApi.versions).mockResolvedValue({ items: [], total: 0 });
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+  await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
 
   fireEvent.change(screen.getByLabelText("买入返点"), { target: { value: "5" } });
   fireEvent.change(screen.getByLabelText("卖出返点"), { target: { value: "3" } });
-  await ui.click(screen.getByRole("button", { name: /保存/ }));
+  await ui.click(await screen.findByRole("button", { name: /保存/ }));
 
   await waitFor(() => expect(vi.mocked(catalog.policyApi.createVersion)).toHaveBeenCalledWith(1, {
     effective_from: expect.any(String),
@@ -104,10 +104,10 @@ it("未定义字段的规则：保存按钮禁用并说明不可配置（避免�
 
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("自定义规则");
-  await ui.click(screen.getByRole("button", { name: /设置配置/ }));
+  await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
 
   expect(await screen.findByText(/暂无可配置参数/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /保存/ })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: /保存/ })).toBeDisabled();
 });
 
 it("渲染经营规则标题、统计卡与左侧规则清单，并默认加载首个规则的版本", async () => {
@@ -126,14 +126,14 @@ it("渲染经营规则标题、统计卡与左侧规则清单，并默认加载�
 it("admin 可见「设置配置」", async () => {
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   expect((await screen.findAllByText("返点比例")).length).toBeGreaterThan(0);
-  expect(screen.getByRole("button", { name: /设置配置/ })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /设置配置/ })).toBeInTheDocument();
 });
 
 it("FE-215：经营规则接口失败时统计不可用且不开放规则操作", async () => {
   vi.mocked(catalog.policyApi.list).mockRejectedValueOnce(new Error("policies down"));
   renderLight(<PolicySettingsPanel />, { user: "admin" });
 
-  expect(await screen.findByText("policies down")).toBeInTheDocument();
+  expect(await screen.findByText(/policies down/)).toBeInTheDocument();
   expect(screen.getByText("规则总数").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.queryByRole("button", { name: /设置配置/ })).toBeNull();
 });
@@ -154,7 +154,7 @@ it("已发布版本不可再编辑/发布：页面不暴露「编辑」「发布
 it("auditor 有 policy.manage：可见「设置配置」", async () => {
   renderLight(<PolicySettingsPanel />, { user: "auditor" });
   await screen.findAllByText("返点比例");
-  expect(screen.getByRole("button", { name: /设置配置/ })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /设置配置/ })).toBeInTheDocument();
 });
 
 it("生效期自查：选编码与日期后调用 resolve 并展示命中版本", async () => {
@@ -164,9 +164,9 @@ it("生效期自查：选编码与日期后调用 resolve 并展示命中版本"
   } as unknown as { found: boolean; version: import("../shared/api/catalog").PolicyVersion | null });
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(screen.getByRole("button", { name: /生效期自查/ }));
+  await ui.click(await screen.findByRole("button", { name: /生效期自查/ }));
   // 规则编码默认取当前选中规则（REBATE），无需重选；直接解析。
-  await ui.click(screen.getByRole("button", { name: /解析/ }));
+  await ui.click(await screen.findByRole("button", { name: /解析/ }));
   await waitFor(() => expect(vi.mocked(catalog.policyApi.resolve)).toHaveBeenCalledWith(
     "REBATE",
     expect.any(String),
@@ -181,8 +181,8 @@ it("生效期自查：未命中时提示该日该作用域无生效版本", asyn
   vi.mocked(catalog.policyApi.resolve).mockResolvedValue({ found: false, version: null });
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(screen.getByRole("button", { name: /生效期自查/ }));
-  await ui.click(screen.getByRole("button", { name: /解析/ }));
+  await ui.click(await screen.findByRole("button", { name: /生效期自查/ }));
+  await ui.click(await screen.findByRole("button", { name: /解析/ }));
   expect(await screen.findByText(/没有生效的规则版本/)).toBeInTheDocument();
 });
 
@@ -217,7 +217,7 @@ it("过期清扫：二次确认后调用 policyApi.expireSweep（不改生效期
   vi.mocked(catalog.policyApi.expireSweep).mockResolvedValue({ swept: 1, version_ids: [1], on: "2026-10-27" });
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(screen.getByRole("button", { name: /过期清扫/ }));
+  await ui.click(await screen.findByRole("button", { name: /过期清扫/ }));
   await ui.click(await screen.findByRole("button", { name: /开始清扫/ }));
   await waitFor(() => expect(catalog.policyApi.expireSweep).toHaveBeenCalledTimes(1));
   expect(vi.mocked(catalog.policyApi.expireSweep).mock.calls[0][0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);

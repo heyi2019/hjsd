@@ -574,18 +574,22 @@ class TestApiV1Health:
         assert health.json()["database_status"] == "ok"
         # PRAGMA 现值必须从连接上读出：配置写错在 SQLite 里是静默无效，
         # 只有这里能看到「运行期真正生效的是什么」。
+        # 非 SQLite 后端（如 PostgreSQL）无 PRAGMA，health 按设计返回空字典。
         pragmas = health.json()["sqlite_pragmas"]
-        assert set(pragmas) == {
-            "journal_mode",
-            "synchronous",
-            "cache_size",
-            "mmap_size",
-            "temp_store",
-            "foreign_keys",
-        }
-        assert pragmas["foreign_keys"] == "1"
-        assert pragmas["journal_mode"] in {"wal", "memory"}
-        assert pragmas["synchronous"] in {"0", "1", "2", "3"}
+        if settings_module.get_settings().database_url.startswith("sqlite"):
+            assert set(pragmas) == {
+                "journal_mode",
+                "synchronous",
+                "cache_size",
+                "mmap_size",
+                "temp_store",
+                "foreign_keys",
+            }
+            assert pragmas["foreign_keys"] == "1"
+            assert pragmas["journal_mode"] in {"wal", "memory"}
+            assert pragmas["synchronous"] in {"0", "1", "2", "3"}
+        else:
+            assert pragmas == {}
 
     def test_health_reports_database_unavailable(self, client, monkeypatch):
         class BrokenEngine:

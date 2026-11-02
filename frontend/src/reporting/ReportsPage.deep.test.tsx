@@ -181,7 +181,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalled());
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
-    expect(await screen.findByText(/已导出 1 份报表/)).toBeInTheDocument();
+    // 成功文案在「页内反馈区」与 antd message 弹层各渲染一份，findByText 单数会报
+    // 「Found multiple elements」，用 findAllByText 兼容双渲染。
+    expect((await screen.findAllByText(/已导出 1 份报表/)).length).toBeGreaterThan(0);
     createUrl.mockRestore();
     revokeUrl.mockRestore();
   });

@@ -175,7 +175,7 @@ def _validate_participant_roles(
 
 
 # --------------------------------------------------------------------- 订单
-def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, value_added_service: str | None = None, platform: str | None = None, wallet_realname: str | None = None, extra_values: Mapping[str, Any] | None = None) -> Account:
+def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, value_added_service: str | None = None, platform: str | None = None, wallet_realname: str | None = None, camp_account: str | None = None, secondary_images: list[str] | None = None, wallet_realname_images: list[str] | None = None, extra_values: Mapping[str, Any] | None = None) -> Account:
     mode, inventory_type = {
         "HS": ("SELF", "RECOVERY"),
         "TH": ("DISTRIBUTION", "PICKUP"),
@@ -188,6 +188,9 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         has_secondary=has_secondary, note=account_note,
         value_added_service=value_added_service, platform=platform,
         wallet_realname=wallet_realname,
+        camp_account=camp_account,
+        secondary_images=secondary_images,
+        wallet_realname_images=wallet_realname_images,
         extra_values=extra_values,
     )
 

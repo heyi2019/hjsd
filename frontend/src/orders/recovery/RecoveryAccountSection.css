@@ -6,6 +6,18 @@
   grid-column: 1 / -1;
 }
 
+/* 二次图片跟在「有无二次」右侧：多列布局占两格，单列布局回落一格。 */
+.account-section .account-secondary-images {
+  grid-column: span 2;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .account-section .account-secondary-images {
+    grid-column: span 1;
+  }
+}
+
 .account-section .business-registration-group {
   grid-column: 1 / -1;
 }

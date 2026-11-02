@@ -194,11 +194,16 @@ export interface Order {
     game_account: string;
     game_type?: string | null;
     game_password?: string | null;
+    camp_account?: string | null;
     channel_region?: string | null;
     bound_phone?: string | null;
     bound_phone_owner?: string | null;
     has_secondary?: boolean | null;
+    /** 二次验证佐证图（data URL，最多 3 张）；仅「有无二次」为有时的上传结果。 */
+    secondary_images?: string[] | null;
     wallet_realname?: string | null;
+    /** 钱包实名已注销佐证图（data URL，最多 3 张）。 */
+    wallet_realname_images?: string[] | null;
     platform?: string | null;
     purchase_price?: string | null;
     note?: string | null;
@@ -345,12 +350,18 @@ export interface Account {
   value_added_service?: string | null;
   game_account?: string | null;
   game_password?: string | null;
+  /** 营地账号：账号绑定的官方社区（营地）账号，随号交付，不参与核算。 */
+  camp_account?: string | null;
   channel_region?: string | null;
   bound_phone?: string | null;
   bound_phone_owner?: string | null;
   has_secondary?: boolean | null;
+  /** 二次验证佐证图（data URL，最多 3 张）。 */
+  secondary_images?: string[] | null;
   /** 钱包实名：未注销 / 已注销（账号交付前需确认实名是否已解绑）。 */
   wallet_realname?: string | null;
+  /** 钱包实名已注销佐证图（data URL，最多 3 张）。 */
+  wallet_realname_images?: string[] | null;
   account_description?: string | null;
   account_images?: string[] | null;
   extra_values?: Record<string, unknown>;

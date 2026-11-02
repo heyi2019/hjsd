@@ -22,6 +22,7 @@ import {
 const ACCOUNT_FIELD_MAP: Record<string, { cfgKey: string; fallback: string }> = {
   gameType: { cfgKey: "game_type", fallback: "游戏 / 产品类型" },
   gameAccount: { cfgKey: "game_account", fallback: "游戏账号 / 产品" },
+  campAccount: { cfgKey: "camp_account", fallback: "营地账号" },
   password: { cfgKey: "game_password", fallback: "账号密码" },
   channelRegion: { cfgKey: "channel_region", fallback: "渠道 / 区服" },
   secondary: { cfgKey: "has_secondary", fallback: "有无二次" },
@@ -55,6 +56,7 @@ export function OrderDetailProfileSection({
   const accountProfileFields: OrderDetailField[] = [
     { key: "gameType", label: ACCOUNT_FIELD_MAP.gameType.fallback, value: meta.gameType || "-" },
     { key: "gameAccount", label: ACCOUNT_FIELD_MAP.gameAccount.fallback, value: meta.gameAccount || "-" },
+    { key: "campAccount", label: ACCOUNT_FIELD_MAP.campAccount.fallback, value: meta.campAccount || "-" },
     {
       key: "password",
       label: ACCOUNT_FIELD_MAP.password.fallback,

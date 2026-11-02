@@ -124,7 +124,7 @@ describe("InventoryPanel：账号台账", () => {
 
   it("提供库存导出入口，并按当前库存字段生成 CSV", async () => {
     expect(buildInventoryCsv(accounts)).toContain(
-      "订单号,业务,类型,游戏/产品类型,库存编号,平台,成本,库存状态",
+      "订单号,业务,类型,游戏/产品类型,营地账号,库存编号,平台,成本,库存状态",
     );
     expect(buildInventoryCsv(accounts)).toContain(
       "HS-2026-0001,,回收,,KU_00001,A平台,100.00,在库",

@@ -11,7 +11,7 @@ import {
 } from "./inventory-logic";
 
 const INVENTORY_EXPORT_HEADERS = [
-  "订单号", "业务", "类型", "游戏/产品类型", "库存编号", "平台", "成本", "库存状态", "未售时长",
+  "订单号", "业务", "类型", "游戏/产品类型", "营地账号", "库存编号", "平台", "成本", "库存状态", "未售时长",
   "建档操作人", "登记时间", "出售时间", "下架时间", "寄售时间", "寄售平台",
   "渠道 / 区服", "绑定手机号", "有无二次", "账号描述", "账号图片", "备注", "执行明细", "资金明细",
   "支出笔数", "收入笔数", "总支出", "总收入",
@@ -98,6 +98,7 @@ export function buildInventoryCsv(
         row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "",
         row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "",
         row.game_type,
+        row.camp_account,
         row.stock_no,
         row.platform,
         row.cost_amount,

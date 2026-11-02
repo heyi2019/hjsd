@@ -276,7 +276,16 @@ export function CreateBusinessModal(props: {
           bound_phone: values.bound_phone as string | undefined,
           bound_phone_owner: values.bound_phone_owner as string | undefined,
           has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
+          // 二次图片只在「有二次」时随号入库；无二次时表单残留不提交。
+          secondary_images: values.has_secondary === "有"
+            ? ((values.secondary_images as string[] | undefined)?.length ? values.secondary_images as string[] : undefined)
+            : undefined,
           wallet_realname: values.wallet_realname as string | undefined,
+          // 钱包实名注销佐证图：仅「已注销」时随号入库。
+          wallet_realname_images: values.wallet_realname === "已注销"
+            ? ((values.wallet_realname_images as string[] | undefined)?.length ? values.wallet_realname_images as string[] : undefined)
+            : undefined,
+          camp_account: values.camp_account as string | undefined,
           note: values.game_account_note as string | undefined,
           extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
         },

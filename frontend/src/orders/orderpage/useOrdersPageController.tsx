@@ -377,6 +377,7 @@ export function useOrdersPageController(params: {
       snap_channel_region: snapshot?.channel_region ?? undefined,
       snap_bound_phone: snapshot?.bound_phone ?? undefined,
       snap_wallet_realname: snapshot?.wallet_realname ?? undefined,
+      snap_camp_account: snapshot?.camp_account ?? undefined,
       snap_platform: snapshot?.platform ?? undefined,
       snap_purchase_price: snapshot?.purchase_price ?? undefined,
       snap_note: snapshot?.note ?? undefined,
@@ -406,6 +407,8 @@ export function useOrdersPageController(params: {
           // 快照整体替换：表单无该控件时沿用原值，避免编辑订单把钱包实名抹掉。
           wallet_realname:
             (values.snap_wallet_realname as string) || snapshot.wallet_realname || null,
+          // 同上：编辑弹窗未必带营地账号控件，缺值时保留原快照值。
+          camp_account: (values.snap_camp_account as string) || snapshot.camp_account || null,
           platform: (values.snap_platform as string) || null,
           purchase_price: (values.snap_purchase_price as string) || null,
           note: (values.snap_note as string) || null,

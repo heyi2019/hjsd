@@ -43,6 +43,7 @@ export function InventoryProfileModal({
 }) {
   const [form, setForm] = useState({
     gameAccount: "",
+    campAccount: "",
     gameType: "",
     gamePassword: "",
     channelRegion: "",
@@ -61,6 +62,7 @@ export function InventoryProfileModal({
     const { account } = target;
     setForm({
       gameAccount: account.game_account ?? "",
+      campAccount: account.camp_account ?? "",
       gameType: account.game_type ?? "",
       gamePassword: account.game_password ?? "",
       channelRegion: account.channel_region ?? "",
@@ -100,6 +102,7 @@ export function InventoryProfileModal({
         ? { account_description: form.description }
         : target.mode === "images" ? { account_images: imagePayload ?? [] } : {
             game_account: form.gameAccount,
+            camp_account: form.campAccount,
             game_type: form.gameType,
             game_password: form.gamePassword,
             channel_region: form.channelRegion,
@@ -162,6 +165,7 @@ export function InventoryProfileModal({
       ) : (
         <Space className="inventory-profile-editor" direction="vertical" size="middle">
           <Input aria-label="游戏账号/产品" placeholder="游戏账号/产品" value={form.gameAccount} onChange={(event) => setForm((current) => ({ ...current, gameAccount: event.target.value }))} />
+          <Input aria-label="营地账号" placeholder="营地账号" value={form.campAccount} onChange={(event) => setForm((current) => ({ ...current, campAccount: event.target.value }))} />
           <Input aria-label="游戏/产品类型" placeholder="游戏/产品类型" value={form.gameType} onChange={(event) => setForm((current) => ({ ...current, gameType: event.target.value }))} />
           <Input.Password aria-label="账号密码" placeholder="账号密码" value={form.gamePassword} onChange={(event) => setForm((current) => ({ ...current, gamePassword: event.target.value }))} />
           <Input aria-label="渠道 / 区服" placeholder="渠道 / 区服" value={form.channelRegion} onChange={(event) => setForm((current) => ({ ...current, channelRegion: event.target.value }))} />

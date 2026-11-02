@@ -1,6 +1,6 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
-import { DatePicker, Form } from "antd";
+import { DatePicker, Form, InputNumber } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi,
@@ -9,12 +9,12 @@ import { ordersApi,
   type AccountExecutionDetail, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
 
-type ListedPlatform = { key: number; platform: string; listedAt: string };
+type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 
 function dateTimeMinute(value: string): string {
   const normalized = value.replace("T", " ");
@@ -27,6 +27,7 @@ function listedPlatforms(detail: AccountExecutionDetail): ListedPlatform[] {
     .map((order) => ({
       key: order.order_id,
       platform: consignmentPlatform(order) ?? "-",
+      price: (order.extra_values?.consignment_price as number | string | undefined) ?? null,
       listedAt: dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
     }));
 }
@@ -56,10 +57,11 @@ export function InventoryConsignmentModal(props: {
     if (props.account) void refreshListed(props.account.id).catch((cause) => setError(normalizeError(cause)));
   }, [form, open, props.account]);
 
-  const submit = async (values: { platform?: string; listed_at?: Dayjs; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const listedAt = values.listed_at ?? dayjs();
     if (!values.platform) return;
+    const price = typeof values.consignment_price === "number" ? values.consignment_price : undefined;
     setSubmitting(true);
     try {
       await ordersApi.create({
@@ -70,12 +72,13 @@ export function InventoryConsignmentModal(props: {
         form_extra: {
           ...values.form_extra,
           consignment_platform: values.platform,
+          ...(price === undefined ? {} : { consignment_price: price }),
           listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
         },
         form_extra_scope: "CONSIGN",
       });
       appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
-      form.setFieldsValue({ platform: undefined, listed_at: dayjs().second(0).millisecond(0) });
+      form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
       await refreshListed(props.account.id);
       await props.onCreated();
     } catch (cause) {
@@ -122,6 +125,16 @@ export function InventoryConsignmentModal(props: {
               <span className="muted">暂无可用寄售平台，请先在中介业务配置中维护经手平台</span>
             )}
           </CfgItem>
+          <CfgItem name="consignment_price" label="寄售价格">
+            <InputNumber
+              aria-label="寄售价格"
+              min={0}
+              precision={2}
+              prefix="¥"
+              className="ui-control-width-180"
+              placeholder="本次挂牌价，选填"
+            />
+          </CfgItem>
           <CfgItem name="listed_at" label="上架时间" rules={[{ required: true, message: "请选择上架时间" }]}>
             <DatePicker aria-label="上架时间" showTime={{ format: "HH:mm" }} format="YYYY-MM-DD HH:mm" minuteStep={1} />
           </CfgItem>
@@ -140,6 +153,7 @@ export function InventoryConsignmentModal(props: {
               emptyText="暂无上架记录"
               columns={[
                 { title: "上架平台", dataIndex: "platform" },
+                { title: "寄售价格", dataIndex: "price", width: 120, align: "right", render: (value: number | string | null) => value == null ? "-" : <MoneyText value={value} tone="plain" /> },
                 { title: "上架时间", dataIndex: "listedAt", width: 180 },
               ]}
             />

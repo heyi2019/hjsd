@@ -19,7 +19,9 @@ from ._common import (
     validate_account_images,
     validate_account_profile_scope,
     validate_inventory_context,
+    validate_camp_account,
     validate_optional_bool,
+    validate_secondary_images,
     validate_wallet_realname,
 )
 
@@ -34,10 +36,13 @@ def create_account(
     inventory_type: str | None = None,
     value_added_service: str | None = None,
     game_password: str | None = None,
+    camp_account: str | None = None,
     channel_region: str | None = None,
     bound_phone: str | None = None,
     has_secondary: bool | None = None,
+    secondary_images: list[str] | None = None,
     wallet_realname: str | None = None,
+    wallet_realname_images: list[str] | None = None,
     platform: str | None = None,
     account_description: str | None = None,
     account_images: list[str] | None = None,
@@ -57,7 +62,10 @@ def create_account(
         )
     stock_no = allocate_number(session, SequenceKey.STOCK_NO)
     has_secondary = validate_optional_bool(has_secondary, field="has_secondary")
+    camp_account = validate_camp_account(camp_account)
+    validated_secondary_images = validate_secondary_images(secondary_images)
     wallet_realname = validate_wallet_realname(wallet_realname)
+    validated_wallet_images = validate_secondary_images(wallet_realname_images)
     validated_images = validate_account_images(account_images)
     validate_account_profile_scope(inventory_type, account_description, validated_images)
     account = Account(
@@ -67,11 +75,14 @@ def create_account(
         value_added_service=value_added_service,
         stock_no=stock_no,
         game_account=identifier,
+        camp_account=camp_account,
         game_password=game_password,
         channel_region=channel_region,
         bound_phone=bound_phone,
         has_secondary=has_secondary,
+        secondary_images=validated_secondary_images,
         wallet_realname=wallet_realname,
+        wallet_realname_images=validated_wallet_images,
         platform=platform,
         status=AccountStatus.WAITING.value,
         account_description=account_description,
@@ -97,6 +108,7 @@ def create_account(
         actor=actor,
         after={
             "game_account": account.game_account,
+            "camp_account": account.camp_account,
             "stock_no": account.stock_no,
             "game_type": account.game_type,
             "business_mode": account.business_mode,
@@ -104,8 +116,10 @@ def create_account(
             "value_added_service": account.value_added_service,
             "platform": account.platform,
             "wallet_realname": account.wallet_realname,
+            "wallet_realname_images": account.wallet_realname_images or [],
             "status": account.status,
             "account_description": account.account_description,
+            "secondary_images": account.secondary_images or [],
             "account_images": account.account_images or [],
         },
     )
@@ -127,10 +141,13 @@ def update_account_profile(
     game_account: str | None | object = _UNSET,
     game_type: str | None | object = _UNSET,
     game_password: str | None | object = _UNSET,
+    camp_account: str | None | object = _UNSET,
     channel_region: str | None | object = _UNSET,
     bound_phone: str | None | object = _UNSET,
     has_secondary: bool | None | object = _UNSET,
+    secondary_images: list[str] | None | object = _UNSET,
     wallet_realname: str | None | object = _UNSET,
+    wallet_realname_images: list[str] | None | object = _UNSET,
     platform: str | None | object = _UNSET,
     account_description: str | None | object = _UNSET,
     account_images: list[str] | None | object = _UNSET,
@@ -142,11 +159,14 @@ def update_account_profile(
     account = get_account(session, account_id, user)
     before = {
         "game_account": account.game_account,
+        "camp_account": account.camp_account,
         "game_type": account.game_type,
         "channel_region": account.channel_region,
         "bound_phone": account.bound_phone,
         "has_secondary": account.has_secondary,
+        "secondary_images": account.secondary_images or [],
         "wallet_realname": account.wallet_realname,
+        "wallet_realname_images": account.wallet_realname_images or [],
         "platform": account.platform,
         "account_description": account.account_description,
         "account_images": account.account_images or [],
@@ -169,15 +189,31 @@ def update_account_profile(
     normalized_wallet = (
         validate_wallet_realname(wallet_realname) if wallet_realname is not _UNSET else _UNSET
     )
+    normalized_wallet_images = (
+        validate_secondary_images(wallet_realname_images)
+        if wallet_realname_images is not _UNSET
+        else _UNSET
+    )
+    normalized_secondary_images = (
+        validate_secondary_images(secondary_images)
+        if secondary_images is not _UNSET
+        else _UNSET
+    )
+    normalized_camp = (
+        validate_camp_account(camp_account) if camp_account is not _UNSET else _UNSET
+    )
     if game_account is not _UNSET:
         account.game_account = next_game_account
     for field, value in {
         "game_type": game_type,
         "game_password": game_password,
+        "camp_account": normalized_camp,
         "channel_region": channel_region,
         "bound_phone": bound_phone,
         "has_secondary": normalized_secondary,
+        "secondary_images": normalized_secondary_images,
         "wallet_realname": normalized_wallet,
+        "wallet_realname_images": normalized_wallet_images,
         "platform": platform,
         "account_description": account_description,
         "account_images": validated_images,
@@ -206,11 +242,14 @@ def update_account_profile(
         before=before,
         after={
             "game_account": account.game_account,
+            "camp_account": account.camp_account,
             "game_type": account.game_type,
             "channel_region": account.channel_region,
             "bound_phone": account.bound_phone,
             "has_secondary": account.has_secondary,
+            "secondary_images": account.secondary_images or [],
             "wallet_realname": account.wallet_realname,
+            "wallet_realname_images": account.wallet_realname_images or [],
             "platform": account.platform,
             "account_description": account.account_description,
             "account_images": account.account_images or [],

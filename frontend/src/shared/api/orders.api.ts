@@ -78,11 +78,14 @@ export const ordersApi = {
       game_account: string;
       game_type?: string;
       game_password?: string;
+      camp_account?: string;
       channel_region?: string;
       bound_phone?: string;
       bound_phone_owner?: string;
       has_secondary?: boolean;
+      secondary_images?: string[];
       wallet_realname?: string;
+      wallet_realname_images?: string[];
       purchase_price?: string;
       note?: string;
       extra_values?: Record<string, unknown>;
@@ -167,6 +170,7 @@ export const ordersApi = {
         game_account: string;
         game_type?: string | null;
         game_password?: string | null;
+        camp_account?: string | null;
         channel_region?: string | null;
         bound_phone?: string | null;
         has_secondary?: boolean | null;

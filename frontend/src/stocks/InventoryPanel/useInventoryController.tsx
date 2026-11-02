@@ -247,6 +247,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     { title: "库存编号", dataIndex: "stock_no", width: 86, ellipsis: true },
     { title: "游戏/产品类型", dataIndex: "game_type", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
     { title: "游戏账号/产品", dataIndex: "game_account", width: 120, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+    { title: "营地账号", dataIndex: "camp_account", width: 120, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
     { title: "订单号", dataIndex: "source_order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.created_by) },

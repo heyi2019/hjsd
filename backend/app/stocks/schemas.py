@@ -16,6 +16,7 @@ class AccountOut(BaseModel):
     source_order_id: int | None = None
     source_order_no: str | None = None
     game_account: str | None = None
+    camp_account: str | None = None
     game_type: str | None = None
     business_mode: str | None = None
     inventory_type: str | None = None
@@ -24,7 +25,9 @@ class AccountOut(BaseModel):
     channel_region: str | None = None
     bound_phone: str | None = None
     has_secondary: bool | None = None
+    secondary_images: list[str] | None = None
     wallet_realname: str | None = None
+    wallet_realname_images: list[str] | None = None
     platform: str | None = None
     note: str | None = None
     account_description: str | None = None
@@ -48,12 +51,15 @@ class AccountProfileUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     game_account: str | None = Field(default=None, max_length=128)
+    camp_account: str | None = Field(default=None, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
     game_password: str | None = Field(default=None, max_length=256)
     channel_region: str | None = Field(default=None, max_length=128)
     bound_phone: str | None = Field(default=None, max_length=64)
     has_secondary: bool | None = None
+    secondary_images: list[str] | None = Field(default=None, max_length=3)
     wallet_realname: str | None = Field(default=None, max_length=16)
+    wallet_realname_images: list[str] | None = Field(default=None, max_length=3)
     platform: str | None = Field(default=None, max_length=64)
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] | None = Field(default=None, max_length=9)

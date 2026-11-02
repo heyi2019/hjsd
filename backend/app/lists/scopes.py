@@ -54,6 +54,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("stock_no", "库存编号"),
             ListColumn("game_type", "游戏/产品类型"),
             ListColumn("game_account", "游戏账号/产品"),
+            ListColumn("camp_account", "营地账号"),
             ListColumn("source_order_no", "订单号"),
             ListColumn("business_mode", "业务"),
             ListColumn("inventory_type", "业务类型"),

@@ -37,11 +37,14 @@ class OrderAccountSnapshot(BaseModel):
     game_account: str = Field(min_length=1, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
     game_password: str | None = Field(default=None, max_length=256)
+    camp_account: str | None = Field(default=None, max_length=128)
     channel_region: str | None = Field(default=None, max_length=128)
     bound_phone: str | None = Field(default=None, max_length=64)
     bound_phone_owner: str | None = Field(default=None, max_length=128)
     has_secondary: bool | None = None
+    secondary_images: list[str] | None = Field(default=None, max_length=3)
     wallet_realname: str | None = Field(default=None, max_length=16)
+    wallet_realname_images: list[str] | None = Field(default=None, max_length=3)
     platform: str | None = Field(default=None, max_length=64)
     purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")
     note: str | None = None

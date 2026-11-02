@@ -115,6 +115,7 @@ export function MobileInventoryList({
         const fields = orderMobileFields([
           { key: "game_type", label: "游戏/产品类型", value: row.game_type || "-" },
           { key: "game_account", label: "游戏账号/产品", value: row.game_account || "-" },
+          { key: "camp_account", label: "营地账号", value: row.camp_account || "-" },
           { key: "source_order_no", label: "订单号", value: row.source_order_no || "-" },
           { key: "business_mode", label: "业务", value: row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "-" },
           { key: "inventory_type", label: "业务类型", value: row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-" },

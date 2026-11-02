@@ -17,7 +17,7 @@ export const stocksApi = {
     }
     return all;
   },
-  updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "channel_region" | "bound_phone" | "has_secondary" | "wallet_realname" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
+  updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "camp_account" | "channel_region" | "bound_phone" | "has_secondary" | "secondary_images" | "wallet_realname" | "wallet_realname_images" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
     api.patch<Account>(`/stocks/${id}`, payload).then((r) => r.data),
   inventory: () =>
     api

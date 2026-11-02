@@ -26,12 +26,37 @@ def validate_account_images(value: list[str] | None) -> list[str] | None:
     return value
 
 
+def validate_secondary_images(value: list[str] | None) -> list[str] | None:
+    """二次验证佐证图：与账号图片同构，但最多 3 张。"""
+    images = validate_account_images(value)
+    if images is not None and len(images) > 3:
+        raise Validation("二次图片最多 3 张", details={"field": "secondary_images", "max": 3})
+    return images
+
+
 def validate_optional_bool(value: object, *, field: str) -> bool | None:
     if value is None:
         return None
     if not isinstance(value, bool):
         raise Validation(f"{field} 必须为布尔值", details={"field": field})
     return value
+
+
+def validate_camp_account(value: object) -> str | None:
+    """营地账号：可空自由文本，只做去空格与长度约束，不参与核算。"""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise Validation("营地账号必须为文本", details={"field": "camp_account"})
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if len(cleaned) > 128:
+        raise Validation(
+            "营地账号长度不能超过 128 个字符",
+            details={"field": "camp_account", "max": 128},
+        )
+    return cleaned
 
 
 def validate_wallet_realname(value: object) -> str | None:
@@ -116,6 +141,8 @@ __all__ = [
     "scope_filter",
     "validate_account_images",
     "validate_account_profile_scope",
+    "validate_camp_account",
     "validate_inventory_context",
     "validate_optional_bool",
+    "validate_secondary_images",
 ]

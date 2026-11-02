@@ -14,9 +14,14 @@
  *   node scripts/test-timing.mjs --top 50           # 最慢用例取前 50（默认 30）
  *   node scripts/test-timing.mjs --from /tmp/x.json # 不重跑，直接分析已有 json 报告
  *   node scripts/test-timing.mjs --since <commit>   # 只跑上次提交以来改动的文件
+ *   node scripts/test-timing.mjs -- --maxWorkers=1 src/x.test.tsx   # A/B 对比固定串行
+ *
+ * 负载口径：机器上常有别的会话在抢 CPU（实测 load 5/8 核时同一份代码墙钟差 20%+），
+ * 所以墙钟只在「本次 instrument 内」有意义。跨天/跨会话对比一律看 cpu= 那一项：
+ * CPU 秒数（user+sys，含全部 worker 子进程）几乎不受外部负载影响，是 A/B 的唯一可靠依据。
  *
  * 输出末行为机器可读总览（便于 CI / 人工对比）：
- *   TIMING_TOTAL files=<n> tests=<n> wall=<s> sum=<s> parallelism=<x>
+ *   TIMING_TOTAL files=<n> tests=<n> wall=<s> sum=<s> cpu=<s> parallelism=<x> cpu_ratio=<x>
  */
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -41,8 +46,15 @@ const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 
 const reportPath = fromFile ?? join(tmpdir(), `vitest-timing-${project}-${Date.now()}.json`);
 
+// ---- 0. CPU 口径：用 /usr/bin/time 取 user+sys（rusage 会把 worker 子进程一并折进来），
+//         这是唯一不受其它会话抢 CPU 影响的对比量。取不到就退化为只有墙钟。
+const TIME_BIN = "/usr/bin/time";
+const canMeasureCpu = existsSync(TIME_BIN);
+const timeFlag = process.platform === "darwin" ? "-l" : "-v";
+
 // ---- 1. 取数据：已有报告直接解析，否则跑一次目标 project ----
 let wallSeconds = null;
+let cpuSeconds = null;
 let phaseLine = "";
 if (!fromFile) {
   const vitestArgs = [
@@ -54,15 +66,44 @@ if (!fromFile) {
   vitestArgs.push(...passthrough);
   process.stderr.write(`[timing] 运行 ${project} 层${changed ? `（${changed.length} 个改动文件）` : ""}…\n`);
   if (process.env.TIMING_DEBUG) process.stderr.write(`[timing] vitest ${vitestArgs.join(" ")}\n`);
+  const cmd = canMeasureCpu ? TIME_BIN : npx;
+  const cmdArgs = canMeasureCpu ? [timeFlag, npx, ...vitestArgs] : vitestArgs;
   const started = performance.now();
-  const child = spawn(npx, vitestArgs, { stdio: ["ignore", "pipe", "inherit"] });
+  // stderr 不直出：/usr/bin/time -l 会打上百行 rusage，只在失败时摘尾部。
+  const child = spawn(cmd, cmdArgs, { stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
+  let err = "";
   child.stdout.on("data", (chunk) => { out += chunk.toString("utf8"); });
+  child.stderr.on("data", (chunk) => { err += chunk.toString("utf8"); });
   const code = await new Promise((resolve) => child.on("close", resolve));
   wallSeconds = (performance.now() - started) / 1000;
   const line = out.split("\n").reverse().find((l) => l.includes("Duration") && l.includes("%"));
   phaseLine = line ? line.trim() : "";
-  if (code !== 0) process.stderr.write(`[timing] 注意：vitest 退出码 ${code}（有失败用例，耗时数据仍有效）\n`);
+  cpuSeconds = parseCpuSeconds(err);
+  if (code !== 0) {
+    process.stderr.write(`[timing] 注意：vitest 退出码 ${code}（有失败用例，耗时数据仍有效）\n`);
+    const tail = err.trim().split("\n").slice(-60).join("\n");
+    if (tail) process.stderr.write(`${tail}\n`);
+  }
+}
+
+function parseCpuSeconds(text) {
+  if (!canMeasureCpu) return null;
+  if (process.platform === "darwin") {
+    // "        0.12 real         0.50 user         0.10 sys"
+    const m = text.match(/^\s*([\d.]+)\s+real\s+([\d.]+)\s+user\s+([\d.]+)\s+sys\s*$/m);
+    return m ? Number(m[2]) + Number(m[3]) : null;
+  }
+  const u = text.match(/User time \(seconds\):\s*([\d.]+)/);
+  const s = text.match(/System time \(seconds\):\s*([\d.]+)/);
+  return u && s ? Number(u[1]) + Number(s[1]) : null;
+}
+
+if (fromFile) {
+  const side = fromFile.replace(/\.json$/, ".summary.json");
+  if (existsSync(side)) {
+    try { cpuSeconds = JSON.parse(readFileSync(side, "utf8")).cpuSeconds ?? null; } catch { /* 忽略 */ }
+  }
 }
 
 const report = JSON.parse(readFileSync(reportPath, "utf8"));
@@ -101,12 +142,19 @@ console.log("\n" + "=".repeat(104));
 console.log(`project=${project}  文件 ${rows.length}  用例 ${testCount}  失败文件 ${failedFiles.length}`);
 console.log(`套内文件耗时合计 ${(sumMs / 1000).toFixed(1)}s` +
   (wallSeconds ? ` | 墙钟 ${wallSeconds.toFixed(1)}s | 并行度 ${(sumMs / 1000 / wallSeconds).toFixed(2)}x` : ""));
+if (cpuSeconds) {
+  const ratio = sumMs / 1000 / cpuSeconds;
+  console.log(`CPU ${cpuSeconds.toFixed(1)}s（user+sys，含全部 worker 子进程）` +
+    ` | 套内/CPU ${ratio.toFixed(2)}x${ratio > 1.05 ? "  ← 有真实并行空转" : ""}`);
+}
 if (phaseLine) console.log(`阶段占比：${phaseLine}`);
 // 机器负载会直接污染墙钟：load 接近核数时，并行度与总时长都不可比。
 // 实测教训：同一份代码两次全层跑出 101.5s 与 123.9s，差别只来自外部负载（load 14.7 / 8 核）。
 const cores = cpus().length;
 const load = loadavg()[0];
-const loadTag = load > cores * 0.6 ? "⚠ 负载偏高，墙钟不可直接对比" : "负载正常";
+const loadTag = load > cores * 0.6
+  ? "⚠ 负载偏高：墙钟不可对比，A/B 请看 cpu="
+  : "负载正常";
 console.log(`机器负载 ${load.toFixed(1)} / ${cores} 核 → ${loadTag}`);
 console.log("=".repeat(104));
 
@@ -136,11 +184,13 @@ if (fromFile) console.log(`\n数据来源：${fromFile}`);
 else console.log(`\n报告已写入：${reportPath}`);
 
 console.log(`TIMING_TOTAL files=${rows.length} tests=${testCount} wall=${wallSeconds ? wallSeconds.toFixed(1) : "n/a"} ` +
-  `sum=${(sumMs / 1000).toFixed(1)} parallelism=${wallSeconds ? (sumMs / 1000 / wallSeconds).toFixed(2) : "n/a"}`);
+  `sum=${(sumMs / 1000).toFixed(1)} cpu=${cpuSeconds ? cpuSeconds.toFixed(1) : "n/a"} ` +
+  `parallelism=${wallSeconds ? (sumMs / 1000 / wallSeconds).toFixed(2) : "n/a"} ` +
+  `cpu_ratio=${cpuSeconds ? (sumMs / 1000 / cpuSeconds).toFixed(2) : "n/a"}`);
 
 writeFileSync(
   reportPath.replace(/\.json$/, ".summary.json"),
-  JSON.stringify({ project, wallSeconds, sumSeconds: sumMs / 1000, rows, generatedAt: new Date().toISOString() }, null, 2),
+  JSON.stringify({ project, wallSeconds, cpuSeconds, sumSeconds: sumMs / 1000, rows, generatedAt: new Date().toISOString() }, null, 2),
 );
 
 function changedFiles(commit) {

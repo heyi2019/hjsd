@@ -26,15 +26,35 @@
 
 ### 1.2 生产（阿里云 ECS）
 
+> **2026-11-02 23:45 首次连线核实**（SSH 别名 `heijin-prod` → `8.155.132.208`，只读）。下表已全部替换为实测值，原「待核实」项均已证实，且**两处原判断被推翻**。
+
 | 项 | 值 | 来源 |
 |---|---|---|
-| 编排 | `deploy/docker-compose.yml` 的 `db` 服务，`postgres:16-alpine` | compose 实读 |
-| 库名 / 用户 | `heijin_erp` / `erp_app`（与本地**同名不同实例**） | `deploy/env/.env.production.example` |
-| 连接串 | `postgresql+psycopg://erp_app:***@db:5432/heijin_erp`（容器网络内部 `db`） | 同上 |
-| 端口暴露 | 不对公网开放（文档明示，DBeaver 走 SSH 隧道） | `README_阿里云部署.md` |
-| **当前版本戳** | **`0064_expand_buy_rebate_scope`** | 文档 2026-10-31，**待核实** |
-| 数据量 | **未知，待核实** | 未连接 |
+| 编排 | `deploy/docker-compose.yml` 的 `db` 服务，`postgres:16-alpine` | 实读 |
+| 运行容器 | `deploy-frontend-1` / `deploy-backend-1`(healthy) / `deploy-db-1`(healthy) | `docker ps` |
+| 库名 / 用户 | **`heijin_erp`** / `erp_app`（实例内只有这 1 个业务库，另有 postgres/template0/1） | `psql -c "\l"` 实测 |
+| 连接串 | `postgresql+psycopg://erp_app:***@db:5432/heijin_erp` | `deploy/.env` 实读 |
+| 端口暴露 | 不对公网开放（DBeaver 走 SSH 隧道） | `README_阿里云部署.md` |
+| **当前版本戳** | **`0003`** —— 原文档与 `README` 都写 `0064_expand_buy_rebate_scope`，**错** | `select version_num from alembic_version` |
+| **表数** | **41** —— 比基线的 40 张多一张遗留表 `db_version`（4 行，最后一条 `alembic_revision=0003` / 2026-10-31 22:33） | `pg_stat_user_tables` |
+| **业务数据** | **全空**：`orders` 0 / `stocks` 0 / `cashflow` 0 / `order_events` 0 / `customers` 0 / `installments` 0 / `rebate_records` 0 | 逐表 `n_live_tup` |
+| **仅存数据** | `users` 2（`admin` / `19873133890`，均 ADMIN）、`audit_logs` 29、`document_sequences` 14、`policy_definitions` 6、`policy_versions` 4、`pools` 2、种子 `order_form_fields` 212 / `option_sets` 62 | 同上 |
 | 归档 | 未开启（`archive_mode=off`）→ 无 PITR | 既有结论 |
+
+**两处被推翻的原判断**
+
+1. **「生产结构落后 10 个迁移、停在 0064」不成立**。实测是 `0003`，且 `db_version` 记录了 11-01 的三次 `0001` 与一次 `0003`——它是 11-01 重建后自己升上去的，与 0064 无关。结论不变（`0003` 同样不在只剩 `0001` 的活动链里，`alembic current` 仍会报 `Can't locate revision`），但**根因描述要改**：不是「历史遗留太久」，是「11-01 重建后又被增量迁移推到 0003，而增量迁移已被压掉」。
+2. **「生产数据量未知」→ 实测为空库**。这直接降低了上线风险等级：覆盖式重建**无业务数据损失**，唯一需要保留的是 2 个登录账号与 29 条审计日志。
+
+**用户账号不一致（上线前必须处理）**
+
+| 库 | 账号 |
+|---|---|
+| 生产 `heijin_erp` | `admin`（系统管理员）、**`19873133890`（何一）** |
+| 上线包 `heijin_erp_release` | `三三`（ADMIN）、`xuanxuan`（VIEWER） |
+
+覆盖式重建会把生产登录账号整组替换成 dev 的 `三三`/`xuanxuan`，口令哈希也换成 dev 的——上线后**用原账号登不进**。三个选项见 11.8。
+
 
 ### 1.3 E2E 数据库：**不存在**
 
@@ -80,11 +100,11 @@
 
 ### P0-1　生产库版本戳断裂，下次部署必失败
 
-- 生产库停在 `0064_expand_buy_rebate_scope`（旧链 `alembic/versions/` 有 75 个文件，但 `alembic.ini` 的 `version_locations` **只指 `squashed_versions`**，旧链与 `legacy_versions_pre_squash/` 的 25 个文件都不参与加载）。
+- **生产库实际停在 `0003`**（2026-11-02 23:45 连线实测，原写 `0064_expand_buy_rebate_scope` 有误，见 1.2 / 11.8）。旧链 `alembic/versions/` 有 75 个文件，但 `alembic.ini` 的 `version_locations` **只指 `squashed_versions`**，旧链与 `legacy_versions_pre_squash/` 的 25 个文件都不参与加载——所以 `0003` 与 `0064` 一样无法解析。
 - 活动链 `alembic/squashed_versions/` 已压平为**单一 `0001`**。
 - `deploy/scripts/deploy.sh` 第 127-128 行**已移除** `stamp_baseline` 兜底 → 部署会**硬停**，不会造成结构半残。
 
-**已实测复现**（临时探针库，验完即删）：把 `alembic_version` 伪造成 `0064_expand_buy_rebate_scope` 后执行 `alembic upgrade head`：
+**已实测复现**（临时探针库，验完即删）：把 `alembic_version` 伪造成 `0064_expand_buy_rebate_scope` 后执行 `alembic upgrade head`（用 `0064` 作探针是为了取最坏情况；真实生产是 `0003`，报错文本仅版本号不同）：
 
 ```
 INFO  [alembic.runtime.migration] Will assume transactional DDL.
@@ -145,7 +165,10 @@ stocks = 90，customers = 12，cashflow = 370（occurred_on 2026-07-07 起），
 ### P2-3　备份能力的缺口
 
 已有（生产）：`backup_daily.sh` 三重校验（PGDMP 魔数 / `pg_restore --list` 可解析 / 归档内 TABLE 数 == 源库表数）、sha256 sidecar、保留 30 份、独立备份卷。
-缺口：**PG 未开 WAL 归档（无 PITR）**；**本地 Dev 库没有任何自动备份**；恢复演练未定期化。
+
+> **2026-11-02 23:47 实测修正**：上面这段「已有」原是按**仓库里的脚本**写的，而 ECS 上跑的是 SQLite 旧版——cron 每天备的是一份 851 KB 废弃 `heijin_erp_v1.db`，PG 库一个字节没备。已同步修复并实测通过（11.8 ②③）。**教训：能力清单必须以目标机器的实际文件为准，不能以仓库代码为准。**
+
+缺口：**PG 未开 WAL 归档（无 PITR）**（`archive_mode=off` 已实测确认）；**本地 Dev 库没有任何自动备份**；恢复演练未定期化。
 
 ### P2-4　工作区残留敏感配置
 
@@ -209,14 +232,16 @@ stocks = 90，customers = 12，cashflow = 370（occurred_on 2026-07-07 起），
 >
 > 这条裁决同时消解了 P0-1：不对旧库跑 `alembic upgrade`，版本戳断裂自然消失。但「**不要用 stamp 绕过**」这条警告仍然有效——绕过本流程直接升级旧库，仍会踩同一个坑。
 
-### 阶段 0　丢弃前必须做的两件事（安全底线）
+### 阶段 0　丢弃前必须做的两件事（安全底线）—— **已完成**，见 11.8
 
 即使决定不要这份数据，也必须先留档：
 
 1. ECS 上 `bash deploy/scripts/backup_daily.sh` → 生成 `heijin_erp_pg_<ts>.dump` + `.sha256`；
-2. `bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>` 取回本地，存为 `backups/prod_final_<ts>.dump`。
+2. `bash deploy/scripts/pull_backup.sh --host <ECS>` 取回本地，存为 `backups/prod_final_<ts>.dump`。
 
 **理由**：删库不可逆。这份 dump 是「上线前生产状态」的唯一证据；将来若发现某个客户/订单只存在于线上，还能捞回来。确认 `pg_restore -l` 能解析后再进入阶段 1。
+
+> ⚠️ **这一步当天曾经是坏的**：ECS 上的 `backup_daily.sh` 是 SQLite 时代旧版，跑起来会「成功备份」一份 851 KB 的废弃 `heijin_erp_v1.db`，而真实 PG 库一个字节都没备。cron 每天 03:20 都在做这件事。11.8 记录了发现、修复与实测。
 
 ### 阶段 1　Release 库就绪（**已完成**）
 
@@ -388,7 +413,7 @@ Prod
 
 ### P0（上线前必须完成，缺一不可）
 
-1. **核实生产库现状**：版本戳、是否已有数据、立即备份取回。⬜ **未做**（需 ECS 访问权）
+1. **核实生产库现状**：✅ 已完成（11.8）——生产为 `0003` / 41 表 / **业务数据全空**；`prod_final_20261102_234555.dump` 已双端留档并校验。**新增待办**：上线账号对齐（11.8 ④ 方案 A）。
 2. **建 `heijin_erp_release`**：✅ 已完成（11.1 / 11.5）——由 dev dump 恢复，**不是** rawdata 导入。
 3. **Dev 库剥离真实数据**：确认 Release 校验通过后，Dev 可重置为纯结构库（此步需你明确授权，本轮未做）。
 4. **部署链路适配压平**：✅ 已完成（`591e7f4`）——`deploy.sh` 版本戳预检 + 测试库黑名单。
@@ -579,6 +604,59 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 阶段 3 第 8 步「管理员登录 → 建一笔回收单 → 作废」需要真实管理员口令，本机无凭据，未执行。这一步必须在上线日现场做，且**不要因为演练全绿就跳过**——健康检查只证明进程起来了，不证明写路径可用。
 
+### 11.8 生产首次连线：阶段 0 完成 + 三处脚本落后（2026-11-02 23:47）
+
+**① 阶段 0 留档已完成**
+
+| 项 | 结果 |
+|---|---|
+| ECS 侧 | `/opt/heijin/backups/prod_final_20261102_234555.dump`（198,322 B）+ `.sha256` |
+| sha256 | `6652d607268a1ffce02c079fd2509f92d5f5fe77570d55051d97d998d9c4fe14` |
+| 本地 | `backups/prod_final_20261102_234555.dump` + `.sha256`，**校验一致** |
+| 可解析性 | 本地 `pg_restore -l` = **41 条 TABLE DATA**（= 生产 41 表） |
+
+**② 发现：ECS 上三个部署脚本全部停留在 SQLite 时代**
+
+| 脚本 | 本地（PG 版） | ECS（旧版） | 后果 |
+|---|---|---|---|
+| `backup_daily.sh` | 111 行，`pg_dump -Fc` + PGDMP 魔数/TOC 表数闸门 | **49 行**，`test -f /app/data/heijin_erp_v1.db` + `backup_db.py` | **cron 每日 03:20 备的是废弃 SQLite（851 KB），真实 PG 库零备份** |
+| `deploy.sh` | 207 行，含版本戳预检 | 181 行，**无预检** | 上线时遇到 `0003` 直接硬停，且没有可读指引 |
+| `pull_backup.sh` | 141 行，`--remote-dir /opt/heijin/backups` + ssh+tar | 166 行，`--volume deploy_erp_db` + `integrity_check`（SQLite 概念） | 异地留存拉的是 docker 卷里的旧 SQLite，不是 PG dump |
+
+**实测证据**：同步前在 ECS 上直接跑旧版 `backup_daily.sh`，输出
+`BACKUP_OK path=/app/data/backups/heijin_erp_v1_20261102_234541.db size=851968` —— 备份了一份 SQLite 文件并返回 0，cron 日志上完全看不出异常。这是「有备份但备错对象」，比没有备份更危险。
+
+**③ 修复与实测**
+
+1. ECS 原脚本先留档：`/opt/heijin/deploy/scripts/.bak-20261102/`（3 个文件，保留原 mtime）；
+2. `scp` 同步仓库三件 → `bash -n` 语法检查通过；
+3. 重跑 `backup_daily.sh`：`BACKUP_OK path=../backups/heijin_erp_pg_20261102_234642.dump size=198322 objects=440`，TOC 闸门通过（41 = 41）；
+4. 本机跑 `pull_backup.sh --host heijin-prod`：拉取 6 份、SHA256 全通过、魔数 0 异常、`keep=3` 滚动生效；
+5. cron 条目 `20 3 * * * .../backup_daily.sh` 无需改动，指向同一路径，次日 03:20 起自动产出 PG dump。
+
+**④ 待你裁决：上线后用什么账号登录**
+
+覆盖式重建会把生产 2 个账号（`admin`、`19873133890`）替换成上线包的 `三三`、`xuanxuan`，口令哈希一并替换。
+
+| 方案 | 做法 | 代价 |
+|---|---|---|
+| **A（推荐）** | 上线包内先把 `users` 对齐生产：删 `三三`/`xuanxuan`，从生产 dump 取 `admin` + `19873133890` 两行（含 `password_hash`）写入 release | 账号口令完全不变；需改 release 库一次（幂等、可重做） |
+| B | 保留 `三三`/`xuanxuan`，上线后重新建号 | 上线当天必须知道 dev 口令，或走重置流程；易卡住 |
+| C | 恢复后立刻用 SQL 把生产两行插回去 | 等效 A，但把风险推到上线窗口现场 |
+
+**⑤ 陷阱：别用生产旧镜像去验「版本戳断裂」**
+
+上线前在 ECS 上跑 `docker compose run --rm backend alembic current`，输出是干净的 `0003`、无任何报错——**这不代表预检会失效，而是验错了对象**。
+
+| 位置 | 镜像 / 代码 | `squashed_versions/` | `alembic current` 结果 |
+|---|---|---|---|
+| ECS 现行 | `heijin-backend:1.0.1`（旧 commit 构建） | `0001` / `0002` / `0003` | `0003`，**不报错** |
+| 仓库当前 | 压平后代码 | 仅 `0001` | `Can't locate revision identified by '0003'`，退出码仍为 **0** |
+
+即：`0003` 是旧链里的合法版本，旧镜像当然认得。上线时 `deploy.sh` 用的是**新构建镜像**，在它眼里 `0003` 就是未知版本，预检照常触发。本地探针库（伪造 `alembic_version='0003'`）用当前代码实跑，复现的就是新镜像行为。
+
+**校验方法**：验版本戳必须在**将要上线的那份代码**里跑；在旧镜像里跑只会得到「一切正常」的假象。
+
 ---
 
 ## 附：操作边界声明
@@ -590,7 +668,13 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 - `heijin_erp_dev` **只读**，仅 `pg_dump` 取全量备份（`backups/heijin_erp_dev_20261102_231449.dump`）；
 - 新建 `heijin_erp_release` 并恢复该备份；
 - 仅在 `heijin_erp_release` 内删除测试主数据（customers 12 / counterparties 4 / teams 2 / user_test_20261101）；
-- `heijin_erp_test`、`heijin_erp_migration_test` 未触碰；
-- 生产库至今**零连接**。
+- `heijin_erp_test`、`heijin_erp_migration_test` 未触碰。
+
+**生产连线（2026-11-02 23:45–23:50，经 SSH 别名 `heijin-prod`）**：第一~十节写作时的「生产库零连接」在此时被打破，动作全部为**只读 + 备份 + 脚本同步**：
+
+- 只读：`docker ps`、`psql` 的 `\l` / `information_schema` / `pg_stat_user_tables` / `users` / `db_version` / `pools` 查询、`alembic current`；
+- 备份：`pg_dump -Fc` 写出 `/opt/heijin/backups/prod_final_20261102_234555.dump`，并 `scp` 取回本地；
+- 写入：`cp` 三份旧脚本到 `.bak-20261102/` 后 `scp` 覆盖为仓库版本（11.8 ③），并重跑 `backup_daily.sh` 生成一份新 dump 验证；
+- **未做**：任何 DDL、任何业务表 DML、任何 DROP、未停任何容器、未动 `deploy/.env`。
 
 **阶段 2 / 演练执行（11.7）**：从 `heijin_erp_release` **只读** `pg_dump` 生成上线包；演练用临时库 `heijin_erp_drill`（非本项目四库之一，用完即 `DROP ... WITH (FORCE)`），演练期间后端在 `127.0.0.1:8199` 临时起停，未触碰 8123 开发服务；`heijin_erp_dev` / `test` / `release` / `migration_test` **零写入**。

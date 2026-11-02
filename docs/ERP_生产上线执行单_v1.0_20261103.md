@@ -30,7 +30,7 @@
 - [x] 空库恢复演练 9 项全绿（含登录、建单、作废、余额、健康检查）
 - [x] 回滚包双端留档（ECS + 本地 sha256 一致）
 - [x] ECS 备份/取回脚本已同步为 PG 版，cron `20 3 * * *` 生效
-- [ ] **`restore_pg.sh` 需补到 ECS**（当前 `/opt/heijin/deploy/scripts/` 缺此文件）
+- [x] `restore_pg.sh` 已补齐到 ECS（11-03 00:07，sha256 双端一致 `c18cff9c…`、`bash -n` 通过）
 - [ ] 上线窗口确定（选低峰，全程预计 15–25 分钟，含验收）
 
 ---
@@ -189,7 +189,7 @@ docker compose up -d backend
 | `19873133890` 的 `must_change_password=true`（生产原值） | 首次登录要求改口令 | 上线后自行决定 |
 | 0 客户档案 | 客户维度报表为空 | 上线后正常建单逐步补录 |
 | 分期 0 / 返点 0 | 业务事实上不存在，非漏导 | 无需处理 |
-| `heijin_erp_migration_test` 孤儿库 | 占空间 | 归档已验证可恢复，可随时删 |
+| `heijin_erp_migration_test` 孤儿库 | 已于 11-03 删除（归档可恢复） | 无需处理 |
 | PG 未开 WAL 归档 | 无 PITR，只有每日 dump | 上线后尽快补 |
 
 ---

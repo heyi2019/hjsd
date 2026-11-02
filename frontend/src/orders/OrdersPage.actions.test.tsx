@@ -324,7 +324,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     );
   });
 
-  it("标记逾期：有新增时提示笔数并刷新分期列表", async () => {
+  // 原两条（有新增 / 无新增）是同一条「标记逾期」路径的两个分支，合并为一次挂载逐次点击。
+  it("标记逾期：有新增提示笔数并刷新列表，无新增提示当前无新增", async () => {
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
     vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
     await openLedger();
@@ -339,17 +340,10 @@ describe("OrdersPage：操作与筛选分支", () => {
     // installmentRefreshKey 自增 → 分期面板重新 load
     await waitFor(() => expect(screen.getByRole("tab", { name: "分期与回款" })).toBeInTheDocument());
     expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore);
-  });
 
-  it("标记逾期：无新增时提示当前无新增逾期合约", async () => {
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+    // 分支二：本次标记 0 笔
     vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
-    await openLedger();
-    fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /标记逾期/ })).toBeInTheDocument());
-
     await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
-
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
   });
 
@@ -388,7 +382,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
   });
 
-  it("分润：打开弹窗按姓名预填已有比例", async () => {
+  // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。
+  it("分润：弹窗按姓名预填已有比例，并展示订单总利润", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
@@ -399,6 +394,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByDisplayValue("40")).toBeInTheDocument();
     // 姓名下拉（顶部多选 + 行内单选）都显示李四
     expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThan(0);
+    // 总利润直接取后端 order_profit，不在前端重算
+    expect(within(modal).getByText(/订单总利润/)).toBeInTheDocument();
+    expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
   });
 
   it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
@@ -496,7 +494,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
   });
 
-  it("分润：比例合计 100% 提交成功并绑定员工", async () => {
+  // 原两条（合计 100% 提交成功 / L266 保存后刷新详情）是一次提交路径的两组断言，合并为一次挂载。
+  it("分润：比例合计 100% 提交成功并绑定员工，随后刷新订单详情", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
@@ -514,19 +514,6 @@ describe("OrdersPage：操作与筛选分支", () => {
       allocation_rate: "100",
       allocation_amount: "0",
     });
-    expect(message.success).toHaveBeenCalledWith("分润已保存");
-  });
-
-  it("L266：分润提交成功后刷新订单详情（详情回显）", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
-    const modal = await modalOf(/分润 · HS-2026-0001/);
-    const rates = within(modal).getAllByLabelText("比例");
-    await ui.clear(rates[0]);
-    await ui.type(rates[0], "100");
-    await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
     expect(message.success).toHaveBeenCalledWith("分润已保存");
     // L266：分润保存后应按 account_id 强制刷新订单详情（ledgerDetails 缓存），使明细回显
     await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalledWith(order1.account_id));
@@ -547,14 +534,6 @@ describe("OrdersPage：操作与筛选分支", () => {
       allocation_rate: "0",
       allocation_amount: "200",
     });
-  });
-
-  it("分润：弹窗展示订单总利润", async () => {
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
-    const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getByText(/订单总利润/)).toBeInTheDocument();
-    expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
   });
 
   it("分润：亏损单展示亏损提示（金额分润不可用）", async () => {
@@ -748,42 +727,33 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("detail fail")));
   });
 
-  it("新建订单：选中类型后弹窗打开，关闭回调清空", async () => {
-    await openLedger();
-    await ui.click(screen.getByRole("button", { name: /新建订单/ }));
-    fireEvent.click(await screen.findByText("新建回收订单"));
-    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
-    await ui.click(screen.getByRole("button", { name: /关闭新建弹窗/ }));
-    await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
-  });
-
-  it("P2-190：选中新建类型后下拉菜单收起（不浮在弹窗上）", async () => {
-    await openLedger();
-    const trigger = screen.getByRole("button", { name: /新建订单/ });
-    await ui.click(trigger);
-    // 菜单展开：菜单项「新建提号订单」可见
-    expect(await screen.findByText("新建提号订单")).toBeInTheDocument();
-    fireEvent.click(await screen.findByText("新建回收订单"));
-    // 选中类型后，CreateBusinessModal 打开（回填 createType）
-    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
-    // 受控下拉：onClick 内 setCreateMenuOpen(false) → open 变 false → 弹层真正卸载
-    // （本文件局部 rc-motion 桩尊重 visible，open=false 时弹层不再残留）。
-    // 这正是 P2-190 修复点：避免「菜单浮在弹窗右上方、与弹窗两个浮层叠加」。
-    await waitFor(() => expect(screen.queryByText("新建提号订单")).toBeNull());
-    // 触发按钮不再处于展开态
-    await waitFor(() => expect(trigger).not.toHaveAttribute("aria-expanded", "true"));
-  });
-
-  it("新建订单成功回调刷新列表", async () => {
+  // 原三条（弹窗开关 / P2-190 菜单收起 / 成功后刷新列表）同一入口同一夹具，合并为一次挂载。
+  it("新建订单：菜单收起、弹窗开关与成功后刷新列表", async () => {
     await openLedger();
     const before = vi.mocked(catalog.ordersApi.list).mock.calls.length;
-    await ui.click(screen.getByRole("button", { name: /新建订单/ }));
+    const trigger = screen.getByRole("button", { name: /新建订单/ });
+
+    await ui.click(trigger);
+    expect(await screen.findByText("新建提号订单")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("新建回收订单"));
+    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
+    // P2-190：受控下拉，选中后弹层真正卸载，不会浮在弹窗上方
+    await waitFor(() => expect(screen.queryByText("新建提号订单")).toBeNull());
+    await waitFor(() => expect(trigger).not.toHaveAttribute("aria-expanded", "true"));
+
+    // 关闭回调清空
+    await ui.click(screen.getByRole("button", { name: /关闭新建弹窗/ }));
+    await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
+
+    // 再走一次并模拟新建成功 → 列表刷新
+    await ui.click(trigger);
     fireEvent.click(await screen.findByText("新建回收订单"));
     await screen.findByTestId("create-stub");
     await ui.click(screen.getByRole("button", { name: /模拟新建成功/ }));
     await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
     expect(vi.mocked(catalog.ordersApi.list).mock.calls.length).toBeGreaterThan(before);
   });
+
 });
 
 describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () => {

@@ -344,7 +344,7 @@ def test_current_migration_head_is_exposed():
 def test_active_migration_chain_has_timestamp_follow_ups():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip().startswith("0012 ")
+    assert result.stdout.strip().startswith("0013 ")
 
     active_dir = BACKEND_DIR / "alembic" / "squashed_versions"
     assert sorted(path.name for path in active_dir.glob("*.py")) == [
@@ -360,6 +360,7 @@ def test_active_migration_chain_has_timestamp_follow_ups():
         "0010_add_stock_secondary_images.py",
         "0011_add_stock_wallet_realname_images.py",
         "0012_seed_supplement_fields.py",
+        "0013_seed_refund_pool_field.py",
     ]
 
 

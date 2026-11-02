@@ -192,10 +192,14 @@ export function useOrdersPageController(params: {
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
-      const employeeList = await employeesApi.list();
+      const [employeeList, poolList] = await Promise.all([employeesApi.list(), poolsApi.list()]);
       setUsers(employeeList.filter((employee) => employee.is_active));
+      const activePools = poolList.filter((pool) => pool.status === "ACTIVE");
+      // 资金收支必须指认资金账户：带上可用池并默认选中第一个，用户仍可改。
+      setCancelPools(activePools);
       setActionOrder(order);
       refundForm.resetFields();
+      refundForm.setFieldValue("pool_id", activePools[0]?.id);
       setRefundOpen(true);
     } catch (error) {
       appMessage.error(normalizeError(error).message);

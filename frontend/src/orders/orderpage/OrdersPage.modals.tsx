@@ -414,6 +414,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
 export function RefundModal({ controller }: { controller: OrdersPageController }) {
   const {
     actionOrder,
+    cancelPools,
     currentOperator,
     load,
     refundForm,
@@ -439,7 +440,7 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="REFUND"
           form={refundForm}
-          onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
+          onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; pool_id?: number; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
@@ -447,6 +448,8 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
                 event_type: "REFUND",
                 amount: values.amount,
                 occurred_on: values.occurred_on?.format("YYYY-MM-DD") ?? today(),
+                // 每笔收支都要指认资金账户：显式选择优先于订单类型的默认路由。
+                pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
                 reason: values.reason,
                 operator_user_ids: values.operator_user_ids,
                 form_extra: values.form_extra,
@@ -472,6 +475,14 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
             <MoneyInput placeholder="请输入退款金额" />
+          </CfgItem>
+          <CfgItem name="pool_id" label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
+            <Select
+              aria-label="资金账户"
+              placeholder="请选择这笔收支的资金账户"
+              options={cancelPools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
+              notFoundContent="暂无可用资金账户"
+            />
           </CfgItem>
           <CfgItem name="reason" label="收支备注" rules={[{ required: true, message: "请输入收支备注" }]}>
             <Input.TextArea rows={3} placeholder="请输入收支备注" />

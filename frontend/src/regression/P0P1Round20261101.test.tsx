@@ -10,6 +10,18 @@ import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { OrdersPage } from "../orders/OrdersPage";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { UsersPanel } from "../users/UsersPanel";
+
+/** 选中主资金账户。附加费用区的中介费账户与主资金账户同名同占位（均为「资金账户」），
+ *  故排除附加费用区定位；antd Select 在 jsdom 中用 mouseDown 展开，避免命中残留的隐藏下拉。 */
+async function pickMainPool(user: ReturnType<typeof userEvent.setup>) {
+  const selector = screen
+    .getAllByText("请选择资金账户", { exact: true })
+    .find((el) => !el.closest(".additional-fee-fields"))!
+    .closest(".ant-select")!
+    .querySelector(".ant-select-selector") as Element;
+  await user.click(selector);
+  await user.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+}
 import { TeamsPanel } from "../users/TeamsPanel";
 import { UserCenterPage } from "../auth/UserCenterPage";
 import * as client from "../shared/api/client";
@@ -465,9 +477,17 @@ it("P1/FE-196：库存 CSV 导出完成后给出成功反馈", async () => {
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {
-  vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-    { id: 99, game_account: "duplicate-account", game_type: "王者荣耀", status: "WAITING" },
-  ] as never);
+  // 判重已后移到后端：前端不自带比对，只呈现后端返回的错误码。
+  vi.mocked(catalog.ordersApi.create).mockRejectedValueOnce({
+    isAxiosError: true,
+    response: {
+      data: {
+        code: "INVENTORY_ACCOUNT_IN_STOCK",
+        message: "已有未售出库存账号「duplicate-account」，请先售出后再建单",
+      },
+    },
+    message: "Request failed",
+  });
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" },
   ] as never);
@@ -498,30 +518,41 @@ it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表�
   const amounts = screen.getAllByPlaceholderText("请输入金额");
   await user.type(amounts[0], "1000");
   await user.type(amounts[1], "1200");
-  await user.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-  await user.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+  await pickMainPool(user);
   await user.click(screen.getByRole("button", { name: /创建订单/ }));
 
   await waitFor(() => expect(screen.getByText(/请先售出后再建单/)).toBeInTheDocument());
   expect(screen.getByLabelText("游戏账号")).toHaveValue("duplicate-account");
   // 未售出属硬阻止：只出页面级错误提示，不应弹复购确认框（ConfirmDialog）。
   expect(screen.queryByText("检测到重复游戏账号")).not.toBeInTheDocument();
-  expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+  // 请求已发出，由后端拒绝；前端不再拉库存台账自行判重。
+  expect(catalog.ordersApi.create).toHaveBeenCalledWith(
+    expect.objectContaining({ confirm_repurchase: false }),
+  );
 });
 
 it("P1/FE-023：已售出重复账号确认复购后允许回流建单", async () => {
-  vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-    { id: 99, game_account: "duplicate-account", game_type: "王者荣耀", status: "SOLD" },
-  ] as never);
+  vi.mocked(catalog.ordersApi.create)
+    .mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        data: {
+          code: "REPURCHASE_CONFIRM_REQUIRED",
+          message: "历史库存账号「duplicate-account」已售出，请确认是否为复购回流订单",
+        },
+      },
+      message: "Request failed",
+    })
+    .mockResolvedValueOnce({ id: 1 } as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" },
   ] as never);
-  vi.mocked(catalog.counterpartiesApi.create).mockResolvedValueOnce({
-    id: 2,
-    display_name: "同行甲",
-    type: "PEER",
-    status: "ACTIVE",
-  } as never);
+  // 两次提交各自都会走一遍 TH 的「供货方→合作方」补齐（合作方列表里还没有它），
+  // 故 once 队列要备两份，否则第二次提交会在建单请求之前就因取不到 id 抛错。
+  const peer = { id: 2, display_name: "同行甲", type: "PEER", status: "ACTIVE" } as never;
+  vi.mocked(catalog.counterpartiesApi.create)
+    .mockResolvedValueOnce(peer)
+    .mockResolvedValueOnce(peer);
   renderLight(
     <CreateBusinessModal
       open
@@ -543,17 +574,19 @@ it("P1/FE-023：已售出重复账号确认复购后允许回流建单", async (
   const amounts = screen.getAllByPlaceholderText("请输入金额");
   await user.type(amounts[0], "1000");
   await user.type(amounts[1], "1200");
-  await user.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-  await user.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+  await pickMainPool(user);
   await user.click(screen.getByRole("button", { name: /创建订单/ }));
 
   // 复购确认现为受控 ConfirmDialog（Modal 级）：等确认框出现 → 未确认前不建单 → 点「是，继续建单」。
   expect(await screen.findByText("检测到重复游戏账号")).toBeInTheDocument();
-  expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+  expect(catalog.ordersApi.create).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: "是，继续建单" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "否，返回修改" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "是，继续建单" }));
-  await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
+  await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalledTimes(2));
+  expect(catalog.ordersApi.create).toHaveBeenLastCalledWith(
+    expect.objectContaining({ confirm_repurchase: true }),
+  );
 });
 
 it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {

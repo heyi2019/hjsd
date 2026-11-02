@@ -11,7 +11,6 @@ import {
   ordersApi,
   poolsApi,
   employeesApi,
-  stocksApi,
   type Counterparty,
   type Customer,
   type GameTypeOption,
@@ -66,8 +65,8 @@ export function CreateBusinessModal(props: {
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
-  const repurchaseConfirmedKey = useRef<string | null>(null);
-  const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string; duplicateKey: string } | null>(null);
+  const repurchaseConfirmedFor = useRef<string | null>(null);
+  const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const initialValuesRef = useRef<Record<string, unknown>>({});
   const { totalRecoveryCost } = useRecoveryFormState(form);
@@ -81,7 +80,7 @@ export function CreateBusinessModal(props: {
   useEffect(() => {
     if (!props.open) {
       form.resetFields();
-      repurchaseConfirmedKey.current = null;
+      repurchaseConfirmedFor.current = null;
     }
   }, [props.open, form]);
 
@@ -135,32 +134,9 @@ export function CreateBusinessModal(props: {
     setSubmitting(true);
     try {
       const gameAccount = String(values.game_account ?? "").trim();
-      const gameType = String(values.game_type ?? "").trim();
-      const duplicateKey = `${gameType}\u0000${gameAccount}`;
-      if (gameAccount && gameType && repurchaseConfirmedKey.current !== duplicateKey) {
-        const existingAccounts = await stocksApi.list();
-        const duplicates = existingAccounts.filter((account) => (
-          account.status !== "VOID"
-          && String(account.game_account ?? "").trim() === gameAccount
-          && String(account.game_type ?? "").trim() === gameType
-        ));
-        // 账号只有在历史库存已售出后才允许回流；未知状态也按未售出处理，避免重复进入库存。
-        const unsoldDuplicate = duplicates.find((account) => account.status !== "SOLD");
-        if (unsoldDuplicate) {
-          const message = `已有未售出库存账号「${gameAccount}」，请先售出后再建单`;
-          form.setFields([{ name: "game_account", errors: [message] }]);
-          setLoadError({ message });
-          return;
-        }
-        const duplicate = duplicates.find((account) => account.status === "SOLD");
-        if (duplicate && repurchaseConfirmedKey.current !== duplicateKey) {
-          const message = `历史库存账号「${gameAccount}」已售出，请确认是否为复购回流订单`;
-          form.setFields([{ name: "game_account", errors: [message] }]);
-          setLoadError({ message });
-          setRepurchasePrompt({ values, gameAccount, duplicateKey });
-          return;
-        }
-      }
+      // 判重已后移到后端（POST /orders）：未售出重复由后端返回 INVENTORY_ACCOUNT_IN_STOCK
+      // 并在 game_account 字段上提示；已售出重复返回 REPURCHASE_CONFIRM_REQUIRED，
+      // 由确认弹窗决定是否按复购回流继续。前端不再拉库存台账自行比对。
       const formExtra = (values.form_extra as Record<string, unknown> | undefined) ?? {};
       const accountExtraKeys = new Set(
         Object.values(config)
@@ -290,6 +266,8 @@ export function CreateBusinessModal(props: {
           extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
         },
         account_id: undefined,
+        // 后端判重：仅当用户已确认复购回流时，同一「已售出」账号才放行。
+        confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
         note,
         customer_roles: customerRoles,
         counterparty_roles: counterpartyId
@@ -313,7 +291,19 @@ export function CreateBusinessModal(props: {
       form.resetFields();
       void Promise.resolve(props.onCreated()).catch(() => undefined);
     } catch (error) {
-      setLoadError(normalizeError(error));
+      const normalized = normalizeError(error);
+      if (normalized.code === "INVENTORY_ACCOUNT_IN_STOCK") {
+        // 未售出重复属硬阻止：字段标红 + 页面级提示，不提供复购确认入口。
+        form.setFields([{ name: "game_account", errors: [normalized.message] }]);
+        setLoadError(normalized);
+        return;
+      }
+      if (normalized.code === "REPURCHASE_CONFIRM_REQUIRED") {
+        form.setFields([{ name: "game_account", errors: [normalized.message] }]);
+        setRepurchasePrompt({ values, gameAccount: String(values.game_account ?? "").trim() });
+        return;
+      }
+      setLoadError(normalized);
     } finally {
       setSubmitting(false);
     }
@@ -387,7 +377,7 @@ export function CreateBusinessModal(props: {
         onConfirm={async () => {
           const prompt = repurchasePrompt;
           if (!prompt) return;
-          repurchaseConfirmedKey.current = prompt.duplicateKey;
+          repurchaseConfirmedFor.current = prompt.gameAccount;
           form.setFields([{ name: "game_account", errors: [] }]);
           setLoadError(null);
           setRepurchasePrompt(null);

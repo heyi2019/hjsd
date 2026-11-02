@@ -16,6 +16,17 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
+
+/** 选中主资金账户。附加费用区的中介费账户与主资金账户同名同占位（资金账户），
+ *  故排除附加费用区后再定位（回收走 payment-info-section、提号走 th-fee-primary）。 */
+async function pickMainPool() {
+  const placeholder = screen
+    .getAllByText("请选择资金账户", { exact: true })
+    .find((el) => !el.closest(".additional-fee-fields"));
+  if (!placeholder) throw new Error("未找到主资金账户下拉");
+  await ui.click(placeholder.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+  await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+}
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()，
 // 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
 // 与各文件 beforeEach 重新设定返回值，避免闭包捕获的 vi.fn() 在共享模块图下串扰。
@@ -221,10 +232,18 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
   });
 
-it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", async () => {
-    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-      { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "WAITING" },
-    ] as never);
+it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", async () => {
+    // 判重已后移到后端：前端不再拉库存台账比对，只呈现后端错误。
+    vi.mocked(catalog.ordersApi.create).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        data: {
+          code: "INVENTORY_ACCOUNT_IN_STOCK",
+          message: "已有未售出库存账号「pickup-account」，请先售出后再建单",
+        },
+      },
+      message: "Request failed",
+    });
     await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
@@ -234,20 +253,31 @@ it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", a
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(screen.getByText(/请先售出后再建单/)).toBeInTheDocument());
     expect(screen.getByLabelText("游戏账号")).toHaveValue("pickup-account");
-    // 未售出属硬阻止：只出页面级错误提示，不应弹复购确认框（ConfirmDialog）。
+    // 未售出属硬阻止：只出错误提示，不应弹复购确认框（ConfirmDialog）。
     expect(screen.queryByText("检测到重复游戏账号")).not.toBeInTheDocument();
-    expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+    // 请求已经发出，由后端判定；前端不自带判重。
+    expect(catalog.ordersApi.create).toHaveBeenCalledWith(
+      expect.objectContaining({ confirm_repurchase: false }),
+    );
   });
 
 it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单", async () => {
-    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-      { id:99, game_account: "pickup-account", game_type: "王者荣耀", status: "SOLD" },
-    ] as never);
+    vi.mocked(catalog.ordersApi.create)
+      .mockRejectedValueOnce({
+        isAxiosError: true,
+        response: {
+          data: {
+            code: "REPURCHASE_CONFIRM_REQUIRED",
+            message: "历史库存账号「pickup-account」已售出，请确认是否为复购回流订单",
+          },
+        },
+        message: "Request failed",
+      })
+      .mockResolvedValueOnce({ id: 1 } as never);
     await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
@@ -257,15 +287,17 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
-    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    // 复购确认框出现，未确认前不建单
+    // 后端要求确认复购：复购确认框出现，未确认前不再次提交。
     expect(await screen.findByText("检测到重复游戏账号")).toBeInTheDocument();
-    expect(catalog.ordersApi.create).not.toHaveBeenCalled();
+    expect(catalog.ordersApi.create).toHaveBeenCalledTimes(1);
     // 复购确认用 ConfirmDialog（Modal 级）：按可访问名精确点击，兼作 loading 图标污染的回归护栏。
     await ui.click(screen.getByRole("button", { name: "是，继续建单" }));
-    await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
+    await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalledTimes(2));
+    expect(catalog.ordersApi.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ confirm_repurchase: true }),
+    );
   });
 
 it("FE-123：原建单测试入口的提号来源默认值跟随主数据", async () => {

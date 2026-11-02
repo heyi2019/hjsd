@@ -91,6 +91,8 @@ export const ordersApi = {
       extra_values?: Record<string, unknown>;
     };
     account_id?: number;
+    /** 后端判重：同账号已有「已售出」记录时，用户确认复购回流后置 true 放行。 */
+    confirm_repurchase?: boolean;
     owner_id?: number;
     capital_type?: string;
     note?: string;

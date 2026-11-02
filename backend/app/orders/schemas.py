@@ -99,6 +99,12 @@ class OrderCreate(BaseModel):
     trade_date: date
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
+    # 建单判重：同一游戏账号+游戏类型已有「已售出」记录时，后端返回
+    # REPURCHASE_CONFIRM_REQUIRED；用户确认复购回流后带此标记重提即放行。
+    # 已有「未售出」记录则无条件拒绝（INVENTORY_ACCOUNT_IN_STOCK），该标记不生效。
+    confirm_repurchase: bool = Field(
+        default=False, description="确认复购回流：仅对已售出的历史同账号生效"
+    )
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None

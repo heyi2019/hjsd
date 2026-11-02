@@ -10,6 +10,7 @@
     "test": "vitest run --project=quick",
     "test:unit": "vitest run --project=fast",
     "test:panel": "node scripts/test-panel.mjs",
+    "audit:ux": "node scripts/ux-audit.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "test:ci": "node scripts/test-full-sharded.mjs --all",
     "test:fast": "vitest run --project=fast",

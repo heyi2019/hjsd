@@ -95,6 +95,6 @@ Playwright E2E 体系已整体删除：`frontend/e2e/`（13 个 spec / 50 例 / 
 | 模块 / 面板 | `npm run test:panel -- <域>` | 分钟级 | 组件渲染与交互逻辑（jsdom） |
 | 后端接口 | `cd backend && python3 run_regression.py <域>` | 分钟级 | 契约、权限、状态机、真实 PG 语义 |
 
-**代价必须说清**：不再有「真实浏览器点下去」的自动化验证。导航可达、外壳不白屏、关键写路径这三类问题，现在只能靠人工点一遍，或按需临时起服务用 `frontend/scripts/ux-audit.mjs` 巡检（该脚本保留，直接用 `playwright` 包做浏览器体检，不属于测试框架）。
+**代价必须说清**：不再有「真实浏览器点下去」的自动化验证。导航可达、外壳不白屏、关键写路径这三类问题，现在只能靠人工点一遍，或按需临时起服务用 `cd frontend && npm run audit:ux` 巡检（脚本 `frontend/scripts/ux-audit.mjs`，7 页 × 3 视口，覆盖 CLS / WCAG 对比度 / 触控目标 / 横向溢出 / 500 可见性，产出 `/tmp/ux-audit/result.json` 与截图；直接用 `playwright` 包做浏览器体检，不属于测试框架，故脚本保留）。巡检前须先起前端，默认打 `http://localhost:5180/`，用 `UXP_BASE` 指向别的实例（如 `UXP_BASE=http://localhost:5188/`）。
 
 如需找回：`git log --diff-filter=D -- frontend/e2e` 可定位删除前的完整快照。

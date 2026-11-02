@@ -23,7 +23,7 @@ from app.imports import service as imports_service
 from app.policy import service as policy_service
 
 
-# ── 1. Policy SUPERSEDED：草稿作废 ───────────────────────────────
+# ── 1. Policy SUPERSEDED：草稿取消 ───────────────────────────────
 
 
 def _make_def(seeded_db, code: str) -> dict:
@@ -47,7 +47,7 @@ def test_supersede_rejects_published_version(seeded_db):
         config={"rate": "10"},
         actor="pytest",
     )
-    # 创建即发布（ACTIVE）：已发布版本是历史解析口径，不可作废
+    # 创建即发布（ACTIVE）：已发布版本是历史解析口径，不可取消
     import pytest
     from app.core.errors import Validation
 
@@ -56,7 +56,7 @@ def test_supersede_rejects_published_version(seeded_db):
             seeded_db,
             version["id"],
             actor="pytest",
-            reason="已发布版本不可作废",
+            reason="已发布版本不可取消",
         )
 
 
@@ -148,7 +148,7 @@ def test_expire_sweep_idempotent(seeded_db):
     assert second["swept"] == 0
 
 
-# ── 3. Rebate VOID：零结算作废 ───────────────────────────────────
+# ── 3. Rebate VOID：零结算取消 ───────────────────────────────────
 
 TODAY = date(2026, 10, 17)
 

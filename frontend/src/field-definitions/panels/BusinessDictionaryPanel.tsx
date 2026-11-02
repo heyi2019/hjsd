@@ -111,7 +111,7 @@ export function BusinessDictionaryPanel() {
             <ActionLine category="过账" action="业务事实过账" desc="将已确认的业务事实登记为订单事件或资金流水。" />
             <ActionLine category="分期结算" action="按期收款结算" desc="按分期计划登记收款、更新已收金额，并在全部结清后进入可交付状态。" />
             <ActionLine category="对账与核销" action="业务与资金匹配" desc="将业务记录、资金流水和外部账单进行匹配并标记核销。" />
-            <ActionLine category="冲销" action="业务事实冲销" desc="对已经登记的业务或资金事实做反向更正，并记录冲销审计事件；不等同于作废或终止操作。" />
+            <ActionLine category="冲销" action="业务事实冲销" desc="对已经登记的业务或资金事实做反向更正，并记录冲销审计事件；不等同于取消或终止操作。" />
           </EntryGroup>
           </div>
         </Descriptions.Item>
@@ -141,14 +141,14 @@ export function BusinessDictionaryPanel() {
           <EntryGroup title="账号状态机">
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>在库</strong></span>
-              <span className="business-dictionary__action-detail">账号买入后进入库存中心；未售出前保持在库，售出后转为已售，作废后到终态。</span>
+              <span className="business-dictionary__action-detail">账号买入后进入库存中心；未售出前保持在库，售出后转为已售，取消后到终态。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>已售</strong></span>
-              <span className="business-dictionary__action-detail">已售出或赊购；回收、取消入库、取消售出回待售，赊购保持，取消售出并终结或作废到终态。</span>
+              <span className="business-dictionary__action-detail">已售出或赊购；回收、取消入库、取消售出回待售，赊购保持，取消售出并终结或取消到终态。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>已作废</strong></span>
+              <span className="business-dictionary__tertiary"><strong>已取消</strong></span>
               <span className="business-dictionary__action-detail">终态。</span>
             </div>
           </EntryGroup>
@@ -244,7 +244,7 @@ export function BusinessDictionaryPanel() {
           <EntryLine name="首次入库" desc="回收、提号、代挂订单创建成功后，账号进入库存中心并按在库状态管理。" />
           <EntryLine name="未售出重复账号" desc="按游戏类型 + 游戏账号精确匹配；只要历史账号仍未售出，就禁止重复入库，不能通过确认强行建单。" />
           <EntryLine name="已售出账号回流" desc="历史账号已售出后，重复建单视为账号回流；经复购确认后允许重新进入库存。" />
-          <EntryLine name="作废记录" desc="已作废账号不参与重复入库校验。" />
+          <EntryLine name="取消记录" desc="已取消账号不参与重复入库校验。" />
         </Descriptions.Item>
       </Descriptions>
     </Card>

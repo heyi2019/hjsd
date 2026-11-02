@@ -4,7 +4,7 @@
 - GET /order-form-fields/scopes 返回注册表 FORM_SCOPES 的全部作用域（当前 49 个，
   断言直接对齐注册表，避免每次新增作用域都要改数字——曾因写死 47 而腐化）；
 - 12 个新作用域种子已由迁移落库（GET /order-form-fields 可读）；
-- 订单事件 / 订单作废 / 订单关联 / 编辑订单 / 分润 / 分期取消 / 账号资料 /
+- 订单事件 / 取消 / 订单关联 / 编辑订单 / 分润 / 分期取消 / 账号资料 /
   工作室流水的 form_extra 通道。
 """
 from __future__ import annotations
@@ -34,9 +34,9 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
     assert {item["code"] for item in scopes} == expected
     assert len(scopes) == len(expected)
     by_code = {item["code"]: item for item in scopes}
-    assert by_code["ORDERCANC"]["label"] == "售出取消交易"
+    assert by_code["ORDERCANC"]["label"] == "取消"
     assert by_code["ORDERCANC"]["group"] == "ORDEROP"
-    assert by_code["INVREFUND"]["label"] == "库存取消交易"
+    assert by_code["INVREFUND"]["label"] == "取消"
     assert by_code["INVREFUND"]["group"] == "INVENTORY"
     assert by_code["INVCANCEL"]["group"] == "INSTALLMENT"
     assert by_code["INVEDIT"]["label"] == "编辑"

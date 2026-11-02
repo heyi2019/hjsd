@@ -137,7 +137,7 @@ describe("InventoryPanel：账号台账", () => {
     }
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
-    expect(screen.queryByRole("menuitem", { name: "取消交易" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "取消" })).toBeNull();
     expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
@@ -145,7 +145,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
   });
 
-  it("更多菜单收纳下架、取消交易、描述和作图", async () => {
+  it("更多菜单收纳下架、取消、描述和作图", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
@@ -162,7 +162,7 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
 
     const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    expect(within(stockRow).queryByRole("button", { name: "作废" })).toBeNull();
+    expect(within(stockRow).queryByRole("button", { name: "取消" })).toBeNull();
 
     await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
     expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();

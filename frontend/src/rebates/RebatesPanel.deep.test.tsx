@@ -57,7 +57,7 @@ describe("RebatesPanel：返点明细 / 空态 / 错误重试", () => {
     vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as unknown as never);
     renderLight(<RebatesPanel />, { user: "admin" });
     expect(await screen.findByText("暂无返点记录")).toBeInTheDocument();
-    // 返点页面不提供结算、冲销或作废状态。
+    // 返点页面不提供结算、冲销或取消状态。
     expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -76,11 +76,11 @@ describe("RebatesPanel：返点明细 / 空态 / 错误重试", () => {
     expect(screen.queryByText("HS0001-RB01")).toBeNull();
   });
 
-  it("返点列表只提供编辑和删除，不提供结算、冲销或作废", async () => {
+  it("返点列表只提供编辑和删除，不提供结算、冲销或取消", async () => {
     renderLight(<RebatesPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-RB01")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /登记结算/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /冲销/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /作废/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /取消/ })).toBeNull();
   });
 });

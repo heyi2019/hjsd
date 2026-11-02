@@ -5,10 +5,10 @@ const scopes = [
   { code: "SALE", label: "售出", group: "INVENTORY" },
   { code: "CONSIGN", label: "寄售", group: "INVENTORY" },
   { code: "INVREBATE", label: "返点", group: "INVENTORY" },
-  { code: "INVREFUND", label: "库存取消交易", group: "INVENTORY" },
+  { code: "INVREFUND", label: "取消", group: "INVENTORY" },
   { code: "INVEDIT", label: "编辑", group: "INVENTORY" },
   { code: "INVOID", label: "下架", group: "INVENTORY" },
-  { code: "INVCANCEL", label: "分期取消交易", group: "INSTALLMENT" },
+  { code: "INVCANCEL", label: "取消", group: "INSTALLMENT" },
   { code: "REFUND", label: "资金收支", group: "ORDEROP" },
 ];
 
@@ -23,7 +23,7 @@ describe("表单作用域顺序", () => {
       { code: "HS", label: "回收建单", group: "ORDER" },
           { code: "TH", label: "提号建单", group: "ORDER" },
       { code: "DG", label: "代挂建单", group: "ORDER" },
-      { code: "ORDERCANC", label: "售出取消交易", group: "ORDEROP" },
+      { code: "ORDERCANC", label: "取消", group: "ORDEROP" },
       { code: "SALE", label: "库存售出", group: "INVENTORY" },
       { code: "CONSIGN", label: "寄售", group: "INVENTORY" },
     ]);
@@ -41,7 +41,7 @@ describe("表单作用域顺序", () => {
       { value: "SALE", label: "售出" },
       { value: "CONSIGN", label: "寄售" },
       { value: "INVREBATE", label: "返点" },
-      { value: "INVREFUND", label: "库存取消交易" },
+      { value: "INVREFUND", label: "取消" },
       { value: "INVEDIT", label: "编辑" },
       { value: "INVOID", label: "下架" },
     ]);

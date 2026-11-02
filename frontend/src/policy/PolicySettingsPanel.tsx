@@ -119,7 +119,7 @@ export function PolicySettingsPanel() {
     setEditorOpen(false);
   };
 
-  /** 作废草稿版本：草稿只是未发布的规划，作废不影响任何历史订单口径。 */
+  /** 取消草稿版本：草稿只是未发布的规划，取消不影响任何历史订单口径。 */
   const submitSupersede = async (values: Record<string, unknown>) => {
     const target = supersedeTarget;
     if (!target) return;
@@ -128,7 +128,7 @@ export function PolicySettingsPanel() {
     });
     if (succeeded) {
       setSupersedeTarget(null);
-      appMessage.success(`草稿 v${target.version} 已作废`);
+      appMessage.success(`草稿 v${target.version} 已取消`);
     }
   };
 
@@ -244,16 +244,16 @@ export function PolicySettingsPanel() {
 
       <FormDrawer
         open={supersedeTarget !== null}
-        title={`作废草稿 · v${supersedeTarget?.version ?? ""}`}
-        fields={[{ name: "reason", label: "作废理由", required: true, kind: "textarea" as const }]}
-        submitText="确认作废"
+        title={`取消草稿 · v${supersedeTarget?.version ?? ""}`}
+        fields={[{ name: "reason", label: "取消理由", required: true, kind: "textarea" as const }]}
+        submitText="确认取消"
         submitting={acting}
         error={error}
         onClose={() => setSupersedeTarget(null)}
         onSubmit={(values) => void submitSupersede(values)}
         extra={
           <p className="ui-drawer-hint">
-            只有草稿版本可作废。已发布版本是历史日期的解析口径，作废会挖掉历史规则的落点；
+            只有草稿版本可取消。已发布版本是历史日期的解析口径，取消会挖掉历史规则的落点；
             要下线生效中的版本，请「设置配置」新建版本并把生效期接上。
           </p>
         }

@@ -182,7 +182,7 @@ describe("OrderDetail", () => {
     render(<OrderDetail row={account} detail={detail} loading={false} />);
 
     expect(screen.getByText("操作追溯")).toBeInTheDocument();
-    expect(screen.getByText("取消订单")).toBeInTheDocument();
+    expect(screen.getByText("取消")).toBeInTheDocument();
     expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
   });
 

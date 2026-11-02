@@ -345,13 +345,13 @@ export function useOrdersPageController(params: {
             pool_id: Number(values.pool_id),
             operator_user_ids: operatorUserIds,
             reason: values.reason,
-            note: cancelScope === "INVREFUND" ? "库存取消交易，冲销入库并入账" : "售出取消交易，原路退款",
+            note: cancelScope === "INVREFUND" ? "取消：冲销入库并入账" : "取消：原路退款",
             form_extra_scope: cancelScope,
             form_extra: values.form_extra,
           });
           appMessage.success(cancelScope === "INVREFUND"
-            ? `库存取消交易已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
-            : `售出取消交易已登记：退款 ¥${money(result.event.amount)}，已按原资金池退还客户`);
+            ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
+            : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金池退还客户`);
         } else {
           await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
           appMessage.success("交易已取消，无已登记款项需要退款");

@@ -1,4 +1,4 @@
-"""订单取消模型。
+"""取消模型。
 
 取消分为两类：
 - 无已登记资金事件：直接将订单置为已取消；
@@ -161,7 +161,7 @@ def cancel_order(
     user: CurrentUser | None = None,
 ) -> Order:
     """取消没有已登记业务/资金事件的订单。"""
-    reason = _required_text(reason, field="reason", message="订单作废必须填写原因")
+    reason = _required_text(reason, field="reason", message="取消必须填写原因")
     order = get_order(session, order_id, user)
     posted = session.scalar(
         select(OrderEvent.id).where(
@@ -170,7 +170,7 @@ def cancel_order(
         )
     )
     if posted is not None:
-        raise Validation("订单已有登记事件，不能直接作废，请先冲销")
+        raise Validation("订单已有登记事件，不能直接取消，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     # 代挂的“本系统下架”直接终止本系统订单并令账号退出库存；平台下架不走此分支。
     if (

@@ -1009,7 +1009,7 @@ class TestGetAndListOrders:
         )
         with pytest.raises(Validation, match="登记事件"):
             order_service.cancel_order(
-                seeded_db, posted.id, actor="operator", reason="不能直接作废"
+                seeded_db, posted.id, actor="operator", reason="不能直接取消"
             )
 
     def test_system_offsale_cancels_dg_order_and_removes_account_from_inventory(self, seeded_db):
@@ -1357,7 +1357,7 @@ class TestCancelOffsetDirection:
 
     def test_cancel_reasons_require_text_values(self, seeded_db):
         order = _order(seeded_db)
-        with pytest.raises(Validation, match="订单作废必须填写原因"):
+        with pytest.raises(Validation, match="取消必须填写原因"):
             order_service.cancel_order(
                 seeded_db, order.id, actor="pytest", reason=123
             )

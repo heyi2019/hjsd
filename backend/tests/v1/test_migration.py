@@ -226,7 +226,7 @@ def test_postgres_baseline_casts_json_null_check_for_postgresql():
 
 
 def test_order_cancel_amount_is_incoming_finance_flow(migration_env):
-    """取消交易的冲销金额应记录为退款入账，而非原始支出。"""
+    """取消的冲销金额应记录为退款入账，而非原始支出。"""
     env, db_file = migration_env
     result = _alembic(env, "upgrade", "head")
     assert result.returncode == 0, result.stdout + result.stderr

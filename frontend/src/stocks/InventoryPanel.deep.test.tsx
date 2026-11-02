@@ -180,7 +180,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await ui.type(amount, "80");
     await ui.click(account.closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("利润池（HJ_PROFIT）", { selector: ".ant-select-item-option-content" }));
-    await ui.type(within(modal).getByLabelText("取消原因"), "取消交易");
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消");
     await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
 
     await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(

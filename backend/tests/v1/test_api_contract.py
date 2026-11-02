@@ -51,7 +51,7 @@ def test_every_json_api_route_declares_response_model(app):
     # → 170（168 为并行会话新增端点后的实测值；列表列配置再 +2：GET /list-columns、
     # PUT /list-columns/{scope}）→ 171（+DELETE /list-columns/{scope}：恢复默认）
     # → 174（自定义列 +3：GET /list-columns/custom-fields、POST /list-columns/{scope}/custom、
-    # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/作废旧入口已移除。
+    # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/取消旧入口已移除。
     # → 176（主列表导出 +6：/orders /stocks /customers /installments /rebates /cashflows）。
     # → 174（删除资金流水审核/驳回端点：POST /cashflows/{id}/approve、POST /cashflows/{id}/reject，
     # 资金流水改为创建即入账；下游 reporting/orders/quality 仍按 ==APPROVED 过滤，不受影响）。

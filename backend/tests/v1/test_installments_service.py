@@ -188,7 +188,7 @@ def test_cancel_rejects_closed_contract(seeded_db):
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
-    with pytest.raises(Conflict, match="不能取消交易"):
+    with pytest.raises(Conflict, match="不能取消"):
         installment_service.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 661-672
@@ -199,7 +199,7 @@ def test_cancel_rejects_settled_contract(seeded_db):
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.SETTLED.value
     seeded_db.flush()
-    with pytest.raises(Conflict, match="不能取消交易"):
+    with pytest.raises(Conflict, match="不能取消"):
         installment_service.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )

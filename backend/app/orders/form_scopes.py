@@ -33,7 +33,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("TH", "提号建单", GROUP_ORDER),
     FormScope("DG", "代挂建单", GROUP_ORDER),
     # ---- 订单操作（迁移 0019）----
-    FormScope("ORDERCANC", "售出取消交易", GROUP_ORDER_OP),
+    FormScope("ORDERCANC", "取消", GROUP_ORDER_OP),
     FormScope("ORDEREDIT", "编辑订单", GROUP_ORDER_OP),
     FormScope("ORDERLINK", "订单关联", GROUP_ORDER_OP),
     FormScope("ALLOCATION", "订单分润", GROUP_ORDER_OP),
@@ -42,7 +42,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("SALE", "售出", GROUP_INVENTORY),
     FormScope("CONSIGN", "寄售", GROUP_INVENTORY),
     FormScope("INVREBATE", "返点", GROUP_INVENTORY),
-    FormScope("INVREFUND", "库存取消交易", GROUP_INVENTORY),
+    FormScope("INVREFUND", "取消", GROUP_INVENTORY),
     FormScope("INVEDIT", "编辑", GROUP_INVENTORY),
     FormScope("INVOID", "下架", GROUP_INVENTORY),
     # ---- 客户（迁移 0003 / 0004）----
@@ -57,7 +57,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("INSTRECOVER", "分期回收", GROUP_INSTALLMENT),
     FormScope("INSTRESALE", "分期出售登记", GROUP_INSTALLMENT),
     FormScope("INSTDELIVER", "交付换绑", GROUP_INSTALLMENT),
-    FormScope("INVCANCEL", "分期取消交易", GROUP_INSTALLMENT),
+    FormScope("INVCANCEL", "取消", GROUP_INSTALLMENT),
     FormScope("INSTCANCEL", "取消退款", GROUP_INSTALLMENT),
     FormScope("INSTSETTLE", "提前结清", GROUP_INSTALLMENT),
     FormScope("INSTDEFAULT", "违约登记", GROUP_INSTALLMENT),

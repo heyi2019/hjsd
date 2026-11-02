@@ -92,7 +92,7 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     renderLight(<ConfigAuditPanel />, { user: "admin" });
 
     expect(await screen.findByText("取消押金")).toBeInTheDocument();
-    expect(screen.getByText("作废返点")).toBeInTheDocument();
+    expect(screen.getByText("取消返点")).toBeInTheDocument();
     expect(screen.getByText("驳回导入批次")).toBeInTheDocument();
   });
 

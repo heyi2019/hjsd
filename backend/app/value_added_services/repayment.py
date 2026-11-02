@@ -176,7 +176,7 @@ def cancel_installment(
     }
     if installment.status not in cancellable:
         raise Conflict(
-            f"合约 {installment.inst_no} 状态 {installment.status}，不能取消交易",
+            f"合约 {installment.inst_no} 状态 {installment.status}，不能取消",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"inst_no": installment.inst_no, "status": installment.status},
         )
@@ -235,7 +235,7 @@ def cancel_installment(
             portion=original.portion,
             offset_event_id=original.id,
             reason=text_reason,
-            note=f"取消交易原路退款：{installment.inst_no}",
+            note=f"取消退款：{installment.inst_no}",
             user=user,
             allow_installment_cancel=True,
             defer_order_cancel=True,

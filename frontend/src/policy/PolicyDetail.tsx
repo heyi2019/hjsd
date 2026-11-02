@@ -12,7 +12,7 @@ interface PolicyDetailProps {
   canManage: boolean;
   onOpenEditor: () => void;
   onOpenResolve: () => void;
-  /** 作废草稿版本（SUPERSEDED）：已发布版本是历史解析口径，服务端拒绝作废。 */
+  /** 取消草稿版本（SUPERSEDED）：已发布版本是历史解析口径，服务端拒绝取消。 */
   onSupersede: (version: PolicyVersion) => void;
   /** 过期清扫：把生效期已结束的 ACTIVE 版本固化为 EXPIRED。 */
   onExpireSweep: () => Promise<void>;
@@ -58,7 +58,7 @@ export function PolicyDetail({
       render: (_v, row) =>
         canManage && row.status === "DRAFT" ? (
           <PermissionButton permission="policy.manage" size="small" danger onClick={() => onSupersede(row)}>
-            作废
+            取消
           </PermissionButton>
         ) : (
           <span className="muted">—</span>

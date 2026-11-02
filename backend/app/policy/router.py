@@ -130,7 +130,7 @@ def supersede_version(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> schemas.PolicyVersionOut:
-    """作废草稿版本（SUPERSEDED）。已发布版本不可作废——它是历史日期的解析口径。"""
+    """取消草稿版本（SUPERSEDED）。已发布版本不可取消——它是历史日期的解析口径。"""
     return schemas.PolicyVersionOut.model_validate(
         service.supersede_draft_version(
             db,

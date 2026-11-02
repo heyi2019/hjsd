@@ -401,7 +401,7 @@ it("提号库存从库存中心售出时统一按库存分期出售，确立时�
     expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
   });
 
-it("售出取消交易不在库存中心提供入口", async () => {
+it("库存中心不为售出单提供取消入口", async () => {
     resolveMockOnce(vi.mocked(catalog.stocksApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await waitFor(() => expect(screen.queryByText("acc-2")).toBeNull());

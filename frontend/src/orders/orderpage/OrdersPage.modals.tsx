@@ -29,7 +29,7 @@ export function SharedCancellationDialog({ controller }: { controller: OrdersPag
   return (
     <InventoryCancellationDialog
       open={hasSharedCancellation}
-      title={cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+      title={cancelOrderTarget ? `取消 · ${cancelOrderTarget.order_no}` : "取消"}
       amount={sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00"}
       pools={cancelPools}
       form={cancelForm}
@@ -63,12 +63,12 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
   } = controller;
   return (
       <BusinessActionModal
-        title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+        title={cancelInstallmentTarget ? `取消 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `取消 · ${cancelOrderTarget.order_no}` : "取消"}
         fieldCount={6}
         open={Boolean(cancelInstallmentTarget || (cancelOrderTarget && !hasSharedCancellation))}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
-        okText="确认取消交易"
+        okText="确认取消"
         okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >

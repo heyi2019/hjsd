@@ -1,0 +1,94 @@
+/** 客户档案、客户详情聚合、合作方与需求线索。
+ * 由原 shared/api/types.ts 按领域拆分；对外仍从 `./types` 统一导入。
+ * 金额一律以字符串传输，前端不做浮点数计算。 */
+
+export interface Customer {
+  id: number;
+  customer_no: string;
+  display_name: string;
+  contact_name?: string | null;
+  phone?: string | null;
+  wechat?: string | null;
+  qq?: string | null;
+  source?: string | null;
+  note?: string | null;
+  status: string;
+  created_at?: string | null;
+  contact_masked?: boolean;
+  merged_into_id?: number | null;
+  /** 表单扩展字段值：field_key → 值，由统一字段配置驱动（BAS-04） */
+  extra_values?: Record<string, unknown> | null;
+}
+
+export interface CustomerOverview {
+  order_count: number;
+  active_order_count: number;
+  completed_order_count: number;
+  cancelled_order_count: number;
+  last_trade_date?: string | null;
+  installment_paid_total: string;
+  installment_receivable_total: string;
+  installment_remaining_total: string;
+  overdue_period_count: number;
+}
+
+export interface CustomerBusiness {
+  order_id: number;
+  order_no: string;
+  order_type: string;
+  capital_type: string;
+  status: string;
+  trade_date: string;
+  owner_id?: number | null;
+  roles: string[];
+}
+
+export interface CustomerInstallment {
+  id: number;
+  inst_no: string;
+  order_id: number;
+  order_no?: string | null;
+  contract_type: string;
+  status: string;
+  principal: string;
+  total_receivable: string;
+  paid_amount: string;
+  remaining_amount: string;
+  overdue_periods: number;
+  first_due_on?: string | null;
+}
+
+export interface CustomerDetail {
+  customer: Customer;
+  overview: CustomerOverview;
+  business: CustomerBusiness[];
+  installments: CustomerInstallment[];
+  audit: Array<{
+    id: number;
+    action: string;
+    entity_type: string;
+    entity_id: string;
+    actor: string;
+    reason?: string | null;
+    occurred_at: string;
+  }>;
+}
+
+export interface Counterparty {
+  id: number;
+  counterparty_no: string;
+  display_name: string;
+  type: string;
+  status: string;
+  contact_name?: string | null;
+  phone?: string | null;
+  wechat?: string | null;
+  qq?: string | null;
+  source?: string | null;
+  note?: string | null;
+  created_at?: string;
+  extra_values?: Record<string, unknown>;
+  extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
+}
+
+export interface Lead { id: number; lead_no: string; customer_id: number; request_type: string; budget?: string | null; target: string; status: string }

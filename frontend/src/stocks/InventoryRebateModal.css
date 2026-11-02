@@ -1,8 +1,54 @@
 /* 非必填字段也预留必填星号的位置，保证所有标签文字从同一纵线开始。 */
+.inventory-rebate-modal .ant-modal {
+  --resizable-modal-width: min(900px, calc(100vw - 48px));
+}
+
+/* 返点类型独占第一行；金额、比例、日期、操作人四个核心字段统一落在下一行。 */
+.business-registration-modal .inventory-rebate-form > .ant-form-item:first-child,
+.business-registration-modal .inventory-rebate-form > .rebate-core-fields {
+  grid-column: 1 / -1;
+}
+
+/* 标题与明细表属于同一组，去掉通用表单的额外上边距和表格自带间距，避免双重留白。 */
+.inventory-rebate-details {
+  gap: var(--space-2);
+}
+.inventory-rebate-details .orders-event-list,
+.inventory-rebate-details .orders-event-table {
+  margin-block-start: 0;
+  margin-top: 0;
+}
+
 .inventory-rebate-form .ant-form-item-label > label:not(.ant-form-item-required)::before {
   content: "*";
   display: inline-block;
   width: 0.5em;
   margin-inline-end: 4px;
   visibility: hidden;
+}
+
+/* 返点明细沿用资金明细的小表格规格：表头固定、行高紧凑，窄屏只横向滚动表格本身。 */
+.inventory-rebate-table {
+  width: 100%;
+  min-width: min(100%, 56rem);
+}
+.inventory-rebate-table .orders-event-row {
+  grid-template-columns: minmax(8rem, 1.2fr) minmax(7rem, 1fr) minmax(6rem, 0.9fr) minmax(8rem, 1fr) minmax(7rem, 1fr) minmax(8rem, 1.1fr);
+}
+.inventory-rebate-table .orders-event-row > [role="columnheader"],
+.inventory-rebate-table .orders-event-row > [role="cell"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inventory-rebate-table__empty {
+  min-height: 4.5rem;
+}
+.inventory-rebate-table__empty [role="cell"] {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  white-space: normal;
 }

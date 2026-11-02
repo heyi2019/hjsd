@@ -56,13 +56,19 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     expect(screen.getByText("否")).toBeInTheDocument();
   });
 
+  it("不再渲染重复的业务类型主数据容器标题", async () => {
+    renderLight(<OrderTypesPanel />, { user: "admin" });
+    expect(await screen.findByText("HS")).toBeInTheDocument();
+    expect(screen.queryByText("业务类型主数据")).toBeNull();
+  });
+
   it("空列表显示暂无业务类型", async () => {
     vi.mocked(catalog.orderTypesApi.list).mockResolvedValue([]);
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText("暂无业务类型")).toBeInTheDocument();
   });
 
-  it("加载失败显示错误横幅", async () => {
+  it("FE-211：业务类型主数据失败显示错误空态并禁用新建", async () => {
     vi.mocked(catalog.orderTypesApi.list).mockRejectedValue(new Error("types down"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText(/types down/)).toBeInTheDocument();

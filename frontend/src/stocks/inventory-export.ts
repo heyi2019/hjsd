@@ -41,6 +41,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
   const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
   const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
   const sourceOrder = orders[0];
+  const rebateIncome = rebateItems.reduce((sum, { rebate }) => sum + Number(rebate.base_amount), 0);
 
   return {
     registrationAt: dateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date),
@@ -76,9 +77,9 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
       ].join(" / ")),
     ].join("；"),
     expenseCount: expenseFlows.length,
-    incomeCount: incomeFlows.length,
+    incomeCount: incomeFlows.length + rebateItems.length,
     totalExpense: expenseFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2),
-    totalIncome: incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2),
+    totalIncome: (incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0) + rebateIncome).toFixed(2),
   };
 }
 
@@ -93,7 +94,7 @@ export function buildInventoryCsv(
       const detailText = exportDetailText(detail);
       const age = inventoryAge(row);
       return [
-        row.source_order_no,
+        row.source_order_no || detail?.orders.find((order) => order.order_type !== "DG")?.order_no || detail?.orders[0]?.order_no || "",
         row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "",
         row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "",
         row.game_type,

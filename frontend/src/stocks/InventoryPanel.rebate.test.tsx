@@ -162,12 +162,16 @@ it("返点按买入与售出订单区分类型并登记", async () => {
 it("登记返点弹窗展示关联订单的返点明细", async () => {
   renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
   expect(await screen.findByText("返点明细")).toBeInTheDocument();
-  expect(screen.getByText("HS0001-RB01")).toBeInTheDocument();
   expect(screen.getByText("何一")).toBeInTheDocument();
-  expect(document.querySelector(".adaptive-business-modal.recovery-order-modal")).toBeTruthy();
+  expect(document.querySelector(".adaptive-business-modal.business-registration-modal")).toBeTruthy();
+  expect(document.querySelector<HTMLElement>(".inventory-rebate-details")?.closest<HTMLElement>(".ant-modal")?.style.getPropertyValue("--resizable-modal-width")).toBe("900px");
   expect(document.querySelectorAll(".rebate-core-fields > .ant-form-item")).toHaveLength(4);
   expect(screen.getByLabelText("操作人")).toBeInTheDocument();
   expect(document.querySelector(".inventory-rebate-details .ant-table-pagination")).toBeNull();
+  expect(document.querySelector(".inventory-rebate-details .orders-event-table")).toBeTruthy();
+  expect(screen.getByRole("table", { name: "返点明细表" })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "返点单号" })).toBeNull();
+  expect(screen.getByRole("columnheader", { name: "类型" })).toBeInTheDocument();
   expect(screen.queryByText("已结算")).toBeNull();
   expect(screen.queryByText("未结算")).toBeNull();
 });

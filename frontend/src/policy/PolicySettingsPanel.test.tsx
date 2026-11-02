@@ -129,6 +129,15 @@ it("admin 可见「设置配置」", async () => {
   expect(screen.getByRole("button", { name: /设置配置/ })).toBeInTheDocument();
 });
 
+it("FE-215：经营规则接口失败时统计不可用且不开放规则操作", async () => {
+  vi.mocked(catalog.policyApi.list).mockRejectedValueOnce(new Error("policies down"));
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+
+  expect(await screen.findByText("policies down")).toBeInTheDocument();
+  expect(screen.getByText("规则总数").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.queryByRole("button", { name: /设置配置/ })).toBeNull();
+});
+
 it("viewer 无 policy.manage：看不到「设置配置」", async () => {
   renderLight(<PolicySettingsPanel />, { user: "viewer" });
   await screen.findAllByText("返点比例");

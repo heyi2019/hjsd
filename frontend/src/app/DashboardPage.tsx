@@ -8,7 +8,7 @@ import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBus
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { inventoryAge } from "../stocks/inventory-logic";
-import { BusinessOverview } from "./BusinessOverview";
+import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
 import {
   BUSINESS_REMINDER_CONFIG_CODE,
   DEFAULT_BUSINESS_REMINDER_CONFIG,
@@ -107,6 +107,11 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     setCreateType(orderType);
     setCreateOpen(true);
   };
+  const businessAlerts = [
+    inventoryAgingCount && inventoryAgingCount > 0 ? `库存订单入库超过 7 天 ${inventoryAgingCount} 个` : null,
+    businessReminderConfig.profitNotificationsEnabled && newProfitNotificationCount && newProfitNotificationCount > 0 ? `新的分润通知 ${newProfitNotificationCount} 条` : null,
+    businessReminderConfig.overdueInstallmentsEnabled && overdueInstallmentCount && overdueInstallmentCount > 0 ? `逾期合约 ${overdueInstallmentCount} 个` : null,
+  ].filter((item): item is string => Boolean(item));
   return (
     <section className="ui-stack dashboard-page">
       <PageHeader
@@ -158,7 +163,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
       </EntryRow>
 
       <div className="dashboard-summary">
-        <h2 id="dashboard-summary-title" className="dashboard-summary__title">业务总览</h2>
+        <h2 id="dashboard-summary-title" className="dashboard-summary__title">我的业务总览</h2>
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
         <BusinessOverview
           orders={orders}
@@ -172,17 +177,16 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
           overdueInstallmentsEnabled={businessReminderConfig.overdueInstallmentsEnabled}
           ordersError={Boolean(summaryError)}
           loading={summaryLoading}
+          personalOrders={personalOrders.length}
+          personalOrdersError={Boolean(personalOrdersError)}
+          onPersonalOrdersClick={() => onPersonalNavigate?.("orders")}
+          personalEarnings={personalEarnings}
+          personalEarningsError={Boolean(earningsError)}
+          onPersonalEarningsClick={() => onPersonalNavigate?.("earnings")}
         />
+        <ErrorBanner error={earningsError} onRetry={() => void loadSummary()} />
+        <BusinessAlerts alerts={businessAlerts} loading={summaryLoading} />
       </div>
-
-      <section className="dashboard-summary" aria-labelledby="dashboard-personal-summary-title">
-        <h2 id="dashboard-personal-summary-title" className="dashboard-summary__title">我的关注</h2>
-        <ErrorBanner error={personalOrdersError ?? earningsError} onRetry={() => void loadSummary()} />
-        <StatRow items={[
-          { label: "我的订单", kind: "count", amount: personalOrdersError ? null : String(personalOrders.length), hint: "创建 / 售出订单", onClick: () => onPersonalNavigate?.("orders") },
-          { label: "我的收益", amount: earningsError ? null : personalEarnings, hint: "当前登录用户分润", onClick: () => onPersonalNavigate?.("earnings") },
-        ]} />
-      </section>
 
       <CreateBusinessModal
         open={createOpen}

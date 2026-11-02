@@ -221,7 +221,8 @@ class AccountingAttribute(StrEnum):
     TH_DIRECT_COST = "TH_DIRECT_COST"
     TH_REVENUE = "TH_REVENUE"
     SERVICE_REVENUE = "SERVICE_REVENUE"
-    REBATE_INCOME = "REBATE_INCOME"
+    ADDITIONAL_INCOME = "ADDITIONAL_INCOME"  # 附加收入：返点(category=REBATE)与其他(TIP/PENALTY)
+    ADDITIONAL_EXPENSE = "ADDITIONAL_EXPENSE"  # 附加支出：同行分成等成交环节的附加费用
     OPERATING_EXPENSE = "OPERATING_EXPENSE"
     DEPOSIT = "DEPOSIT"
     EXTERNAL_FUNDING = "EXTERNAL_FUNDING"
@@ -256,6 +257,13 @@ class InventoryStatus(StrEnum):
 
     IN_STOCK = "IN_STOCK"
     OUT_OF_STOCK = "OUT_OF_STOCK"
+
+
+class WalletRealName(StrEnum):
+    """库存账号的钱包实名状态：交付前需确认实名是否已解绑。"""
+
+    NOT_CANCELLED = "未注销"
+    CANCELLED = "已注销"
 
 
 class BusinessMode(StrEnum):

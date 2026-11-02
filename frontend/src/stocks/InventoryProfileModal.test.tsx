@@ -42,7 +42,12 @@ describe("InventoryProfileModal", () => {
       { user: "admin" },
     );
 
+    expect(screen.getByText("订单编号")).toBeInTheDocument();
+    expect(screen.getByText("游戏类型")).toBeInTheDocument();
+    expect(screen.getByText("游戏账号")).toBeInTheDocument();
     const description = screen.getByPlaceholderText("补充账号等级、资源、限制等信息");
+    expect(description).toHaveAttribute("rows", "8");
+    expect(description).toHaveAttribute("maxlength", "400");
     await ui.clear(description);
     await ui.type(description, "新描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));

@@ -10,7 +10,7 @@ import {
   type BusinessReminderConfig,
 } from "../../app/businessReminderConfig";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { BusinessForm, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
+import { BusinessRegistrationForm, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
 export function BusinessReminderSettingsPanel() {
   const [form] = Form.useForm<BusinessReminderConfig>();
@@ -52,7 +52,11 @@ export function BusinessReminderSettingsPanel() {
         控制工作台业务总览中的提醒规则。库存提醒按入库天数计算，分润和逾期合约提醒可单独关闭。
       </Typography.Paragraph>
       <PermissionGate permission="option-set.manage">
-        <BusinessForm form={form} layout="vertical" onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || Boolean(error)}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={form} onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || Boolean(error)}>
           <Form.Item
             name="inventoryAgingDays"
             label="库存订单超过多少天提醒"
@@ -67,7 +71,7 @@ export function BusinessReminderSettingsPanel() {
             <Switch checkedChildren="开启" unCheckedChildren="关闭" />
           </Form.Item>
           <PermissionButton permission="option-set.manage" type="primary" htmlType="submit">保存配置</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </PermissionGate>
     </Card>
   );

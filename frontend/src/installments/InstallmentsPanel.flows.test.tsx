@@ -1,5 +1,5 @@
 import { appMessage as message } from "../shared/ui/appFeedback";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -246,5 +246,24 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
     await waitFor(() => expect(within(modal).getByText(/pay boom/)).toBeInTheDocument());
     expect(vi.mocked(catalog.installmentsApi.pay)).toHaveBeenCalled();
+  });
+
+  it("P2-274：上一弹窗操作失败后，打开其它业务弹窗不残留旧错误", async () => {
+    vi.mocked(catalog.installmentsApi.markDefault).mockRejectedValueOnce(new Error("default boom"));
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    // 在「登记违约」弹窗触发失败，错误残留于共享 write.error
+    await ui.click(screen.getByRole("button", { name: /登记违约/ }));
+    const defaultModal = openModal("登记违约");
+    await ui.type(within(defaultModal).getByLabelText("违约原因"), "长期失联");
+    await ui.click(within(defaultModal).getByRole("button", { name: /确认登记违约/ }));
+    await waitFor(() => expect(within(defaultModal).getByText(/default boom/)).toBeInTheDocument());
+    // 注：motion-stub 下弹窗关闭动画不会收尾，A 弹窗在测试中仍可见、遮罩仍在；
+    // 因此这里直接以 fireEvent 打开另一个业务弹窗（提前结清）——fireEvent 绕过遮罩直接触发其 onClick。
+    // 打开任一业务弹窗应清空共享错误态（含从 A 弹窗切到 B 弹窗的场景）。
+    fireEvent.click(await screen.findByRole("button", { name: /提前结清/ }));
+    const settleModal = openModal("提前结清");
+    // 旧错误不应残留到新弹窗
+    expect(within(settleModal).queryByText(/default boom/)).toBeNull();
   });
 });

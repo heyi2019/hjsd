@@ -3,7 +3,8 @@ import { Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { stocksApi, type Account } from "../shared/api/catalog";
-import { BusinessActionModal, Select } from "../shared/ui";
+import { BusinessActionModal, InlineError, Select } from "../shared/ui";
+import "./InventoryProfileModal.css";
 
 export type InventoryProfileTarget = {
   account: Account;
@@ -17,6 +18,16 @@ function readImageData(file: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error("图片读取失败"));
     reader.readAsDataURL(file);
   });
+}
+
+function ProfileContext({ account }: { account: Account }) {
+  return (
+    <div className="inventory-profile-context" aria-label="账号上下文">
+      <div className="inventory-profile-context__item"><span>订单编号</span><strong>{account.source_order_no ?? "-"}</strong></div>
+      <div className="inventory-profile-context__item"><span>游戏类型</span><strong>{account.game_type ?? "-"}</strong></div>
+      <div className="inventory-profile-context__item"><span>游戏账号</span><strong>{account.game_account ?? "-"}</strong></div>
+    </div>
+  );
 }
 
 export function InventoryProfileModal({
@@ -43,6 +54,7 @@ export function InventoryProfileModal({
   });
   const [images, setImages] = useState<UploadFile[]>([]);
   const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState<{ message: string } | null>(null);
 
   useEffect(() => {
     if (!target) return;
@@ -64,6 +76,7 @@ export function InventoryProfileModal({
       status: "done",
       url,
     })));
+    setValidationError(null);
   }, [target]);
 
   async function imageValues(): Promise<string[]> {
@@ -75,11 +88,17 @@ export function InventoryProfileModal({
 
   async function save() {
     if (!target) return;
+    setValidationError(null);
     setSaving(true);
     try {
+      const imagePayload = target.mode === "description" ? null : await imageValues();
+      if (target.mode === "images" && !imagePayload?.length) {
+        setValidationError({ message: "请至少添加一张图片" });
+        return;
+      }
       const payload = target.mode === "description"
         ? { account_description: form.description }
-        : target.mode === "images" ? { account_images: await imageValues() } : {
+        : target.mode === "images" ? { account_images: imagePayload ?? [] } : {
             game_account: form.gameAccount,
             game_type: form.gameType,
             game_password: form.gamePassword,
@@ -88,7 +107,7 @@ export function InventoryProfileModal({
             platform: form.platform,
             has_secondary: form.hasSecondary,
             account_description: form.description,
-            account_images: await imageValues(),
+            account_images: imagePayload ?? [],
             note: form.note,
           };
       const updated = await stocksApi.updateProfile(target.account.id, payload);
@@ -112,27 +131,34 @@ export function InventoryProfileModal({
       onCancel={onClose}
       onOk={() => void save()}
     >
+      <InlineError error={validationError} />
       {target?.mode === "images" ? (
-        <Upload
-          listType="picture-card"
-          accept="image/*"
-          maxCount={9}
-          fileList={images}
-          beforeUpload={() => false}
-          onChange={({ fileList }) => setImages(fileList.slice(0, 9))}
-        >
-          <span aria-hidden="true">＋</span>
-          <div>添加图片</div>
-        </Upload>
+        <Space className="inventory-profile-description-editor" direction="vertical" size="middle">
+          <ProfileContext account={target.account} />
+          <Upload
+            listType="picture-card"
+            accept="image/*"
+            maxCount={9}
+            fileList={images}
+            beforeUpload={() => false}
+            onChange={({ fileList }) => setImages(fileList.slice(0, 9))}
+          >
+            <span aria-hidden="true">＋</span>
+            <div>添加图片</div>
+          </Upload>
+        </Space>
       ) : target?.mode === "description" ? (
-        <Input.TextArea
-          rows={6}
-          maxLength={2000}
-          showCount
-          value={form.description}
-          placeholder="补充账号等级、资源、限制等信息"
-          onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-        />
+        <Space className="inventory-profile-description-editor" direction="vertical" size="middle">
+          <ProfileContext account={target.account} />
+          <Input.TextArea
+            rows={8}
+            maxLength={400}
+            showCount
+            value={form.description}
+            placeholder="补充账号等级、资源、限制等信息"
+            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+          />
+        </Space>
       ) : (
         <Space className="inventory-profile-editor" direction="vertical" size="middle">
           <Input aria-label="游戏账号/产品" placeholder="游戏账号/产品" value={form.gameAccount} onChange={(event) => setForm((current) => ({ ...current, gameAccount: event.target.value }))} />

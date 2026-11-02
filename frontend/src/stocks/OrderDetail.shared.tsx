@@ -95,6 +95,7 @@ export type OrderDetailMeta = {
   channelRegion: string;
   boundPhone: string;
   secondary: string;
+  walletRealname: string;
   accountDescription: string;
   accountImages: string[];
   note: string;

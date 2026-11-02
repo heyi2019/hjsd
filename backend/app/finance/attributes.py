@@ -11,7 +11,8 @@ _ALLOWED_ATTRIBUTES_BY_FUND_NATURE: dict[str, frozenset[str]] = {
         AccountingAttribute.TH_DIRECT_COST.value,
         AccountingAttribute.TH_REVENUE.value,
         AccountingAttribute.SERVICE_REVENUE.value,
-        AccountingAttribute.REBATE_INCOME.value,
+        AccountingAttribute.ADDITIONAL_INCOME.value,
+        AccountingAttribute.ADDITIONAL_EXPENSE.value,
         AccountingAttribute.OPERATING_EXPENSE.value,
         AccountingAttribute.REVERSAL.value,
         AccountingAttribute.REFUND.value,
@@ -79,7 +80,7 @@ def accounting_attributes_for_manual_cashflow(
         attribute = (
             AccountingAttribute.REVERSAL.value
             if category == "REBATE_REVERSAL"
-            else AccountingAttribute.REBATE_INCOME.value
+            else AccountingAttribute.ADDITIONAL_INCOME.value
         )
         return FundNature.BUSINESS.value, attribute
     if category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE", "DEPOSIT_LOSS"}:

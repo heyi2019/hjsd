@@ -34,6 +34,7 @@ export function StatCard(props: {
 }
 
 export function StatRow(props: {
+  className?: string;
   items: {
     label: string;
     /** 未传则显示 "-"。金额以字符串透传，此处不做任何加减。 */
@@ -47,7 +48,7 @@ export function StatRow(props: {
   }[];
 }) {
   return (
-    <div className="ui-stat-row">
+    <div className={`ui-stat-row${props.className ? ` ${props.className}` : ""}`}>
       {props.items.map((item) => {
         const kind = item.kind ?? (typeof item.amount === "number" ? "count" : "money");
         const isBlank = item.amount === undefined || item.amount === null;

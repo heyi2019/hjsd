@@ -41,6 +41,7 @@ class OrderAccountSnapshot(BaseModel):
     bound_phone: str | None = Field(default=None, max_length=64)
     bound_phone_owner: str | None = Field(default=None, max_length=128)
     has_secondary: bool | None = None
+    wallet_realname: str | None = Field(default=None, max_length=16)
     platform: str | None = Field(default=None, max_length=64)
     purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")
     note: str | None = None
@@ -194,6 +195,8 @@ class OrderListOut(OrderOut):
     sale_at: datetime | None = None
     sale_operator: str | None = None
     event_total: Decimal | None = None
+    cost_amount: Decimal | None = None
+    profit_base: Decimal | None = None
     last_event_type: str | None = None
     last_event_amount: Decimal | None = None
     last_event_on: date | None = None

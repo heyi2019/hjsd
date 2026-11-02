@@ -219,7 +219,7 @@ def create_order(
 
     # 快照是建单和内联建库的单一事实源；订单行只落快照，不再写平铺列。
     game_account = game_type = game_password = channel_region = None
-    bound_phone = account_note = None
+    bound_phone = account_note = wallet_realname = None
     has_secondary = None
     if account_snapshot is not None and definition.code in {"HS", "TH", "DG"}:
         snap = account_snapshot
@@ -229,6 +229,7 @@ def create_order(
         channel_region = snap.get("channel_region")
         bound_phone = snap.get("bound_phone")
         has_secondary = snap.get("has_secondary")
+        wallet_realname = snap.get("wallet_realname")
         account_note = snap.get("note")
 
     # 内联建库存账号（2026-10-28 口径）：建单成功即生成库存编号，不再等 BUY 事件。
@@ -238,6 +239,7 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            wallet_realname=wallet_realname,
             extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 
@@ -246,6 +248,7 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            wallet_realname=wallet_realname,
             extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 

@@ -2,6 +2,9 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
+import { renderApp } from "../test/render";
+import { MemoryRouter } from "react-router-dom";
+import { AppShell } from "../app/AppShell";
 import * as catalog from "../shared/api/catalog";
 import { CreateBusinessModal } from "../orders/CreateBusinessModal";
 import { OrdersPage } from "../orders/OrdersPage";
@@ -16,7 +19,10 @@ import { FundsPage } from "../pools/FundsPage";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import { DataCenterPanel } from "../reporting/DataCenterPanel";
 import { CustomerPanel } from "../customers/CustomerPanel";
+import { CounterpartyPanel } from "../customers/CounterpartyPanel";
 import { InventoryPanel } from "../stocks/InventoryPanel";
+import { InventoryProfileModal } from "../stocks/InventoryProfileModal";
+import { InventoryConsignmentModal } from "../stocks/InventoryConsignmentModal";
 import { countOngoingOrders } from "../reporting/DataCenterPanel";
 import { OrderTypesPanel } from "../field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "../field-definitions/panels/PoolsPanel";
@@ -27,16 +33,19 @@ import { ImportWorkbench } from "../imports/ImportWorkbench";
 import { RowsTab } from "../imports/ImportWorkbench.tabs";
 import { isSupportedImportFile } from "../imports/ImportWorkbench.fragments";
 import { OrderDetail } from "../stocks/OrderDetail";
+import { OrderDetailDeliverySection } from "../stocks/OrderDetailDeliverySection";
 import { InventorySaleModal } from "../stocks/InventorySaleModal";
 import { buildInventoryCsv } from "../stocks/inventory-export";
 import { SearchPanel } from "../search/SearchPanel";
 import { AttachmentPanel } from "../attachments/AttachmentPanel";
 import { QualityPanel } from "../quality/QualityPanel";
 import { AuditPanel } from "../audit/AuditPanel";
+import { ConfigAuditPanel } from "../field-definitions/panels/ConfigAuditPanel";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
 import { appMessage } from "../shared/ui/appFeedback";
 import { buildActionAllocationCandidates, buildActionAllocationRows } from "../orders/orderpage/helpers";
+import { consignmentRecords } from "../stocks/InventoryPlatformOffsaleModal";
 
 vi.mock("../shared/api/catalog");
 
@@ -566,13 +575,16 @@ it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", (
   expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
 });
 
-it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0", async () => {
+it("P1/FE-224：库存健康接口失败时不把未知结果显示为 0，重试可恢复", async () => {
   vi.mocked(catalog.reportsApi.inventoryHealth).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
   renderLight(<ReportsPage />, { user: "admin" });
   await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   expect(screen.getAllByText("不可用")).toHaveLength(2);
   expect(screen.getByText("库存健康数据不可用，请点击重新加载")).toBeInTheDocument();
   expect(screen.queryByText("暂无在库账号")).not.toBeInTheDocument();
+  vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValueOnce({ generated_on: "2026-10-01", total_cost: "0.00", items: [] } as never);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: /重新加载/ }));
+  expect(await screen.findByText("暂无在库账号")).toBeInTheDocument();
 });
 
 it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
@@ -581,6 +593,13 @@ it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
   expect(await screen.findByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
   expect(screen.getByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
+});
+
+it("P1/FE-211：配置主数据失败态独立回归", async () => {
+  vi.mocked(catalog.orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });
+  renderLight(<OrderTypesPanel />, { user: "admin" });
+  expect(await screen.findByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
 });
 
 it("P1/FE-239：资金池主数据失败时锁定新增入口", async () => {
@@ -603,6 +622,44 @@ it("P1/FE-240：过账路由失败时显示不可用并锁定保存", async () =
   expect((await screen.findAllByText("资金路由数据不可用，请点击重新加载")).length).toBeGreaterThan(0);
   expect(screen.getByRole("button", { name: /保存路由/ })).toBeDisabled();
   expect(screen.getByText(/业务类型覆盖不可用/)).toBeInTheDocument();
+});
+
+it("P1/FE-261：完整资金划转不进入单边异常修复列表", async () => {
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
+    { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({ income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" } as never);
+  vi.mocked(catalog.cashflowsApi.list).mockResolvedValueOnce({
+    items: [
+      { id: 31, flow_no: "TRF-PAIRED-01-OUT", pool_id: 1, transfer_id: "TRF-PAIRED-01", direction: "OUT", amount: "100.00", occurred_on: "2026-11-01", category: "TRANSFER" },
+      { id: 32, flow_no: "TRF-PAIRED-01-IN", pool_id: 2, transfer_id: "TRF-PAIRED-01", direction: "IN", amount: "100.00", occurred_on: "2026-11-01", category: "TRANSFER" },
+    ],
+    total: 2,
+  } as never);
+  renderLight(<FundsPage />, { user: "admin" });
+  await screen.findByText(/POOL-A/);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: "异常" }));
+
+  expect(await screen.findByText("暂无单边划转异常")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /修复划转/ })).not.toBeInTheDocument();
+});
+
+it("P1/FE-262：过账路由覆盖列表包含代挂 DG", async () => {
+  vi.mocked(catalog.orderTypesApi.list).mockResolvedValueOnce([
+    { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
+    { id: 2, code: "DG", name: "代挂", capital_type: "ZERO", is_active: true },
+  ] as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+    { id: 1, code: "MAIN", name: "主账户", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
+  ] as never);
+  vi.mocked(catalog.orderTypesApi.routes).mockImplementation((id: number) => Promise.resolve([
+    { id: id * 10, order_type_code: id === 2 ? "DG" : "HS", portion: "GROSS", fund_nature: null, pool_code: "MAIN", pool_name: "主账户", priority: 0, is_active: true },
+  ] as never));
+  renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
+
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("combobox", { name: "业务类型" }));
+  expect(await screen.findByText("代挂（DG）", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
 });
 
 it("P1/FE-063：导入文件类型校验拒绝 PNG", () => {
@@ -665,6 +722,18 @@ it("P1/FE-241：数据中心主数据失败时不显示零统计且禁用快捷�
   expect(screen.getByText("资金池数量").closest(".ui-stat")).toHaveTextContent("不可用");
 });
 
+it("P1/FE-227：数据中心失败态快捷入口独立回归", async () => {
+  vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+  const onNavigate = vi.fn();
+  renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+
+  const totalCard = await screen.findByRole("button", { name: /订单总数/ });
+  expect(totalCard).toHaveTextContent("不可用");
+  expect(totalCard).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(totalCard);
+  expect(onNavigate).not.toHaveBeenCalled();
+});
+
 it("P1/FE-242：客户中心请求失败时不显示零统计且禁用依赖入口", async () => {
   vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
   renderLight(<CustomerPanel />, { user: "admin" });
@@ -691,10 +760,17 @@ it("P1/FE-164/198：全局搜索结果可进入且清空后不保留旧结果", 
   expect(screen.queryByText("HS0006")).not.toBeInTheDocument();
 });
 
-it("P1/FE-114/165：附件未选对象时保护上传入口并给出前置提示", () => {
+it("P1/FE-114/165：附件未选对象时保护上传入口并给出前置提示", async () => {
   renderLight(<AttachmentPanel />, { user: "admin" });
   expect(screen.getByText("请先填写对象编号后上传附件")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /上传附件/ })).toBeDisabled();
+  vi.mocked(catalog.attachmentsApi.create).mockResolvedValueOnce({ id: 2 } as never);
+  vi.mocked(catalog.attachmentsApi.list).mockResolvedValueOnce({ items: [] } as never);
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  await user.type(screen.getByPlaceholderText("对象编号"), "100");
+  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+  await user.upload(fileInput, new File(["fixture"], "fixture.png", { type: "image/png" }));
+  await waitFor(() => expect(catalog.attachmentsApi.create).toHaveBeenCalledWith(expect.objectContaining({ entity_id: "100", file_name: "fixture.png" })));
 });
 
 it("P1/FE-104/110/160：质量摘要失败不显示零，全部关闭时禁用批量动作", async () => {
@@ -721,6 +797,20 @@ it("P1/FE-150/151：审计对象与动作下拉在字典失败时仍可用", asy
   expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
 });
 
+it("P1/FE-176：配置改动追溯动作筛选独立回归", async () => {
+  vi.mocked(catalog.auditApi.list).mockResolvedValueOnce({
+    items: [{ id: 1, actor: "admin", action: "ROUTE_UPDATE", entity_type: "OrderTypePool", entity_id: "11", reason: "调整路由", occurred_at: "2026-10-26T13:00:00" }],
+    total: 1,
+  });
+  vi.mocked(catalog.auditApi.actions).mockResolvedValueOnce(["ROUTE_UPDATE", "POOL_DISABLE"]);
+  renderLight(<ConfigAuditPanel />, { user: "admin" });
+  await screen.findByText("配置改动追溯");
+  const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(actionSelect.querySelector(".ant-select-selector") as Element);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByText("更新资金路由", { selector: ".ant-select-item-option-content" }));
+  await waitFor(() => expect(vi.mocked(catalog.auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ROUTE_UPDATE" })));
+});
+
 it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
   vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
   renderLight(<FundsPage />, { user: "admin" });
@@ -728,6 +818,15 @@ it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", a
   expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
   expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByText("可用余额合计").closest(".ui-stat")).toHaveTextContent("不可用");
+  expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
+});
+
+it("P1/FE-228：资金总览失败态划转保护独立回归", async () => {
+  vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+  renderLight(<FundsPage />, { user: "admin" });
+
+  expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
+  expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
 });
 
@@ -760,7 +859,7 @@ it("P1/FE-230：对账数据失败时显示明确空态且禁用新增", async (
   expect(screen.getByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
 });
 
-it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {
+it("P1/FE-253：订单台账加载未完成时不显示零统计", async () => {
   vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
   const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
@@ -768,4 +867,449 @@ it("P1/FE-208：订单台账加载未完成时不显示零统计", async () => {
   expect(card).toHaveTextContent("—");
   expect(card).not.toHaveTextContent("0");
   expect(ledger).toBeInTheDocument();
+});
+
+it("P1/FE-252：取消交易依赖的资金账户加载完成后才允许确认", async () => {
+  const order = {
+    id: 21,
+    order_no: "HS-CANCEL-ASYNC-01",
+    order_type: "HS",
+    capital_type: "SELF",
+    trade_date: "2026-11-01",
+    status: "ACTIVE",
+    account_status: "WAITING",
+  };
+  let resolvePools!: (value: unknown[]) => void;
+  const poolsPending = new Promise<unknown[]>((resolve) => { resolvePools = resolve; });
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([order] as never);
+  vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    ...order,
+    events: [{ id: 2101, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", pool_id: 7, is_posted: true }],
+  } as never);
+  vi.mocked(catalog.poolsApi.list).mockImplementation(() => poolsPending as never);
+  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({
+    event: { id: 2102, event_type: "CANCEL", amount: "100.00" },
+  } as never);
+
+  renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  const row = (await screen.findAllByText("HS-CANCEL-ASYNC-01"))[0].closest("tr") as HTMLElement;
+  fireEvent.click(within(row).getByRole("button", { name: /更多/ }));
+  fireEvent.click(await screen.findByText("取消交易"));
+
+  expect(screen.queryByText(/库存取消交易 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
+
+  resolvePools([{ id: 7, code: "HJ_INVEST", name: "投资款荷包", status: "ACTIVE" }]);
+  const modal = await screen.findByText(/库存取消交易 · HS-CANCEL-ASYNC-01/);
+  const modalContent = modal.closest(".ant-modal-content") as HTMLElement;
+  await user.type(within(modalContent).getByLabelText("取消原因"), "异步加载回归");
+  await user.click(within(modalContent).getByRole("button", { name: /确认取消/ }));
+  await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    21,
+    expect.objectContaining({ event_type: "CANCEL", offset_event_id: 2101, pool_id: 7 }),
+  ));
+});
+
+it("P1/FE-255：人员主数据失败时锁定新增用户入口", async () => {
+  vi.mocked(catalog.usersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "users unavailable" });
+  vi.mocked(catalog.teamsApi.list).mockResolvedValueOnce([] as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([] as never);
+  renderLight(<UsersPanel />, { user: "admin" });
+
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+  expect(screen.getByText("用户数据不可用，请点击重新加载")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /新增用户/ })).toBeDisabled();
+});
+
+it("P1/FE-254：库存健康报表纳入在库提号账号", async () => {
+  vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValueOnce({
+    generated_on: "2026-10-01",
+    total_cost: "500.00",
+    items: [{
+      account_id: 8,
+      game_account: "pickup-in-stock-regression",
+      platform: "盼之",
+      status: "IN_STOCK",
+      buy_amount: "500.00",
+      extra_cost: "0.00",
+      total_cost: "500.00",
+      holding_days: 2,
+    }],
+  } as never);
+  renderLight(<ReportsPage />, { user: "admin" });
+
+  expect(await screen.findByText("pickup-in-stock-regression")).toBeInTheDocument();
+  expect(screen.getByText("在库账号").parentElement).toHaveTextContent("1");
+  expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
+});
+
+it("P1/FE-256：系统下架审计轨迹在账号详情中可见", () => {
+  renderLight(
+    <OrderDetail
+      row={{ id: 88, game_account: "dg-audit-account", status: "VOID", inventory_type: "CONSIGNMENT", cost_amount: "0.00" } as never}
+      detail={{
+        orders: [],
+        audit: [{
+          id: 901,
+          action: "ORDER_CANCEL",
+          entity_type: "order",
+          entity_id: "DG-88",
+          actor: "admin",
+          reason: "系统下架同步取消寄售平台上架",
+          occurred_at: "2026-11-02T10:20:00",
+        }],
+      } as never}
+      loading={false}
+    />,
+    { user: "admin" },
+  );
+
+  expect(screen.getByText("操作追溯")).toBeInTheDocument();
+  expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
+});
+
+it("P1/FE-257：分期台账同时展示订单状态和合约状态", async () => {
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
+    id: 31,
+    order_no: "HS-INSTALLMENT-SETTLED-REGRESSION",
+    order_type: "HS",
+    capital_type: "SELF",
+    trade_date: "2026-10-01",
+    status: "INSTALLMENT",
+    installment_status: "SETTLED",
+  }] as never);
+  renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
+
+  const row = (await screen.findAllByText("HS-INSTALLMENT-SETTLED-REGRESSION"))[0].closest("tr") as HTMLElement;
+  expect(within(row).getByText("分期中")).toBeInTheDocument();
+  expect(within(row).getByText("合约：已结清")).toBeInTheDocument();
+});
+
+it("P1/FE-263：寄售上架只创建寄售动作，不重复创建库存", async () => {
+  vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
+    items: [{ code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }] }],
+  } as never);
+  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({ account: { id: 88, game_account: "consignment-regression", status: "WAITING" }, orders: [] } as never);
+  vi.mocked(catalog.ordersApi.create).mockResolvedValueOnce({ id: 901 } as never);
+  renderLight(
+    <InventoryConsignmentModal
+      account={{ id: 88, game_account: "consignment-regression", status: "WAITING", inventory_type: "CONSIGNMENT" } as never}
+      onClose={() => undefined}
+      onCreated={() => undefined}
+    />,
+    { user: "admin" },
+  );
+  await screen.findByText("登记寄售");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: "确认上架" }));
+
+  await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalledWith(expect.objectContaining({ account_id: 88, order_type: "DG", form_extra_scope: "CONSIGN" })));
+});
+
+it("P1/FE-264：系统下架提交产生可确认的成功反馈", async () => {
+  vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
+  vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([{ id: 91, game_account: "system-offsale-regression", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00" }] as never);
+  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+    account: { id: 91, game_account: "system-offsale-regression", status: "WAITING", inventory_type: "RECOVERY" },
+    orders: [{ order_id: 921, order_type: "HS", status: "ACTIVE", events: [{ id: 922, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true }] }],
+  } as never);
+  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([{ id: 3, code: "MAIN", name: "主池", status: "ACTIVE" }] as never);
+  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValueOnce({} as never);
+  renderLight(<InventoryPanel />, { user: "admin" });
+  const row = (await screen.findByText("system-offsale-regression")).closest("tr") as HTMLElement;
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(within(row).getByRole("button", { name: /更多/ }));
+  const menu = await screen.findByRole("menu");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(within(menu).getByText("取消"));
+  const modal = await screen.findByRole("dialog");
+  await userEvent.setup({ pointerEventsCheck: 0 }).clear(within(modal).getByLabelText("退回金额"));
+  await userEvent.setup({ pointerEventsCheck: 0 }).type(within(modal).getByLabelText("退回金额"), "80");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(within(modal).getByLabelText("收款账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByText("主池（MAIN）", { selector: ".ant-select-item-option-content" }));
+  await userEvent.setup({ pointerEventsCheck: 0 }).type(within(modal).getByLabelText("取消原因"), "系统下架回归");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(within(modal).getByRole("button", { name: /确认下架/ }));
+
+  await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(921, expect.objectContaining({ event_type: "CANCEL", amount: "80", pool_id: 3 })));
+  await waitFor(() => expect(appMessage.success).toHaveBeenCalledWith("账号已下架"));
+});
+
+it("P1/FE-265：订单详情回显交易平台、中介类型和包赔类型", async () => {
+  renderLight(
+    <OrderDetailDeliverySection
+      meta={{ sourceOrderNo: "HS-FE265" } as never}
+      detail={{
+        orders: [{
+          order_id: 265,
+          order_no: "HS-FE265",
+          order_type: "HS",
+          created_at: "2026-11-02T10:00:00",
+          extra_values: { intermediary_platform: "盼之", intermediary_type: "包赔", compensation_type: "续保" },
+          events: [],
+        }],
+      } as never}
+    />,
+    { user: "admin" },
+  );
+
+  expect(await screen.findByText("盼之")).toBeInTheDocument();
+  expect(screen.getByText("包赔")).toBeInTheDocument();
+  expect(screen.getByText("续保")).toBeInTheDocument();
+});
+
+it("P1/FE-266：订单详情负责人显示员工姓名且不展示原始 ID", async () => {
+  renderLight(
+    <OrderDetailDeliverySection
+      meta={{ sourceOrderNo: "HS-FE266" } as never}
+      detail={{
+        orders: [{
+          order_id: 266,
+          order_no: "HS-FE266",
+          order_type: "HS",
+          created_at: "2026-11-02T10:00:00",
+          extra_values: { delivery_responsible_ids: [7] },
+          events: [],
+        }],
+      } as never}
+      employees={[{ id: 7, username: "lisi", display_name: "李三（三三）", is_active: true }]}
+    />,
+    { user: "admin" },
+  );
+
+  expect(await screen.findByText("李三（三三）")).toBeInTheDocument();
+  expect(screen.queryByText("7")).not.toBeInTheDocument();
+});
+
+it("P1/FE-267：订单详情分别回显买号和卖号手机号绑定人", async () => {
+  renderLight(
+    <OrderDetailDeliverySection
+      meta={{ sourceOrderNo: "HS-FE267" } as never}
+      detail={{
+        orders: [
+          {
+            order_id: 267,
+            order_no: "HS-FE267",
+            order_type: "HS",
+            created_at: "2026-11-02T10:00:00",
+            extra_values: { bound_phone: "13800000001", bound_phone_owner: "买家负责人" },
+            events: [],
+          },
+          {
+            order_id: 268,
+            order_no: "DG-FE267",
+            order_type: "DG",
+            created_at: "2026-11-02T11:00:00",
+            extra_values: { bound_phone: "13800000002", bound_phone_owner: "卖出负责人" },
+            events: [{ event_type: "SELL", id: 1, amount: "1", occurred_on: "2026-11-02" }],
+          },
+        ],
+      } as never}
+    />,
+    { user: "admin" },
+  );
+
+  expect(await screen.findByText("买家负责人")).toBeInTheDocument();
+  expect(screen.getByText("卖出负责人")).toBeInTheDocument();
+  expect(screen.getByText("13800000001")).toBeInTheDocument();
+  expect(screen.getByText("13800000002")).toBeInTheDocument();
+});
+
+it("P1/FE-268：库存 CSV 补齐详情订单号并汇总返点收入", () => {
+  const csv = buildInventoryCsv([{
+    id: 268,
+    source_order_no: "",
+    game_account: "csv-rebate-regression",
+    inventory_type: "RECOVERY",
+    status: "WAITING",
+    cost_amount: "100.00",
+  } as never], {
+    268: {
+      orders: [{
+        order_id: 2681,
+        order_no: "HS-FE268",
+        order_type: "HS",
+        status: "DONE",
+        created_at: "2026-11-02T10:00:00",
+        events: [],
+        rebates: [{
+          id: 1,
+          rebate_no: "HS-FE268-RB01",
+          rebate_type: "BUY",
+          channel: "买号返点",
+          rate: "10",
+          base_amount: "100.00",
+          status: "OPEN",
+          collected_on: "2026-11-02",
+        }],
+      }],
+    } as never,
+  });
+
+  expect(csv).toContain("HS-FE268");
+  expect(csv).toContain(",0,1,0.00,100.00");
+});
+
+it("P1/FE-269：订单详情财务摘要纳入返点收入", () => {
+  renderLight(<OrderDetail row={{ id: 269, game_account: "rebate-summary-regression", status: "WAITING" } as never} detail={{
+    orders: [{
+      order_id: 2691,
+      order_no: "HS-FE269",
+      order_type: "HS",
+      status: "DONE",
+      created_at: "2026-11-02T10:00:00",
+      events: [],
+      rebates: [{
+        id: 1,
+        rebate_no: "HS-FE269-RB01",
+        rebate_type: "BUY",
+        channel: "买号返点",
+        rate: "10",
+        base_amount: "100.00",
+        status: "OPEN",
+        collected_on: "2026-11-02",
+      }],
+    }],
+  } as never} loading={false} />, { user: "admin" });
+
+  const finance = document.querySelector(".inventory-detail__section--finance") as HTMLElement;
+  expect(within(finance).getAllByText("1 笔").length).toBeGreaterThanOrEqual(1);
+  expect(within(finance).getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
+});
+
+it("P1/FE-270/271/272/273：R2/R3/R4/R5 历史空区间分别传递筛选条件", async () => {
+  vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValue({ items: [], total: {} } as never);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } as never);
+  vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({ items: [], total: {} } as never);
+  vi.mocked(catalog.reportsApi.financeDimensions).mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" } as never);
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: {} } as never);
+  vi.mocked(catalog.reportsApi.dailyFunds).mockResolvedValue({ date: "2026-10-01", total: {}, items: [] } as never);
+  renderLight(<ReportsPage />, { user: "admin" });
+  const setRange = async (tab: string) => {
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: tab }));
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
+    fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
+  };
+
+  await setRange("月度损益 R2");
+  await waitFor(() => expect(catalog.reportsApi.monthlyPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+  await setRange("提成对账 R3");
+  await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
+  await setRange("业务损益 R5");
+  await waitFor(() => expect(catalog.reportsApi.businessPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+  await setRange("资金属性分析");
+  await waitFor(() => expect(catalog.reportsApi.financeDimensions).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: "资金日报 R4" }));
+  const dailyInput = await screen.findByLabelText("资金日报日期");
+  fireEvent.change(dailyInput, { target: { value: "2026-10-01" } });
+  await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
+  expect(dailyInput).toHaveValue("2026-10-01");
+});
+
+it("P1/FE-258：库存图片保存失败时保留上下文并显示错误态", async () => {
+  vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([{
+    id: 1,
+    source_order_no: "HS-IMAGE-ERROR-01",
+    game_account: "image-error-account",
+    status: "WAITING",
+    inventory_type: "RECOVERY",
+    cost_amount: "100.00",
+  }] as never);
+  vi.mocked(catalog.stocksApi.updateProfile).mockRejectedValueOnce(new Error("image save timeout"));
+  renderLight(<InventoryPanel />, { user: "admin" });
+
+  const row = (await screen.findByText("image-error-account")).closest("tr") as HTMLElement;
+  fireEvent.click(within(row).getByRole("button", { name: /更多/ }));
+  fireEvent.click(within(await screen.findByRole("menu")).getByText("作图"));
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: /保存/ }));
+
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+  expect(screen.getAllByText("作图").length).toBeGreaterThanOrEqual(1);
+});
+
+it("P1/FE-259：合作方拉黑状态使用正确的 active 语义", async () => {
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValueOnce([
+    { id: 11, counterparty_no: "CP-REG-11", display_name: "同行回归", type: "PEER", status: "ACTIVE" },
+  ] as never);
+  renderLight(<CounterpartyPanel />, { user: "admin" });
+  const row = (await screen.findByText("CP-REG-11")).closest("tr") as HTMLElement;
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(within(row).getByRole("button", { name: /拉黑/ }));
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByRole("button", { name: /确定|确认/ }));
+
+  await waitFor(() => expect(catalog.counterpartiesApi.setStatus).toHaveBeenCalledWith(11, false));
+});
+
+it("P1/FE-260：提成对账人员筛选传递 user_id", async () => {
+  vi.mocked(catalog.employeesApi.list).mockResolvedValueOnce([
+    { id: 7, username: "operator", display_name: "业务同事", is_active: true },
+  ] as never);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } as never);
+  renderLight(<ReportsPage initialReportTab="commission" />, { user: "admin" });
+  await screen.findByRole("tab", { name: "提成对账 R3" });
+  await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ all_people: true }));
+  const comboboxes = await screen.findAllByRole("combobox");
+  const filter = comboboxes[comboboxes.length - 1] as HTMLElement;
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(filter);
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
+  await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+});
+
+it("P1/FE-129：无平台初始代挂动作不生成平台上架记录", () => {
+  expect(consignmentRecords([{
+    order_id: 129,
+    order_no: "DG-FE129-BASE",
+    order_type: "DG",
+    status: "ACTIVE",
+    created_at: "2026-11-02T10:00:00",
+    trade_date: "2026-11-02",
+    extra_values: {},
+    events: [],
+  }] as never)).toEqual([]);
+});
+
+it("P1/FE-207：真实用户中心在改密请求悬挂时仍可关闭", async () => {
+  vi.spyOn(client, "changePassword").mockReturnValue(new Promise(() => undefined));
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { profit_base: "0" } } as never);
+  vi.mocked(catalog.stocksApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([] as never);
+  vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items: [] } as never);
+  renderApp(
+    <MemoryRouter initialEntries={["/dashboard"]}>
+      <AppShell />
+    </MemoryRouter>,
+    { user: "admin" },
+  );
+
+  fireEvent.click(await screen.findByRole("button", { name: "用户中心" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
+  fireEvent.change(within(dialog).getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
+  fireEvent.change(within(dialog).getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: /修改密码/ }));
+  await waitFor(() => expect(client.changePassword).toHaveBeenCalledWith("wrong-old-pass", "new-pass-12345"));
+  fireEvent.click(within(dialog).getByRole("button", { name: "关闭" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "用户中心" })).toHaveAttribute("data-user-center-open", "false"));
+});
+
+it("P2/FE-274：库存作图空图片集不允许伪装保存成功", async () => {
+  const onClose = vi.fn();
+  const onSaved = vi.fn();
+  const onError = vi.fn();
+  renderLight(
+    <InventoryProfileModal
+      target={{ account: { id: 901, account_images: [] } as never, mode: "images" }}
+      onClose={onClose}
+      onSaved={onSaved}
+      onError={onError}
+    />,
+    { user: "admin" },
+  );
+  await screen.findByText("作图");
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: /保存/ }));
+  expect(catalog.stocksApi.updateProfile).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+  expect(await screen.findByRole("alert")).toHaveTextContent("请至少添加一张图片");
 });

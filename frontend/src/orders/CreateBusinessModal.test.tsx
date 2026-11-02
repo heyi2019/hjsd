@@ -95,7 +95,7 @@ it("回收和代挂均提供手机号绑定人这一核心账号字段", async (
 it("回收建单将平台与交付条件集中展示在交付信息", async () => {
   await openTypedModal("HS");
 
-  const deliverySection = (await screen.findByText("交付信息")).closest("section");
+  const deliverySection = (await screen.findByText("交付信息")).closest(".delivery-info-section");
   expect(deliverySection).not.toBeNull();
   expect(within(deliverySection as HTMLElement).getByLabelText("交易平台")).toBeInTheDocument();
   expect(within(deliverySection as HTMLElement).getByLabelText("中介类型")).toBeInTheDocument();
@@ -105,7 +105,7 @@ it("回收建单将平台与交付条件集中展示在交付信息", async () =
 it("交付信息默认勾选当前员工，并允许追加多位交付负责人", async () => {
   await openTypedModal("HS");
 
-  const deliverySection = (await screen.findByText("交付信息")).closest("section") as HTMLElement;
+  const deliverySection = (await screen.findByText("交付信息")).closest(".delivery-info-section") as HTMLElement;
   const responsible = within(deliverySection).getByLabelText("交付负责人");
   expect(responsible).toBeInTheDocument();
   await waitFor(() => expect(within(deliverySection).getByText(/系统管理员/)).toBeInTheDocument());
@@ -322,5 +322,80 @@ it("附加费用只保留中介费", async () => {
 it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 PermissionGate 决定）", async () => {
     await openModal("viewer");
     expect(screen.queryByRole("button", { name: /创建订单/ })).toBeNull();
+  });
+
+it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async () => {
+    clearOptionSetsCache();
+    vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
+      items: [
+        { code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }] },
+        { code: "INTERMEDIARY_TYPE", options: [{ value: "包赔", label: "包赔" }] },
+        { code: "COMPENSATION_TYPE", options: [{ value: "shoubao", label: "首保" }] },
+      ],
+    } as never);
+    await loadOptionSets();
+
+    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
+    const onClose = vi.fn();
+    await openTypedModal("HS", "admin");
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.type(screen.getByLabelText("客户昵称"), "张三");
+    await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
+    await ui.click(screen.getByText("请选择支出账户", { exact: true }).closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    // 交付信息
+    await ui.type(screen.getByLabelText("手机号绑定人"), "张三");
+    await ui.click(screen.getByLabelText("交易平台").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByLabelText("中介类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("包赔", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByLabelText("包赔类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("首保", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
+    const formExtra = (payload.form_extra ?? {}) as Record<string, unknown>;
+    expect(formExtra.intermediary_platform).toBe("盼之");
+    expect(formExtra.intermediary_type).toBe("包赔");
+    expect(formExtra.compensation_type).toBe("shoubao");
+    expect(formExtra.bound_phone_owner).toBe("张三");
+  });
+
+  it("P2-198：仅展开下拉未改值，关闭直接关闭不弹放弃确认", async () => {
+    const onClose = vi.fn();
+    renderLight(
+      <CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />,
+      { user: "admin" },
+    );
+    await screen.findByText("新建回收订单");
+    // 仅展开「支出账户」下拉（默认已注入主账户选项），不选择任何值
+    const selector = screen.getByLabelText("支出账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element;
+    await ui.click(selector);
+    await waitFor(() => expect(screen.getByText("主账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument());
+    await ui.click(selector); // 收起下拉
+    // 点关闭（X）：未改值 → 直接关闭，不应弹确认
+    await ui.click(document.querySelector(".ant-modal-close") as Element);
+    // 未改值：不出现放弃确认框（ConfirmDialog），直接关闭
+    expect(screen.queryByText("放弃未保存的建单内容？")).not.toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("P2-198：已改值关闭弹出放弃确认，确认后关闭", async () => {
+    const onClose = vi.fn();
+    renderLight(
+      <CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />,
+      { user: "admin" },
+    );
+    await screen.findByText("新建回收订单");
+    await ui.type(screen.getByLabelText("客户昵称"), "改了点东西");
+    await ui.click(document.querySelector(".ant-modal-close") as Element);
+    // 已改值：弹出放弃确认框（ConfirmDialog），点「放弃」后才关闭
+    expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    await ui.click(screen.getByRole("button", { name: "放弃" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });

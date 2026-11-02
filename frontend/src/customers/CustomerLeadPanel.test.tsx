@@ -67,6 +67,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: /新增需求/ }));
     const modal = screen.getByText("新增客户需求").closest(".ant-modal-content") as HTMLElement;
+    expect(modal.closest(".ant-modal")).toHaveStyle({ width: "520px" });
     await ui.click(screen.getByLabelText("客户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("C-1 · 张三", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByLabelText("需求类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);

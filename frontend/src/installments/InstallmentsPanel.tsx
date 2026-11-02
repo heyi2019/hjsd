@@ -1,18 +1,16 @@
 /** 分期：按业务合约类型分列，展示库存分期出售的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, DatePicker, Segmented, Space, Tabs, Typography } from "antd";
-import { appMessage } from "../shared/ui/appFeedback";
+import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
 import { useState } from "react";
 import type { Dayjs } from "dayjs";
 import { installmentsApi, type Installment, type Schedule } from "../shared/api/catalog";
 import { today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";
-import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { columnKey } from "../shared/lib/listColumns";
 
 
-import { CONTRACT_TYPE_LABEL, DISPOSITION_LABEL, MobileInstallmentList } from "./InstallmentsPanel.fragments";
+import { DISPOSITION_LABEL, MobileInstallmentList } from "./InstallmentsPanel.fragments";
 import { useContractTableController } from "./useContractTableController";
 import { ContractModals } from "./InstallmentsPanel.modals";
 
@@ -183,39 +181,7 @@ function ContractTable({
 
 export function InstallmentsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [reloadKey, setReloadKey] = useState(0);
-  const write = useAsyncAction();
   // refreshKey：外部建单生成新合约后由上层递增，触发合约列表重拉。
-  // 逾期标记是全局动作（后端按 as_of 扫描全部合约），故放在 Tab 外层并触发全量刷新。
-  const runMarkOverdue = async () => {
-    await write.run(async () => {
-      const result = await installmentsApi.markOverdue();
-      appMessage.success(
-        result.marked > 0 ? `已标记 ${result.marked} 笔逾期` : "当前无新增逾期合约",
-      );
-      setReloadKey((key) => key + 1);
-    });
-  };
-  return (
-    <Tabs
-      defaultActiveKey="stock"
-      tabBarExtraContent={
-        <Space>
-          <PermissionButton permission="order.event.post" size="small" loading={write.pending} onClick={() => void runMarkOverdue()}>
-            标记逾期
-          </PermissionButton>
-          <PermissionButton permission="finance.read" size="small" onClick={() => setReloadKey((key) => key + 1)}>
-            刷新
-          </PermissionButton>
-        </Space>
-      }
-      items={[
-        {
-          key: "stock",
-          label: configurableLabel("INSTALLMENT_CONTRACT_TYPE", "STOCK_SALE", CONTRACT_TYPE_LABEL),
-          children: <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey + refreshKey} />,
-        },
-      ]}
-    />
-  );
+  return <ContractTable contractType="STOCK_SALE" reloadKey={reloadKey + refreshKey} />;
 }
 

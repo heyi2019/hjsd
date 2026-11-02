@@ -346,7 +346,7 @@ class TestAccountQueries:
             seeded_db.flush()
         seeded_db.rollback()
 
-    def test_pickup_accounts_are_not_inventory_assets(self, seeded_db):
+    def test_pickup_accounts_are_inventory_assets(self, seeded_db):
         pickup = Account(
             game_account="pickup-not-inventory",
             business_mode="DISTRIBUTION",
@@ -360,8 +360,8 @@ class TestAccountQueries:
         seeded_db.flush()
 
         assert pickup in service.list_accounts(seeded_db)
-        assert pickup.id not in {row["account_id"] for row in service.inventory(seeded_db)}
-        assert service.total_inventory_cost(seeded_db) == Decimal("0.00")
+        assert pickup.id in {row["account_id"] for row in service.inventory(seeded_db)}
+        assert service.total_inventory_cost(seeded_db) == Decimal("300.00")
 
 class TestAccountsApi:
     def test_inventory_endpoint_publishes_typed_response_contract(self, app):

@@ -1,6 +1,6 @@
 import { Input, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { AccountExecutionEvent } from "../shared/api/catalog";
+import type { AccountAuditEntry, AccountExecutionEvent } from "../shared/api/catalog";
 import { DataTable, MoneyInput, MoneyText, Select } from "../shared/ui";
 import {
   InventorySectionHeading,
@@ -17,12 +17,14 @@ const CATEGORY_ORDER: InventoryExecutionCategory[] = ["BUY_IN", "OPERATING", "SE
 /** 板块5：操作明细（买号入库 / 账号运营 / 卖号出库），按事件类型归类，含操作人列。 */
 export function OrderDetailExecutionSection({
   rows,
+  audit = [],
   editing,
   eventDrafts,
   onEventEdit,
   employees,
 }: {
   rows: InventoryExecutionRow[];
+  audit?: AccountAuditEntry[];
   editing?: boolean;
   eventDrafts?: Record<number, InventoryEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
@@ -80,12 +82,37 @@ export function OrderDetailExecutionSection({
   ];
 
   return (
-    <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
-      <InventorySectionHeading title="操作明细" />
-      <div className="inventory-detail__meta">
-        {sortedRows.length ? <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
+    <>
+      <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
+        <InventorySectionHeading title="操作明细" />
+        <div className="inventory-detail__meta">
+          {sortedRows.length ? <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
+        </div>
       </div>
-    </div>
+      {audit.length ? (
+        <div className="inventory-detail__section inventory-detail__section--audit inventory-audit-list">
+          <InventorySectionHeading title="操作追溯" />
+          <div className="inventory-detail__meta">
+            <DataTable
+              rows={audit}
+              page={1}
+              pageSize={10}
+              total={audit.length}
+              onPageChange={() => undefined}
+              pagination={false}
+              rowKey="id"
+              size="small"
+              columns={[
+                { title: "动作", dataIndex: "action", render: (value: string) => value === "ORDER_CANCEL" ? "取消订单" : value },
+                { title: "操作人", dataIndex: "actor" },
+                { title: "时间", dataIndex: "occurred_at" },
+                { title: "原因", dataIndex: "reason", render: (value: string | null) => value || "-" },
+              ]}
+            />
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

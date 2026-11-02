@@ -20,7 +20,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
-    "orderSnapshot", "links", "createLink", "deleteLink",
+    "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -45,6 +45,7 @@ vi.mock("../shared/api/client", async (importOriginal) => {
   return {
     ...actual,
     api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() },
+    currentUser: vi.fn(),
   };
 });
 
@@ -66,6 +67,50 @@ vi.mock("./CreateBusinessModal", () => ({
       </div>
     ) : null,
 }));
+
+// 本文件局部覆盖 rc-motion：尊重传入的 visible（open=false 时弹层真正卸载），
+// 使受控 Dropdown「选中后收起」在 jsdom 中可被观测（否则会落到全局 motion-stub 的
+// 强制 visible:true，弹层永远残留、aria-expanded 恒为 null，无法判定收起）。
+// 注意：打开的 Modal/下拉仍按 open=true 渲染内容，不影响其余用例。
+vi.mock("rc-motion", async () => {
+  const React = await import("react");
+  const CSSMotion = React.forwardRef<unknown, any>(function CSSMotion(
+    { children, visible, ...rest },
+    ref,
+  ) {
+    const isVisible = visible !== undefined ? Boolean(visible) : true;
+    if (!isVisible) return null;
+    const content =
+      typeof children === "function"
+        ? children({ ...rest, visible: true }, ref)
+        : children;
+    if (React.isValidElement(content) && ref) {
+      return React.cloneElement(content as React.ReactElement<any>, { ref });
+    }
+    return (content ?? null) as React.ReactNode;
+  });
+  const CSSMotionList = React.forwardRef<unknown, any>(function CSSMotionList(props, _ref) {
+    const { keys = [], children, className, style } = props;
+    const parsed = (Array.isArray(keys) ? keys : []).map((k: any) =>
+      k && typeof k === "object" ? k : { key: k },
+    );
+    const items = parsed.map((item: any, index: number) => {
+      const nodeRef = React.createRef<unknown>();
+      const rendered =
+        typeof children === "function"
+          ? children({ ...item, index }, nodeRef)
+          : children;
+      return (
+        <React.Fragment key={item?.key ?? index}>
+          {rendered ?? null}
+        </React.Fragment>
+      );
+    });
+    return <div className={className} style={style}>{items}</div>;
+  });
+  const Provider = ({ children }: { children?: React.ReactNode }) => children ?? null;
+  return { CSSMotion, CSSMotionList, Provider, default: CSSMotion };
+});
 
 const order1: Order = {
   id: 1,
@@ -159,6 +204,7 @@ const actionAllocationRows: ProfitAllocation[] = [
 beforeEach(() => {
   seedOptionSets(catalog);
   seedOrderFormFields(catalog);
+  vi.mocked(catalog.orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
@@ -193,9 +239,7 @@ beforeEach(() => {
   ]);
   vi.mocked(catalog.installmentsApi.list).mockResolvedValue([installment]);
   vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
-  vi.mocked(client.api).get.mockResolvedValue({
-    data: { id: 9, username: "lisi", role: "operator", display_name: "李四" },
-  });
+  vi.mocked(client.currentUser).mockResolvedValue({ id: 9, username: "lisi", role: "operator", display_name: "李四" });
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
 });
@@ -212,8 +256,7 @@ function tableRow(orderNo: string): HTMLElement {
 }
 
 async function openRowMenu(orderNo: string, item: string) {
-  fireEvent.click(within(tableRow(orderNo)).getByRole("button", { name: /更多/ }));
-  fireEvent.click(await screen.findByText(item));
+  fireEvent.click(within(tableRow(orderNo)).getByRole("button", { name: item }));
 }
 
 async function modalOf(titlePattern: RegExp): Promise<HTMLElement> {
@@ -282,7 +325,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
     await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: /编辑订单/ }));
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
     const modal = await modalOf(/编辑订单 · HS-2026-0001/);
     await ui.clear(within(modal).getByLabelText("成交日期"));
     await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
@@ -294,10 +337,30 @@ describe("OrdersPage：操作与筛选分支", () => {
     })));
   });
 
+  it("L250：编辑有登记事件订单仅改备注时提示「备注已保存」并关闭弹窗", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      {
+        ...order1,
+        events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true }],
+      },
+    ]);
+    vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
+    await openLedger();
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
+    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("备注"), "仅更新备注");
+    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
+    // L250：有登记事件只能改备注，成功提示必须明确「备注已保存」而非笼统「订单已更新」
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("备注已保存"));
+    // 保存后弹窗应关闭
+    await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
+  });
+
   it("分润：打开弹窗按姓名预填已有比例", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(document.querySelector(".allocation-modal")).toBeInTheDocument();
     expect(catalog.policyApi.allocations).toHaveBeenCalledWith(1);
     // 一行 = 一位员工（李四 40%），不再固定四个动作位
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(1);
@@ -422,6 +485,21 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(message.success).toHaveBeenCalledWith("分润已保存");
   });
 
+  it("L266：分润提交成功后刷新订单详情（详情回显）", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const rates = within(modal).getAllByLabelText("比例");
+    await ui.clear(rates[0]);
+    await ui.type(rates[0], "100");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    expect(message.success).toHaveBeenCalledWith("分润已保存");
+    // L266：分润保存后应按 account_id 强制刷新订单详情（ledgerDetails 缓存），使明细回显
+    await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalledWith(order1.account_id));
+  });
+
   it("分润：改成按金额分润时提交 allocation_amount", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
@@ -511,7 +589,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true }],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "取消交易");
+    await openRowMenu("HS-2026-0001", "取消");
     const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     await ui.type(screen.getByLabelText("取消原因"), "重复登记");
@@ -524,13 +602,48 @@ describe("OrdersPage：操作与筛选分支", () => {
     );
   });
 
+  it("FE-252：取消交易依赖的资金账户加载完成后才允许确认", async () => {
+    const cancelOrder = {
+      ...order1,
+      id: 21,
+      order_no: "HS-CANCEL-ASYNC-01",
+      trade_date: "2026-11-01",
+    };
+    let resolvePools!: (value: unknown[]) => void;
+    const poolsPending = new Promise<unknown[]>((resolve) => {
+      resolvePools = resolve;
+    });
+
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([cancelOrder]);
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...cancelOrder,
+      events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true }],
+    });
+    vi.mocked(catalog.poolsApi.list).mockImplementation(() => poolsPending as never);
+    vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+
+    await openLedger();
+    await openRowMenu("HS-CANCEL-ASYNC-01", "取消");
+    expect(screen.queryByText(/库存取消交易 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
+
+    resolvePools([{ id: 7, code: "HJ_INVEST", name: "投资款荷包", status: "ACTIVE" }]);
+    const modal = await modalOf(/库存取消交易 · HS-CANCEL-ASYNC-01/);
+    await ui.type(within(modal).getByLabelText("取消原因"), "异步加载回归");
+    await clickModalOk(modal);
+
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({ event_type: "CANCEL", offset_event_id: 2101, pool_id: 7 }),
+    ));
+  });
+
   it("库存取消交易：冲销入库流水并进入公司钱包", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", pool_id: 7, is_posted: true }],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "取消交易");
+    await openRowMenu("HS-2026-0001", "取消");
     const modal = await modalOf(/库存取消交易 · HS-2026-0001/);
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     expect(within(modal).getByLabelText("收款账户")).toBeInTheDocument();
@@ -553,7 +666,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       ],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "取消交易");
+    await openRowMenu("HS-2026-0001", "取消");
     const modal = await modalOf(/售出取消交易 · HS-2026-0001/);
     expect(within(modal).getByLabelText("退款金额")).toBeInTheDocument();
     expect(within(modal).getByLabelText("付款账户")).toBeInTheDocument();
@@ -577,7 +690,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     await openLedger();
-    await openRowMenu("HS-2026-0003", "取消交易");
+    await openRowMenu("HS-2026-0003", "取消");
     const modal = await modalOf(/分期取消交易 · INS-1/);
     await ui.type(screen.getByLabelText("取消原因"), "提前结清");
     fireEvent.click(screen.getByRole("button", { name: /确认取消交易/ }));
@@ -591,14 +704,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
     await openLedger();
-    await openRowMenu("HS-2026-0003", "取消交易");
+    await openRowMenu("HS-2026-0003", "取消");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith("未找到可取消的分期合约"));
   });
 
   it("取消交易：打开详情失败时提示错误", async () => {
     vi.mocked(catalog.ordersApi.get).mockRejectedValue(new Error("detail fail"));
     await openLedger();
-    await openRowMenu("HS-2026-0001", "取消交易");
+    await openRowMenu("HS-2026-0001", "取消");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("detail fail")));
   });
 
@@ -609,6 +722,23 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /关闭新建弹窗/ }));
     await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
+  });
+
+  it("P2-190：选中新建类型后下拉菜单收起（不浮在弹窗上）", async () => {
+    await openLedger();
+    const trigger = screen.getByRole("button", { name: /新建订单/ });
+    await ui.click(trigger);
+    // 菜单展开：菜单项「新建提号订单」可见
+    expect(await screen.findByText("新建提号订单")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("新建回收订单"));
+    // 选中类型后，CreateBusinessModal 打开（回填 createType）
+    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
+    // 受控下拉：onClick 内 setCreateMenuOpen(false) → open 变 false → 弹层真正卸载
+    // （本文件局部 rc-motion 桩尊重 visible，open=false 时弹层不再残留）。
+    // 这正是 P2-190 修复点：避免「菜单浮在弹窗右上方、与弹窗两个浮层叠加」。
+    await waitFor(() => expect(screen.queryByText("新建提号订单")).toBeNull());
+    // 触发按钮不再处于展开态
+    await waitFor(() => expect(trigger).not.toHaveAttribute("aria-expanded", "true"));
   });
 
   it("新建订单成功回调刷新列表", async () => {

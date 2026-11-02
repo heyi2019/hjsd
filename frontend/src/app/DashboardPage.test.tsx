@@ -46,7 +46,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
 
     renderLight(<DashboardPage />, { user: "admin" });
 
-    const overview = await screen.findByRole("region", { name: "业务总览" });
+    const overview = await screen.findByRole("region", { name: "我的业务总览" });
     for (const [label, value] of [
       ["在库账号", "1"],
       ["订单总量", "2"],
@@ -59,7 +59,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
       expect(card).not.toBeNull();
       expect(within(card!).getByText(value)).toBeInTheDocument();
     }
-    const alerts = await screen.findByRole("region", { name: "业务提醒" });
+    const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(within(alerts).getByText("库存订单入库超过 7 天 1 个")).toBeInTheDocument();
     expect(within(alerts).getByText("新的分润通知 1 条")).toBeInTheDocument();
   });
@@ -87,7 +87,7 @@ it("工作台按业务提醒配置计算库存阈值并控制提醒开关", asyn
 
     renderLight(<DashboardPage />, { user: "admin" });
 
-    const alerts = await screen.findByRole("region", { name: "业务提醒" });
+    const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(within(alerts).getByText("暂无异常事项")).toBeInTheDocument();
     expect(vi.mocked(catalog.optionSetsApi.get)).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS");
   });

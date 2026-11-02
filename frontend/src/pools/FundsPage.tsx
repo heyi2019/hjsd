@@ -1,11 +1,11 @@
-/** 资金中心：总览 / 押金（页面原型 §5，FIN-01/04）。
- *  逻辑层见 useFundsPageController；视图层拆为 FundsPage.tabs（5 个 Tab）与 FundsPage.modals（11 个弹窗）。 */
+/** 资金中心：总览 / 流水 / 工作室支出 / 对账 / 异常。
+ *  逻辑层见 useFundsPageController；视图层拆为 FundsPage.tabs 与 FundsPage.modals。 */
 import { Tabs } from "antd";
 import { ErrorBanner } from "../shared/ui";
 import { RebatesPanel } from "../rebates/RebatesPanel";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFundsPageController } from "./useFundsPageController";
-import { OverviewTab, CashflowTab, DepositTab, ReconciliationTab, ControlsTab } from "./FundsPage.tabs";
+import { OverviewTab, CashflowTab, ReconciliationTab, ControlsTab } from "./FundsPage.tabs";
 import {
   CancelModal,
   CashflowModal,
@@ -30,14 +30,14 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       <ErrorBanner error={ctrl.error} onRetry={() => void ctrl.load()} retrying={ctrl.loading} />
       <Tabs
         defaultActiveKey="overview"
+        destroyOnHidden
         items={[
           { key: "overview", label: "总览", children: <OverviewTab ctrl={ctrl} /> },
           { key: "cashflows", label: "流水", children: <CashflowTab ctrl={ctrl} /> },
-          { key: "deposits", label: "押金", children: <DepositTab ctrl={ctrl} /> },
           { key: "reconciliations", label: "对账", children: <ReconciliationTab ctrl={ctrl} /> },
           { key: "controls", label: "异常", children: <ControlsTab ctrl={ctrl} /> },
           { key: "rebates", label: "返点明细", children: <RebatesPanel /> },
-          { key: "studio-expenses", label: "工作室支出", children: <StudioExpensePanel pools={ctrl.pools} /> },
+          { key: "studio-expenses", label: "工作室支出", children: <StudioExpensePanel pools={ctrl.pools} ctrl={ctrl} /> },
         ]}
       />
       <DepositModal ctrl={ctrl} />

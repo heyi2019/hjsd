@@ -23,9 +23,10 @@
 }
 
 :where(.ant-tag-green, .ant-tag-success) {
-  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)) !important;
-  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface)) !important;
+  border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-surface)) !important;
   color: var(--color-success) !important;
+  font-weight: 600;
 }
 
 :where(.ant-tag-orange, .ant-tag-warning) {
@@ -35,9 +36,10 @@
 }
 
 :where(.ant-tag-red, .ant-tag-error) {
-  border-color: color-mix(in srgb, var(--color-error) 35%, var(--color-border)) !important;
-  background: color-mix(in srgb, var(--color-error) 12%, var(--color-surface)) !important;
+  border-color: color-mix(in srgb, var(--color-error) 55%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-error) 18%, var(--color-surface)) !important;
   color: var(--color-error) !important;
+  font-weight: 600;
 }
 
 :where(.ant-card-head) {
@@ -146,7 +148,7 @@
    内嵌 input 被强锁 36px，而外层 wrapper 同为 36px 还要扣掉上下 padding →
    内层撑出外层、文字贴边不居中（登录页「密码与用户名不齐」的根因）。
    内嵌 input 交回 wrapper 的 flex 居中，高度自适应。 */
-:where(.ant-input:not(.ant-input-affix-wrapper > .ant-input), .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper) {
+:where(.ant-input:not(.ant-input-affix-wrapper > .ant-input):not(textarea), .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
   min-height: var(--ui-control-height-lg) !important;
   height: var(--ui-control-height-lg) !important;
   /* 静止态：三层全透明白阴影，与聚焦态 --focus-glow 同层数，保证 box-shadow 平滑过渡

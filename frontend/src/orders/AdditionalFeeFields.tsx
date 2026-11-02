@@ -1,6 +1,6 @@
 import { Form, Input } from "antd";
 import { useRef } from "react";
-import { AdaptiveFormGrid, MoneyInput, NestedFormSection, PermissionButton } from "../shared/ui";
+import { AdaptiveFormGrid, BusinessRegistrationGroup, MoneyInput, PermissionButton } from "../shared/ui";
 import { CfgNestedItem } from "./ConfigurableField";
 import "./AdditionalFeeFields.css";
 import type { Pool } from "../shared/api/catalog";
@@ -11,13 +11,10 @@ export function AdditionalFeeFields(props: { pools: Pool[] }) {
   const addExpenseRef = useRef<((defaultValue?: unknown, insertIndex?: number) => void) | null>(null);
 
   return (
-    <NestedFormSection
-      className="nested-form-section--card recovery-fee-card"
-      headerClassName="recovery-fee-card__head"
-      titleClassName="recovery-fee-card__label"
-      descriptionClassName="recovery-fee-card__desc"
+    <BusinessRegistrationGroup
+      className="additional-fee-fields"
       title="附加费用"
-      extra={
+      action={
         <PermissionButton permission="order.create" type="link" onClick={() => addExpenseRef.current?.({})}>
           + 增加支出
         </PermissionButton>
@@ -26,16 +23,16 @@ export function AdditionalFeeFields(props: { pools: Pool[] }) {
       {/* 中介费固定行：顶层表单字段，必须放在 Form.List 之外。
           原先误置于 Form.List 内部，antd 会强制给 name 加 expense_items. 前缀，
           导致值写入 expense_items.intermediary_fee、污染数组字段并让 Form.List 重渲染崩溃（点击即报错）。 */}
-      <AdaptiveFormGrid className="recovery-fee-row">
-        <CfgNestedItem className="recovery-fee-field" name="intermediary_fee" label="中介费"><MoneyInput className="recovery-fee-control" placeholder="金额" /></CfgNestedItem>
-        <CfgNestedItem className="recovery-fee-field" name="intermediary_pool_id" label="支出账户"><Select className="recovery-fee-control" placeholder="请选择账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
+      <AdaptiveFormGrid className="fee-row">
+        <CfgNestedItem name="intermediary_fee" label="中介费"><MoneyInput placeholder="金额" /></CfgNestedItem>
+        <CfgNestedItem name="intermediary_pool_id" label="支出账户"><Select placeholder="请选择账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
       </AdaptiveFormGrid>
       <Form.List name="expense_items">
         {(fields, { add, remove }) => {
           addExpenseRef.current = add;
           return (
             <>
-              <AdaptiveFormGrid className="recovery-fee-row additional-expense-list">
+              <AdaptiveFormGrid className="fee-row additional-expense-list">
                 {fields.map((field) => <div className="additional-expense-row" key={field.key}>
                   <Form.Item name={[field.name, "amount"]} label="金额" rules={[{ required: true, message: "请输入支出金额" }]}><MoneyInput placeholder="金额" /></Form.Item>
                   <Form.Item name={[field.name, "pool_id"]} label="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}><Select placeholder="请选择账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
@@ -47,6 +44,6 @@ export function AdditionalFeeFields(props: { pools: Pool[] }) {
           );
         }}
       </Form.List>
-    </NestedFormSection>
+    </BusinessRegistrationGroup>
   );
 }

@@ -32,4 +32,34 @@ describe("库存导出", () => {
     expect(csv).toContain(",admin,-,-,-,-,-");
     expect(csv).toContain(",0,0,0.00,0.00");
   });
+
+  it("FE-268：库存 CSV 使用详情订单号并把返点计入收入汇总", () => {
+    const row = { ...account, source_order_no: "" } as unknown as Account;
+    const csv = buildInventoryCsv([row], {
+      1: {
+        orders: [{
+          order_id: 11,
+          order_no: "HS-FE268",
+          order_type: "HS",
+          status: "DONE",
+          created_at: "2026-11-02T10:00:00",
+          events: [],
+          rebates: [{
+            id: 1,
+            rebate_no: "HS-FE268-RB01",
+            rebate_type: "BUY",
+            channel: "买号返点",
+            rate: "10",
+            base_amount: "100.00",
+            status: "OPEN",
+            collected_on: "2026-11-02",
+          }],
+        }],
+      } as never,
+    });
+
+    expect(csv).toContain("HS-FE268");
+    expect(csv).toContain("买号返点 / HS-FE268 / HS-FE268-RB01 / 已登记 / 100.00");
+    expect(csv).toContain(",0,1,0.00,100.00");
+  });
 });

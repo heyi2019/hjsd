@@ -101,7 +101,7 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
     expect(Object.keys(ACCOUNT_STATUS_LABEL).sort()).toEqual(
       ["WAITING", "SOLD", "VOID"].sort(),
     );
-    expect(ACCOUNT_STATUS_LABEL.WAITING).toBe("待售");
+    expect(ACCOUNT_STATUS_LABEL.WAITING).toBe("在库");
   });
 
   it("事件类型覆盖后端 EventType", () => {
@@ -123,6 +123,12 @@ describe("statusColor：颜色只做辅助", () => {
     for (const s of ["ACTIVE", "PAID", "SETTLED", "IN_STOCK"]) {
       expect(statusColor(s)).toBe("green");
     }
+  });
+
+  it("库存状态用高对比颜色区分在库与出库", () => {
+    expect(statusColor("WAITING")).toBe("green");
+    expect(statusColor("SOLD")).toBe("red");
+    expect(statusColor("VOID")).toBe("red");
   });
 
   it("进行中/待结算为蓝", () => {

@@ -12,7 +12,7 @@ import { orderTypeLabel } from "../shared/lib/labels";
 import { columnKey, useListViewColumns } from "../shared/lib/listColumns";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { CUSTOMER_ROLE_LABEL, customerDateKey, MobileCustomerList, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
 
@@ -22,6 +22,7 @@ const CUSTOMER_STATUS_OPTIONS = [
   { value: "DISABLED", label: "已拉黑" },
   { value: "MERGED", label: "已合并" },
 ];
+const CUSTOMER_CREATE_FORM_ID = "customer-create-form";
 
 export function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const compact = useCompactLayout();
@@ -389,53 +390,72 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         }}
       />}
 
-      <BusinessActionModal title="新建客户" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
-        <FieldConfigScope scope="CUSTOMER" active={createOpen}>
-        <BusinessForm scope="CUSTOMER" form={form} colon={false} className="form-no-colon" onFinish={submitCreate}>
-          <CfgItem name="display_name" label="名字" rules={[{ required: true }]}>
-            <Input />
-          </CfgItem>
-          {/* 短字段两列一行，压弹窗高度（称呼为必填主字段保持整行） */}
-          <div className="form-cols-2">
-            <CfgItem name="contact_name" label="联系人姓名">
-              <Input />
-            </CfgItem>
-            <CfgItem name="phone" label="手机号">
-              <Input />
-            </CfgItem>
-            <CfgItem name="wechat" label="微信号">
-              <Input />
-            </CfgItem>
-            <CfgItem name="qq" label="QQ">
-              <Input />
-            </CfgItem>
-          </div>
-          <CfgItem name="note" label="备注">
-            <Input.TextArea rows={3} placeholder="选填：客户来源、偏好、注意事项等" />
-          </CfgItem>
-          {activeDefs.map((def) => (
-            <Form.Item
-              key={def.field_key}
-              name={def.field_key}
-              label={def.label}
-              valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
-              rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
-            >
-              <ExtraFieldControl def={def} />
-            </Form.Item>
-          ))}
-          <Typography.Paragraph type="secondary">
-            联系方式允许重复；重复只提示候选，不拦截建档。扩展字段在「设置 › 表单字段 › 客户建档」维护，可随时增删。
-          </Typography.Paragraph>
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit">
+      <BusinessActionModal
+        title="新建客户"
+        open={createOpen}
+        onCancel={() => setCreateOpen(false)}
+        wrapClassName="customer-create-modal"
+        fieldCount={5 + activeDefs.length}
+        footer={(
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" form={CUSTOMER_CREATE_FORM_ID}>
             建档
           </PermissionButton>
-        </BusinessForm>
+        )}
+      >
+        <FieldConfigScope scope="CUSTOMER" active={createOpen}>
+          <BusinessRegistrationForm
+            id={CUSTOMER_CREATE_FORM_ID}
+            layout="horizontal"
+            labelAlign="left"
+            labelCol={{ flex: "108px" }}
+            wrapperCol={{ flex: "auto" }}
+            scope="CUSTOMER"
+            form={form}
+            colon={false}
+            className="form-no-colon customer-create-form"
+            onFinish={submitCreate}
+          >
+            <BusinessRegistrationSection className="customer-create-section" title="客户信息">
+              <CfgItem name="display_name" label="名字" rules={[{ required: true }] }>
+                <Input />
+              </CfgItem>
+              <CfgItem name="contact_name" label="联系人姓名">
+                <Input />
+              </CfgItem>
+              <CfgItem name="phone" label="手机号">
+                <Input />
+              </CfgItem>
+              <CfgItem name="wechat" label="微信号">
+                <Input />
+              </CfgItem>
+              <CfgItem name="qq" label="QQ">
+                <Input />
+              </CfgItem>
+              <CfgItem name="note" label="备注">
+                <Input.TextArea rows={3} placeholder="选填：客户来源、偏好、注意事项等" />
+              </CfgItem>
+              {activeDefs.map((def) => (
+                <Form.Item
+                  key={def.field_key}
+                  name={def.field_key}
+                  label={def.label}
+                  valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
+                  rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
+                >
+                  <ExtraFieldControl def={def} />
+                </Form.Item>
+              ))}
+              <Typography.Paragraph type="secondary" className="customer-create-note">
+                联系方式允许重复；重复只提示候选，不拦截建档。扩展字段在「设置 › 表单字段 › 客户建档」维护，可随时增删。
+              </Typography.Paragraph>
+            </BusinessRegistrationSection>
+          </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
 
       <BusinessActionModal
         title={editTarget ? `编辑客户 · ${editTarget.customer_no}` : "编辑客户"}
+        fieldCount={6 + activeDefs.length}
         open={Boolean(editTarget)}
         onCancel={() => {
           setEditTarget(null);
@@ -444,10 +464,13 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         footer={null}
         destroyOnHidden
       >
-        <BusinessForm
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
           scope="CUSTOMER"
           form={editForm}
-          layout="vertical"
           colon={false}
           className="form-no-colon"
           onFinish={submitEdit}
@@ -502,7 +525,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           <PermissionButton permission="customer.update" type="primary" htmlType="submit">
             保存
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
 
       <Drawer
@@ -639,7 +662,11 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         onCancel={() => setMergeTarget(null)}
         footer={null}
       >
-        <BusinessForm scope="CUSTOMER" form={mergeForm} colon={false} className="form-no-colon" onFinish={submitMerge}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="CUSTOMER" form={mergeForm} colon={false} className="form-no-colon" onFinish={submitMerge}>
           <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
             <Select
               options={(rows ?? [])
@@ -655,7 +682,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
               确认合并
             </PermissionButton>
           </CompactActions>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
     </Card>
   );

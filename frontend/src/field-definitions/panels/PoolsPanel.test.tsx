@@ -43,4 +43,13 @@ describe("PoolsPanel", () => {
     // 失败不触发列表重载，避免覆盖错误态
     expect(vi.mocked(catalog.poolsApi).list).toHaveBeenCalledTimes(1);
   });
+
+  it("FE-239：资金池主数据失败时显示错误空态并禁用新增", async () => {
+    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce(new Error("pools down"));
+    const { PoolsPanel } = await import("./PoolsPanel");
+    renderLight(<PoolsPanel />, { user: "admin" });
+
+    expect(await screen.findByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增资金池/ })).toBeDisabled();
+  });
 });

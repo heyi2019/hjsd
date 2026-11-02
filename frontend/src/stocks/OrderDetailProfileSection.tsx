@@ -25,6 +25,7 @@ const ACCOUNT_FIELD_MAP: Record<string, { cfgKey: string; fallback: string }> = 
   password: { cfgKey: "game_password", fallback: "账号密码" },
   channelRegion: { cfgKey: "channel_region", fallback: "渠道 / 区服" },
   secondary: { cfgKey: "has_secondary", fallback: "有无二次" },
+  walletRealname: { cfgKey: "wallet_realname", fallback: "钱包实名" },
   note: { cfgKey: "game_account_note", fallback: "账号备注" },
 };
 
@@ -61,6 +62,7 @@ export function OrderDetailProfileSection({
     },
     { key: "channelRegion", label: ACCOUNT_FIELD_MAP.channelRegion.fallback, value: meta.channelRegion },
     { key: "secondary", label: ACCOUNT_FIELD_MAP.secondary.fallback, value: meta.secondary },
+    { key: "walletRealname", label: ACCOUNT_FIELD_MAP.walletRealname.fallback, value: meta.walletRealname },
     { key: "note", label: ACCOUNT_FIELD_MAP.note.fallback, value: meta.note },
   ];
 

@@ -77,18 +77,42 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getByText("5天")).toBeInTheDocument();
   });
 
+  it("FE-254：库存健康报表展示在库提号账号，不丢失 PICKUP 成本", async () => {
+    resolveMockOnce(vi.mocked(catalog.reportsApi.inventoryHealth), {
+      generated_on: "2026-10-01",
+      total_cost: "500.00",
+      items: [{
+        account_id: 8,
+        game_account: "pickup-in-stock",
+        platform: "盼之",
+        status: "IN_STOCK",
+        buy_amount: "500.00",
+        extra_cost: "0.00",
+        total_cost: "500.00",
+        holding_days: 2,
+      }],
+    });
+    renderLight(<ReportsPage />, { user: "admin" });
+    expect(await screen.findByText("pickup-in-stock")).toBeInTheDocument();
+    expect(screen.getByText("在库账号").parentElement).toHaveTextContent("1");
+    expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
+  });
+
   it("R1 无数据时显示空态文案", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     expect(await screen.findByText("暂无在库账号")).toBeInTheDocument();
   });
 
-  it("R1 后端不可达 → 错误条落地（不静默空表）", async () => {
+  it("FE-224：R1 后端不可达时显示不可用，重新加载后恢复真实空态", async () => {
     vi.mocked(catalog.reportsApi.inventoryHealth).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<ReportsPage />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
     expect(screen.getAllByText("不可用")).toHaveLength(2);
     expect(screen.getByText("库存健康数据不可用，请点击重新加载")).toBeInTheDocument();
     expect(screen.queryByText("暂无在库账号")).not.toBeInTheDocument();
+    vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValueOnce({ generated_on: "2026-10-01", total_cost: "0.00", items: [] } as never);
+    await ui.click(screen.getByRole("button", { name: /重新加载/ }));
+    expect(await screen.findByText("暂无在库账号")).toBeInTheDocument();
   });
 
   it("R2 月度损益：渲染月份与销售收入", async () => {

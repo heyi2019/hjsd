@@ -101,7 +101,7 @@ describe("QualityPanel：质量中心", () => {
     expect(await screen.findByText(/quality down/)).toBeInTheDocument();
   });
 
-  it("质量摘要失败时不伪装成零统计", async () => {
+  it("FE-104：质量摘要失败时不伪装成零统计", async () => {
     vi.mocked(catalog.qualityApi.summary).mockRejectedValueOnce(new Error("summary down"));
     renderLight(<QualityPanel />, { user: "admin" });
     expect(await screen.findByText(/summary down/)).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("QualityPanel：质量中心", () => {
     expect(screen.getByText("高严重度").closest(".ui-stat")).toHaveTextContent("不可用");
   });
 
-  it("没有未关闭工单时禁用批量关闭", async () => {
+  it("FE-160：没有未关闭工单时禁用批量关闭", async () => {
     vi.mocked(catalog.qualityApi.list).mockResolvedValueOnce({
       items: rows.map((row) => ({ ...row, status: "CLOSED" })),
     });
@@ -137,15 +137,18 @@ describe("QualityPanel：质量中心", () => {
     await waitFor(() => expect(catalog.qualityApi.create).toHaveBeenCalled());
   });
 
-  it("关闭工单：打开关闭弹窗并提交", async () => {
+  it("FE-110：关闭工单后刷新统计与列表", async () => {
     renderLight(<QualityPanel />, { user: "admin" });
     await screen.findByText("QLT-1");
+    const listCallsBeforeClose = vi.mocked(catalog.qualityApi.list).mock.calls.length;
     await ui.click(screen.getByRole("button", { name: /关闭$/ }));
     const modal = await screen.findByText("关闭质量工单");
     const content = modal.closest(".ant-modal-content") as HTMLElement;
     await ui.type(within(content).getByLabelText("处理结果"), "已处理");
     await ui.click(within(content).getByRole("button", { name: /确认关闭/ }));
     await waitFor(() => expect(catalog.qualityApi.close).toHaveBeenCalledWith(1, expect.objectContaining({ resolution: "已处理" })));
+    await waitFor(() => expect(vi.mocked(catalog.qualityApi.list).mock.calls.length).toBeGreaterThan(listCallsBeforeClose));
+    expect(vi.mocked(catalog.qualityApi.summary).mock.calls.length).toBeGreaterThan(1);
   });
 
   it("批量关闭：打开弹窗并提交", async () => {

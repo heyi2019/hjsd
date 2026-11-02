@@ -1,6 +1,6 @@
 import { Space } from "antd";
 import type { Account, AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/catalog";
-import { BusinessForm, PermissionButton } from "../shared/ui";
+import { BusinessRegistrationForm, PermissionButton } from "../shared/ui";
 import { FieldConfigScope } from "../orders/ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
@@ -76,14 +76,19 @@ export function OrderDetailView({
     return (
       <div className="inventory-detail inventory-detail--editing">
         <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} />
-        <BusinessForm scope="INVEDIT" form={extraForm as never}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm as never}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
             <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} editing />
             <OrderDetailOperationSection meta={meta} editing />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         <OrderDetailExecutionSection
           rows={executionRows}
+          audit={detail?.audit}
           editing
           eventDrafts={eventDrafts}
           onEventEdit={onEventEdit}
@@ -124,7 +129,7 @@ export function OrderDetailView({
         totalIncome={totalIncome}
         flowCount={flowCount}
       />
-      <OrderDetailExecutionSection rows={executionRows} employees={employees} />
+      <OrderDetailExecutionSection rows={executionRows} audit={detail?.audit} employees={employees} />
       <OrderDetailPartySection meta={meta} />
     </div>
   );

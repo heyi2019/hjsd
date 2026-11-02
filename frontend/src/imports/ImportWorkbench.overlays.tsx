@@ -4,7 +4,7 @@ import { Form, Input, Typography, Upload } from "antd";
 
 import { importsApi } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { BusinessActionModal, BusinessForm, FormDrawer, InlineError, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, FormDrawer, InlineError, PermissionButton, Select } from "../shared/ui";
 
 import { isSupportedImportFile, parseImportText, downloadImportTemplate } from "./ImportWorkbench.fragments";
 import type { ImportWorkbenchController } from "./useImportWorkbenchController";
@@ -117,7 +117,11 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         }}
       >
         <InlineError error={error} />
-        <BusinessForm form={importForm}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={importForm}>
           <Form.Item name="source_name" label="数据名称" rules={[{ required: true, message: "请输入数据名称" }]}>
             <Input placeholder="例如：2026年10月订单导入" />
           </Form.Item>
@@ -161,7 +165,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
           <Form.Item name="note" label="导入说明">
             <Input.TextArea rows={3} placeholder="可填写来源、日期范围或对账依据" />
           </Form.Item>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
 
       <FormDrawer

@@ -6,7 +6,7 @@
 }
 
 /* 建单补充字段统一使用独立网格，避免长标签挤压默认 labelCol。 */
-.recovery-order-modal .custom-field-section {
+.business-registration-modal .custom-field-section {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -15,37 +15,37 @@
   min-width: 0;
   width: 100%;
 }
-.recovery-order-modal .custom-field-section > .ant-typography {
+.business-registration-modal .custom-field-section > .ant-typography {
   grid-column: 1 / -1;
   margin: 0;
 }
-.recovery-order-modal .custom-field-section > .ant-form-item {
+.business-registration-modal .custom-field-section > .ant-form-item {
   min-width: 0;
   margin: 0;
 }
-.recovery-order-modal .custom-field-section > .ant-form-item .ant-form-item-row {
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-row {
   display: grid;
   grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
   align-items: center;
   column-gap: var(--space-2);
 }
-.recovery-order-modal .custom-field-section > .ant-form-item .ant-form-item-label {
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-label {
   width: auto !important;
   padding: 0 !important;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.recovery-order-modal .custom-field-section > .ant-form-item .ant-form-item-label > label {
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-label > label {
   line-height: 1.25;
 }
-.recovery-order-modal .custom-field-section > .ant-form-item .ant-form-item-control,
-.recovery-order-modal .custom-field-section > .ant-form-item .ant-form-item-control-input-content > * {
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-control,
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-control-input-content > * {
   min-width: 0;
   width: 100%;
 }
 
 /* 返点核心字段：四组标签与输入框紧凑横排，避免操作人掉到下一行。 */
-.recovery-order-modal .rebate-core-fields {
+.business-registration-modal .rebate-core-fields {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: start;
@@ -53,40 +53,40 @@
   min-width: 0;
   width: 100%;
 }
-.recovery-order-modal .rebate-core-fields > .ant-form-item {
+.business-registration-modal .rebate-core-fields > .ant-form-item {
   min-width: 0;
   margin: 0;
 }
-.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   column-gap: var(--space-2);
 }
-.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-label {
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-label {
   width: auto !important;
   min-width: max-content;
   padding: 0 !important;
 }
-.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-control {
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-control {
   min-width: 0;
   width: auto !important;
 }
-.recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-control-input-content > * {
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-control-input-content > * {
   width: 100%;
   min-width: 0;
 }
-.recovery-order-modal .rebate-core-fields .ant-form-item-explain,
-.recovery-order-modal .rebate-core-fields .ant-form-item-extra {
+.business-registration-modal .rebate-core-fields .ant-form-item-explain,
+.business-registration-modal .rebate-core-fields .ant-form-item-extra {
   grid-column: 2;
 }
 
 @media (max-width: 720px) {
-  .recovery-order-modal .custom-field-section { grid-template-columns: 1fr; }
-  .recovery-order-modal .custom-field-section > .ant-typography,
-  .recovery-order-modal .custom-field-section > .ant-form-item { grid-column: 1; }
-  .recovery-order-modal .rebate-core-fields { grid-template-columns: 1fr; }
-  .recovery-order-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+  .business-registration-modal .custom-field-section { grid-template-columns: 1fr; }
+  .business-registration-modal .custom-field-section > .ant-typography,
+  .business-registration-modal .custom-field-section > .ant-form-item { grid-column: 1; }
+  .business-registration-modal .rebate-core-fields { grid-template-columns: 1fr; }
+  .business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
     grid-template-columns: max-content minmax(0, 1fr);
   }
 }
@@ -96,6 +96,9 @@
 }
 .settings-tabs.ant-tabs-left > .ant-tabs-content-holder {
   min-width: 0;
+  max-height: calc(100vh - 9rem);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .settings-tabs.ant-tabs-left .ant-tabs-tab {
   justify-content: flex-start;
@@ -104,6 +107,7 @@
 }
 
 @media (--bp-md) {
+  .settings-tabs > .ant-tabs-content-holder { max-height: none; overflow: visible; }
   .dashboard-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (--bp-sm) {
@@ -114,6 +118,44 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.studio-expense-filters {
+  gap: var(--space-3);
+}
+
+/* 工作室支出：让统计卡片与筛选栏分段，并保持筛选项的横向顺序。 */
+.studio-expense-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.studio-expense-card .studio-expense-filters {
+  margin: 0;
+}
+.studio-expense-page-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.studio-expense-card .studio-expense-filters {
+  align-items: center;
+}
+.studio-expense-filters--single-row {
+  flex-wrap: nowrap;
+}
+.ui-control-width-studio-pool {
+  width: var(--col-w-280);
+  max-width: 100%;
+}
+
+@media (--bp-sm) {
+  .studio-expense-filters--single-row {
+    flex-wrap: wrap;
+  }
+
+  .studio-expense-card .studio-expense-filters {
+    align-items: stretch;
+  }
 }
 
 /* 筛选栏内的枚举下拉：按语义宽度收敛，避免被 flex 拉满或缩成选项宽度。 */
@@ -150,6 +192,34 @@
 
 /* Shared form geometry: page files choose semantic widths, never inline pixels. */
 .ui-form-spaced { margin-block-start: var(--space-4); }
+
+.orders-event-table {
+  margin-top: var(--space-2);
+  min-width: 34rem;
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.orders-event-row {
+  display: grid;
+  grid-template-columns: 7.5rem 8rem 8rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  line-height: 1.4;
+  white-space: nowrap;
+  border-bottom: var(--border-w) solid var(--color-border);
+}
+.orders-event-row:last-child {
+  border-bottom: 0;
+}
+.orders-event-row--header {
+  color: var(--color-text-secondary);
+  background: var(--soft);
+  font-weight: 650;
+}
+.orders-event-list { max-width: 100%; overflow-x: auto; }
 .ui-filter-bar--spaced { margin-block-end: var(--space-3); }
 .ui-control-full { width: 100%; }
 .ui-control-width-policy { width: var(--control-filter-select-width); }
@@ -170,7 +240,7 @@
 .orders-allocation-row > .ant-btn { align-self: center; margin: 0; white-space: nowrap; }
 /* 按操作分润：固定四项，每行只有「分配项 + 姓名 + 比例」三列。 */
 .orders-allocation-row.is-action {
-  grid-template-columns: 72px minmax(180px, 1fr) 120px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(100px, 0.75fr) minmax(110px, 0.85fr);
 }
 .orders-allocation-kind {
   align-self: center;

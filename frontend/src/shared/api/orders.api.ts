@@ -82,6 +82,7 @@ export const ordersApi = {
       bound_phone?: string;
       bound_phone_owner?: string;
       has_secondary?: boolean;
+      wallet_realname?: string;
       purchase_price?: string;
       note?: string;
       extra_values?: Record<string, unknown>;
@@ -169,6 +170,7 @@ export const ordersApi = {
         channel_region?: string | null;
         bound_phone?: string | null;
         has_secondary?: boolean | null;
+        wallet_realname?: string | null;
         platform?: string | null;
         purchase_price?: string | null;
         note?: string | null;

@@ -164,7 +164,7 @@ class TestR1Inventory:
         assert row["platform"] is None
         assert payload["total_cost"] == "125.00"
 
-    def test_pickup_accounts_are_excluded_from_inventory_health(self, seeded_db):
+    def test_pickup_accounts_are_included_in_inventory_health(self, seeded_db):
         pickup = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
@@ -179,7 +179,7 @@ class TestR1Inventory:
 
         data = reporting_service.r1_inventory_health(seeded_db)
 
-        assert pickup.id not in {item["account_id"] for item in data["items"]}
+        assert pickup.id in {item["account_id"] for item in data["items"]}
 
     def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
         in_stock = Account(

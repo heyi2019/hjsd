@@ -170,6 +170,8 @@ export interface Order {
   sale_operator?: string | null;
   in_hand_time?: string | null;
   event_total?: string | null;
+  cost_amount?: string | null;
+  profit_base?: string | null;
   last_event_type?: string | null;
   last_event_amount?: string | null;
   last_event_on?: string | null;
@@ -196,6 +198,7 @@ export interface Order {
     bound_phone?: string | null;
     bound_phone_owner?: string | null;
     has_secondary?: boolean | null;
+    wallet_realname?: string | null;
     platform?: string | null;
     purchase_price?: string | null;
     note?: string | null;
@@ -346,6 +349,8 @@ export interface Account {
   bound_phone?: string | null;
   bound_phone_owner?: string | null;
   has_secondary?: boolean | null;
+  /** 钱包实名：未注销 / 已注销（账号交付前需确认实名是否已解绑）。 */
+  wallet_realname?: string | null;
   account_description?: string | null;
   account_images?: string[] | null;
   extra_values?: Record<string, unknown>;

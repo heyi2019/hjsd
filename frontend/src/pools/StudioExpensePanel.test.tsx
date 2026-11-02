@@ -1,4 +1,4 @@
-/** StudioExpensePanel：工作室支出登记与承载池配置。 */
+/** StudioExpensePanel：工作室支出登记与资金池筛选。 */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,15 +52,8 @@ const expenseFlows = [
   },
 ];
 
-function mockOptionSets(poolCodes: string[]) {
+function mockOptionSets() {
   vi.mocked(catalog.optionSetsApi.get).mockImplementation(async (code: string) => {
-    if (code === "STUDIO_EXPENSE_POOL") {
-      if (poolCodes.length === 0) throw new Error("404 not configured");
-      return {
-        id: 91, code, label: "工作室支出承载资金池", group: "FUND", editable: true,
-        options: poolCodes.map((value) => ({ value, label: pools.find((p) => p.code === value)?.name ?? value })),
-      } as never;
-    }
     if (code === "STUDIO_EXPENSE_ITEM") {
       return {
         id: 92, code, label: "工作室支出费用科目", group: "FUND", editable: true,
@@ -91,31 +84,160 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await ui.click(await within(current).findByTitle(title));
 }
 
+/** 收支是分段控件（不是下拉），选项直接可点，不再有下拉弹层。 */
+async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
+  const item = Array.from(modal.querySelectorAll(".ant-segmented-item")).find((el) =>
+    el.textContent?.trim().startsWith(label),
+  );
+  if (!item) throw new Error(`未找到收支分段项：${label}`);
+  await ui.click(item);
+}
+
+async function togglePoolFilter(title: RegExp) {
+  await ui.click(screen.getByRole("combobox", { name: "资金池筛选" }));
+  const dropdowns = document.querySelectorAll(".ant-select-dropdown");
+  const current = dropdowns[dropdowns.length - 1] as HTMLElement;
+  await ui.click(await within(current).findByTitle(title));
+}
+
 describe("StudioExpensePanel：工作室支出", () => {
-  it("未配置承载池时给出引导提示，且列表为空", async () => {
-    mockOptionSets([]);
+  it("资金池直接使用多选下拉筛选，不再显示复选框", async () => {
+    mockOptionSets();
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    expect(await screen.findByText(/尚未勾选任何承载资金池/)).toBeInTheDocument();
-    expect(screen.getByText("暂无工作室支出")).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: /配置承载池/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /经营主池/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("combobox", { name: "资金池筛选" })).toBeInTheDocument();
+
+    await togglePoolFilter(/押金池/);
+    expect(screen.queryByText("日用")).not.toBeInTheDocument();
+  });
+
+  it("资金池筛选下拉只显示中文名称，不显示英文编码", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const poolSelect = await screen.findByRole("combobox", { name: "资金池筛选" });
+    await ui.click(poolSelect);
+    // 断言必须限定在弹层内：列表「资金池」列同样渲染「经营主池」，
+    // 全局 getByText 会命中多个（实测 2 处）而误报。
+    const dropdowns = document.querySelectorAll(".ant-select-dropdown");
+    const current = dropdowns[dropdowns.length - 1] as HTMLElement;
+    expect(within(current).getByText("经营主池")).toBeInTheDocument();
+    expect(within(current).queryByText("POOL-A")).not.toBeInTheDocument();
+  });
+
+  it("记一笔按钮独立于筛选栏", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+
+    expect(screen.getByRole("button", { name: /记一笔/ })).toBeInTheDocument();
+    expect(document.querySelector(".studio-expense-filters")?.querySelector("button")).toBeNull();
+  });
+
+  it("筛选项位于统计卡片下方", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+    const stats = document.querySelector(".ui-stat-row");
+    const filters = document.querySelector(".studio-expense-filters");
+    expect(stats).toBeTruthy();
+    expect(filters).toBeTruthy();
+    expect(Boolean(stats && filters && (stats.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  });
+
+  it("工作室支出卡片使用宽松布局钩子，避免筛选器和统计卡片挤在一起", async () => {
+    // 原写法调用了不存在的 renderPanel()（本文件唯一用例），按其余用例口径改回 renderLight
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    expect(await screen.findByText("已入账收入")).toBeInTheDocument();
+    expect(document.querySelector(".studio-expense-card")).toBeInTheDocument();
+  });
+
+  it("资金池筛选位于全部科目右侧并给下拉足够宽度", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+
+    const filters = document.querySelector(".studio-expense-filters") as HTMLElement;
+    expect(filters).toHaveClass("studio-expense-filters--single-row");
+    expect(filters.querySelector(".ui-control-width-studio-pool")).toBeInTheDocument();
+    expect(filters.textContent?.indexOf("全部科目")).toBeLessThan(filters.textContent?.indexOf("资金池筛选"));
+  });
+
+  it("工作室支出筛选区不显示查询按钮", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+
+    expect(screen.queryByRole("button", { name: /查询/ })).not.toBeInTheDocument();
+  });
+
+  it("费用科目配置入口统一放在设置配置中心", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+    expect(screen.queryByRole("button", { name: "配置费用科目" })).not.toBeInTheDocument();
+  });
+
+  it("无审批流程时不显示状态筛选", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+    expect(screen.queryByRole("combobox", { name: "工作室支出状态" })).not.toBeInTheDocument();
+    expect(screen.queryByText("全部状态")).not.toBeInTheDocument();
+  });
+
+  it("不显示工作室收支标题文字", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+
+    expect(screen.queryByText("工作室收支", { selector: ".ant-card-head-title" })).not.toBeInTheDocument();
+  });
+
+  it("未选择资金池时给出引导提示，且列表为空", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByRole("combobox", { name: "资金池筛选" });
+    await togglePoolFilter(/经营主池/);
+    await togglePoolFilter(/押金池/);
+    expect(await screen.findByText(/尚未选择资金池/)).toBeInTheDocument();
+    expect(screen.getByText("暂无工作室收支")).toBeInTheDocument();
   });
 
   it("列表只显示已勾选承载池的手工收支流水", async () => {
-    mockOptionSets(["POOL-A"]);
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     expect(await screen.findByText("房租")).toBeInTheDocument();
+    await togglePoolFilter(/押金池/);
     // POOL-B 上的日用支出被过滤，不出现在本页
     expect(screen.queryByText("日用")).not.toBeInTheDocument();
   });
 
+  it("日期筛选和登记日期复用库存中心的日期选择器", async () => {
+    mockOptionSets();
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+
+    await screen.findByText("房租");
+    expect(screen.getByPlaceholderText("开始日期")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("结束日期")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("工作室支出日期区间")).toHaveLength(2);
+
+    await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    expect(modal.querySelector(".ant-picker")).toBeInTheDocument();
+  });
+
+  it("工作室收支表补齐流水号、来源和建立时间字段", async () => {
+    mockOptionSets();
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+
+    await screen.findByText("房租");
+    for (const label of ["流水号", "来源", "建立时间"]) {
+      expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
+    }
+  });
+
   it("登记支出：提交即入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {
-    mockOptionSets(["POOL-A"]);
+    mockOptionSets();
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 61 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 2, /房租/);
+    // 收支改为分段控件后，科目从第 3 个下拉前移到第 2 个
+    await pickSelect(modal, 1, /房租/);
     await ui.type(modal.querySelector("#amount") ?? modal, "3000.00");
     await ui.type(modal.querySelector("#note") ?? modal, "10 月工作室房租");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
@@ -132,8 +254,8 @@ describe("StudioExpensePanel：工作室支出", () => {
     });
   });
 
-  it("已配置承载池但流水列表拉取失败时禁用记一笔入口并展示错误重试", async () => {
-    mockOptionSets(["POOL-A"]);
+  it("流水列表拉取失败时禁用记一笔入口并展示错误重试", async () => {
+    mockOptionSets();
     vi.mocked(catalog.cashflowsApi.list).mockRejectedValue(new Error("流水读取失败"));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     const recordBtn = await screen.findByRole("button", { name: /记一笔/ });
@@ -142,15 +264,15 @@ describe("StudioExpensePanel：工作室支出", () => {
   });
 
   it("登记收入：IN / BUSINESS_IN / SELF_REVENUE，同样自动入账", async () => {
-    mockOptionSets(["POOL-A"]);
+    mockOptionSets();
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 62 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 1, /^收入$/);
-    await pickSelect(modal, 2, /货款/);
+    await pickDirection(modal, "收入");
+    await pickSelect(modal, 1, /货款/);
     await ui.type(modal.querySelector("#amount") ?? modal, "800.00");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
     await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
@@ -166,18 +288,4 @@ describe("StudioExpensePanel：工作室支出", () => {
     });
   });
 
-  it("配置承载池保存到选项词典（按池 code 存储）", async () => {
-    mockOptionSets([]);
-    vi.mocked(catalog.optionSetsApi.update).mockResolvedValueOnce({} as never);
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    await screen.findByText(/尚未勾选任何承载资金池/);
-    await ui.click(await screen.findByRole("button", { name: /配置承载池/ }));
-    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-    await pickSelect(modal, 0, /经营主池/);
-    await ui.click(screen.getByRole("button", { name: /保存配置/ }));
-    await waitFor(() => expect(vi.mocked(catalog.optionSetsApi.update)).toHaveBeenCalled());
-    const [code, payload] = vi.mocked(catalog.optionSetsApi.update).mock.calls[0];
-    expect(code).toBe("STUDIO_EXPENSE_POOL");
-    expect((payload as { options: Array<{ value: string }> }).options.map((o) => o.value)).toEqual(["POOL-A"]);
-  });
 });

@@ -20,6 +20,7 @@ from ._common import (
     validate_account_profile_scope,
     validate_inventory_context,
     validate_optional_bool,
+    validate_wallet_realname,
 )
 
 
@@ -36,6 +37,7 @@ def create_account(
     channel_region: str | None = None,
     bound_phone: str | None = None,
     has_secondary: bool | None = None,
+    wallet_realname: str | None = None,
     platform: str | None = None,
     account_description: str | None = None,
     account_images: list[str] | None = None,
@@ -55,6 +57,7 @@ def create_account(
         )
     stock_no = allocate_number(session, SequenceKey.STOCK_NO)
     has_secondary = validate_optional_bool(has_secondary, field="has_secondary")
+    wallet_realname = validate_wallet_realname(wallet_realname)
     validated_images = validate_account_images(account_images)
     validate_account_profile_scope(inventory_type, account_description, validated_images)
     account = Account(
@@ -68,6 +71,7 @@ def create_account(
         channel_region=channel_region,
         bound_phone=bound_phone,
         has_secondary=has_secondary,
+        wallet_realname=wallet_realname,
         platform=platform,
         status=AccountStatus.WAITING.value,
         account_description=account_description,
@@ -99,6 +103,7 @@ def create_account(
             "inventory_type": account.inventory_type,
             "value_added_service": account.value_added_service,
             "platform": account.platform,
+            "wallet_realname": account.wallet_realname,
             "status": account.status,
             "account_description": account.account_description,
             "account_images": account.account_images or [],
@@ -125,6 +130,7 @@ def update_account_profile(
     channel_region: str | None | object = _UNSET,
     bound_phone: str | None | object = _UNSET,
     has_secondary: bool | None | object = _UNSET,
+    wallet_realname: str | None | object = _UNSET,
     platform: str | None | object = _UNSET,
     account_description: str | None | object = _UNSET,
     account_images: list[str] | None | object = _UNSET,
@@ -140,6 +146,7 @@ def update_account_profile(
         "channel_region": account.channel_region,
         "bound_phone": account.bound_phone,
         "has_secondary": account.has_secondary,
+        "wallet_realname": account.wallet_realname,
         "platform": account.platform,
         "account_description": account.account_description,
         "account_images": account.account_images or [],
@@ -159,6 +166,9 @@ def update_account_profile(
         if has_secondary is not _UNSET
         else _UNSET
     )
+    normalized_wallet = (
+        validate_wallet_realname(wallet_realname) if wallet_realname is not _UNSET else _UNSET
+    )
     if game_account is not _UNSET:
         account.game_account = next_game_account
     for field, value in {
@@ -167,6 +177,7 @@ def update_account_profile(
         "channel_region": channel_region,
         "bound_phone": bound_phone,
         "has_secondary": normalized_secondary,
+        "wallet_realname": normalized_wallet,
         "platform": platform,
         "account_description": account_description,
         "account_images": validated_images,
@@ -199,6 +210,7 @@ def update_account_profile(
             "channel_region": account.channel_region,
             "bound_phone": account.bound_phone,
             "has_secondary": account.has_secondary,
+            "wallet_realname": account.wallet_realname,
             "platform": account.platform,
             "account_description": account.account_description,
             "account_images": account.account_images or [],

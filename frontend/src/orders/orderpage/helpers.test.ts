@@ -37,4 +37,21 @@ describe("OrdersPage helpers", () => {
       items: [{ user_id: null, role: "OWNER", allocation_rate: "100", allocation_amount: "0" }],
     });
   });
+
+  it("按操作分润支持直接填金额", () => {
+    expect(validateAllocations([
+      { allocation_type: "BUY", employee: 1, allocation_rate: "20", allocation_amount: "200" },
+      { allocation_type: "SELL", allocation_rate: "10", allocation_amount: "100" },
+      { allocation_type: "OPERATION", allocation_rate: "10", allocation_amount: "100" },
+      { allocation_type: "COMPANY", employee: "COMPANY", allocation_rate: "50", allocation_amount: "500" },
+    ], "1000.00", "ACTION")).toEqual({
+      ok: true,
+      items: [
+        { user_id: 1, role: "BUYER", allocation_type: "BUY", allocation_rate: "0", allocation_amount: "200" },
+        { user_id: null, role: "SALES", allocation_type: "SELL", allocation_rate: "0", allocation_amount: "100" },
+        { user_id: null, role: "SERVICE", allocation_type: "OPERATION", allocation_rate: "0", allocation_amount: "100" },
+        { user_id: null, role: "OWNER", allocation_type: "COMPANY", allocation_rate: "0", allocation_amount: "500" },
+      ],
+    });
+  });
 });

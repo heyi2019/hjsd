@@ -1,13 +1,13 @@
 /** 建单表单字段配置驱动：拉取某业务类型的 OrderFormField 配置，并提供
  *  - FieldConfigContext / useFieldConfig：CreateBusinessModal 把配置注入此 context，各 Section 默认从此读取
  *  - CfgItem：受配置驱动的 Form.Item（停用字段不渲染、必填/标签从配置读）
- *  - CfgNestedItem：同上，但渲染在 NestedFormField 布局内（name 在内层 Form.Item）
+ *  - CfgNestedItem：同上，但渲染在 BusinessRegistrationField 布局内（name 在内层 Form.Item）
  *  - CustomFormField：渲染用户自定义字段（值归集到 form_extra.<field_key>）
  *  降级策略：配置未加载或某字段无配置时，视为「启用 + 使用原硬编码必填/标签」，
  *  保证既有表单在无配置或接口异常时与现状一致。
  */
-import { DatePicker, Form, Input, InputNumber, Radio, Switch, Typography } from "antd";
-import { NestedFormField, Select } from "../shared/ui";
+import { DatePicker, Form, Input, InputNumber, Radio, Switch, Typography, type FormItemProps } from "antd";
+import { BusinessRegistrationField, Select } from "../shared/ui";
 import type { ReactElement, ReactNode } from "react";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
 import type { Rule } from "antd/es/form";
@@ -232,6 +232,9 @@ export function CfgItem(props: {
   extra?: ReactNode;
   /** 字段下方的校验/提示信息（antd Form.Item.help）。 */
   help?: ReactNode;
+  /** 受控值转换：例如日期控件展示 Dayjs、提交仍保留后端日期字符串。 */
+  getValueFromEvent?: FormItemProps["getValueFromEvent"];
+  getValueProps?: FormItemProps["getValueProps"];
   className?: string;
   initialValue?: unknown;
   children: ReactNode;
@@ -248,6 +251,8 @@ export function CfgItem(props: {
       tooltip={props.tooltip}
       extra={props.extra}
       help={props.help}
+      getValueFromEvent={props.getValueFromEvent}
+      getValueProps={props.getValueProps}
       className={props.className}
       initialValue={props.initialValue}
     >
@@ -280,7 +285,7 @@ export function injectOptionsIfMissing(
   return mapped?.length === 1 ? mapped[0] : mapped;
 }
 
-/** 受配置驱动的 NestedFormField 布局项（name 在内层 Form.Item，如「联系方式」网格内的子字段）。 */
+/** 受配置驱动的 BusinessRegistrationField 布局项（name 在内层 Form.Item，如「联系方式」网格内的子字段）。 */
 export function CfgNestedItem(props: {
   cfg?: FieldConfigMap;
   name: string;
@@ -297,7 +302,7 @@ export function CfgNestedItem(props: {
   const resolvedRules = resolveRules(cfg, props.name, props.rules, condValues);
   if (!isFieldActive(cfg, props.name)) return null;
   return (
-    <NestedFormField className={props.className} label={fieldLabel(cfg, props.name, props.label)} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
+    <BusinessRegistrationField className={props.className} label={fieldLabel(cfg, props.name, props.label)} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
       <Form.Item
         noStyle={props.noStyle ?? true}
         name={props.name}
@@ -306,7 +311,7 @@ export function CfgNestedItem(props: {
       >
         {injectOptionsIfMissing(props.children, fieldConfigFor(cfg, props.name))}
       </Form.Item>
-    </NestedFormField>
+    </BusinessRegistrationField>
   );
 }
 

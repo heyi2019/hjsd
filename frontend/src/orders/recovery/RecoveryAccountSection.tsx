@@ -1,7 +1,7 @@
 import { Form, Input } from "antd";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Select } from "../../shared/ui";
+import { BusinessRegistrationSection, Select } from "../../shared/ui";
 import type { GameTypeOption } from "../../shared/api/catalog";
 import type { EmployeeOption } from "../../shared/api/catalog";
 import { CfgItem, sectionLabel } from "../ConfigurableField";
@@ -21,6 +21,7 @@ export function RecoveryAccountSection(props: {
     boundPhone: string;
     boundPhoneOwner: string;
     hasSecondary: string;
+    walletRealname: string;
     accountNote: string;
   }>;
   accountExtras?: ReactNode;
@@ -37,6 +38,7 @@ export function RecoveryAccountSection(props: {
     boundPhone: "bound_phone",
     boundPhoneOwner: "bound_phone_owner",
     hasSecondary: "has_secondary",
+    walletRealname: "wallet_realname",
     accountNote: "game_account_note",
     ...props.fieldNames,
   };
@@ -53,10 +55,7 @@ export function RecoveryAccountSection(props: {
     }
   }, [channelRegions, fieldNames.channelRegion, form, selectedChannelRegion]);
   return (
-    <section className="recovery-account-section recovery-entry-fields" aria-labelledby="game-account-info-title">
-      <div id="game-account-info-title" className="recovery-entry-fields__title">
-        {accountTitle}
-      </div>
+    <BusinessRegistrationSection className="account-section" title={accountTitle}>
       <CfgItem name={fieldNames.gameType} label="游戏类型" rules={[{ required: true, message: "游戏类型必填" }]}>
         {props.gameTypes?.length ? (
           <Select
@@ -96,13 +95,23 @@ export function RecoveryAccountSection(props: {
       <CfgItem name={fieldNames.hasSecondary} label="有无二次">
         <Select />
       </CfgItem>
+      <CfgItem name={fieldNames.walletRealname} label="钱包实名">
+        <Select
+          allowClear
+          placeholder="请选择"
+          options={[
+            { value: "未注销", label: "未注销" },
+            { value: "已注销", label: "已注销" },
+          ]}
+        />
+      </CfgItem>
       {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} /> : null}
-      <CfgItem name={fieldNames.accountNote} label="账号备注" className="recovery-entry-fields__account-note">
+      <CfgItem name={fieldNames.accountNote} label="账号备注" className="account-note">
         <Input placeholder="可选填" />
       </CfgItem>
       {props.accountExtras}
       {props.children}
       <DeliveryInfoSection showIntermediary={props.showIntermediaryDelivery} employees={props.employees} />
-    </section>
+    </BusinessRegistrationSection>
   );
 }

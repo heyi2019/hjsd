@@ -30,10 +30,7 @@
   min-width: 0;
 }
 
-.additional-expense-row .ant-form-item:nth-child(1) { flex: 0 1 360px; }
-.additional-expense-row .ant-form-item:nth-child(2) { flex: 0 1 260px; }
-.additional-expense-row .ant-form-item:nth-child(3) { flex: 0 1 300px; }
-.additional-expense-row .ant-form-item:nth-child(4) { flex: 1 1 320px; }
+.additional-expense-row .ant-form-item { flex: 1 1 0; }
 
 .additional-expense-row .ant-btn {
   flex: 0 0 auto;

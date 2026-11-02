@@ -105,7 +105,8 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单台账把导出按钮放在筛选栏最后并使用简短文案", async () => {
-    await openLedger();
+    renderLight(<OrdersPage initialTab="ledger" />);
+    await screen.findAllByText("HS-2026-INSTALLMENT-SETTLED");
     const exportButton = screen.getByRole("button", { name: /导出/ });
     expect(exportButton).toHaveTextContent("导出");
     expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
@@ -175,13 +176,28 @@ describe("OrdersPage：四类订单台账", () => {
     }
   });
 
-  it("订单列表尚未完成时统计卡不显示可信的零", async () => {
+  it("FE-253：订单台账加载未完成时统计卡不显示可信的零", async () => {
     vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
     renderLight(<OrdersPage initialTab="ledger" />);
     const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
     const card = within(ledger).getByText("订单总量").closest(".ui-stat") as HTMLElement;
     expect(within(card).getByText("—")).toBeInTheDocument();
     expect(within(card).queryByText("0")).toBeNull();
+  });
+
+  it("FE-257：分期订单同时展示订单状态与合约结清状态", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
+      ...orders[0],
+      status: "INSTALLMENT",
+      installment_status: "SETTLED",
+      order_no: "HS-2026-INSTALLMENT-SETTLED",
+    }]);
+    renderLight(<OrdersPage initialTab="ledger" />);
+    await screen.findAllByText("HS-2026-INSTALLMENT-SETTLED");
+
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-INSTALLMENT-SETTLED") !== null)!;
+    expect(within(row).getByText("分期中")).toBeInTheDocument();
+    expect(within(row).getByText("合约：已结清")).toBeInTheDocument();
   });
 
   it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
@@ -427,19 +443,23 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByText("旧平台")).toBeNull();
   });
 
-  it("操作列提供更多菜单入口", async () => {
+  it("操作列直接提供四个小号操作入口", async () => {
     await openLedger("admin");
 
-    expect(screen.getAllByText("更多")).toHaveLength(2);
+    expect(screen.queryAllByRole("button", { name: "更多" })).toHaveLength(0);
+    for (const label of ["编辑", "分润", "资金收支", "取消"]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+      expect(buttons).toHaveLength(2);
+      expect(buttons.every((button) => button.classList.contains("ant-btn-sm"))).toBe(true);
+    }
   });
 
-  it("行级更多菜单提供分润、资金收支和取消交易", async () => {
+  it("行级操作直接提供分润、资金收支和取消交易", async () => {
     await openLedger("admin");
-    fireEvent.click(screen.getAllByText("更多")[0]);
 
-    expect(await screen.findByText("分润")).toBeInTheDocument();
-    expect(await screen.findByText("资金收支")).toBeInTheDocument();
-    expect(await screen.findByText("取消交易")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "分润" })[0]).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "资金收支" })[0]).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "取消" })[0]).toBeInTheDocument();
   });
 
   it("待售代挂订单的操作入口显示下架而不是取消", async () => {
@@ -460,9 +480,7 @@ describe("OrdersPage：四类订单台账", () => {
 
     const row = screen.getAllByText("DG-2026-0003").find((element) => element.closest("tr"))?.closest("tr");
     expect(row).not.toBeNull();
-    fireEvent.click(within(row as HTMLElement).getByText("更多"));
-
-    fireEvent.click(await screen.findByText("下架"));
+    fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "下架" }));
     expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText("取消")).toBeNull();
   });
@@ -487,11 +505,9 @@ describe("OrdersPage：四类订单台账", () => {
 
     const row = screen.getAllByText("DG-2026-0004").find((element) => element.closest("tr"))?.closest("tr");
     expect(row).not.toBeNull();
-    fireEvent.click(within(row as HTMLElement).getByText("更多"));
-
-    expect(await screen.findByText("取消")).toBeInTheDocument();
+    expect(within(row as HTMLElement).getByRole("button", { name: "取消" })).toBeInTheDocument();
     expect(screen.queryByText("下架")).toBeNull();
-    fireEvent.click(screen.getByText("取消"));
+    fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "取消" }));
     const modal = await screen.findByRole("dialog");
     expect(within(modal).getByText("售出取消交易 · DG-2026-0004")).toBeInTheDocument();
     expect(within(modal).getByLabelText("退款金额")).toBeInTheDocument();
@@ -531,13 +547,12 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByRole("button", { name: /登记事件/ })).toBeNull();
   });
 
-  it("订单操作通过更多菜单进入取消交易并提交原因", async () => {
+  it("订单操作通过取消按钮进入取消交易并提交原因", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...orders[0], events: [] });
     vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...orders[0], status: "CANCELLED" });
 
     await openLedger("admin");
-    fireEvent.click(screen.getAllByText("更多")[0]);
-    fireEvent.click(await screen.findByText("取消交易"));
+    fireEvent.click(screen.getAllByRole("button", { name: "取消" })[0]);
 
     expect(await screen.findByText("售出取消交易 · HS-2026-0001")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("取消原因"), { target: { value: "客户取消" } });
@@ -559,8 +574,7 @@ describe("OrdersPage：四类订单台账", () => {
     ] as never);
 
     await openLedger("admin");
-    fireEvent.click(screen.getAllByText("更多")[0]);
-    fireEvent.click(await screen.findByText("取消交易"));
+    fireEvent.click(screen.getAllByRole("button", { name: "取消" })[0]);
 
     const modal = await screen.findByRole("dialog");
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();

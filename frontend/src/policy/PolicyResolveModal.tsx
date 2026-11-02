@@ -1,5 +1,5 @@
 import { Form, Input, Typography } from "antd";
-import { BusinessActionModal, BusinessForm, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, Select } from "../shared/ui";
 import { useEffect } from "react";
 import { today } from "./policyConstants";
 import { describeConfig } from "./policyConfigSchema";
@@ -62,7 +62,11 @@ export function PolicyResolveModal({
       onCancel={onCancel}
       onOk={() => void form.submit()}
     >
-      <BusinessForm form={form} onFinish={onOk}>
+      <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={form} onFinish={onOk}>
         <Typography.Paragraph type="secondary">
           解析某个日期实际命中的规则版本——发布只影响生效日之后的新单，历史订单按建单时固化的快照计算，不随改版变化。
         </Typography.Paragraph>
@@ -95,7 +99,7 @@ export function PolicyResolveModal({
             </Typography.Paragraph>
           )
         ) : null}
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
   );
 }

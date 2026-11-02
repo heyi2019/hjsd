@@ -4,7 +4,7 @@ import { Alert, DatePicker, Form, Input, Typography } from "antd";
 import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
-import { MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessForm } from "../../shared/ui";
+import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
@@ -64,6 +64,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
   return (
       <BusinessActionModal
         title={cancelInstallmentTarget ? `分期取消交易 · ${cancelInstallmentTarget.inst_no}` : cancelOrderTarget ? `${cancelScope === "INVREFUND" ? "库存取消交易" : "售出取消交易"} · ${cancelOrderTarget.order_no}` : "取消交易"}
+        fieldCount={6}
         open={Boolean(cancelInstallmentTarget || (cancelOrderTarget && !hasSharedCancellation))}
         confirmLoading={cancelSubmitting}
         onCancel={closeCancelTransaction}
@@ -71,7 +72,11 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
         okButtonProps={{ danger: true }}
         onOk={() => void cancelForm.submit()}
       >
-        <BusinessForm scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} form={cancelForm} onFinish={submitCancelTransaction}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} form={cancelForm} onFinish={submitCancelTransaction}>
           <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
@@ -114,15 +119,15 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
               <ResponsibleEmployeeSelect name="operator_user_ids" label={cancelScope === "INVREFUND" ? "入账操作人" : "退款操作人"} employees={cancelEmployees} className="order-cancel-employee" />
             </div>
           ) : null}
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true, message: "请输入取消日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix="order-cancel" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
   );
 }
@@ -140,13 +145,18 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
   return (
       <BusinessActionModal
         title={selectedOrder ? `编辑订单 · ${selectedOrder.order_no}` : "编辑订单"}
+        fieldCount={7}
         open={editOpen}
         confirmLoading={editSubmitting}
         onCancel={() => { if (!editSubmitting) setEditOpen(false); }}
         okText="保存修改"
         onOk={() => void editForm.submit()}
       >
-        <BusinessForm scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
           <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
             订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
@@ -156,8 +166,10 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
             label="成交日期"
             rules={orderHasPostedEvents ? [] : [{ required: true, message: "请输入成交日期" }]}
             extra={orderHasPostedEvents ? "已有登记事件，成交日期不可修改" : undefined}
+            getValueFromEvent={dateValueFromEvent}
+            getValueProps={dateValueProps}
           >
-            <Input placeholder="YYYY-MM-DD" disabled={orderHasPostedEvents} />
+            <DateField disabled={orderHasPostedEvents} />
           </CfgItem>
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="订单备注（选填）" />
@@ -165,7 +177,7 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
 
           <CustomFieldSection testIdSuffix="order-edit" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
   );
 }
@@ -181,6 +193,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     allocationProfit,
     allocationSubmitting,
     employeeOptions,
+    loadLedgerDetail,
     profitRoleOptions,
     setActionOrder,
     setAllocationOpen,
@@ -204,19 +217,53 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     }
     return staffOptions;
   };
+  const syncAllocationPair = (index: number, field: "allocation_rate" | "allocation_amount", raw: string) => {
+    const rows = (allocationForm.getFieldValue("allocations") as AllocationFormRow[] | undefined) ?? [];
+    const nextRows = rows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, [field]: raw };
+      const value = Number(raw.trim());
+      const profit = Number(allocationProfit);
+      if (!raw.trim()) {
+        next[field === "allocation_rate" ? "allocation_amount" : "allocation_rate"] = "";
+      } else if (Number.isFinite(value) && value >= 0 && profit > 0) {
+        if (field === "allocation_rate") next.allocation_amount = (profit * value / 100).toFixed(2);
+        else next.allocation_rate = (value / profit * 100).toFixed(2);
+      }
+      return next;
+    });
+    allocationForm.setFieldsValue({ allocations: nextRows });
+  };
   return (
       <BusinessActionModal
         title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
+        fieldCount={21}
         open={allocationOpen}
-        width={720}
         confirmLoading={allocationSubmitting}
+        wrapClassName="allocation-modal"
         onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
         onOk={() => void allocationForm.submit()}
       >
-        <BusinessForm
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
           scope="ALLOCATION"
           form={allocationForm}
-          layout="vertical"
+          onValuesChange={(changedValues) => {
+            const changedRows = changedValues.allocations as Record<string, AllocationFormRow | undefined> | undefined;
+            const changedEntry = Object.entries(changedRows ?? {}).find(([, row]) => row != null);
+            if (!changedEntry) return;
+            const [indexText, changedRow] = changedEntry;
+            if (!changedRow) return;
+            const index = Number(indexText);
+            const field = changedRow.allocation_rate !== undefined
+              ? "allocation_rate"
+              : changedRow.allocation_amount !== undefined ? "allocation_amount" : undefined;
+            if (!field) return;
+            syncAllocationPair(index, field, changedRow[field] ?? "");
+          }}
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             const allRows = values.allocations ?? [];
@@ -238,6 +285,8 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
             try {
               await policyApi.setAllocations(actionOrder.id, items, values.form_extra);
               appMessage.success("分润已保存");
+              // L266：刷新订单详情，使分润明细在订单展开详情中回显（详情由 ledgerDetails 缓存驱动）。
+              if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder.account_id, true);
               setAllocationOpen(false);
               setActionOrder(null);
             } catch (error) {
@@ -261,8 +310,8 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           />
           <Typography.Paragraph type="secondary">
             {isAction
-              ? "按操作分配：买号、售出、运营、公司四项，比例合计须为 100%。买号/售出只能给该动作的执行人；多人协作时由你指定其中一位，其余人记入运营。"
-              : "每行一位员工：填比例按订单利润占比分，填金额按固定额分，两者都选填、同一行只填一个。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。"}
+              ? "按操作分配：买号、售出、运营、公司四项。比例和金额可任选其一，填写后自动换算另一项；买号/售出只能给该动作的执行人。"
+              : "每行一位员工：比例和金额可任选其一，填写后自动换算另一项。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
@@ -275,15 +324,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                   const employeeDisabled = company || actionMissing;
                   return (
                     <AdaptiveFormGrid key={field.key} className={`orders-allocation-row${isAction ? " is-action" : ""}`}>
-                      {kind ? (
-                        <span className="orders-allocation-kind">{ALLOCATION_TYPE_LABEL[kind]}</span>
-                      ) : null}
                       <Form.Item name={[field.name, "allocation_type"]} hidden>
                         <Input />
                       </Form.Item>
                       <Form.Item
                         name={[field.name, "employee"]}
-                        label="姓名"
+                        label={kind ? ALLOCATION_TYPE_LABEL[kind] : "姓名"}
                         rules={employeeDisabled ? [] : [{ required: true, message: "请选择姓名" }]}
                       >
                         <Select
@@ -311,17 +357,25 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                             : percentRules("比例")
                         }
                       >
-                        <Input suffix="%" inputMode="decimal" className="ui-control-width-120" />
+                        <Input
+                          suffix="%"
+                          inputMode="decimal"
+                          className="ui-control-width-120"
+                        />
                       </Form.Item>
-                      {isAction ? null : (
+                      <Form.Item
+                        name={[field.name, "allocation_amount"]}
+                        label="金额"
+                        rules={moneyRules("金额")}
+                      >
+                        <Input
+                          prefix="¥"
+                          inputMode="decimal"
+                          className="ui-control-width-140"
+                        />
+                      </Form.Item>
+                      {!isAction ? (
                         <>
-                          <Form.Item
-                            name={[field.name, "allocation_amount"]}
-                            label="金额"
-                            rules={moneyRules("金额")}
-                          >
-                            <Input prefix="¥" inputMode="decimal" className="ui-control-width-140" />
-                          </Form.Item>
                           <PermissionButton
                             permission="policy.manage"
                             type="link"
@@ -332,7 +386,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                             删除
                           </PermissionButton>
                         </>
-                      )}
+                      ) : null}
                     </AdaptiveFormGrid>
                   );
                 })}
@@ -352,7 +406,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>
             <CustomFieldSection testIdSuffix="order-allocation" />
           </FieldConfigScope>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
   );
 }
@@ -373,14 +427,18 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
   return (
       <BusinessActionModal
         title={actionOrder ? `资金收支 · ${actionOrder.order_no}` : "资金收支"}
+        fieldCount={5}
         open={refundOpen}
         confirmLoading={refundSubmitting}
         onCancel={() => { setRefundOpen(false); setActionOrder(null); }}
         onOk={() => void refundForm.submit()}
       >
-        <BusinessForm scope="REFUND"
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="REFUND"
           form={refundForm}
-          layout="vertical"
           onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);
@@ -420,17 +478,27 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
           </CfgItem>
             <CustomFieldSection testIdSuffix="order-refund" />
           </FieldConfigScope>
-        </BusinessForm>
-        <div className="ui-form-spaced">
+        </BusinessRegistrationForm>
+        <div className="ui-form-spaced orders-event-list">
           <Typography.Text strong>资金明细</Typography.Text>
-          {actionOrder?.cashflows?.length ? actionOrder.cashflows.map((flow) => (
-            <div key={flow.flow_no} className="orders-event-row">
-              <span>{flow.occurred_on}</span>
-              <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
-              <span><MoneyText value={flow.amount} /></span>
-              <span>操作人：{flow.operator || currentOperator}</span>
+          {actionOrder?.cashflows?.length ? (
+            <div className="orders-event-table" role="table" aria-label="资金明细表">
+              <div className="orders-event-row orders-event-row--header" role="row">
+                <span role="columnheader">发生日期</span>
+                <span role="columnheader">收支</span>
+                <span role="columnheader">金额</span>
+                <span role="columnheader">操作人</span>
+              </div>
+              {actionOrder.cashflows.map((flow) => (
+                <div key={flow.flow_no} className="orders-event-row" role="row">
+                  <span role="cell">{flow.occurred_on}</span>
+                  <span role="cell">{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
+                  <span role="cell"><MoneyText value={flow.amount} /></span>
+                  <span role="cell">{flow.operator || currentOperator}</span>
+                </div>
+              ))}
             </div>
-          )) : <Typography.Text type="secondary">暂无资金明细</Typography.Text>}
+          ) : <Typography.Text type="secondary">暂无资金明细</Typography.Text>}
         </div>
       </BusinessActionModal>
   );

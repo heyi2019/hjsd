@@ -43,7 +43,7 @@ export function OrderDetailFinanceSection({
       key: "amount",
       align: "right",
       render: (value: string) => (
-        <div className="inventory-finance-table__amount">
+        <div className="inventory-detail__cell-amount">
           <MoneyText value={value} />
         </div>
       ),

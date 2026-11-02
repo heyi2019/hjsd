@@ -88,7 +88,7 @@ describe("PoolsPanel.deep", () => {
     await ui.click(within(row).getByRole("button", { name: /编辑/ }));
     const modal = (await screen.findByText(/编辑资金池 · HJ_CUSTODY/)).closest(".ant-modal-content") as HTMLElement;
     await ui.click(within(modal).getByRole("button", { name: /保存/ }));
-    expect(await screen.findByText(/update fail/)).toBeInTheDocument();
+    expect(await within(modal).findByText(/update fail/)).toBeInTheDocument();
   });
 
   it("停用（ConfirmButton）：setStatus(id, DISABLED)", async () => {

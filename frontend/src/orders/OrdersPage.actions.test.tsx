@@ -180,6 +180,7 @@ const installment: Installment = {
   per_period: "2000.00",
   paid_amount: "3000.00",
   total_receivable: "12000.00",
+  remaining_receivable: "12000.00",
   status: "ACTIVE",
 };
 const installmentCancelResult: InstallmentCancelResult = {

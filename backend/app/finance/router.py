@@ -4,12 +4,13 @@
 """
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import NotFound
+from app.core.errors import NotFound, Validation
 from app.core.audit import record_audit
 from app.core.security import (
     PERM_DEPOSIT_POST,
@@ -43,6 +44,51 @@ post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 post_transfer = require_permissions(PERM_TRANSFER_POST)
 
 
+@router.get("/cashflows/studio-summary", response_model=schemas.StudioSummaryOut)
+def studio_summary(
+    pool_ids: str | None = Query(
+        default=None,
+        description="逗号分隔的资金池 ID；不传则按当前用户可见池",
+    ),
+    occurred_from: date | None = Query(default=None),
+    occurred_to: date | None = Query(default=None),
+    category: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> schemas.StudioSummaryOut:
+    """工作室收支面板：一次返回明细与已入账汇总。
+
+    「哪些流水算工作室收支」的口径在 `service.studio_summary` 里，前端不再自己过滤、
+    也不再对当页求和（原先收入/支出各拉一次，再 reduce 出两个合计和一个净额）。
+    """
+    parsed: list[int] | None = None
+    if pool_ids:
+        try:
+            parsed = [int(item) for item in pool_ids.split(",") if item.strip()]
+        except ValueError as exc:
+            raise Validation(
+                "pool_ids 必须是逗号分隔的整数",
+                details={"field": "pool_ids", "value": pool_ids},
+            ) from exc
+    result = service.studio_summary(
+        db,
+        pool_ids=parsed,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+        category=category.strip().upper() if category else None,
+        limit=limit,
+        user=user,
+    )
+    return schemas.StudioSummaryOut(
+        items=[_cashflow_out(db, item) for item in result["items"]],
+        approved_income=result["approved_income"],
+        approved_expense=result["approved_expense"],
+        approved_net=result["approved_net"],
+        count=result["count"],
+    )
+
+
 @router.get("/cashflows", response_model=schemas.CashflowListOut)
 def list_cashflows(
     pool_id: int | None = Query(default=None),
@@ -56,64 +102,49 @@ def list_cashflows(
     accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> schemas.CashflowListOut:
+    empty = schemas.CashflowListOut(
+        items=[], total=0, total_in=Decimal("0"), total_out=Decimal("0")
+    )
     if pool_id is not None and not user.can_see_pool(pool_id):
-        return schemas.CashflowListOut(items=[], total=0)
+        return empty
+    pool_ids: list[int] | None = None
     if pool_id is None and not (user.is_admin or user.owner_scope == "ALL"):
         if not user.pool_ids:
-            return schemas.CashflowListOut(items=[], total=0)
-        items, total = service.list_cashflows(
-            db,
-            pool_ids=sorted(user.pool_ids),
-            order_id=order_id,
-            direction=direction,
-            occurred_from=occurred_from,
-            occurred_to=occurred_to,
-            status=status,
-            nature=nature.strip().upper() if nature else None,
-            fund_nature=fund_nature.strip().upper() if fund_nature else None,
-            accounting_attribute=(
-                accounting_attribute.strip().upper()
-                if accounting_attribute else None
-            ),
-            category=category.strip().upper() if category else None,
-            created_by=created_by,
-            limit=limit,
-            offset=offset,
-            user=user,
-        )
-        return schemas.CashflowListOut(
-            items=[_cashflow_out(db, item) for item in items],
-            total=total,
-        )
+            return empty
+        pool_ids = sorted(user.pool_ids)
 
-    items, total = service.list_cashflows(
-        db,
-        pool_id=pool_id,
-        order_id=order_id,
-        direction=direction,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-        status=status,
-        nature=nature.strip().upper() if nature else None,
-        fund_nature=fund_nature.strip().upper() if fund_nature else None,
-        accounting_attribute=(
-            accounting_attribute.strip().upper()
-            if accounting_attribute else None
+    filters = {
+        "pool_id": pool_id,
+        "pool_ids": pool_ids,
+        "order_id": order_id,
+        "direction": direction,
+        "occurred_from": occurred_from,
+        "occurred_to": occurred_to,
+        "status": status,
+        "nature": nature.strip().upper() if nature else None,
+        "fund_nature": fund_nature.strip().upper() if fund_nature else None,
+        "accounting_attribute": (
+            accounting_attribute.strip().upper() if accounting_attribute else None
         ),
-        category=category.strip().upper() if category else None,
-        created_by=created_by,
-        limit=limit,
-        offset=offset,
-        user=user,
-    )
+        "category": category.strip().upper() if category else None,
+        "created_by": created_by,
+        "keyword": keyword,
+        "user": user,
+    }
+    items, total = service.list_cashflows(db, limit=limit, offset=offset, **filters)
+    # 合计与明细同条件、同源：前端不再对当页求和，超 limit 也不会少算。
+    total_in, total_out = service.cashflow_totals(db, **filters)
     return schemas.CashflowListOut(
         items=[_cashflow_out(db, item) for item in items],
         total=total,
+        total_in=total_in,
+        total_out=total_out,
     )
 
 

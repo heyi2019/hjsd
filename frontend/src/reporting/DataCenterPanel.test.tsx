@@ -52,7 +52,11 @@ const orders = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
+  // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
+  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+    items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+  });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
   vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue(businessPnl);
 });

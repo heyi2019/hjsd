@@ -30,6 +30,15 @@ export interface PoolBalance {
   available: string;
 }
 
+/** 资金池余额汇总：由服务端聚合，前端只展示，不再本地累加。 */
+export interface PoolBalanceTotals {
+  cash_balance: string;
+  available: string;
+  deposit_held: string;
+  /** 自有权益：仅 ownership=OWNED 的池，按现金头寸计。 */
+  owned_cash_balance: string;
+}
+
 export interface OrderType {
   id: number;
   code: string;
@@ -477,9 +486,24 @@ export interface AccountAuditEntry {
   occurred_at: string;
 }
 
+export interface ExecutionFinanceSummary {
+  /** 流入流水合计（不含返点）。 */
+  cashflow_income: string;
+  /** 返点收入合计。 */
+  rebate_income: string;
+  /** 总收入 = cashflow_income + rebate_income。 */
+  total_income: string;
+  /** 流出流水合计。 */
+  total_expense: string;
+  /** 净额 = total_income − total_expense。 */
+  net_amount: string;
+}
+
 export interface AccountExecutionDetail {
   account: Account;
   orders: AccountExecutionOrder[];
+  /** 账号维度财务汇总：由后端按同一份明细算好下发，前端不再自行累加。 */
+  finance_summary: ExecutionFinanceSummary;
   audit?: AccountAuditEntry[];
 }
 
@@ -500,6 +524,8 @@ export interface Installment {
   final_period_adjustment?: string;
   /** 总应收：首付 + 每期 × 期数 + 末期调整 − 减免，由后端下发，前端不自行推导。 */
   total_receivable: string;
+  /** 剩余应收：总应收 − 已收 − 坏账，且不小于 0；后端下发，前端不再相减。 */
+  remaining_receivable: string;
   status: string;
   delivery_mode?: string | null;
   delivered_on?: string | null;
@@ -545,6 +571,8 @@ export interface Deposit {
   expected_release_on?: string | null;
   released_on?: string | null;
   note?: string | null;
+  /** 押金剩余：实收 − 已退 − 已损失，且不小于 0；后端下发，前端不再相减。 */
+  remaining_amount: string;
 }
 
 export interface TransferResult {

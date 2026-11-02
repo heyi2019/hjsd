@@ -16,6 +16,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "studioSummary",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -70,10 +71,14 @@ function mockOptionSets() {
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  // 列表按方向拉两次（支出=OPERATING_EXPENSE / 收入=SELF_REVENUE），mock 按参数分流
-  vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
-    const items = expenseFlows.filter((flow) => flow.direction === params?.direction);
-    return { items, total: items.length };
+  // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
+  // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
+  vi.mocked(catalog.cashflowsApi.studioSummary).mockResolvedValue({
+    items: expenseFlows as never,
+    approved_income: "0.00",
+    approved_expense: "3000.00",
+    approved_net: "-3000.00",
+    count: expenseFlows.length,
   });
 });
 
@@ -110,7 +115,10 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(await screen.findByRole("combobox", { name: "资金池筛选" })).toBeInTheDocument();
 
     await togglePoolFilter(/押金池/);
-    expect(screen.queryByText("日用")).not.toBeInTheDocument();
+    // 列表过滤在后端：取消押金池后请求只带 POOL-A
+    expect(vi.mocked(catalog.cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pool_ids: "1" }),
+    );
   });
 
   it("资金池筛选下拉只显示中文名称，不显示英文编码", async () => {
@@ -196,12 +204,36 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(screen.getByText("暂无工作室收支")).toBeInTheDocument();
   });
 
-  it("列表只显示已勾选承载池的手工收支流水", async () => {
+  it("资金池筛选随请求下发 pool_ids，前端不再自行过滤", async () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     expect(await screen.findByText("房租")).toBeInTheDocument();
+    // 默认勾选全部池
+    expect(vi.mocked(catalog.cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pool_ids: "1,2" }),
+    );
     await togglePoolFilter(/押金池/);
-    // POOL-B 上的日用支出被过滤，不出现在本页
-    expect(screen.queryByText("日用")).not.toBeInTheDocument();
+    // 取消押金池后只剩 POOL-A；「只显示这些池的流水」由后端按 pool_ids 筛
+    expect(vi.mocked(catalog.cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pool_ids: "1" }),
+    );
+  });
+
+  it("三个汇总数取服务端，不与当页明细相加", async () => {
+    // 故意让后端汇总与两条明细（3000 + 100）对不上：卡片必须显示后端值。
+    vi.mocked(catalog.cashflowsApi.studioSummary).mockResolvedValue({
+      items: expenseFlows as never,
+      approved_income: "888.88",
+      approved_expense: "777.77",
+      approved_net: "111.11",
+      count: 2,
+    });
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+
+    const cardOf = (label: string) => screen.getByText(label).closest(".ui-stat") as HTMLElement;
+    expect(within(cardOf("已入账收入")).getByText("888.88")).toBeInTheDocument();
+    expect(within(cardOf("已入账支出")).getByText("777.77")).toBeInTheDocument();
+    expect(within(cardOf("净额")).getByText("111.11")).toBeInTheDocument();
   });
 
   it("日期筛选和登记日期复用库存中心的日期选择器", async () => {
@@ -256,7 +288,7 @@ describe("StudioExpensePanel：工作室支出", () => {
 
   it("流水列表拉取失败时禁用记一笔入口并展示错误重试", async () => {
     mockOptionSets();
-    vi.mocked(catalog.cashflowsApi.list).mockRejectedValue(new Error("流水读取失败"));
+    vi.mocked(catalog.cashflowsApi.studioSummary).mockRejectedValue(new Error("流水读取失败"));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     const recordBtn = await screen.findByRole("button", { name: /记一笔/ });
     await waitFor(() => expect(recordBtn).toBeDisabled());

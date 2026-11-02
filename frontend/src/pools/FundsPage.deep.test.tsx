@@ -23,7 +23,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
     "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "balances", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -54,7 +54,7 @@ const balance = {
   available: "700.00",
 };
 const deposits = [
-  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", status: "HELD", expected_release_on: "2026-11-01" },
+  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
   { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
@@ -66,9 +66,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
+  // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
+  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+    items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+  });
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
-  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length });
+  // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
+  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
   // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
@@ -127,7 +132,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
-    resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: approved, total: approved.length });
+    resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: approved, total: approved.length, total_in: "0.00", total_out: "300.00" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -147,9 +152,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const reversal = { ...approved, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
     let mainListCalls = 0;
     vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
-      if (params?.direction) return { items: [], total: 0 };
+      if (params?.direction) return { items: [], total: 0, total_in: "0.00", total_out: "0.00" };
       mainListCalls += 1;
-      return mainListCalls === 1 ? { items: [approved], total: 1 } : { items: [approved, reversal], total: 2 };
+      return mainListCalls === 1
+        ? { items: [approved], total: 1, total_in: "0.00", total_out: "300.00" }
+        : { items: [approved, reversal], total: 2, total_in: "300.00", total_out: "300.00" };
     });
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.reverse), reversal);
     renderLight(<FundsPage />, { user: "admin" });
@@ -169,7 +176,9 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
-    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => params?.direction ? { items: [], total: 0 } : { items: approved, total: 1 });
+    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => params?.direction
+      ? { items: [], total: 0, total_in: "0.00", total_out: "0.00" }
+      : { items: approved, total: 1, total_in: "0.00", total_out: "300.00" });
     vi.mocked(catalog.cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
@@ -286,15 +295,24 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(await screen.findByText(/系统余额口径：截至对账日期「已入账」流水的累计/)).toBeInTheDocument();
   });
 
-  it("总览统计卡展示自有权益合计（仅 OWNED 归属池计入）", async () => {
-    // 注意用 mockResolvedValue 而非 Once：Tabs 不卸载非激活面板，池列表会被多个面板消费。
+  it("总览统计卡的自有权益取服务端汇总（不再前端按 ownership 自算）", async () => {
+    // 归属判定（OWNED 计入权益、CUSTODY/THIRD_PART 只计头寸）已在后端
+    // pool_balance_summary 里完成，契约由 backend tests/v1/test_pool_balances_batch.py 守；
+    // 这里只验前端确实展示服务端给的数，而不是自己挑池相加。
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "OWNED", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "托管池", pool_type: "DEPOSIT", ownership: "CUSTODY", status: "ACTIVE" },
     ]);
+    resolveMock(vi.mocked(catalog.poolsApi.balances), {
+      items: [
+        { ...balance, pool_id: 1, pool_code: "POOL-A" },
+        { ...balance, pool_id: 2, pool_code: "POOL-B" },
+      ],
+      totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
+    });
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByText("自有权益合计")).toBeInTheDocument();
-    // balance mock 两池现金头寸均为 800.00，仅 POOL-A（OWNED）计入权益 → 800.00。
+    // 两池现金头寸各 800.00，但只有 OWNED 的 POOL-A 计入 → 服务端给出 800.00。
     const card = screen.getByText("自有权益合计").closest(".ui-stat");
     expect(within(card as HTMLElement).getByText("800.00")).toBeInTheDocument();
     // 口径说明：CUSTODY/THIRD_PART 只计头寸不计权益。

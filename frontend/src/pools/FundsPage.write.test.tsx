@@ -23,7 +23,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations", "cancel", "voidRecord",
     "supersede", "expireSweep",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "balances", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -47,7 +47,7 @@ const pools = [
   { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
 ];
 const balance = { income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" };
-const deposits = [{ id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", status: "HELD", expected_release_on: "2026-11-01" }];
+const deposits = [{ id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" }];
 const cashflows = [
   { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
   { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
@@ -57,7 +57,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
+  // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
+  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+    items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+  });
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
   resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length });
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
@@ -157,7 +161,7 @@ describe("FundsPage：资金写路径", () => {
 
   it("押金取消：PAID 押金填原因后调用 depositsApi.cancel（全额冲正由后端写）", async () => {
     vi.mocked(catalog.depositsApi.list).mockResolvedValue([
-      { id: 12, pool_id: 1, paid_amount: "300.00", returned_amount: "0.00", lost_amount: "0.00", status: "PAID" },
+      { id: 12, pool_id: 1, paid_amount: "300.00", returned_amount: "0.00", lost_amount: "0.00", remaining_amount: "300.00", status: "PAID" },
     ] as unknown as Awaited<ReturnType<typeof catalog.depositsApi.list>>);
     resolveMockOnce(vi.mocked(catalog.depositsApi.cancel), { id: 12 });
     renderLight(<FundsPage />, { user: "finance" });

@@ -199,9 +199,24 @@ class AccountAuditOut(BaseModel):
     occurred_at: datetime
 
 
+class ExecutionFinanceSummaryOut(BaseModel):
+    """账号维度的财务汇总：明细在前端拼装，合计一律由后端给。
+
+    口径与本接口的 orders 完全一致（事件流水 + 订单独立流水 + 返点收入），
+    前端不再对详情数据做第二遍累加。
+    """
+
+    cashflow_income: Decimal
+    rebate_income: Decimal
+    total_income: Decimal
+    total_expense: Decimal
+    net_amount: Decimal
+
+
 class AccountExecutionDetailOut(BaseModel):
     account: AccountOut
     orders: list[AccountExecutionOrderOut]
+    finance_summary: ExecutionFinanceSummaryOut
     audit: list[AccountAuditOut] = Field(default_factory=list)
 
 __all__ = [
@@ -220,4 +235,5 @@ __all__ = [
     "AccountExecutionOrderOut",
     "AccountAuditOut",
     "AccountExecutionDetailOut",
+    "ExecutionFinanceSummaryOut",
 ]

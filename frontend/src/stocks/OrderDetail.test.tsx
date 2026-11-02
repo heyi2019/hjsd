@@ -186,7 +186,7 @@ describe("OrderDetail", () => {
     expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
   });
 
-  it("FE-269：返点进入订单详情的收入笔数和总收入", () => {
+  it("FE-269：返点进入收入笔数，总收入取服务端 finance_summary", () => {
     const detail = {
       orders: [{
         order_id: 269,
@@ -206,13 +206,59 @@ describe("OrderDetail", () => {
           collected_on: "2026-11-02",
         }],
       }],
+      finance_summary: {
+        cashflow_income: "0.00",
+        rebate_income: "100.00",
+        total_income: "100.00",
+        total_expense: "0.00",
+        net_amount: "100.00",
+      },
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={account} detail={detail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
     const finance = panel.querySelector(".inventory-detail__section--finance") as HTMLElement;
     expect(within(finance).getAllByText("1 笔").length).toBeGreaterThanOrEqual(1);
-    expect(within(finance).getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
+    const summary = finance.querySelector(".inventory-finance-summary") as HTMLElement;
+    expect(within(summary).getByText("总收入").parentElement).toHaveTextContent("100.00");
+  });
+
+  it("总额度只认后端 finance_summary，不按明细行相加", () => {
+    // 明细里有一笔 500.00 收入，但后端合计是 123.45：卡片必须显示 123.45。
+    const detail = {
+      orders: [{
+        order_id: 271,
+        order_no: "HS-FE271",
+        order_type: "HS",
+        status: "DONE",
+        created_at: "2026-11-02T10:00:00",
+        events: [],
+        cashflows: [{
+          flow_no: "SR-FE271",
+          occurred_on: "2026-11-02",
+          occurred_at: "2026-11-02T10:00:00",
+          direction: "IN",
+          nature: "BUSINESS_IN",
+          category: "OTHER",
+          amount: "500.00",
+          operator: "admin",
+        }],
+        rebates: [],
+      }],
+      finance_summary: {
+        cashflow_income: "123.45",
+        rebate_income: "0.00",
+        total_income: "123.45",
+        total_expense: "67.89",
+        net_amount: "55.56",
+      },
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={account} detail={detail} loading={false} />);
+    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    const summary = panel.querySelector(".inventory-finance-summary") as HTMLElement;
+    expect(within(summary).getByText("总收入").parentElement).toHaveTextContent("123.45");
+    expect(within(summary).getByText("总支出").parentElement).toHaveTextContent("67.89");
   });
 
   it("FE-129：无寄售平台的初始代挂单不应显示为已上架", () => {

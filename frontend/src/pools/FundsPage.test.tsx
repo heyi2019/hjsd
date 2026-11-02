@@ -22,7 +22,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "balances", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -53,20 +53,24 @@ const balance = {
   available: "700.00",
 };
 const deposits = [
-  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", status: "HELD", expected_release_on: "2026-11-01" },
+  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  resolveMock(vi.mocked(catalog.poolsApi.balance), balance);
+  // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
+  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+    items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+  });
   resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
-  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length });
+  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "500.00" });
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
   // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
@@ -218,6 +222,23 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getByText("自营收入")).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("总收入/总支出取服务端合计，不再对当页明细求和", async () => {
+    // 明细只回当页（limit 上限 2000），合计必须来自服务端聚合：
+    // 故意让合计与两条明细之和（IN 800 / OUT 500）不同，证明卡片没在本地累加。
+    vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({
+      items: cashflows,
+      total: 5000,
+      total_in: "123456.78",
+      total_out: "87654.32",
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+
+    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
+    expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
   });
 
   it("流水支持按订单号、流水号或备注关键词筛选", async () => {

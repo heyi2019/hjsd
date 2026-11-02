@@ -393,6 +393,23 @@ class PoolBalanceOut(BaseModel):
     available: Decimal
 
 
+class PoolBalanceTotalsOut(BaseModel):
+    """资金池余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
+
+    cash_balance: Decimal
+    available: Decimal
+    deposit_held: Decimal
+    # 自有权益口径：仅 ownership=OWNED 的池、按现金头寸计（不扣押金占用）。
+    owned_cash_balance: Decimal
+
+
+class PoolBalanceListOut(BaseModel):
+    """批量余额：一次返回全部可见池的卡片与汇总，替代前端逐池 N+1。"""
+
+    items: list[PoolBalanceOut]
+    totals: PoolBalanceTotalsOut
+
+
 __all__ = [
     "EventCreate",
     "EventOut",

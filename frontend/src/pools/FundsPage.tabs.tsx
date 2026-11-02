@@ -206,7 +206,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
     { title: "预计释放", dataIndex: "expected_release_on", render: (v: string | null | undefined) => v || "—" },
     { title: "已释放", dataIndex: "returned_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "已损失", dataIndex: "lost_amount", align: "right", render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} /> },
-    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)} />) },
+    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} />) },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",

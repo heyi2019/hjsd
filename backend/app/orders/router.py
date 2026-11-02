@@ -914,6 +914,19 @@ def add_order_customer_role(
     return _order_output(db, order, user)
 
 
+@router.get("/pools/balances", response_model=schemas.PoolBalanceListOut)
+def pool_balances_summary(
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_finance,
+) -> schemas.PoolBalanceListOut:
+    """全部可见资金池的余额卡片 + 汇总（一次请求，替代前端逐池 N+1 与本地累加）。"""
+    items, totals = service.pool_balance_summary(db, user=_user)
+    return schemas.PoolBalanceListOut(
+        items=[schemas.PoolBalanceOut.model_validate(item) for item in items],
+        totals=schemas.PoolBalanceTotalsOut.model_validate(totals),
+    )
+
+
 @router.get("/pools/{pool_id}/balance", response_model=schemas.PoolBalanceOut)
 def pool_balance(
     pool_id: int,

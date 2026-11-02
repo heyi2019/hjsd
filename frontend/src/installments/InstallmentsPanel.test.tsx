@@ -22,6 +22,7 @@ const installments = [
     periods: 4,
     paid_amount: "150.00",
     total_receivable: "300.00",
+    remaining_receivable: "150.00",
     status: "ACTIVE",
   },
   {
@@ -37,6 +38,7 @@ const installments = [
     periods: 2,
     paid_amount: "200.00",
     total_receivable: "200.00",
+    remaining_receivable: "0.00",
     status: "DELIVERED",
   },
 ];
@@ -49,6 +51,13 @@ beforeEach(() => {
     { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
   ]);
   vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
+  // 合计由服务端下发（Decimal 聚合）；「300+200」这类算术的契约在
+  // backend tests/v1/test_installment_totals.py，前端只验展示。
+  vi.mocked(catalog.installmentsApi.totals).mockResolvedValue({
+    total_receivable: "500.00",
+    total_paid: "350.00",
+    total_remaining: "150.00",
+  });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
 });
 
@@ -105,7 +114,7 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(screen.getAllByText("150.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("统计卡：应收与已收为金额口径", async () => {
+  it("统计卡：应收与已收取服务端合计（金额口径）", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findAllByText("总应收");
     // 「总应收」同时是统计卡 label 与表头 → 只在统计卡容器里找
@@ -113,12 +122,35 @@ describe("InstallmentsPanel：分期合约", () => {
       .getAllByText("总应收")
       .map((el) => el.closest(".ui-stat"))
       .find(Boolean);
-    expect(receivable?.textContent).toContain("500.00"); // 300 + 200
+    expect(receivable?.textContent).toContain("500.00");
     const paid = screen
       .getAllByText("已收合计")
       .map((el) => el.closest(".ui-stat"))
       .find(Boolean);
-    expect(paid?.textContent).toContain("350.00"); // 150 + 200
+    expect(paid?.textContent).toContain("350.00");
+  });
+
+  it("合计取服务端，不与当页明细相加（明细只回当前区间）", async () => {
+    // 故意让服务端合计与两条明细之和（500 / 350）不同：卡片不得自己 reduce。
+    vi.mocked(catalog.installmentsApi.totals).mockResolvedValue({
+      total_receivable: "12345.67",
+      total_paid: "8901.23",
+      total_remaining: "3444.44",
+    });
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    await screen.findAllByText("总应收");
+
+    const receivable = screen
+      .getAllByText("总应收")
+      .map((el) => el.closest(".ui-stat"))
+      .find(Boolean);
+    expect(receivable?.textContent).toContain("12,345.67");
+
+    const paid = screen
+      .getAllByText("已收合计")
+      .map((el) => el.closest(".ui-stat"))
+      .find(Boolean);
+    expect(paid?.textContent).toContain("8,901.23");
   });
 
   it("已交付合约禁用「登记收款」，未结清合约禁用「换绑交付」", async () => {

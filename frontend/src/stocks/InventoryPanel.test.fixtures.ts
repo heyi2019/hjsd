@@ -35,6 +35,15 @@ export const resetInventoryPanelMocks = () => {
   ]);
   resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
     account: accounts[0],
+    // 财务汇总由后端下发（口径见 backend tests/v1/test_execution_finance_summary.py）：
+    // 支出 100.00 = CF0001，收入 1350.00 = 回款 350.00 + 返点基数 1000.00。
+    finance_summary: {
+      cashflow_income: "350.00",
+      rebate_income: "1000.00",
+      total_income: "1350.00",
+      total_expense: "100.00",
+      net_amount: "1250.00",
+    },
     orders: [{
       order_id: 21,
       order_no: "HS0001",

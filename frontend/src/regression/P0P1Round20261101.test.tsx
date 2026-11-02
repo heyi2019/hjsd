@@ -75,6 +75,7 @@ const settledInstallment = {
   periods: 4,
   paid_amount: "300.00",
   total_receivable: "300.00",
+  remaining_receivable: "0.00",
   status: "SETTLED",
 };
 
@@ -306,7 +307,7 @@ it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () =
     { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
     { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
   ] as never);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({ income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" } as never);
+  vi.mocked(catalog.poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
   vi.mocked(catalog.depositsApi.list).mockResolvedValueOnce([] as never);
   vi.mocked(catalog.cashflowsApi.list).mockResolvedValueOnce({ items: [], total: 0 } as never);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValueOnce([] as never);
@@ -339,7 +340,7 @@ it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", a
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
   ] as never);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({ income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" } as never);
+  vi.mocked(catalog.poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
   vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
     if (params?.direction) return { items: [], total: 0 } as never;
     mainListCalls += 1;
@@ -662,7 +663,7 @@ it("P1/FE-261：完整资金划转不进入单边异常修复列表", async () =
     { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
     { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
   ] as never);
-  vi.mocked(catalog.poolsApi.balance).mockResolvedValue({ income: "1000.00", expense: "200.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" } as never);
+  vi.mocked(catalog.poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
   vi.mocked(catalog.cashflowsApi.list).mockResolvedValueOnce({
     items: [
       { id: 31, flow_no: "TRF-PAIRED-01-OUT", pool_id: 1, transfer_id: "TRF-PAIRED-01", direction: "OUT", amount: "100.00", occurred_on: "2026-11-01", category: "TRANSFER" },
@@ -726,6 +727,11 @@ it("P1/FE-188：错误大批次原始行按页渲染，避免首屏冻结", () =
 it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {
   expect(countOngoingOrders([{ status: "ACTIVE" }, { status: "INSTALLMENT" }, { status: "COMPLETED" }])).toBe(2);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([]);
+  // 数据中心改为一次批量取余额（含服务端汇总），空池时给空 items + 零合计。
+  vi.mocked(catalog.poolsApi.balances).mockResolvedValueOnce({
+    items: [],
+    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
+  });
   vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
     { id: 10, order_no: "HS-2026-0001", order_type: "HS", capital_type: "STOCK", trade_date: "2026-10-01", status: "ACTIVE" },
     { id: 11, order_no: "TH-2026-0002", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-02", status: "INSTALLMENT" },
@@ -902,7 +908,7 @@ it("P1/FE-253：订单台账加载未完成时不显示零统计", async () => {
   expect(ledger).toBeInTheDocument();
 });
 
-it("P1/FE-252：取消交易依赖的资金账户加载完成后才允许确认", async () => {
+it("P1/FE-252：取消依赖的资金账户加载完成后才允许确认", async () => {
   const order = {
     id: 21,
     order_no: "HS-CANCEL-ASYNC-01",
@@ -928,13 +934,13 @@ it("P1/FE-252：取消交易依赖的资金账户加载完成后才允许确认"
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   const row = (await screen.findAllByText("HS-CANCEL-ASYNC-01"))[0].closest("tr") as HTMLElement;
-  fireEvent.click(within(row).getByRole("button", { name: /更多/ }));
-  fireEvent.click(await screen.findByText("取消交易"));
+  // 台账操作列已由「更多」折叠菜单改为行内独立按钮：编辑 / 分润 / 资金收支 / 取消
+  fireEvent.click(within(row).getByRole("button", { name: "取消" }));
 
-  expect(screen.queryByText(/库存取消交易 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/取消 · HS-CANCEL-ASYNC-01/)).not.toBeInTheDocument();
 
   resolvePools([{ id: 7, code: "HJ_INVEST", name: "投资款荷包", status: "ACTIVE" }]);
-  const modal = await screen.findByText(/库存取消交易 · HS-CANCEL-ASYNC-01/);
+  const modal = await screen.findByText(/取消 · HS-CANCEL-ASYNC-01/);
   const modalContent = modal.closest(".ant-modal-content") as HTMLElement;
   await user.type(within(modalContent).getByLabelText("取消原因"), "异步加载回归");
   await user.click(within(modalContent).getByRole("button", { name: /确认取消/ }));
@@ -1002,7 +1008,7 @@ it("P1/FE-256：系统下架审计轨迹在账号详情中可见", () => {
   expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
 });
 
-it("P1/FE-257：分期台账同时展示订单状态和合约状态", async () => {
+it("P1/FE-257：台账状态列只展示库存状态，订单状态/合约状态不重复展示", async () => {
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
     id: 31,
     order_no: "HS-INSTALLMENT-SETTLED-REGRESSION",
@@ -1011,12 +1017,14 @@ it("P1/FE-257：分期台账同时展示订单状态和合约状态", async () =
     trade_date: "2026-10-01",
     status: "INSTALLMENT",
     installment_status: "SETTLED",
+    account_status: "WAITING",
   }] as never);
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
 
   const row = (await screen.findAllByText("HS-INSTALLMENT-SETTLED-REGRESSION"))[0].closest("tr") as HTMLElement;
-  expect(within(row).getByText("分期中")).toBeInTheDocument();
-  expect(within(row).getByText("合约：已结清")).toBeInTheDocument();
+  expect(within(row).getByText("在库")).toBeInTheDocument();
+  expect(within(row).queryByText("分期中")).toBeNull();
+  expect(within(row).queryByText("合约：已结清")).toBeNull();
 });
 
 it("P1/FE-263：寄售上架只创建寄售动作，不重复创建库存", async () => {
@@ -1175,6 +1183,14 @@ it("P1/FE-268：库存 CSV 补齐详情订单号并汇总返点收入", () => {
           collected_on: "2026-11-02",
         }],
       }],
+      // 合计取后端 finance_summary（口径见 backend tests/v1/test_execution_finance_summary.py）。
+      finance_summary: {
+        cashflow_income: "0.00",
+        rebate_income: "100.00",
+        total_income: "100.00",
+        total_expense: "0.00",
+        net_amount: "100.00",
+      },
     } as never,
   });
 
@@ -1202,11 +1218,20 @@ it("P1/FE-269：订单详情财务摘要纳入返点收入", () => {
         collected_on: "2026-11-02",
       }],
     }],
+    finance_summary: {
+      cashflow_income: "0.00",
+      rebate_income: "100.00",
+      total_income: "100.00",
+      total_expense: "0.00",
+      net_amount: "100.00",
+    },
   } as never} loading={false} />, { user: "admin" });
 
   const finance = document.querySelector(".inventory-detail__section--finance") as HTMLElement;
   expect(within(finance).getAllByText("1 笔").length).toBeGreaterThanOrEqual(1);
-  expect(within(finance).getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
+  // 总收入直接显示后端下发的 finance_summary.total_income。
+  const summary = finance.querySelector(".inventory-finance-summary") as HTMLElement;
+  expect(within(summary).getByText("总收入").parentElement).toHaveTextContent("100.00");
 });
 
 it("P1/FE-270/271/272/273：R2/R3/R4/R5 历史空区间分别传递筛选条件", async () => {

@@ -17,7 +17,12 @@ import type { Permission } from "../shared/state/session";
 
 export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null }) {
   const { contractType, reloadKey, dateRange } = params;
+  // 上层每次渲染都会新建 [from, to] 数组，直接当 useCallback 依赖会每次变化 →
+  // load 变 → useEffect 触发 → 无限重拉。这里只依赖两个原始字符串。
+  const dateFrom = dateRange?.[0] ?? "";
+  const dateTo = dateRange?.[1] ?? "";
   const [rows, setRows] = useState<Installment[]>([]);
+  const [totals, setTotals] = useState<{ total_receivable: string; total_paid: string; total_remaining: string } | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const { can } = useSession();
@@ -69,10 +74,20 @@ export function useContractTableController(params: { contractType: string; reloa
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, orderList] = await Promise.all([installmentsApi.list(), ordersApi.list()]);
+      // 日期区间与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
+      const rangeParams = {
+        trade_date_from: dateFrom || undefined,
+        trade_date_to: dateTo || undefined,
+      };
+      const [list, orderList, summary] = await Promise.all([
+        installmentsApi.list(rangeParams),
+        ordersApi.list(),
+        installmentsApi.totals(rangeParams),
+      ]);
       const filtered = list.filter((item) => item.contract_type === contractType);
       setRows(filtered);
       setOrders(orderList);
+      setTotals(summary);
       const entries = await Promise.all(
         filtered.map(async (item) => {
           const [scheduleRows, dispositionRows] = await Promise.all([
@@ -90,7 +105,7 @@ export function useContractTableController(params: { contractType: string; reloa
     } finally {
       setLoading(false);
     }
-  }, [contractType]);
+  }, [contractType, dateFrom, dateTo]);
 
   useEffect(() => {
     void load();
@@ -263,16 +278,11 @@ export function useContractTableController(params: { contractType: string; reloa
     });
   };
 
-  // 总应收只采用后端下发值，前端不再自行推导第二套口径。
-  const receivable = (row: Installment) => Number(row.total_receivable);
+  // 总应收 / 剩余应收都只采用后端下发值（含「不小于 0」的 clamp），前端不再自行推导。
 
-  const visibleRows = rows.filter((row) => {
-    if (!dateRange) return true;
-    const tradeDate = orders.find((order) => order.id === row.order_id)?.trade_date;
-    return Boolean(tradeDate) && tradeDate! >= dateRange[0] && tradeDate! <= dateRange[1];
-  });
-  const totalReceivable = visibleRows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
-  const totalPaid = visibleRows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);
+  // 合计直接取服务端（Decimal）；日期区间已在后端筛，列表不再二次过滤。
+  const totalReceivable = totals?.total_receivable ?? "0.00";
+  const totalPaid = totals?.total_paid ?? "0.00";
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const columns: ColumnsType<Installment> = [
@@ -312,7 +322,8 @@ export function useContractTableController(params: { contractType: string; reloa
       title: "总应收",
       key: "receivable",
       align: "right",
-      render: (_v, row) => <MoneyText value={receivable(row).toFixed(2)} />,
+      dataIndex: "total_receivable",
+      render: (value: string) => <MoneyText value={value} />,
     },
     {
       title: "服务费",
@@ -343,13 +354,8 @@ export function useContractTableController(params: { contractType: string; reloa
       title: "剩余",
       key: "remaining",
       align: "right",
-      render: (_v, row) => (
-        <MoneyText
-          value={(
-            receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)
-          ).toFixed(2)}
-        />
-      ),
+      dataIndex: "remaining_receivable",
+      render: (value: string) => <MoneyText value={value ?? "0.00"} />,
     },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={installmentDisplayStatus(v)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(v), INSTALLMENT_STATUS_LABEL)} /> },
     {
@@ -489,7 +495,7 @@ export function useContractTableController(params: { contractType: string; reloa
 
 
   return {
-    rows: visibleRows,
+    rows,
     setRows,
     sortDesc,
     setSortDesc,
@@ -548,7 +554,6 @@ export function useContractTableController(params: { contractType: string; reloa
     submitDefault,
     submitWaive,
     submitExtend,
-    receivable,
     totalReceivable,
     totalPaid,
     arrangeColumns,

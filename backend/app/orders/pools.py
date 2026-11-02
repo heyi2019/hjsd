@@ -22,6 +22,7 @@ from app.domain.enums import (
     CashflowStatus,
     Direction,
     Nature,
+    PoolOwnership,
 )
 
 # --------------------------------------------------------------------- 池余额
@@ -120,3 +121,44 @@ def pool_balance(
 ) -> dict[str, Any]:
     """资金池卡片：经营收支、内部划转、押金占用与可用余额（单池）。"""
     return pool_balances(session, [pool_id], user=user)[pool_id]
+
+
+def pool_balance_summary(
+    session: Session, user: CurrentUser | None = None
+) -> tuple[list[dict[str, Any]], dict[str, Decimal]]:
+    """资金页/数据中心的余额总览：一次返回全部可见池的卡片 + 汇总。
+
+    为什么要这个接口：前端原先按池逐个调 `/pools/{id}/balance`（N+1），再自己
+    用浮点把卡片加起来算「总余额 / 可用 / 押金 / 自有权益」。合计口径属于财务事实，
+    必须在服务端用 Decimal 算，前端只负责显示。
+
+    汇总口径：
+    - `cash_balance` / `available` / `deposit_held`：全部可见池直接累加；
+    - `owned_cash_balance`：只累加 `ownership=OWNED` 的池（PRD §1.2 自有权益），
+      且按现金头寸计、不扣押金占用——押金仍是自有资金，只是暂时不可用。
+    """
+    pools = list(
+        session.scalars(select(Pool).order_by(Pool.id))
+    )
+    visible = [
+        pool for pool in pools if user is None or user.can_see_pool(pool.id)
+    ]
+    balances = (
+        pool_balances(session, [pool.id for pool in visible], user=user)
+        if visible
+        else {}
+    )
+    items = [balances[pool.id] for pool in visible]
+    owned_ids = {
+        pool.id for pool in visible if pool.ownership == PoolOwnership.OWNED.value
+    }
+    zero = Decimal("0.00")
+    totals = {
+        "cash_balance": sum((item["cash_balance"] for item in items), zero),
+        "available": sum((item["available"] for item in items), zero),
+        "deposit_held": sum((item["deposit_held"] for item in items), zero),
+        "owned_cash_balance": sum(
+            (balances[pool_id]["cash_balance"] for pool_id in owned_ids), zero
+        ),
+    }
+    return items, totals

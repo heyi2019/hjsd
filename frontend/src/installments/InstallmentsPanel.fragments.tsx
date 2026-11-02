@@ -53,8 +53,6 @@ export function MobileInstallmentList({
   onResale: (row: Installment) => void;
   fieldOrder?: string[];
 }) {
-  const receivable = (row: Installment) => Number(row.total_receivable);
-
   if (rows.length === 0) return <div className="data-mobile-empty">暂无分期合约</div>;
   return (
     <div className="data-mobile-list">
@@ -74,12 +72,12 @@ export function MobileInstallmentList({
                 { key: "order_type", label: "类型", value: order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-" },
                 { key: "product", label: "产品", value: order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-" },
                 { key: "party", label: "对方", value: order?.party_name || "-" },
-                { key: "receivable", label: "总应收", value: <MoneyText value={receivable(row).toFixed(2)} /> },
+                { key: "receivable", label: "总应收", value: <MoneyText value={row.total_receivable} /> },
                 { key: "service_fee", label: "服务费", value: <MoneyText value={row.service_fee ?? "0"} /> },
                 { key: "per_period_service_fee", label: "每期服务费", value: <MoneyText value={row.per_period_service_fee ?? "0"} /> },
                 { key: "paid_amount", label: "已收", value: <MoneyText value={row.paid_amount} /> },
                 { key: "bad_debt", label: "坏账", value: <MoneyText value={row.bad_debt_amount ?? "0"} /> },
-                { key: "remaining", label: "剩余", value: <MoneyText value={(receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)).toFixed(2)} /> },
+                { key: "remaining", label: "剩余", value: <MoneyText value={row.remaining_receivable} /> },
               ], fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
             </dl>
             <Space size={2}>

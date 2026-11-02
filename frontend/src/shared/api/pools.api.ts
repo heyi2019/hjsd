@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Pool, PoolBalance, Reconciliation, TransferResult } from "./types";
+import type { Pool, PoolBalance, PoolBalanceTotals, Reconciliation, TransferResult } from "./types";
 
 export const poolsApi = {
   update: (id: number, data: Partial<Pool>) => api.patch<Pool>(`/pools/${id}`, data).then(r => r.data),
@@ -9,6 +9,11 @@ export const poolsApi = {
   remove: (id: number) => api.delete<void>(`/pools/${id}`).then(r => r.data),
   balance: (poolId: number) =>
     api.get<PoolBalance>(`/pools/${poolId}/balance`).then((r) => r.data),
+  /** 全部可见池的余额 + 服务端汇总；替代逐池 N+1 与前端累加。 */
+  balances: () =>
+    api
+      .get<{ items: PoolBalance[]; totals: PoolBalanceTotals }>("/pools/balances")
+      .then((r) => r.data),
 };
 
 export const transfersApi = {

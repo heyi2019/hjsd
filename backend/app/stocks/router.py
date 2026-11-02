@@ -56,6 +56,7 @@ from .schemas import (
     AccountExecutionOrderOut,
     AccountAuditOut,
     AccountExecutionDetailOut,
+    ExecutionFinanceSummaryOut,
 )
 
 router = APIRouter(tags=["ACC-01 账号台账"])
@@ -506,6 +507,33 @@ def execution_detail(
             )
             for row in db.scalars(select(AuditLog).where(or_(*audit_filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
         ]
+    # 财务汇总与上面组装出的明细同源：事件流水 + 订单独立流水 + 返点收入。
+    # 返点不过滤 status——与前端既有口径保持一致（未收取的返点也计入应收收入）。
+    zero = Decimal("0.00")
+    cashflow_income = zero
+    total_expense = zero
+    for flow in flow_by_event.values():
+        if flow.direction == "IN":
+            cashflow_income += flow.amount
+        else:
+            total_expense += flow.amount
+    for order_flows in cashflows_by_order.values():
+        for flow in order_flows:
+            if flow.direction == "IN":
+                cashflow_income += flow.amount
+            else:
+                total_expense += flow.amount
+    rebate_income = zero
+    for order_rebates in rebates_by_order.values():
+        for rebate in order_rebates:
+            rebate_income += rebate.base_amount
+    finance_summary = ExecutionFinanceSummaryOut(
+        cashflow_income=cashflow_income,
+        rebate_income=rebate_income,
+        total_income=cashflow_income + rebate_income,
+        total_expense=total_expense,
+        net_amount=cashflow_income + rebate_income - total_expense,
+    )
     return AccountExecutionDetailOut(
         account=_account_outputs(
             db,
@@ -513,6 +541,7 @@ def execution_detail(
             _user,
             include_credentials=_user.has(PERM_ORDER_CREATE),
         )[0],
+        finance_summary=finance_summary,
         orders=[
             AccountExecutionOrderOut(
                 order_id=order.id,

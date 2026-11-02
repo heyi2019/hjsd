@@ -138,7 +138,7 @@ export function MobileDepositList({
               { key: "expected_release_on", label: "预计释放", value: row.expected_release_on || "—" },
               { key: "returned_amount", label: "已释放", value: <MoneyText value={row.returned_amount} /> },
               { key: "lost_amount", label: "已损失", value: <MoneyText value={row.lost_amount ?? "0.00"} /> },
-              { key: "remaining", label: "剩余", value: <MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)} /> },
+              { key: "remaining", label: "剩余", value: <MoneyText value={row.remaining_amount} /> },
             ], fieldOrder).map((field) => <div key={field.key}><dt>{field.label}</dt><dd>{field.value}</dd></div>)}
           </dl>
           <Space size={2}>

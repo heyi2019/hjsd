@@ -30,6 +30,7 @@ const installments = [
     periods: 4,
     paid_amount: "150.00",
     total_receivable: "300.00",
+    remaining_receivable: "100.00",
     status: "ACTIVE",
   },
   {
@@ -45,6 +46,7 @@ const installments = [
     periods: 2,
     paid_amount: "200.00",
     total_receivable: "200.00",
+    remaining_receivable: "0.00",
     status: "DELIVERED",
   },
 ];

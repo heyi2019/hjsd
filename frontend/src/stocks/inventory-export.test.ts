@@ -34,7 +34,7 @@ describe("库存导出", () => {
     expect(csv).toContain(",0,0,0.00,0.00");
   });
 
-  it("FE-268：库存 CSV 使用详情订单号并把返点计入收入汇总", () => {
+  it("FE-268：库存 CSV 使用详情订单号，合计取服务端 finance_summary", () => {
     const row = { ...account, source_order_no: "" } as unknown as Account;
     const csv = buildInventoryCsv([row], {
       1: {
@@ -56,11 +56,56 @@ describe("库存导出", () => {
             collected_on: "2026-11-02",
           }],
         }],
+        finance_summary: {
+          cashflow_income: "0.00",
+          rebate_income: "100.00",
+          total_income: "100.00",
+          total_expense: "0.00",
+          net_amount: "100.00",
+        },
       } as never,
     });
 
     expect(csv).toContain("HS-FE268");
     expect(csv).toContain("买号返点 / HS-FE268 / HS-FE268-RB01 / 已登记 / 100.00");
+    // 「支出笔数,收入笔数,总支出,总收入」：条数按明细数，金额只认后端。
     expect(csv).toContain(",0,1,0.00,100.00");
+  });
+
+  it("导出合计不与明细相加：金额以后端 finance_summary 为准", () => {
+    // 故意让后端合计与明细口径不同（明细里有 500 收入），导出必须输出后端值。
+    const csv = buildInventoryCsv([account], {
+      1: {
+        orders: [{
+          order_id: 11,
+          order_no: "HS-SUM",
+          order_type: "HS",
+          status: "DONE",
+          created_at: "2026-11-02T10:00:00",
+          events: [],
+          cashflows: [{
+            flow_no: "SR-SUM-01",
+            occurred_on: "2026-11-02",
+            occurred_at: "2026-11-02T10:00:00",
+            direction: "IN",
+            nature: "BUSINESS_IN",
+            category: "OTHER",
+            amount: "500.00",
+            operator: "admin",
+          }],
+          rebates: [],
+        }],
+        finance_summary: {
+          cashflow_income: "123.45",
+          rebate_income: "0.00",
+          total_income: "123.45",
+          total_expense: "67.89",
+          net_amount: "55.56",
+        },
+      } as never,
+    });
+
+    expect(csv).toContain(",0,1,67.89,123.45");
+    expect(csv).not.toContain(",0,1,0.00,500.00");
   });
 });

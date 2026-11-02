@@ -23,6 +23,7 @@ from .create import (
     _service_fee_from_snapshot,
     create_installment,
     link_recovered_sale,
+    installment_totals,
     list_installments,
 )
 from .recovery import (
@@ -57,6 +58,7 @@ __all__ = [
     "get_installment",
     "link_recovered_sale",
     "list_dispositions",
+    "installment_totals",
     "list_installments",
     "mark_default",
     "mark_overdue",

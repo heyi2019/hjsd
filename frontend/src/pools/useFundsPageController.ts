@@ -14,6 +14,7 @@ import {
   type Deposit,
   type Pool,
   type PoolBalance,
+  type PoolBalanceTotals,
   type Reconciliation,
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
@@ -28,9 +29,13 @@ import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE, deriveCashflowNature } from "./Funds
 export function useFundsPageController(active = true) {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
+  // 服务端汇总（Decimal 聚合）：总余额 / 可用 / 押金占用 / 自有权益，前端不再自己累加。
+  const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
+  // 服务端合计（同筛选条件、不受 limit 影响）；本地即时收窄时回落到对可见行的求和。
+  const [cashflowTotals, setCashflowTotals] = useState({ income: "0.00", expense: "0.00" });
   const [cashflowsReady, setCashflowsReady] = useState(false);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
   const [reconciliationsReady, setReconciliationsReady] = useState(false);
@@ -120,8 +125,10 @@ export function useFundsPageController(active = true) {
   const cashflowCategoryRef = useRef(cashflowCategory);
   cashflowCategoryRef.current = cashflowCategory;
 
-  // 资金流水：筛选全部走服务端（对齐 finance/router.py list_cashflows 的 11 个参数），
+  // 资金流水：筛选全部走服务端（对齐 finance/router.py list_cashflows 的 12 个参数），
   // 避免 2000 条上限把池/方向/状态之外的结果挡在客户端之外。
+  const cashflowKeywordRef = useRef(cashflowKeyword);
+  cashflowKeywordRef.current = cashflowKeyword;
   const fetchCashflows = useCallback(async () => {
     setCashflowsReady(false);
     const result = await cashflowsApi.list({
@@ -133,11 +140,17 @@ export function useFundsPageController(active = true) {
       fund_nature: cashflowFundNatureRef.current || undefined,
       accounting_attribute: cashflowAttributeRef.current || undefined,
       category: cashflowCategoryRef.current.trim() || undefined,
+      keyword: cashflowKeywordRef.current.trim() || undefined,
       limit: 2000,
       offset: 0,
     });
     setCashflows(result.items);
     setCashflowTotal(result.total);
+    // 合计以服务端为准：同一套筛选条件下聚合，流水超过 limit 也不会静默少算。
+    setCashflowTotals({
+      income: result.total_in ?? "0.00",
+      expense: result.total_out ?? "0.00",
+    });
     setCashflowsReady(true);
   }, []);
 
@@ -168,14 +181,17 @@ export function useFundsPageController(active = true) {
   const load = useCallback(async () => {
     setLoading(true);
     setFundsReady(false);
+    setBalanceTotals(null);
     setReconciliationsReady(false);
     try {
       const list = await poolsApi.list();
       setPools(list);
-      const entries = await Promise.all(
-        list.map(async (pool) => [pool.id, await poolsApi.balance(pool.id)] as const),
+      // 余额一次批量拿回（含服务端汇总）：原先逐池 N+1，再把卡片用浮点相加算总余额。
+      const overview = await poolsApi.balances();
+      setBalances(
+        Object.fromEntries(overview.items.map((item) => [item.pool_id, item])),
       );
-      setBalances(Object.fromEntries(entries));
+      setBalanceTotals(overview.totals);
       setDeposits(await depositsApi.list());
       await fetchCashflows();
       setReconciliations(await reconciliationsApi.list());
@@ -379,27 +395,14 @@ export function useFundsPageController(active = true) {
     });
   };
 
-  // 只读合计：仅用于统计卡展示，不回流到任何写路径。
-  const totalCashValue = Object.values(balances)
-    .reduce((sum, balance) => sum + Number(balance.cash_balance), 0)
-    .toFixed(2);
-  const totalAvailableValue = Object.values(balances)
-    .reduce((sum, balance) => sum + Number(balance.available), 0)
-    .toFixed(2);
-  const totalDepositValue = Object.values(balances)
-    .reduce((sum, balance) => sum + Number(balance.deposit_held), 0)
-    .toFixed(2);
-  // 自有权益口径（domain/enums.py PoolOwnership：OWNED 计入权益，CUSTODY/THIRD_PART 只计现金头寸）。
-  // 归属以资金池主数据为准；权益按现金头寸计、不扣押金占用——押金占用仍是自有资金，只是暂时不可用。
-  const totalOwnedValue = pools
-    .filter((pool) => pool.ownership === "OWNED")
-    .reduce((sum, pool) => sum + Number(balances[pool.id]?.cash_balance ?? 0), 0)
-    .toFixed(2);
+  // 四张统计卡全部取服务端汇总（Decimal 聚合）：前端不再对卡片浮点累加，也不再有 N+1。
+  // 自有权益口径（domain/enums.py PoolOwnership：OWNED 计入权益，CUSTODY/THIRD_PART 只计现金头寸）
+  // 由后端按资金池主数据判定，权益按现金头寸计、不扣押金占用。
   const unavailableAmount = error ? "不可用" : "—";
-  const totalCash = fundsReady ? totalCashValue : unavailableAmount;
-  const totalAvailable = fundsReady ? totalAvailableValue : unavailableAmount;
-  const totalDeposit = fundsReady ? totalDepositValue : unavailableAmount;
-  const totalOwned = fundsReady ? totalOwnedValue : unavailableAmount;
+  const totalCash = fundsReady && balanceTotals ? balanceTotals.cash_balance : unavailableAmount;
+  const totalAvailable = fundsReady && balanceTotals ? balanceTotals.available : unavailableAmount;
+  const totalDeposit = fundsReady && balanceTotals ? balanceTotals.deposit_held : unavailableAmount;
+  const totalOwned = fundsReady && balanceTotals ? balanceTotals.owned_cash_balance : unavailableAmount;
 
   const visibleCashflows = useMemo(() => {
     const keyword = cashflowKeyword.trim().toLowerCase();
@@ -432,14 +435,15 @@ export function useFundsPageController(active = true) {
       .map(([transfer_id, rows]) => ({ transfer_id, flow: rows[0] }));
   }, [cashflows]);
 
-  const totalFlowIncome = visibleCashflows
-    .filter((row) => row.direction === "IN")
-    .reduce((sum, row) => sum + Number(row.amount), 0)
-    .toFixed(2);
-  const totalFlowExpense = visibleCashflows
-    .filter((row) => row.direction === "OUT")
-    .reduce((sum, row) => sum + Number(row.amount), 0)
-    .toFixed(2);
+  // 总收入 / 总支出：默认取服务端合计（与列表同一套筛选条件、不受 2000 条上限影响）。
+  // 若用户刚改了筛选但还没点「查询」，列表已在本地即时收窄，此时合计同步按可见行求和，
+  // 保证卡片数字与眼睛看到的行一致；一旦点「查询」，服务端值重新接管。
+  const cashflowLocallyNarrowed = visibleCashflows.length !== cashflows.length;
+  const sumVisible = (directionValue: "IN" | "OUT") => visibleCashflows
+    .filter((row) => row.direction === directionValue)
+    .reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0) / 100;
+  const totalFlowIncome = cashflowLocallyNarrowed ? sumVisible("IN").toFixed(2) : cashflowTotals.income;
+  const totalFlowExpense = cashflowLocallyNarrowed ? sumVisible("OUT").toFixed(2) : cashflowTotals.expense;
 
   return {
     active,

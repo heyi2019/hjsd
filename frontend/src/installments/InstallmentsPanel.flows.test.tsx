@@ -23,6 +23,7 @@ const baseInstallment = {
   paid_amount: "150.00",
   status: "ACTIVE",
   total_receivable: "300.00",
+  remaining_receivable: "100.00",
   final_period_adjustment: "0.00",
   waived_amount: "0.00",
   bad_debt_amount: "0.00",

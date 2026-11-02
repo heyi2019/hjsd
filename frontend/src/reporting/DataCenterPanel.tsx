@@ -3,7 +3,7 @@
 import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
+import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance, type PoolBalanceTotals } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
@@ -31,6 +31,7 @@ export function countOngoingOrders(items: Pick<Order, "status">[]): number {
 export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [pools, setPools] = useState<Pool[] | null>(null);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
+  const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,10 +42,12 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
     try {
       const list = await poolsApi.list();
       setPools(list);
-      const entries = await Promise.all(
-        list.map(async (pool) => [pool.id, await poolsApi.balance(pool.id)] as const),
+      // 余额与汇总一次批量取回：原先逐池 N+1，再用浮点把卡片相加算合计。
+      const overview = await poolsApi.balances();
+      setBalances(
+        Object.fromEntries(overview.items.map((item) => [item.pool_id, item])),
       );
-      setBalances(Object.fromEntries(entries));
+      setBalanceTotals(overview.totals);
       // 订单计数与资金总览同源加载：订单接口失败时池数据已落 state，仍可渲染，
       // 错误经同一 ErrorBanner 露出，不静默显示 0。
       setOrders(await ordersApi.list());
@@ -65,11 +68,9 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
 
   const rows: PoolRow[] = (pools ?? []).map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
 
-  const sum = (pick: (b?: PoolBalance) => string | undefined) =>
-    rows.reduce((acc, row) => acc + Number(pick(row.balance) ?? 0), 0).toFixed(2);
-
-  const totalAvailable = pools === null ? "不可用" : sum((b) => b?.available);
-  const totalDeposit = pools === null ? "不可用" : sum((b) => b?.deposit_held);
+  // 合计取服务端（Decimal），前端不再对卡片浮点累加。
+  const totalAvailable = pools === null ? "不可用" : balanceTotals?.available ?? "—";
+  const totalDeposit = pools === null ? "不可用" : balanceTotals?.deposit_held ?? "—";
 
   // 业务计数口径：ACTIVE 表示进行中。
   const activeCount = orders === null ? null : countOngoingOrders(orders);

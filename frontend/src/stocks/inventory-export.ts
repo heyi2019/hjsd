@@ -41,7 +41,6 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
   const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
   const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
   const sourceOrder = orders[0];
-  const rebateIncome = rebateItems.reduce((sum, { rebate }) => sum + Number(rebate.base_amount), 0);
 
   return {
     registrationAt: dateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date),
@@ -78,8 +77,9 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
     ].join("；"),
     expenseCount: expenseFlows.length,
     incomeCount: incomeFlows.length + rebateItems.length,
-    totalExpense: expenseFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2),
-    totalIncome: (incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0) + rebateIncome).toFixed(2),
+    // 合计取后端 finance_summary；条数仍按明细计数（条数是行数，不是金额）。
+    totalExpense: detail?.finance_summary?.total_expense ?? "0.00",
+    totalIncome: detail?.finance_summary?.total_income ?? "0.00",
   };
 }
 

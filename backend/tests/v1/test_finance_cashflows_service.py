@@ -272,7 +272,12 @@ def test_list_deposits_user_filter(seeded_db):
 
 def test_list_cashflows_user_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    assert cashflows.list_cashflows(seeded_db, pool_id=1, user=_restricted_user()) == []
+    # 无权资金池一律返回空：明细为空、总数也为 0（返回值恒为 (rows, total) 二元组，
+    # 原先这里返回裸 [] 会让调用方解包时报错，只是路由层提前拦住了才没暴露）。
+    rows, total = cashflows.list_cashflows(
+        seeded_db, pool_id=1, user=_restricted_user()
+    )
+    assert rows == [] and total == 0
 
 
 def test_list_cashflows_filters(seeded_db):

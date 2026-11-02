@@ -220,9 +220,10 @@ export function OrderDetail({
   )) ?? [];
   const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
   const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
-  const rebateIncome = rebateItems.reduce((sum, { rebate }) => sum + Number(rebate.base_amount), 0);
-  const totalExpense = expenseFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2);
-  const totalIncome = (incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0) + rebateIncome).toFixed(2);
+  // 合计一律取后端 finance_summary（与上面明细同源），前端只数条数、不再累加金额。
+  const summary = detail?.finance_summary;
+  const totalExpense = summary?.total_expense ?? "0.00";
+  const totalIncome = summary?.total_income ?? "0.00";
 
   const financeRows: InventoryFinanceRow[] = [
     ...financialFlows.map(({ event, cashflow }) => ({

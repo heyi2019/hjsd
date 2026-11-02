@@ -109,6 +109,12 @@ async function readOptionSet(code: string): Promise<OptionItem[] | null> {
 
 export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: FundsPageController }) {
   const [flows, setFlows] = useState<Cashflow[]>([]);
+  const [summary, setSummary] = useState<{
+    approved_income: string;
+    approved_expense: string;
+    approved_net: string;
+    count: number;
+  } | null>(null);
   const [poolCodes, setPoolCodes] = useState<string[]>([]);
   const [expenseItems, setExpenseItems] = useState<OptionItem[]>(DEFAULT_EXPENSE_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -146,40 +152,30 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       const savedItems = await readOptionSet(ITEM_SET_CODE);
       if (savedItems && savedItems.length > 0) setExpenseItems(savedItems);
       const allowedIds = pools.filter((pool) => poolCodes.includes(pool.code)).map((pool) => pool.id);
-      const scoped: Cashflow[] = [];
-      if (allowedIds.length > 0) {
-        // 手工登记的工作室收支来源恒为 OTHER（订单回款=ORDER_EVENT、押金/划转/返点各有专属来源），
-        // 按「支出=运营消耗 / 收入=自营收入」拉取后，用 source=OTHER 精确切出手工口径。
-        const [outRes, inRes] = await Promise.all([
-          cashflowsApi.list({
-            direction: "OUT",
-            accounting_attribute: "OPERATING_EXPENSE",
-            occurred_from: from || undefined,
-            occurred_to: to || undefined,
-            category,
-            limit: FETCH_LIMIT,
-          }),
-          cashflowsApi.list({
-            direction: "IN",
-            accounting_attribute: "SELF_REVENUE",
-            occurred_from: from || undefined,
-            occurred_to: to || undefined,
-            category,
-            limit: FETCH_LIMIT,
-          }),
-        ]);
-        for (const row of [...outRes.items, ...inRes.items]) {
-          if (row.source === "OTHER" && allowedIds.includes(row.pool_id)) scoped.push(row);
-        }
+      if (allowedIds.length === 0) {
+        setFlows([]);
+        setSummary(null);
+        setError(null);
+        return;
       }
-      setFlows(scoped);
+      // 明细与已入账汇总一次取回：什么算工作室收支、收入/支出/净额怎么加，全在
+      // service.studio_summary 里。前端不再拉两次、不再按 source 过滤、不再 reduce。
+      const result = await cashflowsApi.studioSummary({
+        pool_ids: allowedIds.join(","),
+        occurred_from: from || undefined,
+        occurred_to: to || undefined,
+        category,
+        limit: FETCH_LIMIT,
+      });
+      setFlows(result.items);
+      setSummary(result);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
       setLoading(false);
     }
-  }, [category, dateRange, pools, poolCodes]);
+  }, [category, from, to, pools, poolCodes]);
 
   useEffect(() => {
     void load();
@@ -223,15 +219,10 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     });
   };
 
-  const approvedIncome = flows
-    .filter((row) => row.status === "APPROVED" && row.direction === "IN")
-    .reduce((sum, row) => sum + Number(row.amount), 0)
-    .toFixed(2);
-  const approvedExpense = flows
-    .filter((row) => row.status === "APPROVED" && row.direction === "OUT")
-    .reduce((sum, row) => sum + Number(row.amount), 0)
-    .toFixed(2);
-  const netTotal = (Number(approvedIncome) - Number(approvedExpense)).toFixed(2);
+  // 三个数都取服务端（Decimal 聚合，含净额），前端只负责显示。
+  const approvedIncome = summary?.approved_income ?? "0.00";
+  const approvedExpense = summary?.approved_expense ?? "0.00";
+  const netTotal = summary?.approved_net ?? "0.00";
 
   const [registerDirection, setRegisterDirection] = useState<string>("OUT");
 

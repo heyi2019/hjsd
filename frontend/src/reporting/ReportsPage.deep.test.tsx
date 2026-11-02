@@ -48,12 +48,10 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(catalog.poolsApi.balance), {
-    income: "0.00",
-    expense: "0.00",
-    cash_balance: "0.00",
-    deposit_held: "0.00",
-    available: "0.00",
+  // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
+  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+    items: [],
+    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });

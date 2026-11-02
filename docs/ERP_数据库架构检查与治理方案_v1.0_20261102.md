@@ -398,11 +398,56 @@ Prod
 | 缺口 | 建议 |
 |---|---|
 | **1. `restore_pg.sh` 未部署到 ECS** → ✅ **已补齐（11-03 00:07）** | ECS `/opt/heijin/deploy/scripts/` 原只有 6 个（缺恢复脚本）。已 `scp` 补齐，`sha256` 双端一致 `c18cff9c…273bca`、`bash -n` 通过、`--help` 实跑正常，现为 7 个 |
-| Dev 库无自动备份 | `cron` 每日 `pg_dump heijin_erp_dev`，保留 14 份，写独立目录 |
-| Release 库无备份策略 | 导入完成后立即 dump，并在每次清洗/合并前后各留一份 |
-| PG 未开 WAL 归档 | 开启 `archive_mode=on` + `archive_command` 到独立卷，获得 PITR；至少要在正式发布前完成 |
+| Dev / Release 库无自动备份 | ✅ **脚本已落地（11-03 01:04）**：`deploy/scripts/backup_local.sh`，一次备两库、带表数闸门与 sha256 sidecar、保留 14 份 → `backups/local/`；**cron 尚未安装**，需点头后加一行（见下节） |
+| PG 未开 WAL 归档 | ⏳ **待裁决（需授权重启容器，见下节影响面）**。`wal_level` 已是 `replica`，只差 `archive_mode=on` + `archive_command` + 归档目录落宿主机 |
 | 恢复演练未定期化 | 每季度一次「从 dump 恢复到临时库 + 行数校验」，产出记录 |
 | 无库级操作闸门 | 见「防误删」 |
+
+### 本地 Dev / Release 备份落地（2026-11-03 01:04）
+
+**背景**：ECS 有 `backup_daily.sh`（每日 03:20），但本地 dev/release 一直靠手敲 `pg_dump`，等于没有策略。而 dev 是唯一真实数据源（119/90/370/200），release 是上线包母本——这两个库同时丢，重建不出来。
+
+**脚本** `deploy/scripts/backup_local.sh`（与 ECS 那份的分工写进脚本头：那份面向 compose 的 `db` 服务，这份面向本机 `container-db-1`）：
+
+- 容器名 / 用户 / 库清单 / 保留份数 / 输出目录全部可用环境变量覆盖
+- **表数闸门**：归档内 `TABLE DATA` 条数必须等于源库 `public` 表数，不等就删文件并非零退出——防的是「备份说成功，其实只是半套或空库，文件看着正常」
+- 源库 0 张表也直接拒绝
+- 产物 `pg_dump -Fc` + `.sha256` sidecar → `backups/local/`（`.gitignore` 已排除 `/backups/`，不进版本库）
+- 滚动保留最近 14 份/库
+
+**实测（含恢复校验，不是只看文件大小）**
+
+| 项 | 结果 |
+|---|---|
+| dev 备份 | 219,475 B，40 表 |
+| release 备份 | 219,284 B，40 表（与上线包同尺寸，内容一致） |
+| `shasum -c` | 两份均 `OK` |
+| **恢复校验** | 把 dev 备份恢复到临时库 `heijin_bk_verify`：**119 / 90 / 370 / 200 / 3 用户 / 40 表**，与源库逐项一致；验完 `DROP ... WITH (FORCE)` |
+
+**踩坑**：`echo "✓ $DB → $FILE（…）"` 里 `$FILE` 紧跟全角左括号，被 shell 并进变量名 → `FILE: unbound variable`。项目既有约定「`$VAR` 紧跟中文标点一律写 `${VAR}`」再次生效，脚本内已全部改 `${}`。
+
+**未做**：cron 未装。需要时一行（与 ECS 的 03:20 错开）：
+
+```
+10 4 * * * /bin/bash /Users/aries/黑金时代/deploy/scripts/backup_local.sh >> /tmp/heijin_local_backup.log 2>&1
+```
+
+### WAL 归档 / PITR 的影响面（P1-9，待裁决）
+
+**现状实测**：`wal_level=replica`（够 PITR 用）、`archive_mode=off`、`archive_command=(disabled)`、`archive_timeout=0`。容器 `container-db-1`（`postgres:16-alpine`）只挂了**一个**数据卷 `container_postgres_data → /var/lib/postgresql/data`，**没有归档目录**。
+
+**为什么不能直接改**：
+
+1. `archive_mode` 是 **postmaster 级**参数，改完必须**重启容器**——而这个容器里除了本项目三库，还跑着别的项目三个探针库（`berp_*` 共约 1 GB），重启会中断它们的连接。
+2. 归档必须写到**容器持久化之外**才有意义（容器内路径重启即丢）。当前没有第二个挂载点，要加就得**重建容器**（数据在 volume 里，安全，但属高影响面操作）。
+
+**三个选项**（等你定，我不擅自重启共享容器）：
+
+| 方案 | 做法 | 代价 | 恢复能力 |
+|---|---|---|---|
+| **A** 暂缓 | 只靠每日 dump（现已落地） | 零风险 | 最多丢 24h 数据 |
+| **B** 只开归档到容器内 | `archive_mode=on` + `archive_command` 写 `/var/lib/postgresql/archive`（同一卷内） | 需重启容器，不加挂载 | 卷还在时可用；卷损坏则归档与库同归于尽，价值有限 |
+| **C** 完整 PITR（推荐，但要重建容器） | 加宿主机挂载 `backups/wal` + `archive_mode=on` + `archive_command` 写到该目录 + 重启 | 需重建容器（停机数分钟，影响 `berp_*`） | 可恢复到任意时间点；归档与库物理隔离 |
 
 ### `restore_pg.sh` 实测（2026-11-03 00:05，一次性沙箱，非项目库）
 
@@ -448,12 +493,12 @@ Prod
 6. ✅ 测试闸门加 `release/prod` 黑名单 + `TEST != DATABASE` 校验（`591e7f4`）。
 7. ✅ **已复评：无需拆分**。`coverage-gate.yml` 的 postgres 是 GitHub Actions **一次性 service container**，库名 `heijin_erp_test`，job 结束即销毁，两个变量同值不会伤到任何真实数据；`conftest` 的「TEST ≠ DATABASE」校验在 `CI` 环境下按设计跳过。属命名冗余，不是风险。
 8. 删除或归档 `heijin_erp_migration_test`（✅ **已完成 11-03 00:08**：归档 `archive_migration_test_20261102_235246.dump` 经真实恢复验证后 `DROP ... WITH (FORCE)`）。
-9. 开启 PG WAL 归档（PITR）。
+9. 开启 PG WAL 归档（PITR）——⏳ **待裁决**：`wal_level` 已是 `replica`，但 `archive_mode` 需重启共享容器、归档目录需加宿主机挂载。三个方案与影响面见第九节《WAL 归档 / PITR 的影响面》。
 
 ### P2（上线后 30 天内）
 
 10. 清理 E2E 残留（`package.json` 悬空脚本 + playwright 依赖）。
-11. 本地 Dev / Release 每日备份 cron。
+11. 本地 Dev / Release 每日备份——✅ **脚本已落地**（`deploy/scripts/backup_local.sh`，含恢复校验，见第九节）；**只差 cron 一行**，等授权后装。
 12. 恢复演练季度化并留记录。
 13. 历史数据清洗（客户名占位值、无单号历史单的 `link_status` 标注）。
 14. 清理 `.env.bak-*`、`.env.postgres-test` 等含明文口令的遗留文件。

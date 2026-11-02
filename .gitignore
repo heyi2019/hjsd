@@ -12,6 +12,10 @@ dist/
 .env.*-test
 .env.*.test
 .env.postgres-test
+# .env 的临时备份同样含库口令，禁止入库（11-02 数据恢复期间产生）
+.env.bak*
+.env.*.bak*
+*.env.bak*
 frontend/test-results/
 # SQLite 运行产物：由scripts/migrate_v2.py 从原始 JSON 重建，不入版本库
 *.db

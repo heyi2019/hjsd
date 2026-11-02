@@ -186,7 +186,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(card).queryByText("0")).toBeNull();
   });
 
-  it("FE-257：台账状态列只承载库存状态，订单状态与合约状态不在此列", async () => {
+  it("FE-257：台账有独立「订单状态」列，状态列仍只承载库存状态", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
       ...orders[0],
       status: "INSTALLMENT",
@@ -197,11 +197,11 @@ describe("OrdersPage：四类订单台账", () => {
     await screen.findAllByText("HS-2026-INSTALLMENT-SETTLED");
 
     const row = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-INSTALLMENT-SETTLED") !== null)!;
-    // 台账列定稿：状态列 = 库存状态（account_status → 在库/已售/失效）
+    // 库存状态列 = account_status（在库/已售/失效），不被订单状态串占
     expect(within(row).getByText("在库")).toBeInTheDocument();
-    // 订单状态（分期中）改由移动端卡片顶部与客户详情订单表展示；
-    // 合约结清状态由「分期与回款」页签的合约列表承载，台账不再重复展示。
-    expect(within(row).queryByText("分期中")).toBeNull();
+    // 订单状态自成一列（H5 卡片下线后台账是唯一展示位）；合约结清状态仍由「分期与回款」页签承载
+    expect(screen.getByRole("columnheader", { name: "订单状态" })).toBeInTheDocument();
+    expect(within(row).getByText("分期中")).toBeInTheDocument();
     expect(within(row).queryByText("合约：已结清")).toBeNull();
   });
 

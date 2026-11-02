@@ -40,6 +40,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("account_game_type", "游戏/产品类型"),
             ListColumn("account_game_account", "游戏账号/产品"),
             ListColumn("event_total", "金额"),
+            ListColumn("status", "订单状态", value_set="ORDER_STATUS"),
             ListColumn("account_status", "库存状态"),
             ListColumn("cost_amount", "成本"),
             ListColumn("profit_base", "利润"),

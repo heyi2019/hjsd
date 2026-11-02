@@ -206,21 +206,16 @@ export function useOrdersPageController(params: {
     }
   };
 
-  /** 可冲销动作：已过账的 BUY/COST/SELL，按剩余可冲金额过滤（后端支持部分冲销）。 */
+  /**
+   * 可冲销动作：已过账的 BUY/COST/SELL，按「剩余可冲金额」过滤（后端支持部分冲销）。
+   * 余额由后端 `event.cancellable_amount` 下发，前端只负责挑哪一条、按什么顺序 -
+   * 不再自己遍历 CANCEL 事件做 `amount − Σcancel`（那是与库存页、提交校验并行的第三套。
+   */
   const reversibleEvents = (order: Order | null) => {
-    const posted = (order?.events ?? []).filter((event) => event.is_posted);
-    const cancelled = new Map<number, number>();
-    for (const event of posted) {
-      if (event.event_type !== "CANCEL" || event.offset_event_id == null) continue;
-      cancelled.set(event.offset_event_id, (cancelled.get(event.offset_event_id) ?? 0) + Number(event.amount || 0));
-    }
-    return posted
-      .filter((event) => ["BUY", "COST", "SELL"].includes(event.event_type))
-      .map((event) => {
-        const remaining = Number(event.amount || 0) - (cancelled.get(event.id) ?? 0);
-        return { event, remaining };
-      })
-      .filter((item) => item.remaining > 0)
+    return (order?.events ?? [])
+      .filter((event) => event.is_posted && ["BUY", "COST", "SELL"].includes(event.event_type))
+      .map((event) => ({ event, remaining: event.cancellable_amount ?? "0.00" }))
+      .filter((item) => Number(item.remaining) > 0)
       .reverse();
   };
 
@@ -251,7 +246,7 @@ export function useOrdersPageController(params: {
         cancelForm.setFieldsValue({
           cancelled_on: today(),
           offset_event_id: first?.event.id,
-          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first ? first.remaining.toFixed(2) : undefined,
+          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first?.remaining,
           pool_id: first?.event.pool_id ?? undefined,
         });
         const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
@@ -311,13 +306,13 @@ export function useOrdersPageController(params: {
         const selected = reversible.find((item) => item.event.id === Number(values.offset_event_id)) ?? reversible[0];
         if (selected) {
           const amountValue = cancelScope === "INVREFUND" ? (values.refund_amount ?? values.amount) : (values.cancel_amount ?? values.amount);
-          const amount = (amountValue ?? "").trim() || selected.remaining.toFixed(2);
+          const amount = (amountValue ?? "").trim() || selected.remaining;
           if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
             appMessage.error("请输入有效的冲销金额");
             return;
           }
-          if (Number(amount) > selected.remaining + 1e-9) {
-            appMessage.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining.toFixed(2)}`);
+          if (Number(amount) > Number(selected.remaining) + 1e-9) {
+            appMessage.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining}`);
             return;
           }
           // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。

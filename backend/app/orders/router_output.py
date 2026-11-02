@@ -6,6 +6,9 @@ from datetime import datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from decimal import Decimal
+
+from app.core.money import to_money
 from app.core.security import (
     CurrentUser,
     PERM_AUDIT_READ,
@@ -58,7 +61,31 @@ def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
     return {user.id: user.display_name or user.username for user in users}
 
 
-def _event_output(event: OrderEvent, operator_names: dict[int, str] | None = None) -> schemas.EventOut:
+def cancellable_by_event(events: list[OrderEvent]) -> dict[int, Decimal]:
+    """每个事件的可冲销余额：`amount − Σ已冲销 CANCEL`，夹底 0；CANCEL 自身恒 0。
+
+    与 `post_event` 的冲销校验同源（校验挡住超额，这里给前端展示「还能冲多少」）。
+    一次遍历累加 CANCEL 再逐事件相减，避免每个事件回查一遍。
+    """
+    cancelled: dict[int, Decimal] = {}
+    for item in events:
+        if item.event_type == "CANCEL" and item.offset_event_id is not None:
+            cancelled[item.offset_event_id] = cancelled.get(item.offset_event_id, Decimal("0.00")) + to_money(item.amount)
+    amounts: dict[int, Decimal] = {}
+    for item in events:
+        if item.event_type == "CANCEL":
+            amounts[item.id] = Decimal("0.00")
+            continue
+        remaining = to_money(item.amount) - cancelled.get(item.id, Decimal("0.00"))
+        amounts[item.id] = remaining if remaining > 0 else Decimal("0.00")
+    return amounts
+
+
+def _event_output(
+    event: OrderEvent,
+    operator_names: dict[int, str] | None = None,
+    cancellable: dict[int, Decimal] | None = None,
+) -> schemas.EventOut:
     """把审计字段映射为事件响应字段，避免 ORM 属性名泄漏到 API。"""
     selected_operators = _selected_operator_label(event, operator_names)
     return schemas.EventOut.model_validate(
@@ -83,6 +110,7 @@ def _event_output(event: OrderEvent, operator_names: dict[int, str] | None = Non
             "created_at": event.created_at,
             # created_by 是审计操作者；业务上的操作人以表单勾选员工为准。
             "operator": selected_operators or event.created_by,
+            "cancellable_amount": (cancellable or {}).get(event.id, Decimal("0.00")),
         }
     )
 
@@ -130,7 +158,8 @@ def _order_detail_output(
     ).all()
     operator_names = _operator_names(db, events)
     event_by_id = {event.id: event for event in events}
-    output.events = [_event_output(event, operator_names) for event in events]
+    cancellable = cancellable_by_event(list(events))
+    output.events = [_event_output(event, operator_names, cancellable) for event in events]
     output.links = [
         schemas.OrderLinkOut.model_validate(item)
         for item in service.list_order_links(db, order.id, user)

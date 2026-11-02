@@ -326,6 +326,8 @@ export interface OrderEvent {
   is_posted: boolean;
   posted_at?: string | null;
   operator?: string;
+  /** 该事件还能被冲销多少（amount − Σ已冲销 CANCEL，夹底 0；CANCEL 自身为 0），后端下发。 */
+  cancellable_amount: string;
 }
 
 export interface OrderLink {

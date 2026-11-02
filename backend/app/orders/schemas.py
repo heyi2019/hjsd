@@ -263,6 +263,9 @@ class EventOut(BaseModel):
     form_extra: dict[str, object] | None = None
     created_at: datetime
     operator: str
+    # 该事件还能被冲销多少：amount − Σ已冲销 CANCEL，夹底 0；CANCEL 自身恒 0。
+    # 由后端下发，避免前端（订单页/库存页）各自再算一遍而口径漂移。
+    cancellable_amount: Decimal = Decimal("0.00")
 
 
 class OrderDetailOut(OrderOut):

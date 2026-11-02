@@ -26,6 +26,7 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.domain.foundation import Pool
+from app.domain.trade import OrderEvent
 from app.domain.options import OptionSet
 from app.value_added_services import service as installments_service
 from app.lists import service as list_columns_service
@@ -47,6 +48,7 @@ from .router_output import (
     _event_output,
     _order_detail_output,
     _order_list_payload,
+    cancellable_by_event,
 )
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
@@ -892,8 +894,12 @@ def post_event(
         form_extra=payload.form_extra,
         user=user,
     )
+    # 刚提交的事件要能立刻显示「还能冲多少」：把同订单事件一并取出算余额。
+    order_events = list(
+        db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all()
+    )
     return schemas.EventPostResult(
-        event=_event_output(event, _operator_names(db, [event])),
+        event=_event_output(event, _operator_names(db, [event]), cancellable_by_event(order_events)),
         cashflow_no=flow.flow_no if flow else None,
     )
 

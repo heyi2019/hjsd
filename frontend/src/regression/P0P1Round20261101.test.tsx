@@ -598,9 +598,9 @@ it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", (
       delivery_responsible_ids: [22],
     },
     events: [
-      { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [] },
-      { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [] },
-      { id: 3, event_no: "EV-3", order_id: 10, event_type: "COST", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33] },
+      { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "100" },
+      { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "200" },
+      { id: 3, event_no: "EV-3", order_id: 10, event_type: "COST", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "20" },
     ],
   });
   const rows = buildActionAllocationRows([], candidates);
@@ -924,12 +924,12 @@ it("P1/FE-252：取消依赖的资金账户加载完成后才允许确认", asyn
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([order] as never);
   vi.mocked(catalog.ordersApi.get).mockResolvedValue({
     ...order,
-    events: [{ id: 2101, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", pool_id: 7, is_posted: true }],
+    events: [{ id: 2101, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", pool_id: 7, is_posted: true, cancellable_amount: "100.00" }],
   } as never);
   vi.mocked(catalog.poolsApi.list).mockImplementation(() => poolsPending as never);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({
-    event: { id: 2102, event_type: "CANCEL", amount: "100.00" },
+    event: { id: 2102, event_type: "CANCEL", amount: "100.00", cancellable_amount: "0.00" },
   } as never);
 
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
@@ -1143,7 +1143,7 @@ it("P1/FE-267：订单详情分别回显买号和卖号手机号绑定人", asyn
             order_type: "DG",
             created_at: "2026-11-02T11:00:00",
             extra_values: { bound_phone: "13800000002", bound_phone_owner: "卖出负责人" },
-            events: [{ event_type: "SELL", id: 1, amount: "1", occurred_on: "2026-11-02" }],
+            events: [{ event_type: "SELL", id: 1, amount: "1", occurred_on: "2026-11-02", cancellable_amount: "1" }],
           },
         ],
       } as never}

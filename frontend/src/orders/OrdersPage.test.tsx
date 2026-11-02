@@ -305,35 +305,18 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(ledger).getAllByText("TH-2026-0003").length).toBeGreaterThan(0);
   });
 
-  it("订单台账统一展示通用字段", async () => {
+  it("订单台账默认视图露出核心识别列，并按行渲染业务数据", async () => {
     await openLedger();
 
-    // 台账列随库存口径重构：新增入库/售卖/在手/成本/利润，移除「对方 / 来源」「平台」
-    // 「最新动作」，账号状态列改名为「库存状态」。
-    const expected = {
-      "订单号": "110px",
-      "游戏/产品类型": "140px",
-      "游戏账号/产品": "140px",
-      "入库负责人": "110px",
-      "入库时间": "132px",
-      "售卖负责人": "110px",
-      "售卖时间": "132px",
-      "在手时间": "120px",
-      "金额": "126px",
-      "库存状态": "102px",
-      "成本": "110px",
-      "利润": "110px",
-      "日期": "144px",
-      "操作": "220px",
-    };
-    for (const label of Object.keys(expected)) {
+    // 列的显隐 / 顺序 / 列宽 / 自定义列都由「设置 → 列表列」统一配置（服务端单一事实源），
+    // 所以这里不锁完整列清单，也不锁逐列像素宽度：那两样是配置能力，已由
+    // shared/lib/listColumns.test.ts（覆盖/排序/注入）与后端 test_list_columns.py
+    // （注册表契约、保存、重置）覆盖；写死清单只会让每次产品调列都误报。
+    // 本用例守住两件产品真正在意的事：默认视图下核心识别列必须看得见、列的 render 取数正确。
+    for (const label of ["订单号", "金额", "库存状态", "日期", "操作"]) {
       expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
     }
-    for (const width of Object.values(expected)) {
-      const ledgerColumnStyles = Array.from(document.querySelectorAll(".orders-ledger .ant-table col"))
-        .map((column) => column.getAttribute("style") ?? "");
-      expect(ledgerColumnStyles).toContain(`width: ${width};`);
-    }
+    // 固定布局与 ellipsis 配套，避免长账号名把列撑变形；与列配置无关，仍守住。
     expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
     for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);
@@ -511,7 +494,7 @@ describe("OrdersPage：四类订单台账", () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([...orders, soldConsignment]);
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...soldConsignment,
-      events: [{ id: 401, order_id: 4, event_no: "EV-401", event_type: "SELL", amount: "500.00", is_posted: true }],
+      events: [{ id: 401, order_id: 4, event_no: "EV-401", event_type: "SELL", amount: "500.00", is_posted: true, cancellable_amount: "500.00" }],
     } as never);
     // 打开取消弹窗前会并行拉资金池与员工；未 mock 时 poolList 为 undefined，
     // openCancelTransaction 内部抛错被 catch 吞掉 → 弹窗不出现。
@@ -590,7 +573,7 @@ describe("OrdersPage：四类订单台账", () => {
   it("未售且有买入流水的取消复用库存中心的退款弹窗", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...orders[0],
-      events: [{ id: 101, event_no: "EV-101", event_type: "BUY", amount: "100.00", pool_id: 3, is_posted: true }],
+      events: [{ id: 101, event_no: "EV-101", event_type: "BUY", amount: "100.00", pool_id: 3, is_posted: true, cancellable_amount: "100.00" }],
     } as never);
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([
       { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },

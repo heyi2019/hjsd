@@ -31,7 +31,7 @@ export function SharedCancellationDialog({ controller }: { controller: OrdersPag
     <InventoryCancellationDialog
       open={hasSharedCancellation}
       title={cancelOrderTarget ? `取消 · ${cancelOrderTarget.order_no}` : "取消"}
-      amount={sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00"}
+      amount={sharedCancellationEvent?.remaining ?? "0.00"}
       pools={cancelPools}
       form={cancelForm}
       scope={cancelScope}
@@ -42,8 +42,8 @@ export function SharedCancellationDialog({ controller }: { controller: OrdersPag
       onCancel={closeCancelTransaction}
       onFinish={(values) => void submitCancelTransaction({ ...values, cancelled_on: today() })}
       description={cancelScope === "INVREFUND"
-        ? <p className="muted">将冲销来源订单的买入流水（¥{money(sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00")}），退回金额进入所选收款账户；订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。</p>
-        : <p className="muted">将冲销来源订单的售出流水（¥{money(sharedCancellationEvent?.remaining.toFixed(2) ?? "0.00")}），退款金额将从所选付款账户支出；订单状态变为「取消」，历史轨迹保留。</p>}
+        ? <p className="muted">将冲销来源订单的买入流水（¥{money(sharedCancellationEvent?.remaining ?? "0.00")}），退回金额进入所选收款账户；订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。</p>
+        : <p className="muted">将冲销来源订单的售出流水（¥{money(sharedCancellationEvent?.remaining ?? "0.00")}），退款金额将从所选付款账户支出；订单状态变为「取消」，历史轨迹保留。</p>}
     />
   );
 }
@@ -100,12 +100,12 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
                   placeholder={cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择被冲销动作"}
                   options={cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }) => ({
                     value: event.id,
-                    label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining.toFixed(2))}）`,
+                    label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining)}）`,
                   }))}
                   onChange={(value: number) => {
                     const target = cancelableEventsForScope(cancelOrderTarget, cancelScope).find((item) => item.event.id === value);
                     if (target) cancelForm.setFieldsValue({
-                      [cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: target.remaining.toFixed(2),
+                      [cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: target.remaining,
                       pool_id: target.event.pool_id ?? cancelPools[0]?.id,
                     });
                   }}

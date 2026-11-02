@@ -220,7 +220,7 @@ beforeEach(() => {
   vi.mocked(catalog.ordersApi.deleteLink).mockResolvedValue(undefined);
   vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
   vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({
-    event: { id: 2, event_no: "EV-2", order_id: 1, event_type: "CANCEL", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true },
+    event: { id: 2, event_no: "EV-2", order_id: 1, event_type: "CANCEL", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "0.00" },
     installment: { id: 11, inst_no: "INS-1", status: "CANCELLED" },
     cash_flows: [],
     warnings: [],
@@ -396,7 +396,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       {
         ...order1,
-        events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true }],
+        events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
       },
     ]);
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
@@ -438,9 +438,9 @@ describe("OrdersPage：操作与筛选分支", () => {
         delivery_responsible_ids: [22],
       },
       events: [
-        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [] },
-        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [] },
-        { id: 103, event_no: "EV-103", order_id: 1, event_type: "COST", amount: "100.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33] },
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "1500.00" },
+        { id: 103, event_no: "EV-103", order_id: 1, event_type: "COST", amount: "100.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "100.00" },
       ],
     });
     await openLedger();
@@ -642,7 +642,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   it("取消：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
-      events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true }],
+      events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
@@ -673,7 +673,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([cancelOrder]);
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...cancelOrder,
-      events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true }],
+      events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true, cancellable_amount: "100.00" }],
     });
     vi.mocked(catalog.poolsApi.list).mockImplementation(() => poolsPending as never);
     vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
@@ -696,7 +696,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   it("取消：冲销入库流水并进入公司钱包", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
-      events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", pool_id: 7, is_posted: true }],
+      events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", pool_id: 7, is_posted: true, cancellable_amount: "1000.00" }],
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
@@ -717,8 +717,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
       events: [
-        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true },
-        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "500.00", occurred_on: "2026-10-02", is_posted: true },
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "500.00", occurred_on: "2026-10-02", is_posted: true, cancellable_amount: "500.00" },
       ],
     });
     await openLedger();

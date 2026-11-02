@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""后端 GET 接口 SQL 条数 / 耗时探针（只读巡检工具）。
+"""后端 GET 接口 SQL 条数 / 耗时探针（只读巡检工具，PostgreSQL 版）。
 
 用途（2026-10-28 N+1 收口时引入）：
 - 在真实库的临时副本上跑全部 GET 接口，统计每接口单次请求的 SQL 条数、
   同构去重数与耗时中位数；「重复条数」高 = 循环内查询（N+1）指纹。
 - 用于：改查询逻辑前取基线、改完复测对比、巡检新增接口有没有 N+1。
 
-用法（需 backend venv，APP_ENV 自动置 development 走 X-Dev-User 直通）：
-    ./.venv/bin/python scripts/perf_probe.py                    # 打印 Top30
-    ./.venv/bin/python scripts/perf_probe.py --out base.json    # 同时存 JSON 供前后对比
-    ./.venv/bin/python scripts/perf_probe.py --db other.db      # 指定库（相对 backend/ 或绝对路径）
+2026-11-03 重写为 PG（原 SQLite 版已下线）：
+- 源库经 pg_dump 还原到临时 PG 库；探针只读写副本；跑完 DROP 临时库。
+- 源库只做 pg_dump（只读），绝不写入/删除源库（dev/release/test 一律不碰）。
+- dump/restore 一律走容器 heijin-db-1（宿主机无 PG 客户端）。
 
-说明：
-- 全程只读业务数据：每次运行先把库拷到临时目录，接口请求只落副本；
-- SQL 计数挂 Engine 级 before_cursor_execute，过滤 PRAGMA/事务控制语句；
+用法（需 backend venv，APP_ENV 自动置 development 走 X-Dev-User 直通）：
+    ./.venv/bin/python scripts/perf_probe.py                         # 默认源=dev 沙盒，打印 Top30
+    ./.venv/bin/python scripts/perf_probe.py --out base.json         # 同时存 JSON 供前后对比
+    ./.venv/bin/python scripts/perf_probe.py --source-url postgresql+psycopg://erp_app:***@127.0.0.1:5433/heijin_erp_release
+        # 指向有数据的库（只读 dump）；dev 沙盒业务表全空，默认跑只用于工具自检。
+
+安全红线：
+- 只 CREATE/DROP 前缀为 `heijin_erp_perf_probe_` 的临时库；DROP 前硬性校验前缀。
+- 源库名来自 --source-url / DATABASE_URL；容器侧只对其做 pg_dump。
 - 部分接口要求必填查询参数（search / order-form-fields / impact-preview 等），
   未带参会得 422，属探针假象而非服务缺陷；路径参数用各表最新一条真实 id 代入。
 """
@@ -23,20 +29,29 @@ import argparse
 import json
 import os
 import re
-import shutil
-import sqlite3
 import statistics
+import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
+from sqlalchemy import text
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
-NOISE_PREFIXES = ("PRAGMA", "BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "SELECT 1")
+# 容器与凭据（与仓库根 .env 一致；优先读环境变量，回退默认值）。
+CONTAINER = os.environ.get("ERP_PG_CONTAINER", "heijin-db-1")
+PGUSER = os.environ.get("ERP_PG_USER", "erp_app")
+
+# PG 的噪声前缀：事务控制 + 会话级 SET/SHOW/DISCARD/RESET（psycopg 建连会发），
+# 以及 `SELECT 1` 心跳；这些不计为业务 SQL。
+NOISE_PREFIXES = (
+    "BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "RELEASE", "SELECT 1",
+    "SET ", "SHOW ", "DISCARD ", "RESET ", "VALUES", "COPY ",
+)
 COUNTED_HEADS = ("SELECT", "INSERT", "UPDATE", "DELETE")
 
-# 路径参数 -> 示例值来源（各表取一条真实 id；表不存在时回退 1）
+# 路径参数 -> 示例值来源（各表取一条真实 id；表不存在时回退 1）。
 _ID_SOURCES = {
     "order_id": "select id from orders order by id desc limit 1",
     "customer_id": "select id from customers order by id desc limit 1",
@@ -55,29 +70,39 @@ _ID_SOURCES = {
 }
 
 
-def _sample_ids(work_db: Path) -> dict[str, str]:
-    conn = sqlite3.connect(work_db)
-    try:
-        ids: dict[str, str] = {}
-        for key, sql in _ID_SOURCES.items():
-            try:
-                row = conn.execute(sql).fetchone()
-            except sqlite3.Error:
-                row = None
-            ids[key] = str(row[0]) if row else "1"
-        ids["report_name"] = "monthly-pnl"
-        return ids
-    finally:
-        conn.close()
-
-
 def _normalize(statement: str) -> str:
     return re.sub(r"\s+", " ", statement.strip())
 
 
+def _docker_psql(*sql: str) -> None:
+    """在容器内以 erp_app 执行 DDL/DCL（CREATE/DROP DATABASE 必须在 postgres 库执行）。"""
+    subprocess.run(
+        ["docker", "exec", CONTAINER, "psql", "-U", PGUSER, "-d", "postgres", "-c", " ".join(sql)],
+        check=True,
+    )
+
+
+def _sample_ids(engine) -> dict[str, str]:
+    """用 SQLAlchemy 从（临时）PG 库读各表一条真实 id；表不存在/空则回退 1。"""
+    ids: dict[str, str] = {}
+    with engine.connect() as conn:
+        for key, sql in _ID_SOURCES.items():
+            try:
+                row = conn.execute(text(sql)).fetchone()
+            except Exception:  # noqa: BLE001 某些表可能不存在，忽略
+                row = None
+            ids[key] = str(row[0]) if row else "1"
+    ids["report_name"] = "monthly-pnl"
+    return ids
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="GET 接口 SQL 条数/耗时探针（只读）")
-    parser.add_argument("--db", default="data/heijin_erp_v1.db", help="源库路径（相对 backend/ 或绝对路径）")
+    parser = argparse.ArgumentParser(description="GET 接口 SQL 条数/耗时探针（只读，PostgreSQL）")
+    parser.add_argument(
+        "--source-url",
+        default=os.environ.get("DATABASE_URL"),
+        help="源 PG 连接串（默认取环境变量 DATABASE_URL=dev 沙盒）。只读 pg_dump，不写源库。",
+    )
     parser.add_argument("--out", default=None, help="结果 JSON 输出路径（可选）")
     parser.add_argument("--repeat", type=int, default=3, help="每接口正式测量次数（取中位）")
     parser.add_argument("--warmup", type=int, default=1, help="每接口预热次数（不计入统计）")
@@ -87,15 +112,24 @@ def main() -> int:
     if args.repeat < 1 or args.warmup < 0:
         parser.error("--repeat 必须 >= 1，--warmup 必须 >= 0")
 
-    source_db = Path(args.db)
-    if not source_db.is_absolute():
-        source_db = BACKEND_DIR / source_db
-    if not source_db.exists():
-        print(f"源库不存在: {source_db}", file=sys.stderr)
+    if not args.source_url or not args.source_url.startswith("postgresql"):
+        print("源库必须是 PostgreSQL（--source-url 或 DATABASE_URL 以 postgresql 开头）", file=sys.stderr)
         return 2
+
+    from sqlalchemy.engine.url import make_url
+
+    src = make_url(args.source_url)
+    source_dbname = src.database
+    temp_dbname = f"heijin_erp_perf_probe_{os.getpid()}_{int(time.time())}"
 
     os.environ.setdefault("APP_ENV", "development")
     os.environ.setdefault("LOG_LEVEL", "WARNING")
+    # 探针只连临时库：把 DATABASE_URL 指向临时库，再导入 app（避免 get_engine 缓存源库）。
+    os.environ["DATABASE_URL"] = (
+        f"postgresql+psycopg://{src.username or PGUSER}"
+        f"{(':' + src.password) if src.password else ''}"
+        f"@{src.host or '127.0.0.1'}:{src.port or 5432}/{temp_dbname}"
+    )
 
     sys.path.insert(0, str(BACKEND_DIR))
     from fastapi.testclient import TestClient
@@ -104,11 +138,20 @@ def main() -> int:
     from app.api_v1 import create_app
     from app.core.database import get_engine
 
-    with tempfile.TemporaryDirectory(prefix="erp_perf_probe_") as tmp:
-        work_db = Path(tmp) / "probe.db"
-        shutil.copy2(source_db, work_db)
-        os.environ["DATABASE_URL"] = f"sqlite:///{work_db}"
+    # 1) 建临时库（与源库同版本，空库）
+    _docker_psql(f"CREATE DATABASE {temp_dbname} OWNER {PGUSER};")
+    # 2) 源库只读 dump → 临时库（--no-owner 避免还原出不属于 erp_app 的对象）
+    dump = subprocess.run(
+        ["docker", "exec", CONTAINER, "pg_dump", "-U", PGUSER, "-d", source_dbname,
+         "--no-owner", "--no-privileges", "--no-comments"],
+        capture_output=True, text=True, check=True,
+    )
+    subprocess.run(
+        ["docker", "exec", "-i", CONTAINER, "psql", "-U", PGUSER, "-d", temp_dbname],
+        input=dump.stdout, text=True, check=True,
+    )
 
+    try:
         app = create_app()
         engine = get_engine()
         counter = {"sql": 0, "stmts": []}
@@ -124,7 +167,7 @@ def main() -> int:
             counter["sql"] += 1
             counter["stmts"].append(_normalize(statement))
 
-        ids = _sample_ids(work_db)
+        ids = _sample_ids(engine)
         rows: list[dict[str, object]] = []
         with TestClient(app, headers={"X-Dev-User": "admin"}) as client:
             routes = sorted(
@@ -168,6 +211,10 @@ def main() -> int:
                         "bytes": size,
                     }
                 )
+    finally:
+        # 3) 无论探针是否异常，都 DROP 临时库（前缀硬性校验，拒绝误删其它库）。
+        assert temp_dbname.startswith("heijin_erp_perf_probe_"), f"拒绝 DROP 非临时库: {temp_dbname}"
+        _docker_psql(f"DROP DATABASE {temp_dbname} WITH (FORCE);")
 
     rows.sort(key=lambda r: (-int(r["sql"]), -float(r["ms"])))
     if args.out:
@@ -177,7 +224,7 @@ def main() -> int:
         out_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
     ok = sum(1 for r in rows if r["status"] == 200)
-    print(f"\n共探测 {len(rows)} 个 GET 接口，200 成功 {ok} 个；源库 {source_db}\n")
+    print(f"\n共探测 {len(rows)} 个 GET 接口，200 成功 {ok} 个；源库 {source_dbname} → 临时库 {temp_dbname}（已 DROP）\n")
     print(f"{'SQL':>5} {'去重':>5} {'重复':>5} {'ms':>8} {'KB':>8}  status  path")
     for r in rows[: args.top]:
         print(

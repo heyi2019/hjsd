@@ -536,3 +536,176 @@ describe("InventoryPanel：账号台账", () => {
     expect(headers[0]).toBe("状态");
   });
 });
+
+// —— 原 InventoryPanel.expand.test.tsx ——
+// 夹具与主文件同源（InventoryPanel.test.fixtures），mock 契约一致（catalog automock）。
+describe("InventoryPanel：展开行与写路径联动", () => {
+  setupInventoryPanelMocks();
+
+  /** 账号台账「展开」的两条约束：同时只展开一行；写操作后执行明细必须重拉，不能停在写前快照。 */
+  describe("InventoryPanel：账号台账展开", () => {
+    it("一次只展开一行：展开另一行时前一行自动收起", async () => {
+      // 默认 fixture 只有 1 条在库账号，这里补到 2 条才能验证互斥。
+      vi.mocked(catalog.stocksApi.list).mockResolvedValue([
+        { ...accounts[0], id: 11, game_account: "acc-11" },
+        { ...accounts[0], id: 12, game_account: "acc-12" },
+      ]);
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("acc-11");
+
+      const collapsedIcons = () => Array.from(document.querySelectorAll<HTMLElement>(".ant-table-row-expand-icon-collapsed"));
+      expect(collapsedIcons()).toHaveLength(2);
+
+      // 默认「最新在前」按 id 倒序，首行是 id=12。
+      await ui.click(collapsedIcons()[0]);
+      await screen.findByText("当前运营状态");
+      expect(document.querySelectorAll(".inventory-detail")).toHaveLength(1);
+
+      // 展开态互斥：此时仅剩的 collapsed 图标属于另一行。
+      await ui.click(collapsedIcons()[0]);
+      await waitFor(() => expect(document.querySelectorAll(".inventory-detail")).toHaveLength(1));
+
+      const ownerKey = document.querySelector(".ant-table-expanded-row")?.previousElementSibling?.getAttribute("data-row-key");
+      expect(ownerKey).toBe("11");
+    });
+
+    it("展开后登记返点：详情缓存失效并重新拉取执行明细", async () => {
+      // 弹窗打开后会按订单逐个拉取返点列表；夹具只桩了 create 未桩 list，
+      // 自动 mock 返回 undefined 会让表单初始化中途抛错（detail 已到、字段未赋值）。
+      vi.mocked(catalog.rebatesApi.list).mockResolvedValue([]);
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("acc-1");
+
+      await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
+      await screen.findByText("当前运营状态");
+      const callsBeforeWrite = vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length;
+      expect(callsBeforeWrite).toBeGreaterThan(0);
+
+      // 展开后「acc-1」同时出现在主表行与展开详情里，改用全局唯一的「返点」按钮，避免 getByText 多匹配。
+      await ui.click(screen.getByRole("button", { name: "返点" }));
+      await screen.findByText("登记返点");
+      await ui.click(await screen.findByLabelText("卖号返点"));
+      await ui.type(screen.getByLabelText("返点日期"), "2026-10-20{enter}");
+      await ui.click(screen.getByRole("button", { name: "确认登记" }));
+
+      await waitFor(() => expect(vi.mocked(catalog.rebatesApi.create)).toHaveBeenCalled());
+      // 缓存若未失效，executionDetail 不会再被调用，展开区会停在写之前的快照。
+      await waitFor(() =>
+        expect(vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length).toBeGreaterThan(callsBeforeWrite),
+      );
+    });
+
+    it("收起后再展开同一行：命中缓存不重复请求", async () => {
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("acc-1");
+
+      await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
+      await screen.findByText("当前运营状态");
+      const callsAfterFirstExpand = vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length;
+
+      await ui.click(document.querySelector(".ant-table-row-expand-icon-expanded") as HTMLElement);
+      await waitFor(() => expect(document.querySelector(".inventory-detail")).toBeNull());
+
+      await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
+      await screen.findByText("当前运营状态");
+      expect(vi.mocked(catalog.stocksApi.executionDetail).mock.calls.length).toBe(callsAfterFirstExpand);
+    });
+  });
+});
+
+// —— 原 InventoryPanel.stockNo.test.tsx ——
+// 同上。
+describe("InventoryPanel：编号列与导出", () => {
+  setupInventoryPanelMocks();
+
+  // 覆盖共享 mock：本文件使用含 DG 代挂衍生账号的 stockNoAccounts。
+  beforeEach(() => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValue(stockNoAccounts as never);
+  });
+
+  describe("InventoryPanel：库存编号（KU 编码）", () => {
+    // 表格按 id 倒序，KU_00004(id=4) 为首个数据行，作为等待锚点最稳。
+    it("台账首列库存编号展示账号的 stock_no（KU+4位）", async () => {
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("KU_00004");
+
+      const rows = screen.getAllByRole("row");
+      const first = within(rows[1]);
+      expect(first.getByText("KU_00004")).toBeInTheDocument();
+      // 首列库存编号应排在订单号之前
+      const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
+      expect(headers.indexOf("库存编号")).toBeLessThan(headers.indexOf("订单号"));
+    });
+
+    it("游戏账号独立成列，展示 game_account 而非库存编号", async () => {
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("acc-4");
+      const rows = screen.getAllByRole("row");
+      expect(within(rows[1]).getByText("acc-4")).toBeInTheDocument();
+      // 同表内其他账号的游戏账号也正确
+      expect(screen.getByText("acc-1")).toBeInTheDocument();
+    });
+
+    it("不同业务类型的库存账号均显示各自 stock_no（含 DG/TH 衍生）", async () => {
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("KU_00004");
+      // 库存中心只展示仍在库的 HS 回收 / DG 代挂 / TH 提号账号
+      expect(screen.getByText("KU_00001")).toBeInTheDocument();
+      expect(screen.getByText("KU_00003")).toBeInTheDocument();
+      expect(screen.getByText("KU_00004")).toBeInTheDocument();
+      expect(screen.queryByText("KU_00002")).toBeNull();
+    });
+
+    it("导出 CSV 的库存编号列取自 stock_no（含 DG/TH 衍生）", () => {
+      const csv = buildInventoryCsv(stockNoAccounts);
+      expect(csv).toContain("KU_00003");
+      expect(csv).toContain("KU_00004");
+    });
+  });
+});
+
+// —— 原 InventoryPanel.filters.test.tsx ——
+// 同上。
+describe("InventoryPanel：筛选与统计联动", () => {
+  setupInventoryPanelMocks();
+
+  describe("InventoryPanel：职责边界", () => {
+    it("库存中心不提供新增账号入口", async () => {
+      renderLight(<InventoryPanel />, { user: "viewer" });
+      await screen.findByText("acc-1");
+      expect(screen.queryByText("新增账号")).toBeNull();
+      expect(screen.queryByRole("button", { name: /建\s*档/ })).toBeNull();
+    });
+  });
+
+  describe("InventoryPanel：状态边界", () => {
+    it("固定只向库存接口请求在库账号，不提供跨状态筛选", async () => {
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("acc-1");
+      await waitFor(() =>
+        expect(vi.mocked(catalog.stocksApi.list).mock.calls.some((c) => (c[0] as { status?: string })?.status === "WAITING")).toBe(true),
+      );
+      expect(screen.queryByPlaceholderText("按状态筛选")).toBeNull();
+    });
+  });
+
+  describe("InventoryPanel：卡片指标的取数口径", () => {
+    it("汇总只带当前可见账号：筛选收窄后重新请求，清空后回到空集合", async () => {
+      const ui = userEvent.setup({ pointerEventsCheck: 0 });
+      renderLight(<InventoryPanel />, { user: "admin" });
+      await screen.findByText("acc-1");
+      // 初次加载：accounts 里只有 acc-1 在库（acc-2 已售）。
+      await waitFor(() => expect(vi.mocked(catalog.stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]));
+
+      const search = screen.getByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
+      await ui.type(search, "acc-1");
+      await waitFor(() => expect(vi.mocked(catalog.stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]));
+
+      // 搜不到任何行时集合为空：后端据此返回全 0，前端不做本地求和。
+      await ui.clear(search);
+      await ui.type(search, "none-match");
+      await waitFor(() => expect(vi.mocked(catalog.stocksApi.inventoryStats)).toHaveBeenLastCalledWith([]));
+    });
+  });
+});
+

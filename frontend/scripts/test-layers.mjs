@@ -4,8 +4,8 @@
 
 export const fastTests = [
   "src/test/fixtures.test.ts",
-  "src/accounts/inventory-export.test.ts",
-  "src/accounts/inventory-logic.test.ts",
+  "src/stocks/inventory-export.test.ts",
+  "src/stocks/inventory-logic.test.ts",
   "src/shared/api/*.test.ts",
   "src/shared/lib/*.test.ts",
   "src/vite.config.test.ts",
@@ -15,12 +15,10 @@ export const fastTests = [
 // 不包含库存/客户/资金等长链路全量页面回归。
 export const quickTests = [
   "src/app/DashboardPage.test.tsx",
-  "src/app/DashboardPage.interactions.test.tsx",
   "src/auth/LoginPage.test.tsx",
   "src/auth/UserCenterPage.test.tsx",
   "src/field-definitions/SettingsPage.test.tsx",
   "src/orders/CreateBusinessModal.test.tsx",
-  "src/orders/CreateBusinessModal.distribution.test.tsx",
   "src/policy/PolicySettingsPanel.test.tsx",
   "src/reporting/ReportsPage.test.tsx",
   "src/shared/state/session.test.tsx",

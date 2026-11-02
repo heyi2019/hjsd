@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
+from app.core.sql_functions import year_month
 from app.domain.enums import (
     CashflowStatus,
     Direction,
@@ -472,7 +473,7 @@ def metrics(
 
     # 对账：按月聚合（总数 + 已核销数），池可见性过滤下沉 SQL。
     recon_stmt = select(
-        func.strftime("%Y-%m", Reconciliation.reconciled_on).label("month"),
+        year_month(Reconciliation.reconciled_on).label("month"),
         func.count().label("total"),
         func.sum(
             case(
@@ -491,7 +492,7 @@ def metrics(
     # 分期计划：按月聚合（到期数 + 逾期数），订单可见性经子查询下沉 SQL。
     sched_stmt = (
         select(
-            func.strftime("%Y-%m", InstallmentSchedule.due_on).label("month"),
+            year_month(InstallmentSchedule.due_on).label("month"),
             func.count().label("total"),
             func.sum(
                 case(

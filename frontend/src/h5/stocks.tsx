@@ -1,13 +1,14 @@
 /** H5（≤640px）库存账号卡片列表。
  *
- * 归属移动端层；库龄、业务类型等口径仍从 stocks 域的纯函数取，避免两套。
+ * 归属移动端层；业务类型等展示文案仍从 stocks 域的纯函数取，避免两套。
+ * 库龄天数与档位由后端下发（AccountOut.inventory_age_days / _level），此处不做日期差。
  */
 import { Dropdown } from "antd";
 import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
 import { formatDateTimeMinute } from "../shared/lib/format";
 import { orderMobileFields } from "../shared/lib/listColumns";
 import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
-import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL, inventoryAge, isEditableAccountType } from "../stocks/inventory-logic";
+import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../stocks/inventory-logic";
 import { moreMenuItems } from "../stocks/InventoryPanel/helpers";
 
 export function MobileInventoryList({
@@ -41,7 +42,6 @@ export function MobileInventoryList({
   return (
     <div className="data-mobile-list">
       {rows.map((row) => {
-        const age = inventoryAge(row);
         const fields = orderMobileFields([
           { key: "game_type", label: "游戏/产品类型", value: row.game_type || "-" },
           { key: "game_account", label: "游戏账号/产品", value: row.game_account || "-" },
@@ -51,7 +51,7 @@ export function MobileInventoryList({
           { key: "inventory_type", label: "业务类型", value: row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "-" },
           { key: "inventory_entry_at", label: "入库时间", value: formatDateTimeMinute(row.inventory_entry_at) },
           { key: "inventory_operator", label: "入库负责人", value: row.inventory_operator || row.created_by || "-" },
-          { key: "inventory_age", label: "未售时长", value: age ? `${age.days}天` : "-" },
+          { key: "inventory_age", label: "未售时长", value: row.inventory_age_days == null ? "-" : `${row.inventory_age_days}天` },
           { key: "cost_amount", label: "成本", value: <MoneyText value={row.cost_amount} /> },
         ], fieldOrder);
         return (

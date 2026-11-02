@@ -5,7 +5,6 @@ import {
   INVENTORY_TYPE_LABEL,
   accountFinancialFlows,
   financeTypeLabel,
-  inventoryAge,
   inventoryStatusLabel,
   rebateTypeLabel,
 } from "./inventory-logic";
@@ -92,7 +91,6 @@ export function buildInventoryCsv(
     ...rows.map((row) => {
       const detail = details[row.id];
       const detailText = exportDetailText(detail);
-      const age = inventoryAge(row);
       return [
         row.source_order_no || detail?.orders.find((order) => order.order_type !== "DG")?.order_no || detail?.orders[0]?.order_no || "",
         row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "",
@@ -103,7 +101,7 @@ export function buildInventoryCsv(
         row.platform,
         row.cost_amount,
         inventoryStatusLabel(row.inventory_status ?? "IN_STOCK"),
-        age ? `${age.days}天` : "",
+        row.inventory_age_days == null ? "" : `${row.inventory_age_days}天`,
         row.created_by,
         detailText.registrationAt,
         detailText.soldAt,

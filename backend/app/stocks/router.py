@@ -293,9 +293,16 @@ def export_accounts_csv(
         _user,
         include_credentials=_user.has(PERM_ORDER_CREATE),
     )
-    csv_text, meta = build_list_csv(
-        db, "INVENTORY", [output.model_dump() for output in outputs]
-    )
+    # 「未售时长」列的注册键是 inventory_age，而响应字段叫 inventory_age_days，
+    # 不补别名整列会导出成空（列在、值没有）。格式与前端本地导出保持一致：`N天`。
+    rows = [
+        {
+            **output.model_dump(),
+            "inventory_age": "" if output.inventory_age_days is None else f"{output.inventory_age_days}天",
+        }
+        for output in outputs
+    ]
+    csv_text, meta = build_list_csv(db, "INVENTORY", rows)
     record_audit(
         db,
         action=AuditAction.LIST_EXPORT,

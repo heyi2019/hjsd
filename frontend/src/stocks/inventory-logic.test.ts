@@ -1,35 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { accountFinancialFlows, inventoryAge, rebateTypeLabel, INVENTORY_TYPE_LABEL } from "./inventory-logic";
+import { accountFinancialFlows, INVENTORY_AGE_COLOR, rebateTypeLabel, INVENTORY_TYPE_LABEL } from "./inventory-logic";
 
 describe("库存纯逻辑", () => {
   it("展示提号库存类型", () => {
     expect(INVENTORY_TYPE_LABEL.PICKUP).toBe("提号");
   });
 
-  it("按在库天数返回绿色、橙色、红色等级", () => {
-    const now = new Date("2026-10-17T12:00:00");
-    expect(inventoryAge({ status: "WAITING", buy_date: "2026-10-15" }, now)).toEqual({ days: 2, color: "green" });
-    expect(inventoryAge({ status: "WAITING", buy_date: "2026-09-20" }, now)).toEqual({ days: 27, color: "orange" });
-    expect(inventoryAge({ status: "WAITING", buy_date: "2026-09-01" }, now)).toEqual({ days: 46, color: "red" });
-  });
-
-  it("按精确到分的入库时间计算未售时长", () => {
-    expect(inventoryAge({ status: "WAITING", inventory_entry_at: "2026-10-10T09:30:00" }, new Date("2026-10-17T12:00:00"))).toEqual({
-      days: 7,
-      color: "green",
-    });
-  });
-
-  it("未售时长计算保留入库时间的时分秒", () => {
-    expect(inventoryAge({ status: "WAITING", inventory_entry_at: "2026-10-10T09:30:00" }, new Date("2026-10-17T09:29:59"))).toEqual({
-      days: 6,
-      color: "green",
-    });
-  });
-
-  it("非在库状态不计算未售时长", () => {
-    expect(inventoryAge({ status: "SOLD", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
-    expect(inventoryAge({ status: "SOLD", inventory_status: "OUT_OF_STOCK", buy_date: "2026-10-01" }, new Date("2026-10-17T12:00:00"))).toBeNull();
+  // 库龄天数与 7/30 天档位由后端下发（见 tests/v1/test_account_inventory_age.py），
+  // 前端只剩「档位 → 颜色」这一层展示映射。
+  it("库龄档位映射到标签颜色", () => {
+    expect(INVENTORY_AGE_COLOR.NORMAL).toBe("green");
+    expect(INVENTORY_AGE_COLOR.WARNING).toBe("orange");
+    expect(INVENTORY_AGE_COLOR.OVERDUE).toBe("red");
+    expect(Object.keys(INVENTORY_AGE_COLOR)).toHaveLength(3);
   });
 
   it("返点类型优先使用业务类型", () => {

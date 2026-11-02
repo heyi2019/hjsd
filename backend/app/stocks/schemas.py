@@ -4,9 +4,11 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.core.schemas import PageOut, RequestModel
+
+from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, inventory_age_level as age_level
 
 class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -41,6 +43,20 @@ class AccountOut(BaseModel):
     created_by: str
     inventory_operator: str | None = None
     created_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def inventory_age_days(self) -> int | None:
+        """在库天数（自然日）：非在库为 None；与卡片指标同一口径，前端只展示。"""
+        if self.inventory_status not in INVENTORY_STATUSES:
+            return None
+        return age_days(self.inventory_entry_at or self.buy_date or self.created_at)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def inventory_age_level(self) -> str | None:
+        """库龄档位（NORMAL/WARNING/OVERDUE）：阈值由后端定义，前端只映射颜色。"""
+        return age_level(self.inventory_age_days)
 
 
 class AccountListOut(PageOut[AccountOut]):

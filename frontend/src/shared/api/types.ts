@@ -386,6 +386,10 @@ export interface Account {
   buy_date?: string | null;
   created_by: string;
   created_at?: string | null;
+  /** 在库天数（自然日，后端算）：非在库为 null，前端只展示。 */
+  inventory_age_days?: number | null;
+  /** 库龄档位：NORMAL ≤7 天 / WARNING ≤30 天 / OVERDUE >30 天。 */
+  inventory_age_level?: "NORMAL" | "WARNING" | "OVERDUE" | null;
 }
 
 export interface AccountInventoryRow {

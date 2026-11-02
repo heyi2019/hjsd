@@ -7,7 +7,6 @@ import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow }
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
-import { inventoryAge } from "../stocks/inventory-logic";
 import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
 import {
   BUSINESS_REMINDER_CONFIG_CODE,
@@ -75,8 +74,9 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     setBusinessReminderConfig(reminderConfig);
     if (stockResult.status === "fulfilled") {
       setInventoryCount(stockResult.value.length);
-      setInventoryAgingCount(stockResult.value.filter((item) => (inventoryAge(item)?.days ?? 0) > reminderConfig.inventoryAgingDays).length);
-      setInventoryOverdueCount(stockResult.value.filter((item) => inventoryAge(item)?.color === "red").length);
+      // 天数与档位都来自后端（AccountOut）；阈值可配的是「提醒天数」，只做比较不做日期差。
+      setInventoryAgingCount(stockResult.value.filter((item) => (item.inventory_age_days ?? 0) > reminderConfig.inventoryAgingDays).length);
+      setInventoryOverdueCount(stockResult.value.filter((item) => item.inventory_age_level === "OVERDUE").length);
     } else {
       setInventoryCount(null);
       setInventoryAgingCount(null);

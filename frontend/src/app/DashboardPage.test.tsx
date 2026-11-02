@@ -31,10 +31,13 @@ it("工作台展示业务总览指标和业务提醒", async () => {
       { id: 1, status: "ACTIVE" },
       { id: 2, status: "COMPLETED" },
     ] as never);
+    // 库龄天数与档位由后端下发（AccountOut），工作台只比较/展示，不再做日期差。
     vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
       id: 10,
       status: "WAITING",
       inventory_entry_at: "2026-09-01T00:00:00",
+      inventory_age_days: 63,
+      inventory_age_level: "OVERDUE",
       cost_amount: "100.00",
     } as never]);
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
@@ -65,10 +68,13 @@ it("工作台展示业务总览指标和业务提醒", async () => {
   });
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
+    // 天数写死为 14：配置阈值为 14 天，「超 7 天」不触发（不再依赖跑测试那天的日期）。
     vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
       id: 10,
       status: "WAITING",
       inventory_entry_at: "2026-10-20T00:00:00",
+      inventory_age_days: 14,
+      inventory_age_level: "WARNING",
       cost_amount: "100.00",
     } as never]);
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);

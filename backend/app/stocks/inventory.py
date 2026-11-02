@@ -1,9 +1,8 @@
 """库存中心查询与库存成本汇总。"""
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
-from datetime import date, datetime, time
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -14,7 +13,7 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Account
 from app.parties import service as parties_service
-from ._common import INVENTORY_STATUSES, scope_filter
+from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, scope_filter
 
 
 def list_accounts(
@@ -122,16 +121,11 @@ def inventory_stats(
 
 
 def inventory_age_days(row: Account, *, today: date | None = None) -> int | None:
-    """库龄（自然日）：入库存时间优先，旧数据回退买入日/建档时间。"""
-    entry = row.inventory_entry_at or row.buy_date or row.created_at
-    if entry is None:
-        return None
-    if isinstance(entry, datetime):
-        moment = entry.replace(tzinfo=None) if entry.tzinfo else entry
-    else:
-        moment = datetime.combine(entry, time.min)
-    reference = datetime.combine(today or date.today(), time.min)
-    return max(0, math.floor((reference - moment).total_seconds() / 86400))
+    """库龄（自然日）：入库存时间优先，旧数据回退买入日/建档时间。
+
+    计算口径在 `_common`（与响应字段共用），此处只负责挑出「用哪个时间」。
+    """
+    return age_days(row.inventory_entry_at or row.buy_date or row.created_at, today=today)
 
 
 def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> list[Account]:

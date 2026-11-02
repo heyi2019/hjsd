@@ -11,7 +11,7 @@ import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignme
 import type { InventoryPartyLink } from "../OrderDetailView";
 import type { InventoryProfileTarget } from "../InventoryProfileModal";
 import type { InventoryCancellationValues } from "../InventoryCancellationDialog";
-import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL, inventoryAge, isEditableAccountType } from "../inventory-logic";
+import { BUSINESS_MODE_LABEL, INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../inventory-logic";
 import { downloadInventoryCsv } from "../inventory-export";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
@@ -280,10 +280,19 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       // key 必须与 scopes.py 的 ListColumn 注册（inventory_age）一致，
       // 否则 arrangeColumns 按 columnKey 匹配不到，隐藏/调序配置对它无效。
       key: "inventory_age",
-      render: (_value, row) => {
-        const age = inventoryAge(row);
-        return age ? <StatusTag status={row.status} color={age.color} label={`${age.days}天`} /> : inventoryCellValue(null);
-      },
+      // 天数与档位都由后端下发（AccountOut.inventory_age_days / _level），
+      // 此处不做任何日期减法，也不再按 7/30 天判色。
+      render: (_value, row) => (
+        row.inventory_age_days == null
+          ? inventoryCellValue(null)
+          : (
+            <StatusTag
+              status={row.status}
+              color={row.inventory_age_level ? INVENTORY_AGE_COLOR[row.inventory_age_level] : undefined}
+              label={`${row.inventory_age_days}天`}
+            />
+          )
+      ),
     },
     { title: "状态", key: "status", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
     {

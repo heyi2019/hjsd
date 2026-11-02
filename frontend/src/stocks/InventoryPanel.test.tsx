@@ -278,18 +278,16 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByText("TH-2026-0002")).toBeNull();
   });
 
-  it("按未售出时长显示绿色、黄色和红色提醒", async () => {
-    const daysAgo = (days: number) => {
-      const date = new Date();
-      date.setHours(12, 0, 0, 0);
-      date.setDate(date.getDate() - days);
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-    };
+  it("未售时长只渲染后端下发的天数与档位，前端不做日期差", async () => {
+    // buy_date 故意写成 200 天前：若前端仍自己按入库时间算，会显示 200天 且判红；
+    // 这里断言 6天/绿，证明天数与档位都直取 AccountOut 的字段。
+    const stale = { buy_date: "2026-01-01", created_at: "2026-01-01T09:00:00" };
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
-      { ...accounts[0], id: 11, game_account: "green-account", buy_date: daysAgo(6) },
-      { ...accounts[0], id: 12, game_account: "yellow-account", buy_date: daysAgo(14) },
-      { ...accounts[0], id: 13, game_account: "red-account", buy_date: daysAgo(31) },
-      { ...accounts[1], id: 14, game_account: "sold-account", buy_date: daysAgo(31) },
+      { ...accounts[0], ...stale, id: 11, game_account: "green-account", inventory_age_days: 6, inventory_age_level: "NORMAL" },
+      { ...accounts[0], ...stale, id: 12, game_account: "yellow-account", inventory_age_days: 14, inventory_age_level: "WARNING" },
+      { ...accounts[0], ...stale, id: 13, game_account: "red-account", inventory_age_days: 31, inventory_age_level: "OVERDUE" },
+      // 已售账号不进库存中心：即便后端给了档位也不渲染，故「31天」只出现一次。
+      { ...accounts[1], ...stale, id: 14, game_account: "sold-account", inventory_age_days: 31, inventory_age_level: "OVERDUE" },
     ]);
 
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -298,6 +296,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("14天")).toHaveClass("ant-tag-orange");
     expect(screen.getByText("31天")).toHaveClass("ant-tag-red");
     expect(screen.getAllByText("31天")).toHaveLength(1);
+    expect(screen.queryByText("200天")).toBeNull();
   });
 
   it("售出账号不进入库存中心", async () => {

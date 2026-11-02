@@ -259,6 +259,17 @@ class InventoryStatus(StrEnum):
     OUT_OF_STOCK = "OUT_OF_STOCK"
 
 
+class InventoryAgeLevel(StrEnum):
+    """库存账号的库龄档位：7 天内正常、8–30 天预警、超过 30 天超期。
+
+    阈值是经营口径而不是展示细节，故与库存状态同处领域枚举，前后端不得各写一份。
+    """
+
+    NORMAL = "NORMAL"
+    WARNING = "WARNING"
+    OVERDUE = "OVERDUE"
+
+
 class WalletRealName(StrEnum):
     """库存账号的钱包实名状态：交付前需确认实名是否已解绑。"""
 
@@ -547,6 +558,7 @@ __all__ = [
     "InstallmentContractType",
     "InstallmentDispositionAction",
     "InstallmentStatus",
+    "InventoryAgeLevel",
     "LinkStatus",
     "LeadStatus",
     "LeadType",

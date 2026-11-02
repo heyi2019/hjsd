@@ -28,6 +28,17 @@ describe("库存导出", () => {
     expect(csv).toContain('"高段位\n账号"');
   });
 
+  it("未售时长列直取后端天数，不按入库时间自行计算", () => {
+    // inventory_entry_at 给 2020 年：若前端还在算日期差，会导出上千天。
+    const csv = buildInventoryCsv([
+      { ...account, inventory_entry_at: "2020-01-01T00:00:00", inventory_age_days: 12 } as unknown as Account,
+      { ...account, id: 2, inventory_entry_at: "2020-01-01T00:00:00", inventory_age_days: null } as unknown as Account,
+    ]);
+    expect(csv).toContain(",12天,");
+    // 非在库（后端不给天数）留空，不能写成 0天。
+    expect(csv).not.toContain("0天");
+  });
+
   it("没有明细时保持明细字段为空而不阻断导出", () => {
     const csv = buildInventoryCsv([account]);
     expect(csv).toContain(",admin,-,-,-,-,-");

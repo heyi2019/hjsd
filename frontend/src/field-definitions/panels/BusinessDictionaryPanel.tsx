@@ -120,18 +120,18 @@ export function BusinessDictionaryPanel() {
             状态机描述业务对象的生命周期，状态只能通过领域动作流转并由后端受控校验。订单、账号、分期为受控状态机（对应后端核心状态机模块的转移表）；库存状态为业务概念描述，无独立转移表。
           </Typography.Paragraph>
           <div className="business-dictionary__action-table">
-          <EntryGroup title="订单状态机">
+          <EntryGroup title="订单流程（内部）">
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>进行中</strong></span>
-              <span className="business-dictionary__action-detail">订单创建即进入；可登记业务事件，流转到分期进行中、已完成或已取消。</span>
+              <span className="business-dictionary__tertiary"><strong>订单处理中</strong></span>
+              <span className="business-dictionary__action-detail">订单创建后进入内部处理流程；台账以账号库存状态为主，售出或交付后进入完成，取消后终止。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>分期进行中</strong></span>
+              <span className="business-dictionary__tertiary"><strong>分期还款中</strong></span>
               <span className="business-dictionary__action-detail">售出后建立分期合约进入；按期收款，全部结清到已完成，或已取消。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>已完成</strong></span>
-              <span className="business-dictionary__action-detail">业务与资金结清并交付；受控冲销可回退进行中，或到已取消。</span>
+              <span className="business-dictionary__action-detail">业务与资金结清并交付；受控冲销可回退订单处理中，或到已取消。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>已取消</strong></span>
@@ -140,8 +140,8 @@ export function BusinessDictionaryPanel() {
           </EntryGroup>
           <EntryGroup title="账号状态机">
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>待售</strong></span>
-              <span className="business-dictionary__action-detail">账号在库待售；重新入库（买入库存）、赊购或售出到已售、作废到终态。</span>
+              <span className="business-dictionary__tertiary"><strong>在库</strong></span>
+              <span className="business-dictionary__action-detail">账号买入后进入库存中心；未售出前保持在库，售出后转为已售，作废后到终态。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>已售</strong></span>

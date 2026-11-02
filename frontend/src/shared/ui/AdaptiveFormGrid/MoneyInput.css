@@ -1,4 +1,15 @@
 .money-input {
   width: 160px;
   max-width: 100%;
+  align-items: center;
+}
+
+.money-input .ant-input {
+  line-height: 1.5;
+}
+
+.money-input .ant-input-suffix {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }

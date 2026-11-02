@@ -50,6 +50,13 @@
   font-weight: 600;
   margin: 0;
 }
+/* antd Modal 默认给相邻按钮加 margin-inline-start: 8px；footer 已改成上下两排
+   的全宽操作区，这个偏移会让「取消」和「保存/确定」左右边缘不在同一条线上。
+   用逻辑属性并加 !important，覆盖 antd 的动态样式注入顺序。 */
+.business-registration-modal:not(.compact-form-modal) .ant-modal-footer > .ant-btn + .ant-btn {
+  margin-inline-start: 0 !important;
+  margin-left: 0 !important;
+}
 .business-registration-modal:not(.compact-form-modal) .business-registration-form {
   width: 100%;
   min-width: 0;

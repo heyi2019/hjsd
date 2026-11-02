@@ -1,12 +1,12 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Dropdown, Form, Space } from "antd";
+import { Form, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, stocksApi, type AccountExecutionDetail, type Installment, type Order, type OrderType, type Pool } from "../../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
-import { ACCOUNT_STATUS_LABEL, executionActionLabel, formatDateTimeMinute, formatElapsedTime, INSTALLMENT_STATUS_LABEL, money, today } from "../../shared/lib/format";
+import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money, today } from "../../shared/lib/format";
 import { filterRetiredOrderTypeOptions } from "../../shared/lib/retiredProducts";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
@@ -474,26 +474,9 @@ export function useOrdersPageController(params: {
     { title: "售卖时间", dataIndex: "sale_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "在手时间", key: "in_hand_time", width: 120, ellipsis: true, render: (_v, order) => formatElapsedTime(order.inventory_entry_at, order.sale_at) },
     { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "账号周期", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
-    { title: "最新动作", dataIndex: "last_event_type", width: 198, ellipsis: true, render: (v: string | null, order) => v ? `${executionActionLabel(v, order.order_type)}${order.last_event_amount ? ` · ¥${order.last_event_amount}` : ""}` : "-" },
-    {
-      title: "状态",
-      dataIndex: "status",
-      width: 111,
-      ellipsis: true,
-      render: (v: string, order) => (
-        <Space size={4} wrap>
-          <StatusTag status={v} optionSet="ORDER_STATUS" />
-          {v === "INSTALLMENT" && order.installment_status ? (
-            <StatusTag
-              status={order.installment_status}
-              optionSet="INSTALLMENT_STATUS"
-              label={`合约：${INSTALLMENT_STATUS_LABEL[order.installment_status] ?? order.installment_status}`}
-            />
-          ) : null}
-        </Space>
-      ),
-    },
+    { title: "库存状态", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
+    { title: "成本", dataIndex: "cost_amount", width: 110, ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
+    { title: "利润", dataIndex: "profit_base", width: 110, ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.profit_base != null ? `¥${money(order.profit_base)}` : "-" },
     { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
     {
       title: "操作",
@@ -504,40 +487,50 @@ export function useOrdersPageController(params: {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
         return (
           <Space size={2}>
-          <PermissionButton permission="order.update" type="link" onClick={() => openEditOrder(order)}>编辑订单</PermissionButton>
+          <PermissionButton permission="order.update" type="link" size="small" onClick={() => openEditOrder(order)}>编辑</PermissionButton>
           <PermissionGate permission="order.event.post">
-            <Dropdown
-              trigger={["click"]}
-              menu={{
-                items: [
-                  { key: "allocation", label: "分润", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
-                  { key: "refund", label: "资金收支", disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status) },
-                  {
-                    key: "cancel",
-                    label: canOffsaleConsignment ? "下架" : order.order_type === "DG" ? "取消" : "取消交易",
-                    danger: true,
-                    disabled: !["ACTIVE", "INSTALLMENT", "COMPLETED"].includes(order.status),
-                  },
-                ],
-                onClick: ({ key }) => {
-                  if (key === "allocation") void openAllocations(order);
-                  if (key === "refund") void openRefund(order);
-                  if (key === "cancel") {
-                    if (canOffsaleConsignment) openSystemOffsale();
-                    else void openCancelTransaction(order);
-                  }
-                },
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              onClick={() => void openAllocations(order)}
+            >分润</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              onClick={() => void openRefund(order)}
+            >资金收支</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              danger
+              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              onClick={() => {
+                if (canOffsaleConsignment) openSystemOffsale();
+                else void openCancelTransaction(order);
               }}
-            >
-              <PermissionButton permission="order.event.post" type="link">更多</PermissionButton>
-            </Dropdown>
+            >{canOffsaleConsignment ? "下架" : "取消"}</PermissionButton>
           </PermissionGate>
         </Space>
         );
       },
     },
   ];
-  const mobileLedgerFieldOrder = arrangeLedgerColumns(ledgerColumns).map(columnKey);
+  const configuredLedgerColumns = arrangeLedgerColumns(ledgerColumns);
+  const ledgerDateColumn = ledgerColumns.find((column) => columnKey(column) === "trade_date");
+  // 日期是订单台账的核心识别字段，避免配置中心误隐藏后整列消失。
+  const visibleLedgerColumns = ledgerDateColumn && !configuredLedgerColumns.some((column) => columnKey(column) === "trade_date")
+    ? [
+        ...configuredLedgerColumns.filter((column) => columnKey(column) !== "actions"),
+        ledgerDateColumn,
+        ...configuredLedgerColumns.filter((column) => columnKey(column) === "actions"),
+      ]
+    : configuredLedgerColumns;
+  const mobileLedgerFieldOrder = visibleLedgerColumns.map(columnKey);
   const sharedCancellationEvent = cancelOrderTarget
     ? cancelableEventsForScope(cancelOrderTarget, cancelScope)[0]
     : undefined;
@@ -655,7 +648,7 @@ export function useOrdersPageController(params: {
     typeNames,
     types,
     users,
-    ledgerColumns,
+    ledgerColumns: visibleLedgerColumns,
     orderBusinessOptions,
     orderBusinessModeOptions,
     profitRoleOptions,

@@ -386,7 +386,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                             删除
                           </PermissionButton>
                         </>
-                      )}
+                      ) : null}
                     </AdaptiveFormGrid>
                   );
                 })}
@@ -479,16 +479,26 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
             <CustomFieldSection testIdSuffix="order-refund" />
           </FieldConfigScope>
         </BusinessRegistrationForm>
-        <div className="ui-form-spaced">
+        <div className="ui-form-spaced orders-event-list">
           <Typography.Text strong>资金明细</Typography.Text>
-          {actionOrder?.cashflows?.length ? actionOrder.cashflows.map((flow) => (
-            <div key={flow.flow_no} className="orders-event-row">
-              <span>{flow.occurred_on}</span>
-              <span>{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
-              <span><MoneyText value={flow.amount} /></span>
-              <span>操作人：{flow.operator || currentOperator}</span>
+          {actionOrder?.cashflows?.length ? (
+            <div className="orders-event-table" role="table" aria-label="资金明细表">
+              <div className="orders-event-row orders-event-row--header" role="row">
+                <span role="columnheader">发生日期</span>
+                <span role="columnheader">收支</span>
+                <span role="columnheader">金额</span>
+                <span role="columnheader">操作人</span>
+              </div>
+              {actionOrder.cashflows.map((flow) => (
+                <div key={flow.flow_no} className="orders-event-row" role="row">
+                  <span role="cell">{flow.occurred_on}</span>
+                  <span role="cell">{flow.direction === "IN" ? "收入" : "支出"} · {flow.category}</span>
+                  <span role="cell"><MoneyText value={flow.amount} /></span>
+                  <span role="cell">{flow.operator || currentOperator}</span>
+                </div>
+              ))}
             </div>
-          )) : <Typography.Text type="secondary">暂无资金明细</Typography.Text>}
+          ) : <Typography.Text type="secondary">暂无资金明细</Typography.Text>}
         </div>
       </BusinessActionModal>
   );

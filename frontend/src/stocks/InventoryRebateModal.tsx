@@ -12,7 +12,7 @@ import { stocksApi,
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
-import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
@@ -158,8 +158,9 @@ export function InventoryRebateModal(props: {
       fieldCount={5 + Object.keys(config).length}
       open={open}
       destroyOnHidden
+      wrapClassName="inventory-rebate-modal"
       onCancel={props.onClose}
-      width={1200}
+      width={900}
       footer={
         <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} onClick={() => form.submit()}>
           确认登记
@@ -221,60 +222,59 @@ export function InventoryRebateModal(props: {
       {!loading ? (
         <section className="inventory-rebate-details ui-stack" aria-label="返点明细">
           <Typography.Text strong>返点明细</Typography.Text>
-          <DataTable<Rebate>
-            rows={rebates}
-            columns={[
-              { title: "返点单号", dataIndex: "rebate_no" },
-              { title: "类型", render: (_value, row) => row.rebate_type === "BUY" ? "买号返点" : "卖号返点" },
-              { title: "金额", dataIndex: "base_amount", align: "right", render: (value: string) => <MoneyText value={value} /> },
-              { title: "比例", dataIndex: "rate", render: (value: string) => `${value}%` },
-              { title: "返点日期", dataIndex: "collected_on" },
-              {
-                title: "操作人",
-                render: (_value: unknown, row: Rebate) => row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-",
-              },
-              {
-                title: "操作",
-                render: (_value, row) => (
-                  <Space size={2}>
-                    <PermissionButton
-                      permission="order.event.post"
-                      size="small"
-                      onClick={() => {
-                        editForm.setFieldsValue({
-                          base_amount: row.base_amount,
-                          rate: row.rate,
-                          collected_on: row.collected_on,
-                          note: row.note ?? "",
-                          operator_user_ids: row.operator_user_ids ?? undefined,
-                        });
-                        setEditTarget(row);
-                      }}
-                    >编辑</PermissionButton>
-                    <ConfirmButton
-                      permission="order.event.post"
-                      size="small"
-                      danger
-                      title="删除返点明细"
-                      description="删除后该返点记录将不再保留，确定删除吗？"
-                      okText="删除"
-                      onConfirm={async () => {
-                        await rebatesApi.remove(row.id);
-                        setRebates((current) => current.filter((item) => item.id !== row.id));
-                        appMessage.success("返点明细已删除");
-                      }}
-                    >删除</ConfirmButton>
-                  </Space>
-                ),
-              },
-            ]}
-            page={1}
-            pageSize={Math.max(rebates.length, 5)}
-            total={rebates.length}
-            onPageChange={() => undefined}
-            pagination={false}
-            emptyText="暂无返点明细"
-          />
+          <div className="ui-form-spaced orders-event-list">
+            <div className="orders-event-table inventory-rebate-table" role="table" aria-label="返点明细表">
+              <div className="orders-event-row orders-event-row--header" role="row">
+                {(["类型", "金额", "比例", "返点日期", "操作人", "操作"] as const).map((label) => (
+                  <span key={label} role="columnheader">{label}</span>
+                ))}
+              </div>
+              {rebates.length ? rebates.map((row) => (
+                <div key={row.id} className="orders-event-row" role="row">
+                  <span role="cell">{row.rebate_type === "BUY" ? "买号返点" : "卖号返点"}</span>
+                  <span role="cell"><MoneyText value={row.base_amount} /></span>
+                  <span role="cell">{row.rate}%</span>
+                  <span role="cell">{row.collected_on}</span>
+                  <span role="cell">{row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-"}</span>
+                  <span role="cell">
+                    <Space size={2}>
+                      <PermissionButton
+                        permission="order.event.post"
+                        size="small"
+                        onClick={() => {
+                          editForm.setFieldsValue({
+                            base_amount: row.base_amount,
+                            rate: row.rate,
+                            collected_on: row.collected_on,
+                            note: row.note ?? "",
+                            operator_user_ids: row.operator_user_ids ?? undefined,
+                          });
+                          setEditTarget(row);
+                        }}
+                      >编辑</PermissionButton>
+                      <ConfirmButton
+                        permission="order.event.post"
+                        size="small"
+                        danger
+                        title="删除返点明细"
+                        description="删除后该返点记录将不再保留，确定删除吗？"
+                        okText="删除"
+                        onConfirm={async () => {
+                          await rebatesApi.remove(row.id);
+                          setRebates((current) => current.filter((item) => item.id !== row.id));
+                          appMessage.success("返点明细已删除");
+                        }}
+                      >删除</ConfirmButton>
+                    </Space>
+                  </span>
+                </div>
+              )) : (
+                <div className="orders-event-row inventory-rebate-table__empty" role="row">
+                  <span role="cell">暂无返点明细</span>
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       ) : null}
       <BusinessActionModal

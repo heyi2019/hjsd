@@ -31,6 +31,7 @@ from app.domain.trade import (
 )
 from app.domain.users import User
 from app.orders import schemas, service
+from app.orders.amounts import event_totals
 
 def _actor(user: CurrentUser) -> str:
     return user.username
@@ -316,6 +317,8 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         snapshot = order.account_snapshot or {}
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
+        income, buy_amount, direct_cost = event_totals(events)
+        total_cost = buy_amount + direct_cost
         latest = events[0] if events else None
         sale_event = next((event for event in events if event.event_type == "SELL"), None)
         party = parties.get(order.id)
@@ -370,6 +373,8 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "sale_at": sale_at,
             "sale_operator": sale_operator,
             "event_total": sum((event.amount for event in events), 0),
+            "cost_amount": total_cost,
+            "profit_base": income - total_cost,
             "last_event_type": latest.event_type if latest else None,
             "last_event_amount": latest.amount if latest else None,
             "last_event_on": latest.occurred_on if latest else None,

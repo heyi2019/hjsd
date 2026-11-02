@@ -195,6 +195,8 @@ class OrderListOut(OrderOut):
     sale_at: datetime | None = None
     sale_operator: str | None = None
     event_total: Decimal | None = None
+    cost_amount: Decimal | None = None
+    profit_base: Decimal | None = None
     last_event_type: str | None = None
     last_event_amount: Decimal | None = None
     last_event_on: date | None = None

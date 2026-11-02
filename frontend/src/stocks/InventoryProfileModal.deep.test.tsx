@@ -65,6 +65,12 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     renderModal({ account, mode: "description" });
     expect(await screen.findByText("描述")).toBeInTheDocument();
     const area = screen.getByPlaceholderText("补充账号等级、资源、限制等信息");
+    // 只读标识区与输入框约束（原 InventoryProfileModal.test.tsx 的独有断言，已并入本用例）
+    for (const label of ["订单编号", "游戏类型", "游戏账号"]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(area).toHaveAttribute("rows", "8");
+    expect(area).toHaveAttribute("maxlength", "400");
     await ui.clear(area);
     await ui.type(area, "满级账号");
     await ui.click(screen.getByRole("button", { name: /保存/ }));

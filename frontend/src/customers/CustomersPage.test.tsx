@@ -6,6 +6,7 @@ import { CustomersPage } from "./CustomersPage";
 
 import * as catalog from "../shared/api/catalog";
 import { seedOptionSets } from "../test/formFieldsSeed";
+import { resolveMockOnce } from "../test/mock-api";
 vi.mock("../shared/api/catalog")
 vi.mock("./CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
@@ -431,5 +432,79 @@ describe("CustomersPage：行内动作", () => {
       await ui.click(confirm);
       await waitFor(() => expect(vi.mocked(catalog.counterpartiesApi.setStatus)).toHaveBeenCalledWith(11, false));
     });
+  });
+});
+
+// —— 原 CustomersPage.live-fields.test.tsx ——
+// 扩展字段（BAS-04）：列表摘要列 / 新建弹窗动态控件 / 详情抽屉停用字段 / 定义接口失败降级。
+describe("CustomersPage：扩展字段（BAS-04）", () => {
+  let ui: ReturnType<typeof userEvent.setup>;
+
+  /** 扩展字段定义：MULTI_SELECT / SELECT / TEXT / 停用字段各一 */
+  const liveFieldDefs = [
+    {
+      id: 1, order_type_code: "CUSTOMER", is_custom: true, locked: false,
+      field_key: "game_category", label: "常玩品类", field_type: "MULTI_SELECT",
+      options: [{ value: "王者荣耀", label: "王者荣耀" }, { value: "和平精英", label: "和平精英" }],
+      required: false, sort_order: 10, is_active: true,
+    },
+    {
+      id: 2, order_type_code: "CUSTOMER", is_custom: true, locked: false,
+      field_key: "credit_level", label: "信用评级", field_type: "SELECT",
+      options: [{ value: "优质", label: "优质" }, { value: "一般", label: "一般" }, { value: "观察", label: "观察" }, { value: "黑名单", label: "黑名单" }],
+      required: false, sort_order: 20, is_active: true,
+    },
+    {
+      id: 3, order_type_code: "CUSTOMER", is_custom: true, locked: false,
+      field_key: "referrer", label: "转介绍人", field_type: "TEXT",
+      options: null, required: false, sort_order: 30, is_active: true,
+    },
+    {
+      id: 4, order_type_code: "CUSTOMER", is_custom: true, locked: false,
+      field_key: "legacy_note", label: "历史备注", field_type: "TEXT",
+      options: null, required: false, sort_order: 40, is_active: false,
+    },
+  ] as unknown as import("../shared/api/catalog").OrderFormField[];
+
+  beforeEach(() => {
+    ui = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue(liveFieldDefs);
+    vi.mocked(catalog.leadsApi.list).mockResolvedValue([]);
+  });
+
+  it("列表按字段定义渲染扩展字段摘要列", async () => {
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    expect(await screen.findByText(/信用评级：优质/)).toBeInTheDocument();
+    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi.list)).toHaveBeenCalledWith("CUSTOMER", true));
+  });
+
+  it("新建弹窗动态渲染扩展字段控件，提交时回传 extra_values", async () => {
+    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 3 }, duplicate_candidates: [] });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("button", { name: /新建/ }));
+    await ui.type(await screen.findByLabelText("名字"), "王五");
+    await ui.type(await screen.findByLabelText("转介绍人"), "老王");
+    await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
+    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
+  });
+
+  it("详情抽屉展示扩展字段值，停用字段标注保留历史值", async () => {
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getAllByRole("button", { name: /详\s*情/ })[0]);
+    const drawer = await screen.findByRole("dialog");
+    expect(await within(drawer).findByText("信用评级")).toBeInTheDocument();
+    expect(within(drawer).getByText("优质")).toBeInTheDocument();
+    expect(within(drawer).getByText("历史备注（已停用）")).toBeInTheDocument();
+    expect(within(drawer).getByText("早期客户")).toBeInTheDocument();
+  });
+
+  it("扩展字段定义接口失败不阻断客户页渲染", async () => {
+    vi.mocked(catalog.orderFormFieldsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    renderLight(<CustomersPage />, { user: "admin" });
+    expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
   });
 });

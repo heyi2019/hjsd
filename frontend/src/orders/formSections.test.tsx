@@ -1,10 +1,51 @@
-import { screen } from "@testing-library/react";
+/** 订单表单小组件：客户来源（L258）与附加费用（中介费/支出行）字段路径。
+ *  两文件原本各自一套 Form + renderLight，无 vi.mock，合并后只省一次文件级固定成本。 */
+import { useState } from "react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Form, type FormInstance } from "antd";
+import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "../test/render";
+import { CustomerSourceFields } from "./CustomerSourceInput";
 import { AdditionalFeeFields } from "./AdditionalFeeFields";
 import type { Pool } from "../shared/api/catalog";
+
+describe("CustomerSourceFields：客户来源校验文案", () => {
+  function Harness() {
+    const [form] = Form.useForm();
+    const [submitted, setSubmitted] = useState(false);
+    return (
+      <Form form={form} onFinish={() => setSubmitted(true)}>
+        <CustomerSourceFields name="customer_source" otherName="customer_source_other" />
+        <Button htmlType="submit" type="primary">提交</Button>
+        {submitted ? <span data-testid="submitted">已提交</span> : null}
+      </Form>
+    );
+  }
+
+  /** L258 回归：客户来源选「其他」但留空时，校验提示应为「请输入其他来源」，
+   *  而非笼统的「请输入客户来源」（两者语义不同，旧文案误导填写人）。 */
+  it("L258：客户来源选「其他」且未填具体来源时，提示「请输入其他来源」", async () => {
+    const user = userEvent.setup();
+    renderLight(<Harness />, { user: "admin" });
+
+    // 打开客户来源下拉并选择「其他」
+    await user.click(screen.getByText("客户来源").closest(".ant-form-item")!.querySelector(".ant-select-selector")!);
+    const option = await screen.findByText("其他", { selector: ".ant-select-item-option-content" });
+    await user.click(option);
+
+    // 提交触发校验：other 字段为空，应报「请输入其他来源」
+    await user.click(screen.getByRole("button", { name: /提交/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText("请输入其他来源")).toBeInTheDocument(),
+    );
+    // 旧文案不应出现
+    expect(screen.queryByText("请输入客户来源")).toBeNull();
+    // 校验未过，不应提交成功
+    expect(screen.queryByTestId("submitted")).toBeNull();
+  });
+});
 
 const pools: Pool[] = [
   { id: 1, code: "MAIN", name: "主账户", pool_type: "CASH", ownership: "OWNED", status: "ACTIVE" },

@@ -4,6 +4,7 @@ import type { AccountExecutionDetail } from "../shared/api/catalog";
  * ⚠️ 这些是渲染用的静态文案；筛选项的「可选项是哪些」由设置页「选项词典」配置（INVENTORY_STATUS / INVENTORY_BUSINESS / INVENTORY_TYPE）。 */
 export const STATUS_LABEL: Record<string, string> = {
   IN_STOCK: "在库",
+  OUT_OF_STOCK: "出库",
   SOLD: "已售",
   VOID: "下架",
 };

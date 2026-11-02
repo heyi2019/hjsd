@@ -289,7 +289,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
           )
       ),
     },
-    { title: "状态", key: "status", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : row.status)} label={row.status === "VOID" ? "下架" : undefined} /> },
+    { title: "状态", key: "status", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : "OUT_OF_STOCK")} optionSet="INVENTORY_STATUS" /> },
     {
       title: "成本",
       dataIndex: "cost_amount",

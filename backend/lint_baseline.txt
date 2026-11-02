@@ -19,6 +19,3 @@ tests/v1/conftest.py :: 'app.domain.options' imported but unused
 tests/v1/conftest.py :: 'app.domain.parties' imported but unused
 tests/v1/conftest.py :: 'app.domain.quality' imported but unused
 tests/v1/conftest.py :: 'app.domain.trade' imported but unused
-tests/v1/test_backup_restore.py :: 'app.domain.foundation' imported but unused
-tests/v1/test_backup_restore.py :: 'app.domain.parties' imported but unused
-tests/v1/test_backup_restore.py :: 'app.domain.trade' imported but unused

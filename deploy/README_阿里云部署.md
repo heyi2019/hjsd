@@ -174,13 +174,12 @@ chmod +x scripts/deploy.sh
 遇到第二种（旧库结构落后）时，先取备份再决定：
 
 ```bash
-# 1) 先把库取到宿主机 —— 这是唯一必须保留的东西
-docker compose run --rm backend python scripts/backup_db.py \
-  --db /app/data/heijin_erp_v1.db --out-dir /app/data/backups --keep 30
-docker compose cp backend:/app/data/backups ./backups_local
+# 1) 先把库取到宿主机 —— 这是唯一必须保留的东西（pg_dump 自定义格式 + sha256）
+bash scripts/backup_daily.sh
+# 产物：deploy/../backups/heijin_erp_pg_<时间戳>.dump（+ .sha256），落在宿主机磁盘
 
 # 2-A) 库内数据不要 → 删卷重建，走首次部署流程
-docker compose down -v      # ⚠ 会连同卷内 backup 目录一起删除，务必先做完第 1 步
+docker compose down -v      # ⚠ 会连同 PG 数据卷 erp_pgdata 一起删除，务必先做完第 1 步
 
 # 2-B) 库内数据要保留 → 不要删卷；先把缺口补齐（或把数据导出到新库重导），再跑 deploy.sh
 ```
@@ -210,7 +209,7 @@ sudo certbot certonly --standalone -d your-domain.com
 
 ---
 
-## 七、运维（历史 SQLite 流程）
+## 七、运维
 
 ```bash
 docker compose ps                 # 状态
@@ -220,39 +219,38 @@ docker compose down               # 停止
 docker compose pull && docker compose up -d   # 更新（若镜像改了需先 build）
 ```
 
-**数据备份**（在线快照，WAL 安全；`deploy.sh` 每次部署前自动执行，默认保留 30 份。**日常快照必须另挂 `backup_daily.sh`
-的 cron**——两次部署之间不会有任何备份）：
+**数据备份**（`pg_dump -Fc` 在线快照；`deploy.sh` 每次部署前自动执行一次，默认保留 30 份。
+**日常快照必须另挂 `backup_daily.sh` 的 cron**——两次部署之间不会有任何备份）：
 ```bash
-docker compose exec -T backend python scripts/backup_db.py \
-  --db /app/data/heijin_erp_v1.db --out-dir /app/data/backups --keep 30
-# 备份落在 erp_db 卷内，每份带 .sha256 校验文件
+bash deploy/scripts/backup_daily.sh
+# 产物：deploy/../backups/heijin_erp_pg_<时间戳>.dump + 同名 .sha256
+# 位置：宿主机磁盘（不在 docker 卷里，down -v 不会带走）
 
-# 恢复：自动校验 SHA256 + PRAGMA integrity_check，原子替换，旧库保留为 .bak
-docker compose exec -T backend \
-  python scripts/restore_db.py --backup /app/data/backups/<文件名>.db --force
-docker compose restart backend     # 服务需重启才会加载被替换的库文件
+# 恢复：先停 backend → 单事务 pg_restore → 自动重启；恢复前会自动再备份一次当前库
+bash deploy/scripts/restore_pg.sh --backup /opt/heijin/backups/heijin_erp_pg_<时间戳>.dump --yes
 ```
 
-> **不要用 `tar` 直接打包运行中的 `data/`**：SQLite 在 WAL 模式下 `db` / `-wal` / `-shm` 三个文件的时刻不一致，可能得到损坏快照。
-> `backup_db.py` 走 SQLite 在线备份 API，产出单文件一致快照；`restore_db.py` 恢复前会先验签再验页完整性。
+> **不要用 `tar` 直接打包 PG 数据目录**：运行中的 `pgdata` 不是一致快照。`pg_dump` 在 db 容器内执行、
+> 无需停服；产物为自定义格式归档，恢复走 `pg_restore --single-transaction`——失败整体回滚，不会留下半套表。
 
 ### 备份异地留存（必做，否则不构成灾备）
 
-`backup_db.py` 把备份写在 `/app/data/backups`，**与正式库同处一个 Docker 卷**。因此
-`docker compose down -v`、卷损坏或磁盘故障会让「库 + 备份」一起消失——它只能防部署失败，不能防灾难。
+`backup_daily.sh` 已把备份写在**宿主机磁盘**（默认 `/opt/heijin/backups`），不在 docker 卷里，
+`down -v` 不会带走它。但它仍与库同一台机器：磁盘故障、机器丢失、欠费停机都会让「库 + 备份」一起消失——
+只能防部署失败，不能防灾难。
 
 两步补齐：
 
 **① ECS 上每日自动备份**（部署时备份只在部署前触发，日常不产生快照）：
 ```bash
-# deploy/scripts/backup_daily.sh 已随仓库上传，库不存在时自动跳过（首部署前不报错）
+# deploy/scripts/backup_daily.sh 已随仓库上传；db 容器未就绪时明确报错退出，不会伪装成功
 crontab -e
 20 3 * * * /bin/bash /opt/heijin/deploy/scripts/backup_daily.sh >> /var/log/heijin_backup.log 2>&1
 ```
 
 **② 本机（或另一台机器）每日拉取**，形成物理分离的第二份：
 ```bash
-# 首次手动执行，确认 SSH 免密与卷名
+# 首次手动执行，确认 SSH 免密与远端备份目录（默认 /opt/heijin/backups）
 bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>
 
 # 成功后再挂 cron（本机每日 04:10 拉一次，保留 30 份）
@@ -263,8 +261,8 @@ bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>
 
 | 项 | 说明 |
 |---|---|
-| 传输 | `ssh` + 容器内 `tar` 流式拉到本机，不依赖 ECS 宿主机的 tar 与卷路径 |
-| 校验 | 每份比对 `.sha256` sidecar + `PRAGMA integrity_check` |
+| 传输 | `ssh` + 远端 `tar` 流式拉到本机，只搬备份目录，不碰容器与卷 |
+| 校验 | 每份比对 `.sha256` sidecar + `pg_dump` 归档魔数（PGDMP） |
 | **失败保护** | 先落 `$DEST/.incoming` 暂存区，**全部校验通过才原子替换**；校验失败时本地一份不动，坏备份留在暂存区供排查 |
 | 保留 | 本地滚动保留最近 N 份（默认 30），文件名时间戳即排序依据 |
 | 默认目录 | `~/heijin_backups`（可用 `--dest` 或 `ERP_BACKUP_DEST` 覆盖） |
@@ -274,9 +272,9 @@ bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>
 
 恢复演练（建议每季度做一次，验证备份真的能用）：
 ```bash
-# 本机校验通过的最新一份 → 传到 ECS 卷内 → 用 restore_db.py 回滚
+# 本机校验通过的最新一份 → 传回 ECS → 用 restore_pg.sh 回滚
 bash deploy/scripts/pull_backup.sh --host root@<ECS_IP> --dest /tmp/restore_check
-ls -1t /tmp/restore_check/*.db | head -1
+ls -1t /tmp/restore_check/*.dump | head -1
 ```
 
 ---
@@ -293,5 +291,5 @@ ls -1t /tmp/restore_check/*.db | head -1
 5. **网关防护已内置**：Nginx 会限制单 IP 并发、对 API 限流，并对登录接口执行更严格的限流（超额返回 429）；同时发送防点击劫持、MIME 嗅探和权限策略响应头。生产 API 文档（`/docs`、`/redoc`、`/openapi.json`）已关闭。
 6. **正式数据库目标**：PostgreSQL 使用 `erp_pgdata` 持久卷，服务端口只能绑定 `127.0.0.1:5432`；业务容器经 Compose 内网访问，安全组不开放 5432。
 7. **切库纪律**：不得直接修改 `DATABASE_URL` 让线上服务指向空 PostgreSQL。必须先冻结写入、备份 SQLite、执行迁移工具、校验数据和业务链路，再完成流量切换；旧 SQLite 卷在验收期内保留，作为可验证的回退源。
-8. **备份**：切库完成前继续用 `scripts/backup_db.py` 保存 SQLite 一致性快照；切库完成后正式备份必须改为 `pg_dump`，恢复使用 `pg_restore`。不要对运行中的数据库数据目录直接 `tar`。
+8. **备份**：正式备份 = `deploy/scripts/backup_daily.sh`（db 容器内 `pg_dump -Fc` + `.sha256` + 完整性闸门 + 宿主机滚动保留），恢复 = `restore_pg.sh`（校验和 → 单事务 `pg_restore` → 自动重启 backend）。SQLite 备份链（`backup_db.py`/`restore_db.py`）已下线，不要再用；也不要对运行中的 PG 数据目录直接 `tar`。
 9. 数据库与旧库（`heijin.db`/`heijin_v2.db`）物理隔离；切库前勿手动改 `DATABASE_URL` 指向历史库，切库后勿将其改回 SQLite 以规避 PostgreSQL 故障。

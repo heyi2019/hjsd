@@ -98,24 +98,28 @@ echo "==> 构建镜像"
 docker compose build
 fi
 
-if [[ "${DATABASE_URL:-}" == postgresql* ]]; then
-  echo "==> 迁移前备份 PostgreSQL 正式库（不打包/不备份开发 SQLite）"
-  pg_backup_dir="${ERP_PG_BACKUP_DIR:-../backups}"
-  mkdir -p "$pg_backup_dir"
-  pg_backup_file="$pg_backup_dir/heijin_erp_pg_$(date +%Y%m%d_%H%M%S).dump"
-  docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$pg_backup_file"
-  sha256sum "$pg_backup_file" > "$pg_backup_file.sha256"
-  find "$pg_backup_dir" -maxdepth 1 -type f -name 'heijin_erp_pg_*.dump' -mtime +30 -delete
-  echo "BACKUP_OK path=$pg_backup_file sha256=$(awk '{print $1}' "$pg_backup_file.sha256")"
-elif docker compose run --rm backend test -f /app/data/heijin_erp_v1.db; then
-  echo "==> 迁移前备份本地 SQLite 开发库"
-  docker compose run --rm backend \
-    python /app/scripts/backup_db.py \
-    --db /app/data/heijin_erp_v1.db \
-    --out-dir /app/data/backups \
-    --keep 30
-else
-  echo "==> SQLite 开发库不存在，跳过本地备份"
+# 迁移前必须有一份可信的库快照：迁移改的是结构，出错往往不可逆。
+# 备份逻辑只有一处真相（backup_daily.sh，pg_dump -Fc + sha256 + 完整性闸门），
+# 这里只负责「先把 db 拉起来 → 备份 → 备份失败就中止发布」。
+echo "==> 确保 db 服务就绪（迁移前备份依赖它）"
+docker compose up -d db
+
+db_ready=0
+for _ in $(seq 1 20); do
+  if docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -q' </dev/null >/dev/null 2>&1; then
+    db_ready=1; break
+  fi
+  sleep 2
+done
+if [ "$db_ready" -ne 1 ]; then
+  echo "✗ db 在 40s 内未就绪，已中止发布（不在没有备份的情况下改结构）" >&2
+  exit 1
+fi
+
+echo "==> 迁移前备份 PostgreSQL 正式库"
+if ! bash scripts/backup_daily.sh; then
+  echo "✗ 迁移前备份失败，已中止发布（不在没有备份的情况下改结构）" >&2
+  exit 1
 fi
 
 echo "==> 执行数据库迁移"

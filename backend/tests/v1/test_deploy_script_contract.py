@@ -14,14 +14,17 @@ COMPOSE_FILE = PROJECT_ROOT / "deploy" / "docker-compose.yml"
 
 
 def _release_tree(
-    tmp_path: Path, *, curl_exit: int = 0, backup_exit: int = 99, admin_password: str | None = None
+    tmp_path: Path, *, curl_exit: int = 0, dump_exit: int = 0, admin_password: str | None = None
 ) -> tuple[Path, Path]:
     """创建隔离发布目录；仅替换 Docker 与 curl 这两个外部边界。"""
     deploy_dir = tmp_path / "deploy"
     script_dir = deploy_dir / "scripts"
     script_dir.mkdir(parents=True)
     script = script_dir / "deploy.sh"
-    shutil.copy2(SOURCE_SCRIPT, script)
+    # deploy.sh 迁移前会调用同目录的 backup_daily.sh，整目录拷入才接近真实部署树。
+    for source in SOURCE_SCRIPT.parent.glob("*.sh"):
+        target = script_dir / source.name
+        shutil.copy2(source, target)
     script.chmod(script.stat().st_mode | stat.S_IXUSR)
     env_text = "APP_ENV=production\n"
     if admin_password is not None:
@@ -33,9 +36,20 @@ def _release_tree(
     docker = fake_bin / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "if [[ \"$*\" == *\"test -f /app/data/heijin_erp_v1.db\"* ]]; then exit 1; fi\n"
-        f"if [[ \" $* \" == *\" run \"* && \"$*\" == *backup_db.py* ]]; then exit {backup_exit}; fi\n"
+        "set -uo pipefail\n"
+        'args="$*"\n'
+        'case "$args" in\n'
+        '  *"ps --status running --services"*) printf "db\\nbackend\\n"; exit 0 ;;\n'
+        '  *"ps -q"*) printf "fakecid0123456789\\n"; exit 0 ;;\n'
+        "  *psql*)\n"
+        "    printf '1\\n'\n"
+        "    exit 0 ;;\n"
+        "  *pg_dump*)\n"
+        f"    [[ {dump_exit} -ne 0 ]] && exit {dump_exit}\n"
+        "    printf 'PGDMP fake pg_dump archive body\\n'\n"
+        "    exit 0 ;;\n"
+        '  *"pg_restore --list"*) printf "1; 0 0 TABLE public orders erp_app\\n2; 0 0 TABLE DATA public orders erp_app\\n"; exit 0 ;;\n'
+        "esac\n"
         "exit 0\n",
         encoding="utf-8",
     )
@@ -54,21 +68,34 @@ def _run(
         **(extra_env or {}),
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
     }
-    return subprocess.run([str(script)], text=True, capture_output=True, env=env, check=False)
+    return subprocess.run(
+        [str(script)], encoding="utf-8", errors="replace", capture_output=True, env=env, check=False
+    )
 
 
-def test_first_deployment_skips_backup_when_database_does_not_exist(tmp_path):
-    """空数据卷首次发布不应因“备份不存在的库”而退出。"""
+def test_first_deployment_backs_up_empty_database_then_deploys(tmp_path):
+    """首次发布：空库也必须先备份再迁移，且备份成功不阻断发布。"""
     script, fake_bin = _release_tree(tmp_path)
 
     result = _run(script, fake_bin)
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "BACKUP_OK" in result.stdout, "迁移前应产出一次 pg_dump 备份"
+
+
+def test_deploy_aborts_when_pre_migration_backup_fails(tmp_path):
+    """备份失败必须中止发布：没有可信快照就改结构是最高危的操作。"""
+    script, fake_bin = _release_tree(tmp_path, dump_exit=1)
+
+    result = _run(script, fake_bin)
+
+    assert result.returncode != 0
+    assert "迁移前备份失败" in result.stdout + result.stderr
 
 
 def test_deploy_exits_nonzero_when_post_start_health_check_fails(tmp_path):
     """服务健康检查失败必须阻止脚本报告发布成功。"""
-    script, fake_bin = _release_tree(tmp_path, curl_exit=1, backup_exit=0)
+    script, fake_bin = _release_tree(tmp_path, curl_exit=1)
 
     result = _run(script, fake_bin)
 
@@ -77,7 +104,7 @@ def test_deploy_exits_nonzero_when_post_start_health_check_fails(tmp_path):
 
 def test_deploy_uses_admin_password_from_deploy_env_file(tmp_path):
     """管理员密码写入部署环境文件后，首次发布必须实际执行初始化。"""
-    script, fake_bin = _release_tree(tmp_path, backup_exit=0, admin_password="admin123456")
+    script, fake_bin = _release_tree(tmp_path, admin_password="admin123456")
 
     result = _run(script, fake_bin)
 
@@ -87,7 +114,7 @@ def test_deploy_uses_admin_password_from_deploy_env_file(tmp_path):
 
 def test_explicit_app_version_overrides_deploy_env_file(tmp_path):
     """CI 传入的发布版本必须优先于 ECS .env 中遗留的旧版本。"""
-    script, fake_bin = _release_tree(tmp_path, backup_exit=0)
+    script, fake_bin = _release_tree(tmp_path)
     script.parent.parent.joinpath(".env").write_text(
         "APP_ENV=production\nAPP_VERSION=1.0.0\n", encoding="utf-8"
     )

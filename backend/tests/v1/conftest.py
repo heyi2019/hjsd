@@ -109,7 +109,7 @@ def _initial_markers_for_file(filename: str) -> set[str]:
     ):
         markers.add("security")
 
-    if filename in {"test_backup_restore.py", "test_migration.py", "test_coverage_gate.py"}:
+    if filename in {"test_backup_scripts.py", "test_migration.py", "test_coverage_gate.py"}:
         markers.add("slow")
 
     return markers

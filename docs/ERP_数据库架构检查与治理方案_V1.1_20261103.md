@@ -25,7 +25,7 @@
 | 库 | 大小 | 表 | 版本 | 业务数据 | 用户 | 审计 | 定位 |
 |---|---:|---:|---|---|---:|---:|---|
 | `heijin_erp_dev` | 12 MB | 40 | `0001` | 119 单 / 90 库存 / 370 流水 / 200 事件 / 12 客户 / 4 合作方 | 3 | 499 | **开发库**：唯一承载真实历史数据，同时是建单演练场 |
-| `heijin_erp_test` | 19 MB | 40 | `0001` | 全 0（含配置表） | 0 | 0 | **测试库**：pytest 专用，每用例 `TRUNCATE`；体积偏大是 `seed_template` schema 副本 |
+| `heijin_erp_test` | 11 MB | 40 | `0001` | 全 0（含配置表） | 0 | 0 | **测试库**：pytest 专用，每用例 `TRUNCATE`；体积为系统目录碎片，非数据（见结论 12） |
 | `heijin_erp_release` | 12 MB | 40 | `0001` | 119 / 90 / 370 / 200，客户 0、合作方 0 | **6** | 503 | **上线母本**：与上线包字节级一致，只读 |
 
 三库公共基线：`order_form_fields` 259 / `option_sets` 63。
@@ -211,6 +211,7 @@ GitHub Actions（每次 push）
 9. **取消失败 ≠ 退库存。** 判定依据是「有无已登记资金事件」：HS 建单必带 `initial_buy`，故 `POST /orders/{id}/cancel` 必 422；正确路径是 `POST /orders/{id}/events` + `event_type=CANCEL` + `offset_event_id` + `pool_id`。对业务流水直接 `POST /cashflows/{id}/reverse` 会被拒。
 10. **库名闸门挡不住同库错配。** 闸门只校验「库名含 test」，`heijin_erp_release_test` 这类命名必须靠黑名单拦——已加。
 11. **shell 里 `${VAR}` 紧跟中文标点一律写花括号**，否则全角括号被并进变量名（`FILE: unbound variable`）。
+12. **test 库会因反复建删表而持续膨胀，`VACUUM FULL` 只能暂时收缩。** `conftest` 每个 session 都 `create_all`（40 表）+ 建 `seed_template` schema 再 `create_all`（又 40 表）+ teardown `DROP SCHEMA … CASCADE`，系统目录只增不减：实测一次 9 用例的 session 让 `pg_class` 从 344 kB 涨到 840 kB、库从 9.5 MB 涨到 11 MB。19 MB → `VACUUM FULL` → 9.5 MB，但跑完一轮测试又回到 11 MB。**根因不是 `seed_template` 副本**（它每个 session 结束都 DROP 掉，平时不存在），是 `pg_class`/`pg_attribute` 的文件碎片。想真正归零只能 `DROP DATABASE` 重建（让 OID 归位），收益随规模递减，暂不处理。
 
 ---
 

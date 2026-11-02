@@ -402,7 +402,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "SELL", label: "售出" },
     { value: "PAYMENT", label: "回款（分期）" },
     { value: "DELIVER", label: "交付" },
-    { value: "CANCEL", label: "冲销" },
+    { value: "CANCEL", label: "取消" },
     { value: "REFUND", label: "退款" },
   ] },
   { code: "CASHFLOW_NATURE", label: "资金流向", group: "FUND", editable: false, options: [

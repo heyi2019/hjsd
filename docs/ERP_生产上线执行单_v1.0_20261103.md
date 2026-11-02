@@ -13,8 +13,8 @@
 | SSH | `ssh heijin-prod`（root） |
 | 部署目录 | `/opt/heijin/deploy` |
 | 库 / 用户 | `heijin_erp` / `erp_app`（容器网络内 `db:5432`） |
-| 上线包 | `release_20261102_235658.dump`（219,284 B） |
-| 上线包 sha256 | `b62f1a9b1f30bebd277b6776abb4c15c7d6d67389d819136dfd484bccd818e6e` |
+| 上线包 | `release_20261103_002342.dump`（219,284 B） |
+| 上线包 sha256 | `a0e322fafd97c34f65e7b4c594d578f4bf4e6950e997ccce0b4fedb27e66fad4` |
 | 回滚包 | `prod_final_20261102_234555.dump`（198,322 B，**已在 ECS `/opt/heijin/backups/`**） |
 | 期望终态 | 40 表 / `alembic_version=0001` / 119 单 / 90 库存 / 370 流水 / 200 事件 / 2 用户 |
 
@@ -41,16 +41,16 @@
 
 ```bash
 # 本地
-scp backups/release_20261102_235658.dump heijin-prod:/opt/heijin/backups/
+scp backups/release_20261103_002342.dump heijin-prod:/opt/heijin/backups/
 ```
 
 ```bash
 # ECS
 cd /opt/heijin/backups
-sha256sum release_20261102_235658.dump
+sha256sum release_20261103_002342.dump
 ```
 
-**检查点**：输出必须等于 `b62f1a9b…818e6e`。不等就停下重传，别往下走。
+**检查点**：输出必须等于 `a0e322fa…66fad4`。不等就停下重传，别往下走。
 
 ### B2. 再备份一次当前库（覆盖前最后一份）
 
@@ -85,7 +85,7 @@ docker compose exec -T db psql -U erp_app -d postgres \
 ```bash
 cd /opt/heijin/deploy
 CID=$(docker compose ps -q db)
-docker cp /opt/heijin/backups/release_20261102_235658.dump "$CID":/tmp/release.dump
+docker cp /opt/heijin/backups/release_20261103_002342.dump "$CID":/tmp/release.dump
 docker compose exec -T db pg_restore -U erp_app -d heijin_erp \
   --no-owner --no-privileges --single-transaction /tmp/release.dump
 echo "restore_exit=$?"

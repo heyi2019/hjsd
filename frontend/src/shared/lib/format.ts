@@ -81,7 +81,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   SELL: "售出",
   PAYMENT: "回款（分期）",
   DELIVER: "交付",
-  CANCEL: "冲销",
+  CANCEL: "取消",
   REFUND: "退款",
 };
 

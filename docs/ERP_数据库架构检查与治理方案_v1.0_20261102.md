@@ -598,8 +598,8 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 | 项 | 结果 |
 |---|---|
-| 文件 | 初版 `backups/release_20261102_234054.dump`（219,263 B）→ **现行 `backups/release_20261102_235658.dump`（219,284 B，账号对齐后重出，见 11.10）** |
-| 校验 | `backups/release_latest.sha256` → 现行 `b62f1a9b…818e6e`（初版为 `f4af4f80…83fc683`） |
+| 文件 | 初版 `backups/release_20261102_234054.dump`（219,263 B）→ 账号对齐版 `release_20261102_235658.dump` → **现行 `backups/release_20261103_002342.dump`（219,284 B，CANCEL 标签改「取消」后重出，见 11.12）** |
+| 校验 | `backups/release_latest.sha256` → 现行 `a0e322fa…66fad4`（历史：初版 `f4af4f80…83fc683`、账号对齐版 `b62f1a9b…818e6e`） |
 | TOC 自检 | `pg_restore -l` 解出 **40 条 TABLE DATA**（= 40 表），TOC 共 445 条 |
 
 **② 覆盖式重建演练（P0-5）——全流程通过**
@@ -783,7 +783,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 - 哈希可被后端校验器解析：`verify_password('错误口令', hash)` 对两账号均返回 `False` 而非抛异常；
 - 回滚快照：`backups/release_users_rollback_20261102.json`（替换前的两行，含 dev 哈希；`backups/` 已在 `.gitignore`）。
 
-**新上线包**：`backups/release_20261102_235658.dump`（219,284 B，40 TABLE DATA），sha256 `b62f1a9b…818e6e`，指向记录在 `release_latest.sha256`（旧包 `release_20261102_234054.dump` 保留不删）。
+**新上线包**：`backups/release_20261102_235658.dump`（219,284 B，40 TABLE DATA），sha256 `b62f1a9b…818e6e`，指向记录在 `release_latest.sha256`（旧包 `release_20261102_234054.dump` 保留不删）。**11-03 00:23 又重出一次（CANCEL 标签改「取消」），现行以 `release_20261103_002342.dump` 为准，见 11.12。**
 
 **重跑演练（临时库 `heijin_erp_drill3`，用完即 DROP）**
 
@@ -817,6 +817,32 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 | 业务行数 | orders 0 / stocks 0 / cashflow 0 / **users 0** |
 
 结论：`heijin_erp_migration_test` 的归档是**可用的退路**，删除该库不会造成不可恢复的损失（且该库本身零业务数据）。临时库用完即 `DROP`。
+
+---
+
+### 11.12 取消口径统一：「动作=取消，财务账=冲销」（2026-11-03 00:20）
+
+**用户裁决**：「系统里面有作废的说法都要去掉，只留取消」→「订单取消 / 取消交易 / 取消事件都统一为取消」→ 就 CANCEL 事件两处异名，裁定「动作上取消，财务帐上冲销」。
+
+**落地边界（关键）**
+
+| 层 | 用词 | 范围 |
+|---|---|---|
+| 业务动作 | **取消** | 订单取消、事件类型 `CANCEL`、策略草稿作废、账号终态 `VOID`、返点作废、三个表单作用域名 |
+| 财务账务 | **冲销**（保留不动） | 资金流水冲销、核算属性 `REVERSAL`、业务事实冲销、返点冲销、`reversal_of_id` |
+
+**四处改动**
+
+1. `frontend/src/shared/lib/format.ts`：`EVENT_TYPE_LABEL.CANCEL` 由「冲销」改为「取消」，与 `EXECUTION_ACTION_LABEL.CANCEL`（本就用「取消」）一致。该映射此前**只定义未被引用**，页面实际走的是 `executionActionLabel`，所以用户看到的一直是「取消」——两处不同名属死映射残留。
+2. 库内 `option_sets.ORDER_EVENT_TYPE` 的 `CANCEL` 标签：`heijin_erp_dev` 与 `heijin_erp_release` 双库 `UPDATE`（业务字典页与事件类型下拉读的是这里）。逐项比对确认只改这一项，其余 6 个选项逐字未动。
+3. `backend/app/foundation/catalog_seed.py` 种子 blob 重导，否则新建库会把「冲销」复活。
+4. 顺带修掉一处漏网硬编码：`OrderDetailExecutionSection.tsx` 审计动作列写死 `ORDER_CANCEL → "取消订单"`，改为「取消」（`labels.ts` 的 `AUDIT_ACTION_LABEL` 上轮已改，这处没走映射）。
+
+**blob 重导的坑（下次别再踩）**：原 blob 的序列化参数是 `ensure_ascii=False` + `separators=(",", ":")`（中文直出、紧凑）。若用 `json.dumps` 默认参数重导，压缩后文本从 16,900 涨到 18,275 字符——内容相同但体积膨胀 8%。重导前先验证「原 raw 能否被候选参数逐字节复现」，复现成功再改。
+
+**上线包随之重出**：`backups/release_20261103_002342.dump`（219,284 B，40 TABLE DATA，sha256 `a0e322fa…66fad4`）。`release_latest.sha256` 与《ERP_生产上线执行单_v1.0》的常量已同步；旧两版保留不删。
+
+**未改（有意）**：`OrdersLedgerPanel` 台账卡片「已取消订单」（名词短语，指状态而非动作）；`deploy/`、`docs/` 其余历史文档中的「作废」字样（属历史记录，随文档版本处理）。
 
 ---
 

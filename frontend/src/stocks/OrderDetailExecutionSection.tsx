@@ -103,7 +103,7 @@ export function OrderDetailExecutionSection({
               rowKey="id"
               size="small"
               columns={[
-                { title: "动作", dataIndex: "action", render: (value: string) => value === "ORDER_CANCEL" ? "取消订单" : value },
+                { title: "动作", dataIndex: "action", render: (value: string) => value === "ORDER_CANCEL" ? "取消" : value },
                 { title: "操作人", dataIndex: "actor" },
                 { title: "时间", dataIndex: "occurred_at" },
                 { title: "原因", dataIndex: "reason", render: (value: string | null) => value || "-" },

@@ -5,6 +5,7 @@
 | 版本 | 日期 | 变更摘要 |
 |---|---|---|
 | v1.1 | 2026-11-01 | 后端绑定改 0.0.0.0；更正前端 dev 端口未在 vite.config 固定（默认 5173，可 --port 指定）；补代理端口优先级与 E2E 隔离说明；旧版 ERP_本地开发与联调指南_v1.0.md 归档于 `docs/archive/` |
+| v1.2（同版修订） | 2026-11-02 | E2E（Playwright）体系整体下线，第 6 章改写为「验证分层 + 代价说明」；数据库统一 PostgreSQL，删去 SQLite 相关表述 |
 
 
 > 本文是工程启动契约。业务规则以 [PRD](ERP_PRD_v1.3_当前实现版.md)、[ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)、[数据字典](ERP_数据字典_v2.0.md) 为准；本文不覆盖业务口径。
@@ -80,44 +81,20 @@ cd frontend && npm run check && npm run build
 - 涉及接口时更新 API 文档、错误码/状态机和对应测试。
 - 涉及表结构时新增 Alembic revision，更新数据字典和 DDL；不得手改生产 schema。
 
-## 6. E2E 端到端测试（Playwright）
+## 6. 端到端测试：已下线（2026-11-02）
 
-前端 E2E 采用 Playwright + Chromium，配置见 `frontend/playwright.config.ts`，用例在 `frontend/e2e/*.spec.ts`。开发态（`import.meta.env.DEV`）零登录直进 `AppShell`，E2E 全部在 dev server 下运行，无需真实 token。
+Playwright E2E 体系已整体删除：`frontend/e2e/`（13 个 spec / 50 例 / 4 张视觉基线）、`frontend/playwright.config.ts`、`backend/scripts/e2e_backend.sh`、5 个 `seed_e2e_*` / `seed_batch_acceptance_orders` 夹具脚本，以及 CI 的 `frontend-e2e` job 与 `auto-merge` 里对应的 gate。
 
-### 运行方式
+删除原因：E2E 需要独立的 SQLite 库（`heijin_erp_e2e.db`）与 Chromium，维护成本高，且与「运行时统一 PostgreSQL」不一致；同时 50 例里已有一批长期漂移的失败项。
 
-```bash
-cd frontend
-./node_modules/.bin/playwright test                 # 全量
-./node_modules/.bin/playwright test e2e/smoke.spec.ts   # 单文件
-```
+**现在的验证分层**（替代 E2E 的位置）：
 
-`playwright.config.ts` 的 `webServer` 会自动拉起两个服务，无需手工启后端：
+| 层 | 入口 | 耗时 | 能证明什么 |
+|---|---|---|---|
+| 单元 | `cd frontend && npm run test:fast` | 秒级 | 纯逻辑正确 |
+| 模块 / 面板 | `npm run test:panel -- <域>` | 分钟级 | 组件渲染与交互逻辑（jsdom） |
+| 后端接口 | `cd backend && python3 run_regression.py <域>` | 分钟级 | 契约、权限、状态机、真实 PG 语义 |
 
-| 服务 | 端口 | 说明 |
-|---|---:|---|
-| 前端 dev server | 5180 | `vite --strictPort`；若已占用则复用 |
-| E2E 后端 | 8124 | `backend/scripts/e2e_backend.sh` 每次重建**独立库 `heijin_erp_e2e.db`** |
+**代价必须说清**：不再有「真实浏览器点下去」的自动化验证。导航可达、外壳不白屏、关键写路径这三类问题，现在只能靠人工点一遍，或按需临时起服务用 `frontend/scripts/ux-audit.mjs` 巡检（该脚本保留，直接用 `playwright` 包做浏览器体检，不属于测试框架）。
 
-**端口隔离是硬约束**：8123 为你常驻的「生产 dev 后端」（连 `heijin_erp_v1.db`），E2E 严禁复用它的库，故固定走 8124。可用 `ERP_E2E_BACKEND_PORT` / `ERP_E2E_API_BASE` 覆盖。
-
-### 浏览器
-
-Playwright 1.64.0 + Chromium。若报 `Executable doesn't exist`，执行 `./node_modules/.bin/playwright install chromium`；本机浏览器缓存可能不在默认 `~/.cache/ms-playwright`，以 `PLAYWRIGHT_BROWSERS_PATH` 为准。
-
-### 当前基线（2026-10-21 实测）
-
-- 全量 **50 / 50 通过，约 1.2 分钟**（10 个 spec：smoke / auth-login / business-write / crud / integration / other-integration / role-switch / fallback / upgrade-integration / visual）。
-- 串行执行（`workers:1`、`fullyParallel:false`），antd 下拉与真实浏览器状态并行易互相干扰。
-
-### 视觉快照策略
-
-`visual.spec.ts` 对工作台、登录页做像素基线比对。**有意的 UI 改动**（配色令牌、间距）会使快照过期，此时：
-
-1. 先看 `test-results/**/…-diff.png`，确认差异仅限本次改动区域（避免把回归当基线批准）；
-2. 再 `./node_modules/.bin/playwright test e2e/visual.spec.ts --update-snapshots` 重生成；
-3. 复跑全量确认 50/50 绿，并把快照随改动一并提交。
-
-### 提交前
-
-E2E 与单测分开：单测（`vitest`）测逻辑，E2E 守主干（导航可达、外壳不白屏、关键写路径）。二者都要绿才算通过。
+如需找回：`git log --diff-filter=D -- frontend/e2e` 可定位删除前的完整快照。

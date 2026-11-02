@@ -1,6 +1,6 @@
 # ERP_页面原型与交互说明_V1.1
 
-> **状态：已冻结（2026-11-01）**。本文以 `文件名:行号` 定位实现，代码重构后行号已全面失效；页面级行为以代码与 E2E 测试为准。以下内容仅作交互设计参考，其中业务名「业务台账」现为「订单台账」，代分期（DFQ）相关交互已随该功能下线作废。
+> **状态：已冻结（2026-11-01）**。本文以 `文件名:行号` 定位实现，代码重构后行号已全面失效；页面级行为以代码与前端测试（vitest）为准。以下内容仅作交互设计参考，其中业务名「业务台账」现为「订单台账」，代分期（DFQ）相关交互已随该功能下线作废。
 
 
 | 项 | 内容 |
@@ -47,7 +47,7 @@
 
 - **落点由 URL 决定**：`AppShell.tsx:39-40` 从 hash 第一段解析 `active`（非法/空路径回退 `dashboard`）；空路径重定向 `/dashboard`（`navigateTo` 内的 `navigate("/dashboard", { replace: true })`，`AppShell.tsx:53`）。
 - **深链可用**：刷新、浏览器后退/前进、直接输入 `#/business/inventory` 均可定位到具体页面与子 Tab；业务中心支持 `/business/inventory` 深链库存中心。
-- **零服务端改造**：采用 hash 模式（非 BrowserRouter），无需 Nginx history fallback；E2E 的 `page.goto("/")` 仍可用。
+- **零服务端改造**：采用 hash 模式（非 BrowserRouter），无需 Nginx history fallback。
 
 > 注意：V1.0 文档中的页面路径现在**真实存在**（以 hash 形式），本章后续仍用**页面键**指代一级导航，子页用 `key/tab` 二级路径。
 

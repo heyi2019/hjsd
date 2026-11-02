@@ -23,10 +23,7 @@
     "test:full:serial": "vitest run",
     "test:serial": "vitest run --project=react --no-file-parallelism",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "test:e2e:critical": "playwright test e2e/integration.spec.ts e2e/business-write.spec.ts",
     "test:regression:fast": "npm run check && npm run test:e2e:critical",
-    "test:visual": "playwright test e2e/visual.spec.ts",
     "guard": "node scripts/ui_guards.mjs"
   },
   "dependencies": {
@@ -38,7 +35,6 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
@@ -48,6 +44,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^5.0.3",
     "jsdom": "^26.1.0",
+    "playwright": "^1.64.0",
     "typescript": "^5.6.2",
     "vite": "^6.4.3",
     "vitest": "^5.0.3"

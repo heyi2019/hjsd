@@ -1,6 +1,6 @@
 # 宜游轩 ERP · 阿里云部署指南
 
-> 当前发布状态（2026-10-31）：阿里云 ECS 已运行 PostgreSQL 16，后端已通过 `postgresql+psycopg` 连接该库。生产库当前 Alembic 版本为 `0064_expand_buy_rebate_scope`，下一次发布需继续执行 `0065→0071`，再创建数据库版本审计表。
+> 当前发布状态（2026-10-31）：阿里云 ECS 已运行 PostgreSQL 16，后端已通过 `postgresql+psycopg` 连接该库。生产库当前 Alembic 版本为 `0064_expand_buy_rebate_scope`，而活动迁移链已压平为单一 `0001`——`0065→0071` 已不存在，`alembic upgrade head` 会在解析旧版本戳时失败。首次上线须走「dump → 空库 upgrade head → 数据导入」重建路径，**不得用 stamp 冒充已升级**（详见 `docs/ERP_数据库架构检查与治理方案_v1.0_20261102.md`）。
 >
 > **数据库引擎切换已完成；迁移链收口仍需完成。** 目前编排和 PostgreSQL 驱动已接入，但备份恢复脚本仍保留 SQLite 回退路径。下文标记为「历史 SQLite 流程」的内容仅供回退与取数参考，不得用于 PostgreSQL 正式备份。
 
@@ -27,7 +27,7 @@ GitHub Actions（linux/amd64 构建）
 
 - 发布离线包包含 `postgres:16-alpine`，或 ECS 已通过受验证的镜像源预拉并校验该镜像；不能假定 Docker Hub 可访问。
 - `deploy/.env` 配置强随机 `POSTGRES_PASSWORD` 与 PostgreSQL `DATABASE_URL`，且 PostgreSQL 端口不对公网开放。
-- 线上数据库版本 `0064` 已只读核对；发布前必须在备份副本上演练 `0065→0071`，通过行数、关键表、管理员登录、业务读写与健康检查验证。
+- 线上数据库版本 `0064` 已只读核对；发布前必须在备份副本上演练「空库建到 `0001` + 数据导入」，通过行数、关键表、管理员登录、业务读写与健康检查验证。
 - 自动发布脚本能显式执行、记录并校验迁移；失败时保持 SQLite 原卷和 PostgreSQL 空卷，不能半切换。
 - PostgreSQL 备份、恢复和异地留存已演练；旧的 SQLite 备份脚本不可继续充当正式数据库的灾备方案。
 

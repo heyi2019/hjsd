@@ -116,6 +116,27 @@ if [ "$db_ready" -ne 1 ]; then
   exit 1
 fi
 
+echo "==> 预检：数据库版本戳能否被活动迁移链解析"
+# 活动链已压平为单一 0001，历史增量迁移（0065~0071 等）不再加载。
+# 生产库若停在旧链（如 0064_expand_buy_rebate_scope），alembic 会在执行任何 DDL 之前
+# 报 Can't locate revision 并中止。这里提前拦一次，把「不要 stamp 绕过」的指引打到日志里，
+# 避免运维现场把结构落后的库 stamp 成已升级（那样之后 upgrade head 是空操作）。
+migration_probe="$(docker compose run --rm --no-deps backend alembic current </dev/null 2>&1 || true)"
+if printf '%s\n' "$migration_probe" | grep -q "Can't locate revision"; then
+  printf '%s\n' "$migration_probe" | sed 's/^/    /' >&2
+  cat >&2 <<'MIGRATION_CHAIN_MSG'
+
+✗ 数据库版本戳不在活动迁移链内，升级必然失败，已中止（未做任何改动）。
+  活动链已压平为单一 0001，0065~0071 等历史增量已不存在。
+  ⚠ 不要用 alembic stamp 绕过：对结构落后的库 stamp 之后 upgrade head 是空操作，
+    等于把未完成的库伪装成已升级。
+  正确路径：备份数据 → 空库 alembic upgrade head 建全量结构 → 清洗后导入 → 校验。
+  详见 docs/ERP_数据库架构检查与治理方案_v1.0_20261102.md 第六节。
+MIGRATION_CHAIN_MSG
+  exit 1
+fi
+printf '%s\n' "$migration_probe" | sed 's/^/    /'
+
 echo "==> 迁移前备份 PostgreSQL 正式库"
 if ! bash scripts/backup_daily.sh; then
   echo "✗ 迁移前备份失败，已中止发布（不在没有备份的情况下改结构）" >&2
@@ -123,8 +144,9 @@ if ! bash scripts/backup_daily.sh; then
 fi
 
 echo "==> 执行数据库迁移"
-# 保留完整的 0001→0071 迁移链，兼容 ECS 现有 PostgreSQL 的 0064 版本戳；
-# 不得在迁移失败时用 stamp_baseline.py 掩盖错误，否则会把结构未完成的库伪装成已升级。
+# 活动链已压平为单一 0001（alembic.ini 的 version_locations 只指 squashed_versions），
+# ECS 现存的 0064 版本戳无法解析，会在此处硬停——这是预期行为，不是 bug。
+# 首次上线必须先按 Release→Prod 流程重建库；不得用 stamp 把结构未完成的库伪装成已升级。
 docker compose run --rm backend alembic upgrade head
 
 # 数据库版本「随推送版本来」：迁移完成后把当前发布版本戳记进 db_version 审计表，

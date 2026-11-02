@@ -1,7 +1,8 @@
 """tests/v1 共享夹具：PostgreSQL 测试库（绝不用生产库）。
 
-- 测试库由 `TEST_DATABASE_URL`（其次 `.env` 的 `DATABASE_URL`）指定，库名必须含
-  `test`——夹具会 `TRUNCATE` 全表，误指生产库即数据全毁，故在会话开始前硬校验；
+- 测试库只认 `TEST_DATABASE_URL`（**刻意不回落 `DATABASE_URL`**），库名必须含 `test`
+  且不得命中 release/prod 等黑名单、不得与 `DATABASE_URL` 同库——夹具会 `TRUNCATE`
+  全表，误指业务库即数据全毁，故在会话开始前硬校验；
 - 每个 session 对测试库 `create_all`（幂等）；用例之间 `TRUNCATE ... RESTART IDENTITY`；
 - 种子数据放独立 schema `seed_template`，每用例跨 schema 回放（纯 SQL，无 ORM 开销）；
 - `client` 把 `core.database.get_db` 覆盖到测试会话；
@@ -166,6 +167,10 @@ def seed_default_users(db: Session) -> None:
     db.flush()
 
 
+# 上线准备库 / 生产库一律不得作为测试目标，即便库名里带 test 也拒绝。
+_DENIED_DB_KEYWORDS = ("release", "prod", "production", "live", "rehearsal")
+
+
 def _test_database_url() -> str:
     """测试库 URL：环境变量 `TEST_DATABASE_URL` 优先，其次 `.env` 的同名项。
 
@@ -192,11 +197,33 @@ def _test_database_url() -> str:
             returncode=1,
         )
     database = make_url(url).database or ""
-    if "test" not in database.lower():
+    lowered = database.lower()
+    if "test" not in lowered:
         pytest.exit(
             f"拒绝在库 `{database}` 上跑测试（库名须含 test）：夹具会 TRUNCATE 全表。",
             returncode=1,
         )
+    # 显式黑名单：库名同时含 test 与 release/prod 时（如 heijin_erp_test_release），
+    # 只靠「含 test」会放行——但那可能是上线准备库，清掉就没有可上线的数据了。
+    denied = [word for word in _DENIED_DB_KEYWORDS if word in lowered]
+    if denied:
+        pytest.exit(
+            f"拒绝在库 `{database}` 上跑测试（命中黑名单 {denied}）：夹具会 TRUNCATE 全表。"
+            "上线准备库与生产库不允许参与任何自动化测试。",
+            returncode=1,
+        )
+    # 本地必须物理分离。CI 的 postgres service 只建一个一次性的临时库，
+    # 两个变量同库无害，故 CI 环境跳过（`CI` 由 GitHub Actions 自动注入）。
+    if not os.environ.get("CI"):
+        base_url = os.environ.get("DATABASE_URL") or settings.database_url
+        base_database = make_url(base_url).database if base_url else ""
+        if base_database and base_database == database:
+            pytest.exit(
+                f"TEST_DATABASE_URL 与 DATABASE_URL 指向同一个库 `{database}`："
+                "夹具每用例都会 TRUNCATE 全表，等于让测试反复清空业务库。"
+                "请在 .env 把两者分成两个库。",
+                returncode=1,
+            )
     return url
 
 

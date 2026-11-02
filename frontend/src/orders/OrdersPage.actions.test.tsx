@@ -19,7 +19,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
     "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
     "markOverdue",
   ];
@@ -213,6 +213,8 @@ beforeEach(() => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([
     { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
   ]);
+  // 下架弹窗背后会渲染库存上下文，卡片指标走这个接口；不桩会真调 api.get 返回 undefined。
+  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 });
   vi.mocked(catalog.ordersApi.get).mockResolvedValue(order1);
   vi.mocked(catalog.ordersApi.links).mockResolvedValue([link1]);
   vi.mocked(catalog.ordersApi.deleteLink).mockResolvedValue(undefined);

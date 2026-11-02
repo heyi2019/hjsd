@@ -1,6 +1,7 @@
 import { Form } from "antd";
 import type { Pool } from "../../shared/api/catalog";
 import type { ReactNode } from "react";
+import { sumMoney } from "../../shared/lib/money";
 import { BusinessRegistrationGroup, BusinessRegistrationSection, MoneyInput, Select } from "../../shared/ui";
 import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../ConfigurableField";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
@@ -14,8 +15,8 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
   const purchaseAmount = Form.useWatch("th_purchase_amount");
   const intermediaryFee = Form.useWatch("intermediary_fee");
   const expenseItems = Form.useWatch("expense_items") as Array<{ amount?: number }> | undefined;
-  const totalCost = [purchaseAmount, intermediaryFee, ...(expenseItems ?? []).map((item) => item.amount)]
-    .reduce((total, value) => total + (Number(value) || 0), 0);
+  // 与回收页同一套口径：输入期本地换算成分相加，只用于即时展示。
+  const totalCost = sumMoney([purchaseAmount, intermediaryFee, ...(expenseItems ?? []).map((item) => item.amount)]);
 
   return (
     <BusinessRegistrationSection className="finance-section th-fees" title={financeTitle} description="填写账号价格、预计收款与实际发生的附加费用">
@@ -34,7 +35,7 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
       {props.financeExtras}
       <div className="finance-total">
         <span>总成本（含全部附加费用）</span>
-        <strong>¥ {totalCost.toFixed(2)}</strong>
+        <strong>¥ {totalCost}</strong>
       </div>
     </BusinessRegistrationSection>
   );

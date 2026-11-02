@@ -9,6 +9,7 @@ import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { executionActionLabel, money, today } from "../../shared/lib/format";
+import { amountByBasisPoints, basisPointsByAmount, fromBasisPoints, fromCents, toBasisPoints, toCents } from "../../shared/lib/money";
 import { ordersApi, policyApi } from "../../shared/api/catalog";
 import { requiredMoneyRules, percentRules, moneyRules } from "../../shared/lib/validators";
 import { InventoryCancellationDialog } from "../../stocks/InventoryCancellationDialog";
@@ -222,13 +223,20 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     const nextRows = rows.map((row, rowIndex) => {
       if (rowIndex !== index) return row;
       const next = { ...row, [field]: raw };
-      const value = Number(raw.trim());
-      const profit = Number(allocationProfit);
+      // 比率↔金额互算：利润与比率都先换成整数（分 / 基点）再乘除，
+      // `profit * rate / 100` 的浮点中间值会给出 0.005 级别的错位。
+      const profitCents = toCents(allocationProfit);
       if (!raw.trim()) {
         next[field === "allocation_rate" ? "allocation_amount" : "allocation_rate"] = "";
-      } else if (Number.isFinite(value) && value >= 0 && profit > 0) {
-        if (field === "allocation_rate") next.allocation_amount = (profit * value / 100).toFixed(2);
-        else next.allocation_rate = (value / profit * 100).toFixed(2);
+      } else if (Number.isFinite(profitCents) && profitCents > 0) {
+        const value = Number(raw.trim());
+        if (!Number.isFinite(value) || value < 0) return next;
+        if (field === "allocation_rate") {
+          next.allocation_amount = fromCents(amountByBasisPoints(profitCents, toBasisPoints(value)));
+        } else {
+          const bp = basisPointsByAmount(profitCents, toCents(value));
+          if (Number.isFinite(bp)) next.allocation_rate = fromBasisPoints(bp);
+        }
       }
       return next;
     });

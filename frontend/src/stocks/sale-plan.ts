@@ -11,6 +11,8 @@
  * 边界：期数非正整数、金额非数字时返回 null（由对应字段自己的规则报错，这里不重复）。
  */
 
+import { fromCents as formatCents, toCents } from "../shared/lib/money";
+
 export interface SaleInstallmentPlan {
   /** 期数（正整数）。 */
   count: number;
@@ -28,16 +30,8 @@ export interface SaleInstallmentPlan {
   lastPeriod: string;
 }
 
-/** 元 → 分。非数字返回 NaN，交给调用方判空。 */
-export function toCents(value: unknown): number {
-  const numeric = Number(value ?? 0);
-  return Number.isFinite(numeric) ? Math.round(numeric * 100) : Number.NaN;
-}
-
-/** 分 → 2 位小数字符串（只做展示格式化，不参与后续运算）。 */
-export function formatCents(value: number): string {
-  return (value / 100).toFixed(2);
-}
+// 分换算统一由 shared/lib/money 提供；此处仅按原名字导出，避免调用方改动。
+export { fromCents as formatCents, toCents } from "../shared/lib/money";
 
 export function saleInstallmentPlan(input: {
   saleAmount: unknown;

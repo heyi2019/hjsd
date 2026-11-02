@@ -6,7 +6,8 @@ import { AdditionalFeeFields } from "../AdditionalFeeFields";
 import "./RecoveryFeeSection.css";
 
 export function RecoveryFeeSection(props: {
-  totalRecoveryCost: number;
+  /** 上游按「分」汇总后的 2 位小数字符串，此处只负责展示。 */
+  totalRecoveryCost: string;
   pools: Pool[];
   financeExtras?: ReactNode;
 }) {
@@ -24,7 +25,7 @@ export function RecoveryFeeSection(props: {
       </BusinessRegistrationGroup>
       <AdditionalFeeFields pools={props.pools} />
       {props.financeExtras}
-      <div className="finance-total"><span>付款金额（含全部附加费用）</span><strong>¥ {props.totalRecoveryCost.toFixed(2)}</strong></div>
+      <div className="finance-total"><span>付款金额（含全部附加费用）</span><strong>¥ {props.totalRecoveryCost}</strong></div>
     </BusinessRegistrationSection>
   );
 }

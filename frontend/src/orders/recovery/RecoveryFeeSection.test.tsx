@@ -28,7 +28,7 @@ function renderHs(cfg: FieldConfigMap) {
   return renderLight(
     <Form>
       <FieldConfigContext.Provider value={cfg}>
-        <RecoveryFeeSection totalRecoveryCost={0} pools={pools} />
+        <RecoveryFeeSection totalRecoveryCost="0.00" pools={pools} />
       </FieldConfigContext.Provider>
     </Form>,
   );

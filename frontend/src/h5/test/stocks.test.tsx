@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MobileInventoryList } from "./InventoryPanel";
-import { SessionProvider } from "../shared/state/session";
-import type { Account } from "../shared/api/catalog";
+import { MobileInventoryList } from "../stocks";
+import { SessionProvider } from "../../shared/state/session";
+import type { Account } from "../../shared/api/catalog";
 
 // PermissionButton 依赖 useSession().can；单测里恒真放行，避免 dev 角色权限差异导致按钮不可见。
-vi.mock("../shared/state/session", () => ({
+vi.mock("../../shared/state/session", () => ({
   useSession: () => ({ can: () => true }),
   SessionProvider: ({ children }: { children: React.ReactNode }) => children,
 }));

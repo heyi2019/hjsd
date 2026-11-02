@@ -14,7 +14,8 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { CUSTOMER_ROLE_LABEL, customerDateKey, MobileCustomerList, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
+import { MobileCustomerList } from "../h5";
+import { CUSTOMER_ROLE_LABEL, customerDateKey, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
 
 const SearchButton = Button;
 const CUSTOMER_STATUS_OPTIONS = [

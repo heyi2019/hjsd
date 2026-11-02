@@ -3,6 +3,7 @@ import { Card, Input, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
+import { MobileReportCards, type ReportCardColumn } from "../h5";
 import { QualityPanel } from "../quality/QualityPanel";
 import { NotificationsPanel } from "../notifications/NotificationsPanel";
 import { SearchPanel } from "../search/SearchPanel";
@@ -65,47 +66,6 @@ const REPORT_FALLBACK = REPORT_NAMES.map((name) => ({ value: name, label: REPORT
 
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
 type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
-
-/** 通用移动端报表卡片列表：复用各报表已有 columns（title→标签、render/dataIndex→值）。
- * 仅 ≤640px（useCompactLayout）挂载；桌面与 jsdom 测试仅渲染表格，卡片不进 DOM，单测零破坏。 */
-type ReportCardColumn<T> = {
-  title?: ReactNode;
-  dataIndex?: string | string[];
-  render?: (value: any, row: T, index: number) => ReactNode;
-};
-
-export function MobileReportCards<T>({
-  rows,
-  columns,
-}: {
-  rows: readonly T[];
-  columns: readonly ReportCardColumn<T>[];
-}) {
-  return (
-    <div className="data-mobile-list">
-      {rows.map((row, index) => (
-        <article className="data-mobile-card" key={index}>
-          <dl className="data-mobile-meta">
-            {columns.map((col, i) => {
-              const value: ReactNode = col.render
-                ? col.render((row as Record<string, unknown>)[col.dataIndex as string], row, index)
-                : col.dataIndex
-                ? ((row as Record<string, unknown>)[col.dataIndex as string] as ReactNode)
-                : null;
-              const label = typeof col.title === "string" ? col.title : "";
-              return (
-                <div key={i}>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              );
-            })}
-          </dl>
-        </article>
-      ))}
-    </div>
-  );
-}
 
 export function ReportsPage({ onNavigate, active = true, initialReportTab }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
   const reportOptions = useOptionSet("REPORT_NAME") ?? REPORT_FALLBACK;

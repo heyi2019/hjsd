@@ -10,7 +10,8 @@ import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui"
 import { columnKey } from "../shared/lib/listColumns";
 
 
-import { DISPOSITION_LABEL, MobileInstallmentList } from "./InstallmentsPanel.fragments";
+import { MobileInstallmentList } from "../h5";
+import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
 import { useContractTableController } from "./useContractTableController";
 import { ContractModals } from "./InstallmentsPanel.modals";
 

@@ -13,7 +13,7 @@ import {
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
-import { MobileCashflowList, MobileDepositList, MobilePoolList } from "./FundsPage.fragments";
+import { MobileCashflowList, MobileDepositList, MobilePoolList } from "../h5";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/catalog";
 

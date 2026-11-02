@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { MobileReportCards } from "./ReportsPage";
-import { MoneyText } from "../shared/ui";
+import { MobileReportCards } from "../reporting";
+import { MoneyText } from "../../shared/ui";
 
 type Row = {
   game_account: string;

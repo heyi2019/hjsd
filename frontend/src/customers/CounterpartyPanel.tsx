@@ -10,7 +10,8 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag, useCompactLayout } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { MobileCounterpartyList, collectExtras } from "./CustomersPage.fragments";
+import { MobileCounterpartyList } from "../h5";
+import { collectExtras } from "./CustomersPage.fragments";
 
 const COUNTERPARTY_STATUS_OPTIONS = [
   { value: "ACTIVE", label: "进行中" },

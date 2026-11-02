@@ -1,7 +1,7 @@
 import { Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
 import { DataTable, PermissionButton, Select } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetail";
-import { MobileInventoryList } from "./helpers";
+import { MobileInventoryList } from "../../h5";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryLedger({ controller }: { controller: InventoryController }) {

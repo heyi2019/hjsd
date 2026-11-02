@@ -64,6 +64,8 @@ it("设置配置：填写生效期和结构化字段后提交，生成新版本�
   await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
   // 结构化字段由 schema 驱动：REBATE → 统一返点比例（percent 控件）
   const rate = screen.getByLabelText("统一返点比例");
+  // percent-input 落在带 addonAfter 的最外层 group-wrapper 上，不在 .ant-input-number 本身
+  expect(rate.closest(".ant-input-number-group-wrapper")).toHaveClass("percent-input");
   fireEvent.change(rate, { target: { value: "5" } });
   await ui.click(await screen.findByRole("button", { name: /保存/ }));
 
@@ -186,7 +188,7 @@ it("生效期自查：未命中时提示该日该作用域无生效版本", asyn
   expect(await screen.findByText(/没有生效的规则版本/)).toBeInTheDocument();
 });
 
-it("草稿版本可作废（SUPERSEDED）：填理由后调用 policyApi.supersede", async () => {
+it("草稿版本可取消（SUPERSEDED）：填理由后调用 policyApi.supersede", async () => {
   const draft = {
     id: 9,
     policy_definition_id: 1,
@@ -204,10 +206,10 @@ it("草稿版本可作废（SUPERSEDED）：填理由后调用 policyApi.superse
 
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
-  await ui.click(await screen.findByRole("button", { name: /作\s*废/ }));
-  await screen.findByText(/作废草稿 · v2/);
-  await ui.type(screen.getByLabelText("作废理由"), "未采用的规划");
-  await ui.click(screen.getByRole("button", { name: /确认作废/ }));
+  await ui.click(await screen.findByRole("button", { name: /^取\s*消$/ }));
+  await screen.findByText(/取消草稿 · v2/);
+  await ui.type(screen.getByLabelText("取消理由"), "未采用的规划");
+  await ui.click(screen.getByRole("button", { name: /确认取消/ }));
   await waitFor(() =>
     expect(catalog.policyApi.supersede).toHaveBeenCalledWith(9, { reason: "未采用的规划" }),
   );

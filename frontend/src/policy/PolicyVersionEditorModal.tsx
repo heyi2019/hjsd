@@ -10,6 +10,7 @@ import {
   type PolicyFieldDef,
 } from "./policyConfigSchema";
 import { today } from "./policyConstants";
+import "./PolicyVersionEditorModal.css";
 
 export interface PolicyVersionSubmit {
   effective_from: string;
@@ -51,7 +52,7 @@ function renderControl(field: PolicyFieldDef) {
         max={field.max ?? 100}
         addonAfter="%"
         placeholder={field.placeholder}
-        className="ui-control-width-160"
+        className="ui-control-width-160 percent-input"
       />
     );
   }

@@ -23,8 +23,8 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
           <CfgItem alwaysActive name="th_purchase_amount" label={fieldLabel(cfg, "th_purchase_amount", "账号号价")} rules={[{ required: true, message: "账号号价必填" }]}>
             <MoneyInput placeholder="请输入金额" />
           </CfgItem>
-          <CfgItem alwaysActive name="payment_pool_id" label="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}>
-            <Select placeholder="请选择支出账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
+          <CfgItem alwaysActive name="payment_pool_id" fixedLabel="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
+            <Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
           </CfgItem>
           <CfgItem alwaysActive name="th_receive_amount" label={fieldLabel(cfg, "th_receive_amount", "预计收买家")} rules={[{ required: true, message: "请输入预计收买家金额" }]}>
             <MoneyInput placeholder="请输入金额" />

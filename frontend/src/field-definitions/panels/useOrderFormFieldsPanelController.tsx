@@ -14,6 +14,7 @@ import {
   CONDITION_OP_OPTIONS,
   DEFAULT_SECTION_ORDER,
   FIELD_SECTION_OPTIONS,
+  FIXED_LABEL_FIELD_KEYS,
   FLOW_DIRECTION_OPTIONS,
   MANAGED_OPTION_FIELD_KEYS,
   OPTION_FIELD_TYPES,
@@ -63,6 +64,8 @@ export function useOrderFormFieldsPanelController({
   const editorSection = Form.useWatch("section", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
   const managedOptionField = MANAGED_OPTION_FIELD_KEYS.includes(editingField?.field_key ?? "");
+  // 系统统一术语字段（如资金账户）：名称必须全站一致，配置中心只读展示、不可改名。
+  const fixedLabelField = FIXED_LABEL_FIELD_KEYS.includes(editingField?.field_key ?? "");
   const orderedSectionOptions = useMemo(() => {
     const ordered = [...sectionOrder];
     return ordered.map((value) => {
@@ -417,8 +420,14 @@ export function useOrderFormFieldsPanelController({
         <Form.Item name="field_key" label="字段键" rules={[{ required: true }, { pattern: /^[a-z][a-z0-9_]*$/, message: "仅支持小写字母与下划线，且以小写字母开头" }]}>
           <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
         </Form.Item>
-        <Form.Item name="label" label="标签" rules={[{ required: true }]}>
-          <Input placeholder="页面显示名" />
+        <Form.Item
+          name="label"
+          label="标签"
+          rules={[{ required: true }]}
+          tooltip={fixedLabelField ? "系统统一术语，字段名称不可修改" : undefined}
+          extra={fixedLabelField ? "系统统一术语，全站统一显示，不可改名" : undefined}
+        >
+          <Input placeholder="页面显示名" disabled={fixedLabelField} />
         </Form.Item>
         <Form.Item name="field_type" label="类型">
           <Select options={editorFieldTypeOptions} className="ui-control-width-180" disabled={editingId !== null} />

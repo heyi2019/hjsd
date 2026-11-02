@@ -217,6 +217,38 @@ describe("OrderFormFieldsPanel", () => {
     expect(screen.getByLabelText("标签").closest(".ant-table-expanded-row")).not.toBeNull();
   });
 
+  it("资金账户是系统统一术语：配置中心标签只读，不可改名", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({
+        id: 63,
+        field_key: "payment_pool_id",
+        label: "资金账户",
+        field_type: "SELECT",
+        locked: true,
+        is_custom: false,
+      }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("资金账户");
+
+    await ui.click(screen.getByRole("button", { name: "编辑资金账户" }));
+
+    expect(screen.getByLabelText("标签")).toBeDisabled();
+    expect(screen.getByText("系统统一术语，全站统一显示，不可改名")).toBeInTheDocument();
+  });
+
+  it("普通字段的标签仍可编辑", async () => {
+    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+      makeField({ id: 64, field_key: "vip_tag", label: "会员标签", is_custom: true }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("会员标签");
+
+    await ui.click(screen.getByRole("button", { name: "编辑会员标签" }));
+
+    expect(screen.getByLabelText("标签")).toBeEnabled();
+  });
+
   it("编辑区修改标签、归属板块、必填和排序后可成功保存", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 62, field_key: "tag", label: "编辑前标签", is_custom: true }),

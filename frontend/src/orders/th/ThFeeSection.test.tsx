@@ -49,9 +49,9 @@ it("TH 费用卡片：无配置时降级显示原硬编码标题", () => {
   expect(screen.getByText("预计收买家")).toBeInTheDocument();
 });
 
-it("TH 费用卡片：支出账户标题保持写死（不受标签改名影响）", () => {
+it("TH 费用卡片：资金账户标题使用系统统一术语，不受配置旧文案影响", () => {
   renderTh({
     payment_pool_id: makeField({ field_key: "payment_pool_id", label: "资金出处", required: true }),
   });
-  expect(screen.getByText("支出账户")).toBeInTheDocument();
+  expect(screen.getByText("资金账户")).toBeInTheDocument();
 });

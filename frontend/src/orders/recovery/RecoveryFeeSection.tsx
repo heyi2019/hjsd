@@ -18,8 +18,8 @@ export function RecoveryFeeSection(props: {
         <CfgItem name="recovery_price" label={fieldLabel(cfg, "recovery_price", "账号号价")} rules={[{ required: true, message: "回收价必填" }]}>
           <MoneyInput placeholder="请输入金额" />
         </CfgItem>
-        <CfgItem name="payment_pool_id" label="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}>
-          <Select placeholder="请选择支出账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
+        <CfgItem name="payment_pool_id" fixedLabel="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
+          <Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
         </CfgItem>
       </BusinessRegistrationGroup>
       <AdditionalFeeFields pools={props.pools} />

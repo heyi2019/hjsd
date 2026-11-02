@@ -12,12 +12,15 @@ const walk = (dir) =>
     return statSync(full).isDirectory() ? walk(full) : [full];
   });
 
+// 全量文件列表只遍历一次（原 pages() 与规则 9/10/11/13/14 各自 walk(SRC) 重复整树扫描）。
+const ALL_FILES = walk(SRC);
+
 /** 页面文件：排除组件库本体，否则守卫会自己告自己。
  * 同时排除 *.test.tsx：测试夹具常用裸 <Button> / <Table> / <Tag> 模拟外部提交入口与
  * 表格渲染，它们不产出产品 UI，不应被「页面不得绕过组件库」系列规则管辖。
  * 规则 11 / 13 / 14 早已显式排除测试文件，此处统一口径（2026-11-02）。 */
 const pages = () =>
-  walk(SRC).filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f) && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")) && !f.includes(join("auth", "UserCenterPage")));
+  ALL_FILES.filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f) && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")) && !f.includes(join("auth", "UserCenterPage")));
 
 /** 计数语义的 label：必须显式 kind: "count"，否则被 MoneyText 渲染成 "1.00"。 */
 const COUNT_LABELS = [
@@ -36,7 +39,7 @@ for (const file of pages()) {
     const pattern = new RegExp(`label: "${label}",[\\s\\S]{0,160}?amount:`, "g");
     for (const hit of text.matchAll(pattern)) {
       const segment = text.slice(hit.index, hit.index + hit[0].length);
-      if (!segment.includes('kind: "count"')) {
+      if (!/kind:\s*("count"|'count'|\{"count"\})/.test(segment)) {
         fail("count-kind", `${relative(process.cwd(), file)} → label: "${label}" 缺 kind: "count"`);
       }
     }
@@ -165,7 +168,7 @@ if (!existsSync(uiComponentsCss)) {
 // var() 引用不存在的自定义属性时，**整条声明作废且零报错**，静默回落浏览器默认
 // （实测 font 简写整体失效、字号退回 13px，恰与父级继承值撞车而看不出异常）。
 // 这类缺陷 tsc / vite / 现有 8 条规则全都抓不到，只能靠交叉比对声明与引用。
-const cssFiles = walk(SRC).filter((f) => f.endsWith(".css"));
+const cssFiles = ALL_FILES.filter((f) => f.endsWith(".css"));
 /**
  * 剥注释必须能跨行：块注释 /* ... *\/ 常整段跨多行（如 tokens.css 里
  * 「响应式断点媒体查询」那段就整块提到 @media (--bp-md) 的用法），
@@ -260,8 +263,8 @@ for (const [rel, entry] of INLINE_STYLE_ALLOWLIST) {
     fail("no-inline-style", `豁免清单指向的文件不存在：${rel}（${entry.reason}）`);
   }
 }
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
-  const text = readFileSync(file, "utf8");
+for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+  const text = stripComments(readFileSync(file, "utf8"));
   const rel = relative(process.cwd(), file).replaceAll("\\", "/");
   const hits = [...text.matchAll(/<[A-Za-z][^>]*\bstyle\s*=/g)].length;
   if (hits === 0) continue;
@@ -274,7 +277,7 @@ for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(joi
 // 规则 12：前端样式只能使用当前品牌语义，禁止保留旧视觉别名或开发兜底入口。
 // 旧的 violet 命名曾作为兼容别名长期存在，实际颜色已经是品牌蓝；继续保留会让
 // 令牌语义与业务设计不一致，也会让下一轮重构误把旧别名当成可用 API。
-const styleSource = cssFiles.map((file) => readFileSync(file, "utf8")).join("\n");
+const styleSource = cssFiles.map((file) => stripComments(readFileSync(file, "utf8"))).join("\n");
 if (/\bviolet\b/i.test(styleSource)) {
   fail("style-alias", "样式仍保留 violet 旧视觉别名，应统一为品牌语义令牌");
 }
@@ -314,7 +317,7 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
 ]);
 let wiredCount = 0;
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
   const rel = relative(process.cwd(), file).replaceAll("\\", "/");
   const text = readFileSync(file, "utf8");
   // 业务表单统一使用共享 BusinessRegistrationForm；保留对原生 antd Form 的识别以覆盖
@@ -339,7 +342,7 @@ if (wiredCount === 0) {
 // 共享组件本体是唯一允许接触底层 antd Select 的位置；测试夹具可按测试自身需要使用原生组件。
 const sharedSelectFile = join(SRC, "shared", "ui", "Select.tsx");
 const rawAntdSelectRe = /import\s*\{[\s\S]*?\bSelect(?:\s+as\s+\w+)?\s*[,}][\s\S]*?\}\s*from\s+"antd"/;
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
   if (file === sharedSelectFile) continue;
   const text = readFileSync(file, "utf8");
   if (rawAntdSelectRe.test(text)) {

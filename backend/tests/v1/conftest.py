@@ -1,6 +1,9 @@
-"""tests/v1 共享夹具：临时 SQLite（文件库，绝不用 backend/data/*.db）。
+"""tests/v1 共享夹具：PostgreSQL 测试库（绝不用生产库）。
 
-- 每个 session 建独立临时库并 `create_all`；用例之间用嵌套事务回滚；
+- 测试库由 `TEST_DATABASE_URL`（其次 `.env` 的 `DATABASE_URL`）指定，库名必须含
+  `test`——夹具会 `TRUNCATE` 全表，误指生产库即数据全毁，故在会话开始前硬校验；
+- 每个 session 对测试库 `create_all`（幂等）；用例之间 `TRUNCATE ... RESTART IDENTITY`；
+- 种子数据放独立 schema `seed_template`，每用例跨 schema 回放（纯 SQL，无 ORM 开销）；
 - `client` 把 `core.database.get_db` 覆盖到测试会话；
 - 登录态用 `X-Dev-User`（dev 直通），或真实 JWT 走 `Authorization: Bearer`。
 """
@@ -12,7 +15,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # tests/v1 -> backend
@@ -134,6 +138,7 @@ os.environ.setdefault("APP_ENV", "development")
 from app.api_v1 import create_app  # noqa: E402
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
+from app.core.settings import get_settings  # noqa: E402
 from app.domain import attachments, foundation, imports, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
 from app.foundation.seeds import seed_foundation  # noqa: E402
 
@@ -161,42 +166,53 @@ def seed_default_users(db: Session) -> None:
     db.flush()
 
 
+def _test_database_url() -> str:
+    """测试库 URL：`TEST_DATABASE_URL` 优先，其次 `.env` 的 `DATABASE_URL`。
+
+    硬校验两条：必须 PostgreSQL、库名必须含 `test`。夹具会 TRUNCATE 全表，
+    误指生产库即数据全毁——宁可在 collect 前直接退出，也不做"尽力而为"。
+    """
+    url = os.environ.get("TEST_DATABASE_URL") or get_settings().database_url
+    if not url.startswith("postgresql"):
+        pytest.exit(
+            "测试夹具要求 PostgreSQL：请设置 TEST_DATABASE_URL（库名须含 test）。"
+            "SQLite 支持已移除。",
+            returncode=1,
+        )
+    database = make_url(url).database or ""
+    if "test" not in database.lower():
+        pytest.exit(
+            f"拒绝在库 `{database}` 上跑测试（库名须含 test）：夹具会 TRUNCATE 全表。",
+            returncode=1,
+        )
+    return url
+
+
 @pytest.fixture(scope="session")
-def v1_engine(tmp_path_factory: pytest.TempPathFactory):
-    db_file = tmp_path_factory.mktemp("v1") / "test_v1.db"
-    # 文件型 SQLite：不使用 StaticPool（会让所有连接共用同一 DBAPI 连接，导致事务隔离失效）
-    engine = create_engine(
-        f"sqlite:///{db_file}",
-        connect_args={"check_same_thread": False},
-        future=True,
-    )
+def v1_engine():
+    """会话级测试引擎：连测试库并确保 schema 就绪（create_all 幂等）。
 
-    # 测试库不需要崩溃安全：关 fsync + 内存 journal，消除并行跑时的 I/O 等待。
-    # 仅作用于本测试引擎，不影响生产 database.py。
-    from sqlalchemy import event as sa_event
-
-    @sa_event.listens_for(engine, "connect")
-    def _sqlite_pragmas(dbapi_conn, _record):
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA synchronous=OFF")
-        cursor.execute("PRAGMA journal_mode=MEMORY")
-        cursor.execute("PRAGMA temp_store=MEMORY")
-        cursor.close()
-
+    起点必须清一次：SQLite 时代每次都是全新临时文件，天然干净；PG 测试库是
+    持久库，上次会话（或本地手工初始化）留下的行会污染第一个用例——实测残留
+    `document_sequences.current_value=56` 让「分配应得 HS0001」直接变成 HS0057。
+    """
+    engine = create_engine(_test_database_url(), future=True, pool_pre_ping=True)
     Base.metadata.create_all(bind=engine)
+    _truncate_all(engine)
     yield engine
     engine.dispose()
 
 
 def _truncate_all(engine) -> None:
-    """清库到“空库 + 无编号”状态。
+    """清库到「空表 + 序列归位」状态。
 
-    注：SQLite + SQLAlchemy 的 savepoint 模式无法拦截被测代码里的 `session.commit()`，
-    因此改用“每条用例后物理清空”的隔离策略，保证用例之间零污染。
+    注：被测代码里有 `session.commit()`，savepoint 拦不住，因此改用「每条用例后
+    物理清空」的隔离策略。PG 的 TRUNCATE 换 relfilenode 是 O(1)，比逐表 DELETE
+    快一个量级；`RESTART IDENTITY` 让自增序列一起归位，避免用例间主键漂移。
     """
+    names = ", ".join(f'public."{table.name}"' for table in Base.metadata.sorted_tables)
     with engine.begin() as connection:
-        for table in reversed(Base.metadata.sorted_tables):
-            connection.execute(table.delete())
+        connection.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture()
@@ -209,56 +225,96 @@ def db(v1_engine):
         yield session
     finally:
         session.close()
-        _truncate_all(v1_engine)
+        # 先归还连接再 TRUNCATE：PG 下残留事务会持有表锁，让 TRUNCATE 阻塞到超时。
         connection.close()
+        _truncate_all(v1_engine)
+
+
+SEED_SCHEMA = "seed_template"
 
 
 @pytest.fixture(scope="session")
-def seed_template_path(tmp_path_factory: pytest.TempPathFactory):
-    """会话级种子模板库：只 seed 一次，之后每个用例用 ATTACH 回放（纯 SQL，无 ORM 开销）。
+def seed_template(v1_engine):
+    """会话级种子模板 schema：只 seed 一次，之后每个用例跨 schema 回放。
 
-    seed_foundation 单次 ~40-95ms × 978 个种子用例曾是全量运行的最大 CPU 项；
-    回放成本 ~几 ms，行为与逐次 seed 完全一致（同一批行、同样的主键与顺序）。
+    SQLite 时代用 `ATTACH DATABASE` 做跨库拷贝；PG 没有 ATTACH，改用同库独立
+    schema `seed_template`——回放是 `INSERT INTO public.X SELECT * FROM
+    seed_template.X`，同样是纯 SQL、不走 ORM（seed_foundation 单次 ~40-95ms
+    × 近千个种子用例，逐次重 seed 曾是全量运行的最大 CPU 项）。
     """
-    db_file = tmp_path_factory.mktemp("seed_tmpl") / "seed_template.db"
-    engine = create_engine(
-        f"sqlite:///{db_file}",
-        connect_args={"check_same_thread": False},
-        future=True,
-    )
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)()
-    seed_foundation(session, actor="pytest")
-    seed_default_users(session)
-    session.commit()
-    session.close()
-    engine.dispose()
-    return str(db_file)
-
-
-def _replay_seeds(db: Session, template_path: str) -> None:
-    """把模板库的全部行回放到 db 所在库（ATTACH + INSERT..SELECT，走 SQLite C 层）。
-
-    注意：DETACH 必须在 commit 之后——事务未提交时主库持有写锁，DETACH 会报 locked。
-    """
-    raw = db.connection().connection  # DBAPI 连接（SQLAlchemy 池代理）
-    cursor = raw.cursor()
-    cursor.execute("ATTACH DATABASE ? AS seed_template", (template_path,))
+    with v1_engine.begin() as connection:
+        connection.execute(text(f"DROP SCHEMA IF EXISTS {SEED_SCHEMA} CASCADE"))
+        connection.execute(text(f"CREATE SCHEMA {SEED_SCHEMA}"))
+    template_engine = v1_engine.execution_options(schema_translate_map={None: SEED_SCHEMA})
+    Base.metadata.create_all(bind=template_engine)
+    session = sessionmaker(bind=template_engine, autoflush=False, autocommit=False, future=True)()
     try:
-        for table in Base.metadata.sorted_tables:  # 依赖序，父表先插
-            cursor.execute(
-                f'INSERT INTO main."{table.name}" SELECT * FROM seed_template."{table.name}"'
-            )
-        db.commit()  # 先提交释放写锁
-        cursor.execute("DETACH DATABASE seed_template")
+        seed_foundation(session, actor="pytest")
+        seed_default_users(session)
+        session.commit()
     finally:
-        cursor.close()
+        session.close()
+    yield SEED_SCHEMA
+    with v1_engine.begin() as connection:
+        connection.execute(text(f"DROP SCHEMA IF EXISTS {SEED_SCHEMA} CASCADE"))
+
+
+# 序列归位：seed 行带显式主键，回放后序列仍停在初始值，后续插入必然主键冲突。
+# 统一 setval(seq, COALESCE(MAX(col), 0) + 1, false)——is_called=false 让下一个
+# nextval 正好返回该值，空表也自然落到 1。这是 SQLite 没有、PG 必须补的语义差异。
+_RESET_SEQUENCES_SQL = text("""
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT quote_ident(c.relname) AS tbl,
+           quote_ident(a.attname) AS col,
+           pg_get_serial_sequence(
+             quote_ident(n.nspname) || '.' || quote_ident(c.relname), a.attname
+           ) AS seq
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+      AND pg_get_serial_sequence(
+            quote_ident(n.nspname) || '.' || quote_ident(c.relname), a.attname
+          ) IS NOT NULL
+  LOOP
+    EXECUTE format(
+      'SELECT setval(%L, COALESCE((SELECT MAX(%s) FROM public.%s), 0) + 1, false)',
+      r.seq, r.col, r.tbl
+    );
+  END LOOP;
+END $$;
+""")
+
+
+def _replay_seeds(db: Session) -> None:
+    """把模板 schema 的全部行回放到 public（跨 schema INSERT..SELECT，纯 SQL）。
+
+    必须显式列举列名：模板表由 ORM `create_all` 建、public 表由 alembic 迁移建，
+    两者列顺序并不保证一致，`SELECT *` 会按位置对齐——实测 `stocks.buy_date`(date)
+    位置收到字符串列，PG 直接报 DatatypeMismatch。带列名插入按名对齐，顺序无关。
+    """
+    connection = db.connection()
+    for table in Base.metadata.sorted_tables:  # 依赖序，父表先插
+        columns = ", ".join(f'"{column.name}"' for column in table.columns)
+        connection.execute(
+            text(
+                f'INSERT INTO public."{table.name}" ({columns}) '
+                f'SELECT {columns} FROM {SEED_SCHEMA}."{table.name}"'
+            )
+        )
+    connection.execute(_RESET_SEQUENCES_SQL)
+    db.commit()
 
 
 @pytest.fixture()
-def seeded_db(db: Session, seed_template_path: str):
-    _replay_seeds(db, seed_template_path)
-    db.commit()
+def seeded_db(db: Session, seed_template: str):
+    _replay_seeds(db)
     return db
 
 

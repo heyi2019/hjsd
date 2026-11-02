@@ -11,18 +11,16 @@
 - L975（settle_early 循环内 `outstanding <= 0: continue`）：rows 已按
   `received + waived < due` 过滤，正常数据下 outstanding 恒 > 0。
 
-覆盖手段：**用原生 `sqlite3.connect()` 建独立连接绕过约束造脏数据**。
-database.py 的 `@event.listens_for(Engine, "connect")` 只对 SQLAlchemy Engine
-创建的连接生效；原生连接不受影响、默认 `foreign_keys=OFF`，可真实复现
+覆盖手段：**用独立连接 + `session_replication_role=replica` 绕过外键造脏数据**。
+PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
+`session_replication_role` 设为 `replica` 后 FK 触发器不执行，可真实复现
 「约束未生效时遗留的脏行」（生产上 DBA 直连改数据同样会产生）。
-关键：执行前 `session.commit()` 释放 SQLite 写锁，执行后 `expire_all()`
-让主会话重新加载；独立连接用完即关，**不会污染 Session 连接池**
-（区别于 `PRAGMA ignore_check_constraints` 那种连接级状态泄漏）。
+关键：执行前 `session.commit()` 释放行锁；执行后 `RESET` 复位（这是会话级设置，
+不回位会被连接池复用、静默关掉后续用例的 FK 约束），再 `expire_all()` 让主会话重读。
 """
 
 from __future__ import annotations
 
-import sqlite3
 from datetime import date
 from decimal import Decimal
 
@@ -706,26 +704,29 @@ def test_record_sale_success(seeded_db):
 
 # ------------------------------------------------- 外键 / 精度保证的不可达防御
 def _raw_sql(seeded_db, sql: str, params=()):
-    """用独立 sqlite3 连接执行 DML，绕过外键约束造脏数据。
+    """用独立连接执行 DML，绕过外键约束造脏数据。
 
-    database.py 的 `@event.listens_for(Engine, "connect")` 只对 SQLAlchemy
-    Engine 创建的连接生效；原生 `sqlite3.connect()` 不受影响、默认
-    `foreign_keys=OFF`，可真实复现「约束未生效时遗留的悬空引用 / 分以下零头」
-    ——生产上 DBA 直连改数据同样会产生这类脏行。
+    PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
+    `session_replication_role` 设为 `replica` 后 FK 触发器不执行，可真实复现
+    「DBA 直连改数据遗留悬空引用 / 超精度零头」——这是生产同样会出现的一类脏行。
 
-    纪律：执行前 `commit()` 释放 SQLite 写锁，执行后 `expire_all()` 让主会话
-    重新加载；独立连接用完即关，不触碰主连接状态，杜绝连接池污染（与
-    `PRAGMA ignore_check_constraints` 那种连接级泄漏相反）。
+    纪律：
+    - 先 `commit()` 让主会话释放行锁，否则独立连接的 UPDATE 会等锁到超时；
+    - `session_replication_role` 是**会话级**设置，用后必须 `RESET`，否则连接归还
+      连接池后被后续用例复用，会静默关掉它们的 FK 约束；
+    - 结束后 `expire_all()` 让主会话重读被改的行。
     """
-    db_path = seeded_db.get_bind().engine.url.database
+    engine = seeded_db.get_bind().engine
     seeded_db.commit()
-    raw = sqlite3.connect(db_path)
-    try:
-        raw.execute("PRAGMA foreign_keys=OFF")
-        raw.execute(sql, tuple(params))
-        raw.commit()
-    finally:
-        raw.close()
+    with engine.connect() as raw:
+        try:
+            raw.exec_driver_sql("SET session_replication_role = 'replica'")
+            # 调用点沿用 SQLite 的 `?` 占位符书写，这里翻译成 psycopg 的 `%s`。
+            raw.exec_driver_sql(sql.replace("?", "%s"), tuple(params))
+            raw.commit()
+        finally:
+            raw.exec_driver_sql("RESET session_replication_role")
+            raw.commit()
     seeded_db.expire_all()
 
 def test_create_stock_sale_rejects_dangling_account(seeded_db):
@@ -775,11 +776,20 @@ def test_cancel_rejects_dangling_account(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
         )
 
+@pytest.mark.skip(
+    reason=(
+        "PostgreSQL 下不可构造：金额列是 NUMERIC(18,2)，直写 '0.996' 会被四舍五入成 "
+        "1.00，`received + waived < due` 不再成立，进入 settle_early 前就报「没有剩余应收」。"
+        "该 continue 分支只在库能存 3 位小数时才可达；PG 的类型系统保证了它在生产上"
+        "不可达，防御代码仍保留，但无法再用真实脏行证明。"
+    )
+)
 def test_settle_early_skips_sub_cent_residual(seeded_db):
     """期次残留「分以下零头」脏数据 → SQL 判有余额、量化到分后为 0 → continue（L975）。
 
     正常数据下 `received + waived < due` 与 `outstanding > 0` 等价，故该分支恒不
-    触发；仅当 DB 存在超过 2 位小数的脏值时才会走到，此处用独立连接直写复现。
+    触发；仅当 DB 存在超过 2 位小数的脏值时才会走到——SQLite 宽松存储时可用独立
+    连接直写复现，PostgreSQL 的 NUMERIC(18,2) 拒绝该精度，故本用例在 PG 下跳过。
     """
     _, contract = _dg_overdue(seeded_db, "ACC-975")
     _raw_sql(

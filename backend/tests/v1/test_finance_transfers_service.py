@@ -174,15 +174,18 @@ def test_repair_transfer_rejects_multiple_rows_same_transfer(seeded_db):
 def test_repair_transfer_rejects_invalid_direction(seeded_db):
     """单边记录方向既非 IN 也非 OUT（脏数据）应命中 else 防御分支。
 
-    用 PRAGMA ignore_check_constraints 绕过 direction 列的 CHECK 约束直插脏行，
-    证明该防御分支真实可达、无需删除。
+    PostgreSQL 没有 SQLite 的 `PRAGMA ignore_check_constraints`，CHECK 也不能像外键
+    那样靠 `session_replication_role` 绕开，只能把方向约束摘掉、灌完脏行再戴回。
+    戴回会全表校验，所以 finally 里先删脏行再 ADD CONSTRAINT——否则 ADD 自己就失败。
     """
     invest, profit = _pools(seeded_db)
     bad_tid = "TRF-BAD-DIR"
-    seeded_db.execute(text("PRAGMA ignore_check_constraints=ON"))
+    bad_flow_no = f"{bad_tid}-BAD"
+    check_name = "ck_cashflow_cashflow_direction_valid"
+    seeded_db.execute(text(f"ALTER TABLE cashflow DROP CONSTRAINT {check_name}"))
     try:
         bad = Cashflow(
-            flow_no=f"{bad_tid}-BAD",
+            flow_no=bad_flow_no,
             pool_id=invest.id,
             occurred_on=date(2026, 10, 17),
             nature=Nature.INTERNAL.value,
@@ -195,15 +198,23 @@ def test_repair_transfer_rejects_invalid_direction(seeded_db):
         )
         seeded_db.add(bad)
         seeded_db.flush()
+        with pytest.raises(Validation, match="单边划转方向无效"):
+            transfers.repair_transfer(
+                seeded_db,
+                bad_tid,
+                counterpart_pool_id=profit.id,
+                actor="pytest",
+                reason="r",
+            )
     finally:
-        # 关键：复位 PRAGMA。ignore_check_constraints 是连接级状态，经 SQLAlchemy 连接池
-        # 泄漏给后续测试后，会使其数据库约束 contract 测试因 CHECK 不再生效而误通过。
-        seeded_db.execute(text("PRAGMA ignore_check_constraints=OFF"))
-    with pytest.raises(Validation, match="单边划转方向无效"):
-        transfers.repair_transfer(
-            seeded_db,
-            bad_tid,
-            counterpart_pool_id=profit.id,
-            actor="pytest",
-            reason="r",
+        # 先清脏行再加回约束：ADD CONSTRAINT 会全表校验，表里留着 direction='ZZ'
+        # 的行会让它直接失败。约束一旦丢不回，后续所有用例都失去这层保护。
+        seeded_db.execute(text("DELETE FROM cashflow WHERE flow_no = :flow_no"), {"flow_no": bad_flow_no})
+        seeded_db.commit()
+        seeded_db.execute(
+            text(
+                f"ALTER TABLE cashflow ADD CONSTRAINT {check_name} "
+                "CHECK (direction IN ('IN', 'OUT'))"
+            )
         )
+        seeded_db.commit()

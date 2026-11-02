@@ -5,7 +5,7 @@
 - app/finance/rebates.py:179/182       _rebate_base_from_snapshot snapshot 空 / config 非 dict
 - app/finance/rebates.py:645           void_rebate 零结算(OPEN)但已有结算流水的拒绝分支
 - app/finance/rebates.py:429/463       reverse_rebate_settlement 关联 cashflow / fee 悬空
-                                      （FK 保证不可达 -> 原生 sqlite3 绕过，见 _corrupt_settlement_fk）
+                                      （FK 保证不可达 -> session_replication_role 绕过，见 _corrupt_settlement_fk）
 - app/finance/router.py:492-495/503    cancel_deposit 端点（未知 + 成功两条路径）
 - app/finance/router.py:601/604        void_rebate 端点
 - app/reporting/service.py:130/132     report_csv 的 normalize：None 与复合值序列化
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
-import sqlite3
+
 from datetime import date
 from decimal import Decimal
 
@@ -76,20 +76,27 @@ def test_rebate_base_from_snapshot_config_not_dict(seeded_db):
 
 # ----------------------------------------------------------- rebates.py:429 / 463
 # 这两行是 cashflow_id / fee_cashflow_id 指向不存在现金流的防御分支。
-# 运行时测试库 FK 开启，ORM 不能直接插悬空引用 -> 用独立原生 sqlite3 连接绕过。
+# 运行时测试库 FK 开启，ORM 不能直接插悬空引用 -> 独立连接设 session_replication_role 绕过。
 def _corrupt_settlement_fk(seeded_db, settlement_id: int, column: str, bad_id: int) -> None:
-    db_path = seeded_db.get_bind().engine.url.database
-    seeded_db.commit()  # 先释放 SQLite 写锁
-    raw = sqlite3.connect(db_path)
-    try:
-        raw.execute("PRAGMA foreign_keys=OFF")
-        raw.execute(
-            f"UPDATE rebate_settlements SET {column} = ? WHERE id = ?",
-            (bad_id, settlement_id),
-        )
-        raw.commit()
-    finally:
-        raw.close()
+    """用独立连接绕过外键造悬空引用（生产上 DBA 直连改数据同样会产生）。
+
+    PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
+    `session_replication_role` 设为 `replica` 后 FK 触发器不执行。用后必须 `RESET`，
+    否则连接归还连接池后被复用，会静默关掉后续用例的外键约束。
+    """
+    engine = seeded_db.get_bind().engine
+    seeded_db.commit()  # 先释放行锁，否则独立连接的 UPDATE 会等锁
+    with engine.connect() as raw:
+        try:
+            raw.exec_driver_sql("SET session_replication_role = 'replica'")
+            raw.exec_driver_sql(
+                f"UPDATE rebate_settlements SET {column} = %s WHERE id = %s",
+                (bad_id, settlement_id),
+            )
+            raw.commit()
+        finally:
+            raw.exec_driver_sql("RESET session_replication_role")
+            raw.commit()
     seeded_db.expire_all()  # 让主会话重载（否则 identity map 返回旧对象）
 
 

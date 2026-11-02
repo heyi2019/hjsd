@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.audit import record_audit
@@ -198,7 +198,8 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
     assert seeded_db.scalar(select(Account).where(Account.game_account == "rollback-inline")) is None
     assert seeded_db.scalar(
         select(Order).where(
-            func.json_extract(Order.account_snapshot, "$.game_account") == "rollback-inline"
+            # 跨方言 JSON 取值：func.json_extract 是 SQLite 专有函数，PG 无此函数。
+            Order.account_snapshot["game_account"].as_string() == "rollback-inline"
         )
     ) is None
 

@@ -59,4 +59,6 @@ def test_every_json_api_route_declares_response_model(app):
     # 不再重复叠加计数：GET /order-types/{order_type_id}/routes、
     # GET /order-types/{code}/routes/impact-preview。
     # → 175（订单台账 xlsx 导出：GET /orders/export.xlsx，非 JSON 已入豁免表）。
-    assert public_routes == 175
+    # → 179（派生运算下沉后端 +4：GET /pools/balances、GET /installments/totals、
+    # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
+    assert public_routes == 179

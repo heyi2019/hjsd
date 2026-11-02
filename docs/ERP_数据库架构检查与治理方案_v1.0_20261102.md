@@ -701,6 +701,30 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 `heijin_erp_migration_test` 已 dump：`backups/archive_migration_test_20261102_235246.dump`（192,321 B，40 表），sha256 `5929303019…35e071`。库内**无任何业务数据**（orders/stocks/cashflow 全 0），只有种子 + `audit_logs` 17 + `document_sequences` 14。留档完成后可随时删除，等你点头。
 
+### 11.10 作废回收单后库存未退：根因已定位，待口径裁决
+
+11.9 ④ 的观察查到了确切位置，**不是数据问题，是代码分支覆盖不全**。
+
+**现象**：HS 回收单无登记事件时作废 → 订单 `CANCELLED`，库存行仍 `status=WAITING` / `inventory_status=IN_STOCK`，且**仍出现在库存列表里、仍可售**。
+
+**根因**（`app/orders/cancellation_model.py::cancel_order`）：
+
+| 分支 | 代码行为 |
+|---|---|
+| DG 且 `form_extra.platform_unlist_scope == "SYSTEM"` | 账号 `WAITING → VOID`（第 176-184 行）——**唯一会动库存的分支** |
+| 其余（HS / TH 无事件作废） | 只改 `order.status`，账号状态一字未动 |
+
+库存列表的可见性来自 `app/stocks/_common.py:13`：`INVENTORY_STATUSES = (IN_STOCK,)`，`_inventory_rows()` 只按 `inventory_status` 过滤，**不看来源订单是否已作废**。所以那张单作废了，账号照样在「在库」里，`status=WAITING` 即待售。
+
+**为什么不能直接改**：这属于业务口径，不是缺陷判定的技术问题——
+
+- 若口径是「作废 = 这笔买卖没发生」→ 账号应随单退出库存（`VOID` 或 `OUT_OF_STOCK`），现在等于**留下一个可以误卖的账号**；
+- 若口径是「作废 = 单据无效、账号实物仍在手上」→ 现在是对的，但需要使用者知道要手动「下架」（`FormScope("INVOID", "下架")`）才干净。
+
+**测试覆盖**：`tests/v1/test_orders_contract.py` 有 `test_order_cancel_requires_no_posted_events`（只断言订单状态）与 DG 下架用例（断言账号退出库存），**HS/TH 无事件作废后库存如何，没有任何断言**——所以现状既不是「被测试锁定」，也不是「被测试证伪」，属于未定义地带。
+
+**要么改代码、要么写进业务说明，二选一。** 我倾向先确认口径再动，因为一旦改，历史那部分也要考虑是否要补数据。
+
 ---
 
 ## 附：操作边界声明

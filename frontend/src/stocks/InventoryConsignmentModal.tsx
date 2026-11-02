@@ -13,6 +13,7 @@ import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTabl
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
+import "./InventoryConsignmentModal.css";
 
 type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 
@@ -142,6 +143,7 @@ export function InventoryConsignmentModal(props: {
           <section aria-label="已上架记录">
             <h4>已上架记录</h4>
             <DataTable<ListedPlatform>
+              className="inventory-consignment-records-table"
               size="small"
               pagination={false}
               rowKey="key"

@@ -45,6 +45,10 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     expect(screen.getByText("已上架记录")).toBeInTheDocument();
     // 平台名（而非空 / “-”）出现在已上架记录表格
     expect(await screen.findByText("盼之")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(table.closest(".ui-table-wrap")).toHaveClass("inventory-consignment-records-table");
+    expect(table).toHaveTextContent("寄售价格");
+    expect(table).toHaveTextContent("上架时间");
   });
 
   it("DG 订单无 consignment_platform 时，从 counterparties(PLATFORM) 兜底展示平台名，不再为空", async () => {

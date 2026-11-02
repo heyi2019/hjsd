@@ -30,6 +30,14 @@ def regression_environment() -> dict[str, str]:
     environment.setdefault("DATABASE_URL", "sqlite:////tmp/heijin_erp_v1.db")
     return environment
 
+# 三档测试体系（何一裁决）：
+#   ① unit    —— 纯逻辑、无 DB/HTTP，秒级，改完即跑；
+#   ② <业务域> —— 板块测试，改哪个板块只跑哪个（含 platform 跨域基建板块）；
+#   ③ all/ci  —— 全量，只在 CI / 发版前跑。
+# 横切组与业务域组可重叠（同一文件既属 unit 又属某域），但反查「文件→组」时
+# 必须排除横切组，否则会把域归属覆盖成横切组导致跑错范围。
+CROSSCUT_GROUPS = {"smoke", "p0", "unit"}
+
 GROUPS = {
     "smoke": [
         "tests/v1/test_main_contract.py",
@@ -38,6 +46,27 @@ GROUPS = {
         "tests/v1/test_money_float_guard.py",
         "tests/v1/test_numbering.py",
         "tests/v1/test_state_machine.py",
+    ],
+    # 单元档：不碰数据库与 HTTP，实测 110 passed / 2.3s。
+    # 准入标准（后补须先实测）：单文件 < 1s、不依赖 seeded_db/seeded_client/TestClient。
+    "unit": [
+        "tests/v1/test_money.py",
+        "tests/v1/test_money_float_guard.py",
+        "tests/v1/test_numbering.py",
+        "tests/v1/test_state_machine.py",
+        "tests/v1/test_api_contract.py",
+        "tests/v1/test_request_schema_contract.py",
+        "tests/v1/test_cancellation_model.py",
+        "tests/v1/test_orders_common.py",
+        "tests/v1/test_finance_attributes.py",
+        "tests/v1/test_core_infra_gaps.py",
+        "tests/v1/test_notifications_contract.py",
+        "tests/v1/test_rebate_current_contract.py",
+        "tests/v1/test_product_alias_compat.py",
+        "tests/v1/test_main_contract.py",
+        "tests/v1/test_backup_restore.py",
+        "tests/v1/test_repair_baseline_schema.py",
+        "tests/v1/test_coverage_gate.py",
     ],
     "p0": [
         "tests/v1/test_order_types_api.py",
@@ -58,9 +87,14 @@ GROUPS = {
         "tests/v1/test_order_form_fields.py",
         "tests/v1/test_numbering.py",
         "tests/v1/test_settings.py",
+        "tests/v1/test_game_types.py",
+        "tests/v1/test_game_types_contract.py",
+        "tests/v1/test_option_sets_api.py",
+        "tests/v1/test_product_alias_compat.py",
     ],
     "accounts": [
         "tests/v1/test_accounts_contract.py",
+        "tests/v1/test_account_stock_no.py",
     ],
     "orders": [
         "tests/v1/test_core_contract.py",
@@ -71,11 +105,20 @@ GROUPS = {
         "tests/v1/test_api_contract.py",
         "tests/v1/test_request_schema_contract.py",
         "tests/v1/test_bughunt.py",
+        "tests/v1/test_cancellation_model.py",
+        "tests/v1/test_orders_common.py",
+        "tests/v1/test_orders_guard.py",
+        "tests/v1/test_orders_router_guard.py",
+        "tests/v1/test_inventory_execution_edit.py",
+        "tests/v1/test_order_customer_source_fixtures.py",
+        "tests/v1/test_profit_allocation_modes.py",
+        "tests/v1/test_unreachable_status_paths.py",
     ],
     "installments": [
         "tests/v1/test_installments_contract.py",
         "tests/v1/test_m2.py",
         "tests/v1/test_m4.py",
+        "tests/v1/test_installments_service.py",
     ],
     "finance": [
         "tests/v1/test_finance_contract.py",
@@ -87,19 +130,27 @@ GROUPS = {
         "tests/v1/test_rebate_rules_contract.py",
         "tests/v1/test_money.py",
         "tests/v1/test_money_float_guard.py",
+        "tests/v1/test_finance_reconciliation_service.py",
+        "tests/v1/test_finance_reporting_task5_tail.py",
+        "tests/v1/test_finance_transfers_service.py",
+        "tests/v1/test_rebate_current_contract.py",
     ],
     "parties": [
         "tests/v1/test_parties.py",
         "tests/v1/test_parties_contract.py",
         "tests/v1/test_parties_fields_service.py",
         "tests/v1/test_leads_contract.py",
+        "tests/v1/test_parties_policy_guard.py",
     ],
     "reporting": [
         "tests/v1/test_reporting_contract.py",
+        "tests/v1/test_report_export_columns.py",
+        "tests/v1/test_reporting_service_gaps.py",
     ],
     "policy": [
         "tests/v1/test_m5_policy.py",
         "tests/v1/test_policy_contract.py",
+        "tests/v1/test_policy_rule_consumption.py",
     ],
     "governance": [
         "tests/v1/test_quality_contract.py",
@@ -110,6 +161,9 @@ GROUPS = {
         "tests/v1/test_search_contract.py",
         "tests/v1/test_attachments_contract.py",
         "tests/v1/test_audit_contract.py",
+        "tests/v1/test_attachments_service.py",
+        "tests/v1/test_notifications_service.py",
+        "tests/v1/test_quality_guard.py",
     ],
     "imports": [
         "tests/v1/test_import_landing.py",
@@ -117,10 +171,21 @@ GROUPS = {
         "tests/v1/test_imports_contract.py",
         "tests/v1/test_migration.py",
     ],
+    # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。
+    "platform": [
+        "tests/v1/test_list_columns.py",
+        "tests/v1/test_list_custom_columns.py",
+        "tests/v1/test_list_export_csv.py",
+        "tests/v1/test_deploy_script_contract.py",
+        "tests/v1/test_coverage_gate.py",
+        "tests/v1/test_repair_baseline_schema.py",
+    ],
     "auth": [
         "tests/v1/test_auth_contract.py",
         "tests/v1/test_main_contract.py",
         "tests/v1/test_backup_restore.py",
+        "tests/v1/test_public_release_security.py",
+        "tests/v1/test_ratelimit.py",
     ],
 }
 
@@ -157,7 +222,7 @@ def groups_for_changes(paths: list[str]) -> list[str]:
     test_groups = {
         test_path: group
         for group, test_paths in GROUPS.items()
-        if group != "smoke"
+        if group not in CROSSCUT_GROUPS
         for test_path in test_paths
     }
     for path in paths:
@@ -168,7 +233,7 @@ def groups_for_changes(paths: list[str]) -> list[str]:
             if relative_test_path in test_groups:
                 selected.add(test_groups[relative_test_path])
             else:
-                selected.update(name for name in GROUPS if name not in {"smoke", "p0"})
+                selected.update(name for name in GROUPS if name not in CROSSCUT_GROUPS)
             continue
         if path.startswith("backend/app/foundation/") or "foundation" in path or "order_type" in path or "pool" in path or "live_field" in path:
             selected.add("foundation")
@@ -268,7 +333,9 @@ def run_lint(runner: str, *, update_baseline: bool) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="执行按业务域拆分的后端回归")
     parser.add_argument(
-        "group", choices=[*GROUPS, "changed", "all", "lint"], help="回归分组（lint=静态检查）"
+        "group",
+        choices=[*GROUPS, "changed", "all", "ci", "lint"],
+        help="回归分组（unit=单元档；业务域名=板块档；ci/all=全量；lint=静态检查）",
     )
     parser.add_argument("--list", action="store_true", help="仅展示将执行的测试文件")
     parser.add_argument(
@@ -310,7 +377,7 @@ def main() -> int:
             return subprocess.run(["npm", "run", "test:regression:fast"], cwd=ROOT.parent / "frontend", check=False).returncode
         return 0
     else:
-        paths = all_paths() if args.group == "all" else GROUPS[args.group]
+        paths = all_paths() if args.group in ("all", "ci") else GROUPS[args.group]
     if args.list:
         print("\n".join(paths))
         return 0

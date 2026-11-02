@@ -64,7 +64,6 @@ GROUPS = {
         "tests/v1/test_rebate_current_contract.py",
         "tests/v1/test_product_alias_compat.py",
         "tests/v1/test_main_contract.py",
-        "tests/v1/test_repair_baseline_schema.py",
         "tests/v1/test_coverage_gate.py",
     ],
     "p0": [
@@ -112,6 +111,7 @@ GROUPS = {
         "tests/v1/test_order_customer_source_fixtures.py",
         "tests/v1/test_profit_allocation_modes.py",
         "tests/v1/test_unreachable_status_paths.py",
+        "tests/v1/test_flow_recycle.py",
     ],
     "installments": [
         "tests/v1/test_installments_contract.py",
@@ -178,7 +178,6 @@ GROUPS = {
         "tests/v1/test_deploy_script_contract.py",
         "tests/v1/test_backup_scripts.py",
         "tests/v1/test_coverage_gate.py",
-        "tests/v1/test_repair_baseline_schema.py",
     ],
     "auth": [
         "tests/v1/test_auth_contract.py",

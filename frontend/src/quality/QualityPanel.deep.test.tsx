@@ -122,15 +122,28 @@ describe("QualityPanel.deep：写路径与失败分支", () => {
     expect(message.success).toHaveBeenCalledWith("扫描发现 1 个新异常，已生成工单");
   });
 
-  it("批量关闭无可关闭工单：全 CLOSED 时仅 message.info 不调 batchClose", async () => {
+  it("全 CLOSED 时批量关闭按钮禁用：点击不弹窗、不调 batchClose", async () => {
     vi.mocked(catalog.qualityApi.list).mockResolvedValue({ items: closedRows });
-    vi.mocked(catalog.qualityApi.summary).mockResolvedValue(summary);
+    renderLight(<QualityPanel />, { user: "admin" });
+    const trigger = await screen.findByRole("button", { name: /批量关闭未关闭工单/ });
+    await screen.findByText("QLT-1");
+    await waitFor(() => expect(trigger).toBeDisabled());
+    await ui.click(trigger);
+    expect(screen.queryByText("批量关闭质量工单")).not.toBeInTheDocument();
+    expect(catalog.qualityApi.batchClose).not.toHaveBeenCalled();
+  });
+
+  it("弹窗打开期间列表刷新为全部已关闭：提交走 message.info 且不调 batchClose", async () => {
     renderLight(<QualityPanel />, { user: "admin" });
     await screen.findByText("QLT-1");
     await ui.click(screen.getByRole("button", { name: /批量关闭未关闭工单/ }));
     const modal = await screen.findByText("批量关闭质量工单");
     const content = modal.closest(".ant-modal-content") as HTMLElement;
     await ui.type(within(content).getByLabelText("批量处理结果"), "批量已处理");
+    // 弹窗开着时列表被刷新成全部 CLOSED（如主动扫描触发的 reload），提交即命中「无可关闭」分支
+    vi.mocked(catalog.qualityApi.list).mockResolvedValue({ items: closedRows });
+    await ui.click(screen.getByRole("button", { name: /主动扫描/ }));
+    await waitFor(() => expect(catalog.qualityApi.list).toHaveBeenCalledTimes(2));
     await ui.click(within(content).getByRole("button", { name: /确认批量关闭/ }));
     await waitFor(() => expect(message.info).toHaveBeenCalledWith("暂无可批量关闭的工单"));
     expect(catalog.qualityApi.batchClose).not.toHaveBeenCalled();

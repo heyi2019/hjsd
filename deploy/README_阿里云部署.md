@@ -1,6 +1,6 @@
 # 宜游轩 ERP · 阿里云部署指南
 
-> 当前发布状态（2026-11-02 实测）：阿里云 ECS 已运行 PostgreSQL 16（`deploy-db-1` healthy），后端经 `postgresql+psycopg` 连接库 `heijin_erp`。生产库实测 **Alembic 版本 `0003`、41 张表、业务数据全空**（`orders`/`stocks`/`cashflow` 均 0），仅存 2 个登录账号与 29 条审计日志。而活动迁移链已压平为单一 `0001`——`0002→0013` 已不存在，`alembic upgrade head` 会在解析 `0003` 时失败。首次上线按既裁决走**覆盖式重建**（删除旧库、从上线包恢复），**不得用 stamp 冒充已升级**（详见 `docs/ERP_数据库架构检查与治理方案_v1.0_20261102.md` 第六节与 11.7 / 11.8）。
+> 当前发布状态（2026-11-02 实测）：阿里云 ECS 已运行 PostgreSQL 16（`deploy-db-1` healthy），后端经 `postgresql+psycopg` 连接库 `heijin_erp`。生产库实测 **Alembic 版本 `0003`、41 张表、业务数据全空**（`orders`/`stocks`/`cashflow` 均 0），仅存 2 个登录账号与 29 条审计日志。而活动迁移链已压平为单一 `0001`——`0002→0013` 已不存在，`alembic upgrade head` 会在解析 `0003` 时失败。首次上线按既裁决走**覆盖式重建**（删除旧库、从上线包恢复），**不得用 stamp 冒充已升级**（详见 `docs/ERP_数据库架构检查与治理方案_V1.1_20261103.md` 第一、五节）。
 >
 > **数据库引擎切换与部署脚本同步已完成（2026-11-02）。** ECS 上 `deploy/scripts/` 三件（`backup_daily.sh` / `deploy.sh` / `pull_backup.sh`）此前仍是 SQLite 旧版，已于 11-02 23:47 与仓库同步并实测（每日备份改为 `pg_dump -Fc` + 三重完整性闸门）。下文标记为「历史 SQLite 流程」的内容仅供回退与取数参考，不得用于 PostgreSQL 正式备份。
 

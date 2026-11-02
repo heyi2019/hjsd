@@ -131,7 +131,7 @@ if printf '%s\n' "$migration_probe" | grep -q "Can't locate revision"; then
   ⚠ 不要用 alembic stamp 绕过：对结构落后的库 stamp 之后 upgrade head 是空操作，
     等于把未完成的库伪装成已升级。
   正确路径：备份数据 → 空库 alembic upgrade head 建全量结构 → 清洗后导入 → 校验。
-  详见 docs/ERP_数据库架构检查与治理方案_v1.0_20261102.md 第六节。
+  详见 docs/ERP_数据库架构检查与治理方案_V1.1_20261103.md 第五节。
 MIGRATION_CHAIN_MSG
   exit 1
 fi

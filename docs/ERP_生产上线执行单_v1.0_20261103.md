@@ -13,10 +13,10 @@
 | SSH | `ssh heijin-prod`（root） |
 | 部署目录 | `/opt/heijin/deploy` |
 | 库 / 用户 | `heijin_erp` / `erp_app`（容器网络内 `db:5432`） |
-| 上线包 | `release_20261103_002342.dump`（219,284 B） |
-| 上线包 sha256 | `a0e322fafd97c34f65e7b4c594d578f4bf4e6950e997ccce0b4fedb27e66fad4` |
+| 上线包 | `release_20261103_011557.dump`（219,946 B） |
+| 上线包 sha256 | `fc8b89fda9ed97e7407def23914d84fcc1ffb9787627f1de7041d45d4e564fc7` |
 | 回滚包 | `prod_final_20261102_234555.dump`（198,322 B，**已在 ECS `/opt/heijin/backups/`**） |
-| 期望终态 | 40 表 / `alembic_version=0001` / 119 单 / 90 库存 / 370 流水 / 200 事件 / 2 用户 |
+| 期望终态 | 40 表 / `alembic_version=0001` / 119 单 / 90 库存 / 370 流水 / 200 事件 / **6 用户** |
 
 > 上线包内自带 `alembic_version=0001`，**恢复后不要跑 `alembic upgrade head`**——那是 no-op，跑了会让人误以为做过迁移。
 
@@ -26,6 +26,7 @@
 
 - [x] Release 库内容校验：40 表、119/90/370/200、0 客户、0 分期、0 返点
 - [x] 账号对齐生产：`admin`(id1) / `19873133890`(id2)，含原口令哈希
+- [x] **预置员工账号 4 名**（11-03 01:15）：`sansan`三三(ADMIN)、`xiaoxuan`小轩、`jixiang`吉祥、`kaiwen`凯文（后三人 OPERATOR），`owner_scope=ALL`、`pool_ids=[1,2]`、`must_change_password=true`；四人均实测登录 200，OPERATOR 访问 `/users` 返回 403（权限边界正确）。初始口令见交付说明，**首次登录强制改密**。
 - [x] 上线包生成 + sha256 + TOC 40 条 TABLE DATA
 - [x] 空库恢复演练 9 项全绿（含登录、建单、作废、余额、健康检查）
 - [x] **最终包复检 + 验收预演**（11-03 01:00，临时库 `heijin_erp_drill_final`，用完已删）：`release_20261103_002342.dump` 恢复 40 表 / `0001` / 119·90·370·200 / 2 用户 / 63 选项集 / 259 字段，`ORDER_EVENT_TYPE.CANCEL=取消`、全库「取消交易」零残留；C2 余额 57579.17 / 54253.06、C3 `0001 (head)`、C4 五步全过。详见治理方案 11.13。
@@ -42,16 +43,16 @@
 
 ```bash
 # 本地
-scp backups/release_20261103_002342.dump heijin-prod:/opt/heijin/backups/
+scp backups/release_20261103_011557.dump heijin-prod:/opt/heijin/backups/
 ```
 
 ```bash
 # ECS
 cd /opt/heijin/backups
-sha256sum release_20261103_002342.dump
+sha256sum release_20261103_011557.dump
 ```
 
-**检查点**：输出必须等于 `a0e322fa…66fad4`。不等就停下重传，别往下走。
+**检查点**：输出必须等于 `fc8b89fd…564fc7`。不等就停下重传，别往下走。
 
 ### B2. 再备份一次当前库（覆盖前最后一份）
 
@@ -86,7 +87,7 @@ docker compose exec -T db psql -U erp_app -d postgres \
 ```bash
 cd /opt/heijin/deploy
 CID=$(docker compose ps -q db)
-docker cp /opt/heijin/backups/release_20261103_002342.dump "$CID":/tmp/release.dump
+docker cp /opt/heijin/backups/release_20261103_011557.dump "$CID":/tmp/release.dump
 docker compose exec -T db pg_restore -U erp_app -d heijin_erp \
   --no-owner --no-privileges --single-transaction /tmp/release.dump
 echo "restore_exit=$?"

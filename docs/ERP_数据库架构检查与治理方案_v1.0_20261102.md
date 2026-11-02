@@ -939,6 +939,38 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 **⑧ 一处展示缺口（不在本次范围，未改）**：`GET /stocks/inventory` 返回的行里 `stock_no` 为 `null`，而 `stocks.stock_no` 实际已发放 `KU_00091`。属库存视图未带出该列，不影响发号与判重（判重读 `/stocks` 台账）。需要的话单独提。
 
+### 11.14 预置员工账号与上线包第四次重出（2026-11-03 01:15）
+
+**背景**：`release` 库此前只有 2 个账号（`admin` / `19873133890` 何一），且两者都是 ADMIN——意味着上线后全公司只有两个人能登录，且都是全权限。同时发现一处归属错位：dev 的 119 单 `owner_id=1` 是「三三（李三）」，而 release 里 `id=1` 被生产的 `admin` 占用，**同一批单上线后显示为「系统管理员」建的单**。
+
+**账号归属口径（用户裁决 11-03 01:12）**：119 单历史归属**保持 `owner_id=1`（admin）不动**，不改为三三。故本次只建人、不动历史数据。
+
+**新建 4 名员工（走 `app.auth.service.create_user`，非裸 SQL）**
+
+| id | username | 显示名 | 角色 | owner_scope | pool_ids | 首登改密 |
+|---|---|---|---|---|---|---|
+| 4 | `sansan` | 三三 | **ADMIN** | ALL | `[1,2]` | 是 |
+| 5 | `xiaoxuan` | 小轩 | OPERATOR | ALL | `[1,2]` | 是 |
+| 6 | `jixiang` | 吉祥 | OPERATOR | ALL | `[1,2]` | 是 |
+| 7 | `kaiwen` | 凯文 | OPERATOR | ALL | `[1,2]` | 是 |
+
+- 走 Service 层而非 INSERT：自动落 `must_change_password=true`、`hired_on=当天`、`USER_CREATE` 审计（实测产生 969–972 四条）。
+- **角色依据**：只有 `ADMIN` / `OPERATOR` 两个角色含 `PERM_ORDER_CREATE`（`security.py` `ROLE_PERMISSIONS`）；`VIEWER`/`FINANCE`/`AUDITOR` 不能建单。三三按管理岗给 ADMIN，其余按建单岗给 OPERATOR，不给全权限。
+- **范围依据**：`can_see_pool` / `owner_scope_ids` 里 `owner_scope == "ALL"` 直接放行、绕过 `pool_ids`；`pool_ids` 空集语义是「无池授权，明细接口返回空」（`security.py:153`）。故一律 `ALL` 并显式给 `[1,2]`，避免将来改 `SELF` 后立刻看不到账。
+
+**实测（TestClient 打真实 release 库，非只看表）**
+
+- 四人 `POST /auth/login` 全部 **200**，`must_change_password=True`，显示名与角色正确；
+- `GET /users`：`sansan`(ADMIN) → **200**，`kaiwen`(OPERATOR) → **403**，权限边界成立；
+- `GET /stocks/inventory`（OPERATOR）→ 200，业务读路径可用。
+
+**上线包第四次重出**：`release_20261103_011557.dump`，219,946 B，sha256 `fc8b89fd…564fc7`，TOC 仍 430 条 / 40 个 TABLE DATA（只多 4 行 users，对象数不变）。恢复校验：临时库恢复后 **6 用户**（`admin,19873133890,sansan,xiaoxuan,jixiang,kaiwen`）+ 119/90/370/200 全部一致，验完即 `DROP ... WITH (FORCE)`。
+
+执行单常量（包名、大小、sha256、检查点前缀、`scp` / `docker cp` 命令、期望终态「2 用户」→「6 用户」）已同步，并新增「预置员工账号 4 名」勾选项。**11.13 那条复检记录保留原样**——它是对旧包的既成事实，新包的验证是静态恢复校验，未重跑 C4 全链路。
+
+**遗留**：`teams` 为空（0 个团队），故 `team_ids` 一律留空、`owner_scope` 用 `ALL` 而非 `TEAM`。若日后划分小组，需要先建团队再改人员归属。
+
+
 ---
 
 ## 附：操作边界声明

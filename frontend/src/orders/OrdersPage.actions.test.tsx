@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "../shared/ui/appFeedback";
 import { renderLight } from "../test/render";
 import { OrdersPage, validateAllocations } from "./OrdersPage";
+import { buildOrderPatchPayload, buildRefundEventPayload, pickCancelableEvent, resolveCancelAmount } from "./orderpage/helpers";
 
 import * as catalog from "../shared/api/catalog";
 import { seedOptionSets, seedOrderFormFields } from "../test/formFieldsSeed";
+import dayjs from "dayjs";
 import { today } from "../shared/lib/format";
 import * as client from "../shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "../shared/api/catalog";
@@ -844,5 +846,158 @@ describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () =>
       "5000.00",
     );
     expect(r).toEqual({ ok: false, error: "每行至少填比例或金额之一" });
+  });
+});
+
+// —— 冲销金额判定：原内联在 submitCancelTransaction 内，前后端均零覆盖，
+// 抽成 resolveCancelAmount / pickCancelableEvent 后可免挂载覆盖（资金安全分支）。
+describe("resolveCancelAmount / pickCancelableEvent 纯函数", () => {
+  const remaining = "500.00";
+
+  it("留空 → 全额冲销，取后端剩余可冲金额", () => {
+    expect(resolveCancelAmount({ scope: "ORDERCANC", values: {}, remaining })).toEqual({ ok: true, amount: "500.00" });
+    expect(resolveCancelAmount({ scope: "INVREFUND", values: { refund_amount: "" }, remaining })).toEqual({ ok: true, amount: "500.00" });
+  });
+
+  it("部分冲销：填小于剩余的金额按填的值提交", () => {
+    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "300" }, remaining }))
+      .toEqual({ ok: true, amount: "300" });
+  });
+
+  it("超过剩余可冲金额 → 拒绝，提示带上剩余金额", () => {
+    const r = resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.01" }, remaining });
+    expect(r).toEqual({ ok: false, error: "冲销金额不能超过该动作剩余可冲金额 ¥500.00" });
+  });
+
+  it("恰好等于剩余金额 → 放行（边界不因浮点误差误拒）", () => {
+    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.00" }, remaining }))
+      .toEqual({ ok: true, amount: "500.00" });
+  });
+
+  it("非数字 / 0 / 负数 → 拒绝为无效金额", () => {
+    for (const bad of ["abc", "0", "-1", " "]) {
+      const r = resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: bad }, remaining });
+      // 纯空格会被 trim 成空串 → 按全额处理，属"留空"语义
+      if (bad === " ") expect(r).toEqual({ ok: true, amount: "500.00" });
+      else expect(r).toEqual({ ok: false, error: "请输入有效的冲销金额" });
+    }
+  });
+
+  it("两种 scope 读各自的金额字段，互不串用", () => {
+    // 冲销入库（INVREFUND）读 refund_amount；订单退款（ORDERCANC）读 cancel_amount
+    expect(resolveCancelAmount({ scope: "INVREFUND", values: { refund_amount: "120", cancel_amount: "999" }, remaining }))
+      .toEqual({ ok: true, amount: "120" });
+    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { refund_amount: "999", cancel_amount: "120" }, remaining }))
+      .toEqual({ ok: true, amount: "120" });
+  });
+
+  it("pickCancelableEvent：显式选择优先，未选时取第一条", () => {
+    const list = [
+      { event: { id: 102 }, remaining: "500.00" },
+      { event: { id: 101 }, remaining: "1000.00" },
+    ];
+    expect(pickCancelableEvent(list, 101)?.event.id).toBe(101);
+    expect(pickCancelableEvent(list, undefined)?.event.id).toBe(102);
+    // 表单值可能是字符串
+    expect(pickCancelableEvent(list, "101")?.event.id).toBe(101);
+    // 不存在的 id → 回落到第一条，而不是抛错
+    expect(pickCancelableEvent(list, 999)?.event.id).toBe(102);
+    expect(pickCancelableEvent([], 101)).toBeUndefined();
+  });
+});
+
+// —— 编辑订单 PATCH 组装：三条规则原本内联在 submitEditOrder 内，UI 用例只覆盖
+// 「有事件改备注」一条；快照整体替换的两条兜底（钱包实名 / 营地账号）此前零覆盖。
+describe("buildOrderPatchPayload 纯函数", () => {
+  const snapshot = {
+    game_account: "acc-1",
+    game_type: "原神",
+    game_password: "pwd-1",
+    channel_region: "天空岛",
+    bound_phone: "13800000000",
+    wallet_realname: "何一",
+    camp_account: "camp-1",
+    platform: "安卓",
+    purchase_price: "800.00",
+    note: "建单备注",
+  };
+
+  it("无登记事件：带上成交日期与整体快照", () => {
+    const payload = buildOrderPatchPayload({
+      values: { trade_date: "2026-11-02", note: " 改备注 ", snap_game_type: "星穹铁道" },
+      snapshot,
+      hasPosted: false,
+    });
+    expect(payload.trade_date).toBe("2026-11-02");
+    expect(payload.note).toBe("改备注");
+    expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1", game_type: "星穹铁道" });
+  });
+
+  it("已有登记事件：只带备注，不带成交日期也不带快照", () => {
+    const payload = buildOrderPatchPayload({
+      values: { trade_date: "2026-11-02", note: "补充说明" },
+      snapshot,
+      hasPosted: true,
+    });
+    expect(payload).toEqual({ note: "补充说明", form_extra: undefined });
+  });
+
+  it("快照密码被隐去（无 order.create）：不带 account_snapshot，避免覆盖成空", () => {
+    const payload = buildOrderPatchPayload({
+      values: { note: "x", snap_game_account: "acc-9" },
+      snapshot: { ...snapshot, game_password: null },
+      hasPosted: false,
+    });
+    expect(payload.account_snapshot).toBeUndefined();
+  });
+
+  it("表单缺钱包实名/营地账号控件时沿用快照原值（不抹掉）", () => {
+    const payload = buildOrderPatchPayload({
+      values: { note: "x", snap_game_type: "原神", snap_game_password: "pwd-1" },
+      snapshot,
+      hasPosted: false,
+    });
+    expect(payload.account_snapshot).toMatchObject({
+      wallet_realname: "何一",
+      camp_account: "camp-1",
+    });
+  });
+
+  it("备注留空 → note 显式 null（清空），不是空串", () => {
+    const payload = buildOrderPatchPayload({ values: { note: "   " }, snapshot: null, hasPosted: false });
+    expect(payload.note).toBeNull();
+  });
+});
+
+// —— 资金收支（REFUND）入参：日期兜底与「资金账户未选就保持 undefined」此前仅靠挂载覆盖。
+describe("buildRefundEventPayload 纯函数", () => {
+  const fallbackDate = "2026-11-03";
+
+  it("发生日期留空 → 取当天", () => {
+    const payload = buildRefundEventPayload({
+      values: { amount: "88.00", occurred_on: null, pool_id: 3, reason: "退款" },
+      fallbackDate,
+    });
+    expect(payload.occurred_on).toBe(fallbackDate);
+  });
+
+  it("发生日期已选 → 按 YYYY-MM-DD 提交", () => {
+    const payload = buildRefundEventPayload({
+      values: { amount: "88.00", occurred_on: dayjs("2026-10-20"), pool_id: 3, reason: "退款" },
+      fallbackDate,
+    });
+    expect(payload).toMatchObject({ event_type: "REFUND", amount: "88.00", occurred_on: "2026-10-20", pool_id: 3 });
+  });
+
+  it("资金账户未选 → pool_id 保持 undefined（交给后端按订单类型路由），不填 0/空串", () => {
+    const payload = buildRefundEventPayload({ values: { amount: "1", reason: "x" }, fallbackDate });
+    expect(payload.pool_id).toBeUndefined();
+    expect(buildRefundEventPayload({ values: { amount: "1", reason: "x", pool_id: "" as never }, fallbackDate }).pool_id)
+      .toBeUndefined();
+  });
+
+  it("资金账户显式选择 → 数字化提交", () => {
+    const payload = buildRefundEventPayload({ values: { amount: "1", reason: "x", pool_id: "7" }, fallbackDate });
+    expect(payload.pool_id).toBe(7);
   });
 });

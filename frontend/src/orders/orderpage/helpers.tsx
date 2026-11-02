@@ -1,4 +1,6 @@
 import type { Order } from "../../shared/api/catalog";
+import type { OrderPatchPayload } from "../../shared/api/orders.api";
+import type { Dayjs } from "dayjs";
 import { money } from "../../shared/lib/format";
 
 export type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
@@ -205,6 +207,115 @@ export function validateAllocations(
 }
 
 export type CancelFormScope = "ORDERCANC" | "INVREFUND";
+
+/** 从后端下发的可冲销动作里挑一条：显式选择优先，否则取第一条（reversibleEvents 已按新→旧排）。
+ *  offsetEventId 来自表单，可能是 undefined / 字符串，统一 Number() 后比较，与旧内联逻辑一致。 */
+export function pickCancelableEvent<T extends { event: { id: number }; remaining: string }>(
+  reversible: T[],
+  offsetEventId: unknown,
+): T | undefined {
+  return reversible.find((item) => item.event.id === Number(offsetEventId)) ?? reversible[0];
+}
+
+/**
+ * 冲销/退款金额的确定与校验（原本内联在 submitCancelTransaction 里，无任何测试可触达）。
+ * 规则：留空或不填 → 全额（取剩余可冲金额）；必须是正数；不得超过剩余可冲金额（1e-9 容差）。
+ * 余额唯一来源是后端的 `event.cancellable_amount`，前端不重算。
+ */
+export function resolveCancelAmount(params: {
+  scope: CancelFormScope;
+  values: { amount?: string; cancel_amount?: string; refund_amount?: string };
+  remaining: string;
+}): { ok: true; amount: string } | { ok: false; error: string } {
+  const { scope, values, remaining } = params;
+  const raw = scope === "INVREFUND"
+    ? (values.refund_amount ?? values.amount)
+    : (values.cancel_amount ?? values.amount);
+  const amount = (raw ?? "").trim() || remaining;
+  if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+    return { ok: false, error: "请输入有效的冲销金额" };
+  }
+  if (Number(amount) > Number(remaining) + 1e-9) {
+    return { ok: false, error: `冲销金额不能超过该动作剩余可冲金额 ¥${remaining}` };
+  }
+  return { ok: true, amount };
+}
+
+/**
+ * 订单编辑 PATCH 入参组装（原本内联在 submitEditOrder 里）。
+ * 三条规则都由后端契约决定，抽出来才可免挂载覆盖：
+ *  1. 已有登记事件（is_posted）→ 只允许改备注，不再回写成交日期与账号快照；
+ *  2. 快照密码被后端隐去（无 order.create 权限）→ 完全不带 account_snapshot，
+ *     避免把隐藏密码覆盖成空；
+ *  3. 快照是整体替换：表单里没有的控件（钱包实名 / 营地账号）沿用原快照值，
+ *     否则编辑一次订单就把钱包实名抹掉。
+ */
+export function buildOrderPatchPayload(params: {
+  values: Record<string, unknown>;
+  snapshot: Order["account_snapshot"];
+  hasPosted: boolean;
+}): OrderPatchPayload {
+  const { values, snapshot, hasPosted } = params;
+  const payload: OrderPatchPayload = {};
+  if (!hasPosted) payload.trade_date = values.trade_date as string;
+  const note = (values.note as string | undefined)?.trim();
+  payload.note = note ? note : null;
+  payload.form_extra = (values.form_extra as Record<string, unknown> | undefined) ?? undefined;
+  if (!hasPosted && snapshot && snapshot.game_password) {
+    payload.account_snapshot = {
+      game_account: (values.snap_game_account as string) ?? snapshot.game_account,
+      game_type: (values.snap_game_type as string) || null,
+      game_password: (values.snap_game_password as string) || null,
+      channel_region: (values.snap_channel_region as string) || null,
+      bound_phone: (values.snap_bound_phone as string) || null,
+      wallet_realname: (values.snap_wallet_realname as string) || snapshot.wallet_realname || null,
+      camp_account: (values.snap_camp_account as string) || snapshot.camp_account || null,
+      platform: (values.snap_platform as string) || null,
+      purchase_price: (values.snap_purchase_price as string) || null,
+      note: (values.snap_note as string) || null,
+    };
+  }
+  return payload;
+}
+
+/**
+ * 资金收支（REFUND）事件入参组装。两条规则此前只能靠挂载页面才能碰到：
+ *  - 发生日期留空 → 取当天（后端不接受空日期）；
+ *  - 资金账户「显式选择优先」：未选时保持 undefined，让后端按订单类型默认路由，
+ *    不要擅自填 0 或空串（会被当成某个池的 id）。
+ */
+export function buildRefundEventPayload(params: {
+  values: {
+    amount: string;
+    occurred_on?: Dayjs | null;
+    pool_id?: number | string;
+    reason?: string;
+    operator_user_ids?: number[];
+    form_extra?: Record<string, unknown>;
+  };
+  fallbackDate: string;
+}): {
+  event_type: "REFUND";
+  amount: string;
+  occurred_on: string;
+  pool_id?: number;
+  reason?: string;
+  operator_user_ids?: number[];
+  form_extra?: Record<string, unknown>;
+} {
+  const { values, fallbackDate } = params;
+  return {
+    event_type: "REFUND",
+    amount: values.amount,
+    occurred_on: values.occurred_on?.format("YYYY-MM-DD") ?? fallbackDate,
+    pool_id: values.pool_id === undefined || values.pool_id === null || values.pool_id === ""
+      ? undefined
+      : Number(values.pool_id),
+    reason: values.reason,
+    operator_user_ids: values.operator_user_ids,
+    form_extra: values.form_extra,
+  };
+}
 
 export function formatOrderAmount(order: Order): string {
   if (order.installment_principal) {

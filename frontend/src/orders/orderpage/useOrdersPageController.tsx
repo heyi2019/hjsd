@@ -14,7 +14,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
-import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, filterBusinessOrders, formatOrderAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
+import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, buildOrderPatchPayload, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -303,18 +303,14 @@ export function useOrdersPageController(params: {
       } else {
         if (!order) return;
         const reversible = cancelableEventsForScope(order, cancelScope);
-        const selected = reversible.find((item) => item.event.id === Number(values.offset_event_id)) ?? reversible[0];
+        const selected = pickCancelableEvent(reversible, values.offset_event_id);
         if (selected) {
-          const amountValue = cancelScope === "INVREFUND" ? (values.refund_amount ?? values.amount) : (values.cancel_amount ?? values.amount);
-          const amount = (amountValue ?? "").trim() || selected.remaining;
-          if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
-            appMessage.error("请输入有效的冲销金额");
+          const resolved = resolveCancelAmount({ scope: cancelScope, values, remaining: selected.remaining });
+          if (!resolved.ok) {
+            appMessage.error(resolved.error);
             return;
           }
-          if (Number(amount) > Number(selected.remaining) + 1e-9) {
-            appMessage.error(`冲销金额不能超过该动作剩余可冲金额 ¥${selected.remaining}`);
-            return;
-          }
+          const amount = resolved.amount;
           // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
           // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式负责人。
           let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
@@ -390,29 +386,11 @@ export function useOrdersPageController(params: {
     const orderHasPosted = (selectedOrder.events ?? []).some((event) => event.is_posted);
     setEditSubmitting(true);
     try {
-      const payload: Parameters<typeof ordersApi.patch>[1] = {};
-      if (!orderHasPosted) payload.trade_date = values.trade_date as string;
-      payload.note = (values.note as string | undefined)?.trim() ? (values.note as string).trim() : null;
-      payload.form_extra = (values.form_extra as Record<string, unknown> | undefined) ?? undefined;
-      const snapshot = selectedOrder.account_snapshot;
-      // 仅当快照密码可见（持有 order.create）时才允许整体回写，防止把隐藏密码覆盖为空。
-      if (!orderHasPosted && snapshot && snapshot.game_password) {
-        payload.account_snapshot = {
-          game_account: (values.snap_game_account as string) ?? snapshot.game_account,
-          game_type: (values.snap_game_type as string) || null,
-          game_password: (values.snap_game_password as string) || null,
-          channel_region: (values.snap_channel_region as string) || null,
-          bound_phone: (values.snap_bound_phone as string) || null,
-          // 快照整体替换：表单无该控件时沿用原值，避免编辑订单把钱包实名抹掉。
-          wallet_realname:
-            (values.snap_wallet_realname as string) || snapshot.wallet_realname || null,
-          // 同上：编辑弹窗未必带营地账号控件，缺值时保留原快照值。
-          camp_account: (values.snap_camp_account as string) || snapshot.camp_account || null,
-          platform: (values.snap_platform as string) || null,
-          purchase_price: (values.snap_purchase_price as string) || null,
-          note: (values.snap_note as string) || null,
-        };
-      }
+      const payload = buildOrderPatchPayload({
+        values,
+        snapshot: selectedOrder.account_snapshot,
+        hasPosted: orderHasPosted,
+      });
       await ordersApi.patch(selectedOrder.id, payload);
       // L250：有登记事件的订单只能改备注，成功提示需明确「备注已保存」而非笼统的「订单已更新」，
       // 让用户清楚知道保存结果，避免误以为需重试/刷新。

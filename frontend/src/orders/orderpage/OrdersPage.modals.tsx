@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundEventPayload, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -452,16 +452,8 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
-              await ordersApi.postEvent(actionOrder.id, {
-                event_type: "REFUND",
-                amount: values.amount,
-                occurred_on: values.occurred_on?.format("YYYY-MM-DD") ?? today(),
-                // 每笔收支都要指认资金账户：显式选择优先于订单类型的默认路由。
-                pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
-                reason: values.reason,
-                operator_user_ids: values.operator_user_ids,
-                form_extra: values.form_extra,
-              });
+              // 每笔收支都要指认资金账户：显式选择优先于订单类型的默认路由（规则见 helpers）。
+              await ordersApi.postEvent(actionOrder.id, buildRefundEventPayload({ values, fallbackDate: today() }));
               appMessage.success("退款已登记");
               setRefundOpen(false);
               setActionOrder(null);

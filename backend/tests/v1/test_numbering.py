@@ -75,45 +75,63 @@ def test_allocate_unknown_sequence_is_rejected(db):
     assert exc.value.code == ErrorCode.VALIDATION_ERROR
 
 
-def test_concurrent_allocation_is_unique(tmp_path):
+def test_concurrent_allocation_is_unique():
     """并发取号回归（2026-10-28 压测修复）：多会话全周期（取号→提交）编号绝不重复。
 
     旧实现「SELECT 读值 → Python +1 → UPDATE 绝对值写」在并发下会发出重复号，
     撞 orders.order_no 唯一约束产生 500（实测 10 并发建单 37/50 失败）。
 
-    用独立 WAL 文件库（与生产 journal 模式一致）：conftest 的 v1_engine 是
-    journal_mode=MEMORY，双连接「读锁升级写锁」会互相等待造成死锁假象，
-    且失败后遗留池内锁会污染后续用例。
+    SQLite 已整体下线，本用例改为在独立的 PostgreSQL 临时探针库上验证：多连接并发
+    取号，编号唯一且不重复。零触碰 dev/test/release/生产任何既有库。
     """
-    db_file = tmp_path / "numbering_concurrent.db"
-    engine = create_engine(
-        f"sqlite:///{db_file}",
-        connect_args={"check_same_thread": False},
-        future=True,
-    )
-    Base.metadata.create_all(bind=engine)
-    with engine.connect() as connection:
-        connection.execute(text("PRAGMA journal_mode=WAL"))  # WAL 持久化进文件头
+    import os
+    import random
+    from urllib.parse import urlparse
 
-    bootstrap = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)()
-    ensure_sequence(bootstrap, SequenceKey.ORDER_HS, "HS", 4)
-    bootstrap.commit()
-    bootstrap.close()
+    from app.core.database import Base
+    from app.core.settings import get_settings
+    from app.domain.foundation import DocumentSequence
 
-    def worker(_worker_id: int) -> list[str]:
-        session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)()
-        try:
-            numbers = [allocate_number(session, SequenceKey.ORDER_HS) for _ in range(3)]
-            session.commit()
-            return numbers
-        finally:
-            session.close()
-
+    base = get_settings().alembic_url
+    parsed = urlparse(base)
+    db_name = f"heijin_num_probe_{os.getpid()}_{random.randint(0, 9_999_999)}"
+    admin = create_engine(base, isolation_level="AUTOCOMMIT")
     try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{db_name}"')
+    finally:
+        admin.dispose()
+
+    target = base.replace(f"/{parsed.path.lstrip('/')}", f"/{db_name}")
+    engine = create_engine(target)
+    try:
+        # 只建编号表，隔离且轻量
+        Base.metadata.create_all(bind=engine, tables=[DocumentSequence.__table__])
+
+        bootstrap = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)()
+        ensure_sequence(bootstrap, SequenceKey.ORDER_HS, "HS", 4)
+        bootstrap.commit()
+        bootstrap.close()
+
+        def worker(_worker_id: int) -> list[str]:
+            session = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)()
+            try:
+                numbers = [allocate_number(session, SequenceKey.ORDER_HS) for _ in range(3)]
+                session.commit()
+                return numbers
+            finally:
+                session.close()
+
         with ThreadPoolExecutor(max_workers=8) as pool:
             batches = list(pool.map(worker, range(8)))
     finally:
         engine.dispose()
+        admin2 = create_engine(base, isolation_level="AUTOCOMMIT")
+        try:
+            with admin2.connect() as conn:
+                conn.exec_driver_sql(f'DROP DATABASE "{db_name}" WITH (FORCE)')
+        finally:
+            admin2.dispose()
 
     numbers = [n for batch in batches for n in batch]
     assert len(numbers) == 24

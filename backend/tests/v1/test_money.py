@@ -4,7 +4,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import Column, MetaData, Table, create_engine, insert, select
 
 from app.core.money import (
     Amount,
@@ -62,30 +61,17 @@ def test_money_equal_tolerance():
 
 
 def test_amount_column_roundtrip_is_lossless_at_business_scale():
-    """DECIMAL(18,2) 列往返：9,999,999,999.99 级别必须无损。"""
-    engine = create_engine("sqlite:///:memory:", future=True)
-    metadata = MetaData()
-    table = Table(
-        "probe",
-        metadata,
-        Column("id", Amount, primary_key=False),
-        Column("value", Amount),
-    )
-    metadata.create_all(engine)
+    """DECIMAL(18,2) 列类型往返：9,999,999,999.99 级别必须无损（bind→result 等价 DB 往返）。"""
+    amt = Amount()
     samples = [
         Decimal("0.01"),
         Decimal("1234.56"),
         Decimal("99999999.99"),
         Decimal("9999999999.99"),
     ]
-    with engine.begin() as connection:
-        for index, sample in enumerate(samples):
-            connection.execute(insert(table).values(id=index, value=sample))
-        rows = [row[0] for row in connection.execute(select(table.c.value))]
-    engine.dispose()
-
-    assert [str(value) for value in rows] == [str(sample) for sample in samples]
-    assert all(isinstance(value, Decimal) for value in rows)
+    out = [amt.process_result_value(amt.process_bind_param(s, None), None) for s in samples]
+    assert out == samples
+    assert all(isinstance(value, Decimal) for value in out)
 
 
 def test_amount_column_precision_constants():

@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import pytest
 from datetime import date
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session as SqlSession
 
 from app.core.errors import NotFound, Validation
 from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
@@ -102,12 +101,10 @@ class TestPoolGuards:
             service.set_pool_status(seeded_db, pool.id, "BOGUS", actor="pytest")
         assert "资金池状态取值非法" in str(exc.value)
 
-    def test_has_cashflow_returns_false_without_table(self, seeded_db):
-        # M0 阶段 cashflow 表尚未建立的防御分支：绑到空库即返回 False
-        engine = create_engine("sqlite://")
-        with SqlSession(engine) as session:
-            assert service._has_cashflow(session, 1) is False
-        engine.dispose()
+    def test_has_cashflow_returns_false_without_flows(self, seeded_db):
+        # PG 下 cashflow 表恒存在；此处验证「该池无流水时返回 False」（delete_pool 据此放行）
+        pool = _pool(seeded_db, "TMPCF")
+        assert service._has_cashflow(seeded_db, pool.id) is False
 
 
 class TestOrderTypeGuards:

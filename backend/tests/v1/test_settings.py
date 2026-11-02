@@ -79,8 +79,8 @@ def test_settings_loads_from_root_env():
 def test_default_database_is_postgres():
     """SQLite 已彻底下线：缺 .env 时的兜底地址也必须是 PG。
 
-    以前兜底是 `sqlite:///./data/heijin_erp_v1.db`——连不上库时会静默新建一个
-    SQLite 文件，数据写进没人知道的地方。现在宁可连不上明确报错。
+    以前兜底是某个本地文件库地址——连不上库时会静默新建一个本地文件，
+    数据写进没人知道的地方。现在宁可连不上明确报错。
     """
     settings = Settings(_env_file=None)
     assert settings.database_url.startswith("postgresql")

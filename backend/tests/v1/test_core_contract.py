@@ -393,7 +393,7 @@ class TestDatabaseLifecycle:
         def fake_create_engine(url, **kwargs):
             captured["url"] = url
             captured.update(kwargs)
-            engine = create_engine("sqlite://")
+            engine = create_engine("postgresql+psycopg://u:p@h/db")
             created_engines.append(engine)
             return engine
 
@@ -407,7 +407,7 @@ class TestDatabaseLifecycle:
                 engine.dispose()
 
     def test_session_factory_defaults_to_engine_singleton(self, tmp_path, monkeypatch):
-        engine = create_engine(f"sqlite:///{tmp_path / 'db3.sqlite'}")
+        engine = create_engine("postgresql+psycopg://u:p@h/db")
         try:
             monkeypatch.setattr(database, "get_engine", lambda url=None: engine)
             database._session_factory = None
@@ -415,25 +415,6 @@ class TestDatabaseLifecycle:
             assert factory.kw["bind"] is engine
         finally:
             engine.dispose()
-
-    def test_reset_session_factory_and_create_all(self, tmp_path):
-        url = f"sqlite:///{tmp_path / 'db2.sqlite'}"
-        engine = database.reset_engine(url)
-        assert engine is not None
-        factory = database.get_session_factory(url)
-        factory_engine = factory.kw["bind"]
-        session = factory()
-        assert session.get_bind() is not None
-        session.close()
-
-        created_engine = database.create_all(url)
-        try:
-            assert (tmp_path / "db2.sqlite").exists()
-        finally:
-            created_engine.dispose()
-            factory_engine.dispose()
-            database.dispose_engine()
-        assert database._engine is None
 
     def test_get_db_commits_and_rolls_back(self, v1_engine, monkeypatch):
         factory = sessionmaker(

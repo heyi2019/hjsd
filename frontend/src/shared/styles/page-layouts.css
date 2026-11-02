@@ -42,7 +42,6 @@
   font: 700 var(--fs-footnote)/1 var(--font-sans);
 }
 
-.sidebar .nav-item.active,
 .sidebar .nav-level-two,
 .sidebar .nav-level-two.active {
   font-weight: 600;

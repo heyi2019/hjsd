@@ -20,13 +20,15 @@
   background: var(--soft);
 }
 
+/* 选中项已有自身选中材质 + 内嵌顶部焦点条；禁用外描边，避免与渐变圆角胶囊叠出双层偏移框
+   （即截图左上「重影描边」缺陷：outline 不跟随 border-radius，四角露角、与胶囊错位）。
+   焦点态保留品牌渐变底——覆盖基础 focus 规则的 var(--soft) 灰底，避免激活项键盘聚焦时底色突变为灰的回归。
+   注：原死规则误写为 .nav-item.active（单横线），真实类名为 nav-item--active，故永不命中，此处并回本规则。 */
 .sidebar .nav-item--active:focus-visible {
+  outline: none;
   outline-offset: var(--border-w-2);
-  box-shadow: inset 0 3px 0 var(--color-primary);
-}
-
-.sidebar .nav-item.active:focus-visible {
   background: linear-gradient(135deg, var(--brand-50) 0%, var(--brand-200) 100%);
+  box-shadow: inset 0 3px 0 var(--color-primary);
 }
 
 /* 选中项已经有自己的选中材质；焦点提示改为内嵌，避免出现第二层外框。 */

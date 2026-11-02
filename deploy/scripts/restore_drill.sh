@@ -8,7 +8,9 @@
 #
 # 设计要点：
 # 1) 只读演练——临时库用完必删（trap 兜底），不碰 dev/test/release 任何一库。
-# 2) 不变量恒定校验（表数/版本戳/配置表/编号序列/术语），与数据量无关，任何包都该过。
+# 2) 不变量恒定校验（表数/版本戳/配置表/编号序列/术语/结构对代码），与数据量无关，任何包都该过。
+#    其中「结构对代码」走 deploy/scripts/schema_diff.py 做列级比对——只数表个数查不出
+#    「表齐但少一列」，而那正是老包配新代码上线后的典型 500 来源。
 # 3) 精确值用参数传，不写死在脚本里——包内容会变，脚本不该跟着改。
 # 4) 退出码：0 全过 / 1 有不变量失败 / 2 环境或前置错误。
 
@@ -109,6 +111,25 @@ check_eq pools 2
 check_eq sequences 13
 check_eq 作废残留 0
 check_eq cancel标签 取消
+
+# 第 7 项：结构必须与当前代码的 ORM 一致。表数对得上不等于列对得上，
+# 老包配新代码上线后第一个读该列的请求就 500，而恢复演练原本看不见这一层。
+echo "--- 结构对代码（列级）---"
+PY="${REPO_ROOT}/backend/.venv/bin/python3"
+if [ ! -x "${PY}" ]; then
+  printf '  ❌ %-11s 找不到 %s\n' schema "${PY}"
+  FAIL=1
+elif "${PY}" "${REPO_ROOT}/deploy/scripts/schema_diff.py" "${DB}"; then
+  printf '  ✅ %-11s 与当前 ORM 无差异\n' schema
+else
+  rc=$?
+  if [ "${rc}" -eq 2 ]; then
+    printf '  ❌ %-11s 比对无法运行（环境问题，非结构差异，见上）\n' schema
+  else
+    printf '  ❌ %-11s 与当前 ORM 有差异（缺列/多列/类型不符）\n' schema
+  fi
+  FAIL=1
+fi
 
 echo "--- 内容量 ---"
 echo "${REPORT}" | tr ' ' '\n' | grep -E '^(orders|stocks|cashflow|events|users|customers|fields|optionsets)=' | sed 's/^/  /'

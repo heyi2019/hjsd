@@ -12,6 +12,10 @@ dist/
 .env.*-test
 .env.*.test
 .env.postgres-test
+# 任意 .env 变体（.env.release / .env.stage 等同样含库口令与 JWT 密钥），
+# 除模板 .env.example 外一律不入库。此前只忽略精确文件名，新变体会被 git 静默跟踪。
+.env.*
+!.env.example
 # .env 的临时备份同样含库口令，禁止入库（11-02 数据恢复期间产生）
 .env.bak*
 .env.*.bak*

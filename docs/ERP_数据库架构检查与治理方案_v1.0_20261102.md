@@ -378,7 +378,7 @@ Prod
 | 7 | `frontend/package.json` | ✅ 已删 `test:regression:fast` 里悬空的 `test:e2e:critical`（改为 `npm run test:fast`）；`playwright` 依赖**待清**（需同步 lockfile） | 清理 E2E 残留 |
 | 8 | `.env.bak-20261102-2115` / `.env.postgres-test` | 删除或移入受控的凭据管理 | 消除明文口令与误用面 |
 | 9 | `backend/alembic/squashed_versions/0001_*.py` | 无需改动；但 `docs/` 需补一条「既有库如何演进」的操作说明 | 压平后最大的认知缺口 |
-| 10 | `deploy/scripts/backup_daily.sh` 的 cron | 本地 Dev 与 Release 库增加每日 dump（不同目录、不同保留策略） | 目前只有生产有自动备份 |
+| 10 | `deploy/scripts/backup_local.sh` + cron | ✅ **已落地（11-03 01:20）**：本地 Dev 与 Release 每日 dump，独立目录 `backups/local/`、保留 14 份、带表数闸门 | 已闭环，见第九节 |
 
 ---
 
@@ -398,7 +398,7 @@ Prod
 | 缺口 | 建议 |
 |---|---|
 | **1. `restore_pg.sh` 未部署到 ECS** → ✅ **已补齐（11-03 00:07）** | ECS `/opt/heijin/deploy/scripts/` 原只有 6 个（缺恢复脚本）。已 `scp` 补齐，`sha256` 双端一致 `c18cff9c…273bca`、`bash -n` 通过、`--help` 实跑正常，现为 7 个 |
-| Dev / Release 库无自动备份 | ✅ **脚本已落地（11-03 01:04）**：`deploy/scripts/backup_local.sh`，一次备两库、带表数闸门与 sha256 sidecar、保留 14 份 → `backups/local/`；**cron 尚未安装**，需点头后加一行（见下节） |
+| Dev / Release 库无自动备份 | ✅ **已闭环（11-03 01:20）**：`deploy/scripts/backup_local.sh` 一次备两库、带表数闸门与 sha256 sidecar、保留 14 份 → `backups/local/`；**cron 已装并实测**（每日 04:10，错开 ECS 的 03:20），见下节 |
 | PG 未开 WAL 归档 | ⏳ **待裁决（需授权重启容器，见下节影响面）**。`wal_level` 已是 `replica`，只差 `archive_mode=on` + `archive_command` + 归档目录落宿主机 |
 | 恢复演练未定期化 | 每季度一次「从 dump 恢复到临时库 + 行数校验」，产出记录 |
 | 无库级操作闸门 | 见「防误删」 |
@@ -426,11 +426,23 @@ Prod
 
 **踩坑**：`echo "✓ $DB → $FILE（…）"` 里 `$FILE` 紧跟全角左括号，被 shell 并进变量名 → `FILE: unbound variable`。项目既有约定「`$VAR` 紧跟中文标点一律写 `${VAR}`」再次生效，脚本内已全部改 `${}`。
 
-**未做**：cron 未装。需要时一行（与 ECS 的 03:20 错开）：
+**cron 已安装并实测（2026-11-03 01:20）**
 
 ```
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 10 4 * * * /bin/bash /Users/aries/黑金时代/deploy/scripts/backup_local.sh >> /tmp/heijin_local_backup.log 2>&1
 ```
+
+**装之前先踩了一个坑（差点变成「有 cron 但每天静默失败」）**：cron 的默认 `PATH` 只有 `/usr/bin:/bin`，而这台机器的 `docker` 在 `/opt/homebrew/bin/docker`（另有一个 `/usr/local/bin/docker` 软链）。**直接把这行塞进 crontab，脚本第一句 `docker ps` 就会 `command not found`**——和 ECS 那次「备了张废弃 SQLite 还返回 `BACKUP_OK`」是同一类错误：动作在跑，目标不在。
+
+修法是双保险，两处都做：
+
+1. 脚本内自设 `PATH`（`/opt/homebrew/bin` 打头）+ `LANG/LC_ALL`，并加 `command -v docker` 前置检查，找不到就带当前 `PATH` 明确报错退出；
+2. crontab 顶部也写一行 `PATH=`，防止将来脚本被别的调用方式绕过。
+
+**验证方式**：不用等第二天 04:10，用 `env -i HOME=$HOME /bin/bash deploy/scripts/backup_local.sh` 模拟 cron 的最小环境实跑——**空环境也能通过**，两库各 40 表、`BACKUP_OK`。这是本次唯一可能失效的点，已被覆盖。
+
+日志：`/tmp/heijin_local_backup.log`；产物：`backups/local/`（`.gitignore` 已排除）。**注意 `/tmp` 会被系统清理，长期留档看 `backups/local/` 本身。**
 
 ### WAL 归档 / PITR 的影响面（P1-9，待裁决）
 
@@ -498,7 +510,7 @@ Prod
 ### P2（上线后 30 天内）
 
 10. 清理 E2E 残留（`package.json` 悬空脚本 + playwright 依赖）。
-11. 本地 Dev / Release 每日备份——✅ **脚本已落地**（`deploy/scripts/backup_local.sh`，含恢复校验，见第九节）；**只差 cron 一行**，等授权后装。
+11. 本地 Dev / Release 每日备份——✅ **已闭环（11-03 01:20）**：脚本 + cron 都已落地并实测（`env -i` 空环境跑通，绕开 cron 默认 PATH 找不到 homebrew docker 的坑），见第九节。
 12. 恢复演练季度化并留记录。
 13. 历史数据清洗（客户名占位值、无单号历史单的 `link_status` 标注）。
 14. 清理 `.env.bak-*`、`.env.postgres-test` 等含明文口令的遗留文件。

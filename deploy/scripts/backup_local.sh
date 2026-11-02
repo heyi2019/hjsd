@@ -18,9 +18,19 @@
 #   ERP_LOCAL_BACKUP_DBS="heijin_erp_dev" bash deploy/scripts/backup_local.sh   # 只备一个库
 #   ERP_BACKUP_KEEP=30 bash deploy/scripts/backup_local.sh
 #
-# crontab（每日 04:10，错开 ECS 的 03:20）：
+# crontab（2026-11-03 01:20 已安装，每日 04:10，错开 ECS 的 03:20）：
+#   PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
 #   10 4 * * * /bin/bash /Users/aries/黑金时代/deploy/scripts/backup_local.sh >> /tmp/heijin_local_backup.log 2>&1
+# 注意 PATH 那一行不能省：cron 默认只有 /usr/bin:/bin，找不到 homebrew 的 docker，
+# 会变成「每天准时失败但没人看日志」。脚本内已自设 PATH 兜底，crontab 是第二道。
 set -euo pipefail
+
+# cron / launchd 的默认 PATH 只有 /usr/bin:/bin，找不到 homebrew 的 docker。
+# 这里自设 PATH，保证「任何调用方（手动 / cron / launchd）」跑出来行为一致。
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+export LANG="${LANG:-en_US.UTF-8}"
+
 cd "$(dirname "$0")/../.."   # -> 仓库根
 
 CONTAINER="${ERP_PG_CONTAINER:-container-db-1}"
@@ -30,6 +40,9 @@ KEEP="${ERP_BACKUP_KEEP:-14}"
 OUT="${ERP_LOCAL_BACKUP_DIR:-backups/local}"
 
 die() { echo "✗ $*" >&2; exit 1; }
+
+command -v docker >/dev/null 2>&1 \
+  || die "PATH 里找不到 docker（当前 PATH=${PATH}）"
 
 docker ps --format '{{.Names}}' | grep -qx "$CONTAINER" \
   || die "容器 ${CONTAINER} 未运行，无法备份"

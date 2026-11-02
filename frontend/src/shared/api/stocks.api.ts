@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Account, AccountExecutionDetail, AccountInventoryRow, PageResponse } from "./types";
+import type { Account, AccountExecutionDetail, AccountInventoryRow, InventoryStats, PageResponse } from "./types";
 
 export const stocksApi = {
   list: async (params?: { status?: string; limit?: number; offset?: number }): Promise<Account[]> => {
@@ -22,6 +22,11 @@ export const stocksApi = {
   inventory: () =>
     api
       .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/stocks/inventory")
+      .then((r) => r.data),
+  /** 汇总当前可见账号的占用成本与库龄档位（金额与天数只在后端算）。 */
+  inventoryStats: (accountIds: number[]) =>
+    api
+      .post<InventoryStats>("/stocks/inventory/stats", { account_ids: accountIds })
       .then((r) => r.data),
   executionDetail: (id: number) =>
     api.get<AccountExecutionDetail>(`/stocks/${id}/execution-detail`).then((r) => r.data),

@@ -49,6 +49,8 @@ from .schemas import (
     AccountProfileUpdate,
     ExecutionEditRequest,
     InventoryResponseOut,
+    InventoryStatsOut,
+    InventoryStatsQuery,
     ExecutionCashflowOut,
     ExecutionEventOut,
     ExecutionCounterpartyOut,
@@ -333,6 +335,21 @@ def inventory(
     rows = service.inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
+
+
+@router.post("/stocks/inventory/stats", response_model=InventoryStatsOut)
+def inventory_stats(
+    payload: InventoryStatsQuery,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> InventoryStatsOut:
+    """汇总当前可见账号的占用成本与库龄档位。
+
+    入参是界面此刻展示的账号集合，因此筛选口径只有一份（前端视图），
+    金额累加与库龄天数只在后端算，前端不再做 float 求和。
+    """
+    stats = service.inventory_stats(db, account_ids=payload.account_ids, user=_user)
+    return InventoryStatsOut(**stats)
 
 
 @router.get("/stocks/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)

@@ -1,6 +1,9 @@
 """库存中心查询与库存成本汇总。"""
 from __future__ import annotations
 
+import math
+from collections.abc import Sequence
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
@@ -74,6 +77,63 @@ def total_inventory_cost(session: Session, *, user: CurrentUser | None = None) -
     return to_money(sum((to_money(row.cost_amount) for row in _inventory_rows(session, user=user)), Decimal("0")))
 
 
+def inventory_stats(
+    session: Session,
+    *,
+    account_ids: Sequence[int],
+    today: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """按给定账号集合汇总库存卡片指标。
+
+    集合由调用方（界面上当前可见的行）给出，避免筛选口径在前后端各写一份；
+    金额与库龄全部在此按后端口径算好，前端只负责展示。
+    """
+    ids = [int(item) for item in dict.fromkeys(account_ids)]
+    if not ids:
+        return {
+            "account_count": 0,
+            "occupied_cost": to_money(Decimal("0")),
+            "over_7d_count": 0,
+            "over_30d_count": 0,
+        }
+    stmt = select(Account).where(Account.id.in_(ids))
+    scope = scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = list(session.scalars(stmt).all())
+    reference = today or date.today()
+    over_7d = 0
+    over_30d = 0
+    for row in rows:
+        age = inventory_age_days(row, today=reference)
+        if age is None:
+            continue
+        if age > 7:
+            over_7d += 1
+        if age > 30:
+            over_30d += 1
+    return {
+        "account_count": len(rows),
+        "occupied_cost": to_money(sum((to_money(row.cost_amount) for row in rows), Decimal("0"))),
+        "over_7d_count": over_7d,
+        "over_30d_count": over_30d,
+    }
+
+
+def inventory_age_days(row: Account, *, today: date | None = None) -> int | None:
+    """库龄（自然日）：入库存时间优先，旧数据回退买入日/建档时间。"""
+    entry = row.inventory_entry_at or row.buy_date or row.created_at
+    if entry is None:
+        return None
+    if isinstance(entry, datetime):
+        moment = entry.replace(tzinfo=None) if entry.tzinfo else entry
+    else:
+        moment = datetime.combine(entry, time.min)
+    reference = datetime.combine(today or date.today(), time.min)
+    return max(0, math.floor((reference - moment).total_seconds() / 86400))
+
+
 def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> list[Account]:
     stmt = select(Account).where(
         Account.inventory_status.in_(INVENTORY_STATUSES),
@@ -84,4 +144,11 @@ def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> lis
     return list(session.scalars(stmt).all())
 
 
-__all__ = ["count_accounts", "inventory", "list_accounts", "total_inventory_cost"]
+__all__ = [
+    "count_accounts",
+    "inventory",
+    "inventory_age_days",
+    "inventory_stats",
+    "list_accounts",
+    "total_inventory_cost",
+]

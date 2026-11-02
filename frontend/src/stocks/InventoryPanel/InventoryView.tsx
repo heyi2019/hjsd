@@ -2,11 +2,11 @@ import { ErrorBanner, StatRow } from "../../shared/ui";
 import { InventoryLedger } from "./InventoryLedger";
 import { InventoryModals } from "./InventoryModals";
 import type { InventoryController } from "./useInventoryController";
-import { inventoryAge } from "../inventory-logic";
 
 export function InventoryView({ controller }: { controller: InventoryController }) {
-  const inventoryOver7Days = controller.visibleRows.filter((row) => (inventoryAge(row)?.days ?? 0) > 7).length;
-  const inventoryOver30Days = controller.visibleRows.filter((row) => (inventoryAge(row)?.days ?? 0) > 30).length;
+  // 金额与库龄档位由后端汇总（口径见 backend tests/v1/test_inventory_stats.py）；
+  // 行数是这张表当前渲染的条数，属于视图事实，不额外绕一次请求。
+  const stats = controller.inventoryStats;
 
   return (
     <section className="ui-stack">
@@ -14,9 +14,9 @@ export function InventoryView({ controller }: { controller: InventoryController 
       <StatRow
         items={[
           { label: "在库账号", kind: "count", amount: String(controller.visibleRows.length) },
-          { label: "占用成本合计", amount: controller.totalCost },
-          { label: "超7天库存账号", kind: "count", amount: String(inventoryOver7Days) },
-          { label: "超30天库存账号", kind: "count", amount: String(inventoryOver30Days) },
+          { label: "占用成本合计", amount: stats?.occupied_cost ?? "—" },
+          { label: "超7天库存账号", kind: "count", amount: stats ? String(stats.over_7d_count) : "—" },
+          { label: "超30天库存账号", kind: "count", amount: stats ? String(stats.over_30d_count) : "—" },
         ]}
       />
       <InventoryLedger controller={controller} />

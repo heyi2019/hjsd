@@ -2,8 +2,8 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { Dropdown, Form, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Key } from "react";
-import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type Pool } from "../../shared/api/catalog";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key } from "react";
+import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type InventoryStats, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { formatDateTimeMinute, money, today } from "../../shared/lib/format";
 import { MoneyText, PermissionButton, PermissionGate, StatusTag, useCompactLayout } from "../../shared/ui";
@@ -19,8 +19,12 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuItems } from "./helpers";
 
+// 关键字逐键输入时合并请求：指标不是主流程，200ms 足够跟手。
+const INVENTORY_STATS_DEBOUNCE_MS = 200;
+
 export function useInventoryController({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   const [rows, setRows] = useState<Account[]>([]);
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
   const [gameTypeFilter, setGameTypeFilter] = useState<string | undefined>(undefined);
@@ -102,17 +106,33 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
 
   const inventoryRows = filterInventoryRows(rows ?? [], { businessMode, gameType: gameTypeFilter });
   const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
-  const visibleRows = filterInventoryRows(rows ?? [], {
+  const visibleRows = useMemo(() => filterInventoryRows(rows ?? [], {
     businessMode,
     inventoryType,
     gameType: gameTypeFilter,
     keyword,
     dateRange,
-  });
+  }), [rows, businessMode, inventoryType, gameTypeFilter, keyword, dateRange]);
   // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
   const orderedRows = [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id));
-  const visibleOccupied = visibleRows;
-  const totalCost = visibleOccupied.reduce((sum, row) => sum + Number(row.cost_amount), 0).toFixed(2);
+  // 卡片上的金额与库龄档位由后端按「当前可见集合」汇总：筛选只在前端做一份，
+  // 算术只在后端做一份，避免 Number() 累加的浮点残渣与两套日期口径漂移。
+  useEffect(() => {
+    const accountIds = visibleRows.map((row) => row.id);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      stocksApi.inventoryStats(accountIds)
+        .then((data) => {
+          if (!cancelled && data) setInventoryStats(data);
+        })
+        // 指标是派生展示值，取不到就保留上一次结果，不打断台账主流程。
+        .catch(() => undefined);
+    }, INVENTORY_STATS_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [visibleRows]);
 
   function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
@@ -543,7 +563,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setVoidTarget,
     setSortDesc,
     sortDesc,
-    totalCost,
+    inventoryStats,
     updateEventDraft,
     voidForm,
     voidPools,

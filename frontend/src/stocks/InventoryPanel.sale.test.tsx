@@ -20,6 +20,7 @@ beforeEach(() => {
   seedOrderFormFields(catalog);
   seedOptionSets(catalog);
   vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
   resolveMock(vi.mocked(catalog.ordersApi.addCustomerRole), { id: 21 });
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);

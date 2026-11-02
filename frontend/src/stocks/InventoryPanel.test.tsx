@@ -348,13 +348,25 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
   });
 
-  it("统计卡：只统计在库账号与占用成本", async () => {
+  it("统计卡：账号数取当前视图，占用成本与库龄档位读后端汇总", async () => {
+    // 故意让后端给的合计（8,888.88）与可见明细（100.00）不相等：
+    // 卡片照原样显示，才能证明这里没有本地 reduce。
+    vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({
+      account_count: 1,
+      occupied_cost: "8888.88",
+      over_7d_count: 2,
+      over_30d_count: 1,
+    });
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("在库账号");
     const occupied = screen.getByText("在库账号").closest(".ui-stat");
     expect(occupied?.textContent).toContain("1");
     const cost = screen.getByText("占用成本合计").closest(".ui-stat");
-    expect(cost?.textContent).toContain("100.00");
+    await waitFor(() => expect(cost?.textContent).toContain("8,888.88"));
+    expect(screen.getByText("超7天库存账号").closest(".ui-stat")?.textContent).toContain("2");
+    expect(screen.getByText("超30天库存账号").closest(".ui-stat")?.textContent).toContain("1");
+    // 汇总只按「当前可见集合」发起：accounts 里只有 acc-1 在库。
+    expect(vi.mocked(catalog.stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]);
     expect(screen.queryByText("已售")).toBeNull();
   });
 

@@ -401,6 +401,17 @@ export interface AccountInventoryRow {
   extra_values?: Record<string, unknown>;
 }
 
+/**
+ * 库存卡片指标：由后端按「当前可见的账号集合」汇总。
+ * `account_count` 是后端实际命中的集合大小（可见范围过滤后），用于核对前后端口径。
+ */
+export interface InventoryStats {
+  account_count: number;
+  occupied_cost: string;
+  over_7d_count: number;
+  over_30d_count: number;
+}
+
 export interface AccountExecutionCashflow {
   flow_no: string;
   pool_name?: string | null;

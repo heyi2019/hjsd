@@ -89,6 +89,7 @@ beforeEach(() => {
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as never);
   vi.mocked(catalog.depositsApi.list).mockResolvedValue([] as never);
   vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([] as never);
@@ -1054,7 +1055,8 @@ it("P1/FE-264：系统下架提交产生可确认的成功反馈", async () => {
   vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([{ id: 91, game_account: "system-offsale-regression", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00" }] as never);
   vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
     account: { id: 91, game_account: "system-offsale-regression", status: "WAITING", inventory_type: "RECOVERY" },
-    orders: [{ order_id: 921, order_type: "HS", status: "ACTIVE", events: [{ id: 922, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true }] }],
+    // 可冲销余额由后端下发（cancellable_amount），前端不再自己 amount − Σcancel。
+    orders: [{ order_id: 921, order_type: "HS", status: "ACTIVE", events: [{ id: 922, event_type: "BUY", amount: "100.00", portion: "PRINCIPAL", is_posted: true, cancellable_amount: "100.00" }] }],
   } as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([{ id: 3, code: "MAIN", name: "主池", status: "ACTIVE" }] as never);
   vi.mocked(catalog.ordersApi.postEvent).mockResolvedValueOnce({} as never);

@@ -16,7 +16,7 @@ vi.mock("../shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove", "cancel", "skip", "markUnlinked",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -99,6 +99,7 @@ const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INST
 
 async function openPanel(rows: Account[]) {
   resolveMock(vi.mocked(catalog.stocksApi.list), rows);
+  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }

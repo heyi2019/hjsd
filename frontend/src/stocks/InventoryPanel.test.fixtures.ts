@@ -20,6 +20,8 @@ export const stockNoAccounts = [
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
   vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
+  // 卡片指标由后端汇总（/stocks/inventory/stats），前端只渲染返回值。
+  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   // T19/T20：建单表单字段与选项词典改为从配置读取，测试需默认种子，否则下拉无选项。
   seedOrderFormFields(catalog);
   seedOptionSets(catalog);

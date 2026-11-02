@@ -62,9 +62,10 @@ def load_gates() -> dict[str, int]:
 
 def _run(cmd: list[str]) -> None:
     print("+ " + " ".join(cmd), flush=True)
-    environment = os.environ.copy()
-    environment.setdefault("DATABASE_URL", "sqlite:////tmp/heijin_erp_v1.db")
-    subprocess.run(cmd, cwd=BACKEND, env=environment, check=True)
+    # 不注入 DATABASE_URL：测试夹具强制要求 PostgreSQL 且库名必须含 test
+    # （见 tests/v1/conftest.py::_test_database_url），注入 SQLite 会让整套测试
+    # 在 collect 期直接 exit。库地址由 .env（本地）或 CI 环境变量指定。
+    subprocess.run(cmd, cwd=BACKEND, env=os.environ.copy(), check=True)
 
 
 def collect_coverage() -> Path:

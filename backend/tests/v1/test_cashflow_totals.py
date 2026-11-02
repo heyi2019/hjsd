@@ -95,3 +95,28 @@ def test_keyword_wildcards_are_escaped(seeded_client, headers):
     _, _, body = _totals(seeded_client, headers, keyword="%")
     assert body["total"] == 0
     assert Decimal(str(body["total_in"])) == Decimal("0")
+
+
+def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, headers):
+    """导出路由曾漏传 keyword：路由默认值 `Query(None)` 被原样带进 SQL 条件 → 500。
+
+    关键字加在列表接口后，导出（直接调用 `list_cashflows`）也必须显式传，
+    否则 `keyword.strip()` 作用在 Query 对象上。这里同时锁住「导出按关键字过滤」。
+    """
+    created = _create(seeded_client, headers, direction="IN", amount="12.34", note="导出关键字-甲")
+
+    hit = seeded_client.get(
+        "/api/v1/cashflows/export.csv",
+        params={"keyword": created["flow_no"]},
+        headers=headers,
+    )
+    assert hit.status_code == 200, hit.text
+    assert created["flow_no"] in hit.text
+
+    miss = seeded_client.get(
+        "/api/v1/cashflows/export.csv",
+        params={"keyword": "绝不可能命中的关键字-zzz"},
+        headers=headers,
+    )
+    assert miss.status_code == 200, miss.text
+    assert created["flow_no"] not in miss.text

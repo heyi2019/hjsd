@@ -161,9 +161,12 @@ def export_cashflows_csv(
     accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> Response:
+    # 直接调用路由函数时 `Query(default=None)` 不会被解析成 None，
+    # 漏传 keyword 会把 Query 对象一路带进 SQL 条件（曾让导出直接 500）。
     result = list_cashflows(
         pool_id=pool_id,
         order_id=order_id,
@@ -176,6 +179,7 @@ def export_cashflows_csv(
         accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
+        keyword=keyword,
         limit=EXPORT_ROW_LIMIT,
         offset=0,
         db=db,

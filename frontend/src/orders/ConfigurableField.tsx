@@ -289,7 +289,10 @@ export function injectOptionsIfMissing(
 export function CfgNestedItem(props: {
   cfg?: FieldConfigMap;
   name: string;
-  label: string;
+  /** 无配置时的兜底名称；统一术语字段应改用 fixedLabel。 */
+  label?: string;
+  /** 固定展示名称：字段键与配置仍保留，避免历史配置的旧文案影响统一业务术语。 */
+  fixedLabel?: string;
   rules?: Rule[];
   initialValue?: unknown;
   className?: string;
@@ -302,7 +305,7 @@ export function CfgNestedItem(props: {
   const resolvedRules = resolveRules(cfg, props.name, props.rules, condValues);
   if (!isFieldActive(cfg, props.name)) return null;
   return (
-    <BusinessRegistrationField className={props.className} label={fieldLabel(cfg, props.name, props.label)} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
+    <BusinessRegistrationField className={props.className} label={props.fixedLabel ?? fieldLabel(cfg, props.name, props.label ?? "")} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
       <Form.Item
         noStyle={props.noStyle ?? true}
         name={props.name}

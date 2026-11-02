@@ -25,7 +25,7 @@ export function AdditionalFeeFields(props: { pools: Pool[] }) {
           导致值写入 expense_items.intermediary_fee、污染数组字段并让 Form.List 重渲染崩溃（点击即报错）。 */}
       <AdaptiveFormGrid className="fee-row">
         <CfgNestedItem name="intermediary_fee" label="中介费"><MoneyInput placeholder="金额" /></CfgNestedItem>
-        <CfgNestedItem name="intermediary_pool_id" label="支出账户"><Select placeholder="请选择账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
+        <CfgNestedItem name="intermediary_pool_id" fixedLabel="资金账户"><Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></CfgNestedItem>
       </AdaptiveFormGrid>
       <Form.List name="expense_items">
         {(fields, { add, remove }) => {
@@ -35,7 +35,7 @@ export function AdditionalFeeFields(props: { pools: Pool[] }) {
               <AdaptiveFormGrid className="fee-row additional-expense-list">
                 {fields.map((field) => <div className="additional-expense-row" key={field.key}>
                   <Form.Item name={[field.name, "amount"]} label="金额" rules={[{ required: true, message: "请输入支出金额" }]}><MoneyInput placeholder="金额" /></Form.Item>
-                  <Form.Item name={[field.name, "pool_id"]} label="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}><Select placeholder="请选择账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
+                  <Form.Item name={[field.name, "pool_id"]} label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}><Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
                   <Form.Item name={[field.name, "note"]} label="支出备注"><Input placeholder="可选填" /></Form.Item>
                   <PermissionButton permission="order.create" type="link" danger onClick={() => remove(field.name)}>删除</PermissionButton>
                 </div>)}

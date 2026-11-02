@@ -167,12 +167,24 @@ def seed_default_users(db: Session) -> None:
 
 
 def _test_database_url() -> str:
-    """测试库 URL：`TEST_DATABASE_URL` 优先，其次 `.env` 的 `DATABASE_URL`。
+    """测试库 URL：环境变量 `TEST_DATABASE_URL` 优先，其次 `.env` 的同名项。
+
+    **刻意不回落 `DATABASE_URL`**：2026-11-02 的事故就是回落导致的——`.env` 只配了
+    `DATABASE_URL`，夹具回落到它，而库名 `heijin_erp_test` 恰好含 test 通过校验，
+    于是开发后端与 pytest 共用同一个库，跑一次测试清空一次，118 单丢失。
+    现在缺配置只会拒绝运行，不会"猜一个库去清空"。
 
     硬校验两条：必须 PostgreSQL、库名必须含 `test`。夹具会 TRUNCATE 全表，
     误指生产库即数据全毁——宁可在 collect 前直接退出，也不做"尽力而为"。
     """
-    url = os.environ.get("TEST_DATABASE_URL") or get_settings().database_url
+    settings = get_settings()
+    url = os.environ.get("TEST_DATABASE_URL") or settings.test_database_url
+    if not url:
+        pytest.exit(
+            "未配置测试库：请在 .env 设置 TEST_DATABASE_URL（库名须含 test），"
+            "或在环境变量中提供。不要与 DATABASE_URL 指向同一个库。",
+            returncode=1,
+        )
     if not url.startswith("postgresql"):
         pytest.exit(
             "测试夹具要求 PostgreSQL：请设置 TEST_DATABASE_URL（库名须含 test）。"

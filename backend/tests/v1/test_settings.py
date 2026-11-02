@@ -218,3 +218,33 @@ class TestLoginRateLimitKnob:
         with pytest.raises(ValidationError):
             Settings(login_rate_limit_per_minute=-1)
 
+
+
+class TestTestDatabaseSeparation:
+    """测试库必须与开发库分开配置：曾因回落 DATABASE_URL 把开发库 118 单清空。"""
+
+    def test_test_database_url_defaults_to_empty(self):
+        """缺省为空表示「未单独配置」，夹具据此拒绝运行，不猜一个库去清空。"""
+        # 必须显式屏蔽 .env：本机 .env 已配了 TEST_DATABASE_URL，否则测的是环境而非缺省值
+        assert Settings(_env_file=None).test_database_url == ""
+
+    def test_test_database_url_is_independent_of_database_url(self):
+        settings = Settings(
+            database_url="postgresql+psycopg://u:p@127.0.0.1:5432/heijin_erp_dev",
+            test_database_url="postgresql+psycopg://u:p@127.0.0.1:5432/heijin_erp_test",
+        )
+        assert settings.test_database_url.endswith("/heijin_erp_test")
+        assert settings.database_url.endswith("/heijin_erp_dev")
+
+    def test_env_file_value_is_loaded(self, monkeypatch, tmp_path):
+        """`.env` 里的 TEST_DATABASE_URL 必须真的被读进来，而不是只认环境变量。"""
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "DATABASE_URL=postgresql+psycopg://u:p@127.0.0.1:5432/heijin_erp_dev\n"
+            "TEST_DATABASE_URL=postgresql+psycopg://u:p@127.0.0.1:5432/heijin_erp_test\n",
+            encoding="utf-8",
+        )
+        monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+        settings = Settings(_env_file=env_file)
+        assert settings.test_database_url.endswith("/heijin_erp_test")
+        assert settings.database_url.endswith("/heijin_erp_dev")

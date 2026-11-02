@@ -94,6 +94,12 @@ class Settings(BaseSettings):
     # （迁移链与业务 SQL 均为跨方言写法，两种后端都能跑）。
     database_url: str = f"sqlite:///./{DEFAULT_DEV_DB_RELPATH}"
 
+    # 测试库：**必须与 database_url 分开**。pytest 夹具每个 session 会 TRUNCATE 全表 +
+    # 序列归位，一旦回落指向开发库/正式库就是数据全毁（2026-11-02 已真实发生过一次：
+    # .env 只配了 DATABASE_URL，夹具回落到它，把开发库 118 单清空）。
+    # 空字符串表示未单独配置——此时夹具会拒绝运行，不静默回落。
+    test_database_url: str = ""
+
     # 说明：原 SQLITE_SYNCHRONOUS / CACHE_SIZE_KB / MMAP_SIZE_MB / TEMP_STORE /
     # BUSY_TIMEOUT_MS 五个 PRAGMA 旋钮已随连接级 PRAGMA 应用函数一并下线；
     # 配置里若仍残留这些键会被 extra="ignore" 静默忽略，不再有任何效果。

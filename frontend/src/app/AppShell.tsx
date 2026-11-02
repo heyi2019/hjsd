@@ -252,12 +252,16 @@ export function AppShell() {
               const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
               if (!PageComponent) return null;
               return (
-                <ErrorBoundary key={key} name={key}>
-                  <div
-                    ref={isActive ? pageRef : undefined}
-                    className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
-                    aria-hidden={!isActive}
-                  >
+                <div
+                  key={key}
+                  ref={isActive ? pageRef : undefined}
+                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
+                  aria-hidden={!isActive}
+                >
+                  {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，
+                      page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
+                      当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
+                  <ErrorBoundary name={key}>
                     {key === "dashboard" ? (
                       <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
                     ) : (
@@ -271,8 +275,8 @@ export function AppShell() {
                         focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}
-                  </div>
-                </ErrorBoundary>
+                  </ErrorBoundary>
+                </div>
               );
             })}
           </Suspense>

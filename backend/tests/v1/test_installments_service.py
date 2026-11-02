@@ -60,7 +60,7 @@ def _account(
         actor="pytest",
     )
 
-def _order(seeded_db, *, order_type="DG", account_id=None, trade_date=TODAY):
+def _order(seeded_db, *, order_type="TH", account_id=None, trade_date=TODAY):
     return orders_service.create_order(
         seeded_db,
         order_type=order_type,
@@ -83,7 +83,7 @@ def _contract(
     seeded_db,
     order_id: int,
     *,
-    contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+    contract_type=InstallmentContractType.PICKUP_SALE.value,
     principal=None,
     down_payment="100",
     periods=2,
@@ -120,15 +120,15 @@ def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, off
     seeded_db.flush()
     return event
 
-def _dg_overdue(seeded_db, game_account: str, **kwargs):
+def _pickup_overdue(seeded_db, game_account: str, **kwargs):
     """DG 订单 + 逾期分期合约（订单创建时即关联库存账号）。"""
     account = _account(
         seeded_db,
         game_account,
         business_mode="DISTRIBUTION",
-        inventory_type="CONSIGNMENT",
+        inventory_type="PICKUP",
     )
-    order = _order(seeded_db, order_type="DG", account_id=account.id)
+    order = _order(seeded_db, order_type="TH", account_id=account.id)
     contract = _contract(seeded_db, order.id, **kwargs)
     contract.status = InstallmentStatus.OVERDUE.value
     seeded_db.flush()
@@ -144,17 +144,24 @@ def test_create_pickup_sale_requires_th_order(seeded_db):
             contract_type=InstallmentContractType.PICKUP_SALE.value,
         )  # 320-326
 
-def test_create_consignment_sale_requires_dg_order(seeded_db):
-    order = _order(seeded_db, order_type="HS")
-    with pytest.raises(Validation, match="CONSIGNMENT_SALE 只能用于 DG 订单"):
+def test_consignment_sale_is_rejected_for_consignment_orders(seeded_db):
+    """代挂售出仅全款：DG 订单既不能建 STOCK_SALE，也不能建遗留的 CONSIGNMENT_SALE。"""
+    order = _order(seeded_db, order_type="DG")
+    with pytest.raises(Validation, match="STOCK_SALE 只能用于 HS、TH 订单"):
+        _contract(
+            seeded_db,
+            order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+        )  # 327-333
+    with pytest.raises(Validation, match="代挂售出仅全款，不提供分期出售"):
         _contract(
             seeded_db,
             order.id,
             contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
-        )  # 327-333
+        )
 
 def test_create_rejects_schedule_period_out_of_range(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     with pytest.raises(Validation, match="分期计划期次必须从 1 开始且不能重复"):
         _contract(
             seeded_db,
@@ -167,7 +174,7 @@ def test_create_rejects_schedule_period_out_of_range(seeded_db):
         )  # 349-352
 
 def test_create_rejects_negative_final_period(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     # 本金 0 + 每期 100×2 = 200 的还款计划，尾期调整后为负
     with pytest.raises(Validation, match="每期金额过高"):
         _contract(
@@ -184,7 +191,7 @@ def test_create_rejects_negative_final_period(seeded_db):
 
 # ------------------------------------------------------------- 取消：状态守卫
 def test_cancel_rejects_closed_contract(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
@@ -195,7 +202,7 @@ def test_cancel_rejects_closed_contract(seeded_db):
 
 def test_cancel_rejects_settled_contract(seeded_db):
     """已结清合约不得再走退款/终止分期，避免反向冲销已完成交易。"""
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.SETTLED.value
     seeded_db.flush()
@@ -205,7 +212,7 @@ def test_cancel_rejects_settled_contract(seeded_db):
         )
 
 def test_cancel_rejects_non_active_order(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     order.status = "CANCELLED"
     seeded_db.flush()
@@ -216,7 +223,7 @@ def test_cancel_rejects_non_active_order(seeded_db):
 
 def test_cancel_skips_payment_already_reversed(seeded_db):
     """PAYMENT 已被 CANCEL 冲销同额 → remaining<=0，跳过逐笔退款（L712）。"""
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     payment = _posted_event(seeded_db, order.id, event_type=EventType.PAYMENT.value, amount="100")
     _posted_event(
@@ -316,7 +323,7 @@ def test_cancel_refund_total_matches_per_event_recompute(seeded_db):
 
 # ------------------------------------------------------------- 减免：期次守卫
 def test_waive_rejects_missing_period(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     with pytest.raises(NotFound, match="期次 99 不存在"):
         installment_service.waive_schedule(
@@ -330,7 +337,7 @@ def test_waive_rejects_missing_period(seeded_db):
         )  # 790-797
 
 def test_waive_rejects_completed_period(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -352,7 +359,7 @@ def test_waive_rejects_completed_period(seeded_db):
         )  # 800-801
 
 def test_waive_rejects_amount_over_outstanding(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id, per_period="300")
     with pytest.raises(Validation, match="减免金额超过未收金额"):
         installment_service.waive_schedule(
@@ -367,7 +374,7 @@ def test_waive_rejects_amount_over_outstanding(seeded_db):
 
 # ------------------------------------------------------------- 展期：期次守卫
 def test_extend_rejects_missing_period(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     with pytest.raises(NotFound, match="期次 99 不存在"):
         installment_service.extend_schedule(
@@ -380,7 +387,7 @@ def test_extend_rejects_missing_period(seeded_db):
         )  # 870-877
 
 def test_extend_rejects_received_period(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -401,7 +408,7 @@ def test_extend_rejects_received_period(seeded_db):
         )  # 878-879
 
 def test_extend_rejects_completed_period(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -422,7 +429,7 @@ def test_extend_rejects_completed_period(seeded_db):
         )  # 880-881
 
 def test_extend_rejects_earlier_due_on(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id, first_due_on=FUTURE)
     with pytest.raises(Validation, match="展期后的到期日必须晚于原到期日"):
         installment_service.extend_schedule(
@@ -435,7 +442,7 @@ def test_extend_rejects_earlier_due_on(seeded_db):
         )  # 882-883
 
 def test_extend_resets_overdue_period_to_pending(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     schedule = seeded_db.scalar(
         select(InstallmentSchedule).where(
@@ -458,7 +465,7 @@ def test_extend_resets_overdue_period_to_pending(seeded_db):
 
 # --------------------------------------------------------- 提前结清：状态守卫
 def test_settle_early_rejects_settled_contract(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.SETTLED.value
     seeded_db.flush()
@@ -468,7 +475,7 @@ def test_settle_early_rejects_settled_contract(seeded_db):
         )  # 947-956
 
 def test_settle_early_rejects_when_nothing_outstanding(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     for row in seeded_db.scalars(
         select(InstallmentSchedule).where(
@@ -484,7 +491,7 @@ def test_settle_early_rejects_when_nothing_outstanding(seeded_db):
 
 # ----------------------------------------------------------- 账号回收：处置守卫
 def test_recover_rejects_contract_not_overdue(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     assert contract.status in {
         InstallmentStatus.PENDING.value,
@@ -499,7 +506,7 @@ def test_recover_rejects_order_without_account(seeded_db):
     """未关联库存账号的订单 → 不物化快照，直接报「没有可回收的账号」。
 
     用 TH + PICKUP_SALE 组合：建单合法且天然不带库存账号（HS+STOCK_SALE 会
-    强制要求账号在库，DG+CONSIGNMENT_SALE 会要求订单类型为 DG）。
+    强制要求账号在库，DG 订单不提供分期出售）。
     """
     order = _order(seeded_db, order_type="TH")
     contract = _contract(
@@ -515,7 +522,7 @@ def test_recover_rejects_order_without_account(seeded_db):
         )  # 1062-1065
 
 def test_recover_rejects_duplicate_recovery(seeded_db):
-    order, contract = _dg_overdue(seeded_db, "recover-dup-account")
+    order, contract = _pickup_overdue(seeded_db, "recover-dup-account")
     installment_service.recover_account(
         seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
     )
@@ -530,7 +537,7 @@ def test_recover_rejects_duplicate_recovery(seeded_db):
 # ------------------------------------------------------- 回收账号出售登记全流程
 def _recovered(seeded_db, game_account: str):
     """返回 (order, contract)：已完成账号回收、合约 CLOSED。"""
-    order, contract = _dg_overdue(seeded_db, game_account)
+    order, contract = _pickup_overdue(seeded_db, game_account)
     installment_service.recover_account(
         seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
     )
@@ -560,7 +567,7 @@ def test_record_sale_requires_note(seeded_db):
         )  # 1128
 
 def test_record_sale_rejects_contract_not_closable(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     sale = _order(seeded_db, order_type="HS")
     with pytest.raises(Validation, match="只有已关闭、逾期或违约合约可以登记出售"):
@@ -574,7 +581,7 @@ def test_record_sale_rejects_contract_not_closable(seeded_db):
         )  # 1130-1135
 
 def test_record_sale_rejects_order_without_account(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
@@ -633,9 +640,9 @@ def test_record_sale_requires_prior_recovery(seeded_db):
         seeded_db,
         "resale-no-recover",
         business_mode="DISTRIBUTION",
-        inventory_type="CONSIGNMENT",
+        inventory_type="PICKUP",
     )
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db, order_type="TH")
     order.account_id = account.id
     seeded_db.flush()
     contract = _contract(seeded_db, order.id)
@@ -748,7 +755,7 @@ def test_create_stock_sale_rejects_dangling_account(seeded_db):
 
 def test_cancel_rejects_dangling_order(seeded_db):
     """installments.order_id 悬空 → 取消分期报「所属订单不存在」（L676）。"""
-    _, contract = _dg_overdue(seeded_db, "ACC-676")
+    _, contract = _pickup_overdue(seeded_db, "ACC-676")
     _raw_sql(
         seeded_db,
         "UPDATE installments SET order_id = 999676 WHERE id = ?",
@@ -765,9 +772,9 @@ def test_cancel_rejects_dangling_account(seeded_db):
         seeded_db,
         "ACC-739",
         business_mode="DISTRIBUTION",
-        inventory_type="CONSIGNMENT",
+        inventory_type="PICKUP",
     )
-    order = _order(seeded_db, order_type="DG", account_id=account.id)
+    order = _order(seeded_db, order_type="TH", account_id=account.id)
     contract = _contract(seeded_db, order.id)
     seeded_db.flush()
     _raw_sql(seeded_db, "UPDATE orders SET account_id = 999739 WHERE id = ?", (order.id,))
@@ -791,7 +798,7 @@ def test_settle_early_skips_sub_cent_residual(seeded_db):
     触发；仅当 DB 存在超过 2 位小数的脏值时才会走到——SQLite 宽松存储时可用独立
     连接直写复现，PostgreSQL 的 NUMERIC(18,2) 拒绝该精度，故本用例在 PG 下跳过。
     """
-    _, contract = _dg_overdue(seeded_db, "ACC-975")
+    _, contract = _pickup_overdue(seeded_db, "ACC-975")
     _raw_sql(
         seeded_db,
         "UPDATE installment_schedules SET due_amount = '1.00', "
@@ -816,7 +823,7 @@ def test_settle_early_skips_sub_cent_residual(seeded_db):
 
 def test_recover_rejects_dangling_order(seeded_db):
     """installments.order_id 悬空 → 回收账号报「没有所属订单」（L1061）。"""
-    _, contract = _dg_overdue(seeded_db, "ACC-1061")
+    _, contract = _pickup_overdue(seeded_db, "ACC-1061")
     _raw_sql(
         seeded_db,
         "UPDATE installments SET order_id = 999161 WHERE id = ?",
@@ -833,9 +840,9 @@ def test_recover_rejects_dangling_account(seeded_db):
         seeded_db,
         "ACC-1068",
         business_mode="DISTRIBUTION",
-        inventory_type="CONSIGNMENT",
+        inventory_type="PICKUP",
     )
-    order = _order(seeded_db, order_type="DG", account_id=account.id)
+    order = _order(seeded_db, order_type="TH", account_id=account.id)
     contract = _contract(seeded_db, order.id)
     contract.status = InstallmentStatus.OVERDUE.value
     seeded_db.flush()

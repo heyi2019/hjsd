@@ -25,14 +25,14 @@ TODAY = date(2026, 10, 12)
 def _contract(seeded_db, *, principal="1200.00", down_payment="200.00", periods=2, per_period="500.00"):
     order = orders_service.create_order(
         seeded_db,
-        order_type="DG",
+        order_type="TH",
         trade_date=TODAY,
         actor="pytest",
     )
     return installment_service.create_installment(
         seeded_db,
         order_id=order.id,
-        contract_type="CONSIGNMENT_SALE",
+        contract_type="PICKUP_SALE",
         principal=Decimal(principal),
         down_payment=Decimal(down_payment),
         periods=periods,

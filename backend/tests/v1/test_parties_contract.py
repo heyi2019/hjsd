@@ -247,8 +247,8 @@ class TestListAndGetCustomers:
         )
         installment = installment_service.create_installment(
             seeded_db,
-            order_id=dg_order.id,
-            contract_type="CONSIGNMENT_SALE",
+            order_id=th.id,
+            contract_type="PICKUP_SALE",
             principal=500,
             down_payment=100,
             periods=1,
@@ -674,15 +674,15 @@ class TestPartiesApi:
         customer = _customer(seeded_db, "详情接口客户", owner_id=9)
         order = orders_service.create_order(
             seeded_db,
-            order_type="DG",
+            order_type="TH",
             trade_date=date(2026, 10, 12),
-            customer_roles=[(customer.id, "CONSIGNOR")],
+            customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
         )
         installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type="CONSIGNMENT_SALE",
+            contract_type="PICKUP_SALE",
             principal=300,
             down_payment=100,
             periods=1,

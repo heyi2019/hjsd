@@ -1601,11 +1601,11 @@ class TestAccountEffect:
         assert account.status == AccountStatus.VOID.value
 
     def test_payment_event_cannot_bypass_installment_service(self, seeded_db):
-        order = _order(seeded_db, order_type="DG")
+        order = _order(seeded_db, order_type="TH")
         installments_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+            contract_type=InstallmentContractType.PICKUP_SALE.value,
             principal=Decimal("1000"),
             periods=1,
             per_period=Decimal("1000"),
@@ -1624,11 +1624,11 @@ class TestAccountEffect:
             )
 
     def test_cancel_payment_is_rejected_until_schedule_reversal_is_supported(self, seeded_db):
-        order = _order(seeded_db, order_type="DG")
+        order = _order(seeded_db, order_type="TH")
         contract = installments_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+            contract_type=InstallmentContractType.PICKUP_SALE.value,
             principal=to_money("1000"),
             periods=1,
             per_period=to_money("1000"),
@@ -1883,10 +1883,10 @@ class TestOrdersApi:
         response = seeded_client.post(
             "/api/v1/orders",
             json={
-                "order_type": "DG",
+                "order_type": "TH",
                 "trade_date": D.isoformat(),
                 "installment": {
-                    "contract_type": "CONSIGNMENT_SALE",
+                    "contract_type": "PICKUP_SALE",
                     "principal": "800.00",
                     "periods": 1,
                     "first_due_on": "2026-11-01",

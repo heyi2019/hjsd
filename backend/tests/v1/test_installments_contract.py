@@ -59,7 +59,7 @@ def _account(seeded_db, game_account: str):
         actor="pytest",
     )
 
-def _order(seeded_db, *, order_type="DG", account_id=None, owner_id=None, trade_date=TODAY):
+def _order(seeded_db, *, order_type="TH", account_id=None, owner_id=None, trade_date=TODAY):
     return orders_service.create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
@@ -75,7 +75,7 @@ def _contract(
     seeded_db,
     order_id: int,
     *,
-    contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+    contract_type=InstallmentContractType.PICKUP_SALE.value,
     principal=None,
     down_payment="100",
     periods=2,
@@ -100,8 +100,8 @@ def _contract(
 
 # ------------------------------------------------------------------ 建单校验
 class TestCreateInstallmentValidation:
-    @pytest.mark.parametrize(("order_type", "inventory_type"), [("TH", "PICKUP"), ("DG", "CONSIGNMENT")])
-    def test_inventory_accounts_use_stock_sale_for_th_and_dg(self, seeded_db, order_type, inventory_type):
+    @pytest.mark.parametrize(("order_type", "inventory_type"), [("TH", "PICKUP")])
+    def test_inventory_accounts_use_stock_sale_for_th(self, seeded_db, order_type, inventory_type):
         source = orders_service.create_order(
             seeded_db,
             order_type=order_type,
@@ -138,10 +138,9 @@ class TestCreateInstallmentValidation:
         ("order_type", "contract_type"),
         [
             ("TH", "PICKUP_SALE"),
-            ("DG", "CONSIGNMENT_SALE"),
         ],
     )
-    def test_th_and_dg_support_installment_overdue_and_payment(
+    def test_th_supports_installment_overdue_and_payment(
         self, seeded_db, order_type, contract_type
     ):
         order = _order(seeded_db, order_type=order_type)
@@ -319,7 +318,7 @@ class TestCreateInstallmentValidation:
             Installment(
                 inst_no="INS-INVALID-SCHEDULE-TOTAL",
                 order_id=order.id,
-                contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+                contract_type=InstallmentContractType.PICKUP_SALE.value,
                 principal=Decimal("700"),
                 down_payment=Decimal("100"),
                 service_fee=Decimal("0"),
@@ -538,7 +537,6 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
     ("order_type", "contract_type", "business_mode", "inventory_type", "expected_status"),
     [
         ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP", AccountStatus.VOID.value),
-        ("DG", "CONSIGNMENT_SALE", "DISTRIBUTION", "CONSIGNMENT", AccountStatus.WAITING.value),
     ],
 )
 def test_cancel_distribution_installment_uses_business_specific_account_result(
@@ -1485,7 +1483,6 @@ class TestInstallmentsApi:
         [
             ("HS", "STOCK_SALE", "SELF", "RECOVERY"),
             ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP"),
-            ("DG", "CONSIGNMENT_SALE", "DISTRIBUTION", "CONSIGNMENT"),
         ],
     )
     def test_recovered_account_installment_sale_auto_links_resale(
@@ -1544,7 +1541,7 @@ class TestInstallmentsApi:
         assert resale.related_order_id == resale_order.id
 
 def test_final_period_absorbs_rounding_difference(seeded_db):
-    order = _order(seeded_db, order_type="DG")
+    order = _order(seeded_db)
     contract = _contract(seeded_db, order.id, principal="1000", down_payment="0", periods=3, per_period="333.34", adjust_final_period=True)
     schedules = seeded_db.scalars(select(InstallmentSchedule).where(InstallmentSchedule.installment_id == contract.id).order_by(InstallmentSchedule.period_no)).all()
     assert [item.due_amount for item in schedules] == [Decimal("0"), Decimal("333.34"), Decimal("333.34"), Decimal("333.32")]

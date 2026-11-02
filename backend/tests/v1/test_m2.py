@@ -41,29 +41,33 @@ def _account(seeded_db, game_account: str):
         actor="pytest",
     )
 
-class TestA04DgConsignmentSale:
+class TestA04DistributionInstallmentSale:
+    """分销货源的分期出售：回收、提号可选分期出售，代挂售出仅全款。
+
+    原 A04 按「代挂分期」编写；代挂售出收敛为仅全款后，分期链路载体改用提号（TH）。
+    """
 
     def test_downpayment_two_periods_deliver(self, seeded_db):
         platform = parties_service.create_counterparty(
-            seeded_db, display_name="寄售平台B", type="PLATFORM", actor="pytest"
+            seeded_db, display_name="寄售平台B", type="PEER", actor="pytest"
         )
         customer = parties_service.create_customer(seeded_db, display_name="分期客户", actor="pytest")
         seeded_db.commit()
 
         order = orders_service.create_order(
             seeded_db,
-            order_type="DG",
+            order_type="TH",
             trade_date=TODAY,
             actor="pytest",
-            customer_roles=[(customer.id, "CONSIGNOR")],
-            counterparty_roles=[(platform.id, "PLATFORM")],
+            customer_roles=[(customer.id, "BUYER")],
+            counterparty_roles=[(platform.id, "PEER")],
         )
         seeded_db.commit()
 
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+            contract_type=InstallmentContractType.PICKUP_SALE.value,
             principal=Decimal("1200"),
             down_payment=Decimal("200"),
             periods=2,
@@ -114,13 +118,13 @@ class TestA04DgConsignmentSale:
     def test_unsettled_contract_cannot_deliver(self, seeded_db):
         seeded_db.commit()
         order = orders_service.create_order(
-            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+            contract_type=InstallmentContractType.PICKUP_SALE.value,
             principal=Decimal("1100"),
             down_payment=Decimal("100"),
             periods=2,
@@ -139,13 +143,13 @@ class TestA04DgConsignmentSale:
     def test_payment_cannot_exceed_receivable(self, seeded_db):
         seeded_db.commit()
         order = orders_service.create_order(
-            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         contract = installment_service.create_installment(
             seeded_db,
             order_id=order.id,
-            contract_type=InstallmentContractType.CONSIGNMENT_SALE.value,
+            contract_type=InstallmentContractType.PICKUP_SALE.value,
             principal=Decimal("600"),
             down_payment=Decimal("100"),
             periods=1,

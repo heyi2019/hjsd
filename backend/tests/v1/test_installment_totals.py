@@ -23,12 +23,12 @@ D2 = date(2026, 10, 15)
 def _contract(seeded_db, *, trade_date: date, paid: str = "0", down: str = "200.00",
               periods: int = 2, per_period: str = "500.00"):
     order = orders_service.create_order(
-        seeded_db, order_type="DG", trade_date=trade_date, actor="pytest"
+        seeded_db, order_type="TH", trade_date=trade_date, actor="pytest"
     )
     contract = installment_service.create_installment(
         seeded_db,
         order_id=order.id,
-        contract_type="CONSIGNMENT_SALE",
+        contract_type="PICKUP_SALE",
         principal=Decimal("1200.00"),
         down_payment=Decimal(down),
         periods=periods,

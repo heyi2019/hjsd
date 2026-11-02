@@ -102,7 +102,7 @@ def _dg_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
     order = _order(
         seeded_db,
         order_no=order_no,
-        order_type="DG",
+        order_type="TH",
         capital_type="ZERO",
         owner_id=owner_id,
         account_id=None,
@@ -110,7 +110,7 @@ def _dg_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
     inst = installments_service.create_installment(
         seeded_db,
         order_id=order.id,
-        contract_type="CONSIGNMENT_SALE",
+        contract_type="PICKUP_SALE",
         principal=Decimal("100"),
         down_payment=Decimal("0"),
         periods=1,

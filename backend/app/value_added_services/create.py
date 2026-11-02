@@ -199,10 +199,12 @@ def _service_fee_from_snapshot(
 
 
 #: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
+#: 分期出售的业务名称只有一个，回收/提号售出可用，代挂售出仅全款不建分期合约；
+#: PICKUP_SALE / CONSIGNMENT_SALE 是迁移 0056 之前的遗留类型，只为读取历史数据保留。
 _CONTRACT_ALLOWED_ORDER_TYPES = {
-    InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH", "DG"}),
+    InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH"}),
     InstallmentContractType.PICKUP_SALE.value: frozenset({"TH"}),
-    InstallmentContractType.CONSIGNMENT_SALE.value: frozenset({"DG"}),
+    InstallmentContractType.CONSIGNMENT_SALE.value: frozenset(),
 }
 
 
@@ -260,6 +262,13 @@ def create_installment(
     # 表驱动比复制四遍 if/elif 更难漏改、也更好审计（新增类型必须在此登记或显式例外）。
     allowed_order_types = _CONTRACT_ALLOWED_ORDER_TYPES.get(contract_type)
     if allowed_order_types is not None and order.order_type not in allowed_order_types:
+        if not allowed_order_types:
+            # 空集 = 该合约类型已不再对任何订单开放（代挂售出仅全款）。
+            raise Validation(
+                "代挂售出仅全款，不提供分期出售",
+                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+                details={"order_no": order.order_no, "contract_type": contract_type},
+            )
         allowed_order_label = "、".join(sorted(allowed_order_types))
         raise Validation(
             f"{contract_type} 只能用于 {allowed_order_label} 订单",

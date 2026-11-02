@@ -1009,7 +1009,7 @@ it("P1/FE-256：系统下架审计轨迹在账号详情中可见", () => {
   expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
 });
 
-it("P1/FE-257：台账状态列只展示库存状态，订单状态/合约状态不重复展示", async () => {
+it("P1/FE-257：台账库存状态列只展示库存状态，订单状态独立成列不重复展示", async () => {
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
     id: 31,
     order_no: "HS-INSTALLMENT-SETTLED-REGRESSION",
@@ -1023,8 +1023,11 @@ it("P1/FE-257：台账状态列只展示库存状态，订单状态/合约状态
   renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
 
   const row = (await screen.findAllByText("HS-INSTALLMENT-SETTLED-REGRESSION"))[0].closest("tr") as HTMLElement;
+  // 库存状态列只反映账号/库存状态，不被订单状态覆盖
   expect(within(row).getByText("在库")).toBeInTheDocument();
-  expect(within(row).queryByText("分期中")).toBeNull();
+  // 订单状态独立成列（INSTALLMENT → 分期中）：允许出现，但全行只出现一次，不与库存状态列重复
+  expect(within(row).getAllByText("分期中")).toHaveLength(1);
+  // 合约状态不再重复出现在台账行内
   expect(within(row).queryByText("合约：已结清")).toBeNull();
 });
 

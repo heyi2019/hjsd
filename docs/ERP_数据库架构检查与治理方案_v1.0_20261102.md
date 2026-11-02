@@ -46,14 +46,15 @@
 1. **「生产结构落后 10 个迁移、停在 0064」不成立**。实测是 `0003`，且 `db_version` 记录了 11-01 的三次 `0001` 与一次 `0003`——它是 11-01 重建后自己升上去的，与 0064 无关。结论不变（`0003` 同样不在只剩 `0001` 的活动链里，`alembic current` 仍会报 `Can't locate revision`），但**根因描述要改**：不是「历史遗留太久」，是「11-01 重建后又被增量迁移推到 0003，而增量迁移已被压掉」。
 2. **「生产数据量未知」→ 实测为空库**。这直接降低了上线风险等级：覆盖式重建**无业务数据损失**，唯一需要保留的是 2 个登录账号与 29 条审计日志。
 
-**用户账号不一致（上线前必须处理）**
+**用户账号不一致（✅ 已处理，方案 A，见 11.9）**
 
-| 库 | 账号 |
-|---|---|
-| 生产 `heijin_erp` | `admin`（系统管理员）、**`19873133890`（何一）** |
-| 上线包 `heijin_erp_release` | `三三`（ADMIN）、`xuanxuan`（VIEWER） |
+| 库 | 账号 | 状态 |
+|---|---|---|
+| 生产 `heijin_erp` | `admin`（系统管理员）、`19873133890`（何一） | 原始状态 |
+| 上线包（替换前） | `三三`（ADMIN）、`xuanxuan`（VIEWER） | 已废弃 |
+| 上线包（替换后） | `admin`（系统管理员）、`19873133890`（何一） | ✅ 与生产一致，含原口令哈希 |
 
-覆盖式重建会把生产登录账号整组替换成 dev 的 `三三`/`xuanxuan`，口令哈希也换成 dev 的——上线后**用原账号登不进**。三个选项见 11.8。
+上线包的 `users` 已按生产对齐，覆盖式重建后**账号与口令均不变**。待决残留：`19873133890` 的 `must_change_password = true`（生产原值，非本次引入），首次登录会被要求改口令。
 
 
 ### 1.3 E2E 数据库：**不存在**
@@ -413,7 +414,7 @@ Prod
 
 ### P0（上线前必须完成，缺一不可）
 
-1. **核实生产库现状**：✅ 已完成（11.8）——生产为 `0003` / 41 表 / **业务数据全空**；`prod_final_20261102_234555.dump` 已双端留档并校验。**新增待办**：上线账号对齐（11.8 ④ 方案 A）。
+1. **核实生产库现状**：✅ 已完成（11.8）——生产为 `0003` / 41 表 / **业务数据全空**；`prod_final_20261102_234555.dump` 已双端留档并校验。上线账号对齐 ✅ 已完成（11.10，方案 A）。
 2. **建 `heijin_erp_release`**：✅ 已完成（11.1 / 11.5）——由 dev dump 恢复，**不是** rawdata 导入。
 3. **Dev 库剥离真实数据**：确认 Release 校验通过后，Dev 可重置为纯结构库（此步需你明确授权，本轮未做）。
 4. **部署链路适配压平**：✅ 已完成（`591e7f4`）——`deploy.sh` 版本戳预检 + 测试库黑名单。
@@ -495,7 +496,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 | `customers` | 12 | **0** | 全部命中 `TEST_CUSTOMERS` 名单，引用 0 |
 | `counterparties` | 4 | **0** | 全部测试 |
 | `teams` | 2 | **0** | 全部测试 |
-| `users` | 3 | **2** | 删 `user_test_20261101`；保留 `三三`(ADMIN) 与 `xuanxuan`(VIEWER) |
+| `users` | 3 | **2** | 删 `user_test_20261101`；当时保留 `三三`(ADMIN) 与 `xuanxuan`(VIEWER)，**11.9 已整体替换为生产的 `admin` / `19873133890`** |
 
 订单 / 库存 / 流水 / 事件零影响（119 / 90 / 370 / 200 不变），`orders.owner_id` 无空值，涉及的外键表（deposits、order_counterparty_roles、customer_leads、order_customer_roles、notifications）全为 0 行。
 
@@ -574,8 +575,8 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 | 项 | 结果 |
 |---|---|
-| 文件 | `backups/release_20261102_234054.dump`（219,263 B，`pg_dump -Fc`） |
-| 校验 | `backups/release_latest.sha256` → `f4af4f80…83fc683` |
+| 文件 | 初版 `backups/release_20261102_234054.dump`（219,263 B）→ **现行 `backups/release_20261102_235658.dump`（219,284 B，账号对齐后重出，见 11.10）** |
+| 校验 | `backups/release_latest.sha256` → 现行 `b62f1a9b…818e6e`（初版为 `f4af4f80…83fc683`） |
 | TOC 自检 | `pg_restore -l` 解出 **40 条 TABLE DATA**（= 40 表），TOC 共 445 条 |
 
 **② 覆盖式重建演练（P0-5）——全流程通过**
@@ -636,15 +637,17 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 4. 本机跑 `pull_backup.sh --host heijin-prod`：拉取 6 份、SHA256 全通过、魔数 0 异常、`keep=3` 滚动生效；
 5. cron 条目 `20 3 * * * .../backup_daily.sh` 无需改动，指向同一路径，次日 03:20 起自动产出 PG dump。
 
-**④ 待你裁决：上线后用什么账号登录**
+**④ 上线后用什么账号登录（→ 已按 A 执行，见 11.10）**
 
 覆盖式重建会把生产 2 个账号（`admin`、`19873133890`）替换成上线包的 `三三`、`xuanxuan`，口令哈希一并替换。
 
 | 方案 | 做法 | 代价 |
 |---|---|---|
-| **A（推荐）** | 上线包内先把 `users` 对齐生产：删 `三三`/`xuanxuan`，从生产 dump 取 `admin` + `19873133890` 两行（含 `password_hash`）写入 release | 账号口令完全不变；需改 release 库一次（幂等、可重做） |
+| **A（✅ 已采用）** | 上线包内先把 `users` 对齐生产：从生产 dump 取 `admin` + `19873133890` 两行（含 `password_hash`）写入 release | 账号口令完全不变；需改 release 库一次（幂等、可重做） |
 | B | 保留 `三三`/`xuanxuan`，上线后重新建号 | 上线当天必须知道 dev 口令，或走重置流程；易卡住 |
 | C | 恢复后立刻用 SQL 把生产两行插回去 | 等效 A，但把风险推到上线窗口现场 |
+
+**执行细节补充**：release 与生产两库 `users` 均为 **2 行、id 恰好都是 1/2、18 列顺序完全一致**，所以实际做法是**原地 UPDATE 而非删行重插**——`users` 被 6 处外键引用（`orders.owner_id` 等），删行会触发 RESTRICT。见 11.10。
 
 **⑤ 陷阱：别用生产旧镜像去验「版本戳断裂」**
 
@@ -727,6 +730,58 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 ---
 
+### 11.10 上线包账号对齐生产（方案 A 已执行，2026-11-02 23:56，全本地）
+
+**目标**：覆盖式重建后，生产原账号 `admin` / `19873133890`（何一）能照旧登录，口令不变。
+
+**取数**：生产 dump 已在本机（`prod_final_20261102_234555.dump`），**无需再连生产**。恢复进一次性临时库 `berp_prod_stage` 读出两行，用完即 `DROP`。
+
+**两库结构比对（决定实现方式）**
+
+| 项 | 结果 |
+|---|---|
+| 行数 | 均 **2** 行 |
+| id | 均 **1 / 2**，一一对应 |
+| 列 | 均 **18 列，列名与顺序完全一致** |
+| 哈希 | 均 `pbkdf2_sha256$240000$`，salt 22 字符、hash 43 字符 |
+| 引用外键 | `orders.owner_id` / `customers.owner_id` / `customer_leads.owner_id` / `notifications.recipient_user_id` / `order_profit_allocations.user_id` / `users.handover_user_id` 共 6 处 |
+
+因为是 2↔2、id 对齐，**采用原地 `UPDATE` 而非删行重插**——`users` 被 6 处外键引用，`DELETE` 会撞 RESTRICT。列类型注意：`pool_ids` / `team_ids` 是 **json**，参数需 `::json` 转型（首次执行即报 `DatatypeMismatch`）。
+
+**结果**
+
+| id | username | display_name | role | must_change_password |
+|---|---|---|---|---|
+| 1 | `admin` | 系统管理员 | ADMIN | f |
+| 2 | `19873133890` | 何一 | ADMIN | **t** |
+
+- 何一 `pool_ids = [1,2]`（两池权限随行迁移，未丢）；
+- 五处外键**悬空 0 行**（`orders.owner_id` 119 条全部仍指向有效的 id=1）；
+- 哈希可被后端校验器解析：`verify_password('错误口令', hash)` 对两账号均返回 `False` 而非抛异常；
+- 回滚快照：`backups/release_users_rollback_20261102.json`（替换前的两行，含 dev 哈希；`backups/` 已在 `.gitignore`）。
+
+**新上线包**：`backups/release_20261102_235658.dump`（219,284 B，40 TABLE DATA），sha256 `b62f1a9b…818e6e`，指向记录在 `release_latest.sha256`（旧包 `release_20261102_234054.dump` 保留不删）。
+
+**重跑演练（临时库 `heijin_erp_drill3`，用完即 DROP）**
+
+| 校验 | 结果 |
+|---|---|
+| `pg_restore --no-owner --single-transaction` | 退出码 0 |
+| 表 / 版本戳 | 40 / `0001` |
+| 行数 | 119 单 / 90 库存 / 370 流水 / 200 事件 / **2 用户** |
+| `alembic current` | `0001 (head)`，无 `Can't locate revision` |
+| 错误口令登录（两账号） | **401** `AUTH_REQUIRED`，非 500 → 哈希路径可用 |
+| `ADMIN_PASSWORD=… create_admin.py` | 「管理员账号已就绪：admin」→ 登录 200 |
+| 鉴权读取 | `/orders` 200、`/pools/1/balance` 200（`287510.47` / `343401.72`）、`/users` 200 |
+
+**副作用与残留**
+
+1. 119 单的 `owner_id` 仍 = 1，现在指向「系统管理员」——归属人显示名会从「李三」变「系统管理员」。语义修正（改成 id=2 何一）属动业务数据，**未做**。
+2. `19873133890` 的 `must_change_password = true` 是**生产原值**，不是本次引入：上线后首次登录会被要求改口令。若要免除，改的是生产语义而非上线包，**未动**。
+3. `create_admin.py` 是「建或改」，部署时 `export ADMIN_PASSWORD` 会**覆盖 admin(id=1) 的口令**——这是刻意保留的兜底，不影响何一账号。
+
+---
+
 ## 附：操作边界声明
 
 **检查阶段（第一~十节）**：只对本项目三个库执行 `SELECT`（`pg_database`、`information_schema`、`count(*)`）；未连阿里云生产库；未执行 DDL/DML；未改任何 `.env`。
@@ -745,4 +800,6 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 - 写入：`cp` 三份旧脚本到 `.bak-20261102/` 后 `scp` 覆盖为仓库版本（11.8 ③），并重跑 `backup_daily.sh` 生成一份新 dump 验证；
 - **未做**：任何 DDL、任何业务表 DML、任何 DROP、未停任何容器、未动 `deploy/.env`。
 
-**阶段 2 / 演练执行（11.7）**：从 `heijin_erp_release` **只读** `pg_dump` 生成上线包；演练用临时库 `heijin_erp_drill`（非本项目四库之一，用完即 `DROP ... WITH (FORCE)`），演练期间后端在 `127.0.0.1:8199` 临时起停，未触碰 8123 开发服务；`heijin_erp_dev` / `test` / `release` / `migration_test` **零写入**。
+**阶段 2 / 演练执行（11.7）**：从 `heijin_erp_release` **只读** `pg_dump` 生成上线包；演练用临时库 `heijin_erp_drill`（非本项目四库之一，用完即 `DROP ... WITH (FORCE)`），演练期间后端在 `127.0.0.1:8199` 临时起停，未触碰 8123 开发服务；`heijin_erp_dev` / `test` / `release` / `migration_test` **零写入**（11.7、11.9 两轮）。
+
+**账号对齐（11.10，唯一一次对 `heijin_erp_release` 的写入）**：`UPDATE users` 两行（id=1/2）为生产 dump 中的同名同 id 行，18 列全量覆盖；替换前两行已留档 `backups/release_users_rollback_20261102.json`，可原地回写。取数用的临时库 `berp_prod_stage`、演练库 `heijin_erp_drill3` 均用完即 `DROP`。**生产库自「不想碰」宣告后未再连接**。

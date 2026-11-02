@@ -53,6 +53,7 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
     return [
         {
             "account_id": row.id,
+            "stock_no": row.stock_no,
             "game_account": row.game_account,
             "business_mode": row.business_mode,
             "inventory_type": row.inventory_type,

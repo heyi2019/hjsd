@@ -423,7 +423,7 @@ Prod
 
 6. ✅ 测试闸门加 `release/prod` 黑名单 + `TEST != DATABASE` 校验（`591e7f4`）。
 7. ✅ **已复评：无需拆分**。`coverage-gate.yml` 的 postgres 是 GitHub Actions **一次性 service container**，库名 `heijin_erp_test`，job 结束即销毁，两个变量同值不会伤到任何真实数据；`conftest` 的「TEST ≠ DATABASE」校验在 `CI` 环境下按设计跳过。属命名冗余，不是风险。
-8. 删除或归档 `heijin_erp_migration_test`（先 dump 留档）。
+8. 删除或归档 `heijin_erp_migration_test`（✅ 已 dump 留档 `archive_migration_test_20261102_235246.dump`，待删除）。
 9. 开启 PG WAL 归档（PITR）。
 
 ### P2（上线后 30 天内）
@@ -604,6 +604,8 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 阶段 3 第 8 步「管理员登录 → 建一笔回收单 → 作废」需要真实管理员口令，本机无凭据，未执行。这一步必须在上线日现场做，且**不要因为演练全绿就跳过**——健康检查只证明进程起来了，不证明写路径可用。
 
+> **当日已补齐**：用临时库 + `create_admin.py` 造出的演练管理员把这一步跑通了（登录 / 建单 201 / 读取 / 作废 / 池余额接口复核），连同第 9 步的 `stamp_db_version` 与 `seed_policy_definitions` 一并验证，见 11.9。
+
 ### 11.8 生产首次连线：阶段 0 完成 + 三处脚本落后（2026-11-02 23:47）
 
 **① 阶段 0 留档已完成**
@@ -656,6 +658,48 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 即：`0003` 是旧链里的合法版本，旧镜像当然认得。上线时 `deploy.sh` 用的是**新构建镜像**，在它眼里 `0003` 就是未知版本，预检照常触发。本地探针库（伪造 `alembic_version='0003'`）用当前代码实跑，复现的就是新镜像行为。
 
 **校验方法**：验版本戳必须在**将要上线的那份代码**里跑；在旧镜像里跑只会得到「一切正常」的假象。
+
+### 11.9 阶段 3 第 8–9 步补齐演练（2026-11-02 23:52，全部在本地临时库）
+
+11.7 里未覆盖的「登录 → 建单 → 作废」与「部署脚本后半段」，本轮用临时库 `heijin_erp_drill2` 补齐（用完已 DROP）。
+
+**① 部署脚本后半段（`deploy.sh` 在 `alembic upgrade head` 之后的三步）**
+
+| 步骤 | 结果 |
+|---|---|
+| `stamp_db_version.py`（`APP_VERSION=1.0.1`） | ✅ `db_version` 表在 release 包里**不存在**，脚本靠 `create_all(checkfirst=True)` 自动建表并写入 1 行（`0001` / 1.0.1） |
+| `seed_policy_definitions.py --apply` | ✅ 定义仍 6 条、版本仍 4 条（幂等）；日志措辞「将创建/已创建」有歧义，但计数无变化 |
+| `create_admin.py`（`ADMIN_PASSWORD=…`） | ✅ 建出 `admin`（ADMIN） |
+
+**② 冒烟：登录 → 建单 → 读取 → 作废**
+
+| 动作 | 结果 |
+|---|---|
+| `POST /auth/login`（admin） | ✅ 200，取到 token |
+| `POST /orders`（HS，`game_account=SMOKE_DRILL_20261102`） | ✅ **201**，单号 `HS0056`，`account_id=169`，`owner_id=4` |
+| `GET /orders`、`GET /stocks` | ✅ 200，读到 119 单存量数据 |
+| `GET /pools/1/balance`、`/pools/2/balance` | ✅ `57579.17` / `54253.06`——**与 11.7 修正后的余额口径完全一致**，等于接口层复核了那次纠错 |
+| `POST /orders/227/cancel` | ✅ 200，订单转 `CANCELLED` |
+
+**③ 关键结论：上线不会登不进去（影响 11.8 ④ 的方案选择）**
+
+`create_admin.py` 的语义是**建或改**：找不到 `admin` 就建，找到就重置口令并置 ADMIN。所以只要部署时 `export ADMIN_PASSWORD='强口令'`，无论上线包里的账号是什么，都一定有一个可用的 `admin` 登录。**「覆盖后原账号登不进」不是硬阻塞，最多是「登进去的人不是原来那个人」。**
+
+重估三个方案：
+
+| 方案 | 真实后果 |
+|---|---|
+| **A** | 保住生产的 `19873133890`（何一）账号且口令不变；`admin`（id=1）口令会被 `ADMIN_PASSWORD` 覆盖成新值；119 单归属人显示名变成「系统管理员」 |
+| **B** | 何一账号丢失，变成 `三三`/`xuanxuan` + 新建的 `admin`；历史数据不受影响（`created_by` 全是 `wps-import`） |
+| **C** | 等价 A，但拖到上线窗口现场做 |
+
+**④ 一处待业务确认的观察（非本次范围，不改）**
+
+冒烟单作废后：订单 `status=CANCELLED`，但它生成的库存行仍是 `status=WAITING` / `inventory_status=IN_STOCK`（`KU_00091`）。即「撤掉一笔回收单，那个账号还留在在库列表里」。可能是有意（账号实物仍在手上，作废只表示单据无效），也可能是漏改。**需业务口径确认，本轮不动代码。**
+
+**⑤ P1-8 孤儿库留档**
+
+`heijin_erp_migration_test` 已 dump：`backups/archive_migration_test_20261102_235246.dump`（192,321 B，40 表），sha256 `5929303019…35e071`。库内**无任何业务数据**（orders/stocks/cashflow 全 0），只有种子 + `audit_logs` 17 + `document_sequences` 14。留档完成后可随时删除，等你点头。
 
 ---
 

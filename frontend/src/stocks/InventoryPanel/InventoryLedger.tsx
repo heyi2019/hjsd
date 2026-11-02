@@ -1,7 +1,6 @@
 import { Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
 import { DataTable, PermissionButton, Select } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetail";
-import { MobileInventoryList } from "../../h5";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryLedger({ controller }: { controller: InventoryController }) {
@@ -10,7 +9,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     businessOptions,
     arrangeColumns,
     columns,
-    compact,
     countInventoryRows,
     dateRange,
     executionDetails,
@@ -25,7 +23,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     inlineEditId,
     invEditExtraForm,
     keyword,
-    mobileFieldOrder,
     orderedRows,
     page,
     pageSize,
@@ -42,14 +39,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     editingAccount,
     eventDrafts,
     employees,
-    openDetail,
-    openEditor,
-    setSaleTarget,
-    setConsignmentTarget,
-    setRebateTarget,
-    openVoid,
-    handleMoreAction,
-    loadExecution,
     updateEventDraft,
     saveInline,
     cancelInlineEdit,
@@ -113,57 +102,40 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         />
         <PermissionButton permission="report.read" aria-label="导出" size="small" loading={exporting} onClick={() => void handleExport()}>导出</PermissionButton>
       </Space>
-      {compact ? (
-        <MobileInventoryList
-          rows={orderedRows}
-          onDetail={(row) => void openDetail(row)}
-          onSale={setSaleTarget}
-          onConsign={setConsignmentTarget}
-          onVoid={(row) => void openVoid(row)}
-          onRebate={setRebateTarget}
-          onEdit={openEditor}
-          onMoreAction={handleMoreAction}
-          executionDetails={executionDetails}
-          onLoadExecution={loadExecution}
-          editingAccount={editingAccount ? editingAccount.id : null}
-          fieldOrder={mobileFieldOrder}
-        />
-      ) : (
-        <DataTable
-          key={`account-ledger-${expandedAccountIds.join("|")}`}
-          className="inventory-table"
-          columns={arrangeColumns(columns)}
-          rows={orderedRows}
-          page={page}
-          pageSize={pageSize}
-          total={controller.visibleRows.length}
-          controlledPaging
-          expandable={{
-            expandedRowKeys: expandedAccountIds,
-            expandedRowRender: (row) => (
-              <OrderDetail
-                row={row}
-                detail={executionDetails[row.id]}
-                loading={Boolean(executionLoading[row.id])}
-                onPartyClick={openPartyCard}
-                editing={inlineEditId === row.id ? editingAccount : undefined}
-                onEdit={controller.setEditingAccount}
-                eventDrafts={eventDrafts}
-                onEventEdit={updateEventDraft}
-                employees={employees}
-                extraForm={invEditExtraForm}
-                onSave={saveInline}
-                onCancel={cancelInlineEdit}
-                saving={savingAccount}
-              />
-            ),
-            expandRowByClick: true,
-            onExpand: (expanded, row) => void handleExpand(expanded, row),
-          }}
-          emptyText="暂无账号"
-          onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
-        />
-      )}
+      <DataTable
+        key={`account-ledger-${expandedAccountIds.join("|")}`}
+        className="inventory-table"
+        columns={arrangeColumns(columns)}
+        rows={orderedRows}
+        page={page}
+        pageSize={pageSize}
+        total={controller.visibleRows.length}
+        controlledPaging
+        expandable={{
+          expandedRowKeys: expandedAccountIds,
+          expandedRowRender: (row) => (
+            <OrderDetail
+              row={row}
+              detail={executionDetails[row.id]}
+              loading={Boolean(executionLoading[row.id])}
+              onPartyClick={openPartyCard}
+              editing={inlineEditId === row.id ? editingAccount : undefined}
+              onEdit={controller.setEditingAccount}
+              eventDrafts={eventDrafts}
+              onEventEdit={updateEventDraft}
+              employees={employees}
+              extraForm={invEditExtraForm}
+              onSave={saveInline}
+              onCancel={cancelInlineEdit}
+              saving={savingAccount}
+            />
+          ),
+          expandRowByClick: true,
+          onExpand: (expanded, row) => void handleExpand(expanded, row),
+        }}
+        emptyText="暂无账号"
+        onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
+      />
     </Card>
   );
 }

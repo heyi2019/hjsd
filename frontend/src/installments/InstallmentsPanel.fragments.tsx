@@ -1,4 +1,4 @@
-/** 分期文案常量（移动端卡片已迁至 src/h5/installments.tsx）。 */
+/** 分期文案常量。 */
 /** 合约类型页签与违约处置文案的回落值；词典加载后由选项词典接管（改造前即为这些文案）。 */
 export const CONTRACT_TYPE_LABEL: Record<string, string> = {
   STOCK_SALE: "分期出售",

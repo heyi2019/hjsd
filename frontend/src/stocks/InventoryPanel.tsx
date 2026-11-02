@@ -3,7 +3,6 @@ import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { InventoryView } from "./InventoryPanel/InventoryView";
 import { useInventoryController } from "./InventoryPanel/useInventoryController";
 export { findCancelableBuy, findCancelableEvent, findCancelableSale, moreMenuItems } from "./InventoryPanel/helpers";
-// 移动端组件统一收在 src/h5（见 h5/index.ts）。
 import "./InventoryPanel.css";
 
 export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: {

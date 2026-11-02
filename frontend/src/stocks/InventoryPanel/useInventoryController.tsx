@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type InventoryStats, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { formatDateTimeMinute, money, today } from "../../shared/lib/format";
-import { MoneyText, PermissionButton, PermissionGate, StatusTag, useCompactLayout } from "../../shared/ui";
+import { MoneyText, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
 import type { InventoryPartyLink } from "../OrderDetailView";
 import type { InventoryProfileTarget } from "../InventoryProfileModal";
@@ -46,7 +46,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   // 内联编辑：标记当前正在编辑（且已展开）的行；与 editingAccount（草稿副本）配合，决定展开区是否进入编辑态。
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
-  const compact = useCompactLayout();
   const [savingAccount, setSavingAccount] = useState(false);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voidPools, setVoidPools] = useState<Pool[]>([]);
@@ -145,12 +144,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause))),
       loadExecution(account),
     ]);
-    // 桌面：直接就地展开该行进入内联编辑（不弹窗）；移动端无内联表格，复用详情弹窗承载编辑态。
-    if (compact) {
-      setDetailTarget(account);
-    } else {
-      expandTo([String(account.id)]);
-    }
+    // 就地展开该行进入内联编辑（不弹窗）。
+    expandTo([String(account.id)]);
     setInlineEditId(account.id);
   }
 
@@ -507,7 +502,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     businessMode,
     businessOptions,
     columns,
-    compact,
     consignmentTarget,
     countInventoryRows,
     dateRange,

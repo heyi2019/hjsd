@@ -8,9 +8,8 @@ import { normalizeError } from "../shared/api/client";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag, useCompactLayout } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { MobileCounterpartyList } from "../h5";
 import { collectExtras } from "./CustomersPage.fragments";
 
 const COUNTERPARTY_STATUS_OPTIONS = [
@@ -23,7 +22,6 @@ const COUNTERPARTY_STATUS_OPTIONS = [
 const COUNTERPARTY_TYPE_FALLBACK = Object.entries(COUNTERPARTY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
-  const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
@@ -175,7 +173,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。
       </Typography.Paragraph>
-      {!compact ? <DataTable<Counterparty>
+      <DataTable<Counterparty>
         columns={columns}
         rows={visibleCounterparties}
         page={1}
@@ -183,16 +181,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         total={visibleCounterparties.length}
         emptyText="暂无合作方"
         onPageChange={() => undefined}
-     /> : <MobileCounterpartyList
-        rows={rows}
-        onDetail={(row) => void openDetail(row)}
-        onEdit={setEditTarget}
-        onToggle={async (row) => {
-          await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
-          appMessage.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
-          await load();
-        }}
-      />}
+     />
       <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
         <BusinessRegistrationForm

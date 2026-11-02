@@ -151,8 +151,8 @@ describe("OrdersPage：四类订单台账", () => {
     await openLedger();
     expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("进行中").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("已完成").length).toBeGreaterThanOrEqual(1);
+    // 订单状态列只存在于台账列表中（订单台账列注册表无 status 列），此处不再断言状态文案。
+    expect(screen.getAllByText("库存状态").length).toBeGreaterThanOrEqual(1);
   });
 
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {

@@ -9,12 +9,11 @@ import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { formatDateTimeMinute, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
-import { columnKey, useListViewColumns } from "../shared/lib/listColumns";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import { DataTable, BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, useCompactLayout, CompactActions } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, CompactActions } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { MobileCustomerList } from "../h5";
 import { CUSTOMER_ROLE_LABEL, customerDateKey, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
 
 const SearchButton = Button;
@@ -26,7 +25,6 @@ const CUSTOMER_STATUS_OPTIONS = [
 const CUSTOMER_CREATE_FORM_ID = "customer-create-form";
 
 export function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
-  const compact = useCompactLayout();
   const [rows, setRows] = useState<Customer[] | null>(null);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -294,7 +292,6 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       ),
     },
   ];
-  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   const currentDate = today();
   const newThisMonthCount = rows?.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
@@ -364,7 +361,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           }}
         />
       </Space>
-      {!compact ? <DataTable<Customer>
+      <DataTable<Customer>
         columns={arrangeColumns(columns)}
         rows={rows ?? []}
         loading={loading}
@@ -378,18 +375,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           setPage(nextPage);
           setPageSize(nextSize);
         }}
-      /> : <MobileCustomerList
-        rows={rows ?? []}
-        onDetail={(row) => void openDetail(row)}
-        onMerge={setMergeTarget}
-        renderPhone={(row) => renderContact(row, "phone")}
-        fieldOrder={mobileFieldOrder}
-        onDisable={async (row) => {
-          await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
-          appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
-          await load();
-        }}
-      />}
+      />
 
       <BusinessActionModal
         title="新建客户"

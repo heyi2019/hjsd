@@ -1,4 +1,4 @@
-/** 资金中心：纯工具/常量（移动端卡片已迁至 src/h5/pools.tsx）。 */
+/** 资金中心：纯工具/常量。 */
 
 // 与 backend/app/finance/attributes.py 的 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE 保持一致：
 // 资金性质决定可用核算属性，非法组合后端直接 422，此处事前收窄避免误选。

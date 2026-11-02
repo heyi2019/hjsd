@@ -4,10 +4,10 @@
  * 库龄天数与档位由后端下发（AccountOut.inventory_age_days / _level），此处不做日期差。
  */
 import { Dropdown } from "antd";
-import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
-import { formatDateTimeMinute } from "../shared/lib/format";
-import { orderMobileFields } from "../shared/lib/listColumns";
-import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
+import type { Account, AccountExecutionDetail } from "../frontend/src/shared/api/catalog";
+import { formatDateTimeMinute } from "../frontend/src/shared/lib/format";
+import { orderMobileFields } from "../frontend/src/shared/lib/listColumns";
+import { MoneyText, PermissionButton, StatusTag } from "../frontend/src/shared/ui";
 import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../stocks/inventory-logic";
 import { moreMenuItems } from "../stocks/InventoryPanel/helpers";
 

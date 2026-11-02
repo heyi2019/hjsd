@@ -3,7 +3,6 @@ import { Card, Input, Space, Tabs, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
-import { MobileReportCards, type ReportCardColumn } from "../h5";
 import { QualityPanel } from "../quality/QualityPanel";
 import { NotificationsPanel } from "../notifications/NotificationsPanel";
 import { SearchPanel } from "../search/SearchPanel";
@@ -36,7 +35,7 @@ import { DataTable,
   StatusTag,
   PermissionButton,
   Select,
-  useCompactLayout, } from "../shared/ui";
+} from "../shared/ui";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { appMessage } from "../shared/ui/appFeedback";
@@ -232,7 +231,6 @@ function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
 /** 区间选择已提升到父级（reportRange），各报表通过 range 属性复用父级统计周期。 */
 
 function InventoryReport() {
-  const compact = useCompactLayout();
   const { data, loading, error, reload } = useReport<InventoryHealthReport>(
     () => reportsApi.inventoryHealth(),
     [],
@@ -274,26 +272,21 @@ function InventoryReport() {
           { label: "占用成本合计", amount: error ? "不可用" : data?.total_cost ?? "-" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<InventoryHealthRow> rows={data?.items ?? []} columns={arrangeInventoryHealth(columns) as unknown as ReportCardColumn<InventoryHealthRow>[]} />
-          ) : (
-            <DataTable<InventoryHealthRow>
-        columns={arrangeInventoryHealth(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText={error ? "库存健康数据不可用，请点击重新加载" : "暂无在库账号"}
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<InventoryHealthRow>
+         columns={arrangeInventoryHealth(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText={error ? "库存健康数据不可用，请点击重新加载" : "暂无在库账号"}
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 function MonthlyPnl({ range }: { range: ReportRange }) {
-  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<MonthlyPnlReport>(
     () => reportsApi.monthlyPnl(params),
@@ -324,26 +317,21 @@ function MonthlyPnl({ range }: { range: ReportRange }) {
           { label: "经营利润", amount: data?.total.operating_profit ?? "-", tone: "auto" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<MonthlyPnlRow> rows={data?.items ?? []} columns={arrangeMonthlyPnl(columns) as unknown as ReportCardColumn<MonthlyPnlRow>[]} />
-          ) : (
-            <DataTable<MonthlyPnlRow>
-        columns={arrangeMonthlyPnl(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText="所选区间无数据"
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<MonthlyPnlRow>
+         columns={arrangeMonthlyPnl(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText="所选区间无数据"
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
-  const compact = useCompactLayout();
   const { params, picker } = range;
   const [employees, setEmployees] = useState<{ id: number; username: string; display_name: string; is_active: boolean }[]>([]);
   const [employeeError, setEmployeeError] = useState<{ message: string; code?: string } | null>(null);
@@ -416,26 +404,21 @@ function Commission({ range, mine = false }: { range: ReportRange; mine?: boolea
           { label: "差异", amount: data?.total.difference ?? "-", tone: "auto" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<CommissionRow> rows={data?.items ?? []} columns={arrangeCommission(columns) as unknown as ReportCardColumn<CommissionRow>[]} />
-          ) : (
-            <DataTable<CommissionRow>
-        columns={arrangeCommission(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText="所选区间无提成记录"
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<CommissionRow>
+         columns={arrangeCommission(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText="所选区间无提成记录"
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 function DailyFunds() {
-  const compact = useCompactLayout();
   const [reportOn, setReportOn] = useState(today());
   const { data, loading, error, reload } = useReport<DailyFundsReport>(
     () => reportsApi.dailyFunds({ on: reportOn }),
@@ -472,26 +455,21 @@ function DailyFunds() {
           { label: "可用余额", amount: data?.total.available ?? "-", tone: "auto" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<DailyFundsRow> rows={data?.items ?? []} columns={arrangeDailyFunds(columns) as unknown as ReportCardColumn<DailyFundsRow>[]} />
-          ) : (
-            <DataTable<DailyFundsRow>
-        columns={arrangeDailyFunds(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText="当日无资金流水"
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<DailyFundsRow>
+         columns={arrangeDailyFunds(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText="当日无资金流水"
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 function FinanceDimensions({ range }: { range: ReportRange }) {
-  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<FinanceDimensionReport>(
     () => reportsApi.financeDimensions(params),
@@ -518,26 +496,21 @@ function FinanceDimensions({ range }: { range: ReportRange }) {
           { label: "净方向金额", amount: data?.total_signed_amount ?? "-", tone: "auto" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<FinanceDimensionRow> rows={data?.items ?? []} columns={arrangeFinanceDim(columns) as unknown as ReportCardColumn<FinanceDimensionRow>[]} />
-          ) : (
-            <DataTable<FinanceDimensionRow>
-        columns={arrangeFinanceDim(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText="所选区间无已审核流水"
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<FinanceDimensionRow>
+         columns={arrangeFinanceDim(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText="所选区间无已审核流水"
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 function BusinessPnl({ range }: { range: ReportRange }) {
-  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<BusinessPnlReport>(
     () => reportsApi.businessPnl(params),
@@ -583,26 +556,21 @@ function BusinessPnl({ range }: { range: ReportRange }) {
           { label: "完整收益", amount: data?.total.full_income ?? "-", tone: "auto" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<BusinessPnlRow> rows={data?.items ?? []} columns={arrangeBusinessPnl(columns) as unknown as ReportCardColumn<BusinessPnlRow>[]} />
-          ) : (
-            <DataTable<BusinessPnlRow>
-        columns={arrangeBusinessPnl(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText="所选区间无业务数据"
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<BusinessPnlRow>
+         columns={arrangeBusinessPnl(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText="所选区间无业务数据"
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 function OrderProfit({ range }: { range: ReportRange }) {
-  const compact = useCompactLayout();
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<OrderProfitReport>(
     () => reportsApi.orderProfit(params),
@@ -641,20 +609,16 @@ function OrderProfit({ range }: { range: ReportRange }) {
           { label: "净利合计", amount: data?.total.net_profit ?? "-", tone: "auto" },
         ]}
       />
-      {compact ? (
-            <MobileReportCards<OrderProfitRow> rows={data?.items ?? []} columns={arrangeOrderProfit(columns) as unknown as ReportCardColumn<OrderProfitRow>[]} />
-          ) : (
-            <DataTable<OrderProfitRow>
-        columns={arrangeOrderProfit(columns)}
-        rows={data?.items ?? []}
-        loading={loading}
-        page={1}
-        pageSize={10}
-        total={data?.items.length ?? 0}
-        emptyText="所选区间无订单"
-        onPageChange={() => undefined}
-     />
-          )}
+             <DataTable<OrderProfitRow>
+         columns={arrangeOrderProfit(columns)}
+         rows={data?.items ?? []}
+         loading={loading}
+         page={1}
+         pageSize={10}
+         total={data?.items.length ?? 0}
+         emptyText="所选区间无订单"
+         onPageChange={() => undefined}
+      />
     </Card>
   );
 }

@@ -532,7 +532,6 @@ export function useOrdersPageController(params: {
         ...configuredLedgerColumns.filter((column) => columnKey(column) === "actions"),
       ]
     : configuredLedgerColumns;
-  const mobileLedgerFieldOrder = visibleLedgerColumns.map(columnKey);
   const sharedCancellationEvent = cancelOrderTarget
     ? cancelableEventsForScope(cancelOrderTarget, cancelScope)[0]
     : undefined;
@@ -589,7 +588,6 @@ export function useOrdersPageController(params: {
     ledgerDetailLoading,
     ledgerDetails,
     ledgerSortDesc,
-    mobileLedgerFieldOrder,
     load,
     loadError,
     loadLedgerDetail,

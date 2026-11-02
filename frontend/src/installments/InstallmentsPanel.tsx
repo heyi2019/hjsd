@@ -7,10 +7,8 @@ import { installmentsApi, type Installment, type Schedule } from "../shared/api/
 import { today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";
-import { columnKey } from "../shared/lib/listColumns";
 
 
-import { MobileInstallmentList } from "../h5";
 import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
 import { useContractTableController } from "./useContractTableController";
 import { ContractModals } from "./InstallmentsPanel.modals";
@@ -32,7 +30,6 @@ function ContractTable({
     arrangeColumns,
     cancelForm,
     columns,
-    compact,
     defaultForm,
     dispositions,
     error,
@@ -61,7 +58,6 @@ function ContractTable({
     totalPaid,
     totalReceivable,
   } = controller;
-  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
@@ -114,56 +110,39 @@ function ContractTable({
           </Space>
         }
       >
-        {compact ? (
-          <MobileInstallmentList
-            rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
-            orders={orders}
-            dispositions={dispositions}
-            settlePermission={settlePermission}
-            onPay={(row) => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
-            onDeliver={openDeliver}
-            onRecover={(row) => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
-            onRefund={(row) => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
-            onSettle={(row) => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
-            onDefault={(row) => { defaultForm.resetFields(); setDefaultTarget(row); }}
-            onResale={(row) => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
-            fieldOrder={mobileFieldOrder}
-          />
-        ) : (
-          <DataTable<Installment>
-            columns={arrangeColumns(columns)}
-            rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
-            loading={loading}
-            page={1}
-            pageSize={Math.max(rows.length, 10)}
-            total={rows.length}
-           
-            emptyText="暂无分期合约"
-            onPageChange={() => undefined}
-            expandable={{
-              expandedRowRender: (row) => (
-                <Space direction="vertical" size="middle" className="installment-detail-stack">
-                  <DataTable<Schedule>
-                  rows={schedules[row.id] ?? []}
-                  page={1}
-                  pageSize={20}
-                  total={(schedules[row.id] ?? []).length}
-                  onPageChange={() => undefined}
-                  emptyText="暂无期次"
-                  columns={scheduleColumns}
-                />
-                {(dispositions[row.id] ?? []).length > 0 && (
-                  <Typography.Paragraph>
-                    处置记录：{(dispositions[row.id] ?? []).map((item) =>
-                      `${configurableLabel("INSTALLMENT_DISPOSITION", item.action, DISPOSITION_LABEL)}（${item.occurred_on}）`,
-                    ).join("、")}
-                  </Typography.Paragraph>
-                )}
-              </Space>
-            ),
-          }}
-        />
-        )}
+        <DataTable<Installment>
+          columns={arrangeColumns(columns)}
+          rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
+          loading={loading}
+          page={1}
+          pageSize={Math.max(rows.length, 10)}
+          total={rows.length}
+         
+          emptyText="暂无分期合约"
+          onPageChange={() => undefined}
+          expandable={{
+            expandedRowRender: (row) => (
+              <Space direction="vertical" size="middle" className="installment-detail-stack">
+                <DataTable<Schedule>
+                rows={schedules[row.id] ?? []}
+                page={1}
+                pageSize={20}
+                total={(schedules[row.id] ?? []).length}
+                onPageChange={() => undefined}
+                emptyText="暂无期次"
+                columns={scheduleColumns}
+              />
+              {(dispositions[row.id] ?? []).length > 0 && (
+                <Typography.Paragraph>
+                  处置记录：{(dispositions[row.id] ?? []).map((item) =>
+                    `${configurableLabel("INSTALLMENT_DISPOSITION", item.action, DISPOSITION_LABEL)}（${item.occurred_on}）`,
+                  ).join("、")}
+                </Typography.Paragraph>
+              )}
+            </Space>
+          ),
+        }}
+      />
       </Card>
 
       <ContractModals controller={controller} />

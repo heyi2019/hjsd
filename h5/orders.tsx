@@ -3,11 +3,11 @@
  * 归属移动端层：这里只做「怎么把一行数据摆成卡片」，取数与业务规则留在 orders 域。
  * 桌面由 useCompactLayout 控制不挂载，卡片不进 DOM，桌面表格与单测不受影响。
  */
-import type { Order } from "../shared/api/catalog";
-import { ACCOUNT_STATUS_LABEL, executionActionLabel, formatDateTimeMinute, formatElapsedTime } from "../shared/lib/format";
-import { orderMobileFields } from "../shared/lib/listColumns";
-import { PermissionButton, StatusTag } from "../shared/ui";
-import { formatOrderAmount } from "../orders/orderpage/helpers";
+import type { Order } from "../frontend/src/shared/api/catalog";
+import { ACCOUNT_STATUS_LABEL, executionActionLabel, formatDateTimeMinute, formatElapsedTime } from "../frontend/src/shared/lib/format";
+import { orderMobileFields } from "../frontend/src/shared/lib/listColumns";
+import { PermissionButton, StatusTag } from "../frontend/src/shared/ui";
+import { formatOrderAmount } from "../frontend/src/orders/orderpage/helpers";
 
 export function MobileOrderList(props: {
   orders: Order[];

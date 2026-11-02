@@ -1,12 +1,12 @@
 /** H5（≤640px）分期合约卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
 import { Space } from "antd";
-import type { Installment, InstallmentDisposition, Order } from "../shared/api/catalog";
-import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus } from "../shared/lib/format";
-import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
-import { configurableLabel } from "../shared/lib/optionSets";
-import { orderMobileFields } from "../shared/lib/listColumns";
-import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
-import type { Permission } from "../shared/state/session";
+import type { Installment, InstallmentDisposition, Order } from "../frontend/src/shared/api/catalog";
+import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus } from "../frontend/src/shared/lib/format";
+import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../frontend/src/shared/lib/labels";
+import { configurableLabel } from "../frontend/src/shared/lib/optionSets";
+import { orderMobileFields } from "../frontend/src/shared/lib/listColumns";
+import { MoneyText, PermissionButton, StatusTag } from "../frontend/src/shared/ui";
+import type { Permission } from "../frontend/src/shared/state/session";
 
 export function MobileInstallmentList({
   rows,

@@ -2,7 +2,6 @@
  *  与 FundsPage.tsx 原组件体一一对应，仅把逻辑从组件作用域移到 hook 作用域，行为不变。 */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
-import { useCompactLayout } from "../shared/ui";
 import { Form } from "antd";
 import {
   cashflowsApi,
@@ -59,7 +58,6 @@ export function useFundsPageController(active = true) {
   const [cashflowFundNature, setCashflowFundNature] = useState("");
   const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
-  const compact = useCompactLayout();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [fundsReady, setFundsReady] = useState(false);
   // T20：资金流水筛选项从「选项词典」配置读取（方向 / 状态 / 资金性质 / 核算属性）。
@@ -458,7 +456,6 @@ export function useFundsPageController(active = true) {
     loading,
     error,
     fundsReady,
-    compact,
     depositOpen,
     setDepositOpen,
     cashflowOpen,

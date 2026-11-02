@@ -8,7 +8,7 @@ import { downloadBlob } from "../shared/api/download";
 import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus, money, today } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { MoneyText, PermissionButton, StatusTag, useCompactLayout } from "../shared/ui";
+import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useSession } from "../shared/state/session";
@@ -41,7 +41,6 @@ export function useContractTableController(params: { contractType: string; reloa
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const compact = useCompactLayout();
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
 
@@ -529,7 +528,6 @@ export function useContractTableController(params: { contractType: string; reloa
     setError,
     loading,
     setLoading,
-    compact,
     write,
     payForm,
     deliverForm,

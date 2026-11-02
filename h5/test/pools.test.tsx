@@ -1,8 +1,8 @@
 /** h5/pools：移动端流水卡片的冲销入口可见性（L1707）。 */
 import { within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { renderLight } from "../../test/render";
-import type { Cashflow } from "../../shared/api/catalog";
+import { renderLight } from "../../frontend/src/test/render";
+import type { Cashflow } from "../../frontend/src/frontend/src/shared/api/catalog";
 import { MobileCashflowList } from "../pools";
 
 function makeRow(overrides: Partial<Cashflow> = {}): Cashflow {

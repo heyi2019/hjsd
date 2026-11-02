@@ -1,11 +1,11 @@
 /** H5（≤640px）客户 / 合作方卡片列表。 */
 import { Space } from "antd";
 import type { ReactNode } from "react";
-import { PermissionButton, StatusTag } from "../shared/ui";
-import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
-import { formatDateTimeMinute } from "../shared/lib/format";
-import { orderMobileFields } from "../shared/lib/listColumns";
-import type { Counterparty, Customer } from "../shared/api/catalog";
+import { PermissionButton, StatusTag } from "../frontend/src/shared/ui";
+import { COUNTERPARTY_TYPE_LABEL } from "../frontend/src/shared/lib/labels";
+import { formatDateTimeMinute } from "../frontend/src/shared/lib/format";
+import { orderMobileFields } from "../frontend/src/shared/lib/listColumns";
+import type { Counterparty, Customer } from "../frontend/src/shared/api/catalog";
 
 export function MobileCustomerList(props: {
   rows: Customer[];

@@ -1,11 +1,11 @@
 /** H5（≤640px）资金中心卡片列表：资金池总览 / 资金流水 / 押金占用。 */
 import { Space } from "antd";
-import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
-import { configurableLabel } from "../shared/lib/optionSets";
-import { formatDateTimeMinute } from "../shared/lib/format";
-import { orderMobileFields } from "../shared/lib/listColumns";
-import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../shared/lib/labels";
-import type { Cashflow, Deposit, Pool, PoolBalance } from "../shared/api/catalog";
+import { MoneyText, PermissionButton, StatusTag } from "../frontend/src/shared/ui";
+import { configurableLabel } from "../frontend/src/shared/lib/optionSets";
+import { formatDateTimeMinute } from "../frontend/src/shared/lib/format";
+import { orderMobileFields } from "../frontend/src/shared/lib/listColumns";
+import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, POOL_OWNERSHIP_LABEL } from "../frontend/src/shared/lib/labels";
+import type { Cashflow, Deposit, Pool, PoolBalance } from "../frontend/src/shared/api/catalog";
 
 /** 资金池总览卡片列表。桌面由 useCompactLayout 控制不挂载，故不影响桌面表格与单测。 */
 export function MobilePoolList({ rows, balances, fieldOrder }: { rows: Pool[]; balances: Record<number, PoolBalance>; fieldOrder?: string[] }) {

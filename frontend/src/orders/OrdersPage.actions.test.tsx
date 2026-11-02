@@ -353,29 +353,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
   });
 
-  it("移动端订单卡片渲染完整字段", async () => {
-    await openLedger();
-    const list = screen.getByLabelText("订单列表");
-    // 卡片字段 = 卡片字段表 ∩ 台账列（fieldOrder 取 arrangeColumns 后的列 key），
-    // 台账重构后已无「对方/来源」与「平台」列，故这两项在卡片上也不再渲染。
-    // 账号状态走 ACCOUNT_STATUS_LABEL 映射（WAITING → 在库），不再输出原始英文枚举。
-    for (const value of ["原神", "seller-001", "在库"]) {
-      expect(within(list).getAllByText(value).length).toBeGreaterThan(0);
-    }
-    expect(within(list).getAllByText("¥1,234.00").length).toBeGreaterThan(0);
-  });
-
-  it("移动端卡片点击编辑订单打开编辑弹窗", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
-    await openLedger();
-    const list = screen.getByLabelText("订单列表");
-    // 移动端卡片顺序不一定与桌面行一致，按订单号定位目标卡片的编辑按钮，而非取 [0]。
-    const cards = within(list).getAllByText("HS-2026-0001");
-    const card = cards[0].closest(".orders-mobile-card") as HTMLElement;
-    await ui.click(within(card).getByRole("button", { name: /编辑订单/ }));
-    expect(await modalOf(/编辑订单 · HS-2026-0001/)).toBeInTheDocument();
-  });
-
   it("编辑订单：行操作列打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });

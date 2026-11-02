@@ -3,7 +3,6 @@ import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../../stocks/OrderDetail";
 import type { InventoryPartyLink } from "../../stocks/OrderDetailView";
-import { MobileOrderList } from "../../h5";
 import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
@@ -31,7 +30,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     ledgerSortDesc,
     loadError,
     loading,
-    mobileLedgerFieldOrder,
     onExportLedger,
     onExportLedgerXlsx,
     orderBusinessModeOptions,
@@ -49,7 +47,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     setOrderTypeFilter,
     setPage,
     setPageSize,
-    openEditOrder,
   } = controller;
 
   const statValue = (value: number) => (loading ? "—" : loadError ? "不可用" : String(value));
@@ -156,7 +153,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           }}
           onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
         />
-        <MobileOrderList orders={filteredOrders} emptyText="暂无业务订单" onSelect={openEditOrder} fieldOrder={mobileLedgerFieldOrder} />
       </Card>
     </section>
   );

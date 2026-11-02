@@ -200,14 +200,14 @@
 | `WAITING` | `BUY_STOCK` | `WAITING` | 自营买入后保留在库，同一账号可再次买入形成新轨迹 |
 | `WAITING` | `BUY_CREDIT` | `SOLD` | 分期型买入，账号进入已售 |
 | `WAITING` | `SELL` | `SOLD` | 全款售出后标记已售 |
-| `WAITING` | `VOID` | `VOID` | 账号被作废 |
+| `WAITING` | `VOID` | `VOID` | 账号被取消 |
 | `SOLD` | `BUY_STOCK` | `WAITING` | 售出撤销后重新入库 |
 | `SOLD` | `BUY_CREDIT` | `SOLD` | 撤销后重新进入分期型买入 |
 | `SOLD` | `RECOVER` | `WAITING` | 分期逾期回收后恢复在库 |
 | `SOLD` | `CANCEL_STOCK` | `WAITING` | 买入事实被取消，退回在库 |
 | `SOLD` | `CANCEL_SELL` | `WAITING` | 售出冲销后恢复在库 |
 | `SOLD` | `CANCEL_SELL_END` | `VOID` | 售出冲销且业务终止 |
-| `SOLD` | `VOID` | `VOID` | 账号被作废 |
+| `SOLD` | `VOID` | `VOID` | 账号被取消 |
 | `VOID` | 任意业务动作 | 拒绝 | `VOID` 为终态，不再接受新动作 |
 
 ### 4.4 分期与回款
@@ -363,8 +363,8 @@
 | `OPEN` | 全部结算 | `SETTLED` | 有效结算金额达到应收 |
 | `PARTIALLY_SETTLED` | 继续结算 | `PARTIALLY_SETTLED` 或 `SETTLED` | 根据累计有效结算金额重新计算 |
 | `PARTIALLY_SETTLED` / `SETTLED` | 冲销结算 | `OPEN` 或 `PARTIALLY_SETTLED` | 结算冲销后按剩余有效金额重新计算 |
-| `OPEN` / `PARTIALLY_SETTLED` / `SETTLED` | 作废 | `VOID` | 仅在受控作废动作中使用，作废后不可继续结算 |
-| `VOID` | 任意结算或冲销 | 拒绝 | 作废为终态 |
+| `OPEN` / `PARTIALLY_SETTLED` / `SETTLED` | 取消 | `VOID` | 仅在受控取消动作中使用，取消后不可继续结算 |
+| `VOID` | 任意结算或冲销 | 拒绝 | 取消为终态 |
 
 ### 4.7 经营报表
 

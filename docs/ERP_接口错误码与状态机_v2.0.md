@@ -47,14 +47,14 @@
 | `WAITING` | `BUY_STOCK` | `WAITING` | 自营买入后保留在库 |
 | `WAITING` | `BUY_CREDIT` | `SOLD` | 分期型买入 |
 | `WAITING` | `SELL` | `SOLD` | 全款售出 |
-| `WAITING` | `VOID` | `VOID` | 作废 |
+| `WAITING` | `VOID` | `VOID` | 取消 |
 | `SOLD` | `BUY_STOCK` | `WAITING` | 售出撤销后重新入库 |
 | `SOLD` | `BUY_CREDIT` | `SOLD` | 撤销后重新进入分期型买入 |
 | `SOLD` | `RECOVER` | `WAITING` | 分期逾期回收 |
 | `SOLD` | `CANCEL_STOCK` | `WAITING` | 买入事实被取消 |
 | `SOLD` | `CANCEL_SELL` | `WAITING` | 售出冲销 |
 | `SOLD` | `CANCEL_SELL_END` | `VOID` | 售出冲销且业务终止 |
-| `SOLD` | `VOID` | `VOID` | 作废 |
+| `SOLD` | `VOID` | `VOID` | 取消 |
 | `VOID` | — | — | 终态，拒绝一切业务动作 |
 
 同一 `game_account` 可反复买入，每次收购都是独立实体，`game_account` **不唯一**。

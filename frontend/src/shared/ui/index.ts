@@ -27,4 +27,3 @@ export {
 } from "./BusinessRegistrationForm";
 export { BusinessRegistrationModal } from "./BusinessRegistrationModal";
 export { DateField, dateValueFromEvent, dateValueProps } from "./DateField";
-export { useCompactLayout } from "./useCompactLayout";

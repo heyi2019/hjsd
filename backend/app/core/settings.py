@@ -37,6 +37,31 @@ def locate_env_file() -> Path | None:
     return None
 
 
+def redact_database_url(url: str) -> str:
+    """把连接串降级成「方言://主机:端口/库名」。
+
+    健康检查与日志会原样输出这个字符串，因此**绝不能**带口令：PG 的 URL 形如
+    `postgresql+psycopg://user:pass@host:5432/db`，直接回显等于把生产库口令写进
+    接口响应体与日志。SQLite 只保留文件名，避免泄露宿主机目录结构。
+    """
+    try:
+        from sqlalchemy.engine import make_url
+
+        parsed = make_url(url)
+    except Exception:  # pragma: no cover - 非法 URL 交由上层报错
+        return "<unparsable>"
+    backend = parsed.get_backend_name()
+    if backend == "sqlite":
+        database = parsed.database or ""
+        if database in {"", ":memory:"}:
+            return "sqlite::memory:"
+        return f"sqlite:{Path(database).name}"
+    host = parsed.host or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    return f"{backend}://{host}/{parsed.database or ''}"
+
+
 class Settings(BaseSettings):
     """v1 配置项。环境变量优先级：系统环境变量 > .env > 默认值。"""
 
@@ -65,23 +90,13 @@ class Settings(BaseSettings):
     login_rate_limit_enabled: bool = True
     login_rate_limit_per_minute: int = 10
 
-    # database（先 SQLite；生产换 PostgreSQL URL，业务代码零改动）
+    # database：正式环境为 PostgreSQL；SQLite 仅作为无 .env 时的本地兜底
+    # （迁移链与业务 SQL 均为跨方言写法，两种后端都能跑）。
     database_url: str = f"sqlite:///./{DEFAULT_DEV_DB_RELPATH}"
 
-    # SQLite 运行参数（连接级 PRAGMA；非 SQLite 库自动忽略）
-    # synchronous：WAL 下 SQLite 官方推荐 NORMAL——提交不再逐次 fsync，
-    #   断电最多丢最后一个已提交事务，库本身不会损坏。要绝对持久性可设 FULL。
-    # cache_size_kb：页缓存（负 PRAGMA 的 KB 形式）；0 表示沿用 SQLite 默认 2MB。
-    # mmap_size_mb：只读映射窗口，0 表示关闭（SQLite 默认）。
-    # temp_store：排序/临时表位置，MEMORY 避免报表排序写盘。
-    sqlite_synchronous: str = "NORMAL"
-    sqlite_cache_size_kb: int = 16000
-    sqlite_mmap_size_mb: int = 64
-    sqlite_temp_store: str = "MEMORY"
-    # busy_timeout（ms）：并发写等待时长。多 worker 部署时多个进程争写同一 SQLite 文件，
-    #   不设会立即抛 `database is locked`；5s 足以覆盖本系统短事务。显式声明使行为可配、可演进
-    #   （python sqlite3 默认即 5s，这里落为显式配置，对应压测报告 P2-⑦）。
-    sqlite_busy_timeout_ms: int = 5000
+    # 说明：原 SQLITE_SYNCHRONOUS / CACHE_SIZE_KB / MMAP_SIZE_MB / TEMP_STORE /
+    # BUSY_TIMEOUT_MS 五个 PRAGMA 旋钮已随连接级 PRAGMA 应用函数一并下线；
+    # 配置里若仍残留这些键会被 extra="ignore" 静默忽略，不再有任何效果。
 
     # cors（逗号分隔）：显式白名单，任何环境都生效
     cors_origins: str = (
@@ -132,31 +147,12 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("sqlite_synchronous")
+    @field_validator("login_rate_limit_per_minute")
     @classmethod
-    def _validate_synchronous(cls, value: str) -> str:
-        """只接受 SQLite 认识的四档，避免拼错后 PRAGMA 静默失效。"""
-        normalized = value.strip().upper()
-        if normalized not in {"OFF", "NORMAL", "FULL", "EXTRA"}:
-            raise ValueError("SQLITE_SYNCHRONOUS 只允许 OFF/NORMAL/FULL/EXTRA")
-        return normalized
-
-    @field_validator("sqlite_temp_store")
-    @classmethod
-    def _validate_temp_store(cls, value: str) -> str:
-        normalized = value.strip().upper()
-        if normalized not in {"MEMORY", "FILE"}:
-            raise ValueError("SQLITE_TEMP_STORE 只允许 MEMORY/FILE")
-        return normalized
-
-    @field_validator(
-        "sqlite_cache_size_kb", "sqlite_mmap_size_mb", "sqlite_busy_timeout_ms",
-        "login_rate_limit_per_minute",
-    )
-    @classmethod
-    def _validate_sqlite_sizes(cls, value: int) -> int:
+    def _validate_non_negative(cls, value: int) -> int:
+        """负值会让限流窗口失效（计数永远打不满），在配置层直接拒绝。"""
         if value < 0:
-            raise ValueError("SQLite 缓存 / mmap 尺寸 / busy_timeout 不得为负数（0 表示不覆盖）")
+            raise ValueError("登录限流次数不得为负数（0 表示每个窗口一律拒绝，请确认意图）")
         return value
 
     @staticmethod
@@ -225,14 +221,13 @@ class Settings(BaseSettings):
         return self.app_env.lower() in {"development", "dev", "local"}
 
     def describe(self) -> dict[str, str]:
-        """健康检查/排障用：不泄露密钥原文。"""
-        sqlite_file = self.sqlite_file
+        """健康检查/排障用：不泄露密钥原文，也不回显连接串里的口令。"""
         return {
             "app_env": self.app_env,
             "app_name": self.app_name,
             "app_version": self.app_version,
             "api_prefix": self.api_prefix,
-            "database": str(sqlite_file) if sqlite_file else "non-sqlite",
+            "database": redact_database_url(self.database_url),
             "env_file": str(self.env_file_path) if self.env_file_path else "<none>",
         }
 
@@ -250,4 +245,5 @@ __all__ = [
     "Settings",
     "get_settings",
     "locate_env_file",
+    "redact_database_url",
 ]

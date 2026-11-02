@@ -123,6 +123,22 @@ def test_describe_does_not_leak_secret():
         assert isinstance(value, str)
 
 
+def test_describe_redacts_database_password():
+    """连接串里的口令绝不能出现在健康检查/日志里（describe 会被原样输出）。"""
+    settings = Settings(
+        database_url="postgresql+psycopg://erp_app:s3cr3t@db.internal:5432/heijin_erp"
+    )
+    payload = settings.describe()
+    assert payload["database"] == "postgresql://db.internal:5432/heijin_erp"
+    assert "s3cr3t" not in str(payload)
+
+
+def test_describe_sqlite_keeps_filename_only():
+    """SQLite 只回显文件名，避免把宿主机目录结构写进响应体。"""
+    settings = Settings(database_url="sqlite:///./data/heijin_erp_v1.db")
+    assert settings.describe()["database"] == "sqlite:heijin_erp_v1.db"
+
+
 # --- CORS：dev 端口通配 ---------------------------------------------------
 # 背景（实测事故）：前端换到 5199 端口后，CORS 预检返回 400，
 # axios 全部 Failed to fetch，但页面**不报错**，只静默显示
@@ -192,40 +208,13 @@ def test_dev_wildcard_can_be_disabled():
     assert settings.cors_origin_regex is None
 
 
-class TestSqliteRuntimeKnobs:
-    """SQLite 运行参数可配可回退：默认走 WAL 推荐值，写错立即报错而非静默失效。"""
+class TestLoginRateLimitKnob:
+    """登录限流次数：负值必须炸，否则窗口计数永远打不满、限流形同关闭。"""
 
-    def test_defaults_match_wal_recommendation(self):
-        settings = Settings()
-        assert settings.sqlite_synchronous == "NORMAL"
-        assert settings.sqlite_cache_size_kb == 16000
-        assert settings.sqlite_mmap_size_mb == 64
-        assert settings.sqlite_temp_store == "MEMORY"
-        assert settings.sqlite_busy_timeout_ms == 5000
+    def test_default_is_positive(self):
+        assert Settings().login_rate_limit_per_minute >= 1
 
-    def test_values_are_normalized_and_env_overridable(self, monkeypatch):
-        monkeypatch.setenv("SQLITE_SYNCHRONOUS", "full")
-        monkeypatch.setenv("SQLITE_TEMP_STORE", "file")
-        monkeypatch.setenv("SQLITE_CACHE_SIZE_KB", "0")
-        monkeypatch.setenv("SQLITE_MMAP_SIZE_MB", "128")
-        settings = Settings()
-        assert settings.sqlite_synchronous == "FULL"
-        assert settings.sqlite_temp_store == "FILE"
-        assert settings.sqlite_cache_size_kb == 0
-        assert settings.sqlite_mmap_size_mb == 128
-
-    @pytest.mark.parametrize(
-        ("field", "value"), [("sqlite_synchronous", "FAST"), ("sqlite_temp_store", "DISK")]
-    )
-    def test_unknown_enum_is_rejected(self, field, value):
-        """拼错必须炸：PRAGMA 写错在 SQLite 里是静默无效，只能靠这里兜住。"""
+    def test_negative_is_rejected(self):
         with pytest.raises(ValidationError):
-            Settings(**{field: value})
-
-    @pytest.mark.parametrize(
-        "field", ["sqlite_cache_size_kb", "sqlite_mmap_size_mb", "sqlite_busy_timeout_ms"]
-    )
-    def test_negative_sizes_are_rejected(self, field):
-        with pytest.raises(ValidationError):
-            Settings(**{field: -1})
+            Settings(login_rate_limit_per_minute=-1)
 

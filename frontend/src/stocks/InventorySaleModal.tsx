@@ -21,6 +21,7 @@ import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSect
 import { DeliveryInfoSection } from "../orders/DeliveryInfoSection";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import { collectFullPayment, collectInstallmentPayment } from "./ReceiverSection";
+import { lastPeriodAmount, perPeriodServiceFee, saleInstallmentMismatch, saleInstallmentPlan } from "./sale-plan";
 import "./InventorySaleModal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
@@ -72,10 +73,8 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const lastAutoPeriodAmount = useRef<number | undefined>();
 
   useEffect(() => {
-    const total = Number(serviceFee);
-    const count = Number(periods);
-    if (!Number.isFinite(total) || !Number.isFinite(count) || count <= 0) return;
-    const nextValue = Number((total / count).toFixed(2));
+    const nextValue = perPeriodServiceFee(serviceFee, periods);
+    if (nextValue === null) return;
     const isAutoValue = periodServiceFee === undefined || periodServiceFee === lastAutoPeriodFee.current;
     if (isAutoValue) {
       form.setFieldValue("per_period_service_fee", nextValue);
@@ -83,29 +82,21 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     }
   }, [form, periodServiceFee, periods, serviceFee]);
 
-  const defaultPeriodAmount = useMemo(() => {
-    const principal = Number(saleAmount ?? 0);
-    const firstPayment = Number(downPayment ?? 0);
-    const count = Number(periods ?? 0);
-    if (!Number.isFinite(principal) || !Number.isFinite(firstPayment) || !Number.isFinite(count) || count <= 0) {
-      return undefined;
-    }
-    return ((principal - firstPayment + Number(serviceFee ?? 0)) / count).toFixed(2);
-  }, [downPayment, periods, saleAmount, serviceFee]);
+  // 分期金额规划的唯一算法来源（见 sale-plan.ts）：自动填值、末期提示、校验共用一套「分」。
+  const plan = useMemo(
+    () => saleInstallmentPlan({ saleAmount, downPayment, serviceFee, periods }),
+    [downPayment, periods, saleAmount, serviceFee],
+  );
 
   useEffect(() => {
-    const principal = Number(saleAmount);
-    const firstPayment = Number(downPayment);
-    const fee = Number(serviceFee);
-    const count = Number(periods);
-    if (![principal, firstPayment, fee, count].every(Number.isFinite) || count <= 0) return;
-    const nextValue = Math.ceil((Math.round(principal * 100) - Math.round(firstPayment * 100) + Math.round(fee * 100)) / count) / 100;
+    if (!plan) return;
+    const nextValue = plan.perPeriodCents / 100;
     const isAutoValue = perPeriod === undefined || perPeriod === lastAutoPeriodAmount.current;
     if (isAutoValue) {
       form.setFieldValue("per_period", nextValue);
       lastAutoPeriodAmount.current = nextValue;
     }
-  }, [downPayment, form, periods, perPeriod, saleAmount, serviceFee]);
+  }, [form, perPeriod, plan]);
 
   useEffect(() => {
     if (paymentMethod !== "INSTALLMENT") return;
@@ -297,7 +288,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                   <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
                   <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>
                   <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}><MoneyInput placeholder="按服务费总额/期数计算" /></CfgItem>
-                  <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value); if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配"); } }]} extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
+                  <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { if (saleInstallmentMismatch(plan, value)) throw new Error("每期金额与分期总额不匹配"); } }]} extra={plan && perPeriod != null ? `最后一期：${lastPeriodAmount(plan, perPeriod) ?? plan.lastPeriod} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
                   <div className="inventory-sale-plan">
                     <div className="inventory-sale-plan__title">分期计划</div>
                     <InstallmentScheduleFields name="installment_schedule" />

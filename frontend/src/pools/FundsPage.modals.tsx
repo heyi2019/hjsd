@@ -206,7 +206,7 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
       <InlineError error={write.error} />
       {returnTarget ? (
         <Typography.Paragraph type="secondary">
-          押金占用合计 <MoneyText value={returnTarget.paid_amount} />；已释放 <MoneyText value={returnTarget.returned_amount} />；已损失 <MoneyText value={returnTarget.lost_amount ?? "0.00"} />；剩余可释放 <MoneyText value={(Number(returnTarget.paid_amount) - Number(returnTarget.returned_amount) - Number(returnTarget.lost_amount ?? 0)).toFixed(2)} strong />。
+          押金占用合计 <MoneyText value={returnTarget.paid_amount} />；已释放 <MoneyText value={returnTarget.returned_amount} />；已损失 <MoneyText value={returnTarget.lost_amount ?? "0.00"} />；剩余可释放 <MoneyText value={returnTarget.remaining_amount} strong />。
         </Typography.Paragraph>
       ) : null}
       <Typography.Paragraph type="warning">
@@ -226,9 +226,10 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
               () => ({
                 validator(_rule: unknown, value: unknown) {
                   if (!returnTarget || !value) return Promise.resolve();
-                  const max = Number(returnTarget.paid_amount) - Number(returnTarget.returned_amount) - Number(returnTarget.lost_amount ?? 0);
+                  // 上限取后端下发的剩余可释放额（口径同押金「剩余」列），不在前端重算。
+                  const max = Number(returnTarget.remaining_amount);
                   if (Number(value) > max + 1e-9) {
-                    return Promise.reject(new Error(`释放金额不得超过剩余可释放额 ¥${max.toFixed(2)}`));
+                    return Promise.reject(new Error(`释放金额不得超过剩余可释放额 ¥${returnTarget.remaining_amount}`));
                   }
                   return Promise.resolve();
                 },

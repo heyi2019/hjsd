@@ -23,7 +23,7 @@
     "test:full:serial": "vitest run",
     "test:serial": "vitest run --project=react --no-file-parallelism",
     "test:watch": "vitest",
-    "test:regression:fast": "npm run check && npm run test:e2e:critical",
+    "test:regression:fast": "npm run check && npm run test:fast",
     "guard": "node scripts/ui_guards.mjs"
   },
   "dependencies": {

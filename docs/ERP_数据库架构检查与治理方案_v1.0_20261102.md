@@ -63,7 +63,7 @@
 - SQLite 时代的 `heijin_erp_e2e.db` 已于 11-02 删除；
 - E2E 体系于 2026-11-02 整体下线，`frontend-e2e` job 已从 CI 移除。
 
-**遗留悬空**：`frontend/package.json` 的 `test:regression:fast` 仍在调用 `test:e2e:critical`，而该脚本已无定义；`playwright ^1.64.0` 依赖仍在。即「删了体系，没删入口」。
+**遗留悬空（✅ 已修入口）**：`frontend/package.json` 的 `test:regression:fast` 原先调用已无定义的 `test:e2e:critical`，已于 11-02 24:00 改为 `npm run check && npm run test:fast`。`playwright ^1.64.0` **依赖仍在**——移除需同步重生成 `package-lock.json`，否则 `npm ci` 会因两侧不同步直接失败，故未动。
 
 ### 1.4 连接配置与传递链路
 
@@ -155,9 +155,9 @@ stocks = 90，customers = 12，cashflow = 370（occurred_on 2026-07-07 起），
 
 `coverage-gate.yml` 两者都指向同一个 `heijin_erp_test`。在一次性容器里无实际风险，但它**示范了错误配置**——本地照抄一次就是 11-02 事故重演。
 
-### P2-1　E2E 残留入口
+### P2-1　E2E 残留入口（入口已修，依赖待清）
 
-`test:regression:fast` → `test:e2e:critical`（不存在）；`playwright` 依赖空转。会让新人以为 E2E 还在。
+`test:regression:fast` 曾指向不存在的 `test:e2e:critical`——**已修为** `npm run check && npm run test:fast`，脚本引用链闭合（CI 未调用该脚本，无外部影响）。`playwright` 依赖仍空转，移除须同步 `package-lock.json`（否则 `npm ci` 报不同步），留待与前端并行工作时一并处理。
 
 ### P2-2　历史数据质量
 
@@ -373,7 +373,7 @@ Prod
 | 4 | `deploy/scripts/deploy.sh` | 在 `alembic upgrade head` 前加**版本戳预检**：若 `alembic_version` 不在活动链，输出明确指引并中止 | 压平后生产库必踩，给出可读错误而非 alembic 原始异常 |
 | 5 | `deploy/scripts/preflight_db.sh`（新增） | 只读预检：库名、版本戳、表数、关键表行数、是否空库 | 部署前打印现状；**路径已固定为覆盖式重建**，不再分支判断 |
 | 6 | `.env.example` | 补 `RELEASE_DATABASE_URL` 说明段（仅文档用途，不参与运行时） | 让三个库的角色在模板里可见 |
-| 7 | `frontend/package.json` | 删 `test:regression:fast` 里悬空的 `test:e2e:critical`；移除 `playwright` 依赖 | 清理 E2E 残留 |
+| 7 | `frontend/package.json` | ✅ 已删 `test:regression:fast` 里悬空的 `test:e2e:critical`（改为 `npm run test:fast`）；`playwright` 依赖**待清**（需同步 lockfile） | 清理 E2E 残留 |
 | 8 | `.env.bak-20261102-2115` / `.env.postgres-test` | 删除或移入受控的凭据管理 | 消除明文口令与误用面 |
 | 9 | `backend/alembic/squashed_versions/0001_*.py` | 无需改动；但 `docs/` 需补一条「既有库如何演进」的操作说明 | 压平后最大的认知缺口 |
 | 10 | `deploy/scripts/backup_daily.sh` 的 cron | 本地 Dev 与 Release 库增加每日 dump（不同目录、不同保留策略） | 目前只有生产有自动备份 |
@@ -387,7 +387,7 @@ Prod
 | 能力 | 位置 | 说明 |
 |---|---|---|
 | 生产每日备份 | `backup_daily.sh` | `pg_dump -Fc`；三重完整性闸门（PGDMP 魔数、TOC 可解析、归档表数==源库表数）；sha256 sidecar；保留 30 份（`ERP_BACKUP_KEEP`）；备份写独立卷 |
-| 恢复 | `restore_pg.sh` | 强制 `--yes`；校验 sha256；`pg_restore --list` 预检；**恢复前自动再备份**；`--single-transaction` 失败整体回滚 |
+| 恢复 | `restore_pg.sh` | 强制 `--yes`；校验 sha256；`pg_restore --list` 预检；**恢复前自动再备份**；`--single-transaction` 失败整体回滚。⚠ **该脚本只在仓库里，ECS 上没有**（见下方缺口 1） |
 | 取回 | `pull_backup.sh` | 异地留存 |
 | 测试库闸门 | `conftest.py` | 必须 PG + 库名含 `test`，否则拒绝运行 |
 
@@ -395,6 +395,7 @@ Prod
 
 | 缺口 | 建议 |
 |---|---|
+| **1. `restore_pg.sh` 未部署到 ECS**（11-02 24:00 核查：ECS `/opt/heijin/deploy/scripts/` 只有 `backup_daily/deploy/export_images/gen_selfsigned/harden_host/pull_backup` 六个，**缺恢复脚本**） | 与 11.8 ③ 同批的遗漏：当时只同步了三件。灾备脚本不在机器上，等于「有备份、没恢复路径」——出事时只能临场敲命令。建议 `scp` 补齐并 `bash -n` 校验（需你许可写生产） |
 | Dev 库无自动备份 | `cron` 每日 `pg_dump heijin_erp_dev`，保留 14 份，写独立目录 |
 | Release 库无备份策略 | 导入完成后立即 dump，并在每次清洗/合并前后各留一份 |
 | PG 未开 WAL 归档 | 开启 `archive_mode=on` + `archive_command` 到独立卷，获得 PITR；至少要在正式发布前完成 |
@@ -779,6 +780,21 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 1. 119 单的 `owner_id` 仍 = 1，现在指向「系统管理员」——归属人显示名会从「李三」变「系统管理员」。语义修正（改成 id=2 何一）属动业务数据，**未做**。
 2. `19873133890` 的 `must_change_password = true` 是**生产原值**，不是本次引入：上线后首次登录会被要求改口令。若要免除，改的是生产语义而非上线包，**未动**。
 3. `create_admin.py` 是「建或改」，部署时 `export ADMIN_PASSWORD` 会**覆盖 admin(id=1) 的口令**——这是刻意保留的兜底，不影响何一账号。
+
+---
+
+### 11.11 孤儿库归档「可恢复」验证（2026-11-02 24:00）
+
+11.9 只验证了 `archive_migration_test_20261102_235246.dump` **可被 `pg_restore -l` 解析**，那不等于可恢复。本轮补做真实恢复：
+
+| 步骤 | 结果 |
+|---|---|
+| `shasum -a 256 -c *.sha256` | OK |
+| 恢复到临时库 `heijin_erp_archcheck` | 退出码 0，`--single-transaction` |
+| 表 / 版本戳 | **40** / `0001` |
+| 业务行数 | orders 0 / stocks 0 / cashflow 0 / **users 0** |
+
+结论：`heijin_erp_migration_test` 的归档是**可用的退路**，删除该库不会造成不可恢复的损失（且该库本身零业务数据）。临时库用完即 `DROP`。
 
 ---
 

@@ -228,7 +228,7 @@ stocks = 90，customers = 12，cashflow = 370（occurred_on 2026-07-07 起），
 | 客户 / 分期 / 返点 | 0 / 0 / 0（源数据本就没有，见 11.6） |
 | 测试脏数据 | ✅ 已清（customers 12→0、counterparties 4→0、teams 2→0、测试用户已删） |
 
-### 阶段 2　生成上线包
+### 阶段 2　生成上线包（**已完成**，实测记录见 11.7）
 
 ```bash
 docker exec container-db-1 pg_dump -U erp_app -d heijin_erp_release -Fc \
@@ -268,9 +268,15 @@ docker exec -i container-db-1 pg_restore -l < backups/release_*.dump | grep -c "
      -c "select count(*) from orders" \
      -c "select count(*) from stocks" \
      -c "select count(*) from cashflow" \
-     -c "select code, name from pools"
+     -c "select p.code, sum(case when c.direction='IN' then c.amount else -c.amount end) as cash
+         from pools p left join cashflow c
+           on c.pool_id=p.id and c.status='APPROVED'
+         group by p.code order by p.code"
    ```
-   期望：`0001` / **119** / **90** / **370**；池余额 **HJ_PROFIT 54,253.06**、HJ_INVEST 744,382.61。
+   期望：`0001` / **119** / **90** / **370**；池余额 **HJ_PROFIT 54,253.06**、**HJ_INVEST 57,579.17**。
+
+   > 余额口径 = 已审流水按 `direction` 带符号求和（`app/orders/pools.py::pool_balances` 的 `cash_balance`），
+   > **不是** `sum(amount)`。后者忽略方向，HJ_INVEST 会算成 744,382.61（收入 400,980.89 + 支出 343,401.72），属错误值。
 7. 起服务并验健康：
    ```bash
    docker compose up -d
@@ -382,16 +388,16 @@ Prod
 
 ### P0（上线前必须完成，缺一不可）
 
-1. **核实生产库现状**：版本戳、是否已有数据、立即备份取回。
-2. **建 `heijin_erp_release`**：`upgrade head` → 导入 rawdata → 对账 → dump 留档。
+1. **核实生产库现状**：版本戳、是否已有数据、立即备份取回。⬜ **未做**（需 ECS 访问权）
+2. **建 `heijin_erp_release`**：✅ 已完成（11.1 / 11.5）——由 dev dump 恢复，**不是** rawdata 导入。
 3. **Dev 库剥离真实数据**：确认 Release 校验通过后，Dev 可重置为纯结构库（此步需你明确授权，本轮未做）。
-4. **部署链路适配压平**：`deploy.sh` 增加版本戳预检 + `stamp --purge 0001` 指引。
-5. **首次上线演练**：在本地用 Release dump 恢复到临时库，完整走一遍 3A 流程。
+4. **部署链路适配压平**：✅ 已完成（`591e7f4`）——`deploy.sh` 版本戳预检 + 测试库黑名单。
+5. **首次上线演练**：✅ 已完成（11.7）——本地临时库全流程 9 步，仅「管理员登录建单」因无口令未覆盖。
 
 ### P1（上线前建议完成）
 
-6. 测试闸门加 `release/prod` 黑名单 + `TEST != DATABASE` 校验。
-7. CI 的 `DATABASE_URL` / `TEST_DATABASE_URL` 拆分。
+6. ✅ 测试闸门加 `release/prod` 黑名单 + `TEST != DATABASE` 校验（`591e7f4`）。
+7. ✅ **已复评：无需拆分**。`coverage-gate.yml` 的 postgres 是 GitHub Actions **一次性 service container**，库名 `heijin_erp_test`，job 结束即销毁，两个变量同值不会伤到任何真实数据；`conftest` 的「TEST ≠ DATABASE」校验在 `CI` 环境下按设计跳过。属命名冗余，不是风险。
 8. 删除或归档 `heijin_erp_migration_test`（先 dump 留档）。
 9. 开启 PG WAL 归档（PITR）。
 
@@ -421,7 +427,7 @@ Prod
 
 关键行数：`orders` 119 / `stocks` 90 / `cashflow` 370 / `order_events` 200 / `audit_logs` 499 / `customers` 12 / `order_form_fields` 259 / `option_sets` 63 / `users` 3。
 
-余额：**HJ_PROFIT 54,253.06**（与 11-02 重建基线完全一致）、HJ_INVEST 744,382.61。
+余额（`cash_balance` 口径）：**HJ_PROFIT 54,253.06**（与 11-02 重建基线完全一致）、**HJ_INVEST 57,579.17**。
 
 ### 11.2 结论一：Release 现在是 Dev 的克隆，且带着测试脏数据
 
@@ -537,6 +543,42 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 **上线后客户维度报表为空的唯一解法**：从上线第一天起在系统内正常建单录入客户——`CreateBusinessModal` 会在有 `customer_id` 时自动写 `customer_roles`，不需要额外开发。历史 119 单将永久无客户归属。
 
+### 11.7 阶段 2 上线包与首次上线演练（2026-11-02 23:45）
+
+**① 上线包已生成**
+
+| 项 | 结果 |
+|---|---|
+| 文件 | `backups/release_20261102_234054.dump`（219,263 B，`pg_dump -Fc`） |
+| 校验 | `backups/release_latest.sha256` → `f4af4f80…83fc683` |
+| TOC 自检 | `pg_restore -l` 解出 **40 条 TABLE DATA**（= 40 表），TOC 共 445 条 |
+
+**② 覆盖式重建演练（P0-5）——全流程通过**
+
+在本地建临时库 `heijin_erp_drill`，逐条复刻第六节阶段 3 的动作，全绿后已删除该库：
+
+| 步 | 动作 | 结果 |
+|---|---|---|
+| 1 | `CREATE DATABASE heijin_erp_drill` | ✅ |
+| 2 | `pg_restore --no-owner --single-transaction` | ✅ 退出码 0，单事务，无 `--clean` |
+| 3 | 表数 / 版本戳 | **40 表** / `0001` |
+| 4 | 业务行数 | orders **119** / stocks **90** / cashflow **370** / order_events **200** / customers **0** |
+| 5 | 种子 | `order_form_fields` **259** / `option_sets` **63** |
+| 6 | 池余额（服务层 `pool_balances` 实算） | HJ_PROFIT **54,253.06**（收入 54,253.06 / 支出 0）；HJ_INVEST **57,579.17**（收入 287,510.47 / 支出 343,401.72）；押金 0 |
+| 7 | `alembic current` | `0001 (head)`，**无 `Can't locate revision`** → `deploy.sh` 版本戳预检不会误拦 |
+| 8 | `alembic upgrade head` | 零 DDL 输出，版本仍 `0001`，119 单未动 → **no-op 确认** |
+| 9 | 后端启动 + `GET /api/v1/health` | `{"status":"ok","database_status":"ok"}`，`database` 指向演练库 |
+
+**③ 演练暴露并已修正的一处文档错误**
+
+原文档两处（阶段 3 校验期望、11.1 余额）写 `HJ_INVEST 744,382.61`，**是错的**。该值 = `cashflow` 全部金额绝对值之和（收入 400,980.89 + 支出 343,401.72），忽略了 `direction` 方向。
+
+真实口径（`app/orders/pools.py::pool_balances` → `cash_balance = sum(IN) - sum(OUT)`，仅 `APPROVED`）为 **57,579.17**，dev 与 release 两库实测一致。已同步修正两处，并在阶段 3 第 6 步补上了可执行的余额校验 SQL（原步骤只查 `code, name`，根本没算余额）。
+
+**④ 演练未覆盖的唯一一步**
+
+阶段 3 第 8 步「管理员登录 → 建一笔回收单 → 作废」需要真实管理员口令，本机无凭据，未执行。这一步必须在上线日现场做，且**不要因为演练全绿就跳过**——健康检查只证明进程起来了，不证明写路径可用。
+
 ---
 
 ## 附：操作边界声明
@@ -550,3 +592,5 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 - 仅在 `heijin_erp_release` 内删除测试主数据（customers 12 / counterparties 4 / teams 2 / user_test_20261101）；
 - `heijin_erp_test`、`heijin_erp_migration_test` 未触碰；
 - 生产库至今**零连接**。
+
+**阶段 2 / 演练执行（11.7）**：从 `heijin_erp_release` **只读** `pg_dump` 生成上线包；演练用临时库 `heijin_erp_drill`（非本项目四库之一，用完即 `DROP ... WITH (FORCE)`），演练期间后端在 `127.0.0.1:8199` 临时起停，未触碰 8123 开发服务；`heijin_erp_dev` / `test` / `release` / `migration_test` **零写入**。

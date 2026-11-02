@@ -98,23 +98,23 @@ export default defineConfig({
           // 日常 test:full 不再覆盖（详见 scripts/test-full-sharded.mjs 模式说明）。
           exclude: [
             "src/test/fixtures.test.ts",
-            "src/accounts/inventory-export.test.ts",
-            "src/accounts/inventory-logic.test.ts",
+            "src/stocks/inventory-export.test.ts",
+            "src/stocks/inventory-logic.test.ts",
             "src/shared/api/*.test.ts",
             "src/shared/lib/*.test.ts",
             "src/vite.config.test.ts",
             "src/**/*.deep.test.tsx",
             ...quickTests,
           ],
-          // [2026-10-20 实测] forks → threads：酸测 5 文件 31 用例中位数 29.37s → 25.57s（~13%），
-          // 且两组区间不重叠（threads 24.17~26.96 vs forks 27.62~31.12）。threads 复用 worker
-          // 线程而非每次 fork 进程，省下进程创建开销；正确性零回归（31/31 两次全绿）。
-          // [2026-10-27 提速定案] react 项目内 threads maxWorkers 由 1→2：线程级并行（共享同进程
-          // vite + transform 缓存，与「分片子进程」机制不同），实测 test:react 150.1s→112s（↓25%，
-          // 432 用例零失败零 retry）；jsdom+antd 在 2 worker 下稳定，故采纳。react-deep 重型用例
-          // 多线程争抢风险未实测，维持 1 worker。
+          // [2026-11-03 实测重定] maxWorkers 1→2 之后机器已升到 8 核，2 worker 只吃到
+          // 214% CPU（6 核闲置）。三档实测（91 文件 / 432 用例，同机同代码）：
+          //   2 worker 181.89s（cpu 214%）
+          //   4 worker 144.62s（cpu 372%）← 采纳，-20%
+          //   6 worker 156.72s（cpu 372%）← 反而回退，超订（每 worker 要 2 核）
+          // 结论：worker 数取「物理核 / 2」。jsdom+antd 在 4 worker 下 91 文件全绿、
+          // 零 retry 触发的失败。新增机器或升配后按此公式重测。
           pool: "threads",
-          maxWorkers: 2,
+          maxWorkers: 4,
           minWorkers: 1,
         },
       },

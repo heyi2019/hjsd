@@ -238,7 +238,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
           wrapperCol={{ flex: "auto" }} scope="SALE" form={form} onFinish={submit}>
           <RecoveryCustomerSection title={buyerInfoTitle} />
           <DeliveryInfoSection showIntermediary employees={employees} />
-          <section className="inventory-sale-cashflow" aria-labelledby="inventory-sale-cashflow-title">
+          <section className="inventory-sale-cashflow inventory-sale-cashflow--full-width" aria-labelledby="inventory-sale-cashflow-title">
             <div id="inventory-sale-cashflow-title" className="inventory-sale-cashflow__title">资金流水</div>
             <AdaptiveFormGrid>
               {isConsignment && (
@@ -284,7 +284,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                   <Input placeholder="可选填" />
                 </CfgItem>
               </> : (
-                <div className="inventory-sale-installment-fields">
+                <div className="inventory-sale-installment-fields inventory-sale-installment-fields--grid">
                   <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
                   <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
                   <CfgItem

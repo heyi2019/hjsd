@@ -374,7 +374,7 @@ it("提号库存从库存中心售出时统一按库存分期出售，确立时�
     expect(await screen.findByText("售出提号账号")).toBeInTheDocument();
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1200");
-    await ui.click(screen.getByText("分期付款"));
+    await ui.click(await screen.findByText("分期付款"));
     await ui.clear(screen.getByLabelText("首付金额"));
     await ui.type(screen.getByLabelText("首付金额"), "300");
     await ui.click(screen.getByLabelText("资金账户"));
@@ -415,6 +415,12 @@ describe("库存售出三表单分支", () => {
     renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
     expect(await screen.findByText("售出回收账号")).toBeInTheDocument();
     expect(screen.getByText("买家信息")).toBeInTheDocument();
+  });
+
+  it("售出表单的资金流水区占满表单宽度", async () => {
+    renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    const cashflow = await screen.findByText("资金流水");
+    expect(cashflow.closest(".inventory-sale-cashflow")).toHaveClass("inventory-sale-cashflow--full-width");
   });
 
   it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {

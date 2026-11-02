@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from app.api_v1 import create_app
 from app.core.settings import (
-    BACKEND_DIR,
     PROJECT_ROOT,
     Settings,
     get_settings,
@@ -77,42 +76,28 @@ def test_settings_loads_from_root_env():
     assert settings.access_token_expire_minutes >= 1
 
 
-def test_sqlite_path_is_resolved_under_backend(tmp_path):
-    settings = Settings(database_url=f"sqlite:///{tmp_path}/x.db")
-    assert settings.sqlite_file == tmp_path / "x.db"
+def test_default_database_is_postgres():
+    """SQLite 已彻底下线：缺 .env 时的兜底地址也必须是 PG。
 
-    relative = Settings(database_url="sqlite:///./data/tmp_probe.db")
-    assert relative.sqlite_file is not None
-    assert relative.sqlite_file.is_absolute()
-    assert relative.sqlite_file.parent == BACKEND_DIR / "data"
-
-
-def test_default_database_is_independent_v1_file():
-    """v1 默认库不得是旧 heijin.db / heijin_v2.db（仅 SQLite 默认路径有此约束）。
-
-    已切到 PostgreSQL 等非 SQLite 后端时 sqlite_file 应为 None，跳过该约束。
+    以前兜底是 `sqlite:///./data/heijin_erp_v1.db`——连不上库时会静默新建一个
+    SQLite 文件，数据写进没人知道的地方。现在宁可连不上明确报错。
     """
-    settings = get_settings()
-    if not settings.database_url.startswith("sqlite"):
-        pytest.skip("非 SQLite 后端（如 PostgreSQL）无独立 sqlite 文件约束")
-    sqlite_file = settings.sqlite_file
-    assert sqlite_file is not None
-    assert sqlite_file.name not in {"heijin.db", "heijin_v2.db"}
-    assert sqlite_file.name == "heijin_erp_v1.db"
+    settings = Settings(_env_file=None)
+    assert settings.database_url.startswith("postgresql")
+    assert settings.database_url.endswith("/heijin_erp_dev")
 
 
-@pytest.mark.parametrize("legacy", ["heijin.db", "heijin_v2.db"])
-def test_legacy_database_url_is_rejected(legacy):
-    """V15/V17：把 v1 指向旧库必须在配置层炸掉。"""
-    with pytest.raises(ValidationError) as exc:
-        Settings(database_url=f"sqlite:///./data/{legacy}")
-    assert "旧库" in str(exc.value)
+def test_alembic_url_equals_database_url():
+    """PG 下不需要再拼绝对路径，engine 与 alembic 共用同一串。"""
+    settings = Settings(database_url="postgresql+psycopg://u:p@127.0.0.1:5432/x")
+    assert settings.alembic_url == settings.database_url
 
 
-def test_memory_database_allowed():
-    settings = Settings(database_url="sqlite:///:memory:")
-    assert settings.sqlite_file is None
-    assert settings.sqlalchemy_url == "sqlite:///:memory:"
+def test_sqlite_is_no_longer_supported():
+    """残留的 SQLite 配置不再有专属处理路径：没有 sqlite_file / sqlalchemy_url。"""
+    settings = Settings(database_url="sqlite:///./data/probe.db", _env_file=None)
+    assert not hasattr(settings, "sqlite_file")
+    assert not hasattr(settings, "sqlalchemy_url")
 
 
 def test_describe_does_not_leak_secret():
@@ -133,12 +118,6 @@ def test_describe_redacts_database_password():
     assert "s3cr3t" not in str(payload)
 
 
-def test_describe_sqlite_keeps_filename_only():
-    """SQLite 只回显文件名，避免把宿主机目录结构写进响应体。"""
-    settings = Settings(database_url="sqlite:///./data/heijin_erp_v1.db")
-    assert settings.describe()["database"] == "sqlite:heijin_erp_v1.db"
-
-
 # --- CORS：dev 端口通配 ---------------------------------------------------
 # 背景（实测事故）：前端换到 5199 端口后，CORS 预检返回 400，
 # axios 全部 Failed to fetch，但页面**不报错**，只静默显示
@@ -156,7 +135,7 @@ def test_dev_allows_any_local_port():
 def test_dev_cors_middleware_accepts_frontend_port():
     settings = Settings(
         app_env="development",
-        database_url="sqlite:///:memory:",
+        database_url="postgresql+psycopg://erp_app@127.0.0.1:5432/heijin_erp_test",
     )
     response = TestClient(create_app(settings)).options(
         "/api/v1/orders",

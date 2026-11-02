@@ -40,7 +40,7 @@ def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
     取用前先探活，避免首个请求报 `server closed the connection unexpectedly`。
     """
     settings = get_settings()
-    target = url or settings.sqlalchemy_url
+    target = url or settings.alembic_url
     return create_engine(target, future=True, echo=echo, pool_pre_ping=True)
 
 

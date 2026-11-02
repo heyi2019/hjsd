@@ -68,7 +68,7 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = get_settings()
-    engine = create_engine(settings.sqlalchemy_url)
+    engine = create_engine(settings.alembic_url)
 
     # 防御性建表：正常部署顺序下已由迁移 0003 建好，此处兜底避免脚本前置依赖过强。
     # 使用 SQLAlchemy 元数据而不是 SQLite 专用 AUTOINCREMENT，保证 PostgreSQL 也可执行。

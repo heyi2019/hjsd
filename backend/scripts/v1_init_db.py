@@ -57,7 +57,7 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = get_settings()
-    print(f"[v1] 目标数据库: {settings.sqlite_file or settings.database_url}")
+    print(f"[v1] 目标数据库: {settings.database_url}")
     print(f"[v1] 配置文件: {settings.env_file_path}")
 
     if not args.check:

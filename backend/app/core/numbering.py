@@ -47,10 +47,10 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     调用方必须处于事务中：编号递增与业务落库一起提交，失败整体回滚（允许出现号段空洞）。
 
     并发安全（2026-10-28 压测修复）：单语句「条件相对递增 + RETURNING」取号。
-    SQLite 忽略 `with_for_update()`，旧的「SELECT 读值 → Python +1 → UPDATE 绝对值写」
-    在并发建单时会让多个事务读到同一个 current_value，各自发同一个号，后提交者撞
-    `orders.order_no` 唯一约束直接 500。相对递增利用 SQLite 单写锁天然串行：后到者的
-    UPDATE 会等前者提交后再执行（python sqlite3 默认 busy 等待 5s），拿到的是 +1 后的值。
+    旧的「SELECT 读值 → Python +1 → UPDATE 绝对值写」在并发建单时会让多个事务读到
+    同一个 current_value，各自发同一个号，后提交者撞 `orders.order_no` 唯一约束直接 500。
+    改为相对递增（`current_value + 1`）后由数据库自己串行化：PG 在行锁上排队，
+    后到者的 UPDATE 等前者提交后才执行，读到的是 +1 之后的值。
     上限校验放进 WHERE：超限时语句零命中、不消耗任何号，语义与旧版一致。
     """
     key_value = key.value if isinstance(key, SequenceKey) else key

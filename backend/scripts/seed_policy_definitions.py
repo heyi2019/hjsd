@@ -22,12 +22,12 @@
 脚本沿用服务默认：create_version 直接创建 ACTIVE 版本（无独立审批环节）。
 版本参数为占位口径，业务方在页面「设置配置」按实际调整（每次设置生成新版本并发布）。
 
-用法（必须 cd 到 backend 目录，默认库为 data/heijin_erp_v1.db）
+用法（必须 cd 到 backend 目录，库地址取自 .env 的 DATABASE_URL）
 ---------------------------------------------------------------
     cd /Users/aries/黑金时代/backend
     /Users/aries/Applications/Python_3.13/bin/python3 scripts/seed_policy_definitions.py            # 预演，不写库
     /Users/aries/Applications/Python_3.13/bin/python3 scripts/seed_policy_definitions.py --apply    # 实际写入
-    DATABASE_URL=sqlite:///./data/heijin_erp_e2e.db ... --apply                                     # 指定库
+    DATABASE_URL=postgresql+psycopg://erp_app@127.0.0.1:5432/heijin_erp_dev ... --apply             # 指定库
 """
 from __future__ import annotations
 

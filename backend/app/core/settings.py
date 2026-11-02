@@ -2,7 +2,8 @@
 
 约束（工程启动契约）：
 1. 必须读取**仓库根目录** `.env`（`.env.example` 只是模板，不得当成已生效配置）。
-2. v1 数据库与旧 `heijin.db` / `heijin_v2.db` 物理隔离：一旦指向旧库文件名立即报错。
+2. 数据库统一 PostgreSQL（SQLite 支持已彻底下线，2026-11-02）：缺 `.env` 时回落到本机 PG 默认地址，
+   连不上会明确报错，而不是静默在 `data/` 下新建一个 SQLite 文件。
 3. `.env` 不入库；缺文件时回落到安全默认值 + APP_ENV=development。
 """
 from __future__ import annotations
@@ -19,9 +20,9 @@ from app.version import __version__
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # app/core/settings.py -> backend
 PROJECT_ROOT = BACKEND_DIR.parent  # 黑金时代/
 
-# 旧库保护名单：v1 绝不允许在这些文件上建立/迁移（MIG/P2 迁移区 PRD §2.1.1）
-LEGACY_SQLITE_FILENAMES = frozenset({"heijin.db", "heijin_v2.db"})
-DEFAULT_DEV_DB_RELPATH = "data/heijin_erp_v1.db"
+# 缺 `.env` 时的本机兜底地址。刻意不带口令：连不上就明确报错，
+# 好过静默在 data/ 下新建一个 SQLite 文件、把真实数据写进没人知道的角落。
+DEFAULT_DEV_DATABASE_URL = "postgresql+psycopg://erp_app@127.0.0.1:5432/heijin_erp_dev"
 
 
 def locate_env_file() -> Path | None:
@@ -42,7 +43,7 @@ def redact_database_url(url: str) -> str:
 
     健康检查与日志会原样输出这个字符串，因此**绝不能**带口令：PG 的 URL 形如
     `postgresql+psycopg://user:pass@host:5432/db`，直接回显等于把生产库口令写进
-    接口响应体与日志。SQLite 只保留文件名，避免泄露宿主机目录结构。
+    接口响应体与日志。
     """
     try:
         from sqlalchemy.engine import make_url
@@ -50,16 +51,10 @@ def redact_database_url(url: str) -> str:
         parsed = make_url(url)
     except Exception:  # pragma: no cover - 非法 URL 交由上层报错
         return "<unparsable>"
-    backend = parsed.get_backend_name()
-    if backend == "sqlite":
-        database = parsed.database or ""
-        if database in {"", ":memory:"}:
-            return "sqlite::memory:"
-        return f"sqlite:{Path(database).name}"
     host = parsed.host or ""
     if parsed.port:
         host = f"{host}:{parsed.port}"
-    return f"{backend}://{host}/{parsed.database or ''}"
+    return f"{parsed.get_backend_name()}://{host}/{parsed.database or ''}"
 
 
 class Settings(BaseSettings):
@@ -90,9 +85,8 @@ class Settings(BaseSettings):
     login_rate_limit_enabled: bool = True
     login_rate_limit_per_minute: int = 10
 
-    # database：正式环境为 PostgreSQL；SQLite 仅作为无 .env 时的本地兜底
-    # （迁移链与业务 SQL 均为跨方言写法，两种后端都能跑）。
-    database_url: str = f"sqlite:///./{DEFAULT_DEV_DB_RELPATH}"
+    # database：统一 PostgreSQL（SQLite 已下线）。缺 .env 时用下面的本机兜底地址。
+    database_url: str = DEFAULT_DEV_DATABASE_URL
 
     # 测试库：**必须与 database_url 分开**。pytest 夹具每个 session 会 TRUNCATE 全表 +
     # 序列归位，一旦回落指向开发库/正式库就是数据全毁（2026-11-02 已真实发生过一次：
@@ -136,23 +130,6 @@ class Settings(BaseSettings):
             raise ValueError("生产环境 CORS_ORIGINS 不得使用通配符 *")
         return self
 
-    @field_validator("database_url")
-    @classmethod
-    def _reject_legacy_database(cls, value: str) -> str:
-        """V15/V17：禁止把 v1 指向历史库，避免覆盖真实经营数据。"""
-        if not value.startswith("sqlite"):
-            return value
-        path = cls._extract_path(value)
-        if path is None:
-            return value
-        filename = Path(path).name
-        if filename in LEGACY_SQLITE_FILENAMES:
-            raise ValueError(
-                f"DATABASE_URL 不得指向旧库 {filename}；"
-                "v1 必须使用独立数据库（建议使用 data/heijin_erp_v1.db）"
-            )
-        return value
-
     @field_validator("login_rate_limit_per_minute")
     @classmethod
     def _validate_non_negative(cls, value: int) -> int:
@@ -161,48 +138,14 @@ class Settings(BaseSettings):
             raise ValueError("登录限流次数不得为负数（0 表示每个窗口一律拒绝，请确认意图）")
         return value
 
-    @staticmethod
-    def _extract_path(url: str) -> str | None:
-        """优先交给 SQLAlchemy 解析：`sqlite:////abs/a.db` 与 `sqlite:///./a.db` 都要正确。"""
-        try:
-            from sqlalchemy.engine import make_url
-
-            database = make_url(url).database
-        except Exception:  # pragma: no cover - 非法 URL 交由上层报错
-            return None
-        if not database or database.startswith(":"):  # sqlite:///:memory:
-            return None
-        return database
-
     @property
     def env_file_path(self) -> Path | None:
         return locate_env_file()
 
     @property
-    def sqlite_file(self) -> Path | None:
-        """返回 SQLite 数据库文件的绝对路径（非 SQLite 返回 None）。"""
-        if not self.database_url.startswith("sqlite"):
-            return None
-        raw = self._extract_path(self.database_url)
-        if raw is None:
-            return None
-        path = Path(raw)
-        if not path.is_absolute():
-            path = BACKEND_DIR / path
-        return path
-
-    @property
-    def sqlalchemy_url(self) -> str:
-        """供 engine / Alembic 使用的绝对 URL。"""
-        sqlite_file = self.sqlite_file
-        if sqlite_file is None:
-            return self.database_url
-        sqlite_file.parent.mkdir(parents=True, exist_ok=True)
-        return f"sqlite:///{sqlite_file}"
-
-    @property
     def alembic_url(self) -> str:
-        return self.sqlalchemy_url
+        """供 engine / Alembic 使用的连接串（PG 下与 DATABASE_URL 一致）。"""
+        return self.database_url
 
     @property
     def attachment_storage_path(self) -> Path:
@@ -246,7 +189,7 @@ def get_settings() -> Settings:
 
 __all__ = [
     "BACKEND_DIR",
-    "LEGACY_SQLITE_FILENAMES",
+    "DEFAULT_DEV_DATABASE_URL",
     "PROJECT_ROOT",
     "Settings",
     "get_settings",

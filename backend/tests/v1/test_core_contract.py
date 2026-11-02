@@ -377,20 +377,11 @@ class TestSettingsHelpers:
         monkeypatch.setattr(settings_module, "BACKEND_DIR", tmp_path / "no-backend")
         assert settings_module.locate_env_file() is None
 
-    def test_non_sqlite_url_bypasses_path_extraction(self):
-        assert (
-            settings_module.Settings._reject_legacy_database("postgresql://u:p@h/db")
-            == "postgresql://u:p@h/db"
-        )
-        settings = settings_module.Settings(database_url="postgresql://u:p@h/db")
-        assert settings.sqlite_file is None
-
-    def test_sqlalchemy_url_creates_parent_dir(self, tmp_path):
-        target = tmp_path / "nested" / "erp.db"
-        settings = settings_module.Settings(database_url=f"sqlite:///{target}")
-        assert settings.sqlalchemy_url == f"sqlite:///{target}"
-        assert target.parent.is_dir()  # 130：父目录自动创建
-        assert settings.alembic_url == settings.sqlalchemy_url
+    def test_alembic_url_is_database_url(self):
+        """SQLite 下线后不再有「把相对路径解析成绝对路径」的步骤，两者必须一致。"""
+        url = "postgresql+psycopg://erp_app@127.0.0.1:5432/heijin_erp_test"
+        settings = settings_module.Settings(database_url=url)
+        assert settings.alembic_url == url
 
 
 # ------------------------------------------------------------------ database

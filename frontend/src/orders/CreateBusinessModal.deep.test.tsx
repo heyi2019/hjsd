@@ -67,9 +67,8 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     // 放弃确认框出现，未确认前不关闭
     expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
-    // 放弃确认用 ConfirmDialog（Modal 级）：rc-motion 测试桩强制 visible 会让 antd Button 渲染
-    // loading 图标并污染 getByRole 的 name，故用正则按文案匹配（真实运行不受影响）。
-    await ui.click(screen.getByRole("button", { name: /放弃/ }));
+    // 放弃确认用 ConfirmDialog（Modal 级）：按可访问名精确点击，兼作 loading 图标污染的回归护栏。
+    await ui.click(screen.getByRole("button", { name: "放弃" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 

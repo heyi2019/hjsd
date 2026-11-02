@@ -66,14 +66,17 @@
 
 ## 8. 测试约定（重要）
 
-测试环境用 `rc-motion` 桩（`src/test/motion-stub.tsx`）替代动画。该桩为「零动画」会**强制
-`CSSMotion` 的 `visible=true`**，导致 antd `Button`（无自定义图标者）**总是渲染 loading 图标**
-（`aria-label="loading"`），从而污染 `getByRole("button", { name })` 的匹配结果
-（如名称变为「loading 删除」）。
+测试环境用 `rc-motion` 桩（`src/test/motion-stub.tsx`）替代动画。该桩必须遵守 rc-motion 的
+`visible === false && removeOnLeave` 语义——此时**不渲染** children。历史上该桩硬编码
+`visible: true`，使 antd `Button`（无自定义图标者）**总是渲染 loading 图标**（`aria-label="loading"`），
+把按钮可访问名污染为「loading 删除」，导致 `getByRole("button", { name })` 精确匹配失效。
+**根因已修**（L1805 收口后一轮），现按措辞精确断言即可。
 
-- 因此涉及 `ConfirmButton` / `ConfirmDialog` 按钮的断言，**用 `within(dialog).getByText("删除")`
-  或 `getByRole("button", { name: /删除/ })` 按文案匹配**，避免被 loading 图标干扰。
-- 该现象**仅存在于测试环境**，真实运行不受影响（见 L1805 收口说明与测试报告对应章节）。
+- 涉及 `ConfirmButton` / `ConfirmDialog` 按钮的断言**优先用可访问名精确匹配**
+  （`within(dialog).getByRole("button", { name: "删除" })`）：一旦 loading 图标再次出现（例如桩被
+  改回硬编码 `visible: true`），断言会立即失败，起到回归护栏作用。
+- 仅当同一文案在多个位置出现、需要缩小范围时，才退回 `within(...).getByText(...)`；**不要**用
+  `/正则/` 去「绕过」可访问名不匹配——那是掩盖污染，而非修复。
 
 ## 9. 本次 B 方案迁移清单（L1805）
 

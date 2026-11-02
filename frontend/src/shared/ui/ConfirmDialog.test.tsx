@@ -20,11 +20,11 @@ describe("ConfirmDialog", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("删除确认")).toBeInTheDocument();
     expect(within(dialog).getByText("此操作不可撤销")).toBeInTheDocument();
-    // 注：rc-motion 测试桩强制 visible，antd Button 会渲染 loading 图标（aria-label="loading"），
-    // 污染 getByRole 的 name；改用文本断言（真实运行不受影响）。
-    expect(within(dialog).getByText("删除")).toBeInTheDocument();
+    // 精确断言可访问名：若 rc-motion 测试桩再次忽略 visible，antd Button 会渲染 loading 图标
+    // 把 name 污染成「loading 删除」，这两条会立即失败（回归护栏）。
+    expect(within(dialog).getByRole("button", { name: "删除" })).toBeInTheDocument();
     // 默认取消文案
-    expect(within(dialog).getByText("取消")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "取消" })).toBeInTheDocument();
   });
 
   it("点击确认调用 onConfirm", async () => {
@@ -34,7 +34,7 @@ describe("ConfirmDialog", () => {
       <ConfirmDialog open title="删除确认" okText="删除" onConfirm={onConfirm} onCancel={vi.fn()} />,
       { user: "admin" },
     );
-    await ui.click(within(screen.getByRole("dialog")).getByText("删除"));
+    await ui.click(within(screen.getByRole("dialog")).getByRole("button", { name: "删除" }));
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   });
 
@@ -46,7 +46,7 @@ describe("ConfirmDialog", () => {
       <ConfirmDialog open title="删除确认" okText="删除" onConfirm={onConfirm} onCancel={vi.fn()} />,
       { user: "admin" },
     );
-    await ui.click(within(screen.getByRole("dialog")).getByText("删除"));
+    await ui.click(within(screen.getByRole("dialog")).getByRole("button", { name: "删除" }));
     // normalizeError 对非 axios 错误取 String(error)（见 src/shared/api/client.ts），故上屏文案为
     // 「Error: 网络异常」；此处只校验全局 toast 触发且携带原错误文本，不过度绑定格式细节。
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("网络异常")));
@@ -61,7 +61,7 @@ describe("ConfirmDialog", () => {
       <ConfirmDialog open title="删除确认" okText="删除" onConfirm={vi.fn()} onCancel={onCancel} />,
       { user: "admin" },
     );
-    await ui.click(within(screen.getByRole("dialog")).getByText("取消"));
+    await ui.click(within(screen.getByRole("dialog")).getByRole("button", { name: "取消" }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

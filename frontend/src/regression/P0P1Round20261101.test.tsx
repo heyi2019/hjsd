@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "../test/render";
@@ -35,7 +35,7 @@ import { QualityPanel } from "../quality/QualityPanel";
 import { AuditPanel } from "../audit/AuditPanel";
 import { clearOptionSetsCache, loadOptionSets } from "../shared/lib/optionSets";
 import { seedOrderFormFields } from "../test/formFieldsSeed";
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 import { buildActionAllocationCandidates, buildActionAllocationRows } from "../orders/orderpage/helpers";
 
 vi.mock("../shared/api/catalog");
@@ -456,7 +456,6 @@ it("P1/FE-196：库存 CSV 导出完成后给出成功反馈", async () => {
 });
 
 it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表单", async () => {
-  const confirmSpy = vi.spyOn(appModal, "confirm");
   vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
     { id: 99, game_account: "duplicate-account", game_type: "王者荣耀", status: "WAITING" },
   ] as never);
@@ -496,16 +495,12 @@ it("P1/FE-023：库存中的未售出重复账号直接阻止建单并保留表�
 
   await waitFor(() => expect(screen.getByText(/请先售出后再建单/)).toBeInTheDocument());
   expect(screen.getByLabelText("游戏账号")).toHaveValue("duplicate-account");
-  expect(confirmSpy).not.toHaveBeenCalled();
+  // 未售出属硬阻止：只出页面级错误提示，不应弹复购确认框（ConfirmDialog）。
+  expect(screen.queryByText("检测到重复游戏账号")).not.toBeInTheDocument();
   expect(catalog.ordersApi.create).not.toHaveBeenCalled();
 });
 
 it("P1/FE-023：已售出重复账号确认复购后允许回流建单", async () => {
-  let confirmConfig: { onOk?: () => void | Promise<void> } | undefined;
-  const confirmSpy = vi.spyOn(appModal, "confirm").mockImplementation((config) => {
-    confirmConfig = config as typeof confirmConfig;
-    return { destroy: () => undefined } as unknown as ReturnType<typeof appModal.confirm>;
-  });
   vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
     { id: 99, game_account: "duplicate-account", game_type: "王者荣耀", status: "SOLD" },
   ] as never);
@@ -543,10 +538,12 @@ it("P1/FE-023：已售出重复账号确认复购后允许回流建单", async (
   await user.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
   await user.click(screen.getByRole("button", { name: /创建订单/ }));
 
-  await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+  // 复购确认现为受控 ConfirmDialog（Modal 级）：等确认框出现 → 未确认前不建单 → 点「是，继续建单」。
+  expect(await screen.findByText("检测到重复游戏账号")).toBeInTheDocument();
   expect(catalog.ordersApi.create).not.toHaveBeenCalled();
-  expect(confirmConfig).toMatchObject({ title: "检测到重复游戏账号", okText: "是，继续建单", cancelText: "否，返回修改" });
-  await act(async () => { await confirmConfig?.onOk?.(); });
+  expect(screen.getByRole("button", { name: "是，继续建单" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "否，返回修改" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "是，继续建单" }));
   await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
 });
 

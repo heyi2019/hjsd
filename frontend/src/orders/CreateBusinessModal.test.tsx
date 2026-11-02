@@ -222,7 +222,6 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
   });
 
 it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", async () => {
-    const confirmSpy = vi.spyOn(appModal, "confirm");
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
       { id: 99, game_account: "pickup-account", game_type: "王者荣耀", status: "WAITING" },
     ] as never);
@@ -240,7 +239,8 @@ it("FE-023：未售出的相同游戏账号直接阻止建单并保留表单", a
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(screen.getByText(/请先售出后再建单/)).toBeInTheDocument());
     expect(screen.getByLabelText("游戏账号")).toHaveValue("pickup-account");
-    expect(confirmSpy).not.toHaveBeenCalled();
+    // 未售出属硬阻止：只出页面级错误提示，不应弹复购确认框（ConfirmDialog）。
+    expect(screen.queryByText("检测到重复游戏账号")).not.toBeInTheDocument();
     expect(catalog.ordersApi.create).not.toHaveBeenCalled();
   });
 
@@ -263,9 +263,8 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     // 复购确认框出现，未确认前不建单
     expect(await screen.findByText("检测到重复游戏账号")).toBeInTheDocument();
     expect(catalog.ordersApi.create).not.toHaveBeenCalled();
-    // 复购确认用 ConfirmDialog（Modal 级）：rc-motion 测试桩强制 visible 会让 antd Button 渲染
-    // loading 图标并污染 getByRole 的 name，故用正则按文案匹配（真实运行不受影响）。
-    await ui.click(screen.getByRole("button", { name: /是，继续建单/ }));
+    // 复购确认用 ConfirmDialog（Modal 级）：按可访问名精确点击，兼作 loading 图标污染的回归护栏。
+    await ui.click(screen.getByRole("button", { name: "是，继续建单" }));
     await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalled());
   });
 

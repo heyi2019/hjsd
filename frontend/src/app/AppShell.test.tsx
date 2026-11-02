@@ -199,9 +199,8 @@ describe("AppShell：角色展示与退出", () => {
   it("DEV 态顶栏也常驻退出登录按钮", async () => {
     await renderShell({ user: "admin" });
     const topbar = document.querySelector(".topbar") as HTMLElement;
-    // 注：ConfirmButton 包裹的 antd Button 在测试桩（rc-motion 强制 visible）下会渲染 loading 图标，
-    // 其 aria-label="loading" 会污染 getByRole 的 name（变为「loading 退出登录」）。改用文本断言，
-    // 真实运行不受影响（详见 L1805 收口说明）。
-    expect(within(topbar).getByText("退出登录")).toBeTruthy();
+    // 用可访问名精确断言：rc-motion 测试桩若忽略 visible，antd Button 会渲染 loading 图标
+    // 把 name 污染成「loading 退出登录」，此断言即失败（回归护栏）。
+    expect(within(topbar).getByRole("button", { name: "退出登录" })).toBeTruthy();
   });
 });

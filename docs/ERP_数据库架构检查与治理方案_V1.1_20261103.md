@@ -83,7 +83,7 @@
 | 母本只读 | 5190 | 8124 | `.env.release` | `heijin_erp_release` |
 
 - 库在**后端进程启动时**由 `DATABASE_URL` 固定，`get_engine()` 是进程级单例，全仓除测试外**零调用** `reset_engine()`——运行中不会自切库。
-- 多环境并行靠 `ERP_ENV_FILE`（`settings.py:31`），各进程各读各的，无需改根 `.env`。
+- 多环境并行靠 `ERP_ENV_FILE`（定义在 `settings.py`），各进程各读各的，无需改根 `.env`。
 - 前端只认端口，不认库；`VITE_API_BASE=/api/v1` 走同源代理。
 - `.env` 变体已被 `.gitignore` 的 `.env.*` + `!.env.example` 覆盖（此前 `.env.release` 会被静默跟踪）。
 
@@ -227,7 +227,7 @@ GitHub Actions（每次 push）
 10. **库名闸门挡不住同库错配。** 闸门只校验「库名含 test」，`heijin_erp_release_test` 这类命名必须靠黑名单拦——已加。
 11. **shell 里 `${VAR}` 紧跟中文标点一律写花括号**，否则全角括号被并进变量名（`FILE: unbound variable`）。
 12. **test 库会因反复建删表而持续膨胀，`VACUUM FULL` 只能暂时收缩。** `conftest` 每个 session 都 `create_all`（40 表）+ 建 `seed_template` schema 再 `create_all`（又 40 表）+ teardown `DROP SCHEMA … CASCADE`，系统目录只增不减：实测一次 9 用例的 session 让 `pg_class` 从 344 kB 涨到 840 kB、库从 9.5 MB 涨到 11 MB。19 MB → `VACUUM FULL` → 9.5 MB，但跑完一轮测试又回到 11 MB。**根因不是 `seed_template` 副本**（它每个 session 结束都 DROP 掉，平时不存在），是 `pg_class`/`pg_attribute` 的文件碎片。想真正归零只能 `DROP DATABASE` 重建（让 OID 归位），收益随规模递减，暂不处理。
-13. **`document_sequences` 不是业务表，清空它等于让建单/发库存号/建合作方全部瘫痪。** `allocate_number()` 在序列行不存在时直接抛 `Validation`「编号序列 X 尚未初始化，请先执行基础种子」（`core/numbering.py:62`），而自动补建行的 `ensure_sequence()` 只在**基础种子**里被调用，运行时路径不会补。剥离 dev 时按「业务表」把它一并 `TRUNCATE` 是错的——正确做法是**保留 13 行、只把 `current_value` 归零**（本次保留原值，避免将来回导 rawdata 撞号）。识别方法：一张表里既有 `prefix`/`padding`（配置）又有 `current_value`（计数器），就是混合型，不能当纯业务表清。
+13. **`document_sequences` 不是业务表，清空它等于让建单/发库存号/建合作方全部瘫痪。** `allocate_number()` 在序列行不存在时直接抛 `Validation`「编号序列 X 尚未初始化，请先执行基础种子」（见 `core/numbering.py` 的 `allocate_number()`），而自动补建行的 `ensure_sequence()` 只在**基础种子**里被调用，运行时路径不会补。剥离 dev 时按「业务表」把它一并 `TRUNCATE` 是错的——正确做法是**保留 13 行、只把 `current_value` 归零**（本次保留原值，避免将来回导 rawdata 撞号）。识别方法：一张表里既有 `prefix`/`padding`（配置）又有 `current_value`（计数器），就是混合型，不能当纯业务表清。
 14. **`TRUNCATE` 的级联方向会从子表向父表蔓延，可能连带清掉配置表。** `TRUNCATE orders CASCADE` 会顺着引用关系把 `order_form_fields`(259) 这类被业务表引用的配置一并清空，建单页当场报废。安全做法：**显式列出全部待清表、单事务、不加 `CASCADE`**，并事先用 `pg_constraint` 查询确认「保留表没有任何一个引用待清表」（本次仅 3 条 FK，全部指向保留表内部）。清完必须**逐项比对各配置表行数**，不相等立即从备份恢复。
 15. **验证 dump 必须给 `docker exec` 加 `-i`，否则会误判备份已损坏。** `docker exec deploy-db-1 pg_restore -l < x.dump` 不加 `-i` 时 **stdin 不转发**，容器里的 `pg_restore` 读到 0 字节，报 `input file is too short (read 0, expected 5)`。这条报错指向的是备份文件，实际错在命令——在 ECS 上核验时踩到过，差点把一份完好的 440 对象 / 41 条 `TABLE DATA` 的备份判成废包。正确写法：`docker exec -i … pg_restore -l < file`。同理，**「文件很小」也不等于废备份**：11-01 那两份 1915 字节的包是合法 `PGDMP`，当时生产库业务数据本来就全空，41 张空表压缩后就是这个量级——判废要看 `pg_restore -l` 能否解析，不看字节数。
 16. **别把本项目的库寄存在别人项目的容器里。** 三个库共 35 MB，却跑在另一项目的 `container-db-1` 上：对方 `compose down -v` 会连卷删掉上线母本，对方重建容器本项目跟着闪断，本项目的 `archive_mode` 只能写进对方卷里的 `auto.conf`（像改了别人的配置又不好解释）。迁出成本极低（35 MB、三个 `pg_dump`），迁出收益是把「别人一句话删掉我的母本」这个尾部风险彻底去掉。**判据不是库大小，是谁拥有这个卷。**

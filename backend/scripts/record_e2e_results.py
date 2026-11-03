@@ -3,7 +3,7 @@
 """Playwright E2E 执行结果 → 测试结果库/results.jsonl（后端执行记录器的 E2E 补口）。
 
 为什么需要它：`tests/v1/conftest.py` 只能记录 pytest，`record_frontend_results.py`
-只能记录 vitest。E2E 跑完原本只在终端留痕 —— 60 条浏览器用例在《测试报告》里
+只能记录 vitest。E2E 跑完原本只在终端留痕 —— 浏览器用例在《测试报告》里
 永远显示「未执行」，报告的 E2E 行恒为 0。本脚本把 Playwright 的 JSON 报告翻成
 与后端完全相同的记录格式，追加进同一份 results.jsonl，报告侧无需任何特判。
 
@@ -14,7 +14,7 @@
 关联口径：case_index.json 的 E2E 键为 `frontend/e2e/<规格文件名>::<标题>`。
 Playwright JSON 的 `spec.file` 是**相对 testDir 的路径**（`modal-footer.spec.ts`，
 不是 `frontend/e2e/modal-footer.spec.ts`），故必须显式补 `frontend/e2e/` 前缀，
-否则 60 条记录全部落空、报告仍旧显示 0。
+否则全部记录落空、报告仍旧显示 0。
 
 状态映射：
     test.status  expected   -> PASS

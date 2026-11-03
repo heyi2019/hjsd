@@ -2564,5 +2564,8 @@
   "IT|B07|ThBusinessPanel.deep.test.tsx|备注列有值时直接显示该文本（不走 '-' 兜底）": 17,
   "IT|F02|OrderFormFieldsPanel.test.tsx|逐一验证 %s 类型字段进入编辑态后可保存": 96,
   "IT|SYS07|AppShell.test.tsx|空路径 '/' 重定向到工作台（URL 决定落点）": 196,
-  "IT|SYS07|BusinessActionModal.test.tsx|按字段数量 %s 使用标准宽度 %s": 197
+  "IT|SYS07|BusinessActionModal.test.tsx|按字段数量 %s 使用标准宽度 %s": 197,
+  "IT|B08|test_installments_service.py|test_amount_columns_lock_two_decimal_precision": 164,
+  "IT|B08|test_installments_service.py|test_overpaid_schedule_rejected_by_check_constraint": 165,
+  "IT|B08|test_installments_service.py|test_settle_early_filters_settled_rows_but_keeps_one_cent": 166
 }

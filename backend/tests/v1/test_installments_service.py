@@ -9,14 +9,23 @@
   SET NULL、installments.order_id → orders.id RESTRICT）。正常 ORM 路径删父行只
   会置 NULL，不留悬空引用，故常规测试到不了。
 - L975（settle_early 循环内 `outstanding <= 0: continue`）：rows 已按
-  `received + waived < due` 过滤，正常数据下 outstanding 恒 > 0。
+  `received + waived < due` 过滤，正常数据下 outstanding 恒 > 0，该分支是死代码。
+  原用例需构造 received=0.996 的超精度脏行，PG 存不进去，曾以 skip 挂起；
+  [2026-11-03] 改为把「不可达」本身写成可执行断言（三层保证各一条用例）：
+  `test_amount_columns_lock_two_decimal_precision`（列 scale=2 且 0.996→1.00、
+  该行被查询排除）、`test_overpaid_schedule_rejected_by_check_constraint`
+  （ck_installment_schedules_settled_amount_within_due 拒绝超额付）、
+  `test_settle_early_filters_settled_rows_but_keeps_one_cent`（付清行被过滤、
+  只差 1 分仍结清）。任一层松动即报警，提示守卫重新变为可达。
 
 覆盖手段：**用独立连接 + `session_replication_role=replica` 绕过外键造脏数据**。
 PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
 `session_replication_role` 设为 `replica` 后 FK 触发器不执行，可真实复现
 「约束未生效时遗留的脏行」（生产上 DBA 直连改数据同样会产生）。
-关键：执行前 `session.commit()` 释放行锁；执行后 `RESET` 复位（这是会话级设置，
-不回位会被连接池复用、静默关掉后续用例的 FK 约束），再 `expire_all()` 让主会话重读。
+注意：`replica` 只关 FK 触发器，**CHECK 约束照常执行**——所以超额付这类脏行
+在 PG 上根本造不出来，这本身就是一道不可绕过的防线。
+复位用 `SET LOCAL`（作用域为当前事务，用例回滚即自动失效），随后 `expire_all()`
+让主会话重读。
 """
 
 from __future__ import annotations
@@ -25,7 +34,8 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import (
@@ -785,21 +795,31 @@ def test_cancel_rejects_dangling_account(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
         )
 
-@pytest.mark.skip(
-    reason=(
-        "PostgreSQL 下不可构造：金额列是 NUMERIC(18,2)，直写 '0.996' 会被四舍五入成 "
-        "1.00，`received + waived < due` 不再成立，进入 settle_early 前就报「没有剩余应收」。"
-        "该 continue 分支只在库能存 3 位小数时才可达；PG 的类型系统保证了它在生产上"
-        "不可达，防御代码仍保留，但无法再用真实脏行证明。"
-    )
-)
-def test_settle_early_skips_sub_cent_residual(seeded_db):
-    """期次残留「分以下零头」脏数据 → SQL 判有余额、量化到分后为 0 → continue（L975）。
+def test_amount_columns_lock_two_decimal_precision(seeded_db):
+    """精度锁死在 2 位 → settle_early 的「零头 continue」在 PG 下不可达。
 
-    正常数据下 `received + waived < due` 与 `outstanding > 0` 等价，故该分支恒不
-    触发；仅当 DB 存在超过 2 位小数的脏值时才会走到——SQLite 宽松存储时可用独立
-    连接直写复现，PostgreSQL 的 NUMERIC(18,2) 拒绝该精度，故本用例在 PG 下跳过。
+    该 continue 位于 settlement.py:82（`outstanding <= 0`），原用例需要构造
+    received=0.996 的超精度脏行才能触发。但金额列是 NUMERIC(18,2)：直写 3 位小数
+    会被 ROUND_HALF_UP 存成 1.00，`received + waived < due` 随即不成立、该行连 SQL
+    都查不出来，永远到不了 continue。
+
+    本用例把「不可达」本身变成可执行断言 —— 若日后有人放宽列精度，这里先红，
+    提示守卫重新变为可达、必须恢复脏数据用例：
+      1) 结构：三张金额列的 numeric_scale 都是 2；
+      2) 存储：直写 '0.996' 落库是 1.00（超精度零头根本进不了表）；
+      3) 过滤：该行因 `received + waived < due` 不成立而被 settle_early 的查询排除。
     """
+    scales = dict(
+        seeded_db.execute(
+            text(
+                "SELECT column_name, numeric_scale FROM information_schema.columns "
+                "WHERE table_name = 'installment_schedules' "
+                "AND column_name IN ('due_amount', 'received_amount', 'waived_amount')"
+            )
+        ).all()
+    )
+    assert scales == {"due_amount": 2, "received_amount": 2, "waived_amount": 2}
+
     _, contract = _pickup_overdue(seeded_db, "ACC-975")
     _raw_sql(
         seeded_db,
@@ -807,21 +827,87 @@ def test_settle_early_skips_sub_cent_residual(seeded_db):
         "received_amount = '0.996', waived_amount = '0' WHERE installment_id = ?",
         (contract.id,),
     )
-    before = seeded_db.scalar(
-        select(func.count())
-        .select_from(OrderEvent)
-        .where(OrderEvent.event_type == EventType.PAYMENT.value)
+    seeded_db.expire_all()
+    stored = seeded_db.scalar(
+        select(InstallmentSchedule.received_amount).where(
+            InstallmentSchedule.installment_id == contract.id
+        )
     )
+    assert stored == Decimal("1.00"), "NUMERIC(18,2) 应把 0.996 四舍五入成 1.00"
+
+    selected = seeded_db.scalars(
+        select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id == contract.id,
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
+            < InstallmentSchedule.due_amount,
+        )
+    ).all()
+    assert selected == [], "取整后已无剩余应收，continue 分支拿不到任何行"
+
+
+def test_overpaid_schedule_rejected_by_check_constraint(seeded_db):
+    """received + waived > due 被 CHECK 约束拒绝 → 超额付的行结构上就不存在。
+
+    这是「零头 continue」不可达的第一层保证（另两层见
+    test_amount_columns_lock_two_decimal_precision：NUMERIC(18,2) 精度、
+    settle_early 的 `received + waived < due` 过滤）。
+    """
+    _, contract = _pickup_overdue(seeded_db, "ACC-975")
+    savepoint = seeded_db.begin_nested()
+    with pytest.raises(IntegrityError):
+        seeded_db.execute(
+            text(
+                "UPDATE installment_schedules SET received_amount = due_amount + 5 "
+                "WHERE installment_id = :iid AND period_no = 1"
+            ),
+            {"iid": contract.id},
+        )
+    savepoint.rollback()
+
+
+def test_settle_early_filters_settled_rows_but_keeps_one_cent(seeded_db):
+    """已付清的行被过滤、只差 1 分仍结清 → 「零头 continue」永远无输入。
+
+    证明 SQL 条件 `received + waived < due` 已把零余额行拦干净，且用的是 `<` 不是
+    `<=`，不会误杀真实应收。
+    """
+    _, contract = _pickup_overdue(seeded_db, "ACC-975")
+    periods = seeded_db.scalars(
+        select(InstallmentSchedule.period_no)
+        .where(InstallmentSchedule.installment_id == contract.id)
+        .order_by(InstallmentSchedule.period_no)
+    ).all()
+    assert periods == [0, 1, 2]
+
+    # period 0 付清（等于）、period 1 也付清：两者都必须被 SQL 过滤掉
+    _raw_sql(
+        seeded_db,
+        "UPDATE installment_schedules SET received_amount = due_amount "
+        "WHERE installment_id = ? AND period_no IN (0, 1)",
+        (contract.id,),
+    )
+    # period 2 只差 1 分：必须仍被查出并结清，证明过滤没误杀
+    _raw_sql(
+        seeded_db,
+        "UPDATE installment_schedules SET received_amount = due_amount - 0.01 "
+        "WHERE installment_id = ? AND period_no = 2",
+        (contract.id,),
+    )
+    seeded_db.expire_all()
+
+    def _payments():
+        return seeded_db.scalars(
+            select(OrderEvent).where(OrderEvent.event_type == EventType.PAYMENT.value)
+        ).all()
+
+    before = {event.id for event in _payments()}
     result = installment_service.settle_early(
         seeded_db, contract.id, paid_on=TODAY, actor="pytest", pool_id=1
     )
-    after = seeded_db.scalar(
-        select(func.count())
-        .select_from(OrderEvent)
-        .where(OrderEvent.event_type == EventType.PAYMENT.value)
-    )
     assert result.id == contract.id
-    assert after == before  # continue 生效：零头不足 1 分，未生成 PAYMENT
+    created = [event for event in _payments() if event.id not in before]
+    assert len(created) == 1, "付清/超额付的行不得生成 PAYMENT，只差 1 分的行必须结清"
+    assert created[0].amount == Decimal("0.01")
 
 def test_recover_rejects_dangling_order(seeded_db):
     """installments.order_id 悬空 → 回收账号报「没有所属订单」（L1061）。"""

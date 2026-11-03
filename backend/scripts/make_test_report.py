@@ -190,14 +190,26 @@ def main() -> None:
     if no_exec:
         L.append(f"- 已定义但未执行（无执行记录）：**{len(no_exec)}** 条，例如 "
                  + "、".join(no_exec[:10]) + " …")
-    fails = [no for no, r in latest.items() if r.get("status") in ("FAIL", "ERROR")]
+    fails = [
+        no for no, r in latest.items()
+        if no in cases and r.get("status") in ("FAIL", "ERROR")
+    ]
     if fails:
         L.append(f"- 最近执行 FAIL/ERROR：**{len(fails)}** 条："
                  + "、".join(fails[:15]) + " …")
-    skips = [no for no, r in latest.items() if r.get("status") == "SKIP"]
+    skips = [
+        no for no, r in latest.items()
+        if no in cases and r.get("status") == "SKIP"
+    ]
     if skips:
         L.append(f"- 最近执行 SKIP：**{len(skips)}** 条（SKIP 不计入 PASS）："
                  + "、".join(skips[:10]) + " …")
+    # 已退役编号（用例被删/改号，结果库里仍有历史记录）不计入任何状态统计，
+    # 否则会出现「矩阵全绿但汇总说 SKIP=1」的自相矛盾。
+    retired = sorted(no for no in latest if no not in cases)
+    if retired:
+        L.append(f"- 已退役编号（仅存历史记录、不计入统计）：**{len(retired)}** 条，例如 "
+                 + "、".join(retired[:10]) + " …")
     pending = [no for no, c in cases.items() if c.get("合格标准", "") == "待确认"]
     if pending:
         L.append(f"- 合格标准「待确认」（业务规则待澄清）：**{len(pending)}** 条，需逐条补确认。")
@@ -242,6 +254,7 @@ def main() -> None:
         "no_execution": len(no_exec),
         "fail_error": len(fails),
         "skip": len(skips),
+        "retired_cases": len(retired),
         "pending_criteria": len(pending),
     }
     with open(OUT_JSON, "w", encoding="utf-8") as f:

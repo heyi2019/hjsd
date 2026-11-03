@@ -1,23 +1,33 @@
-"""E2E 隔离库：每次运行「用完就丢」，与 pytest 测试库同一套语义。
+"""E2E 隔离库：默认**不清数据**（只补表与种子），`--reset` 才重建清空。
+
+两种模式（默认 keep 是用户裁决：E2E 库同时当「第五个可查看环境」，不能每次启动就清空）：
+  - `python scripts/e2e_db.py`（默认）：create_all 补缺失表 + 幂等播种，**不删任何行**，
+    已有单据/库存/流水原样保留；
+  - `python scripts/e2e_db.py --reset`（或 `E2E_RESET=1`）：drop_all + create_all + TRUNCATE，
+    得到干净起点；playwright 自动化走这条。
+
+注意「重置只发生在跑前，不在跑后」：库 heijin_erp_e2e 一直存在，跑完的数据原样留着。
+
 
 设计对齐 `tests/v1/conftest.py` 的 `v1_engine` 夹具：
   - `Base.metadata.create_all` 幂等建表（对齐压平后的 0001 基线，不跑 alembic）；
-  - `TRUNCATE 全 ORM 表 RESTART IDENTITY CASCADE` 清空上一轮数据；
+  - `TRUNCATE 全 ORM 表 RESTART IDENTITY CASCADE`（仅 `--reset` 时）清空上一轮数据；
   - `seed_foundation` + 默认用户（id 1..9）重播基础种子。
 
 与测试库的区别 / 安全铁律：
-  - **只认名字含 `e2e` 的库**：E2E 库是一次性玩具库，绝不允许指向 dev / release /
-    prod / test 等业务库——`heijin_erp_dev` 是用户的真实沙盒数据，误清即损失。
-    因此这里比 conftest 更严：必须显式含 `e2e`，且拒绝任何 deny-list 词。
+  - **只认名字含 `e2e` 的库**：绝不允许指向 dev / release / prod / test 等业务库——
+    `heijin_erp_dev` 是用户的真实沙盒数据，误清即损失。必须显式含 `e2e`，且拒绝
+    deny-list 词。
   - 不回落 `DATABASE_URL`：缺 `E2E_DATABASE_URL` 时从 `DATABASE_URL` 派生（仅替换
     库名为 `heijin_erp_e2e`，保留 host/port/凭据），绝不直接用业务库。
   - `TRUNCATE ... CASCADE` 在这里是安全的：E2E 库纯由 ORM `create_all` 建出，
     无任何非 ORM 表；"TRUNCATE 不能带 CASCADE" 的铁律只针对 dev/release（那里有
     配置表要保留）。本库全清正好是要的目的。
 
-用法（被 playwright.config.ts 的 webServer 调起）：
-  python scripts/e2e_db.py            # 重置 + 种子（默认）
-  python scripts/e2e_db.py --reset-only   # 仅重置，不补 E2E 业务夹具
+用法（playwright.config.ts 的 webServer 调起时设 `E2E_RESET=1`）：
+  python scripts/e2e_db.py               # 保留数据 + 补种子（默认，给人看）
+  python scripts/e2e_db.py --reset       # 重建 + 清空 + 种子（自动化）
+  python scripts/e2e_db.py --reset-only  # 仅重建不补 E2E 业务夹具
 """
 from __future__ import annotations
 
@@ -35,9 +45,29 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from app.core.database import Base, get_engine  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
-from app.domain import attachments, foundation, imports, lists, notifications, options, parties, quality, trade, users  # noqa: E402,F401 注册全部 v1 表
+# 这些模块只为「导入即注册 ORM 表」：Base.metadata.create_all 只会建已 import 的
+# 模型，少导一个就会静默漏表（曾经表现为建单用例全部 500，报「表不存在」）。
+# pyflakes 不认 `# noqa`（那是 flake8 的能力），故用 `__all__` 收口，避免被
+# lint 门禁判成 unused import 而被迫删掉这些导入。
+from app.domain import (  # noqa: E402
+    attachments,
+    foundation,
+    imports,
+    lists,
+    notifications,
+    options,
+    parties,
+    quality,
+    trade,
+    users,
+)
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.catalog_seed import seed_catalog  # noqa: E402
+
+__all__ = [
+    "attachments", "foundation", "imports", "lists", "notifications",
+    "options", "parties", "quality", "trade", "users",
+]
 
 # E2E 库名必须含此标记；dev/release/prod/test 业务库一律拒绝，避免误清真实数据。
 _REQUIRED_MARK = "e2e"
@@ -173,19 +203,29 @@ def _ensure_database(url: str) -> None:
         eng.dispose()
 
 
-def reset(reset_only: bool = False) -> str:
-    """重置 E2E 库并播种基础数据；返回实际使用的库名（供诊断）。
+def reset(reset_only: bool = False, keep: bool = False) -> str:
+    """确保 E2E 库可用并播种基础数据；返回实际使用的库名（供诊断）。
 
-    E2E 库是一次性玩具库，故这里 drop_all + create_all 强制把表结构对齐当前 ORM
-    （含 CHECK 约束、新增列等），避免「库已存在 → create_all 不改旧表」导致的约束
-    落后。业务库绝不可走这条路（见文件头铁律）。
+    两种模式：
+      - `keep=True`（默认，给人看数据用）：**不删任何行**。只 create_all 补齐缺失的表，
+        再跑一遍播种（全部函数都有 existing 守卫，天然幂等）。已有单据/库存/流水原样保留。
+      - `keep=False`（`--reset`，给自动化跑测试用）：drop_all + create_all 强制把表结构
+        对齐当前 ORM（含 CHECK 约束、新增列等），再 TRUNCATE 全表，得到干净起点。
+        避免「库已存在 → create_all 不改旧表」导致的约束落后。
+
+    选择默认 keep 的原因：E2E 库同时被当作第五个「可查看环境」，每次启动都清空会让人
+    打开页面就看不到数据。自动化需要干净起点时显式传 --reset / 设 E2E_RESET=1 即可。
+    业务库绝不可走这条路（见文件头铁律）。
     """
     url = _e2e_database_url()
     _ensure_database(url)
     engine = get_engine(url)
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    _truncate_all(engine)
+    if keep:
+        Base.metadata.create_all(bind=engine)
+    else:
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        _truncate_all(engine)
     Session = sessionmaker(bind=engine, autoflush=False, future=True)
     db = Session()
     try:
@@ -269,5 +309,8 @@ def _seed_e2e_fixtures(db) -> None:
 
 if __name__ == "__main__":
     reset_only = "--reset-only" in sys.argv
-    db_name = reset(reset_only=reset_only)
-    print(f"[e2e-db] 已重置并播种 E2E 库：{db_name}")
+    # 默认 keep（不清数据）；`--reset` 或 E2E_RESET=1 才走全量重建。
+    keep = not ("--reset" in sys.argv or os.environ.get("E2E_RESET") == "1")
+    db_name = reset(reset_only=reset_only, keep=keep)
+    mode = "保留数据并补齐种子（幂等）" if keep else "已重建并清空"
+    print(f"[e2e-db] {mode}：{db_name}")

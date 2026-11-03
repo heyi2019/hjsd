@@ -34,6 +34,11 @@
   - `app/finance` max_missing=**43**
 - 注释/代码与真实阈值严重不符；`finance` 容忍 **43 行**未覆盖，闸门对关键资金模块极宽松。
 - **建议**：以真实基线为起点，按风险逐步收紧；修正代码内联常量误导。
+- **[2026-11-03 处置]** 本条实为「误读非缺陷」：`load_gates()` 会用基线整个覆盖内联值，闸门
+  一直按真实 `max_missing` 判定。但误导确凿，已把内联字典改为纯域名元组 `DOMAINS`
+  （不含任何数字），阈值只剩 `coverage_baseline.json` 一个事实源；同时基线已按实测收紧为
+  **foundation 1 / core 0 / reporting 22 / finance 41**（`coverage_baseline.json`，
+  守卫用例 `test_coverage_gate.py` 同步）。
 
 **P2 — 前端 deep 层在 PR/test 跳过**
 - `frontend-gate` 的 `test-react-deep`（4 分片、16 个重型用例）`if` 条件=非 PR 且（非 push 或 ref 为 main/master），即 **PR 与 test 分支跳过**，仅 main/定时/手动触发。

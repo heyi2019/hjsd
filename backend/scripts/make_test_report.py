@@ -213,7 +213,16 @@ def main() -> None:
     pending = [no for no, c in cases.items() if c.get("合格标准", "") == "待确认"]
     if pending:
         L.append(f"- 合格标准「待确认」（业务规则待澄清）：**{len(pending)}** 条，需逐条补确认。")
-    if not (no_exec or fails or skips or pending):
+    # 合格标准已从真实断言机械推导；完全没有显式断言的用例会落到这里的「弱标准」，
+    # 它反映的是**测试本身薄弱**（只验证不抛异常），不是文档缺失。
+    weak = [
+        no for no, c in cases.items()
+        if c.get("合格标准", "").startswith("正常执行不抛异常")
+    ]
+    if weak:
+        L.append(f"- 合格标准为「弱标准」（用例无显式断言，仅验证不抛异常）："
+                 f"**{len(weak)}** 条，建议补断言：" + "、".join(weak[:10]) + " …")
+    if not (no_exec or fails or skips or pending or weak):
         L.append("- 当前无显著未覆盖/风险项。")
     L.append("")
 
@@ -256,12 +265,14 @@ def main() -> None:
         "skip": len(skips),
         "retired_cases": len(retired),
         "pending_criteria": len(pending),
+        "weak_criteria": len(weak),
     }
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
 
     print(f"[report] 用例定义={len(cases)} 历史批次={len(run_ids)} 最近 run={last_run}")
-    print(f"[report] 未执行={len(no_exec)} FAIL/ERROR={len(fails)} SKIP={len(skips)} 待确认合格标准={len(pending)}")
+    print(f"[report] 未执行={len(no_exec)} FAIL/ERROR={len(fails)} SKIP={len(skips)} "
+          f"待确认合格标准={len(pending)} 弱断言={len(weak)}")
     print(f"[report] 输出：{OUT_MD}")
 
 

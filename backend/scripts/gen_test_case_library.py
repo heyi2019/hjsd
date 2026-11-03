@@ -130,12 +130,15 @@ def _skip_balanced(src: str, i: int) -> int:
 
 
 def scan_ts(path: str):
-    """返回 [(标题, None, "")]。
+    """返回 [(标题, None, 回调体)]。
 
     支持 `it("t")` / `test("t")` / `it.skip("t")` / `it.each([...])("t")`。
     `it.each` 保留原始模板（`%s` 等占位符）作为**一条**用例 —— 与后端
     `parametrize` 一个函数一条用例同构；运行时展开的多个变体由执行记录器
     按通配归并回这一条。
+
+    回调体用于提取合格标准（`expect(...)` 断言）。注意 `it.each([...])("标题", cb)`
+    有两组括号：`close` 是第一组（参数列表）的结尾，回调体要取**第二组**括号内的内容。
     """
     src = open(path, encoding="utf-8").read()
     out: list[tuple[str, None, str]] = []
@@ -146,21 +149,24 @@ def scan_ts(path: str):
         while j < len(src) and src[j] in " \t\r\n":
             j += 1
         title: str | None = None
+        title_end = 0
+        body_close = close
         if j < len(src) and src[j] in "\"'`":
-            title, _end = _read_js_string(src, j)
+            title, title_end = _read_js_string(src, j)
         if title is None:
             # it.each([...])("标题") —— 参数列表之后紧跟的第二组括号才是标题
             k = close
             while k < len(src) and src[k] in " \t\r\n":
                 k += 1
             if k < len(src) and src[k] == "(":
+                body_close = _skip_balanced(src, k)
                 k += 1
                 while k < len(src) and src[k] in " \t\r\n":
                     k += 1
                 if k < len(src) and src[k] in "\"'`":
-                    title, _end = _read_js_string(src, k)
+                    title, title_end = _read_js_string(src, k)
         if title:
-            out.append((title, None, ""))
+            out.append((title, None, src[title_end:max(title_end, body_close - 1)]))
     return out
 
 
@@ -179,6 +185,14 @@ PRIORITY_HIGH = re.compile(r'contract|guard|security|auth|state_machine|ratelimi
 PRIORITY_LOW = re.compile(r'\.deep\.|write\.|\.regression\.', re.I)
 EXPECT_KW = re.compile(r'应|必须|返回|等于|拒绝|raise|正确|一致|不变|为\b|→|校验|不\b|仅', re.I)
 NUM_LIT = re.compile(r'\b(?:Decimal\()?["\']?(\d{1,9}(?:\.\d{1,4})?)["\']?\)?')
+RAISES_RE = re.compile(
+    r'pytest\.raises\(\s*\(?\s*'
+    r'([A-Za-z_][\w\.]*(?:\s*,\s*(?!match\s*=)[A-Za-z_][\w\.]*)*)'
+    r'(?:\s*,\s*match\s*=\s*[rf]?["\']([^"\']*)["\'])?'
+)
+ASSERT_RE = re.compile(r'^\s*assert\s+(?!=)(.+?)\s*$', re.M)
+EXPECT_RE = re.compile(r'\bexpect\s*\(')
+WEAK_CRITERIA = "正常执行不抛异常（用例无显式断言）"
 
 
 def clean_doc(doc: str | None) -> str:
@@ -223,7 +237,56 @@ def extract_input_data(body: str) -> str:
     return "见测试方法主操作"
 
 
-def extract_criteria(doc: str | None, body: str) -> tuple[str, str]:
+def _clip(text: str, limit: int = 120) -> str:
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _criteria_from_expect(body: str) -> str:
+    """前端：取第一条 `expect(...)` 的完整断言链（含 .toBe/.toEqual 等）。"""
+    m = EXPECT_RE.search(body)
+    if not m:
+        return ""
+    start = m.start()
+    end = _skip_balanced(body, m.end() - 1)
+    while True:  # 继续吞掉 .toBe(...) / .toHaveTextContent(...) 等链式调用
+        k = end
+        while k < len(body) and body[k] in " \t\r\n":
+            k += 1
+        if k < len(body) and body[k] == ".":
+            k += 1
+            while k < len(body) and (body[k].isalnum() or body[k] in "_$"):
+                k += 1
+            while k < len(body) and body[k] in " \t\r\n":
+                k += 1
+            if k < len(body) and body[k] == "(":
+                end = _skip_balanced(body, k)
+                continue
+        break
+    total = len(EXPECT_RE.findall(body))
+    suffix = f"（共 {total} 处断言）" if total > 1 else ""
+    return _clip("断言 " + body[start:end], 110) + suffix
+
+
+def _criteria_from_body(body: str, *, frontend: bool) -> str:
+    """从真实断言推导合格标准：后端取首个 raises / assert，前端取首个 expect。"""
+    if not body:
+        return ""
+    if frontend:
+        return _criteria_from_expect(body)
+    m = RAISES_RE.search(body)
+    if m:
+        exc = m.group(1).replace(" ", "")
+        msg = (m.group(2) or "").strip()
+        return f"抛出 {exc}" + (f"，消息匹配「{msg}」" if msg else "")
+    for a in ASSERT_RE.finditer(body):
+        expr = re.sub(r'\s+#.*$', '', a.group(1)).strip()
+        if expr:
+            return _clip("断言 " + expr)
+    return ""
+
+
+def extract_criteria(doc: str | None, body: str, *, frontend: bool = False) -> tuple[str, str]:
     cd = clean_doc(doc)
     expected = cd or "见合格标准"
     sentences = re.split(r'[。；\n]', cd) if cd else []
@@ -231,11 +294,20 @@ def extract_criteria(doc: str | None, body: str) -> tuple[str, str]:
         s = s.strip()
         if EXPECT_KW.search(s) and len(s) >= 4:
             return expected, s
-    for m in re.finditer(r'assert\s+[^,]+,\s*[\'"]([^\'"]+)[\'"]', body):
-        return expected, m.group(1)
+    # assert 消息：`[^,\n]+` 必须限定在同一行 —— 用 `[^,]+` 会跨行吞到下一个
+    # 逗号+引号，把多行字符串的空白片段当成消息（实测产出空白合格标准）。
+    for m in re.finditer(r'assert\s+[^,\n]+,\s*[\'"]([^\'"\n]+)[\'"]', body):
+        msg = m.group(1).strip()
+        if msg:
+            return expected, msg
     if cd:
         return expected, cd
-    return expected, "待确认"
+    # 无 docstring 可用：从真实断言机械推导。断言本身就是可执行、可核对的合格标准，
+    # 远胜「待确认」占位；仅当用例完全没有显式断言时才落到「弱断言」标记。
+    derived = _criteria_from_body(body, frontend=frontend)
+    if derived:
+        return expected, derived
+    return expected, WEAK_CRITERIA
 
 
 def extract_priority(test_type: str, relpath: str, fname: str, func_id: str) -> str:
@@ -404,7 +476,11 @@ def _unit_files() -> set:
 
 
 def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) -> dict:
-    expected, criteria = extract_criteria(doc, body)
+    is_fe = rel.startswith("frontend/")
+    expected, criteria = extract_criteria(doc, body, frontend=is_fe)
+    # 测试方法/前置条件/输入数据沿用原口径（前端历来只扫标题、不扫回调体）。
+    # 本次只为补「合格标准」，不顺带改写前端这 3 个字段的既有取值。
+    meta_body = "" if is_fe else body
     related_str = "/".join(sorted(related)) if len(related) > 1 else ""
     row = {
         "功能编号": func,
@@ -412,9 +488,9 @@ def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) ->
         "关联模块": related_str,
         "测试层级": ttype,
         "测试名称": (clean_doc(doc).split("。")[0][:60] if doc else tname),
-        "测试方法": extract_method(ttype, rel, body, tname),
-        "前置条件": extract_precond(rel, body),
-        "输入数据": extract_input_data(body),
+        "测试方法": extract_method(ttype, rel, meta_body, tname),
+        "前置条件": extract_precond(rel, meta_body),
+        "输入数据": extract_input_data(meta_body),
         "预期结果": expected,
         "合格标准": criteria,
         "优先级": extract_priority(ttype, rel, fname, tname),

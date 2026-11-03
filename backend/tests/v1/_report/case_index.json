@@ -2130,6 +2130,7 @@
   "tests/v1/test_settings.py::test_production_never_widens_cors": "IT-SYS06-027",
   "tests/v1/test_settings.py::test_production_rejects_default_jwt_secret": "IT-SYS06-028",
   "tests/v1/test_settings.py::test_production_rejects_wildcard_cors": "IT-SYS06-029",
+  "tests/v1/test_settings.py::test_release_notes_has_section_for_current_version": "IT-SYS06-034",
   "tests/v1/test_settings.py::test_settings_loads_from_root_env": "IT-SYS06-030",
   "tests/v1/test_settings.py::test_sqlite_is_no_longer_supported": "IT-SYS06-031",
   "tests/v1/test_core_contract.py::TestApiV1Health::test_health_reports_database_unavailable": "IT-SYS07-013",

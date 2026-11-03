@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CASE_CSV = os.path.join(REPO, "docs", "testing", "测试用例库.csv")
 RESULTS = os.path.join(REPO, "docs", "testing", "测试结果库", "results.jsonl")
+CASE_INDEX = os.path.join(REPO, "backend", "tests", "v1", "_report", "case_index.json")
 OUT_MD = os.path.join(REPO, "docs", "testing", "测试报告.md")
 OUT_JSON = os.path.join(REPO, "docs", "testing", "测试报告.json")
 
@@ -44,6 +45,22 @@ def load_cases() -> dict[str, dict]:
             if no:
                 cases[no] = row
     return cases
+
+
+def load_node_index() -> dict[str, str]:
+    """nodeid -> 测试编号。
+
+    新写的用例第一次跑时，用例库还没给它分配编号，执行记录里的 `case_no` 只能是
+    空串——这些记录若无补救就永远归不到编号上，报告会显示「未执行」。报告生成阶段
+    case_index 一定是最新的，故按 nodeid 反查补号（无需为此重跑一遍测试）。
+    """
+    if not os.path.exists(CASE_INDEX):
+        return {}
+    try:
+        with open(CASE_INDEX, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def load_results() -> list[dict]:
@@ -65,6 +82,7 @@ def load_results() -> list[dict]:
 def main() -> None:
     cases = load_cases()
     results = load_results()
+    node_index = load_node_index()
 
     # case_no -> 最近一次执行（按 run 聚合）+ 历史
     # 重要：参数化变体（test_x[param]）在 conftest 里按 base nodeid 归并到同一 case_no，
@@ -77,7 +95,7 @@ def main() -> None:
         run_id = r.get("run_id")
         if run_id and run_id not in run_ids:
             run_ids.append(run_id)  # 文件顺序=追加顺序=时间顺序，末尾即最近 run
-        no = r.get("case_no") or ""
+        no = r.get("case_no") or node_index.get(r.get("nodeid", ""), "")
         if no:
             history[no].append(r)
             records_by_case[no].append(r)

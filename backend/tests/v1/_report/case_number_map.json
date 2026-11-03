@@ -2568,5 +2568,18 @@
   "IT|B08|test_installments_service.py|test_amount_columns_lock_two_decimal_precision": 164,
   "IT|B08|test_installments_service.py|test_overpaid_schedule_rejected_by_check_constraint": 165,
   "IT|B08|test_installments_service.py|test_settle_early_filters_settled_rows_but_keeps_one_cent": 166,
-  "IT|SYS06|test_settings.py|test_release_notes_has_section_for_current_version": 34
+  "IT|SYS06|test_settings.py|test_release_notes_has_section_for_current_version": 34,
+  "IT|D02|test_finance_cashflows_service.py|test_cashflow_out_marks_order_event_source": 56,
+  "IT|D02|test_finance_cashflows_service.py|test_cashflow_out_marks_rebate_settlement_source": 57,
+  "UT|D02|test_finance_attributes.py|test_non_negative_returns_decimal_for_valid_input": 9,
+  "UT|D02|test_finance_attributes.py|test_non_negative_wraps_money_error_as_validation": 10,
+  "IT|F04|test_game_types.py|test_delete_default_game_type_is_rejected": 33,
+  "IT|F04|test_game_types.py|test_update_game_type_writes_channel_regions": 34,
+  "UT|SYS10|test_core_infra_gaps.py|test_create_all_is_idempotent_on_existing_schema": 6,
+  "UT|SYS10|test_core_infra_gaps.py|test_dispose_engine_clears_singletons": 7,
+  "UT|SYS10|test_core_infra_gaps.py|test_get_engine_builds_engine_for_explicit_url": 8,
+  "UT|SYS10|test_core_infra_gaps.py|test_get_session_factory_builds_for_explicit_url": 9,
+  "UT|SYS10|test_core_infra_gaps.py|test_ratelimit_window_expiry_resets_counter": 10,
+  "UT|SYS10|test_core_infra_gaps.py|test_rebate_settlement_no_increments_per_record": 11,
+  "UT|SYS10|test_core_infra_gaps.py|test_year_month_compiles_for_both_dialects": 12
 }

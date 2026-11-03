@@ -1,15 +1,29 @@
-"""core 基础设施补充覆盖：engine 生命周期、JWT payload 全分支。
+"""core 基础设施补充覆盖：engine 生命周期、跨方言函数、编号生成、限流窗口。
 
 补齐 coverage 缺口：
-- core/database.py:81  reset_engine 已建 engine 时触发 _engine.dispose()
-- core/security.py:336/345/351/353  user_from_payload 四种非法 payload → AuthError
+- core/database.py:55/74      get_engine/get_session_factory 的「显式 url」分支
+- core/database.py:103-105    create_all 测试建库入口
+- core/database.py:110-113    dispose_engine 必须把两个全局单例都置空
+- core/business_numbering.py:63/64/69  rebate_settlement_no 的 -CF-NN 从属编号
+- core/ratelimit.py:30        窗口过期后计数归零（不是永久封禁）
+- core/sql_functions.py:30/31 sqlite 方言的 strftime 渲染
+
+本文件属 `unit` 组（单文件 <1s、不依赖 seeded_db/TestClient），故编号生成
+用 MagicMock 会话驱动分支，真实落库路径由集成用例覆盖。
 """
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
+from sqlalchemy import column, inspect, select, text
+from sqlalchemy.dialects import postgresql, sqlite
 
 from app.core import database
+from app.core.business_numbering import rebate_settlement_no
+from app.core.ratelimit import RateLimiter
 from app.core.security import AuthError, user_from_payload
+from app.core.sql_functions import year_month
 
 
 def test_reset_engine_disposes_existing():
@@ -20,6 +34,87 @@ def test_reset_engine_disposes_existing():
     assert new_engine is not None
     # 复位后全局 engine 为新建实例，后续 fixture 复用同一 DB URL
     assert database.get_engine() is new_engine
+
+
+def test_get_engine_builds_engine_for_explicit_url(v1_engine):
+    """显式 url 时不写全局单例，直接返回一个能连上的新 engine。"""
+    engine = database.get_engine(v1_engine.url)
+    try:
+        assert engine is not database._engine
+        with engine.connect() as connection:
+            assert connection.scalar(text("select 1")) == 1
+    finally:
+        engine.dispose()
+
+
+def test_get_session_factory_builds_for_explicit_url(v1_engine):
+    """显式 url 时新建工厂，且不把进程级 _session_factory 一起改掉。"""
+    factory = database.get_session_factory(v1_engine.url)
+    assert database._session_factory is None
+    session = factory()
+    try:
+        assert session.get_bind().url.database == v1_engine.url.database
+    finally:
+        session.close()
+
+
+def test_create_all_is_idempotent_on_existing_schema(v1_engine):
+    """测试建库入口：对已建好的 schema 重复执行不报错、表仍在。"""
+    engine = database.create_all(v1_engine.url)
+    try:
+        assert inspect(engine).has_table("orders")
+    finally:
+        engine.dispose()
+
+
+def test_dispose_engine_clears_singletons(v1_engine):
+    """停用后必须把 engine 与工厂都置空，否则残留连接池指向旧库。"""
+    database.reset_engine(v1_engine.url)
+    assert database._engine is not None
+
+    database.dispose_engine()
+
+    assert database._engine is None
+    assert database._session_factory is None
+
+
+def test_rebate_settlement_no_increments_per_record():
+    """从属编号 = 返点号 + `-CF-NN`，NN 按该返点已有结算笔数递增（两位补零）。"""
+    session = MagicMock()
+    session.scalar.return_value = 2
+
+    assert (
+        rebate_settlement_no(session, rebate_no="HS0001-RB01", rebate_record_id=7)
+        == "HS0001-RB01-CF-03"
+    )
+    # 首笔结算时 count 为 0（或 None，被 `or 0` 兜住）→ CF-01
+    session.scalar.return_value = None
+    assert (
+        rebate_settlement_no(session, rebate_no="HS0001-RB01", rebate_record_id=7)
+        == "HS0001-RB01-CF-01"
+    )
+
+
+def test_ratelimit_window_expiry_resets_counter(monkeypatch):
+    """窗口到期后计数归零：同一 key 在 61s 后重新放行，而不是永久封禁。"""
+    ticks = iter([0.0, 0.0, 61.0])
+    monkeypatch.setattr("app.core.ratelimit.time.monotonic", lambda: next(ticks))
+    limiter = RateLimiter()
+
+    assert limiter.is_allowed("k", limit=1, window_seconds=60) is True
+    assert limiter.is_allowed("k", limit=1, window_seconds=60) is False  # 同窗口封顶
+    assert limiter.is_allowed("k", limit=1, window_seconds=60) is True  # 窗口过期重置
+
+
+def test_year_month_compiles_for_both_dialects():
+    """按月聚合键必须两边都能渲染：PG 走 to_char，SQLite 走 strftime（已下线方言仍保兼容）。"""
+    expression = year_month(column("trade_date"))
+
+    pg_sql = str(select(expression).compile(dialect=postgresql.dialect()))
+    sqlite_sql = str(select(expression).compile(dialect=sqlite.dialect()))
+
+    assert "to_char(trade_date, 'YYYY-MM')" in pg_sql
+    assert "strftime('%Y-%m', trade_date)" in sqlite_sql
 
 
 def test_user_from_payload_rejects_bool_sub():

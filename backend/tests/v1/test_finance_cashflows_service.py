@@ -435,3 +435,37 @@ def test_list_cashflows_by_pool_id_visible(seeded_db):
     items, total = cashflows.list_cashflows(seeded_db, pool_id=1, user=_all_scope_user())
     assert total >= 1
     assert all(item["pool_id"] == 1 for item in items)
+
+
+def _cashflow_row(**overrides):
+    """列表路径的 row dict 形态（`_cashflow_out` 的 dict 分支入参）。"""
+    from datetime import datetime
+
+    row = dict(
+        id=1, flow_no="ZC00001", pool_id=1, occurred_on=TODAY,
+        occurred_at=datetime(2026, 10, 17, 9, 0), nature="BUSINESS_IN",
+        fund_nature="BUSINESS", accounting_attribute="SELF_REVENUE",
+        category="SALE", direction="IN", amount=Decimal("10"), status="APPROVED",
+        reviewed_by=None, reviewed_at=None, reversal_of_id=None, order_id=None,
+        order_no=None, deposit_id=None, order_event_id=None, transfer_id=None,
+        note=None, form_extra=None, operator="pytest", created_by="pytest",
+    )
+    row.update(overrides)
+    return row
+
+
+def test_cashflow_out_marks_order_event_source(seeded_db):
+    """挂了订单事件就必须标 ORDER_EVENT —— 前端据此决定能否跳订单详情。"""
+    from app.finance import router_output
+
+    assert router_output._cashflow_out(seeded_db, _cashflow_row(order_event_id=7)).source == (
+        "ORDER_EVENT"
+    )
+
+
+def test_cashflow_out_marks_rebate_settlement_source(seeded_db):
+    """返点类（含冲销）没有订单事件，来源必须落到 REBATE_SETTLEMENT 而不是 OTHER。"""
+    from app.finance import router_output
+
+    out = router_output._cashflow_out(seeded_db, _cashflow_row(category="REBATE_REVERSAL"))
+    assert out.source == "REBATE_SETTLEMENT"

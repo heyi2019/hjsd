@@ -3,24 +3,24 @@
   "description": "当前已验证代码的业务域覆盖率基线；门禁只允许缺失行数下降，不允许增加。",
   "packages": {
     "app/foundation": {
-      "statements": 709,
-      "missing": 2,
-      "max_missing": 2
+      "statements": 734,
+      "missing": 1,
+      "max_missing": 1
     },
     "app/core": {
-      "statements": 779,
-      "missing": 4,
-      "max_missing": 4
+      "statements": 692,
+      "missing": 0,
+      "max_missing": 0
     },
     "app/reporting": {
-      "statements": 596,
+      "statements": 679,
       "missing": 22,
       "max_missing": 22
     },
     "app/finance": {
-      "statements": 1022,
-      "missing": 43,
-      "max_missing": 43
+      "statements": 1047,
+      "missing": 41,
+      "max_missing": 41
     }
   }
 }

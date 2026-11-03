@@ -33,3 +33,23 @@ def test_cannot_disable_default_game_type(seeded_db):
 def test_duplicate_game_type_is_rejected(seeded_db):
     with pytest.raises(Validation, match="游戏类型已存在"):
         service.create_game_type(seeded_db, name="王者荣耀", actor="pytest")
+
+
+def test_delete_default_game_type_is_rejected(seeded_db):
+    """默认游戏类型是业务表单的兜底，删除会让录单失去默认值 —— 必须拒绝。"""
+    item = service.list_game_types(seeded_db)[0]
+    assert item.is_default
+
+    with pytest.raises(Validation, match="默认游戏类型不能删除"):
+        service.delete_game_type(seeded_db, item.id, actor="pytest")
+
+
+def test_update_game_type_writes_channel_regions(seeded_db):
+    """渠道地区入库前要去空、去重，且顺序按首次出现。"""
+    item = service.list_game_types(seeded_db)[1]
+
+    updated = service.update_game_type(
+        seeded_db, item.id, actor="pytest", channel_regions=["安卓", "iOS", "  ", "安卓"]
+    )
+
+    assert updated.channel_regions == ["安卓", "iOS"]

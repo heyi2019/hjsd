@@ -9,13 +9,18 @@ import run_coverage_gate
 
 
 def test_load_gates_reads_all_business_domains():
+    """四域上限必须与 coverage_baseline.json 一致。
+
+    这里刻意硬编码具体数字：放宽上限（把 missing 改大）必须同时改这条用例，
+    否则「悄悄调低门禁」会一次通过。收紧（数字变小）同样要显式改这里。
+    """
     gates = run_coverage_gate.load_gates()
 
     assert gates == {
-        "app/foundation": 2,
-        "app/core": 4,
+        "app/foundation": 1,
+        "app/core": 0,
         "app/reporting": 22,
-        "app/finance": 43,
+        "app/finance": 41,
     }
 
 

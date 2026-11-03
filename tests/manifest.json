@@ -72,21 +72,57 @@
           "deep": 16
         },
         "cases": {
-          "fast": 94,
+          "fast": 96,
           "quick": 88,
-          "react": 756
+          "react": 756,
+          "deep": 124
         },
         "byArea": {
-          "A": 2,
-          "B": 25,
-          "C": 3,
-          "D": 6,
-          "E": 6,
-          "F": 16,
-          "SYS": 32,
-          "shared": 4
+          "unit": {
+            "workbench": 1,
+            "business": 8,
+            "settings": 2,
+            "shared": 9,
+            "system": 4
+          },
+          "module": {
+            "workbench": 6,
+            "business": 17,
+            "customer": 3,
+            "finance": 5,
+            "operations": 7,
+            "settings": 15,
+            "shared": 7,
+            "system": 10
+          }
         },
-        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例），fast 88→94"
+        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/，分层与用例数不变。",
+        "root_layout": "tests/frontend/<unit|module>/<区域>/",
+        "baseline": {
+          "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",
+          "fast": {
+            "files": 14,
+            "cases": 96,
+            "wall": 7.3
+          },
+          "quick": {
+            "files": 8,
+            "cases": 88,
+            "wall": 27.2
+          },
+          "react": {
+            "files": 56,
+            "cases": 756,
+            "wall": 119.7,
+            "cpu": 462.0
+          },
+          "deep": {
+            "files": 16,
+            "cases": 124,
+            "wall": 45.8
+          },
+          "full_default_wall": 154.23
+        }
       },
       "budgets": {
         "fast": 60,
@@ -115,7 +151,13 @@
       "config": "frontend/playwright.config.ts",
       "expected": {
         "files": 15,
-        "cases": 62
+        "cases": 62,
+        "byArea": {
+          "system": 7,
+          "business": 1,
+          "finance": 1,
+          "cross": 6
+        }
       },
       "budgets": {
         "full": 300

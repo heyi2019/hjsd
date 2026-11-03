@@ -73,12 +73,14 @@ def test_ledger_entries_are_well_formed() -> None:
 def _evidence_path(name: str) -> Path:
     """解析验证证据路径。
 
-    默认按后端测试文件名（相对 tests/backend）解析；`frontend:` 前缀指向前端源码树，
-    用于「证据本身是前端守卫」的跨端承诺（如 vi.mock 模块标识守卫）。
-    没有这个前缀，负责端为「双端」的承诺只能把证据留空，等于放弃证据链。
+    默认按后端测试文件名（相对 tests/backend）解析；以 `tests/` 开头的写仓库根相对路径，
+    用于「证据本身是前端/E2E 守卫」的跨端承诺（如 vi.mock 模块标识守卫）。
+    没有这条路，负责端为「双端」的承诺只能把证据留空，等于放弃证据链。
     """
-    if name.startswith("frontend:"):
-        return FRONTEND / name[len("frontend:") :]
+    if name.startswith("tests/"):
+        return REPO / name
+    if name.startswith("frontend:"):  # 旧写法兼容：frontend:<仓库根相对路径>
+        return REPO / name[len("frontend:") :]
     direct = BE_TESTS / name
     if direct.exists():
         return direct
@@ -103,7 +105,7 @@ def test_ledger_evidence_files_exist() -> None:
                 missing.append(f"{code} -> {name}")
     assert not missing, (
         "承诺清单引用了不存在的测试文件"
-        "（前端证据需写成 `frontend:src/...`）：\n" + "\n".join(missing)
+        "（前端证据写仓库根相对路径，如 `tests/frontend/unit/system/x.test.ts`）：\n" + "\n".join(missing)
     )
 
 

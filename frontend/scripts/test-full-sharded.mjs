@@ -38,13 +38,14 @@ const collectTestFiles = (directory, prefix) => readdirSync(directory, { withFil
     return testFilePattern.test(entry.name) ? [relative] : [];
   });
 
-// 两个测试根：组件测试留在 src/ 旁，纯逻辑测试在 frontend/tests/（见 tests/README.md「两个根」）。
-// 前缀必须是「相对 frontend/ 的路径」，与 test-layers.mjs 的 glob、vitest include 同一基准。
-// 只扫 src/ 的后果不是报错，而是这批文件「既不在 fast 也不在 react」——分层统计永远自洽，
+// 唯一测试根：仓库根 tests/frontend/（2026-11-04 起组件测试与纯逻辑测试都在这里，
+// 包内 src/ 与 frontend/tests/ 已清空，见 tests/README.md）。
+// 前缀必须是「相对仓库根」的路径，与 test-layers.mjs 的 glob、vitest root 同一基准；
+// 扫错根的后果不是报错，而是文件「既不在 fast 也不在 react」——分层统计永远自洽，
 // 但它们再也不会被 test:full 跑到。
+const REPO = join(process.cwd(), "..");
 const TEST_ROOTS = [
-  { directory: join(process.cwd(), "src"), prefix: "src" },
-  { directory: join(process.cwd(), "tests"), prefix: "tests" },
+  { directory: join(REPO, "tests", "frontend"), prefix: "tests/frontend" },
 ];
 
 const allTestFiles = TEST_ROOTS
@@ -68,9 +69,9 @@ if (fastFiles.length === 0 || quickFiles.length === 0) {
   console.error(`分层清单与实际文件不匹配：fast=${fastFiles.length}，quick=${quickFiles.length}，请核对 scripts/test-layers.mjs 与 vitest.config.ts`);
   process.exit(1);
 }
-// 目录在、却一条没收到 = include/前缀对不上（比如此前只会静默漏跑）。
-if (existsSync(TEST_ROOTS[1].directory) && !allTestFiles.some((file) => file.startsWith("tests/"))) {
-  console.error("frontend/tests 存在但未收集到任何用例：核对 test-layers.mjs 的 tests/ 前缀");
+// 目录在、却一条没收到 = 前缀对不上（比如此前只会静默漏跑）。
+if (existsSync(TEST_ROOTS[0].directory) && !allTestFiles.some((file) => file.startsWith("tests/frontend/"))) {
+  console.error("tests/frontend 存在但未收集到任何用例：核对 test-layers.mjs 与 test-full-sharded 的前缀基准（仓库根）");
   process.exit(1);
 }
 

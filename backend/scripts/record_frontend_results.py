@@ -59,13 +59,18 @@ def _status(raw: str) -> str:
 
 
 def _rel_key(abs_path: str, title: str) -> str | None:
-    """绝对路径 → `frontend/src/...::标题`（含 frontend/tests/…，同在包内）；包外放弃。"""
+    """绝对路径 → `tests/frontend/...::标题`（仓库根基准）。
+
+    2026-11-04 前端测试整体迁到仓库根 tests/frontend/ 后，键必须改成仓库根基准；
+    旧口径用 relative_to(FRONTEND)，对包外路径直接 ``return None``——那是静默丢记录，
+    不是报错（曾经每天丢掉整批前端记录而报告只显示「未执行」）。
+    """
     try:
         p = Path(abs_path).resolve()
-        rel = p.relative_to(FRONTEND.resolve())
+        rel = p.relative_to(REPO.resolve())
     except Exception:
         return None
-    return f"frontend/{rel.as_posix()}::{title}"
+    return f"{rel.as_posix()}::{title}"
 
 
 # it.each 的占位符：用例库记的是模板（`按字段数量 %s 使用标准宽度 %s`），
@@ -83,7 +88,7 @@ def _build_templates(index: dict) -> dict:
     """文件 → [(模板正则, 用例键)]，供 it.each 变体归并。"""
     out: dict = {}
     for key in index:
-        if not key.startswith("frontend/"):
+        if not key.startswith("tests/frontend/"):
             continue
         fname, _, title = key.partition("::")
         if _PLACEHOLDER.search(title):

@@ -11,10 +11,10 @@
     npx playwright test            # playwright.config.ts 已配 json reporter
     python3 scripts/record_e2e_results.py --json test-results/playwright-report.json
 
-关联口径：case_index.json 的 E2E 键为 `frontend/e2e/<规格文件名>::<标题>`。
-Playwright JSON 的 `spec.file` 是**相对 testDir 的路径**（`modal-footer.spec.ts`，
-不是 `frontend/e2e/modal-footer.spec.ts`），故必须显式补 `frontend/e2e/` 前缀，
-否则全部记录落空、报告仍旧显示 0。
+关联口径：case_index.json 的 E2E 键为 `tests/e2e/<区域>/<规格文件名>::<标题>`
+（2026-11-04 规格从包内 frontend/e2e/ 迁到仓库根 tests/e2e/<区域>/）。
+Playwright JSON 的 `spec.file` 是**相对 testDir 的路径**（`system/modal-footer.spec.ts`），
+故必须补 `tests/e2e/` 前缀；漏了就是全部记录落空、报告仍旧显示 0。
 
 状态映射：
     test.status  expected   -> PASS
@@ -115,7 +115,7 @@ def _build_templates(index: dict) -> dict:
     """文件 → [(模板正则, 用例键)]，供模板标题的运行时展开归并。"""
     out: dict = {}
     for key in index:
-        if not key.startswith("frontend/e2e/"):
+        if not key.startswith("tests/e2e/"):
             continue
         fname, _, title = key.partition("::")
         if "${" in title:
@@ -164,7 +164,7 @@ def main() -> int:
         title = sp.get("title") or ""
         if not file:
             continue
-        key = f"frontend/e2e/{file}::{title}"
+        key = f"tests/e2e/{file}::{title}"
 
         duration = 0.0
         reason = ""

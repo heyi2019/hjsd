@@ -1,41 +1,56 @@
 # 测试资产索引
 
-更新时间：2026-11-04
+更新时间：2026-11-04（测试体系整体重构完成）
 
 本文件回答四个问题：**测试在哪、怎么跑、新测试放哪、怎么判断一个测试有没有价值**。
 
-> 目录重构仍在进行中，本文件描述的是**目标结构 + 当前实际状态**，两者不一致处已逐条标注。
-> 上一版（2026-11-01）写的 `backend/tests/v1/` 已不存在，后端测试已于 11-04 迁至 `tests/backend/`。
+> 2026-11-04 已完成整体搬迁：后端、前端、E2E 三端的测试**全部**在仓库根 `tests/` 下，
+> 包内不再有测试文件。这是本轮重构的验收项之一——`tests/frontend/unit/system/manifest-parity.test.ts`
+> 会扫描 `frontend/src` 与 `frontend/tests`，一旦有残留直接红。
 
 ## 1. 目录结构
 
 ```text
 tests/
 ├── README.md                     本文件（唯一入口说明）
-├── backend/
+├── manifest.json                 三端「应该收到多少」的唯一事实源（只存数量，不存文件名）
+├── backend/                      pytest
 │   ├── conftest.py               11 个共享夹具 + 测试库硬校验 + db 标记派生（唯一一份）
-│   ├── test_*.py                 113 个文件扁平存放，**不按 unit/integration 拆目录**
-│   └── _report/                  生成物（case_index.json 等），已 gitignore
-├── fixtures/                     合成数据与图片，禁止真实客户资料
+│   ├── _repo.py                  仓库根定位（禁写 parents[N]，层数一变就错）
+│   ├── unit/<区域>/              不连库的纯逻辑与静态守卫（32 文件 / 297 例）
+│   ├── integration/<区域>/       连真实 PG 的接口与服务测试（82 文件 / 1387 例）
+│   └── _report/                  生成物（case_index.json 等），gitignore
+├── frontend/                     vitest（root = 仓库根）
+│   ├── unit/<区域>/              不挂载 React 的纯逻辑（24 文件）
+│   └── module/<区域>/            组件与页面测试（70 文件，含 16 个 .deep 重型）
+├── e2e/                          Playwright
+│   ├── <区域>/*.spec.ts          按区域分布；cross/ 是跨区域串联
+│   └── support/api-stub.ts       规格共用夹具
+├── fixtures/                     测试基建：render/mock-api/桩/种子数据（`@fixtures` 别名）
+├── config/                       setup.ts、mock-specifier 基线
 ├── manifests/                    用例 ↔ 文件映射表（人写）
 └── results/                      执行基线记录（人写）
 ```
 
-**前端测试不在本目录**，理由不是"还没搬"，是**搬不了**（2026-11-04 实测）：仓库根没有
-`node_modules`，而 vitest 的 root 是 `frontend/`，包外测试会先被 Vite 的 fs 白名单拦
-（`/@fs/... Cannot find module`），放开白名单后 bare 依赖（`axios` 等）又按 importer
-所在目录向上找不到包。故两个前端目录都在包内：
+**区域目录名 = 一级导航名**：`system`（系统级兜底）/ `workbench`（工作台）/ `business`（业务中心）
+/ `customer`（客户中心）/ `finance`（资金中心）/ `operations`（经营中心）/ `settings`（设置）
+/ `shared`（跨区域公共层）。功能编号仍用字母前缀（A..F / SYS），映射收敛在
+`manifest.json` 的 `regionByCode`，不在代码里各写一份。
 
-```text
-frontend/src/**/*.test.tsx        组件测试（与被测组件同层）
-frontend/tests/**/*.test.ts       纯逻辑测试（15 个文件 / 105 条用例，准入标准见该目录 README）
-frontend/e2e/*.spec.ts            Playwright 规格
-```
+**为什么三端都按 `<层>/<区域>/` 分两层**：区域轴用来定位失败范围（改资金中心就只跑
+`finance/`），分层轴用来定位执行成本（纯逻辑 vs 要 jsdom vs 要真实 PG）。两轴正交，
+任一轴写进另一轴都会让另一轴失效。
 
-后端测试的搬迁已在 2026-11-04 完成（`backend/tests/v1/` → `tests/backend/`）。搬迁会改变
-nodeid，而 `results.jsonl` 的历史记录靠 nodeid 关联用例编号：写入时 `case_no` 已解析的记录
-搬完仍能归位，只有 `case_no` 为空的老记录要靠 nodeid 反查（`make_test_report.py` 的
-`load_node_index`）。实测 1091 条历史前端用例的编号零漂移。
+**前端为什么能搬出包外**（此前结论是"搬不了"，已作废）：仓库根现在是 npm workspaces
+包根（根 `package.json` + 根 `package-lock.json` + 根 `node_modules`），vitest 的
+`root` 改成仓库根、`server.fs.allow` 放开到仓库根。三条对照实验确认了必要条件：
+删掉根 `node_modules` 立刻 `Cannot find module`，配置文件挪出包外立刻
+`@vitejs/plugin-react` 解析失败。
+
+搬迁会改变 nodeid，而 `results.jsonl` 的历史记录靠 nodeid 关联用例编号：写入时
+`case_no` 已解析的记录搬完仍能归位，只有 `case_no` 为空的老记录要靠 nodeid 反查
+（`make_test_report.py` 的 `load_node_index`）。**实测 1091 条历史前端用例编号零漂移**
+（`case_number_map.json` 的键是 `层级|功能编号|文件名|函数名`，文件名搬家不变）。
 
 ## 2. 三根轴，各管一件事
 
@@ -133,28 +148,43 @@ pytest 已把传递依赖展开进 `item.fixturenames`，`conftest.py` 的 `pyte
 
 ```text
 cd frontend
-npm run test:fast            # 纯逻辑（13 文件 = frontend/tests/ 的 10 个 + src 内 3 个基建自测）
-npm run test:quick           # 提交前默认
-npm run test:react           # 组件 / 面板
-npm run test:react-deep
-npm run test:full:all        # 全量分片
-npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e
+npm run test:fast            # 纯逻辑 + 静态守卫：14 文件 / 96 例 / 7s
+npm run test:quick           # 提交前默认：8 文件 / 88 例 / 27s
+npm run test:react           # 组件与页面：56 文件 / 756 例 / 120s
+npm run test:react-deep      # 重型交互（不含在 test:full 里）：16 文件 / 124 例 / 46s
+npm run test:full            # fast + quick + react，层间串行，约 154s
+npm run test:full:all        # 再加 react-deep（发版前）
+npm run test:panel business  # 只跑某区域：tests/frontend/<unit|module>/business
+npm run test:changed         # 按 git 变更自动选区域（改 src/orders → business）
+npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e（15 spec / 62 例）
 ```
 
-#### 前端测试的模块定位：一律用 `@/`
+三层与四档的关系：`fast`/`quick`/`react`/`react-deep` 是**跑法**（执行成本档），
+`unit`/`module` 与区域是**归属**（文件放哪）。`test-layers.mjs` 只登记前者的文件清单，
+归属永远扫磁盘——两套清单必然漂移，这是 2026-10-27 已经付过学费的坑。
 
-`@` 指向 `frontend/src`，在 `vitest.config.ts`、`vite.config.ts`、`tsconfig.json` 三处必须同步。
-测试里的 `import` 与 `vi.mock` 都写 `@/...`，不写 `./` `../`：
+#### 前端测试的模块定位：一律用 `@/` 与 `@fixtures/`
+
+`@` 指向 `frontend/src`（被测源码），`@fixtures` 指向 `tests/fixtures`（测试基建）。
+在 `vitest.config.ts`、`vite.config.ts`、`tsconfig.json` 三处必须同步。测试里的
+`import` 与 `vi.mock` 都写别名，不写 `./` `../`：
 
 ```ts
-vi.mock("@/shared/api/client", () => ({ api: mocks }));   // 对
-vi.mock("../shared/api/client", () => ({ api: mocks }));  // 错
+vi.mock("@/shared/api/client", () => ({ api: mocks }));      // 对
+vi.mock("../shared/api/client", () => ({ api: mocks }));     // 错
+import { renderLight } from "@fixtures/render";              // 对
 ```
 
-相对路径的危险不是「解析失败」（那会显式报错），而是**搬家后仍解析到某个存在的文件**：mock 注册了
-却没命中被测模块，测试改用真实现照常通过，保护静默消失。守卫 `src/test/mock-specifier.test.ts`
-把它变成提交时的显式失败——新增相对路径直接红，存量 74 处冻结在
-`src/test/mock-specifier-baseline.json`（只减不增，条目失效必须删除）。守卫在 `test:fast` 档。
+相对路径的危险不是「解析失败」（那会显式报错），而是**搬家后仍解析到某个存在的文件**：
+mock 注册了却没命中被测模块，测试改用真实现照常通过，保护静默消失。守卫
+`unit/system/mock-specifier.test.ts` 把它变成提交时的显式失败。**2026-11-04 搬迁时存量
+74 处已全部清零**，基线文件保留但为空：此后新增一条相对路径即红，没有冻结豁免。
+
+本轮搬迁正是靠这条守卫抓到两个真缺陷：`OrdersPage.actions.test.tsx` 里
+`vi.mock("../../stocks/InventoryPanel")` 从 `src/orders/` 解析到根本不存在的
+`frontend/stocks/`，mock 从未生效，测试一直在渲染真面板——而它的断言恰恰依赖真面板
+（切到「分期与回款」会真发请求）。修正说明符后立刻红了，说明「修 mock ≠ 修意图」，
+最终删掉这两行死 mock 并注明原因。
 
 ### 环境约束
 
@@ -167,11 +197,14 @@ vi.mock("../shared/api/client", () => ({ api: mocks }));  // 错
 | 项 | 状态 |
 |---|---|
 | ~~13 个后端测试文件未进任何分组~~ | **已解决**：全部登记，`test_group_coverage.py` 拦截复发 |
-| ~~33 个文件头写的功能码尚未登记进承诺清单（基线值，只降不升）~~ | **已解决**：112/112 全部自带承诺码，历史回退机制已封存 |
-| ~~后端 112 个文件仍扁平存放，`unit/` `integration/` 只是空壳~~ | **已决策**：不拆目录，改用 `db` marker 派生；两个空壳目录已删除 |
-| ~~前端纯逻辑测试迁出 `src/`~~ | **已完成**：15 个文件 / 105 条用例迁入 `frontend/tests/`；落点选包内而非仓库根，因包外必撞 Vite fs 白名单与 bare 依赖解析（实测）。组件测试按准入标准不迁 |
-| ~~`vi.mock` 用相对路径，测试文件搬迁后静默失效~~ | **已解决**：`@` 别名 + `mock-specifier.test.ts` 守卫，74 处存量冻结 |
+| ~~33 个文件头写的功能码尚未登记进承诺清单~~ | **已解决**：112/112 全部自带承诺码，历史回退机制已封存 |
+| ~~后端测试扁平存放，没有分层~~ | **已解决**：`unit/integration` × 区域两层（2026-11-04），`test_manifest_parity.py` 守着分布 |
+| ~~前端测试散在包内 `src/` 与 `frontend/tests/`~~ | **已解决**：94 个文件全部迁入 `tests/frontend/{unit,module}/<区域>/`；包内扫描为空的断言在 `manifest-parity.test.ts` |
+| ~~`vi.mock` 用相对路径，测试文件搬迁后静默失效~~ | **已解决**：`@`/`@fixtures` 别名 + `mock-specifier.test.ts`，74 处存量已清零（基线为空） |
+| ~~E2E 规格散在包内 `frontend/e2e/`~~ | **已解决**：15 个 spec 迁入 `tests/e2e/<区域>/`，快照目录随 `visual.spec.ts` 走 |
+| ~~前端测试只能整层跑，改一个板块要跑全部~~ | **已解决**：`test:panel <区域>` 与 `test:changed`（按 git 变更推断区域） |
 | `results.jsonl` 只增不减，日增约 14 MB | **已解决**：`scripts/trim_test_results.py` 覆盖保持式裁剪，14.61 MB / 102 run → **3.82 MB / 24 run**，被裁行归档进 `测试结果库/archive/`（gitignore）。裁剪后报告「未执行 0 / FAIL 0」与裁剪前逐项一致 |
+| 后端 `integration` 与 `unit` 的判定仍是「文件内 db 用例多数派」 | **已知取舍**：35 个混层文件（31%），极端如 `test_orders_contract.py` 105 集成 + 1 单元被整体归入 integration。代价是 57 条快用例跟进集成通道；未拆文件，因为拆文件会改 nodeid 与用例编号 |
 
 ## 7. 维护规则
 

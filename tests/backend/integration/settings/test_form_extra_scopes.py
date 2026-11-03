@@ -55,7 +55,6 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
 def test_operation_scope_seeds_match_registry():
     """迁移种子与 form_scopes 注册表一致（测试库不跑 alembic，直接对拍常量）。"""
     import importlib.util
-    from pathlib import Path
 
     migration_path = (
         _repo.BACKEND_DIR
@@ -85,7 +84,6 @@ def test_operation_scope_seeds_match_registry():
 def test_allocation_scope_has_core_field_seeds():
     """订单分润不能再是空配置，核心字段应由迁移预置。"""
     import importlib.util
-    from pathlib import Path
 
     migration_path = (
         _repo.BACKEND_DIR

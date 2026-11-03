@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import importlib.util
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 from sqlalchemy import func

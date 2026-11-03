@@ -22,43 +22,47 @@ import re
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # /Users/aries/黑金时代
 BACKEND = os.path.join(REPO, "backend")
 FRONTEND = os.path.join(REPO, "frontend")
-# 前端测试有两个根：组件测试与被测组件同层（frontend/src/…），纯逻辑测试在仓库根
-# tests/frontend/…（2026-11-04 迁出，见 tests/frontend/README.md 准入标准）。
-# 键一律以仓库根为基准，故前缀有两种，判「是不是前端用例」必须用 is_frontend_test()，
-# 不能写 startswith("frontend/")——那样迁出去的文件会静默落回后端/未分类分支。
-# 前端测试有**两个目录**，但键统一以仓库根为基准，都带 `frontend/` 前缀：
-#   frontend/src/…    组件测试（与被测组件同层）
-#   frontend/tests/…  纯逻辑测试（2026-11-04 迁出，见 tests/README.md「两个根」）
-# 放在 frontend 包内而不是仓库根 tests/ 下是实测结论：仓库根没有 node_modules，
-# vitest 会先被 Vite 的 fs 白名单拦（/@fs/... Cannot find module），放开白名单后
-# bare 依赖（axios 等）仍解析不到——包外测试在 Vite/npm 解析模型里没有立足点。
-FRONTEND_TEST_DIRS = (os.path.join(FRONTEND, "src"), os.path.join(FRONTEND, "tests"))
+# 前端测试只有一个根：仓库根 tests/frontend/<unit|module>/<区域>/（2026-11-04 整体迁入）。
+# 键统一以仓库根为基准，故前缀是 `tests/frontend/`；判「是不是前端用例」必须用
+# is_frontend_test()，不能写 startswith("frontend/")——那样会漏掉全部前端用例，
+# 也会把 frontend/e2e/（Playwright，另一套编号）算进来。
+# 包外能跑的前提是仓库根有 node_modules（npm workspaces + hoisted），2026-11-04 已落地，
+# 并在 vitest.config.ts 里把 root 改成仓库根、放开 server.fs.allow。
+FRONTEND_TEST_DIRS = (os.path.join(REPO, "tests", "frontend"),)
 REGISTRY = os.path.join(REPO, "docs/testing", "功能编号注册表.csv")
 
 
 def is_frontend_test(relpath: str) -> bool:
     """该路径是否为前端 vitest 用例（仓库根基准的相对路径）。"""
-    return relpath.replace("\\", "/").startswith("frontend/")
+    return relpath.replace("\\", "/").startswith("tests/frontend/")
+
+
+def is_e2e_test(relpath: str) -> bool:
+    """该路径是否为 Playwright 规格（另一套编号，别和 vitest 混算）。"""
+    return relpath.replace("\\", "/").startswith("tests/e2e/")
 
 
 def frontend_test_files() -> list[str]:
-    """全部前端 vitest 文件的仓库根相对路径（两个根合并、已排序）。
+    """全部前端 vitest 文件的仓库根相对路径（已排序）。
 
-    只扫 `src/` 与 `tests/` 两个目录，**不扫 `frontend/` 整树**：后者会带进 node_modules，
+    只扫 `tests/frontend/` 一棵树，**不扫 `frontend/` 整树**：后者会带进 node_modules，
     也会把 `frontend/e2e/*.spec.ts`（Playwright，另一套编号）算成 vitest 用例。
+    扫不到任何文件时直接炸——空集合上的校验恒真，静默归零是这套体系最贵的失败模式。
     """
     out: list[str] = []
     for base in FRONTEND_TEST_DIRS:
         if not os.path.isdir(base):
             continue
-        prefix = "frontend/" + os.path.relpath(base, FRONTEND).replace(os.sep, "/") + "/"
         for root, _dirs, files in os.walk(base):
             for fn in files:
                 if not fn.endswith((".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")):
                     continue
-                rel = os.path.relpath(os.path.join(root, fn), base).replace(os.sep, "/")
-                out.append(prefix + rel)
+                full = os.path.join(root, fn)
+                out.append(os.path.relpath(full, REPO).replace(os.sep, "/"))
+    assert out, f"扫不到任何前端测试文件：{FRONTEND_TEST_DIRS}（用例库会静默归零）"
     return sorted(out)
+
+
 RUN_REG = os.path.join(BACKEND, "run_regression.py")
 
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
@@ -244,41 +248,117 @@ CROSS_FLOW_LABEL = {
 }
 
 
+# 前端测试文件 -> 功能编号（94 个文件逐一登记，与后端 BACKEND_FILE_TO_FUNC 同构）。
+# 只登记**文件名**：搬目录、拆区域都不影响编号，这正是历史 1091 条前端用例零漂移的前提。
+FRONTEND_FILE_TO_FUNC: dict[str, str] = {
+    "DashboardPage.deep.test.tsx":         "A01",
+    "DashboardPage.test.tsx":              "A01",
+    "CreateBusinessModal.deep.test.tsx":   "B01",
+    "CreateBusinessModal.test.tsx":        "B01",
+    "DeliveryInfoSection.test.tsx":        "B01",
+    "OrdersPage.actions.test.tsx":         "B01",
+    "OrdersPage.test.tsx":                 "B01",
+    "helpers.test.ts":                     "B01",
+    "businessReminderConfig.test.ts":      "B02",
+    "InventoryPanel-helpers.test.ts":      "B04",
+    "InventoryPanel.deep.test.tsx":        "B04",
+    "InventoryPanel.sale.test.tsx":        "B04",
+    "InventoryPanel.test.tsx":             "B04",
+    "InventoryPanel.write.test.tsx":       "B04",
+    "InventoryProfileModal.deep.test.tsx": "B04",
+    "OrderDetail.test.tsx":                "B04",
+    "StocksApiRoutes.test.ts":             "B04",
+    "inventory-logic.test.ts":             "B05",
+    "RecoveryFeeSection.test.tsx":         "B06",
+    "findCancelable.test.ts":              "B06",
+    "sale-plan.test.ts":                   "B06",
+    "ThBusinessPanel.deep.test.tsx":       "B07",
+    "ThBusinessPanel.test.tsx":            "B07",
+    "consignment-logic.test.ts":           "B07",
+    "InstallmentsPanel.test.tsx":          "B08",
+    "ConfigurableField.test.tsx":          "B09",
+    "formSections.test.tsx":               "B09",
+    "CustomerLeadPanel.test.tsx":          "C01",
+    "CustomersPage.test.tsx":              "C01",
+    "CustomersPage.write.test.tsx":        "C01",
+    "FundsPage.deep.test.tsx":             "D01",
+    "FundsPage.test.tsx":                  "D01",
+    "PoolsPanel.deep.test.tsx":            "D01",
+    "RebatesPanel.deep.test.tsx":          "D04",
+    "RebatesPanel.test.tsx":               "D04",
+    "StudioExpensePanel.test.tsx":         "D05",
+    "DataCenterPanel.test.tsx":            "E01",
+    "ReportsPage.deep.test.tsx":           "E01",
+    "ReportsPage.details.test.tsx":        "E01",
+    "ReportsPage.test.tsx":                "E01",
+    "inventory-export.test.ts":            "E02",
+    "ImportWorkbench.test.tsx":            "E03",
+    "ConfigCenterPanel.test.tsx":          "F01",
+    "PolicySettingsPanel.test.tsx":        "F01",
+    "SettingsPage.deep.test.tsx":          "F01",
+    "SettingsPage.test.tsx":               "F01",
+    "panels.config.test.tsx":              "F01",
+    "panels.routes.test.tsx":              "F01",
+    "panels.settings.test.tsx":            "F01",
+    "policyConfigSchema.test.ts":          "F01",
+    "OrderFormFieldsPanel.test.tsx":       "F02",
+    "formScopes.test.ts":                  "F02",
+    "ListColumnsPanel.test.tsx":           "F03",
+    "listColumns.test.ts":                 "F03",
+    "retiredProducts.test.ts":             "F04",
+    "OrderTypesPanel.deep.test.tsx":       "F05",
+    "OrderTypesPanel.test.tsx":            "F05",
+    "antdTheme.test.ts":                   "F05",
+    "ChangePasswordPage.test.tsx":         "SYS01",
+    "LoginPage.test.tsx":                  "SYS01",
+    "TeamsPanel.test.tsx":                 "SYS01",
+    "UserCenterPage.test.tsx":             "SYS01",
+    "UsersPanel.deep.test.tsx":            "SYS01",
+    "UsersPanel.test.tsx":                 "SYS01",
+    "session.test.tsx":                    "SYS01",
+    "format.test.ts":                      "SYS02",
+    "money.test.ts":                       "SYS02",
+    "AuditPanel.deep.test.tsx":            "SYS05",
+    "AuditPanel.test.tsx":                 "SYS05",
+    "AppShell.deep.test.tsx":              "SYS07",
+    "AppShell.test.tsx":                   "SYS07",
+    "AppShell.user-center.test.tsx":       "SYS07",
+    "AppearancePanel.test.tsx":            "SYS07",
+    "BusinessActionModal.test.tsx":        "SYS07",
+    "BusinessRegistrationModal.test.tsx":  "SYS07",
+    "ErrorBoundary.test.tsx":              "SYS07",
+    "ResizableModal.test.tsx":             "SYS07",
+    "catalog.orders.test.ts":              "SYS07",
+    "catalog.test.ts":                     "SYS07",
+    "client.cache.test.ts":                "SYS07",
+    "client.test.ts":                      "SYS07",
+    "ui.atoms.test.tsx":                   "SYS07",
+    "ui.containers.test.tsx":              "SYS07",
+    "AttachmentPanel.deep.test.tsx":       "SYS08",
+    "AttachmentPanel.test.tsx":            "SYS08",
+    "NotificationsPanel.test.tsx":         "SYS08",
+    "QualityPanel.deep.test.tsx":          "SYS08",
+    "QualityPanel.test.tsx":               "SYS08",
+    "SearchPanel.test.tsx":                "SYS08",
+    "fixtures.test.ts":                    "SYS10",
+    "vite.config.test.ts":                 "SYS10",
+    "P0P1Round20261101.test.tsx":          "SYS11",
+    "manifest-parity.test.ts":             "SYS12",
+    "mock-specifier.test.ts":              "SYS12",
+}
+
+
 def frontend_func_for(relpath: str) -> str:
-    p = relpath.replace("\\", "/")
-    rules = [
-        ("/auth/", "SYS01"), ("/users/", "SYS01"),
-        ("/attachments/", "SYS08"), ("/audit/", "SYS05"),
-        ("/notifications/", "SYS08"), ("/search/", "SYS08"),
-        ("/quality/", "SYS08"), ("/customers/", "C01"),
-        ("/imports/", "E03"), ("/installments/", "B08"),
-        ("/rebates/", "D04"), ("/policy/", "F01"),
-        ("/reporting/", "E01"),
-        ("/stocks/consignment-logic", "B07"), ("/stocks/inventory-export", "E02"),
-        ("/stocks/sale-plan", "B06"), ("/stocks/findCancelable", "B06"),
-        ("/stocks/inventory-logic", "B05"), ("/stocks/", "B04"),
-        ("/pools/StudioExpensePanel", "D05"), ("/pools/", "D01"),
-        ("/orders/recovery/", "B06"), ("/orders/th/", "B07"),
-        ("/orders/ConfigurableField", "B09"), ("/orders/formSections", "B09"),
-        ("/orders/", "B01"),
-        ("/field-definitions/panels/ListColumnsPanel", "F03"),
-        ("/field-definitions/panels/OrderFormFieldsPanel", "F02"),
-        ("/field-definitions/panels/OrderTypesPanel", "F05"),
-        ("/field-definitions/panels/PoolsPanel", "D01"),
-        ("/field-definitions/formScopes", "F02"), ("/field-definitions/", "F01"),
-        ("/shared/lib/money", "SYS02"), ("/shared/lib/format", "SYS02"),
-        ("/shared/lib/listColumns", "F03"), ("/shared/lib/retiredProducts", "F04"),
-        ("/shared/state/session", "SYS01"), ("/shared/state/antdTheme", "F05"),
-        ("/shared/api/", "SYS07"), ("/shared/ui/", "SYS07"), ("/shared/", "SYS07"),
-        ("/regression/", "SYS11"), ("/test/fixtures", "SYS10"),
-        ("/vite.config.test", "SYS10"),
-        ("/app/DashboardPage", "A01"), ("/app/AppearancePanel", "SYS07"),
-        ("/app/businessReminderConfig", "B02"), ("/app/AppShell", "SYS07"),
-    ]
-    for frag, code in rules:
-        if frag in p:
-            return code
-    return "SYS12"
+    """前端 vitest 文件 -> 功能编号。
+
+    按**文件名**查表，不按路径片段：2026-11-04 测试全部迁入
+    ``tests/frontend/<unit|module>/<区域>/`` 后，路径里不再有 ``/orders/`` ``/stocks/``
+    这类源码域片段，原来的路径匹配会整批落进兜底 SYS12，导致用例编号全线漂移
+    （编号键 = 层级|功能编号|文件名|函数名，功能编号一变就是新用例）。
+    文件名搬家不变，故按文件名查表是唯一稳定的锚点。未登记文件落 SYS12 并在此可见。
+    """
+    base = os.path.basename(relpath.replace("\\", "/"))
+    return FRONTEND_FILE_TO_FUNC.get(base, "SYS12")
 
 
 def load_registry() -> dict[str, dict]:

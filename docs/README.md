@@ -136,7 +136,7 @@
 | `tests/manifests/前端用例自动化映射_20261101.md` | `FE-xxx` → Vitest / Playwright 文件 |
 | `tests/results/前端快速回归基线_20261101.md` | 前端快速回归耗时基线 |
 | `tests/fixtures/README.md` | v1 验收种子数据（假数据）的使用约束 |
-| `frontend/tests/README.md` | 前端纯逻辑测试的准入标准、为何放在包内（仓库根会撞 fs 白名单与 bare 依赖解析） |
+| `tests/frontend/README.md` | 前端测试的 unit/module 分层、区域归属、别名定位与新增测试四步 |
 | `tests/e2e/README.md` | E2E 职责边界、独立库约束、快照目录迁移陷阱 |
 | `security/PII_处置口径_V1.0.md` | PII 处置口径，`lint-gate.yml` 注释引用 |
 | `outputs/README.md` | **数据导入与迁移脚本索引**：49 个一次性脚本的分类、用途与破坏性标记（11-04 建立） |

@@ -21,12 +21,24 @@
 
 **当前状态**
 
-目录已建，**尚未迁入文件**。15 个 spec 仍在 `frontend/e2e/`。
+15 个 spec / 62 条用例已全部迁入本目录（2026-11-04），按区域分目录：
+
+```text
+tests/e2e/
+├── system/    7 spec  外壳契约、导航可达、降级不白屏、弹窗几何、视觉回归、认证、角色切换
+├── business/  1 spec  建单弹窗「放弃未保存」确认
+├── finance/   1 spec  划转派生流水、对账核销
+├── cross/     6 spec  五类业务写入、资金写路径、售出闭环、返点嵌套弹窗、CRUD、真实接口渲染
+└── support/   api-stub.ts（8 个 spec 共用的导航桩）
+```
+
+`playwright.config.ts` 的 `testDir` 已指向 `../tests/e2e`。
 
 **迁移陷阱（无变通余地）**
 
 `visual.spec.ts-snapshots/` 必须与 spec 同目录整目录搬迁。快照按 spec 路径定位，
-spec 一动而快照留在原地，`visual.spec.ts` 全部失败。
+spec 一动而快照留在原地，`visual.spec.ts` 全部失败。本轮的快照已随
+`visual.spec.ts` 一起落在 `tests/e2e/system/`。
 
 **每条 spec 应对上一条承诺**
 

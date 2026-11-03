@@ -32,7 +32,10 @@ process.env.ERP_E2E_API_BASE = `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1`;
 process.env.ERP_E2E_BACKEND_PORT = E2E_BACKEND_PORT;
 
 export default defineConfig({
-  testDir: "./e2e",
+  // 规格家在仓库根 tests/e2e/<区域>/（2026-11-04 从包内 e2e/ 迁出，与 vitest 的
+  // tests/frontend/ 同构：区域目录 + 支撑文件）。快照目录跟着 spec 走，
+  // `visual.spec.ts-snapshots/` 已随 visual.spec.ts 一起迁到 tests/e2e/system/。
+  testDir: "../tests/e2e",
   timeout: 30000,
   expect: { timeout: 10000 },
   // E2E 涉及真实浏览器状态与 antd 下拉，串行最稳，避免并行互相干扰。

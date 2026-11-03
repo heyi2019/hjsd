@@ -46,9 +46,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        working-directory: .
         run: npm ci
 
       - name: TypeScript and UI checks
@@ -79,9 +80,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        working-directory: .
         run: npm ci
 
       - name: Run ${{ matrix.layer }} layer
@@ -103,9 +105,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        working-directory: .
         run: npm ci
 
       - name: Run coverage (fast+quick+react)
@@ -113,7 +116,7 @@ jobs:
 
   test-react-deep:
     # 仅在 main/master 的 push、定时与手动触发时运行，PR 与 test 分支跳过。
-    # deep 按业务域拆成 4 个矩阵分片，既保留单分片隔离，又缩短 CI 总等待时间。
+    # deep 按区域拆成 6 个矩阵分片（共 16 个 .deep 文件），既保留单分片隔离，又缩短 CI 总等待时间。
     name: Tests (react-deep-${{ matrix.shard }})
     if: >
       github.event_name != 'pull_request' &&
@@ -124,7 +127,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [shell, business, governance, support]
+        # 分片 = 业务区域（tests/frontend/module/<区域>/*.deep.test.tsx），
+        # 由 scripts/test-deep-shard.mjs 从磁盘发现，勿在此写死文件清单。
+        shard: [workbench, business, finance, operations, settings, system]
     steps:
       - uses: actions/checkout@v4
 
@@ -133,9 +138,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        working-directory: .
         run: npm ci
 
       - name: Run react-deep shard
@@ -153,9 +159,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
+        working-directory: .
         run: npm ci
 
       - name: Build frontend

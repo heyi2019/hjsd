@@ -52,7 +52,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install backend dependencies (venv)
         working-directory: backend
@@ -61,8 +61,8 @@ jobs:
           .venv/bin/pip install --upgrade pip
           .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Install frontend dependencies
-        working-directory: frontend
+      - name: Install frontend dependencies (仓库根 npm workspaces)
+        working-directory: .
         run: npm ci
 
       - name: Install Playwright Chromium

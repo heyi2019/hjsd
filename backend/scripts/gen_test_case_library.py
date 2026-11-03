@@ -443,7 +443,7 @@ def extract_priority(test_type: str, relpath: str, fname: str, func_id: str) -> 
 
 
 def extract_precond(relpath: str, body: str) -> str:
-    if relpath.startswith("frontend/e2e/"):
+    if relpath.startswith("tests/e2e/"):
         return ("vite(5181) + uvicorn(8124) + PG 独立库 heijin_erp_e2e"
                 "（每轮 create_all+TRUNCATE+seed，用完即丢）")
     if is_frontend_test(relpath):
@@ -498,8 +498,9 @@ def main() -> None:
             cases.append(_stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow))
 
     # ---- 前端 ----
-    # 两个目录：组件测试在 frontend/src/，纯逻辑测试在 frontend/tests/（2026-11-04 迁出）。
-    # 只扫前者会让 15 个文件的用例从库里整批消失，且报告显示「未执行」而不是报错。
+    # 单一根：tests/frontend/<unit|module>/<区域>/（2026-11-04 整体迁入）。
+    # 扫描根写错时结果是空集合而不是报错，report 只会显示「未执行」——故 frontend_test_files()
+    # 内部自带「扫不到就炸」的断言。
     for rel in frontend_test_files():
         full = os.path.join(REPO, rel)
         fn = os.path.basename(rel)
@@ -509,18 +510,22 @@ def main() -> None:
             cases.append(_stage("IT", func, rel, tname, doc, body, fn, primary, related, ""))
 
     # ---- E2E（Playwright：真实浏览器 + 真实后端 + ephemeral 库）----
-    # 只收 e2e/ 根下的 *.spec.ts；support/ 是夹具不是规格。
-    e2e_dir = os.path.join(FRONTEND, "e2e")
-    if os.path.isdir(e2e_dir):
-        for fn in sorted(os.listdir(e2e_dir)):
-            if not fn.endswith(".spec.ts"):
-                continue
-            full = os.path.join(e2e_dir, fn)
-            rel = f"frontend/e2e/{fn}"
-            func = e2e_func_for(fn)
-            primary, related = e2e_file_modules(fn)
-            for tname, doc, body in scan_ts(full, exclude_methods=E2E_STRUCTURAL):
-                cases.append(_stage("E2E", func, rel, tname, doc, body, fn, primary, related, ""))
+    # 递归扫 tests/e2e/<区域>/：规格按区域分目录（2026-11-04 迁出包内 e2e/）。
+    # 只扫一层会让搬进区域目录的 15 个规格从用例库整批消失；support/ 是夹具不是规格。
+    e2e_dir = os.path.join(REPO, "tests", "e2e")
+    e2e_entries = []
+    for dirpath, _dirs, files in os.walk(e2e_dir):
+        for fn in files:
+            if fn.endswith(".spec.ts"):
+                full = os.path.join(dirpath, fn)
+                e2e_entries.append((fn, full, os.path.relpath(full, REPO).replace(os.sep, "/")))
+    e2e_entries.sort(key=lambda x: x[2])
+    assert e2e_entries, f"扫不到任何 E2E 规格：{e2e_dir}（E2E 用例会静默归零）"
+    for fn, full, rel in e2e_entries:
+        func = e2e_func_for(fn)
+        primary, related = e2e_file_modules(fn)
+        for tname, doc, body in scan_ts(full, exclude_methods=E2E_STRUCTURAL):
+            cases.append(_stage("E2E", func, rel, tname, doc, body, fn, primary, related, ""))
 
     # ---- 稳定分配序号 ----
     cases.sort(key=lambda c: (c["功能编号"], c["测试层级"], c["自动化测试文件及函数"], c["测试函数标识"]))

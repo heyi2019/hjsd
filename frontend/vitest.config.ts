@@ -1,15 +1,23 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ESM 项目（package.json 带 "type": "module"）下 __dirname 未定义 —— 这是最常见的
 // 落地失败点。若项目是 CJS（无 "type": "module"），可改回 resolve(__dirname, ...)。
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
-// 轻量纯逻辑测试可以安全并行；涉及大量 antd/jsdom 交互的页面测试共用
-// 一个 worker，避免多个大型 DOM 树同时争抢机器资源导致超时和重试。
-// 清单本体见 scripts/test-layers.mjs（此处仅解构引入）。
+// [2026-11-04 结构变更] 前端测试全部迁到仓库根 tests/frontend/<unit|module>/<区域>/，
+// 测试基建迁到 tests/fixtures（夹具/桩）与 tests/config（setup/基线）。
+// 因此 vitest 的 **root 设成仓库根**，include / exclude / setupFiles 一律以仓库根为基准，
+// 与 scripts/test-layers.mjs、test-full-sharded.mjs、manifest-parity.test.ts 同一基准。
+// 前提（缺一即挂，2026-11-04 三条对照实验实测）：
+//   1) 仓库根有 node_modules（npm workspaces + --install-strategy=hoisted，已落地）
+//   2) 配置必须留在本包内（挪到 /tmp 会 @vitejs/plugin-react 解析失败）
+//   3) server.fs.allow 必须放开到仓库根，否则包外文件被 Vite 白名单拦
+const REPO = path.resolve(here(".."));
+const SRC = here("./src");
 
 // Antd v5 + jsdom reliable test config.
 // Three settings are mandatory (see SKILL.md):
@@ -19,28 +27,32 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 // fast/quick 清单与 scripts/test-full-sharded.mjs 共用单一事实源（scripts/test-layers.mjs），
 // 严禁在本文件另写一份（2026-10-27 实锤：两处漂移致分片脚本 exit 1、test:full 长期不可用）。
 import { fastTests, quickTests } from "./scripts/test-layers.mjs";
+
 export default defineConfig({
+  root: REPO,
   plugins: [react()],
   // Never inherit a developer machine's .env.local API address in jsdom.
   define: { "import.meta.env.VITE_API_BASE": JSON.stringify("http://127.0.0.1:8123/api/v1") },
   resolve: {
     mainFields: ["module", "jsnext:main", "jsnext"],
     alias: {
-      // `@` 是测试文件模块定位的**唯一基准**：vi.mock 与 import 的 specifier 都写
-      // `@/...`，测试文件搬到任何位置都不会失效。相对路径的真正危险不是「解析失败」
-      // （那会显式报错），而是「搬家后仍解析到某个存在的文件」——mock 不报错却没命中
-      // 被测模块，测试改用真实现，保护静默消失。
+      // `@` 指向生产源码、`@fixtures` 指向测试基建，两者是测试文件模块定位的**唯一基准**：
+      // import 与 vi.mock 都写别名，测试文件搬到任何位置都不会失效。相对路径的真正危险不是
+      // 「解析失败」（那会显式报错），而是「搬家后仍解析到某个存在的文件」——mock 不报错却没
+      // 命中被测模块，测试改用真实现，保护静默消失。存量相对路径已于 2026-11-04 清零，
+      // 由 unit/system/mock-specifier.test.ts 守着不再新增。
       // 与 @ant-design/* 不冲突：alias 匹配规则是「全等」或「前缀 + '/'」，
       // `@ant-design/icons` 不以 `@/` 开头，不会被 `@` 吃掉。
-      "@": here("./src"),
-      "rc-motion": here("./src/test/motion-stub.tsx"),
-      "rc-resize-observer": here("./src/test/resize-observer-stub.tsx"),
+      "@fixtures": path.join(REPO, "tests", "fixtures"),
+      "@": SRC,
+      "rc-motion": path.join(REPO, "tests", "fixtures", "motion-stub.tsx"),
+      "rc-resize-observer": path.join(REPO, "tests", "fixtures", "resize-observer-stub.tsx"),
     },
   },
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["tests/config/setup.ts"],
     // 单个用例超时放宽：写路径重型用例（大量 userEvent 交互 + antd Modal）临界耗时较长，
     // 资源紧张时易被拖超；给 60s 余量避免偶发误判。
     testTimeout: 60000,
@@ -51,6 +63,10 @@ export default defineConfig({
     maxWorkers: 1,
     minWorkers: 1,
     server: {
+      fs: {
+        // 测试文件在包外（仓库根 tests/），必须显式放开，否则 /@fs/... 被白名单拦。
+        allow: [REPO],
+      },
       deps: {
         // [2026-10-20 实测更正] 旧注释把失败归因于「esbuild 预打包不应用 resolve.alias、inline 非
         // true 即触发优化器崩溃」——该归因错误。真实机制：Vitest 5.0.3 的 esbuild 优化器默认完全关闭
@@ -100,21 +116,16 @@ export default defineConfig({
         test: {
           name: "react",
           sequence: { groupOrder: 3 },
-          include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.ts"],
-          // [2026-10-27 提速] .deep 重型深度用例从 react 层剥离，独立成 react-deep 项目，
-          // 日常 test:full 不再覆盖（详见 scripts/test-full-sharded.mjs 模式说明）。
-          // 纯逻辑测试已迁到 frontend/tests/（见 tests/README.md「前端测试两个根」），
-          // 下列 4 条随之改为新路径。
+          include: ["tests/frontend/**/*.{test,spec}.{ts,tsx}"],
+          // react 层的 include 覆盖整个 tests/frontend，故必须显式排掉 fast/quick 与 .deep：
+          //   - 漏排 fast/quick → 同一文件双跑，四层计数静默错位（manifest-parity 会红）
+          //   - 漏排 .deep     → 重型用例混回日常层，反馈从 ~170s 反弹到 ~408s
           exclude: [
-            "src/test/fixtures.test.ts",
-            "src/test/mock-specifier.test.ts",
-            "tests/stocks/inventory-export.test.ts",
-            "tests/stocks/inventory-logic.test.ts",
-            "tests/shared/api/*.test.ts",
-            "tests/shared/lib/*.test.ts",
-            "src/vite.config.test.ts",
-            "src/**/*.deep.test.tsx",
+            "**/node_modules/**",
+            "**/dist/**",
+            ...fastTests,
             ...quickTests,
+            "tests/frontend/**/*.deep.test.{ts,tsx}",
           ],
           // [2026-11-03 实测重定] maxWorkers 1→2 之后机器已升到 8 核，2 worker 只吃到
           // 214% CPU（6 核闲置）。三档实测（91 文件 / 432 用例，同机同代码）：
@@ -133,7 +144,7 @@ export default defineConfig({
         test: {
           name: "react-deep",
           sequence: { groupOrder: 4 },
-          include: ["src/**/*.deep.test.{ts,tsx}"],
+          include: ["tests/frontend/**/*.deep.test.{ts,tsx}"],
           // 与 react 同构：单 worker 避免 jsdom+antd 争抢。deep 重型用例（大量 userEvent
           // 交互 + antd Modal）集中于此层，由 test:full:deep / test:full:all 触发，日常
           // test:full 不含（提速日常反馈）。单进程跑以复用 vite transform 缓存（分片子进程
@@ -149,16 +160,16 @@ export default defineConfig({
     // 量化前端薄弱页用：provider v8（与 esbuild transform 兼容，零额外依赖）。
     coverage: {
       provider: "v8",
-      reportsDirectory: "./coverage",
+      // root 是仓库根，路径必须显式带 frontend/ 前缀。
+      reportsDirectory: here("./coverage"),
       reporter: ["text", "json-summary", "json", "html"],
-      include: ["src/**/*.{ts,tsx}"],
+      include: ["frontend/src/**/*.{ts,tsx}"],
       exclude: [
-        "src/test/**",
-        "src/**/*.test.{ts,tsx}",
-        "src/**/*.spec.{ts,tsx}",
-        "src/main.tsx",
-        "src/vite-env.d.ts",
-        "src/vite.config.test.ts",
+        "frontend/src/**/*.test.{ts,tsx}",
+        "frontend/src/**/*.spec.{ts,tsx}",
+        "frontend/src/main.tsx",
+        "frontend/src/vite-env.d.ts",
+        "frontend/src/vite.config.test.ts",
         "**/*.d.ts",
       ],
       thresholds: {

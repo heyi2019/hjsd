@@ -79,14 +79,88 @@ def scan_py(path: str):
     return out
 
 
-TS_TOKEN = re.compile(r'\b(it|test)\s*\(\s*[\'"]([^\'"]+)[\'"]')
+TS_TOKEN = re.compile(r'\b(it|test)\b\s*((?:\.\s*[A-Za-z_$][\w$]*\s*)*)\(')
+
+
+def _read_js_string(src: str, i: int) -> tuple[str | None, int]:
+    """从 i 处的引号开始读一个 JS 字符串字面量，返回 (值, 结束位置)。
+
+    必须自己走一遍而不是用正则 `[\'"]([^\'"]+)[\'"]`：标题里合法地含引号
+    （如 `空路径 '/' 重定向到工作台`、`（不走 '-' 兜底）`）时，正则会从内层引号
+    处截断，导致用例库里存的是半截标题、运行时永远对不上。
+    """
+    if i >= len(src) or src[i] not in "\"'`":
+        return None, i
+    quote = src[i]
+    out: list[str] = []
+    j = i + 1
+    while j < len(src):
+        ch = src[j]
+        if ch == "\\" and j + 1 < len(src):
+            nxt = src[j + 1]
+            out.append({"n": "\n", "t": "\t", "r": "\r"}.get(nxt, nxt))
+            j += 2
+            continue
+        if ch == quote:
+            return "".join(out), j + 1
+        out.append(ch)
+        j += 1
+    return None, i
+
+
+def _skip_balanced(src: str, i: int) -> int:
+    """i 指向 `(`，返回与之配对的 `)` 之后的位置（跳过字符串与括号嵌套）。"""
+    depth = 0
+    j = i
+    while j < len(src):
+        ch = src[j]
+        if ch in "\"'`":
+            _val, j = _read_js_string(src, j)
+            if _val is None:
+                j += 1
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return len(src)
 
 
 def scan_ts(path: str):
+    """返回 [(标题, None, "")]。
+
+    支持 `it("t")` / `test("t")` / `it.skip("t")` / `it.each([...])("t")`。
+    `it.each` 保留原始模板（`%s` 等占位符）作为**一条**用例 —— 与后端
+    `parametrize` 一个函数一条用例同构；运行时展开的多个变体由执行记录器
+    按通配归并回这一条。
+    """
     src = open(path, encoding="utf-8").read()
-    out = []
+    out: list[tuple[str, None, str]] = []
     for m in TS_TOKEN.finditer(src):
-        out.append((m.group(2), None, ""))
+        open_paren = m.end() - 1
+        close = _skip_balanced(src, open_paren)
+        j = open_paren + 1
+        while j < len(src) and src[j] in " \t\r\n":
+            j += 1
+        title: str | None = None
+        if j < len(src) and src[j] in "\"'`":
+            title, _end = _read_js_string(src, j)
+        if title is None:
+            # it.each([...])("标题") —— 参数列表之后紧跟的第二组括号才是标题
+            k = close
+            while k < len(src) and src[k] in " \t\r\n":
+                k += 1
+            if k < len(src) and src[k] == "(":
+                k += 1
+                while k < len(src) and src[k] in " \t\r\n":
+                    k += 1
+                if k < len(src) and src[k] in "\"'`":
+                    title, _end = _read_js_string(src, k)
+        if title:
+            out.append((title, None, ""))
     return out
 
 

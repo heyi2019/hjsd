@@ -2558,5 +2558,11 @@
   "IT|SYS08|test_quality_contract.py|TestQualityScan::test_quality_endpoint_does_not_leak_cross_pool_transfer": 42,
   "IT|SYS08|test_quality_contract.py|TestQualityScan::test_quality_endpoint_respects_order_scope": 43,
   "IT|SYS08|test_quality_contract.py|TestQualityScan::test_scan_and_record_persists_deduplicated_open_issues": 45,
-  "IT|SYS08|test_quality_contract.py|TestQualityScan::test_th_purchase_does_not_create_removed_advance_issue": 47
+  "IT|SYS08|test_quality_contract.py|TestQualityScan::test_th_purchase_does_not_create_removed_advance_issue": 47,
+  "IT|B01|CreateBusinessModal.test.tsx|%s 在游戏账号信息登记%s": 257,
+  "IT|B01|CreateBusinessModal.test.tsx|%s 建单提供换绑手机号字段": 258,
+  "IT|B07|ThBusinessPanel.deep.test.tsx|备注列有值时直接显示该文本（不走 '-' 兜底）": 17,
+  "IT|F02|OrderFormFieldsPanel.test.tsx|逐一验证 %s 类型字段进入编辑态后可保存": 96,
+  "IT|SYS07|AppShell.test.tsx|空路径 '/' 重定向到工作台（URL 决定落点）": 196,
+  "IT|SYS07|BusinessActionModal.test.tsx|按字段数量 %s 使用标准宽度 %s": 197
 }

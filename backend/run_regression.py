@@ -40,24 +40,65 @@ LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
 
 
 def run_frontend_files(relpaths: list[str]) -> int:
-    """用 vitest 运行指定前端测试文件（best-effort，失败不影响后端结果汇总）。
+    """用 vitest 运行指定前端测试文件，并把结果写入测试结果库。
 
-    relpaths 形如 frontend/src/...；转换为前端目录下的 src/... 传给 vitest。
+    relpaths 形如 frontend/src/...，转换为前端目录下的 src/... 传给 vitest。
+
+    两个曾踩过的坑：
+      1. 旧实现用 `npm run test:fast -- <files>`（即 `--project=fast`），而 fast 项目
+         只覆盖 `scripts/test-layers.mjs` 的清单 —— 不属于 fast 的模块文件会被 vitest
+         直接过滤掉，表现为「跑了但一条没执行」却仍以 0 退出（假绿）。故这里不指定
+         project，让 vitest 按文件自行匹配所属项目。
+      2. vitest 结果原本无处可去（执行记录器是 pytest 插件），前端用例在报告里永远
+         「未执行」。这里统一走 JSON reporter，再交给 record_frontend_results.py 落库。
     """
     if not relpaths:
         return 0
     fe_root = REPO / "frontend"
     files = [p[len("frontend/"):] for p in relpaths]
-    cmd = ["npm", "run", "test:fast", "--", *files]
     print(f"[frontend] 运行 {len(files)} 个模块相关前端测试文件：")
     for f in files:
         print(f"  - {f}")
+    json_out = fe_root / "node_modules" / ".cache" / "vitest-module.json"
+    json_out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["npx", "vitest", "run", "--reporter=json", f"--outputFile={json_out}", *files]
     try:
         r = subprocess.run(cmd, cwd=fe_root, check=False)
-        return r.returncode
     except FileNotFoundError:
-        print("[frontend] 未检测到 npm，跳过前端模块测试（仅列出文件）")
+        print("[frontend] 未检测到 npx，跳过前端模块测试（仅列出文件）")
         return 0
+    record_frontend(json_out)
+    return r.returncode
+
+
+def run_frontend_full() -> int:
+    """前端全量（fast / quick / react / react-deep 四档）+ 写入测试结果库。"""
+    fe_root = REPO / "frontend"
+    json_out = fe_root / "node_modules" / ".cache" / "vitest-full.json"
+    json_out.parent.mkdir(parents=True, exist_ok=True)
+    print("[frontend] 运行前端全量：fast / quick / react / react-deep")
+    try:
+        r = subprocess.run(
+            ["npx", "vitest", "run", "--reporter=json", f"--outputFile={json_out}"],
+            cwd=fe_root, check=False,
+        )
+    except FileNotFoundError:
+        print("[frontend] 未检测到 npx，跳过前端全量")
+        return 0
+    record_frontend(json_out)
+    return r.returncode
+
+
+def record_frontend(json_out: Path) -> None:
+    """把 vitest JSON 报告写入测试结果库（失败只提示，不影响回归结论）。"""
+    script = ROOT / "scripts" / "record_frontend_results.py"
+    if not json_out.exists() or not script.exists():
+        return
+    runner = str(PYTHON) if PYTHON.exists() else sys.executable
+    try:
+        subprocess.run([runner, str(script), "--json", str(json_out)], cwd=ROOT, check=False)
+    except Exception as exc:  # noqa: BLE001 - 记录失败不应把绿的回归判红
+        print(f"[frontend] 执行结果未写入结果库：{exc}")
 
 
 def regression_environment() -> dict[str, str]:
@@ -390,9 +431,9 @@ def main() -> int:
     )
     parser.add_argument(
         "group",
-        choices=[*GROUPS, "changed", "all", "ci", "lint", "cross", *MODULES, "ut", "it", "e2e"],
+        choices=[*GROUPS, "changed", "all", "ci", "lint", "cross", "fe", *MODULES, "ut", "it", "e2e"],
         help="回归分组：业务域名=板块档；A-F/SYS=模块档；ut/it/e2e=类型档；"
-             "cross=跨模块流程；ci/all=全量；lint=静态检查；changed=按 git 变更选组",
+             "cross=跨模块流程；ci/all=全量；fe=前端全量(四档)；lint=静态检查；changed=按 git 变更选组",
     )
     parser.add_argument("--type", choices=["ut", "it", "e2e"],
                         help="与模块档组合：仅跑该模块的某类型（如 B --type ut）")
@@ -408,6 +449,11 @@ def main() -> int:
             str(PYTHON) if PYTHON.exists() else sys.executable,
             update_baseline=args.update_baseline,
         )
+    if args.group == "fe":
+        if args.list:
+            print("# 前端全量（fast / quick / react / react-deep）")
+            return 0
+        return run_frontend_full()
     if args.group == "changed":
         paths_changed = changed_paths()
         selected = groups_for_changes(paths_changed)

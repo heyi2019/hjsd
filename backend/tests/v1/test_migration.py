@@ -64,8 +64,51 @@ def _admin_engine() -> Engine:
     return create_engine(base, isolation_level="AUTOCOMMIT")
 
 
-def _provision_probe_db() -> tuple[str, dict[str, str]]:
-    """在同一 PG 实例上建一个全新的临时库并跑迁移到 head。"""
+_TEMPLATE_DB = "heijin_erp_migration_tpl"
+
+
+@pytest.fixture(scope="session")
+def _migration_template() -> str:
+    """会话级模板库：整个会话只跑一次 `alembic upgrade head`。
+
+    [2026-11-03 提速] 原实现每个用例都 `CREATE DATABASE` 并**起子进程**跑一次
+    `alembic upgrade head`（Python 解释器启动 + 加载整个 app 是主要成本），单次
+    中位 2.1s，13 个用例合计约 28s，占全量 117s 的 24%。
+
+    改为 PG 的文件级拷贝 `CREATE DATABASE ... TEMPLATE`：隔离语义不变（每个用例
+    仍是自己的独立库，drop 后即消失），建库降到百毫秒级。需要真跑迁移的用例
+    （`test_upgrade_is_repeatable` / `test_downgrade_and_upgrade_roundtrip`）
+    仍对拷贝出来的库自己调 `_alembic`，不受影响。
+    """
+    from app.core.settings import get_settings
+
+    base = get_settings().alembic_url
+    parsed = urlparse(base)
+    admin = _admin_engine()
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{_TEMPLATE_DB}" WITH (FORCE)')
+            conn.exec_driver_sql(f'CREATE DATABASE "{_TEMPLATE_DB}"')
+    finally:
+        admin.dispose()
+
+    target = base.replace(f"/{parsed.path.lstrip('/')}", f"/{_TEMPLATE_DB}")
+    env = {"DATABASE_URL": target, "APP_ENV": "development"}
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    yield _TEMPLATE_DB
+
+    admin = _admin_engine()
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{_TEMPLATE_DB}" WITH (FORCE)')
+    finally:
+        admin.dispose()
+
+
+def _provision_probe_db(template: str) -> tuple[str, dict[str, str]]:
+    """从模板库拷贝出一个全新的临时库（已处于 head 结构）。"""
     from app.core.settings import get_settings
 
     base = get_settings().alembic_url
@@ -74,14 +117,12 @@ def _provision_probe_db() -> tuple[str, dict[str, str]]:
     admin = _admin_engine()
     try:
         with admin.connect() as conn:
-            conn.exec_driver_sql(f'CREATE DATABASE "{db_name}"')
+            conn.exec_driver_sql(f'CREATE DATABASE "{db_name}" TEMPLATE "{template}"')
     finally:
         admin.dispose()
 
     target = base.replace(f"/{parsed.path.lstrip('/')}", f"/{db_name}")
     env = {"DATABASE_URL": target, "APP_ENV": "development"}
-    result = _alembic(env, "upgrade", "head")
-    assert result.returncode == 0, result.stdout + result.stderr
     return target, env
 
 
@@ -97,12 +138,12 @@ def _drop_probe_db(target: str) -> None:
 
 
 @pytest.fixture()
-def migration_db():
-    """临时 PG 库：已 upgrade head，teardown 时强制删除。
+def migration_db(_migration_template: str):
+    """临时 PG 库：从会话级模板库拷贝（结构已在 head），teardown 时强制删除。
 
     返回 (engine, target_url, env) —— engine 用于内省；target_url/env 用于二次迁移。
     """
-    target, env = _provision_probe_db()
+    target, env = _provision_probe_db(_migration_template)
     engine = create_engine(target)
     try:
         yield engine, target, env

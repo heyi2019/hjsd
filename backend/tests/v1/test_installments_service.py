@@ -711,29 +711,31 @@ def test_record_sale_success(seeded_db):
 
 # ------------------------------------------------- 外键 / 精度保证的不可达防御
 def _raw_sql(seeded_db, sql: str, params=()):
-    """用独立连接执行 DML，绕过外键约束造脏数据。
+    """在主会话的连接上执行 DML，绕过外键约束造脏数据。
 
     PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
     `session_replication_role` 设为 `replica` 后 FK 触发器不执行，可真实复现
     「DBA 直连改数据遗留悬空引用 / 超精度零头」——这是生产同样会出现的一类脏行。
 
-    纪律：
-    - 先 `commit()` 让主会话释放行锁，否则独立连接的 UPDATE 会等锁到超时；
-    - `session_replication_role` 是**会话级**设置，用后必须 `RESET`，否则连接归还
-      连接池后被后续用例复用，会静默关掉它们的 FK 约束；
-    - 结束后 `expire_all()` 让主会话重读被改的行。
+    [2026-11-03 夹具改为事务回滚后重写] 原实现走**独立连接**：那时每个用例结束会
+    物理清库，主会话的 `commit()` 是真的落库，独立连接看得到那几行。夹具换成
+    「外层事务 + savepoint」后主会话写入不再真正提交，独立连接看不到，`UPDATE ...
+    WHERE id = ?` 会匹配 0 行，`pytest.raises(NotFound)` 随之失效。
+
+    现在改在主会话的连接内执行：
+    - 用 `SET LOCAL` 而不是 `SET`，作用域是当前事务，用例回滚时自动失效——比原来
+      「用完必须 RESET、否则连接归还池后静默关掉后续用例的 FK 约束」更安全；
+    - 造完脏数据立刻把 `session_replication_role` 恢复 `origin`，本事务后续的正常
+      写入仍受 FK 约束保护。
     """
-    engine = seeded_db.get_bind().engine
-    seeded_db.commit()
-    with engine.connect() as raw:
-        try:
-            raw.exec_driver_sql("SET session_replication_role = 'replica'")
-            # 调用点沿用 SQLite 的 `?` 占位符书写，这里翻译成 psycopg 的 `%s`。
-            raw.exec_driver_sql(sql.replace("?", "%s"), tuple(params))
-            raw.commit()
-        finally:
-            raw.exec_driver_sql("RESET session_replication_role")
-            raw.commit()
+    seeded_db.flush()
+    connection = seeded_db.connection()
+    connection.exec_driver_sql("SET LOCAL session_replication_role = 'replica'")
+    try:
+        # 调用点沿用 SQLite 的 `?` 占位符书写，这里翻译成 psycopg 的 `%s`。
+        connection.exec_driver_sql(sql.replace("?", "%s"), tuple(params))
+    finally:
+        connection.exec_driver_sql("SET LOCAL session_replication_role = 'origin'")
     seeded_db.expire_all()
 
 def test_create_stock_sale_rejects_dangling_account(seeded_db):

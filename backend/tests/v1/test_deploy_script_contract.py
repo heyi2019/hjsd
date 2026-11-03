@@ -55,8 +55,15 @@ def _release_tree(
     )
     curl = fake_bin / "curl"
     curl.write_text(f"#!/usr/bin/env bash\nexit {curl_exit}\n", encoding="utf-8")
+    # deploy.sh 的后端健康检查是 `for attempt in {1..30}; do curl ...; sleep 2; done`：
+    # 失败路径要真等满 60 秒，单个用例就占全量 184.8s 的 33%（实测 61.42s）。
+    # 契约测的是退出码与输出文案，不测真实等待时长，故把 sleep 短路。
+    # 仍放在 fake_bin 而不是改 deploy.sh：生产脚本必须保留真实的等待语义。
+    sleep = fake_bin / "sleep"
+    sleep.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     docker.chmod(0o755)
     curl.chmod(0o755)
+    sleep.chmod(0o755)
     return script, fake_bin
 
 

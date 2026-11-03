@@ -326,17 +326,37 @@ def _truncate_all(engine) -> None:
 
 @pytest.fixture()
 def db(v1_engine):
-    """函数级会话：用例结束后清库，互不污染。"""
+    """函数级会话：绑定到外层事务，用例结束整体回滚——不物理清库。
+
+    [2026-11-03 提速] 原实现每用例 after 都 `TRUNCATE 37 张表 RESTART IDENTITY
+    CASCADE`。实测单次中位 **149ms**（成本随表数线性增长 ≈4ms/表，与事务提交的
+    fsync 无关，同一事务内批量做也不摊薄），1524 用例合计 **227s**，占全量
+    421.93s 的 54%。
+
+    改为「外层事务 + 会话加入该事务」后，业务代码里的 `db.commit()` 由
+    `join_transaction_mode="create_savepoint"` 降级为 savepoint release，teardown
+    只剩一次 `rollback()`（实测 <2ms）。
+
+    前提已核验：app 内唯一独立连接是 `api_v1.py` 的 healthz 只读探活，业务写路径
+    全部经 `get_db` 注入的会话，不会被绕过。
+
+    差异（已确认无影响）：PG 的 `setval` 不受事务回滚影响，因此序列值不再随用例
+    归零；而编号计数器 `document_sequences` 是**普通表**，仍随回滚归位。
+    """
     connection = v1_engine.connect()
-    Testing = sessionmaker(bind=connection, autoflush=False, autocommit=False, future=True)
-    session: Session = Testing()
+    transaction = connection.begin()
+    session: Session = Session(
+        bind=connection,
+        join_transaction_mode="create_savepoint",
+        autoflush=False,
+        future=True,
+    )
     try:
         yield session
     finally:
         session.close()
-        # 先归还连接再 TRUNCATE：PG 下残留事务会持有表锁，让 TRUNCATE 阻塞到超时。
+        transaction.rollback()
         connection.close()
-        _truncate_all(v1_engine)
 
 
 SEED_SCHEMA = "seed_template"

@@ -65,3 +65,6 @@ htmlcov/
 
 # WorkBuddy 记忆目录，与项目代码无关
 .workbuddy/
+
+# 测试执行结果（按 run_id 追加，历史不覆盖；用例定义为 测试用例库.csv，二者分离）
+docs/testing/测试结果库/results.jsonl

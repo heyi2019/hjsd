@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-11-03 00:47 UTC",
+  "last_run_id": "20261103-084007-24964c3-5916",
+  "run_batches": 22,
+  "cases_total": 2552,
+  "module_def": {
+    "A": 22,
+    "B": 785,
+    "C": 185,
+    "D": 260,
+    "E": 236,
+    "F": 413,
+    "SYS": 651
+  },
+  "layer_def": {
+    "IT": 2505,
+    "UT": 47
+  },
+  "cross_flow_cases": 8,
+  "no_execution": 1777,
+  "fail_error": 1,
+  "skip": 1,
+  "pending_criteria": 2221
+}

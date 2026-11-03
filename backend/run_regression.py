@@ -1,4 +1,12 @@
-"""按业务域执行后端分组回归，避免日常开发默认跑全量套件。"""
+"""按业务域 / 模块 / 测试类型执行后端分组回归，避免日常开发默认跑全量套件。
+
+三种执行维度（详见 docs/testing/模块与跨模块测试集规范.md）：
+  - 业务域分组（历史）：orders/finance/parties/foundation/... 保留可用。
+  - 模块分组：module A-F/SYS  —— 一个模块的全部后端(UT+IT) + 前端测试。
+  - 测试类型：type ut/it/e2e  —— 单元 / 集成 / 端到端。
+  - 跨模块：cross            —— FLOW-* 跨模块流程测试（B↔D 等）。
+维度可组合：module B --type ut  => 业务中心全部单元测试。
+"""
 from __future__ import annotations
 
 import argparse
@@ -10,13 +18,46 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parent
 PYTHON = ROOT / ".venv" / "bin" / "python"
+
+# 模块/类型/跨模块筛选统一走共享目录（单一事实源）
+sys.path.insert(0, str(ROOT / "scripts"))
+from test_catalog import (  # noqa: E402
+    MODULES,
+    cross_files,
+    frontend_module_files,
+    module_files,
+    module_type_files,
+    type_files,
+)
 
 # pyflakes 扫描范围：业务代码 + 测试 + 迁移 + 脚本（与历史「pyflakes 干净」口径一致）
 LINT_TARGETS = ["app", "tests/v1", "alembic/versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
 # 基线只记「文件 + 消息」，不含行列号——行号漂移不应判定为新增告警
 LINT_BASELINE = ROOT / "lint_baseline.txt"
 LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
+
+
+def run_frontend_files(relpaths: list[str]) -> int:
+    """用 vitest 运行指定前端测试文件（best-effort，失败不影响后端结果汇总）。
+
+    relpaths 形如 frontend/src/...；转换为前端目录下的 src/... 传给 vitest。
+    """
+    if not relpaths:
+        return 0
+    fe_root = REPO / "frontend"
+    files = [p[len("frontend/"):] for p in relpaths]
+    cmd = ["npm", "run", "test:fast", "--", *files]
+    print(f"[frontend] 运行 {len(files)} 个模块相关前端测试文件：")
+    for f in files:
+        print(f"  - {f}")
+    try:
+        r = subprocess.run(cmd, cwd=fe_root, check=False)
+        return r.returncode
+    except FileNotFoundError:
+        print("[frontend] 未检测到 npm，跳过前端模块测试（仅列出文件）")
+        return 0
 
 
 def regression_environment() -> dict[str, str]:
@@ -340,12 +381,19 @@ def run_lint(runner: str, *, update_baseline: bool) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="执行按业务域拆分的后端回归")
+    parser = argparse.ArgumentParser(
+        description="执行按业务域 / 模块 / 测试类型 / 跨模块拆分的后端回归"
+    )
     parser.add_argument(
         "group",
-        choices=[*GROUPS, "changed", "all", "ci", "lint"],
-        help="回归分组（unit=单元档；业务域名=板块档；ci/all=全量；lint=静态检查）",
+        choices=[*GROUPS, "changed", "all", "ci", "lint", "cross", *MODULES, "ut", "it", "e2e"],
+        help="回归分组：业务域名=板块档；A-F/SYS=模块档；ut/it/e2e=类型档；"
+             "cross=跨模块流程；ci/all=全量；lint=静态检查；changed=按 git 变更选组",
     )
+    parser.add_argument("--type", choices=["ut", "it", "e2e"],
+                        help="与模块档组合：仅跑该模块的某类型（如 B --type ut）")
+    parser.add_argument("--backend-only", action="store_true",
+                        help="模块档只跑后端，不跑前端 vitest")
     parser.add_argument("--list", action="store_true", help="仅展示将执行的测试文件")
     parser.add_argument(
         "--update-baseline", action="store_true", help="仅用于 lint：把当前存量告警写入基线"
@@ -385,19 +433,58 @@ def main() -> int:
         if frontend_changed:
             return subprocess.run(["npm", "run", "test:regression:fast"], cwd=ROOT.parent / "frontend", check=False).returncode
         return 0
+    fe_paths: list[str] = []
+    if args.group == "cross":
+        paths = [f"tests/v1/{f}" for f in cross_files()]
+        label = "跨模块流程(FLOW-*)"
+    elif args.group in MODULES:
+        module = args.group
+        if args.type:
+            paths = [f"tests/v1/{f}" for f in module_type_files(module, args.type)]
+            label = f"模块 {module} / 类型 {args.type}"
+            if not args.backend_only and args.type in ("it", "e2e"):
+                fe_paths = frontend_module_files(module)
+        else:
+            paths = [f"tests/v1/{f}" for f in module_files(module)]
+            label = f"模块 {module}（后端 UT+IT）"
+            if not args.backend_only:
+                fe_paths = frontend_module_files(module)
+    elif args.group in ("ut", "it", "e2e"):
+        ttype = args.group
+        if ttype == "e2e":
+            paths = []
+            label = "E2E（当前无常住 E2E 套件）"
+            print(f"[{label}] 无匹配测试文件")
+            return 0
+        paths = [f"tests/v1/{f}" for f in type_files(ttype)]
+        label = f"类型 {ttype}"
     else:
         paths = all_paths() if args.group in ("all", "ci") else GROUPS[args.group]
+        label = args.group
     if args.list:
+        print(f"# {label}")
         print("\n".join(paths))
+        if fe_paths:
+            for f in fe_paths:
+                print(f)
+        return 0
+    if not paths:
+        print(f"[{label}] 无匹配后端测试文件")
         return 0
     runner = str(PYTHON) if PYTHON.exists() else sys.executable
-    command = [runner, "-m", "pytest", "-q", *paths]
-    return subprocess.run(
-        command,
+    print(f"=== 执行 {label}：{len(paths)} 个后端文件 ===")
+    result = subprocess.run(
+        [runner, "-m", "pytest", "-q", *paths],
         cwd=ROOT,
         env=regression_environment(),
         check=False,
-    ).returncode
+    )
+    rc = result.returncode
+    # 模块档：后端跑完后（如有）再跑前端模块测试（best-effort）
+    if fe_paths:
+        frc = run_frontend_files(fe_paths)
+        rc = rc or frc
+    return rc
 
 
 if __name__ == "__main__":

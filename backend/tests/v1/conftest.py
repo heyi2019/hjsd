@@ -513,3 +513,144 @@ def viewer_headers() -> dict[str, str]:
 @pytest.fixture()
 def operator_headers() -> dict[str, str]:
     return {"X-Dev-User": "operator"}
+
+
+# ---------------------------------------------------------------------------
+# 测试执行结果记录器（用例库与执行结果分离；历史不覆盖）
+# 每次 pytest 运行 -> 一条 run_id；每个用例 -> results.jsonl 一条追加记录。
+# 与 docs/testing/测试用例库.csv 通过「测试编号」关联（case_index.json: nodeid->编号）。
+# 设计边界：本钩子只读/追加文件，任何异常都吞掉，绝不阻断正常测试运行。
+# ---------------------------------------------------------------------------
+import json as _json  # noqa: E402
+import subprocess as _sp  # noqa: E402
+from datetime import datetime as _dt  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+_RESULTS_DIR = _Path(__file__).resolve().parents[3] / "docs" / "testing" / "测试结果库"
+_RESULTS_JSONL = _RESULTS_DIR / "results.jsonl"
+_CASE_INDEX = _Path(__file__).resolve().parent / "_report" / "case_index.json"
+
+# 运行级状态（模块级，整个 session 共享）
+_RUN_STATE: dict = {"run_id": None, "case_index": {}, "rows": {}}
+
+
+def _load_case_index() -> dict:
+    try:
+        return _json.loads(_CASE_INDEX.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _git_commit() -> str:
+    try:
+        out = _sp.run(["git", "rev-parse", "--short", "HEAD"], cwd=_Path(__file__).resolve().parents[3],
+                      capture_output=True, text=True, check=False)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _env_tag() -> str:
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        return "ci"
+    return "local"
+
+
+def _mask_db(url: str) -> str:
+    if not url:
+        return ""
+    return url.split("@")[-1] if "@" in url else url.split("://")[-1]
+
+
+def pytest_sessionstart(session):  # noqa: D401
+    try:
+        _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        ts = _dt.now().strftime("%Y%m%d-%H%M%S")
+        _RUN_STATE["run_id"] = f"{ts}-{_git_commit()}-{os.getpid()}"
+        _RUN_STATE["case_index"] = _load_case_index()
+        _RUN_STATE["rows"] = {}
+        _RUN_STATE["commit"] = _git_commit()
+        _RUN_STATE["env"] = _env_tag()
+        _RUN_STATE["db"] = _mask_db(os.environ.get("TEST_DATABASE_URL", ""))
+    except Exception:
+        _RUN_STATE["run_id"] = None
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):  # noqa: D401
+    outcome = yield
+    try:
+        rep = outcome.get_result()
+    except Exception:
+        return
+    if _RUN_STATE.get("run_id") is None:
+        return
+    nodeid = item.nodeid
+    when = rep.when
+    existing = _RUN_STATE["rows"].get(nodeid, {})
+    # 以更严重的状态覆盖：ERROR > FAIL > SKIP > PASS
+    rank = {"PASS": 0, "SKIP": 1, "FAIL": 2, "ERROR": 3}
+    cur = existing.get("status", "PASS")
+    new_status = None
+    reason = ""
+    if when == "setup" and rep.skipped:
+        new_status, reason = "SKIP", _short_repr(rep)
+    elif when == "setup" and rep.failed:
+        new_status, reason = "ERROR", _short_repr(rep)
+    elif when == "call":
+        if rep.passed:
+            new_status = "PASS"
+        elif rep.failed:
+            new_status, reason = "FAIL", _short_repr(rep)
+        elif rep.skipped:
+            new_status, reason = "SKIP", _short_repr(rep)
+    elif when == "teardown" and rep.failed:
+        new_status, reason = "ERROR", _short_repr(rep)
+    if new_status and rank.get(new_status, 0) >= rank.get(cur, 0):
+        existing = {
+            "status": new_status,
+            "reason": reason or existing.get("reason", ""),
+            "duration": rep.duration if when == "call" else existing.get("duration", 0.0),
+        }
+        _RUN_STATE["rows"][nodeid] = existing
+
+
+def _short_repr(rep) -> str:
+    try:
+        txt = str(rep.longrepr) if rep.longrepr else ""
+    except Exception:
+        txt = ""
+    return txt[:500]
+
+
+def pytest_sessionfinish(session, exitstatus):  # noqa: D401
+    try:
+        if _RUN_STATE.get("run_id") is None:
+            return
+        run_id = _RUN_STATE["run_id"]
+        commit = _RUN_STATE.get("commit", "unknown")
+        env = _RUN_STATE.get("env", "local")
+        db = _RUN_STATE.get("db", "")
+        ts = _dt.now().isoformat(timespec="seconds")
+        rows = _RUN_STATE["rows"]
+        idx = _RUN_STATE.get("case_index", {})
+        # 兜底：把 session 收集到的全部用例都记一笔（含未触发 makereport 的 collected-only）
+        lines = []
+        for nodeid, rec in rows.items():
+            base = nodeid.split("[")[0]  # 参数化用例 [RPT_...] 退化为函数级 nodeid 再查编号
+            case_no = idx.get(nodeid) or idx.get(base, "")
+            lines.append(_json.dumps({
+                "run_id": run_id, "commit": commit, "env": env, "db": db,
+                "time": ts, "nodeid": nodeid, "case_no": case_no,
+                "status": rec.get("status", "UNKNOWN"),
+                "duration": round(float(rec.get("duration", 0.0)), 4),
+                "reason": rec.get("reason", ""),
+                "evidence": f"logs/pytest/{run_id}.log",
+            }, ensure_ascii=False))
+        if lines:
+            with _RESULTS_JSONL.open("a", encoding="utf-8") as fh:
+                fh.write("\n".join(lines) + "\n")
+    except Exception:
+        pass

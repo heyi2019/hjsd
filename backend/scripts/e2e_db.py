@@ -1,0 +1,273 @@
+"""E2E 隔离库：每次运行「用完就丢」，与 pytest 测试库同一套语义。
+
+设计对齐 `tests/v1/conftest.py` 的 `v1_engine` 夹具：
+  - `Base.metadata.create_all` 幂等建表（对齐压平后的 0001 基线，不跑 alembic）；
+  - `TRUNCATE 全 ORM 表 RESTART IDENTITY CASCADE` 清空上一轮数据；
+  - `seed_foundation` + 默认用户（id 1..9）重播基础种子。
+
+与测试库的区别 / 安全铁律：
+  - **只认名字含 `e2e` 的库**：E2E 库是一次性玩具库，绝不允许指向 dev / release /
+    prod / test 等业务库——`heijin_erp_dev` 是用户的真实沙盒数据，误清即损失。
+    因此这里比 conftest 更严：必须显式含 `e2e`，且拒绝任何 deny-list 词。
+  - 不回落 `DATABASE_URL`：缺 `E2E_DATABASE_URL` 时从 `DATABASE_URL` 派生（仅替换
+    库名为 `heijin_erp_e2e`，保留 host/port/凭据），绝不直接用业务库。
+  - `TRUNCATE ... CASCADE` 在这里是安全的：E2E 库纯由 ORM `create_all` 建出，
+    无任何非 ORM 表；"TRUNCATE 不能带 CASCADE" 的铁律只针对 dev/release（那里有
+    配置表要保留）。本库全清正好是要的目的。
+
+用法（被 playwright.config.ts 的 webServer 调起）：
+  python scripts/e2e_db.py            # 重置 + 种子（默认）
+  python scripts/e2e_db.py --reset-only   # 仅重置，不补 E2E 业务夹具
+"""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from app.core.database import Base, get_engine  # noqa: E402
+from app.core.security import hash_password  # noqa: E402
+from app.core.settings import get_settings  # noqa: E402
+from app.domain import attachments, foundation, imports, lists, notifications, options, parties, quality, trade, users  # noqa: E402,F401 注册全部 v1 表
+from app.foundation.seeds import seed_foundation  # noqa: E402
+from app.foundation.catalog_seed import seed_catalog  # noqa: E402
+
+# E2E 库名必须含此标记；dev/release/prod/test 业务库一律拒绝，避免误清真实数据。
+_REQUIRED_MARK = "e2e"
+_DENIED = ("dev", "release", "prod", "production", "live", "rehearsal", "test")
+
+
+def _e2e_database_url() -> str:
+    """解析 E2E 库地址：E2E_DATABASE_URL 优先；否则从 DATABASE_URL 派生（仅换库名）。
+
+    刻意不回落到业务库本身：若 DATABASE_URL=heijin_erp_dev，派生后变成
+    heijin_erp_e2e，host/port/凭据继承，库名通过下方校验才放行。
+    """
+    url = os.environ.get("E2E_DATABASE_URL")
+    if not url:
+        base = os.environ.get("DATABASE_URL") or get_settings().database_url
+        if not base:
+            raise SystemExit("未配置 E2E_DATABASE_URL 或 DATABASE_URL，无法派生 E2E 库。")
+        # 仅替换 URL 末尾的数据库名，保留 scheme/user/password/host/port。
+        if "postgresql" not in base:
+            raise SystemExit("E2E 库必须是 PostgreSQL（当前 DATABASE_URL 非 PG）。")
+        url = base.rsplit("/", 1)[0] + "/heijin_erp_e2e"
+    if "postgresql" not in url:
+        raise SystemExit("E2E_DATABASE_URL 必须是 PostgreSQL。")
+    db = url.rsplit("/", 1)[-1].lower()
+    if _REQUIRED_MARK not in db:
+        raise SystemExit(
+            f"拒绝：E2E 库名 `{db}` 必须含 `{_REQUIRED_MARK}`（一次性玩具库，"
+            "绝不可指向业务库）。请将 E2E_DATABASE_URL 指向如 heijin_erp_e2e。"
+        )
+    hit = [w for w in _DENIED if w in db]
+    if hit:
+        raise SystemExit(
+            f"拒绝：E2E 库名 `{db}` 命中禁用词 {hit}。E2E 会 TRUNCATE 全表，"
+            "严禁指向 dev/release/prod 等业务库。"
+        )
+    return url
+
+
+def _truncate_all(engine) -> None:
+    """清空全部 ORM 表并归位序列（对齐 conftest._truncate_all）。"""
+    names = ", ".join(f'public."{t.name}"' for t in Base.metadata.sorted_tables)
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+
+
+def _seed_default_users(db) -> None:
+    """补齐占位用户（对齐 conftest.seed_default_users）。
+
+    DEV 态后端以 X-Dev-User 直通，并按 id 映射 operator/finance/auditor/viewer；
+    这些接口仍查真实 DB 用户行，故需存在足够活跃用户，否则 404/422。
+    此处不写显式 id——交给 PG 自增序列，避免后续 API 插「无 id」记录时序列错位撞主键。
+    """
+    for uid in range(1, 10):
+        if db.query(users.User).filter(users.User.username == f"seeduser{uid}").first() is None:
+            db.add(users.User(
+                username=f"seeduser{uid}",
+                display_name=f"种子用户{uid}",
+                password_hash="seed-not-real",
+                role="ADMIN",
+                owner_scope="ALL",
+                pool_ids=[],
+                team_ids=[],
+                is_active=True,
+            ))
+    db.flush()
+
+
+def _seed_real_admin(db) -> None:
+    """造一个**真实可登录**的管理员 admin/12345678（供 auth-login 真实登录联调用例）。
+
+    与 seeduser1..9 的假哈希不同：这里用后端同款 PBKDF2-SHA256 写真哈希，
+    id 取 1001 避开门禁占位用户 1..9。仅 E2E 库存在，不污染业务库。
+    """
+    existing = db.query(users.User).filter(users.User.username == "admin").first()
+    if existing is None:
+        db.add(users.User(
+            username="admin",
+            display_name="系统管理员",
+            password_hash=hash_password("12345678"),
+            role="ADMIN",
+            owner_scope="ALL",
+            pool_ids=[],
+            team_ids=[],
+            is_active=True,
+        ))
+    db.flush()
+
+
+def _seed_real_employee(db) -> None:
+    """造一个**真实可登录**的普通员工 employee/12345678（角色 EMPLOYEE，仅业务录入）。
+
+    用于验证「普通员工看不到经营中心/资金中心」：该角色在前后端 ROLE_PERMISSIONS
+    中均不含 report.read / finance.read，故这两类导航对其隐藏。id 取 1002 避开占位用户。
+    """
+    existing = db.query(users.User).filter(users.User.username == "employee").first()
+    if existing is None:
+        db.add(users.User(
+            username="employee",
+            display_name="普通员工",
+            password_hash=hash_password("12345678"),
+            role="EMPLOYEE",
+            owner_scope="ALL",
+            pool_ids=[],
+            team_ids=[],
+            is_active=True,
+        ))
+    db.flush()
+
+
+def _ensure_database(url: str) -> None:
+    """若 E2E 库不存在则创建（本地首次运行需要；CI 的 postgres service 已建好）。
+
+    连维护库（postgres）执行 CREATE DATABASE；该库不存在时退化为连任意一个已存在
+    的业务库再建——但绝不触碰任何业务库的数据，只发一条 CREATE DATABASE。
+    """
+    dbname = url.rsplit("/", 1)[-1]
+    maint = url.rsplit("/", 1)[0] + "/postgres"
+    eng = create_engine(maint, future=True)
+    try:
+        with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": dbname}
+            ).scalar()
+            if not exists:
+                conn.execute(text(f'CREATE DATABASE "{dbname}"'))
+                print(f"[e2e-db] 已创建数据库 {dbname}")
+    except Exception as exc:  # 维护库连不上（如 erp_app 无权连 postgres）
+        raise SystemExit(
+            f"[e2e-db] 无法连接维护库以创建 {dbname}：{exc}\n"
+            "请先手动建库：CREATE DATABASE heijin_erp_e2e（用有权限的账号）。"
+        )
+    finally:
+        eng.dispose()
+
+
+def reset(reset_only: bool = False) -> str:
+    """重置 E2E 库并播种基础数据；返回实际使用的库名（供诊断）。
+
+    E2E 库是一次性玩具库，故这里 drop_all + create_all 强制把表结构对齐当前 ORM
+    （含 CHECK 约束、新增列等），避免「库已存在 → create_all 不改旧表」导致的约束
+    落后。业务库绝不可走这条路（见文件头铁律）。
+    """
+    url = _e2e_database_url()
+    _ensure_database(url)
+    engine = get_engine(url)
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    _truncate_all(engine)
+    Session = sessionmaker(bind=engine, autoflush=False, future=True)
+    db = Session()
+    try:
+        seed_foundation(db, actor="e2e")
+        # 选项词典 + 表单字段配置：资金流水方向（FUND_FLOW_DIRECTION）、返点类型
+        # （rebate_type 等）的下拉依赖 option_sets / order_form_fields，缺一不可——
+        # 缺失会导致 finance-write-ui 等用例下拉为空、表单无法提交。对齐真实库（dev/
+        # release 首次启动即落 catalog），E2E 库 TRUNCATE 后必须重播。
+        seed_catalog(db, actor="e2e")
+        _seed_default_users(db)
+        _seed_real_admin(db)
+        _seed_real_employee(db)
+        if not reset_only:
+            _seed_e2e_fixtures(db)
+        db.commit()
+    finally:
+        db.close()
+    engine.dispose()
+    return url.rsplit("/", 1)[-1]
+
+
+def _seed_e2e_fixtures(db) -> None:
+    """E2E 业务夹具：客户 + 干净在库账户，供建单 / 售出 / 资金等真实写入联调用例。
+
+    仅建「最小可用」数据：业务写路径用例（business-write / finance-write-ui）多数
+    走 UI 自己造订单，这里补的是下拉数据源（买家客户、在库库存账户）。
+    字段严格对齐当前 ORM（见 app/domain/trade/stocks 等）；若后续模型变更，
+    本函数报错的用例即提示需同步，不会静默污染。
+    """
+    from app.domain.parties import Customer  # noqa: E402
+    from app.domain.trade_models.account import Account  # noqa: E402
+
+    if db.query(Customer).count() == 0:
+        # 客户编号用 9xxx 段：后端新建客户走 allocate_number 自动分配（CUS0001…），
+        # 与种子客户错开，避免撞 uq_customers_no（实测 CUS0001-0003 与自动分配首值冲突）。
+        for i, name in enumerate(["测试买家甲", "测试买家乙", "测试买家丙"], start=1):
+            db.add(Customer(
+                customer_no=f"CUS{str(9000 + i)}",
+                display_name=name,
+                phone=f"138{str(80000000 + i)}",
+                owner_id=1,
+                note="E2E 夹具",
+            ))
+    if db.query(Account).count() == 0:
+        # 各类业务形态各造若干干净在库账号，供 HS/TH/DG 真实写入联调用例按 inventory_type 取用：
+        # HS→SELF/RECOVERY、TH→DISTRIBUTION/PICKUP、DG(代挂)→DISTRIBUTION/CONSIGNMENT。
+        # 因 E2E 套件串行共享同一 ephemeral 库，用例会「消耗」在库账号（建单后出库），
+        # 故每类多造几份，让后续用例仍能 find 到 IN_STOCK 的同类账号（find 会跳过已出库的）。
+        # 不写显式 id——交 PG 自增，避免序列错位。
+        _GAMES = [
+            "王者荣耀", "原神", "和平精英", "英雄联盟", "穿越火线",
+            "崩坏星穹铁道", "蛋仔派对", "第五人格", "QQ飞车", "三国杀",
+            "光遇", "明日方舟",
+        ]
+        _CHANNELS = ["微信区", "官服", "QQ区", "B服", "iOS", "安卓", "抖音", "TapTap"]
+        _PLANS = [
+            ("SELF", "RECOVERY", 20000),
+            ("DISTRIBUTION", "PICKUP", 20100),
+            ("DISTRIBUTION", "CONSIGNMENT", 20200),
+        ]
+        for biz_mode, inv_type, stock_prefix in _PLANS:
+            for j in range(len(_GAMES)):
+                db.add(Account(
+                    stock_no=f"KU_{str(stock_prefix + j)}",
+                    game_account=f"e2e_{inv_type.lower()}_{j + 1}",
+                    camp_account=f"e2e_camp_{inv_type.lower()}_{j + 1}",
+                    game_password="e2e-pwd",
+                    channel_region=_CHANNELS[j % len(_CHANNELS)],
+                    bound_phone="13800000000",
+                    has_secondary=False,
+                    wallet_realname="E2E",
+                    business_mode=biz_mode,
+                    inventory_type=inv_type,
+                    status="WAITING",
+                    inventory_status="IN_STOCK",
+                    game_type=_GAMES[j],
+                    cost_amount=0,
+                ))
+    db.flush()
+
+
+if __name__ == "__main__":
+    reset_only = "--reset-only" in sys.argv
+    db_name = reset(reset_only=reset_only)
+    print(f"[e2e-db] 已重置并播种 E2E 库：{db_name}")

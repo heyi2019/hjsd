@@ -1,0 +1,84 @@
+name: e2e-gate
+
+# E2E 门禁（2026-11-03 重建）：真实 Chromium + 真实后端 + 独立 PG 库 heijin_erp_e2e。
+# 「用完就丢」对齐 pytest 测试库：每次运行 e2e_db.py 对 heijin_erp_e2e 重建 + 重播种子，
+# 库容器常驻、数据每跑清空，绝不触碰 dev/test/release。
+# main / test 推送、PR、手动触发均阻塞。
+
+on:
+  push:
+    branches: [main, master, test]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-gate-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  E2E_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@postgres:5432/heijin_erp_e2e"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp_app
+          POSTGRES_PASSWORD: erp_app
+          POSTGRES_DB: heijin_erp_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies (venv)
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E (真实浏览器 + 真实后端 + 独立 E2E 库)
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 14

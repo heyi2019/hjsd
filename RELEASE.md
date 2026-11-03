@@ -10,13 +10,19 @@
 scripts/ops/bump_version.sh patch         # 先 --dry-run 看将要改什么
 scripts/ops/bump_version.sh --check       # 确认三处一致
 
-# 2 写本文件的发布说明（新版本章节，脚本不代写）
+# 2 生成本文件的发布章节（脚本出骨架，业务口径仍需人工补）
+scripts/ops/changelog.sh --from v1.0.1        # 先看草稿，不落盘
+scripts/ops/changelog.sh --from v1.0.1 --write # 插入到顶部（已有该版本章节会拒绝）
 
 # 3 提交并打 tag（tag 必须指向含本次版本改动的提交）
 git add backend/app/version.py frontend/package.json frontend/package-lock.json RELEASE.md
 git commit -m "release: v1.1.1 ..."
 scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 ```
+
+> **漏写会被测试挡住**：`backend/tests/v1/test_settings.py::test_release_notes_has_section_for_current_version`
+> 断言本文件存在当前版本的 `## Vx.y.z` 章节，且章节内含「发布时间」「本次内容」。
+> 版本号涨了、章节没跟上 → `run_regression.py ci` 直接红，不再依赖人记得。
 
 一次改动三处，缺一处即失效：
 

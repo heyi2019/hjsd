@@ -60,6 +60,71 @@ def test_frontend_version_matches_backend_release_version():
         )
 
 
+def _release_sections(text: str) -> dict[str, str]:
+    """把 RELEASE.md 切成 {版本: 章节正文}，正文不含标题行本身。
+
+    只认 `## V1.2.3` / `## V1.2.3（说明）` 这种形态；`## 发版流程` 之类不带
+    版本号的一级标题自然被跳过——它们不是发布记录。
+    """
+    sections: dict[str, str] = {}
+    current: str | None = None
+    buffer: list[str] = []
+
+    for line in text.splitlines():
+        match = re.match(r"^##\s+V?(\d+\.\d+\.\d+)", line)
+        if match:
+            if current is not None:
+                sections[current] = "\n".join(buffer)
+            current = match.group(1)
+            buffer = []
+            continue
+        if line.startswith("## "):
+            if current is not None:
+                sections[current] = "\n".join(buffer)
+            current = None
+            buffer = []
+            continue
+        if current is not None:
+            buffer.append(line)
+
+    if current is not None:
+        sections[current] = "\n".join(buffer)
+    return sections
+
+
+def test_release_notes_has_section_for_current_version():
+    """升了版本却没写 RELEASE.md = 更新日志断档，且此前无人会发现。
+
+    实测缺口：`bump_version.sh` 明写「不写 RELEASE.md」，CI 只打 tag 不生成
+    release notes，全仓库无任何断言检查章节是否存在。于是发版脚本可以一路
+    绿灯（升版本 → 打 tag → 部署成功），RELEASE.md 里却没有这一版。
+    本测试就是那道兜底：版本号涨了、章节没跟上 → 直接红。
+    """
+    from app.version import __version__ as release_version
+
+    release_path = PROJECT_ROOT / "RELEASE.md"
+    assert release_path.is_file(), f"缺少发布记录：{release_path}"
+
+    sections = _release_sections(release_path.read_text(encoding="utf-8"))
+    assert sections, "RELEASE.md 里一个 `## Vx.y.z` 发布章节都没有，格式可能被改坏"
+
+    assert release_version in sections, (
+        f"RELEASE.md 缺少当前版本 V{release_version} 的章节"
+        f"（现有：{', '.join('V' + v for v in sections)}）。\n"
+        f"发版请依次执行：\n"
+        f"  1) scripts/ops/bump_version.sh {release_version}   # 改齐三处版本\n"
+        f"  2) scripts/ops/changelog.sh --write                # 生成章节草稿并插入\n"
+        f"  3) 人工补业务口径与「发布前检查 / 回滚」两节"
+    )
+
+    body = sections[release_version]
+    for required in ("发布时间", "本次内容"):
+        assert required in body, (
+            f"V{release_version} 章节缺少「{required}」。"
+            "空章节等于没写——它挡不住「这版到底改了什么」这个问题"
+        )
+
+
 def test_env_file_is_project_root_dotenv():
     """本地开发与联调指南 §1：必须读根目录 .env，而不是 backend/.env。"""
     path = locate_env_file()

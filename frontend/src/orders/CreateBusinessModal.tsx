@@ -310,6 +310,7 @@ export function CreateBusinessModal(props: {
   };
 
   return (
+    <>
     <BusinessActionModal
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
       fieldCount={21}
@@ -368,33 +369,38 @@ export function CreateBusinessModal(props: {
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
       </BusinessRegistrationForm>
-      <ConfirmDialog
-        open={Boolean(repurchasePrompt)}
-        title="检测到重复游戏账号"
-        description={`历史账号「${repurchasePrompt?.gameAccount ?? ""}」已售出，可作为复购回流重新入库。请确认是否继续建单。`}
-        okText="是，继续建单"
-        cancelText="否，返回修改"
-        onConfirm={async () => {
-          const prompt = repurchasePrompt;
-          if (!prompt) return;
-          repurchaseConfirmedFor.current = prompt.gameAccount;
-          form.setFields([{ name: "game_account", errors: [] }]);
-          setLoadError(null);
-          setRepurchasePrompt(null);
-          await submit(prompt.values);
-        }}
-        onCancel={() => setRepurchasePrompt(null)}
-      />
-      <ConfirmDialog
-        open={abandonConfirmOpen}
-        title="放弃未保存的建单内容？"
-        description="表单已填写但未提交，关闭后将丢失本次输入。"
-        okText="放弃"
-        cancelText="继续编辑"
-        danger
-        onConfirm={async () => { setAbandonConfirmOpen(false); props.onClose(); }}
-        onCancel={() => setAbandonConfirmOpen(false)}
-      />
     </BusinessActionModal>
+    {/* 确认框必须渲染在业务弹窗「外侧」（与它同级），不能作为其 children。
+        嵌在 children 里时，主弹窗一旦 open=false，嵌套 Modal 的关闭渲染会被跳过：
+        DOM 卡在可见状态，而 state 已是 false —— 之后点 X / 取消 都是幂等 setState，
+        React 直接 bail out 不重渲染，表现为「弹窗看得见但怎么都关不掉」。 */}
+    <ConfirmDialog
+      open={Boolean(repurchasePrompt)}
+      title="检测到重复游戏账号"
+      description={`历史账号「${repurchasePrompt?.gameAccount ?? ""}」已售出，可作为复购回流重新入库。请确认是否继续建单。`}
+      okText="是，继续建单"
+      cancelText="否，返回修改"
+      onConfirm={async () => {
+        const prompt = repurchasePrompt;
+        if (!prompt) return;
+        repurchaseConfirmedFor.current = prompt.gameAccount;
+        form.setFields([{ name: "game_account", errors: [] }]);
+        setLoadError(null);
+        setRepurchasePrompt(null);
+        await submit(prompt.values);
+      }}
+      onCancel={() => setRepurchasePrompt(null)}
+    />
+    <ConfirmDialog
+      open={abandonConfirmOpen}
+      title="放弃未保存的建单内容？"
+      description="表单已填写但未提交，关闭后将丢失本次输入。"
+      okText="放弃"
+      cancelText="继续编辑"
+      danger
+      onConfirm={async () => { setAbandonConfirmOpen(false); props.onClose(); }}
+      onCancel={() => setAbandonConfirmOpen(false)}
+    />
+    </>
   );
 }

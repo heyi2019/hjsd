@@ -2,12 +2,16 @@ import { ConfigProvider, Modal, type ModalProps } from "antd";
 import {
   createContext,
   useEffect,
+  useId,
   useRef,
-  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { ResizableModal } from "./AdaptiveFormGrid/ResizableModal";
+
+/** Esc 时若这些浮层处于展开态，应先让它们自己处理（关浮层），不关闭弹窗。 */
+const NESTED_OVERLAY_SELECTOR =
+  ".ant-select-open, .ant-picker-open, .ant-cascader-open, .ant-dropdown:not(.ant-dropdown-hidden), .ant-popover:not(.ant-popover-hidden)";
 
 /**
  * 把弹窗自身的 onCancel 下发给内部子组件（CompactActions 渲染「取消」用）。
@@ -65,6 +69,10 @@ export function BusinessActionModal({
   ...props
 }: BusinessActionModalProps) {
   const { children, onCancel, ...restProps } = props;
+  // 每个实例一个稳定标记类，用于在 Esc 处理器里定位「本弹窗自己的 .ant-modal-wrap」。
+  // 不能用内容根 ref 反查：antd 的弹窗内容要等入场后才挂载，effect 首次执行时 ref 还是空的，
+  // 反查会拿到 undefined，最上层判定整段失效（表现为 Esc 把下面那层也关掉）。
+  const instanceClass = `business-action-modal--${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const fieldLayout = getBusinessFieldLayout(fieldCount);
   const titleNode: ReactNode = typeof title === "string"
     ? <span className="resizable-modal__drag-handle">{title}</span>
@@ -72,6 +80,7 @@ export function BusinessActionModal({
   const mergedWrapClassName = [
     "adaptive-business-modal",
     "business-registration-modal",
+    instanceClass,
     fieldLayout ? `business-form-layout-${fieldLayout}` : null,
     size === "compact" ? "compact-form-modal" : null,
     wrapClassName,
@@ -119,22 +128,38 @@ export function BusinessActionModal({
 
   // L262：内嵌浮层（下拉/日期选择器等）打开时，Esc 应先关浮层，而非直接触发弹窗
   // onCancel（否则会误弹「放弃确认」并可能关闭整个表单弹窗）。
-  // 做法：关闭 antd Modal 自带的 Esc→onCancel（keyboard=false），改由本捕获阶段处理器判定——
+  // 做法：关闭 antd Modal 自带的 Esc→onCancel（keyboard=false），改由本组件自己判定——
   // 有浮层打开则放行（让内部组件自己关浮层），无浮层才手动 onCancel。
+  //
+  // 监听位置：antd 打开弹窗时把焦点放在对话框容器上（不在内容根 div 内），页脚按钮、
+  // 关闭按钮同样在内容根之外。若只在内容根监听，用户不点进任何字段直接按 Esc 毫无反应。
+  // 因此改为 document 级捕获监听，覆盖「焦点在对话框任意位置」的情况。
+  //
+  // 只让「最上层弹窗」响应：多层弹窗（如返点弹窗内再开编辑弹窗）时，焦点可能还停在
+  // 底层的触发按钮上；若底层照常响应，就会「按 Esc 关掉的是下面那层」。
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
-  const handleKeyDownCapture = (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (event.key !== "Escape") return;
-    const overlayOpen = Boolean(
-      document.querySelector(
-        ".ant-select-open, .ant-picker-open, .ant-cascader-open, .ant-dropdown:not(.ant-dropdown-hidden)",
-      ),
-    );
-    if (overlayOpen) return; // 有浮层：交给内部组件自行处理 Esc（关浮层）
-    // antd 的 ModalProps 将 onCancel 事件窄化为鼠标事件；这里实际来自键盘捕获，
-    // 但回调只需要收到一次取消通知，不依赖事件类型。
-    onCancelRef.current?.(event as unknown as ReactMouseEvent<HTMLButtonElement>);
-  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // 有浮层：交给内部组件自行处理 Esc（关浮层）
+      if (document.querySelector(NESTED_OVERLAY_SELECTOR)) return;
+      const mine = document.querySelector<HTMLElement>(`.${instanceClass}`);
+      if (!mine) return; // 本弹窗还没挂到 DOM，不该由它响应
+      // 不是最上层弹窗：让上层处理，避免「关掉下面那层」
+      const stacked = Array.from(document.querySelectorAll<HTMLElement>(".ant-modal-wrap"))
+        .filter((node) => getComputedStyle(node).display !== "none");
+      const topmost = stacked[stacked.length - 1];
+      if (topmost && topmost !== mine) return;
+      // antd 的 ModalProps 将 onCancel 事件窄化为鼠标事件；这里实际来自键盘。
+      // 回调只需要收到一次取消通知，不依赖事件类型。
+      onCancelRef.current?.({} as ReactMouseEvent<HTMLButtonElement>);
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, instanceClass]);
 
   return (
     <ConfigProvider button={{ autoInsertSpace: false }}>
@@ -148,9 +173,7 @@ export function BusinessActionModal({
         modalRender={renderModal}
       >
         <ModalCancelContext.Provider value={onCancel as (() => void) | undefined}>
-          {/* L262：在内容根挂捕获阶段 Esc 处理器（display:contents 不影响布局）。
-              内嵌浮层打开时放行（让内部组件自己关浮层），无浮层才手动 onCancel。 */}
-          <div className="business-action-modal__content" onKeyDownCapture={handleKeyDownCapture}>
+          <div className="business-action-modal__content">
             {children}
           </div>
         </ModalCancelContext.Provider>

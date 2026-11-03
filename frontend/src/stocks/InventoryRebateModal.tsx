@@ -153,13 +153,14 @@ export function InventoryRebateModal(props: {
   };
 
   return (
+    <>
     <BusinessActionModal
       title="登记返点"
       fieldCount={5 + Object.keys(config).length}
       open={open}
       destroyOnHidden
       wrapClassName="inventory-rebate-modal"
-      onCancel={props.onClose}
+      onCancel={() => { setEditTarget(null); props.onClose(); }}
       width={900}
       footer={
         <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} onClick={() => form.submit()}>
@@ -277,30 +278,35 @@ export function InventoryRebateModal(props: {
           </div>
         </section>
       ) : null}
-      <BusinessActionModal
-        title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"}
-        fieldCount={5 + Object.keys(config).length}
-        open={Boolean(editTarget)}
-        onCancel={() => setEditTarget(null)}
-        footer={null}
-      >
-        <FieldConfigContext.Provider value={config}>
-          <BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
-            <div className="rebate-core-fields">
-              <CfgItem name="base_amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
-              <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
-              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
-              <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
-            </div>
-            <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
-            <PermissionButton permission="order.event.post" type="primary" htmlType="submit">保存</PermissionButton>
-          </BusinessRegistrationForm>
-        </FieldConfigContext.Provider>
-      </BusinessActionModal>
     </BusinessActionModal>
+    {/* 内层「编辑返点」与外层「登记返点」必须是兄弟节点，不能作为其 children。
+        嵌在 children 里时，React 合成事件的捕获阶段会沿 fiber 树回溯到外层内容根，
+        外层挂在内容根上的 Esc 捕获处理器同样会触发 → 在编辑弹窗按 Esc 会把「登记返点」
+        一起关掉，外层已填的返点金额直接丢失。E2E：inventory-rebate-nest.spec.ts。 */}
+    <BusinessActionModal
+      title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"}
+      fieldCount={5 + Object.keys(config).length}
+      open={Boolean(editTarget)}
+      onCancel={() => setEditTarget(null)}
+      footer={null}
+    >
+      <FieldConfigContext.Provider value={config}>
+        <BusinessRegistrationForm
+        layout="horizontal"
+        labelAlign="left"
+        labelCol={{ flex: "108px" }}
+        wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
+          <div className="rebate-core-fields">
+            <CfgItem name="base_amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
+            <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
+            <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+          </div>
+          <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">保存</PermissionButton>
+        </BusinessRegistrationForm>
+      </FieldConfigContext.Provider>
+    </BusinessActionModal>
+    </>
   );
 }

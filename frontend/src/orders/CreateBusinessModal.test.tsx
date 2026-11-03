@@ -427,4 +427,26 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     await ui.click(screen.getByRole("button", { name: "放弃" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
+
+  it("放弃确认框可用 X 收起：不关闭表单，也不触发 onClose", async () => {
+    const onClose = vi.fn();
+    renderLight(
+      <CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />,
+      { user: "admin" },
+    );
+    await screen.findByText("新建回收订单");
+    await ui.type(screen.getByLabelText("客户昵称"), "改了点东西");
+    await ui.click(document.querySelector(".ant-modal-close") as Element);
+    const title = await screen.findByText("放弃未保存的建单内容？");
+
+    // 点的是确认框自身的 X（不是主弹窗的 X）：应从确认框容器内部取。
+    const confirmBox = title.closest(".ant-modal-content") as HTMLElement;
+    await ui.click(confirmBox.querySelector(".ant-modal-close") as Element);
+
+    // X 的语义是「取消放弃」＝继续编辑：不得关表单、不得触发 onClose。
+    // 注：确认框 DOM 是否真的隐藏属 antd 渲染层行为，jsdom + motion-stub 下关闭后
+    // 节点不会移除，断言必然失真；该收尾由 E2E（order-abandon-confirm.spec.ts）守护。
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("新建回收订单")).toBeInTheDocument();
+  });
 });

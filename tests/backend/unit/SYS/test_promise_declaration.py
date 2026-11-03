@@ -12,9 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-BACKEND = REPO / "backend"
-BE_TESTS = REPO / "tests" / "backend"
+from _repo import BACKEND_DIR as BACKEND, BE_TESTS, REPO_ROOT as REPO
 FRONTEND = REPO / "frontend"
 
 sys.path.insert(0, str(BACKEND / "scripts"))
@@ -81,7 +79,14 @@ def _evidence_path(name: str) -> Path:
     """
     if name.startswith("frontend:"):
         return FRONTEND / name[len("frontend:") :]
-    return BE_TESTS / name
+    direct = BE_TESTS / name
+    if direct.exists():
+        return direct
+    # 测试文件已按 unit|integration/<区域>/ 分层，而清单里存的是裸文件名。
+    # 只查根目录会让 48 条证据集体「不存在」——报错很响亮，但真正的问题是解析方式
+    # 还停留在扁平结构；下次再分层（例如按域再拆一层）这里必须仍然有效。
+    matches = sorted(BE_TESTS.rglob(name))
+    return matches[0] if matches else direct
 
 
 def test_ledger_evidence_files_exist() -> None:

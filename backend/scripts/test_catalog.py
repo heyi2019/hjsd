@@ -307,11 +307,12 @@ def module_of_func(func: str) -> str:
 # ---------------------------------------------------------------------------
 def backend_file_modules(fname: str) -> tuple[str, set[str]]:
     """返回 (主模块, 关联模块集合)。跨模块文件主模块取功能编号模块，关联模块含 FLOW 跨度。"""
-    func = BACKEND_FILE_TO_FUNC.get(fname, "SYS12")
+    base = os.path.basename(fname)  # 入参可能是 unit/B/test_x.py，字典键是文件名
+    func = BACKEND_FILE_TO_FUNC.get(base, "SYS12")
     primary = module_of_func(func)
     related = {primary}
-    if fname in CROSS_MODULE_FILES:
-        related |= CROSS_MODULE_FILES[fname]
+    if base in CROSS_MODULE_FILES:
+        related |= CROSS_MODULE_FILES[base]
     return primary, related
 
 
@@ -342,22 +343,51 @@ def _group_files(group_name: str) -> set[str]:
     m = re.search(r'"%s":\s*\[(.*?)\]' % re.escape(group_name), text, re.S)
     if not m:
         return set()
-    return {os.path.basename(x) for x in re.findall(r'"([^"]+)"', m.group(1))}
+    prefix = "tests/backend/"
+    # 只认真正的路径：旧实现把正则匹配到的任意字符串都当条目，而 GROUPS 上方有一条
+    # 注释写着 `-m "not db"`（带引号），于是 `ut` 维度会拼出 `tests/backend/not db` 去跑。
+    # 返回「相对 tests/backend 的路径」，与 all_backend_test_files() 同一形态。
+    return {x[len(prefix):] for x in re.findall(r'"([^"]+)"', m.group(1)) if x.startswith(prefix)}
 
 
 UNIT_FILES = _group_files("unit")
 
 
 def test_type_of_backend_file(fname: str) -> str:
-    return "UT" if fname in UNIT_FILES else "IT"
+    """文件落在 unit/ 还是 integration/ 目录即为类型；不再靠 GROUPS 里的手工分组反推。
+
+    目录是类型的事实源：GROUPS 的 "unit" 组只收 19 个纯逻辑文件，而 unit/ 目录收
+    32 个（含「多数派是快用例、但仍带少量 db 用例」的混层文件）。用 GROUPS 反推
+    会让类型判定与实际分层不一致。
+    """
+    rel = fname.replace("\\", "/")
+    if rel.startswith("integration/"):
+        return "IT"
+    if rel.startswith("unit/"):
+        return "UT"
+    base = os.path.basename(rel)  # 未分层时的兜底
+    return "UT" if base in {os.path.basename(u) for u in UNIT_FILES} else "IT"
 
 
 # ---------------------------------------------------------------------------
 # 筛选接口（供 run_regression.py 调用）
 # ---------------------------------------------------------------------------
 def all_backend_test_files() -> list[str]:
-    d = os.path.join(BACKEND, "tests", "v1")
-    return sorted(f for f in os.listdir(d) if f.startswith("test_") and f.endswith(".py"))
+    """全部后端测试文件，返回**相对 tests/backend 的路径**（如 unit/B/test_orders.py）。
+
+    旧实现指向 ``backend/tests/v1``——那个目录早已删除。后果不是报错，而是
+    ``run_regression.py B`` 打印「无匹配后端测试文件」然后 exit 0，业务域维度
+    静默失效了很久。递归扫盘 + 非空断言，是这条路径唯一的防线。
+    """
+    root = os.path.join(REPO, "tests", "backend")
+    out: list[str] = []
+    for dirpath, _dirs, files in os.walk(root):
+        for fn in files:
+            if fn.startswith("test_") and fn.endswith(".py"):
+                rel = os.path.relpath(os.path.join(dirpath, fn), root).replace(os.sep, "/")
+                out.append(rel)
+    assert out, f"扫不到任何后端测试文件：{root}"
+    return sorted(out)
 
 
 def module_files(module: str) -> list[str]:
@@ -376,10 +406,11 @@ def cross_files() -> list[str]:
 
 def type_files(ttype: str) -> list[str]:
     """ttype=ut -> unit 组；it -> 非 unit 后端；e2e -> 当前无常住 E2E（返回空）"""
+    files = all_backend_test_files()
     if ttype == "ut":
-        return sorted(UNIT_FILES)
+        return sorted(f for f in files if f.startswith("unit/"))
     if ttype == "it":
-        return sorted(set(all_backend_test_files()) - UNIT_FILES)
+        return sorted(f for f in files if f.startswith("integration/"))
     return []  # e2e 预留
 
 

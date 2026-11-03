@@ -475,16 +475,26 @@ def main() -> None:
     index: dict[str, str] = {}
 
     # ---- 后端 ----
-    be_files = sorted(f for f in os.listdir(os.path.join(REPO, "tests", "backend"))
-                      if f.startswith("test_") and f.endswith(".py"))
-    for fname in be_files:
+    # 递归扫盘：测试文件已按 unit|integration/<区域>/ 分层，只扫一层会让后端用例
+    # 整批从用例库里消失——CSV 只剩前端 + E2E，而脚本不报错。
+    be_root = os.path.join(REPO, "tests", "backend")
+    be_entries = []
+    for dirpath, _dirs, files in os.walk(be_root):
+        for fn in files:
+            if fn.startswith("test_") and fn.endswith(".py"):
+                full = os.path.join(dirpath, fn)
+                rel = os.path.relpath(full, REPO).replace(os.sep, "/")
+                be_entries.append((fn, full, rel))
+    be_entries.sort(key=lambda x: x[2])
+    assert be_entries, f"扫不到任何后端测试文件：{be_root}（用例库会静默归零）"
+
+    for fname, full_path, rel in be_entries:
         func = BACKEND_FILE_TO_FUNC.get(fname, "SYS12")
-        rel = f"tests/backend/{fname}"
         primary, related = backend_file_modules(fname)
-        is_unit = fname in _unit_files()
-        ttype = "UT" if is_unit else "IT"
+        # 类型看目录：unit/ 前 5 个字符就是事实，比从 GROUPS 反查更可靠。
+        ttype = "UT" if rel.startswith("tests/backend/unit/") else "IT"
         flow = CROSS_FLOW_LABEL.get(fname, "")
-        for tname, doc, body in scan_py(os.path.join(REPO, "tests", "backend", fname)):
+        for tname, doc, body in scan_py(full_path):
             cases.append(_stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow))
 
     # ---- 前端 ----

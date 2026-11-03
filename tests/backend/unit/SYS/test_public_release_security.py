@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from app.api_v1 import create_app
 from app.core.settings import Settings
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
 PRODUCTION_SECRET = "production-secret-key-0123456789-abcdef"
@@ -36,7 +37,7 @@ SECURITY_HEADERS = (
 
 
 def _frontend_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "frontend"
+    return _repo.FRONTEND_DIR
 
 
 def _location_blocks(nginx_conf: str) -> list[str]:
@@ -115,7 +116,7 @@ def test_frontend_image_ships_the_security_header_snippet():
 
 
 def test_host_hardening_script_protects_public_ssh_without_blocking_http():
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = _repo.REPO_ROOT
     script = (project_root / "deploy/scripts/harden_host.sh").read_text(encoding="utf-8")
 
     assert "authorized_keys" in script

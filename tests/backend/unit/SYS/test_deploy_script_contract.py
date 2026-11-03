@@ -6,9 +6,10 @@ import shutil
 import stat
 import subprocess
 from pathlib import Path
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = _repo.REPO_ROOT
 SOURCE_SCRIPT = PROJECT_ROOT / "deploy" / "scripts" / "deploy.sh"
 COMPOSE_FILE = PROJECT_ROOT / "deploy" / "docker-compose.yml"
 

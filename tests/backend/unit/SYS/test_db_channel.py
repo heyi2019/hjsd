@@ -19,8 +19,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-BE_TESTS = REPO / "tests" / "backend"
+# 测试文件下沉后 parents[N] 的层数变了，写死层数只能撑到下一次搬家。
+from _repo import BE_TESTS, REPO_ROOT as REPO
 
 # db 用例数基线：只允许上升。派生机制被删除、v1_engine 被改名时，数字会塌下来。
 # 要下调这条基线，必须同时证明「确实有用例不再需要数据库」，不能图省事直接改数。
@@ -35,7 +35,11 @@ _CONNECTS = re.compile(r"\.connect\(\)")
 
 
 def _sources() -> dict[str, str]:
-    return {p.name: p.read_text(encoding="utf-8") for p in sorted(BE_TESTS.glob("test_*.py"))}
+    paths = sorted(BE_TESTS.rglob("test_*.py"))
+    # 非空是这类守卫的命门：扫描根写错时 glob 返回空集合，所有「磁盘 ⊆ 清单」
+    # 断言在空集上恒真，守卫看起来全绿（搬迁到子目录后正是如此）。
+    assert paths, "rglob 扫不到任何测试文件：扫描根写错了"
+    return {p.name: p.read_text(encoding="utf-8") for p in paths}
 
 
 def test_db_marker_is_derived_from_fixtures(pytestconfig) -> None:

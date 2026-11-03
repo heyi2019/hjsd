@@ -26,8 +26,9 @@ from pathlib import Path
 import pytest
 
 from app.lists.scopes import LIST_SCOPES, get_scope
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
-_FRONTEND_SRC = Path(__file__).resolve().parents[2] / "frontend" / "src"
+_FRONTEND_SRC = _repo.FRONTEND_DIR / "src"
 
 # 作用域 → 渲染该列表的面板源文件（相对 frontend/src）。
 # 同一文件承载多个列表时（资金中心 5 个、报表 7 个），靠 useListViewColumns 标记定位各自的列数组。

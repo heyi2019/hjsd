@@ -18,10 +18,11 @@ from sqlalchemy import func
 from app.core.money import to_money
 from app.domain.enums import ImportRowStatus, LinkStatus, Portion
 from app.domain.trade import Order, OrderEvent
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
 def _load_script():
-    path = Path(__file__).resolve().parents[2] / "backend" / "scripts" / "map_import_to_entities.py"
+    path = _repo.BACKEND_DIR / "scripts" / "map_import_to_entities.py"
     spec = importlib.util.spec_from_file_location("map_import_to_entities", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

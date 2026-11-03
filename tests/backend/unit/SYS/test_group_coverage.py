@@ -19,9 +19,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-BACKEND = REPO / "backend"
-BE_TESTS = REPO / "tests" / "backend"
+from _repo import BACKEND_DIR as BACKEND, BE_TESTS, REPO_ROOT as REPO
 
 sys.path.insert(0, str(BACKEND))
 
@@ -32,7 +30,9 @@ EXPECTED_PREFIX = "tests/backend/"
 
 def _disk_names() -> set[str]:
     """磁盘上实际存在的测试文件名。"""
-    return {path.name for path in BE_TESTS.glob("test_*.py")}
+    paths = sorted(BE_TESTS.rglob("test_*.py"))
+    assert paths, "rglob 扫不到任何测试文件：扫描根写错了（空集合会让下面的断言恒真）"
+    return {path.name for path in paths}
 
 
 def _grouped_names() -> dict[str, list[str]]:

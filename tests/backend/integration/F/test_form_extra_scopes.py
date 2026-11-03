@@ -15,6 +15,7 @@ from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderLink
 from app.orders.form_scopes import FORM_SCOPES
 from app.orders.form_fields import validate_form_extra
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
 D = "2026-10-27"
@@ -57,7 +58,7 @@ def test_operation_scope_seeds_match_registry():
     from pathlib import Path
 
     migration_path = (
-        Path(__file__).resolve().parents[2] / "backend"
+        _repo.BACKEND_DIR
         / "alembic" / "legacy_versions_pre_squash" / "0019_form_extra_columns_and_op_scopes.py"
     )
     spec = importlib.util.spec_from_file_location("migration_0019", migration_path)
@@ -87,7 +88,7 @@ def test_allocation_scope_has_core_field_seeds():
     from pathlib import Path
 
     migration_path = (
-        Path(__file__).resolve().parents[2] / "backend"
+        _repo.BACKEND_DIR
         / "alembic" / "versions" / "0054_seed_allocation_form_fields.py"
     )
     spec = importlib.util.spec_from_file_location("migration_0054", migration_path)

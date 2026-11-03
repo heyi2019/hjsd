@@ -14,11 +14,12 @@ import pytest
 
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus
 from app.imports import service as import_service
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
 def _load_script():
     """按路径加载 scripts/land_raw_import.py（脚本目录不在包内）。"""
-    path = Path(__file__).resolve().parents[2] / "backend" / "scripts" / "land_raw_import.py"
+    path = _repo.BACKEND_DIR / "scripts" / "land_raw_import.py"
     spec = importlib.util.spec_from_file_location("land_raw_import", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

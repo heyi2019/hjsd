@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
+import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 # 本文件自建引擎并实际连接（create_engine + connect），不走 v1_engine 夹具，
 # 因此 db 标记无法由夹具依赖派生，必须在此显式声明。守卫 test_db_channel.py
@@ -31,7 +32,7 @@ def _backend_root() -> Path:
     for cand in (p, *p.parents):
         if (cand / "alembic.ini").exists():
             return cand
-    return p.parents[2] / "backend"
+    return _repo.BACKEND_DIR
 
 
 BACKEND_DIR = _backend_root()

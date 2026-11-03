@@ -109,7 +109,9 @@ def scan_backend(ledger: dict[str, dict] | None = None) -> list[dict]:
     data = ledger if ledger is not None else load_ledger()
     index = alias_index(data)
     rows: list[dict] = []
-    for path in sorted(BACKEND_TESTS.glob("test_*.py")):
+    # rglob：测试文件已按 unit|integration/<区域>/ 分层，glob 只认根目录会返回空，
+    # 承诺守卫随即空转（文件名对不上、清单证据找不到，全是恒真断言）。
+    for path in sorted(BACKEND_TESTS.rglob("test_*.py")):
         code, source = promise_of(path, data, index)
         rows.append({"file": path.name, "code": code, "source": source})
     return rows

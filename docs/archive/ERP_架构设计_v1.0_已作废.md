@@ -1,6 +1,6 @@
 # 宜游轩 ERP · 架构设计 v1.0
 
-> **权威来源**：[PRD v1.2](ERP_PRD_v1.2_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
+> **权威来源**：[PRD v1.2](ERP_PRD_v1.2_已作废.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
 
 ## 设计边界
 

@@ -213,4 +213,4 @@ cd frontend && UXP_BASE="http://localhost:5180/" UXP_OUT="docs/ux-audit" node sc
 | `docs/ux-audit/shots/*-before-fix.png` | **修复前**证据留存（500 态显示 0/0） |
 | `docs/ux-audit/shots/*.png` | 修复后 25 张证据截图（7 页 × 3 视口 + 500 态 + 焦点核查） |
 
-> V1.0（`ERP_UX测试报告_V1.0_20261021.md` / `.html`）已按仓库惯例 `git mv` 归档至 `docs/archive/`。本版为终态口径全文重写，不在旧稿打补丁。
+> V1.0（`ERP_UX测试报告_V1.0_20261021_已作废.md` / `.html`）已按仓库惯例 `git mv` 归档至 `docs/archive/`。本版为终态口径全文重写，不在旧稿打补丁。

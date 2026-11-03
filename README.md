@@ -90,12 +90,12 @@ cd frontend && npm run build
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
 | `backend/app` 领域包 | 20 个已挂载 router：`foundation` `parties` `search` `orders` + `orders.form_fields` `value_added_services`（分期域，路由名仍为 installments）`finance` `stocks` `reporting` `policy` `quality` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM |
-| `backend/alembic/squashed_versions` | **活动迁移链**：`0001_current_schema_baseline` → `0002` → `0003`，唯一 head `0003`（`alembic.ini` 的 `version_locations` 只指向此目录） |
+| `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
 | `backend/alembic/versions` | 74 个历史增量迁移，**不被 alembic 加载**，仅作追溯（`run_regression.py lint` 仍扫描） |
 | `backend/tests/v1` | v1 测试 |
 | `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
-| `docs` | 当前有效文档 15 份（PRD、数据字典、架构、DDL、API、权限矩阵、状态机等），索引见 `docs/README.md`；时点性报告已归档至 `docs/archive/` |
+| `docs` | 当前有效文档：顶层事实源 / 工程 / 前端测试资产 + `testing/` 测试体系 + `ux-audit/`、`h5_audit_*/` 证据目录；**全仓文档地图见 `docs/README.md`**；时点性报告已归档至 `docs/archive/` |
 | `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
 | `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
 

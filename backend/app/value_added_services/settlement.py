@@ -78,7 +78,13 @@ def settle_early(
             - to_money(row.received_amount)
             - to_money(row.waived_amount)
         )
-        if outstanding <= 0:
+        # 按当前实现走不到这里：上面的查询已用 `received + waived < due` 过滤，
+        # 三列都是 DECIMAL(18,2)，库上还有 ck_installment_schedules_settled_amount_within_due，
+        # 故 outstanding 恒 ≥ 0.01。保留它是为了防「循环内的陈旧读」——若 payable 的
+        # pay() 将来支持跨期顺延，前一期收款会把后一期补满，rows 里的 ORM 对象随之
+        # 变更，该期就不该再收；删掉换来的不是安全，而是那种场景下 pay(amount<=0)
+        # 抛 Validation、提前结清直接失败。要删请连这段注释一起删，别只删 if。
+        if outstanding <= 0:  # pragma: no cover - 见上，不可达分支
             continue
         pay(
             session,

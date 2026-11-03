@@ -59,9 +59,15 @@ import test_catalog as tc  # noqa: E402 — 必须先调整 sys.path
 
 
 def _area_of(fname: str) -> str:
+    """功能编号首字母 → 区域目录名。
+
+    目录与 manifest 用区域全名（business/customer/…），功能编号仍是字母前缀
+    （B03、SYS12），映射表在 manifest.regionByCode，避免两套命名各写一份。
+    """
     func = tc.BACKEND_FILE_TO_FUNC.get(fname) or GUARD_AREA.get(fname)
     assert func, f"{fname} 既不在 BACKEND_FILE_TO_FUNC 也无守卫区域登记"
-    return func[0] if func[0] in "ABCDEF" else "SYS"
+    code = func[0] if func[0] in "ABCDEF" else "SYS"
+    return _manifest()["regionByCode"][code]
 
 
 def test_manifest_has_all_three_layers() -> None:
@@ -71,7 +77,7 @@ def test_manifest_has_all_three_layers() -> None:
     for layer in ("backend", "frontend", "e2e"):
         assert layer in m["layers"], f"manifest 缺 {layer} 层"
         assert m["layers"][layer]["root"].startswith("tests/"), f"{layer}.root 必须指向 tests/"
-    for key in ("shared", "SYS"):
+    for key in ("shared", "system"):
         assert key in m["regions"], f"regions 缺 {key}"
 
 

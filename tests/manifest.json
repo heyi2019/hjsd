@@ -2,13 +2,13 @@
   "version": 1,
   "_doc": "测试体系唯一事实源。只存「应该收到多少」，不存文件名清单——第二份清单必然腐烂。文件集合永远扫磁盘。",
   "regions": {
-    "A": "工作台",
-    "B": "业务中心",
-    "C": "客户中心",
-    "D": "资金中心",
-    "E": "经营中心",
-    "F": "设置",
-    "SYS": "系统级（跨区域兜底）",
+    "system": "系统级（跨区域兜底）",
+    "workbench": "工作台",
+    "business": "业务中心",
+    "customer": "客户中心",
+    "finance": "资金中心",
+    "operations": "经营中心",
+    "settings": "设置",
     "shared": "测试基建与跨区域守卫"
   },
   "layers": {
@@ -30,24 +30,24 @@
             "files": 32,
             "cases": 297,
             "byArea": {
-              "B": 5,
-              "C": 1,
-              "D": 3,
-              "E": 2,
-              "F": 2,
-              "SYS": 19
+              "business": 5,
+              "customer": 1,
+              "finance": 3,
+              "operations": 2,
+              "settings": 2,
+              "system": 19
             }
           },
           "integration": {
             "files": 82,
             "cases": 1387,
             "byArea": {
-              "B": 28,
-              "C": 6,
-              "D": 14,
-              "E": 7,
-              "F": 13,
-              "SYS": 14
+              "business": 28,
+              "customer": 6,
+              "finance": 14,
+              "operations": 7,
+              "settings": 13,
+              "system": 14
             }
           }
         },
@@ -122,5 +122,16 @@
       }
     }
   },
-  "fixtures": "tests/fixtures"
+  "fixtures": "tests/fixtures",
+  "regionByCode": {
+    "A": "workbench",
+    "B": "business",
+    "C": "customer",
+    "D": "finance",
+    "E": "operations",
+    "F": "settings",
+    "SYS": "system",
+    "shared": "shared"
+  },
+  "_regionDoc": "目录名用区域全名（tests/backend/<kind>/<区域>/）；功能编号仍用字母前缀（A..F/SYS），映射见 regionByCode。"
 }

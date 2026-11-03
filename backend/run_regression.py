@@ -169,6 +169,10 @@ GROUPS = {
         # 它守的是「新增测试文件必须进白名单」——曾有一批 13 个文件 68 个用例
         # 因未登记而从未进过 CI，且不报错、不告警。
         "tests/backend/test_group_coverage.py",
+        # 结构一致性守卫：扫盘核对文件数、区域归属与分层归属是否与 tests/manifest.json 一致。
+        # 它守的是「搬目录后扫描范围仍指向旧路径」——失败表现是结果为空而非报错，
+        # 用例会整批从用例库与报告里消失。纯静态，< 0.1s。
+        "tests/backend/test_manifest_parity.py",
     ],
     "p0": [
         "tests/backend/test_order_types_api.py",

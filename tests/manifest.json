@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "_doc": "测试体系唯一事实源。只存「应该收到多少」，不存文件名清单——第二份清单必然腐烂。文件集合永远扫磁盘。",
+  "regions": {
+    "A": "工作台",
+    "B": "业务中心",
+    "C": "客户中心",
+    "D": "资金中心",
+    "E": "经营中心",
+    "F": "设置",
+    "SYS": "系统级（跨区域兜底）",
+    "shared": "测试基建与跨区域守卫"
+  },
+  "layers": {
+    "backend": {
+      "root": "tests/backend",
+      "runner": "pytest",
+      "conftest": "tests/backend/conftest.py",
+      "report": "tests/backend/_report",
+      "kinds": [
+        "unit",
+        "integration"
+      ],
+      "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
+      "expected": {
+        "files": 114,
+        "cases": 1684,
+        "kinds": {
+          "unit": {
+            "files": 32,
+            "cases": 297,
+            "byArea": {
+              "B": 5,
+              "C": 1,
+              "D": 3,
+              "E": 2,
+              "F": 2,
+              "SYS": 19
+            }
+          },
+          "integration": {
+            "files": 82,
+            "cases": 1387,
+            "byArea": {
+              "B": 28,
+              "C": 6,
+              "D": 14,
+              "E": 7,
+              "F": 13,
+              "SYS": 14
+            }
+          }
+        },
+        "_baseline_note": "1676 是搬迁前基线（113 文件）；1684 = 1676 + 新增 test_manifest_parity.py 的 8 条用例"
+      },
+      "budgets": {
+        "fast": 60,
+        "unit": 120,
+        "all": 600
+      }
+    },
+    "frontend": {
+      "root": "tests/frontend",
+      "runner": "vitest",
+      "config": "frontend/vitest.config.ts",
+      "expected": {
+        "files": 94,
+        "layers": {
+          "fast": 14,
+          "quick": 8,
+          "react": 56,
+          "deep": 16
+        },
+        "cases": {
+          "fast": 94,
+          "quick": 88,
+          "react": 756
+        },
+        "byArea": {
+          "A": 2,
+          "B": 25,
+          "C": 3,
+          "D": 6,
+          "E": 6,
+          "F": 16,
+          "SYS": 32,
+          "shared": 4
+        },
+        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例），fast 88→94"
+      },
+      "budgets": {
+        "fast": 60,
+        "quick": 150,
+        "react": 600,
+        "deep": 600
+      },
+      "baseline": {
+        "_doc": "2026-11-04 搬迁前实测。react 的 cpu 字段 = user+sys，是跨会话可比口径；wall 受并发会话干扰可达 20%。",
+        "react": {
+          "files": 56,
+          "cases": 756,
+          "wall": 133.92,
+          "cpu": 468.1
+        },
+        "fast_quick": {
+          "files": 21,
+          "cases": 176,
+          "wall": 25.74
+        }
+      }
+    },
+    "e2e": {
+      "root": "tests/e2e",
+      "runner": "playwright",
+      "config": "frontend/playwright.config.ts",
+      "expected": {
+        "files": 15,
+        "cases": 62
+      },
+      "budgets": {
+        "full": 300
+      }
+    }
+  },
+  "fixtures": "tests/fixtures"
+}

@@ -9,6 +9,8 @@ export const fastTests = [
   "src/test/fixtures.test.ts",
   // vi.mock 模块标识守卫：纯静态扫描（无 DOM、无网络），放快速档以便每次提交即跑。
   "src/test/mock-specifier.test.ts",
+  // 结构一致性守卫（TESTING-06）：扫盘 + 读 manifest，纯静态，与 mock 守卫同理放快速档。
+  "src/test/manifest-parity.test.ts",
   "tests/stocks/inventory-export.test.ts",
   "tests/stocks/inventory-logic.test.ts",
   "tests/shared/api/*.test.ts",

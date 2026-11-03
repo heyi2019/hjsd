@@ -1,4 +1,4 @@
-承诺编号,层级,负责端,承诺内容,失效后果,验证证据,覆盖状态,历史别名,备注
+﻿承诺编号,层级,负责端,承诺内容,失效后果,验证证据,覆盖状态,历史别名,备注
 MONEY-01,L0,双端,"金额全程 Decimal(18,2)；任何合计不得经 float 中转",分丢失、账对不上，且不可逆,test_money.py;test_money_float_guard.py,已覆盖,,
 MONEY-02,L0,后端,成交总额 total 为 gross，不等于本金+利润之和,利润口径虚高，经营数据失真,test_orders_contract.py,待核,,需确认断言直接校验 gross 语义
 POOL-01,L0,后端,资金池余额 = 池内已审核流水的有符号和；批量端点与单池端点同口径,余额错→超额支付或拒付,test_pool_balances_batch.py,已覆盖,FIN-01,
@@ -48,3 +48,4 @@ TESTING-03,L2,后端,覆盖率门禁只降不升,覆盖率静默下滑无人察�
 ROBUST-01,L2,后端,非法输入必须被明确拒绝，不得 500 或静默吞错,攻击面暴露、故障不可诊断,test_bughunt.py,已覆盖,,
 TESTING-04,L2,双端,测试内 vi.mock 的模块标识必须是 @/ 别名或包名，禁止相对路径；相对路径存量冻结只减不增,测试文件搬家后相对 mock 静默不命中，测试改用真实现仍通过，保护消失且不报警,frontend:src/test/mock-specifier.test.ts,已覆盖,,基线 src/test/mock-specifier-baseline.json，74 条存量已冻结
 TESTING-05,L2,后端,"快速通道（pytest -m ""not db""）内不得出现任何连库用例；db 标记由 v1_engine 夹具依赖派生，自建连接的文件必须显式声明",快通道静默连库：慢、依赖外部服务，极端情况下连错库或污染数据,test_db_channel.py,已覆盖,,"判据来自死端口实验：DATABASE_URL 指向不可达端口后跑 -m ""not db""，曾暴露 test_migration 12 错误 + test_numbering 1 失败"
+TESTING-06,L2,双端,磁盘上的测试文件集合、区域归属与分层归属必须与 tests/manifest.json 一致；任一端少收、多收或归错层即失败,测试文件搬走后扫描仍只认旧目录，用例整批从用例库与报告消失却不报错（已在 workspace 扫描、GROUPS 反查、record 落键三处各发生过一次）,test_manifest_parity.py;frontend:src/test/manifest-parity.test.ts,已覆盖,,manifest 只存「应该收到多少」，不存文件名清单；文件集合永远扫磁盘，避免第二份清单腐烂

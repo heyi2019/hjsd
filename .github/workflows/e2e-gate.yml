@@ -73,6 +73,13 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e
 
+      # E2E 结果翻译进《测试结果库/results.jsonl》，否则报告 E2E 行恒为 0。
+      # 用 always()：E2E 失败时更要把 FAIL 记进去，那正是报告要暴露的东西。
+      - name: Record E2E results → 测试结果库
+        if: always()
+        working-directory: backend
+        run: .venv/bin/python scripts/record_e2e_results.py --json test-results/playwright-report.json
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

@@ -40,10 +40,18 @@ from test_catalog import (  # noqa: E402
     BACKEND_FILE_TO_FUNC,
     CROSS_FLOW_LABEL,
     backend_file_modules,
+    e2e_file_modules,
+    e2e_func_for,
     frontend_func_for,
     frontend_file_modules,
     load_registry,
 )
+
+# Playwright 的结构性调用：命中 `test` + `(` 但本身不是用例（见 scan_ts 说明）。
+E2E_STRUCTURAL = frozenset({
+    "describe", "beforeEach", "afterEach", "beforeAll", "afterAll",
+    "use", "extend", "step", "slow", "fail", "setTimeout",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +96,10 @@ def _read_js_string(src: str, i: int) -> tuple[str | None, int]:
     必须自己走一遍而不是用正则 `[\'"]([^\'"]+)[\'"]`：标题里合法地含引号
     （如 `空路径 '/' 重定向到工作台`、`（不走 '-' 兜底）`）时，正则会从内层引号
     处截断，导致用例库里存的是半截标题、运行时永远对不上。
+
+    模板字符串里的 `${...}` 也必须整体原样保留并跳过：其中可以嵌套反引号
+    （如 `` `走查：${x ? "A" : `${n} 个`}` ``），逐字符扫描会把内层反引号当成
+    本模板的结束符，同样截出半句标题。
     """
     if i >= len(src) or src[i] not in "\"'`":
         return None, i
@@ -101,6 +113,11 @@ def _read_js_string(src: str, i: int) -> tuple[str | None, int]:
             out.append({"n": "\n", "t": "\t", "r": "\r"}.get(nxt, nxt))
             j += 2
             continue
+        if quote == "`" and ch == "$" and j + 1 < len(src) and src[j + 1] == "{":
+            end = _skip_braces(src, j + 1)
+            out.append(src[j:end])
+            j = end
+            continue
         if ch == quote:
             return "".join(out), j + 1
         out.append(ch)
@@ -108,20 +125,19 @@ def _read_js_string(src: str, i: int) -> tuple[str | None, int]:
     return None, i
 
 
-def _skip_balanced(src: str, i: int) -> int:
-    """i 指向 `(`，返回与之配对的 `)` 之后的位置（跳过字符串与括号嵌套）。"""
+def _skip_braces(src: str, i: int) -> int:
+    """i 指向 `{`，返回与之配对的 `}` 之后的位置（跳过字符串与嵌套模板）。"""
     depth = 0
     j = i
     while j < len(src):
         ch = src[j]
         if ch in "\"'`":
-            _val, j = _read_js_string(src, j)
-            if _val is None:
-                j += 1
+            val, j2 = _read_js_string(src, j)
+            j = j2 if val is not None else j + 1
             continue
-        if ch == "(":
+        if ch == "{":
             depth += 1
-        elif ch == ")":
+        elif ch == "}":
             depth -= 1
             if depth == 0:
                 return j + 1
@@ -129,7 +145,40 @@ def _skip_balanced(src: str, i: int) -> int:
     return len(src)
 
 
-def scan_ts(path: str):
+_BRACKET_PAIRS = {"(": ")", "[": "]", "{": "}"}
+
+
+def _skip_balanced(src: str, i: int) -> int:
+    """i 指向 `(`/`[`/`{`，返回与之配对的闭括号之后的位置。
+
+    必须用**栈**同时跟踪三种括号，不能只数目标括号：Playwright 的回调参数常写成
+    解构形式 `async ({ page, request }) => {...}`，只数圆括号会让 `test(` 与解构
+    里的 `)` 提前配对，回调体被截成半句（实测使 E2E 用例的合格标准全部退化为
+    「正常执行不抛异常」，把「提取失败」伪装成「测试薄弱」）。
+    """
+    if i >= len(src) or src[i] not in _BRACKET_PAIRS:
+        return i
+    stack: list[str] = []
+    j = i
+    while j < len(src):
+        ch = src[j]
+        if ch in "\"'`":
+            val, j2 = _read_js_string(src, j)
+            j = j2 if val is not None else j + 1
+            continue
+        if ch in _BRACKET_PAIRS:
+            stack.append(_BRACKET_PAIRS[ch])
+        elif ch in ")]}":
+            if stack and ch == stack[-1]:
+                stack.pop()
+                if not stack:
+                    return j + 1
+            # 不配对的闭括号直接忽略，容忍源码片段不完整
+        j += 1
+    return len(src)
+
+
+def scan_ts(path: str, exclude_methods: frozenset = frozenset()):
     """返回 [(标题, None, 回调体)]。
 
     支持 `it("t")` / `test("t")` / `it.skip("t")` / `it.each([...])("t")`。
@@ -139,10 +188,19 @@ def scan_ts(path: str):
 
     回调体用于提取合格标准（`expect(...)` 断言）。注意 `it.each([...])("标题", cb)`
     有两组括号：`close` 是第一组（参数列表）的结尾，回调体要取**第二组**括号内的内容。
+
+    `exclude_methods`：按链式方法名排除结构性调用。Playwright 惯用
+    `test.describe("分组", () => {...})` / `test.describe.serial(...)`，它们同样
+    命中 `test` + `(` 的模式且第一个参数就是字符串，不排除会被当作用例，
+    凭空多出若干条「用例」（vitest 侧不受影响，故默认不排除）。
     """
     src = open(path, encoding="utf-8").read()
     out: list[tuple[str, None, str]] = []
     for m in TS_TOKEN.finditer(src):
+        if exclude_methods:
+            chain = re.findall(r'\.\s*([A-Za-z_$][\w$]*)', m.group(2) or "")
+            if any(c in exclude_methods for c in chain):
+                continue
         open_paren = m.end() - 1
         close = _skip_balanced(src, open_paren)
         j = open_paren + 1
@@ -207,6 +265,8 @@ def clean_doc(doc: str | None) -> str:
 def extract_method(test_type: str, relpath: str, body: str, func_id: str) -> str:
     if test_type == "UT":
         isolate = "无 DB/纯函数"
+    elif test_type == "E2E":
+        isolate = "真实浏览器(chromium)+真实后端+ephemeral 库(整轮重建)"
     elif relpath.startswith("frontend/"):
         isolate = "组件测试(mount/交互)"
     else:
@@ -217,6 +277,9 @@ def extract_method(test_type: str, relpath: str, body: str, func_id: str) -> str
         if m:
             main_op = fmt(m)
             break
+    if test_type == "E2E" and main_op == "—":
+        # E2E 的主操作是「页面操作」而非函数调用，用规格文件名标识更实在
+        main_op = f"页面端到端操作({os.path.basename(relpath)})"
     if relpath.startswith("frontend/") and main_op == "—":
         comp = os.path.basename(relpath).split(".")[0]
         main_op = f"组件渲染/交互({comp})"
@@ -378,6 +441,9 @@ def extract_priority(test_type: str, relpath: str, fname: str, func_id: str) -> 
 
 
 def extract_precond(relpath: str, body: str) -> str:
+    if relpath.startswith("frontend/e2e/"):
+        return ("vite(5181) + uvicorn(8124) + PG 独立库 heijin_erp_e2e"
+                "（每轮 create_all+TRUNCATE+seed，用完即丢）")
     if relpath.startswith("frontend/"):
         return "组件挂载；mock 网络层(apiMock)；局部渲染"
     items = []
@@ -431,6 +497,20 @@ def main() -> None:
             primary, related = frontend_file_modules(rel)
             for tname, doc, body in scan_ts(full):
                 cases.append(_stage("IT", func, rel, tname, doc, body, fn, primary, related, ""))
+
+    # ---- E2E（Playwright：真实浏览器 + 真实后端 + ephemeral 库）----
+    # 只收 e2e/ 根下的 *.spec.ts；support/ 是夹具不是规格。
+    e2e_dir = os.path.join(FRONTEND, "e2e")
+    if os.path.isdir(e2e_dir):
+        for fn in sorted(os.listdir(e2e_dir)):
+            if not fn.endswith(".spec.ts"):
+                continue
+            full = os.path.join(e2e_dir, fn)
+            rel = f"frontend/e2e/{fn}"
+            func = e2e_func_for(fn)
+            primary, related = e2e_file_modules(fn)
+            for tname, doc, body in scan_ts(full, exclude_methods=E2E_STRUCTURAL):
+                cases.append(_stage("E2E", func, rel, tname, doc, body, fn, primary, related, ""))
 
     # ---- 稳定分配序号 ----
     cases.sort(key=lambda c: (c["功能编号"], c["测试层级"], c["自动化测试文件及函数"], c["测试函数标识"]))

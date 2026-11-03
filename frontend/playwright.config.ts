@@ -37,7 +37,12 @@ export default defineConfig({
   // E2E 涉及真实浏览器状态与 antd 下拉，串行最稳，避免并行互相干扰。
   fullyParallel: false,
   workers: 1,
-  reporter: [["list"]],
+  // 控制台看过程，JSON 供 `backend/scripts/record_e2e_results.py` 翻译进
+  // 《测试结果库/results.jsonl》——否则 E2E 跑完只在终端留痕，报告里永远显示 0 条。
+  reporter: [
+    ["list"],
+    ["json", { outputFile: "test-results/playwright-report.json" }],
+  ],
   use: {
     baseURL: E2E_FRONTEND_BASE,
     headless: true,

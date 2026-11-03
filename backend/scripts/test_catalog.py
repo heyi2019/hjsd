@@ -144,6 +144,49 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
+# E2E 规格文件 -> 功能编号
+#
+# 为什么单列一张表而不复用 `frontend_func_for()`：那张表按**源码路径片段**归类
+# （`/orders/` -> B01），而 e2e/ 下的文件名表达的是**验证意图**（`visual.spec.ts`
+# 验界面几何、`auth-login.spec.ts` 验认证），两者维度不同，硬塞会全部落到兜底
+# SYS12「测试用例库与执行记录」，让报告里的 E2E 分布失去意义。
+#
+# 归类口径（与《测试编号设计规范》一致：按「被测功能」而非「用了什么手段」）：
+#   - 外壳/界面契约类（冒烟、导航叶子、降级不白屏、弹窗对齐、视觉回归、真实接口渲染）
+#     统一落 SYS07 —— 这些验证的是前端与 API 的对外契约，不绑定某个业务模块。
+#   - 业务写路径按主业务功能归：建单->B01、售出->B06、资金流水->D02。
+#   - 认证/角色按 SYS01。
+# 未登记的文件落 SYS12，并在生成期可见（不会静默串号）。
+# ---------------------------------------------------------------------------
+E2E_FILE_TO_FUNC: dict[str, str] = {
+    "auth-login.spec.ts": "SYS01",            # 真后端账号密码登录、JWT、越权 401
+    "role-switch.spec.ts": "SYS01",           # DEV 态角色切换与导航权限门
+    "business-write.spec.ts": "B01",          # 五类业务写入主路径（跨模块，见下）
+    "order-abandon-confirm.spec.ts": "B01",   # 建单弹窗「放弃未保存」确认框收尾回归
+    "upgrade-integration.spec.ts": "B06",     # 页面售出/退款/分润比例
+    "finance-write-ui.spec.ts": "D02",        # 资金流水/划转/返点/分期 UI 写路径
+    "inventory-rebate-nest.spec.ts": "D02",   # 返点弹窗内层编辑弹窗（Modal 嵌套 / Esc 路由）
+    "other-integration.spec.ts": "D02",       # 划转派生流水、对账核销
+    "crud.spec.ts": "SYS07",                  # 真实后端 CRUD 闭环
+    "integration.spec.ts": "SYS07",           # 真实接口 -> 页面渲染
+    "smoke.spec.ts": "SYS07",                 # 外壳挂载与一级导航可达
+    "navigation-leaves.spec.ts": "SYS07",     # 二级 Tab 叶子逐个走查
+    "fallback.spec.ts": "SYS07",              # 后端不可达时外壳降级不白屏
+    "modal-footer.spec.ts": "SYS07",          # 业务弹窗按钮几何对齐
+    "visual.spec.ts": "SYS07",                # 响应式/可视区域/弹窗缩放回归
+}
+
+# E2E 的跨模块文件：一个 spec 覆盖多个业务模块时登记，仅影响「关联模块」列。
+E2E_CROSS_MODULE: dict[str, set[str]] = {
+    # 五类业务写入 + 资金闭环 + 质量中心 + 需求池 + 通知/搜索 + 报表导出 + 审计 + 数据范围
+    "business-write.spec.ts": {"B", "C", "D", "E", "SYS"},
+    "finance-write-ui.spec.ts": {"B", "D"},   # 分期收款同时动订单与资金
+    "upgrade-integration.spec.ts": {"B", "D"},
+    "inventory-rebate-nest.spec.ts": {"B", "D"},  # 库存页上的返点登记
+}
+
+
+# ---------------------------------------------------------------------------
 # 跨模块流程文件：显式登记其跨模块归属（可多模块）
 # FLOW-001 客户↔订单(C→B)、FLOW-002 订单↔资金(B→D)、FLOW-003 订单↔经营(B→E)、
 # FLOW-004 资金↔经营(D→E)、FLOW-005 配置↔业务(F→B)、FLOW-006 认证↔全模块(SYS→A-F)
@@ -240,6 +283,19 @@ def frontend_file_modules(relpath: str) -> tuple[str, set[str]]:
     func = frontend_func_for(relpath)
     primary = module_of_func(func)
     return primary, {primary}
+
+
+def e2e_func_for(fname: str) -> str:
+    """E2E 规格文件名 -> 功能编号（未登记落 SYS12，生成期可见）。"""
+    return E2E_FILE_TO_FUNC.get(fname, "SYS12")
+
+
+def e2e_file_modules(fname: str) -> tuple[str, set[str]]:
+    """E2E 规格文件 -> (主模块, 关联模块集合)。"""
+    func = e2e_func_for(fname)
+    primary = module_of_func(func)
+    related = {primary} | E2E_CROSS_MODULE.get(fname, set())
+    return primary, related
 
 
 # ---------------------------------------------------------------------------

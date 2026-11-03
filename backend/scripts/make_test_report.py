@@ -265,6 +265,9 @@ def main() -> None:
     L.append("---")
     L.append("> 用例定义见《测试用例库.csv》；每次执行明细见《测试结果库/results.jsonl》（按 run_id 可查历史，不覆盖）。")
     L.append("> 关联规则见《测试编号设计规范》《模块与跨模块测试集规范》。")
+    L.append("> **计数口径**：本报告的「定义用例」是用例库条目数（源码里的 test 定义）。")
+    L.append("> 循环/参数化标题（前端 `it.each` 的 `%s`、E2E 标题里的 `${x}` 模板）在库里记**一条**，")
+    L.append("> 运行时展开的多个变体按模板归并回同一条，故实跑例数多于定义数（如 E2E 定义 51 条、实跑 60 例）。")
 
     with open(OUT_MD, "w", encoding="utf-8") as f:
         f.write("\n".join(L))

@@ -70,7 +70,14 @@ do_wal() {
   archived=${stat%%/*}
   failed=$(echo "${stat}" | cut -d/ -f2)
 
-  newest=$(find "${WAL_DIR}" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
+  # 取最新段用 `ls -1t | sed -n '1p'`，**不能**用 `| head -1`：在 `set -o pipefail`
+  # 下，head 读一行即关闭管道，上游 ls 收到 SIGPIPE（141）让整个赋值返回非零，
+  # set -e 随即**静默**退出——而所有 echo 都在这一行之后，于是日志一行不写。
+  # 2026-11-04 实测：归档段累积到 407 个（路径约 18 KB，超过 macOS 管道缓冲区
+  # 16 KB）后必然触发，表现是「脚本返回 1 但零输出」，极易被误判成「cron 没跑」。
+  # sed -n '1p' 会读完整输入不提前退出，不会产生 SIGPIPE。
+  newest=$(ls -1t "${WAL_DIR}" 2>/dev/null | sed -n '1p')
+  [ -n "${newest}" ] && newest="${WAL_DIR}/${newest}"
   echo "归档 : 本机 ${after} 段 / ${bytes}"
   echo "归档器: 成功/失败/最近段 = ${stat}"
   [ -n "${newest}" ] && echo "最新 : $(basename "${newest}") @ $(stat -f '%Sm' -t '%F %T' "${newest}")"

@@ -10,7 +10,7 @@ jobs:
   coverage:
     # 与 Dockerfile 保持一致：python:3.12-slim（pandas/numpy 预编译 wheel 最稳）
     runs-on: ubuntu-latest
-    # SQLite 通道已下线，测试夹具（backend/tests/v1/conftest.py）强制要求
+    # SQLite 通道已下线，测试夹具（tests/backend/conftest.py）强制要求
     # PostgreSQL 且库名必须含 test，否则在 collect 期直接 exit。
     services:
       postgres:

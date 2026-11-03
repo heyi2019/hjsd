@@ -22,7 +22,43 @@ import re
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # /Users/aries/黑金时代
 BACKEND = os.path.join(REPO, "backend")
 FRONTEND = os.path.join(REPO, "frontend")
+# 前端测试有两个根：组件测试与被测组件同层（frontend/src/…），纯逻辑测试在仓库根
+# tests/frontend/…（2026-11-04 迁出，见 tests/frontend/README.md 准入标准）。
+# 键一律以仓库根为基准，故前缀有两种，判「是不是前端用例」必须用 is_frontend_test()，
+# 不能写 startswith("frontend/")——那样迁出去的文件会静默落回后端/未分类分支。
+# 前端测试有**两个目录**，但键统一以仓库根为基准，都带 `frontend/` 前缀：
+#   frontend/src/…    组件测试（与被测组件同层）
+#   frontend/tests/…  纯逻辑测试（2026-11-04 迁出，见 tests/README.md「两个根」）
+# 放在 frontend 包内而不是仓库根 tests/ 下是实测结论：仓库根没有 node_modules，
+# vitest 会先被 Vite 的 fs 白名单拦（/@fs/... Cannot find module），放开白名单后
+# bare 依赖（axios 等）仍解析不到——包外测试在 Vite/npm 解析模型里没有立足点。
+FRONTEND_TEST_DIRS = (os.path.join(FRONTEND, "src"), os.path.join(FRONTEND, "tests"))
 REGISTRY = os.path.join(REPO, "docs/testing", "功能编号注册表.csv")
+
+
+def is_frontend_test(relpath: str) -> bool:
+    """该路径是否为前端 vitest 用例（仓库根基准的相对路径）。"""
+    return relpath.replace("\\", "/").startswith("frontend/")
+
+
+def frontend_test_files() -> list[str]:
+    """全部前端 vitest 文件的仓库根相对路径（两个根合并、已排序）。
+
+    只扫 `src/` 与 `tests/` 两个目录，**不扫 `frontend/` 整树**：后者会带进 node_modules，
+    也会把 `frontend/e2e/*.spec.ts`（Playwright，另一套编号）算成 vitest 用例。
+    """
+    out: list[str] = []
+    for base in FRONTEND_TEST_DIRS:
+        if not os.path.isdir(base):
+            continue
+        prefix = "frontend/" + os.path.relpath(base, FRONTEND).replace(os.sep, "/") + "/"
+        for root, _dirs, files in os.walk(base):
+            for fn in files:
+                if not fn.endswith((".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")):
+                    continue
+                rel = os.path.relpath(os.path.join(root, fn), base).replace(os.sep, "/")
+                out.append(prefix + rel)
+    return sorted(out)
 RUN_REG = os.path.join(BACKEND, "run_regression.py")
 
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
@@ -352,17 +388,12 @@ def module_type_files(module: str, ttype: str) -> list[str]:
 
 
 def frontend_module_files(module: str) -> list[str]:
-    """某模块的前端测试文件（相对仓库根 frontend/...）。"""
+    """某模块的前端测试文件（相对仓库根的 frontend/src/… 或 tests/frontend/…）。"""
     out = []
-    src = os.path.join(FRONTEND, "src")
-    for root, _dirs, files in os.walk(src):
-        for fn in files:
-            if not fn.endswith((".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")):
-                continue
-            rel = "frontend/" + os.path.relpath(os.path.join(root, fn), FRONTEND)
-            prim, _ = frontend_file_modules(rel)
-            if prim == module:
-                out.append(rel)
+    for rel in frontend_test_files():
+        prim, _ = frontend_file_modules(rel)
+        if prim == module:
+            out.append(rel)
     return sorted(out)
 
 

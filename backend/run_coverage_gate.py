@@ -11,7 +11,7 @@ fail_under 是全局单阈值，无法表达按业务域保存基线、只拦截
 故解析 `coverage json` 按包聚合后逐包与版本化基线比较。
 
 用法：
-    python3 run_coverage_gate.py            # 跑全量 tests/v1 + 校验闸门（CI/收口用）
+    python3 run_coverage_gate.py            # 跑全量 tests/backend + 校验闸门（CI/收口用）
     python3 run_coverage_gate.py --report   # 只打印当前覆盖率，不失败（本地巡检用）
 
 与既有纪律一致：
@@ -41,7 +41,7 @@ DOMAINS = (
     "app/finance",
 )
 
-FULL_SUITE = ["tests/v1"]
+FULL_SUITE = ["../tests/backend"]
 COV_JSON = BACKEND / "coverage.json"
 BASELINE_JSON = BACKEND / "coverage_baseline.json"
 
@@ -66,7 +66,7 @@ def load_gates() -> dict[str, int]:
 def _run(cmd: list[str]) -> None:
     print("+ " + " ".join(cmd), flush=True)
     # 不注入 DATABASE_URL：测试夹具强制要求 PostgreSQL 且库名必须含 test
-    # （见 tests/v1/conftest.py::_test_database_url），注入 SQLite 会让整套测试
+    # （见 tests/backend/conftest.py::_test_database_url），注入 SQLite 会让整套测试
     # 在 collect 期直接 exit。库地址由 .env（本地）或 CI 环境变量指定。
     subprocess.run(cmd, cwd=BACKEND, env=os.environ.copy(), check=True)
 

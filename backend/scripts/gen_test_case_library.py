@@ -5,8 +5,8 @@
 扫描后端 pytest + 前端 vitest 测试文件，自动生成：
   - docs/testing/测试用例库.csv   （12 核心字段 + 测试名称/功能名称/关联旧编号/流程编号/备注）
   - docs/testing/测试用例库.md    （按功能编号分组的可读视图）
-  - tests/v1/_report/case_index.json   （nodeid -> 测试用例编号，供执行记录器关联）
-  - tests/v1/_report/case_number_map.json（持久化序号，保证编号稳定不漂移）
+  - tests/backend/_report/case_index.json   （nodeid -> 测试用例编号，供执行记录器关联）
+  - tests/backend/_report/case_number_map.json（持久化序号，保证编号稳定不漂移）
 
 编号规则：<类型>-<功能编号>-<三位序号>，类型=UT/IT/E2E，功能编号见 功能编号注册表.csv。
 类型判定：后端落在 run_regression.py 的 unit 组 -> UT，其余 -> IT；前端 vitest -> IT。
@@ -30,7 +30,7 @@ FRONTEND = os.path.join(REPO, "frontend")
 REGISTRY = os.path.join(REPO, "docs/testing", "功能编号注册表.csv")
 OUT_CSV = os.path.join(REPO, "docs/testing", "测试用例库.csv")
 OUT_MD = os.path.join(REPO, "docs/testing", "测试用例库.md")
-REPORT_DIR = os.path.join(BACKEND, "tests", "v1", "_report")
+REPORT_DIR = os.path.join(REPO, "tests", "backend", "_report")
 CASE_MAP = os.path.join(REPORT_DIR, "case_number_map.json")
 CASE_INDEX = os.path.join(REPORT_DIR, "case_index.json")
 
@@ -44,6 +44,8 @@ from test_catalog import (  # noqa: E402
     e2e_func_for,
     frontend_func_for,
     frontend_file_modules,
+    frontend_test_files,
+    is_frontend_test,
     load_registry,
 )
 
@@ -267,7 +269,7 @@ def extract_method(test_type: str, relpath: str, body: str, func_id: str) -> str
         isolate = "无 DB/纯函数"
     elif test_type == "E2E":
         isolate = "真实浏览器(chromium)+真实后端+ephemeral 库(整轮重建)"
-    elif relpath.startswith("frontend/"):
+    elif is_frontend_test(relpath):
         isolate = "组件测试(mount/交互)"
     else:
         isolate = "真实 PG 隔离库(TRUNCATE 单事务)"
@@ -280,7 +282,7 @@ def extract_method(test_type: str, relpath: str, body: str, func_id: str) -> str
     if test_type == "E2E" and main_op == "—":
         # E2E 的主操作是「页面操作」而非函数调用，用规格文件名标识更实在
         main_op = f"页面端到端操作({os.path.basename(relpath)})"
-    if relpath.startswith("frontend/") and main_op == "—":
+    if is_frontend_test(relpath) and main_op == "—":
         comp = os.path.basename(relpath).split(".")[0]
         main_op = f"组件渲染/交互({comp})"
     return f"{test_type}：{relpath}::{func_id}；{isolate}；主操作={main_op}"
@@ -444,7 +446,7 @@ def extract_precond(relpath: str, body: str) -> str:
     if relpath.startswith("frontend/e2e/"):
         return ("vite(5181) + uvicorn(8124) + PG 独立库 heijin_erp_e2e"
                 "（每轮 create_all+TRUNCATE+seed，用完即丢）")
-    if relpath.startswith("frontend/"):
+    if is_frontend_test(relpath):
         return "组件挂载；mock 网络层(apiMock)；局部渲染"
     items = []
     if "seeded_db" in body:
@@ -473,30 +475,28 @@ def main() -> None:
     index: dict[str, str] = {}
 
     # ---- 后端 ----
-    be_files = sorted(f for f in os.listdir(os.path.join(BACKEND, "tests", "v1"))
+    be_files = sorted(f for f in os.listdir(os.path.join(REPO, "tests", "backend"))
                       if f.startswith("test_") and f.endswith(".py"))
     for fname in be_files:
         func = BACKEND_FILE_TO_FUNC.get(fname, "SYS12")
-        rel = f"backend/tests/v1/{fname}"
+        rel = f"tests/backend/{fname}"
         primary, related = backend_file_modules(fname)
         is_unit = fname in _unit_files()
         ttype = "UT" if is_unit else "IT"
         flow = CROSS_FLOW_LABEL.get(fname, "")
-        for tname, doc, body in scan_py(os.path.join(BACKEND, "tests", "v1", fname)):
+        for tname, doc, body in scan_py(os.path.join(REPO, "tests", "backend", fname)):
             cases.append(_stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow))
 
     # ---- 前端 ----
-    for root, _dirs, files in os.walk(os.path.join(FRONTEND, "src")):
-        for fn in files:
-            if not (fn.endswith(".test.ts") or fn.endswith(".test.tsx")
-                    or fn.endswith(".spec.ts") or fn.endswith(".spec.tsx")):
-                continue
-            full = os.path.join(root, fn)
-            rel = "frontend/" + os.path.relpath(full, FRONTEND)
-            func = frontend_func_for(rel)
-            primary, related = frontend_file_modules(rel)
-            for tname, doc, body in scan_ts(full):
-                cases.append(_stage("IT", func, rel, tname, doc, body, fn, primary, related, ""))
+    # 两个目录：组件测试在 frontend/src/，纯逻辑测试在 frontend/tests/（2026-11-04 迁出）。
+    # 只扫前者会让 15 个文件的用例从库里整批消失，且报告显示「未执行」而不是报错。
+    for rel in frontend_test_files():
+        full = os.path.join(REPO, rel)
+        fn = os.path.basename(rel)
+        func = frontend_func_for(rel)
+        primary, related = frontend_file_modules(rel)
+        for tname, doc, body in scan_ts(full):
+            cases.append(_stage("IT", func, rel, tname, doc, body, fn, primary, related, ""))
 
     # ---- E2E（Playwright：真实浏览器 + 真实后端 + ephemeral 库）----
     # 只收 e2e/ 根下的 *.spec.ts；support/ 是夹具不是规格。
@@ -548,9 +548,9 @@ def main() -> None:
         case_no = f"{c['测试层级']}-{c['功能编号']}-{n:03d}"
         c["测试编号"] = case_no
         rel = c["自动化测试文件及函数"]
-        # nodeid 必须与 pytest 真实 nodeid 逐字一致：backend/ 前缀对仓库可见，测试内不是。
-        pytest_path = rel[len("backend/"):] if rel.startswith("backend/") else rel
-        nodeid = f"{pytest_path}::{c['测试函数标识']}"
+        # nodeid 必须与 pytest 真实 nodeid 逐字一致。rootdir 是仓库根（pytest.ini 在根），
+        # pytest 归一化后即 tests/backend/<file>.py::<func>，与 rel 完全同形。
+        nodeid = f"{rel}::{c['测试函数标识']}"
         index[nodeid] = case_no
 
     # 编号与 nodeid 都必须唯一：重复即编号体系已失效（报告会漏行、执行记录会错挂），
@@ -612,7 +612,7 @@ def _unit_files() -> set:
 
 
 def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) -> dict:
-    is_fe = rel.startswith("frontend/")
+    is_fe = is_frontend_test(rel)
     expected, criteria = extract_criteria(doc, body, frontend=is_fe)
     # 测试方法/前置条件/输入数据沿用原口径（前端历来只扫标题、不扫回调体）。
     # 本次只为补「合格标准」，不顺带改写前端这 3 个字段的既有取值。

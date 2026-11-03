@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CASE_CSV = os.path.join(REPO, "docs", "testing", "测试用例库.csv")
 RESULTS = os.path.join(REPO, "docs", "testing", "测试结果库", "results.jsonl")
-CASE_INDEX = os.path.join(REPO, "backend", "tests", "v1", "_report", "case_index.json")
+CASE_INDEX = os.path.join(REPO, "tests", "backend", "_report", "case_index.json")
 OUT_MD = os.path.join(REPO, "docs", "testing", "测试报告.md")
 OUT_JSON = os.path.join(REPO, "docs", "testing", "测试报告.json")
 

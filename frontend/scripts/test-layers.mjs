@@ -2,12 +2,17 @@
  *  避免两处各写一份清单后漂移（2026-10-27 实锤：脚本硬编码清单落后 44 个新文件，
  *  「未分片」守卫直接 exit 1，test:full 长期不可用，大家被迫退回 404s 串行全量）。 */
 
+// 纯逻辑测试已于 2026-11-04 迁到 `frontend/tests/`（与组件解耦，见 tests/README.md「两个根」）。
+// 路径以 **frontend/ 为基准**，与 vitest include、test-full-sharded 的收集前缀同一基准；
+// 漏改任一处，文件会「既不在 fast 也不在 react」= 静默不跑。
 export const fastTests = [
   "src/test/fixtures.test.ts",
-  "src/stocks/inventory-export.test.ts",
-  "src/stocks/inventory-logic.test.ts",
-  "src/shared/api/*.test.ts",
-  "src/shared/lib/*.test.ts",
+  // vi.mock 模块标识守卫：纯静态扫描（无 DOM、无网络），放快速档以便每次提交即跑。
+  "src/test/mock-specifier.test.ts",
+  "tests/stocks/inventory-export.test.ts",
+  "tests/stocks/inventory-logic.test.ts",
+  "tests/shared/api/*.test.ts",
+  "tests/shared/lib/*.test.ts",
   "src/vite.config.test.ts",
 ];
 

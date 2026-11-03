@@ -1,5 +1,10 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+
+// 与 vitest.config.ts 保持同一套别名定义。两处分叉会让「测试能解析、构建不能」
+// 或反之，且症状是运行期才暴露。
+const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -12,6 +17,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    resolve: {
+      alias: { "@": here("./src") },
+    },
     // 页面从局域网地址打开时，浏览器会将直连 127.0.0.1 视为跨网络请求。
     // 开发时统一走同源路径，由 Vite 在本机转发到后端，避免 CORS/PNA 拦截。
     server: {

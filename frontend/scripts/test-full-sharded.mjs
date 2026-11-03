@@ -11,7 +11,7 @@
  *    --all         ：fast + quick + 常规 react + react-deep   —— 发版前完整回归
  *  react / react-deep 的项目归属与 deep 剥离口径在 vitest.config.ts（react.exclude + react-deep
  *  项目）单一事实源，本脚本只按 --project 触发，不另写文件清单。 */
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { spawn } from "node:child_process";
@@ -30,7 +30,7 @@ const CONCURRENCY = 1;
 const testFilePattern = /\.(test|spec)\.(ts|tsx)$/;
 const DEEP_PATTERN = /\.deep\.test\.(ts|tsx)$/;
 
-const collectTestFiles = (directory, prefix = "src") => readdirSync(directory, { withFileTypes: true })
+const collectTestFiles = (directory, prefix) => readdirSync(directory, { withFileTypes: true })
   .flatMap((entry) => {
     const absolute = join(directory, entry.name);
     const relative = `${prefix}/${entry.name}`;
@@ -38,7 +38,19 @@ const collectTestFiles = (directory, prefix = "src") => readdirSync(directory, {
     return testFilePattern.test(entry.name) ? [relative] : [];
   });
 
-const allTestFiles = collectTestFiles(join(process.cwd(), "src")).sort();
+// 两个测试根：组件测试留在 src/ 旁，纯逻辑测试在 frontend/tests/（见 tests/README.md「两个根」）。
+// 前缀必须是「相对 frontend/ 的路径」，与 test-layers.mjs 的 glob、vitest include 同一基准。
+// 只扫 src/ 的后果不是报错，而是这批文件「既不在 fast 也不在 react」——分层统计永远自洽，
+// 但它们再也不会被 test:full 跑到。
+const TEST_ROOTS = [
+  { directory: join(process.cwd(), "src"), prefix: "src" },
+  { directory: join(process.cwd(), "tests"), prefix: "tests" },
+];
+
+const allTestFiles = TEST_ROOTS
+  .filter(({ directory }) => existsSync(directory))
+  .flatMap(({ directory, prefix }) => collectTestFiles(directory, prefix))
+  .sort();
 const fastFiles = allTestFiles.filter((file) => matchesAny(file, fastTests));
 const quickFiles = allTestFiles.filter((file) => matchesAny(file, quickTests));
 // 常规 react 层 = 既不在 fast/quick、也不是 .deep 重型用例。
@@ -54,6 +66,11 @@ if (allTestFiles.length === 0) {
 }
 if (fastFiles.length === 0 || quickFiles.length === 0) {
   console.error(`分层清单与实际文件不匹配：fast=${fastFiles.length}，quick=${quickFiles.length}，请核对 scripts/test-layers.mjs 与 vitest.config.ts`);
+  process.exit(1);
+}
+// 目录在、却一条没收到 = include/前缀对不上（比如此前只会静默漏跑）。
+if (existsSync(TEST_ROOTS[1].directory) && !allTestFiles.some((file) => file.startsWith("tests/"))) {
+  console.error("frontend/tests 存在但未收集到任何用例：核对 test-layers.mjs 的 tests/ 前缀");
   process.exit(1);
 }
 

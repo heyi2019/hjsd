@@ -4,7 +4,7 @@
 
 | 版本 | 日期 | 变更摘要 |
 |---|---|---|
-| v1.1 | 2026-11-01 | 领域包改为实测结构（分期域为 value_added_services、人员与团队路由在 auth）；accounts 域→stocks；分期合约三类；迁移活动链改为 squashed_versions；旧版 ERP_架构设计_v1.0.md 归档于 `docs/archive/` |
+| v1.1 | 2026-11-01 | 领域包改为实测结构（分期域为 value_added_services、人员与团队路由在 auth）；accounts 域→stocks；分期合约三类；迁移活动链改为 squashed_versions；旧版 ERP_架构设计_v1.0_已作废.md 归档于 `docs/archive/` |
 
 
 > **权威来源**：[PRD v1.3](ERP_PRD_v1.3_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
@@ -64,7 +64,7 @@ frontend/src/
 - 基础设施：`core/`（settings / database / money / errors / security / audit / numbering / state_machine）、`domain/`（全部 ORM 与枚举）
 - 领域包：`foundation`、`parties`、`orders`（含 `form_fields_router`）、`stocks`、`value_added_services`、`finance`、`reporting`、`policy`、`quality`、`notifications`、`imports`、`audit`、`auth`（含 `admin_router` / `teams_router`）、`attachments`、`options`、`lists`、`search`
 - 两个易误记的命名：**分期域包名是 `value_added_services`**，路由前缀仍为 `/installments`，不存在 `app/installments/`；**人员与团队没有独立包**，路由挂在 `auth` 包内
-- 测试在 `backend/tests/v1`（单一目录，不存在 `tests/api|domain|services` 分层）；迁移**活动链**在 `backend/alembic/squashed_versions`（`0001` → `0003`，唯一 head `0003`），`backend/alembic/versions` 的 74 个文件仅作历史追溯、不被 alembic 加载
+- 测试在 `tests/backend`（单一目录，不存在 `tests/api|domain|services` 分层）；迁移**活动链**在 `backend/alembic/squashed_versions`（`0001` → `0003`，唯一 head `0003`），`backend/alembic/versions` 的 74 个文件仅作历史追溯、不被 alembic 加载
 - 早期过渡实现 `models_new` / `services_new` 已全部迁入领域包并删除；不复制参考工程的业务模型、权限、多组织或外部集成代码
 
 ## 核心关系

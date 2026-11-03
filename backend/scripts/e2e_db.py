@@ -9,7 +9,7 @@
 注意「重置只发生在跑前，不在跑后」：库 heijin_erp_e2e 一直存在，跑完的数据原样留着。
 
 
-设计对齐 `tests/v1/conftest.py` 的 `v1_engine` 夹具：
+设计对齐 `tests/backend/conftest.py` 的 `v1_engine` 夹具：
   - `Base.metadata.create_all` 幂等建表（对齐压平后的 0001 基线，不跑 alembic）；
   - `TRUNCATE 全 ORM 表 RESTART IDENTITY CASCADE`（仅 `--reset` 时）清空上一轮数据；
   - `seed_foundation` + 默认用户（id 1..9）重播基础种子。

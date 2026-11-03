@@ -51,10 +51,11 @@
 | `testing/测试报告.md`、`testing/测试报告.json` | 最近执行批次报告，含历史批次计数 | **禁手改**（脚本生成） |
 | `testing/测试结果库/results.jsonl` | 逐次执行结果流水 | **禁手改**（脚本生成） |
 | `testing/功能代码测试映射表.csv` | 旧 `BIZ-xxx` 编号 → 功能 / 代码 / 测试的映射 | 历史映射，编号已被注册表取代 |
+| `testing/承诺清单.csv` | **承诺清单**：L0-L3 分级、负责端、失效后果、验证证据（11-04 建立，测试文件头声明的权威源） | 维护 |
 
 上表除 `testing/功能编号注册表.csv` 与 `testing/功能代码测试映射表.csv` 外均由脚本生成，**跑完测试若产生 diff 应随该次改动一并提交**（它们是「当前测了什么」的快照）。
 
-另有两份 nodeid ↔ 测试编号的映射索引**不入库**：`backend/tests/v1/_report/case_index.json`、`backend/tests/v1/_report/case_number_map.json`。原因：每次执行都整份重写（约 584KB），入库只剩无意义 diff；CI 的 `backend-gate.yml` 在跑测试前已先执行 `scripts/gen_test_case_library.py` 重建，本地同理。`conftest.py` 读不到时返回空映射（编号列缺省），不会让测试失败。
+另有两份 nodeid ↔ 测试编号的映射索引**不入库**：`tests/backend/_report/case_index.json`、`tests/backend/_report/case_number_map.json`。原因：每次执行都整份重写（约 584KB），入库只剩无意义 diff；CI 的 `backend-gate.yml` 在跑测试前已先执行 `scripts/gen_test_case_library.py` 重建，本地同理。`conftest.py` 读不到时返回空映射（编号列缺省），不会让测试失败。
 
 ### 3.3 治理留痕（时点性，不随代码更新）
 
@@ -94,11 +95,13 @@
 | 目录 / 文件 | 内容 |
 |---|---|
 | `黑金时代_代码体检报告_V1.0.md` | 代码体检报告（时点性，11-01 产出，不入事实链） |
-| `ux-audit/` | UX 自动化审计结果（`ux-audit/result.json`、`ux-audit/result-before-scriptfix.json`）与截图 `ux-audit/shots/` |
-| `h5_audit_20261028/` | H5 移动端适配截图证据，对应 `archive/ERP_H5移动端适配审计报告_V1.0_20261028.md` |
+| `archive/ux-audit/` | UX 审计证据：`archive/ux-audit/result.json`、`archive/ux-audit/result-before-scriptfix.json` 与截图 `archive/ux-audit/shots/`；对应报告 `archive/ERP_UX测试报告_V1.0_20261021_已作废.md`、`archive/ERP_UX测试报告_V2.0_20261026_已作废.md` |
+| `archive/h5_audit_20261028/` | H5 移动端适配截图证据；对应报告 `archive/ERP_H5移动端适配审计报告_V1.0_20261028_已作废.md`，报告内以相对路径引用本目录下的截图（6 处，均已验证可定位） |
 | `archive/studio_ledger_20261102/` | 工作室台账界面调整的 6 张截图 + 1 个对照 HTML（原 `artifacts/`，11-04 归位） |
 
-本类目录只存**证据**（截图、原始 JSON），结论文字在对应报告里；证据不入正文。
+本类只存**证据**（截图、原始 JSON），结论文字在对应报告里；证据不入正文。
+
+**证据必须与它支撑的报告同层存放。** 报告已归档的，证据也要进 `archive/` —— 否则报告里的相对路径会指向不存在的目录。11-04 实测：H5 审计报告有 6 处指向 `h5_audit_20261028/` 下截图的相对引用，截图留在 `docs/` 顶层时这 6 处全部落空；`git mv` 进 `archive/` 后逐一验证全部接通。UX 审计同批处理（29 个文件），原先也是「报告在 archive、证据在正位」。
 
 ## 六、已冻结（保留编号引用价值，不再修订）
 
@@ -108,7 +111,7 @@
 
 ## 七、归档（`archive/`，历史参考）
 
-`archive/` 内含：旧版 PRD（v1.0 / v1.1）、旧版数据字典（v1.0）、旧版权限矩阵与状态机（v1.0）、各时点测试与审计报告（10-13 ~ 10-28）、性能与联调报告、迁移报告、验收用例、数据导入映射草案、数据库表结构核查报告。这些文件记录"当时测得什么"，不描述"现在是什么"。
+`archive/` 内含：旧版 PRD（v1.0 / v1.1）、旧版数据字典（v1.0）、旧版权限矩阵与状态机（v1.0）、各时点测试与审计报告（10-13 ~ 10-28）**及其证据目录**（`archive/ux-audit/`、`archive/h5_audit_20261028/`、`archive/studio_ledger_20261102/`）、性能与联调报告、迁移报告、验收用例、数据导入映射草案、数据库表结构核查报告。这些文件记录"当时测得什么"，不描述"现在是什么"。
 
 **2026-11-01 升版归档（8 份）**：PRD `v1.2`、API 规范 `v1.1`、架构设计 `v1.0`、DDL 与迁移方案 `v1.0`、数据库建设实施方案 `v1.0`、本地开发与联调指南 `v1.0`、UI 设计规范 `v1.0`、业务裁决台账 `v1.0`。本轮为「定向修订转正」，新版已按代码实测校正后原位升级，旧版快照取自修订前提交 `7006e41`。
 
@@ -128,11 +131,13 @@
 |---|---|
 | `backend/ARCHITECTURE.md` | 后端按领域拆分的目录架构速查 |
 | `deploy/README_阿里云部署.md` | 阿里云 ECS 部署、发布状态、回退与取数流程 |
-| `tests/README.md` | 测试文件与执行入口索引（测试资产的另一入口） |
+| `tests/README.md` | 测试文件与执行入口索引：目录结构、三根轴、新增测试四步、`db` 标记派生的快/慢通道 |
 | `tests/manifests/测试资产映射_20261101.md` | 测试文件 ↔ 执行入口 |
 | `tests/manifests/前端用例自动化映射_20261101.md` | `FE-xxx` → Vitest / Playwright 文件 |
 | `tests/results/前端快速回归基线_20261101.md` | 前端快速回归耗时基线 |
 | `tests/fixtures/README.md` | v1 验收种子数据（假数据）的使用约束 |
+| `frontend/tests/README.md` | 前端纯逻辑测试的准入标准、为何放在包内（仓库根会撞 fs 白名单与 bare 依赖解析） |
+| `tests/e2e/README.md` | E2E 职责边界、独立库约束、快照目录迁移陷阱 |
 | `security/PII_处置口径_V1.0.md` | PII 处置口径，`lint-gate.yml` 注释引用 |
 | `outputs/README.md` | **数据导入与迁移脚本索引**：49 个一次性脚本的分类、用途与破坏性标记（11-04 建立） |
 | `outputs/wps_import/导入对账报告_20261101.md` | WPS 订单导入对账 |

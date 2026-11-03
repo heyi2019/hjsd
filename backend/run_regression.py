@@ -33,10 +33,17 @@ from test_catalog import (  # noqa: E402
 )
 
 # pyflakes 扫描范围：业务代码 + 测试 + 迁移 + 脚本（与历史「pyflakes 干净」口径一致）
-LINT_TARGETS = ["app", "tests/v1", "alembic/versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
+LINT_TARGETS = ["app", "../tests/backend", "alembic/versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
 # 基线只记「文件 + 消息」，不含行列号——行号漂移不应判定为新增告警
 LINT_BASELINE = ROOT / "lint_baseline.txt"
 LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
+
+
+def _pytest_arg(path: str) -> str:
+    """GROUPS 里存仓库相对路径（与 git status 同形），pytest 以 backend 为 cwd 运行，
+    故补 ../ 前缀。nodeid 不受影响：rootdir 是仓库根（pytest.ini 在根），
+    归一化后仍是 tests/backend/<file>.py::<func>。"""
+    return path if path.startswith("../") else f"../{path}"
 
 
 def run_frontend_files(relpaths: list[str]) -> int:
@@ -122,165 +129,189 @@ CROSSCUT_GROUPS = {"smoke", "p0", "unit"}
 
 GROUPS = {
     "smoke": [
-        "tests/v1/test_main_contract.py",
-        "tests/v1/test_api_contract.py",
-        "tests/v1/test_request_schema_contract.py",
-        "tests/v1/test_money_float_guard.py",
-        "tests/v1/test_numbering.py",
-        "tests/v1/test_state_machine.py",
+        "tests/backend/test_main_contract.py",
+        "tests/backend/test_api_contract.py",
+        "tests/backend/test_request_schema_contract.py",
+        "tests/backend/test_money_float_guard.py",
+        "tests/backend/test_numbering.py",
+        "tests/backend/test_state_machine.py",
     ],
     # 单元档：不碰数据库与 HTTP，实测 106 passed（空闲机约 2.3s，负载下会延长）。
     # 准入标准（后补须先实测）：单文件 < 1s、不依赖 seeded_db/seeded_client/TestClient。
     "unit": [
-        "tests/v1/test_money.py",
-        "tests/v1/test_money_float_guard.py",
-        "tests/v1/test_numbering.py",
-        "tests/v1/test_state_machine.py",
-        "tests/v1/test_api_contract.py",
-        "tests/v1/test_request_schema_contract.py",
-        "tests/v1/test_cancellation_model.py",
-        "tests/v1/test_orders_common.py",
-        "tests/v1/test_finance_attributes.py",
-        "tests/v1/test_core_infra_gaps.py",
-        "tests/v1/test_notifications_contract.py",
-        "tests/v1/test_rebate_current_contract.py",
-        "tests/v1/test_product_alias_compat.py",
-        "tests/v1/test_main_contract.py",
-        "tests/v1/test_coverage_gate.py",
+        "tests/backend/test_money.py",
+        "tests/backend/test_money_float_guard.py",
+        "tests/backend/test_numbering.py",
+        "tests/backend/test_state_machine.py",
+        "tests/backend/test_api_contract.py",
+        "tests/backend/test_request_schema_contract.py",
+        "tests/backend/test_cancellation_model.py",
+        "tests/backend/test_orders_common.py",
+        "tests/backend/test_finance_attributes.py",
+        "tests/backend/test_core_infra_gaps.py",
+        "tests/backend/test_notifications_contract.py",
+        "tests/backend/test_rebate_current_contract.py",
+        "tests/backend/test_product_alias_compat.py",
+        "tests/backend/test_main_contract.py",
+        "tests/backend/test_coverage_gate.py",
         # 列表列「界面↔注册表」守卫：纯静态读前端源码，无 DB/HTTP，0.04s。
         # 曾长期游离在所有分组之外 —— 前端把报表视图拆成 ./reports/*.tsx 后它指错文件、
         # 7 条 RPT_* 一直红着却没人发现，证明「不在分组里的守卫等于没有守卫」。
-        "tests/v1/test_list_scope_ui_parity.py",
+        "tests/backend/test_list_scope_ui_parity.py",
+        # 承诺归属守卫：静态解析 111 个测试文件的 docstring，无 DB/HTTP，0.4s。
+        # 它守的是「每个测试文件都能说清自己在保护哪条承诺」，以及清单证据不指向
+        # 不存在的文件——没有它，新增测试就是加一个没人知道在测什么的文件。
+        "tests/backend/test_promise_declaration.py",
+        # 快通道守卫：静态核对 db 标记是否仍由夹具依赖派生、自建连接的文件是否显式声明。
+        # 它守的是「pytest -m "not db" 里不会偷偷连库」，无 DB/HTTP，< 0.1s。
+        "tests/backend/test_db_channel.py",
+        # 分组覆盖守卫：断言磁盘上每个 test_*.py 都登记在本表的某个组内。
+        # 它守的是「新增测试文件必须进白名单」——曾有一批 13 个文件 68 个用例
+        # 因未登记而从未进过 CI，且不报错、不告警。
+        "tests/backend/test_group_coverage.py",
     ],
     "p0": [
-        "tests/v1/test_order_types_api.py",
-        "tests/v1/test_orders_contract.py",
-        "tests/v1/test_orders.py",
-        "tests/v1/test_installments_contract.py",
-        "tests/v1/test_reporting_contract.py",
-        "tests/v1/test_m2.py",
-        "tests/v1/test_m4.py",
+        "tests/backend/test_order_types_api.py",
+        "tests/backend/test_orders_contract.py",
+        "tests/backend/test_orders.py",
+        "tests/backend/test_installments_contract.py",
+        "tests/backend/test_reporting_contract.py",
+        "tests/backend/test_m2.py",
+        "tests/backend/test_m4.py",
     ],
     "foundation": [
-        "tests/v1/test_foundation_contract.py",
-        "tests/v1/test_foundation_order_types_service.py",
-        "tests/v1/test_foundation_pools_service.py",
-        "tests/v1/test_order_types_api.py",
-        "tests/v1/test_pools_api.py",
-        "tests/v1/test_form_extra_scopes.py",
-        "tests/v1/test_order_form_fields.py",
-        "tests/v1/test_numbering.py",
-        "tests/v1/test_settings.py",
-        "tests/v1/test_game_types.py",
-        "tests/v1/test_game_types_contract.py",
-        "tests/v1/test_option_sets_api.py",
-        "tests/v1/test_product_alias_compat.py",
+        "tests/backend/test_foundation_contract.py",
+        "tests/backend/test_foundation_order_types_service.py",
+        "tests/backend/test_foundation_pools_service.py",
+        "tests/backend/test_order_types_api.py",
+        "tests/backend/test_pools_api.py",
+        "tests/backend/test_form_extra_scopes.py",
+        "tests/backend/test_order_form_fields.py",
+        "tests/backend/test_numbering.py",
+        "tests/backend/test_settings.py",
+        "tests/backend/test_game_types.py",
+        "tests/backend/test_game_types_contract.py",
+        "tests/backend/test_option_sets_api.py",
+        "tests/backend/test_product_alias_compat.py",
     ],
     "accounts": [
-        "tests/v1/test_accounts_contract.py",
-        "tests/v1/test_account_stock_no.py",
+        "tests/backend/test_accounts_contract.py",
+        "tests/backend/test_account_stock_no.py",
+        "tests/backend/test_account_inventory_age.py",
+        "tests/backend/test_inventory_stats.py",
     ],
     "orders": [
-        "tests/v1/test_core_contract.py",
-        "tests/v1/test_orders_contract.py",
-        "tests/v1/test_orders.py",
-        "tests/v1/test_orders_events_service.py",
-        "tests/v1/test_state_machine.py",
-        "tests/v1/test_api_contract.py",
-        "tests/v1/test_request_schema_contract.py",
-        "tests/v1/test_bughunt.py",
-        "tests/v1/test_cancellation_model.py",
-        "tests/v1/test_orders_common.py",
-        "tests/v1/test_orders_guard.py",
-        "tests/v1/test_orders_router_guard.py",
-        "tests/v1/test_inventory_execution_edit.py",
-        "tests/v1/test_order_customer_source_fixtures.py",
-        "tests/v1/test_profit_allocation_modes.py",
-        "tests/v1/test_unreachable_status_paths.py",
-        "tests/v1/test_flow_recycle.py",
-        "tests/v1/test_order_status_contract.py",
-        "tests/v1/test_flow_sale.py",
-        "tests/v1/test_flow_config_driven.py",
-        "tests/v1/test_stock_intake_contract.py",
+        "tests/backend/test_core_contract.py",
+        "tests/backend/test_orders_contract.py",
+        "tests/backend/test_orders.py",
+        "tests/backend/test_orders_events_service.py",
+        "tests/backend/test_state_machine.py",
+        "tests/backend/test_api_contract.py",
+        "tests/backend/test_request_schema_contract.py",
+        "tests/backend/test_bughunt.py",
+        "tests/backend/test_cancellation_model.py",
+        "tests/backend/test_orders_common.py",
+        "tests/backend/test_orders_guard.py",
+        "tests/backend/test_orders_router_guard.py",
+        "tests/backend/test_inventory_execution_edit.py",
+        "tests/backend/test_order_customer_source_fixtures.py",
+        "tests/backend/test_profit_allocation_modes.py",
+        "tests/backend/test_unreachable_status_paths.py",
+        "tests/backend/test_flow_recycle.py",
+        "tests/backend/test_order_status_contract.py",
+        "tests/backend/test_flow_sale.py",
+        "tests/backend/test_flow_config_driven.py",
+        "tests/backend/test_stock_intake_contract.py",
+        "tests/backend/test_cancel_inventory_release.py",
+        "tests/backend/test_deposit_remaining.py",
+        "tests/backend/test_execution_cancellable_amount.py",
+        "tests/backend/test_execution_finance_summary.py",
+        "tests/backend/test_order_duplicate_account.py",
+        "tests/backend/test_order_event_cancellable_amount.py",
     ],
     "installments": [
-        "tests/v1/test_installments_contract.py",
-        "tests/v1/test_m2.py",
-        "tests/v1/test_m4.py",
-        "tests/v1/test_installments_service.py",
-        "tests/v1/test_flow_installment.py",
+        "tests/backend/test_installments_contract.py",
+        "tests/backend/test_m2.py",
+        "tests/backend/test_m4.py",
+        "tests/backend/test_installments_service.py",
+        "tests/backend/test_flow_installment.py",
+        "tests/backend/test_installment_remaining.py",
+        "tests/backend/test_installment_totals.py",
     ],
     "finance": [
-        "tests/v1/test_finance_contract.py",
-        "tests/v1/test_finance_attributes.py",
-        "tests/v1/test_finance_cashflows_service.py",
-        "tests/v1/test_finance_controls_service.py",
-        "tests/v1/test_finance_rebates_service.py",
-        "tests/v1/test_finance_router_contract.py",
-        "tests/v1/test_rebate_rules_contract.py",
-        "tests/v1/test_money.py",
-        "tests/v1/test_money_float_guard.py",
-        "tests/v1/test_finance_reconciliation_service.py",
-        "tests/v1/test_finance_reporting_task5_tail.py",
-        "tests/v1/test_finance_transfers_service.py",
-        "tests/v1/test_rebate_current_contract.py",
-        "tests/v1/test_finance_reversal_service.py",
-        "tests/v1/test_finance_idempotency_service.py",
-        "tests/v1/test_flow_distribution.py",
+        "tests/backend/test_finance_contract.py",
+        "tests/backend/test_finance_attributes.py",
+        "tests/backend/test_finance_cashflows_service.py",
+        "tests/backend/test_finance_controls_service.py",
+        "tests/backend/test_finance_rebates_service.py",
+        "tests/backend/test_finance_router_contract.py",
+        "tests/backend/test_rebate_rules_contract.py",
+        "tests/backend/test_money.py",
+        "tests/backend/test_money_float_guard.py",
+        "tests/backend/test_finance_reconciliation_service.py",
+        "tests/backend/test_finance_reporting_task5_tail.py",
+        "tests/backend/test_finance_transfers_service.py",
+        "tests/backend/test_rebate_current_contract.py",
+        "tests/backend/test_finance_reversal_service.py",
+        "tests/backend/test_finance_idempotency_service.py",
+        "tests/backend/test_flow_distribution.py",
+        "tests/backend/test_cashflow_totals.py",
+        "tests/backend/test_pool_balances_batch.py",
+        "tests/backend/test_studio_cashflow_summary.py",
     ],
     "parties": [
-        "tests/v1/test_parties.py",
-        "tests/v1/test_parties_contract.py",
-        "tests/v1/test_parties_fields_service.py",
-        "tests/v1/test_leads_contract.py",
-        "tests/v1/test_parties_policy_guard.py",
-        "tests/v1/test_parties_masking.py",
+        "tests/backend/test_parties.py",
+        "tests/backend/test_parties_contract.py",
+        "tests/backend/test_parties_fields_service.py",
+        "tests/backend/test_leads_contract.py",
+        "tests/backend/test_parties_policy_guard.py",
+        "tests/backend/test_parties_masking.py",
     ],
     "reporting": [
-        "tests/v1/test_reporting_contract.py",
-        "tests/v1/test_report_export_columns.py",
-        "tests/v1/test_reporting_service_gaps.py",
-        "tests/v1/test_reporting_r_consistency.py",
+        "tests/backend/test_reporting_contract.py",
+        "tests/backend/test_report_export_columns.py",
+        "tests/backend/test_reporting_service_gaps.py",
+        "tests/backend/test_reporting_r_consistency.py",
     ],
     "policy": [
-        "tests/v1/test_m5_policy.py",
-        "tests/v1/test_policy_contract.py",
-        "tests/v1/test_policy_rule_consumption.py",
+        "tests/backend/test_m5_policy.py",
+        "tests/backend/test_policy_contract.py",
+        "tests/backend/test_policy_rule_consumption.py",
     ],
     "governance": [
-        "tests/v1/test_quality_contract.py",
-        "tests/v1/test_quality_issue_contract.py",
-        "tests/v1/test_quality_issues_service.py",
-        "tests/v1/test_quality_metrics_contract.py",
-        "tests/v1/test_notifications_contract.py",
-        "tests/v1/test_search_contract.py",
-        "tests/v1/test_attachments_contract.py",
-        "tests/v1/test_audit_contract.py",
-        "tests/v1/test_attachments_service.py",
-        "tests/v1/test_notifications_service.py",
-        "tests/v1/test_quality_guard.py",
+        "tests/backend/test_quality_contract.py",
+        "tests/backend/test_quality_issue_contract.py",
+        "tests/backend/test_quality_issues_service.py",
+        "tests/backend/test_quality_metrics_contract.py",
+        "tests/backend/test_notifications_contract.py",
+        "tests/backend/test_search_contract.py",
+        "tests/backend/test_attachments_contract.py",
+        "tests/backend/test_audit_contract.py",
+        "tests/backend/test_attachments_service.py",
+        "tests/backend/test_notifications_service.py",
+        "tests/backend/test_quality_guard.py",
     ],
     "imports": [
-        "tests/v1/test_import_landing.py",
-        "tests/v1/test_import_mapping.py",
-        "tests/v1/test_imports_contract.py",
-        "tests/v1/test_migration.py",
+        "tests/backend/test_import_landing.py",
+        "tests/backend/test_import_mapping.py",
+        "tests/backend/test_imports_contract.py",
+        "tests/backend/test_migration.py",
     ],
     # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。
     "platform": [
-        "tests/v1/test_list_columns.py",
-        "tests/v1/test_list_custom_columns.py",
-        "tests/v1/test_list_export_csv.py",
-        "tests/v1/test_deploy_script_contract.py",
-        "tests/v1/test_backup_scripts.py",
-        "tests/v1/test_coverage_gate.py",
+        "tests/backend/test_list_columns.py",
+        "tests/backend/test_list_custom_columns.py",
+        "tests/backend/test_list_export_csv.py",
+        "tests/backend/test_deploy_script_contract.py",
+        "tests/backend/test_backup_scripts.py",
+        "tests/backend/test_coverage_gate.py",
     ],
     "auth": [
-        "tests/v1/test_auth_contract.py",
-        "tests/v1/test_main_contract.py",
-        "tests/v1/test_backup_scripts.py",
-        "tests/v1/test_public_release_security.py",
-        "tests/v1/test_ratelimit.py",
+        "tests/backend/test_auth_contract.py",
+        "tests/backend/test_main_contract.py",
+        "tests/backend/test_backup_scripts.py",
+        "tests/backend/test_public_release_security.py",
+        "tests/backend/test_ratelimit.py",
     ],
 }
 
@@ -323,10 +354,9 @@ def groups_for_changes(paths: list[str]) -> list[str]:
     for path in paths:
         if path.startswith("frontend/"):
             continue
-        if path.startswith("backend/tests/"):
-            relative_test_path = path.removeprefix("backend/")
-            if relative_test_path in test_groups:
-                selected.add(test_groups[relative_test_path])
+        if path.startswith("tests/backend/"):
+            if path in test_groups:
+                selected.add(test_groups[path])
             else:
                 selected.update(name for name in GROUPS if name not in CROSSCUT_GROUPS)
             continue
@@ -372,7 +402,15 @@ def lint_findings(runner: str) -> list[str]:
         if not line:
             continue
         matched = LINT_LINE_RE.match(line)
-        findings.append(f"{matched['path']} :: {matched['msg']}" if matched else line)
+        if matched:
+            # cwd 是 backend，pyflakes 对 ../tests/backend 会输出带 ../ 的路径；
+            # 基线统一用仓库相对路径，故在此归一化。
+            clean = matched["path"]
+            if clean.startswith("../"):
+                clean = clean[3:]
+            findings.append(f"{clean} :: {matched['msg']}")
+        else:
+            findings.append(line)
     return findings
 
 
@@ -473,7 +511,7 @@ def main() -> int:
         if selected:
             runner = str(PYTHON) if PYTHON.exists() else sys.executable
             result = subprocess.run(
-                [runner, "-m", "pytest", "-q", *paths],
+                [runner, "-m", "pytest", "-q", *[_pytest_arg(x) for x in paths]],
                 cwd=ROOT,
                 env=regression_environment(),
                 check=False,
@@ -485,17 +523,17 @@ def main() -> int:
         return 0
     fe_paths: list[str] = []
     if args.group == "cross":
-        paths = [f"tests/v1/{f}" for f in cross_files()]
+        paths = [f"tests/backend/{f}" for f in cross_files()]
         label = "跨模块流程(FLOW-*)"
     elif args.group in MODULES:
         module = args.group
         if args.type:
-            paths = [f"tests/v1/{f}" for f in module_type_files(module, args.type)]
+            paths = [f"tests/backend/{f}" for f in module_type_files(module, args.type)]
             label = f"模块 {module} / 类型 {args.type}"
             if not args.backend_only and args.type in ("it", "e2e"):
                 fe_paths = frontend_module_files(module)
         else:
-            paths = [f"tests/v1/{f}" for f in module_files(module)]
+            paths = [f"tests/backend/{f}" for f in module_files(module)]
             label = f"模块 {module}（后端 UT+IT）"
             if not args.backend_only:
                 fe_paths = frontend_module_files(module)
@@ -506,7 +544,7 @@ def main() -> int:
             label = "E2E（当前无常住 E2E 套件）"
             print(f"[{label}] 无匹配测试文件")
             return 0
-        paths = [f"tests/v1/{f}" for f in type_files(ttype)]
+        paths = [f"tests/backend/{f}" for f in type_files(ttype)]
         label = f"类型 {ttype}"
     else:
         paths = all_paths() if args.group in ("all", "ci") else GROUPS[args.group]
@@ -524,7 +562,7 @@ def main() -> int:
     runner = str(PYTHON) if PYTHON.exists() else sys.executable
     print(f"=== 执行 {label}：{len(paths)} 个后端文件 ===")
     result = subprocess.run(
-        [runner, "-m", "pytest", "-q", *paths],
+        [runner, "-m", "pytest", "-q", *[_pytest_arg(x) for x in paths]],
         cwd=ROOT,
         env=regression_environment(),
         check=False,

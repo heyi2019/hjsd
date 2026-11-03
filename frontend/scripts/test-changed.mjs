@@ -117,6 +117,9 @@ if (frontendChanges.length === 0) {
 
 const domains = new Set();
 let globalReason = null;
+// `tests/` 是包内纯逻辑测试目录（2026-11-04 从 src/ 迁出）。它的变更不属于任何
+// `src/<域>`，旧逻辑会落到「未落在业务板块内 → 什么都不跑」。改为直接跑 fast 档。
+const pureTestsChanged = frontendChanges.some((path) => path.startsWith("tests/"));
 
 for (const path of frontendChanges) {
   if (STRUCTURAL.has(path)) {
@@ -157,6 +160,22 @@ if (globalReason) {
     }
     process.exit(code ?? 1);
   });
+} else if (pureTestsChanged) {
+  console.log("命中 frontend/tests/（纯逻辑测试变更）→ 跑 fast 档");
+  if (listOnly) {
+    console.log("\n将执行：npm run test:fast");
+    process.exit(0);
+  }
+  const child = spawn("npm", ["run", "test:fast", ...(passthrough.length ? ["--", ...passthrough] : [])], {
+    cwd: FRONTEND,
+    stdio: "inherit",
+    env: process.env,
+  });
+  child.on("error", (error) => {
+    console.error(`无法启动 fast 档：${error.message}`);
+    process.exit(1);
+  });
+  child.on("close", (code) => process.exit(code ?? 1));
 } else if (domains.size === 0) {
   console.log(
     `前端变更未落在业务板块内（${frontendChanges.slice(0, 5).join(", ")}${frontendChanges.length > 5 ? " …" : ""}），无需跑板块测试。`,

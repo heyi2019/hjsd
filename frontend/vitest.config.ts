@@ -26,6 +26,13 @@ export default defineConfig({
   resolve: {
     mainFields: ["module", "jsnext:main", "jsnext"],
     alias: {
+      // `@` 是测试文件模块定位的**唯一基准**：vi.mock 与 import 的 specifier 都写
+      // `@/...`，测试文件搬到任何位置都不会失效。相对路径的真正危险不是「解析失败」
+      // （那会显式报错），而是「搬家后仍解析到某个存在的文件」——mock 不报错却没命中
+      // 被测模块，测试改用真实现，保护静默消失。
+      // 与 @ant-design/* 不冲突：alias 匹配规则是「全等」或「前缀 + '/'」，
+      // `@ant-design/icons` 不以 `@/` 开头，不会被 `@` 吃掉。
+      "@": here("./src"),
       "rc-motion": here("./src/test/motion-stub.tsx"),
       "rc-resize-observer": here("./src/test/resize-observer-stub.tsx"),
     },
@@ -93,15 +100,18 @@ export default defineConfig({
         test: {
           name: "react",
           sequence: { groupOrder: 3 },
-          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.ts"],
           // [2026-10-27 提速] .deep 重型深度用例从 react 层剥离，独立成 react-deep 项目，
           // 日常 test:full 不再覆盖（详见 scripts/test-full-sharded.mjs 模式说明）。
+          // 纯逻辑测试已迁到 frontend/tests/（见 tests/README.md「前端测试两个根」），
+          // 下列 4 条随之改为新路径。
           exclude: [
             "src/test/fixtures.test.ts",
-            "src/stocks/inventory-export.test.ts",
-            "src/stocks/inventory-logic.test.ts",
-            "src/shared/api/*.test.ts",
-            "src/shared/lib/*.test.ts",
+            "src/test/mock-specifier.test.ts",
+            "tests/stocks/inventory-export.test.ts",
+            "tests/stocks/inventory-logic.test.ts",
+            "tests/shared/api/*.test.ts",
+            "tests/shared/lib/*.test.ts",
             "src/vite.config.test.ts",
             "src/**/*.deep.test.tsx",
             ...quickTests,

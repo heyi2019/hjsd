@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """前端 vitest 执行结果 → 测试结果库/results.jsonl（后端执行记录器的前端补口）。
 
-为什么需要它：`tests/v1/conftest.py` 是 pytest 插件，只能记录后端用例。前端
+为什么需要它：`tests/backend/conftest.py` 是 pytest 插件，只能记录后端用例。前端
 vitest 跑完原本对报告毫无贡献 —— 1033 条前端用例在《测试报告》里永远显示
 「未执行」。本脚本把 vitest 的 JSON 报告翻成与后端完全相同的记录格式，
 追加进同一份 results.jsonl，报告侧无需任何特判。
@@ -29,7 +29,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend"
-CASE_INDEX = REPO / "backend" / "tests" / "v1" / "_report" / "case_index.json"
+CASE_INDEX = REPO / "tests" / "backend" / "_report" / "case_index.json"
+
 RESULTS = REPO / "docs" / "testing" / "测试结果库" / "results.jsonl"
 
 _RANK = {"PASS": 0, "SKIP": 1, "FAIL": 2, "ERROR": 3}
@@ -58,7 +59,7 @@ def _status(raw: str) -> str:
 
 
 def _rel_key(abs_path: str, title: str) -> str | None:
-    """绝对路径 → `frontend/src/...::标题`；不在 frontend/ 下的直接放弃。"""
+    """绝对路径 → `frontend/src/...::标题`（含 frontend/tests/…，同在包内）；包外放弃。"""
     try:
         p = Path(abs_path).resolve()
         rel = p.relative_to(FRONTEND.resolve())

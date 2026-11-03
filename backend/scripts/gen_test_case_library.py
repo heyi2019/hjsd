@@ -50,17 +50,32 @@ from test_catalog import (  # noqa: E402
 # 扫描测试函数
 # ---------------------------------------------------------------------------
 def scan_py(path: str):
+    """返回 [(限定名, docstring, 函数源码)]。
+
+    限定名必须带类名（`TestX::test_y`）：
+      - 不同 Test 类下允许同名方法，只用函数名会让它们撞同一个编号；
+      - `case_index.json` 的 nodeid 要与 pytest 真实 nodeid 逐字一致，否则执行记录
+        关联不到编号，结果是「测了但报告里永远显示未执行」。
+    只收模块级与类级函数 —— pytest 不会收集嵌套在其他函数里的 test_*。
+    """
     src = open(path, encoding="utf-8").read()
     try:
         tree = ast.parse(src)
     except SyntaxError:
         return []
-    out = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
-            doc = ast.get_docstring(node)
-            body = ast.get_source_segment(src, node) or ""
-            out.append((node.name, doc, body))
+    out: list = []
+
+    def _emit(node, prefix: str) -> None:
+        out.append((prefix + node.name, ast.get_docstring(node),
+                    ast.get_source_segment(src, node) or ""))
+
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
+            _emit(node, "")
+        elif isinstance(node, ast.ClassDef):
+            for sub in node.body:
+                if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)) and sub.name.startswith("test_"):
+                    _emit(sub, f"{node.name}::")
     return out
 
 
@@ -220,24 +235,46 @@ def main() -> None:
 
     counters: dict[tuple[str, str], int] = {}
     for k, v in number_map.items():
-        t, f = k.split("|", 1)
-        counters[(t, f)] = max(counters.get((t, f), 0), v)
+        # map_key = 层级|功能编号|文件名|函数名 —— 只取前两段作计数维度。
+        # 曾写成 k.split("|", 1)，把「功能编号|文件名|函数」整段当成功能编号，
+        # 计数种子永远匹配不上，新用例从 001 重数并与既有编号撞号。
+        parts = k.split("|")
+        if len(parts) < 2:
+            continue
+        counters[(parts[0], parts[1])] = max(counters.get((parts[0], parts[1]), 0), v)
 
     for c in cases:
-        map_key = f"{c['测试层级']}|{c['功能编号']}|{os.path.basename(c['自动化测试文件及函数'])}|{c['测试函数标识']}"
+        base = os.path.basename(c["自动化测试文件及函数"])
+        func_id = c["测试函数标识"]
+        map_key = f"{c['测试层级']}|{c['功能编号']}|{base}|{func_id}"
         if map_key in number_map:
             n = number_map[map_key]
         else:
-            counters[(c["测试层级"], c["功能编号"])] = counters.get((c["测试层级"], c["功能编号"]), 0) + 1
-            n = counters[(c["测试层级"], c["功能编号"])]
+            # 兼容迁移：早期版本只记裸函数名（丢类名），历史 map 里存的是
+            # `...|test_x`。首次以 `...|TestX::test_x` 出现时继承旧号，
+            # 避免把 29% 的类内方法整体重编号、留下大量空洞与孤儿键。
+            # 同名跨类冲突时按排序先后，先声明者继承，其余照常新编。
+            inherited = f"{c['测试层级']}|{c['功能编号']}|{base}|{func_id.rsplit('::', 1)[-1]}"
+            inherited_no = number_map.pop(inherited, None) if inherited != map_key else None
+            if inherited_no is not None:
+                n = inherited_no
+            else:
+                counters[(c["测试层级"], c["功能编号"])] = counters.get(
+                    (c["测试层级"], c["功能编号"]), 0) + 1
+                n = counters[(c["测试层级"], c["功能编号"])]
             number_map[map_key] = n
         case_no = f"{c['测试层级']}-{c['功能编号']}-{n:03d}"
         c["测试编号"] = case_no
-        if c["自动化测试文件及函数"].startswith("backend/"):
-            nodeid = c["自动化测试文件及函数"].replace("backend/", "").replace(".py", ".py") + "::" + c["测试函数标识"]
-        else:
-            nodeid = c["自动化测试文件及函数"] + "::" + c["测试函数标识"]
+        rel = c["自动化测试文件及函数"]
+        # nodeid 必须与 pytest 真实 nodeid 逐字一致：backend/ 前缀对仓库可见，测试内不是。
+        pytest_path = rel[len("backend/"):] if rel.startswith("backend/") else rel
+        nodeid = f"{pytest_path}::{c['测试函数标识']}"
         index[nodeid] = case_no
+
+    # 编号与 nodeid 都必须唯一：重复即编号体系已失效（报告会漏行、执行记录会错挂），
+    # 宁可让生成器失败，也不产出看着整齐实则串号的文件。
+    _assert_unique("测试编号", [c["测试编号"] for c in cases])
+    _assert_unique("nodeid", list(index))
 
     json.dump(number_map, open(CASE_MAP, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     json.dump(index, open(CASE_INDEX, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -267,6 +304,24 @@ def main() -> None:
     print(f"[gen] 模块分布={by_module}")
     print(f"[gen] 输出: {OUT_CSV}")
     print(f"[gen] 索引: {CASE_INDEX}")
+
+
+def _assert_unique(label: str, values: list) -> None:
+    """值必须唯一；否则打印重复项并中止生成。"""
+    seen: dict = {}
+    dups: dict = {}
+    for v in values:
+        seen[v] = seen.get(v, 0) + 1
+    for v, n in seen.items():
+        if n > 1:
+            dups[v] = n
+    if not dups:
+        return
+    detail = "；".join(f"{v} ×{n}" for v, n in list(dups.items())[:5])
+    raise SystemExit(
+        f"[gen] {label} 重复，共 {len(dups)} 个（前 5）：{detail}\n"
+        "  常见原因：同名测试函数未被类名限定、或计数器种子没接上既有编号。"
+    )
 
 
 def _unit_files() -> set:

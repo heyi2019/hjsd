@@ -46,13 +46,15 @@ PANEL_SOURCES: dict[str, str] = {
     "AUDIT_LOG": "audit/AuditPanel.tsx",
     "QUALITY_METRIC": "quality/QualityPanel.tsx",
     "QUALITY_ISSUE": "quality/QualityPanel.tsx",
-    "RPT_INVENTORY_HEALTH": "reporting/ReportsPage.tsx",
-    "RPT_MONTHLY_PNL": "reporting/ReportsPage.tsx",
-    "RPT_COMMISSION": "reporting/ReportsPage.tsx",
-    "RPT_DAILY_FUNDS": "reporting/ReportsPage.tsx",
-    "RPT_FINANCE_DIM": "reporting/ReportsPage.tsx",
-    "RPT_BUSINESS_PNL": "reporting/ReportsPage.tsx",
-    "RPT_ORDER_PROFIT": "reporting/ReportsPage.tsx",
+    # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
+    # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
+    "RPT_INVENTORY_HEALTH": "reporting/reports/InventoryReport.tsx",
+    "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
+    "RPT_COMMISSION": "reporting/reports/CommissionReport.tsx",
+    "RPT_DAILY_FUNDS": "reporting/reports/DailyFundsReport.tsx",
+    "RPT_FINANCE_DIM": "reporting/reports/FinanceDimensionsReport.tsx",
+    "RPT_BUSINESS_PNL": "reporting/reports/BusinessPnlReport.tsx",
+    "RPT_ORDER_PROFIT": "reporting/reports/OrderProfitReport.tsx",
 }
 
 _ARRAY_DECL = re.compile(r"=\s*\[")

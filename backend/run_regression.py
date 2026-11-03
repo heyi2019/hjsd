@@ -106,6 +106,10 @@ GROUPS = {
         "tests/v1/test_product_alias_compat.py",
         "tests/v1/test_main_contract.py",
         "tests/v1/test_coverage_gate.py",
+        # 列表列「界面↔注册表」守卫：纯静态读前端源码，无 DB/HTTP，0.04s。
+        # 曾长期游离在所有分组之外 —— 前端把报表视图拆成 ./reports/*.tsx 后它指错文件、
+        # 7 条 RPT_* 一直红着却没人发现，证明「不在分组里的守卫等于没有守卫」。
+        "tests/v1/test_list_scope_ui_parity.py",
     ],
     "p0": [
         "tests/v1/test_order_types_api.py",

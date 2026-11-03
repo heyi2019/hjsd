@@ -66,7 +66,7 @@ export function AppShell() {
   const businessTab = active === "business" ? (rawBizTab ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { user, authenticated, mustChangePassword, logout } = useSession();
+  const { user, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
@@ -154,7 +154,9 @@ export function AppShell() {
           宜游轩 <span>ERP</span>
         </div>
         <nav className="nav-list" aria-label="主导航" ref={navRef}>
-          {navigation.map((n) => (
+          {navigation
+            .filter((n) => !n.requiredPermission || can(n.requiredPermission))
+            .map((n) => (
             <button
               key={n.key}
               type="button"

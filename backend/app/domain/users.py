@@ -28,7 +28,7 @@ class User(Base, TimestampMixin):
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("phone", name="uq_users_phone"),
         CheckConstraint(
-            "role IN ('ADMIN', 'OPERATOR', 'FINANCE', 'AUDITOR', 'VIEWER')",
+            "role IN ('ADMIN', 'OPERATOR', 'FINANCE', 'AUDITOR', 'VIEWER', 'EMPLOYEE')",
             name="role_valid",
         ),
         CheckConstraint(

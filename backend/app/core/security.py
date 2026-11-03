@@ -33,8 +33,9 @@ ROLE_OPERATOR = "OPERATOR"
 ROLE_FINANCE = "FINANCE"
 ROLE_AUDITOR = "AUDITOR"
 ROLE_VIEWER = "VIEWER"
+ROLE_EMPLOYEE = "EMPLOYEE"
 
-ALL_ROLES: tuple[str, ...] = (ROLE_ADMIN, ROLE_OPERATOR, ROLE_FINANCE, ROLE_AUDITOR, ROLE_VIEWER)
+ALL_ROLES: tuple[str, ...] = (ROLE_ADMIN, ROLE_OPERATOR, ROLE_FINANCE, ROLE_AUDITOR, ROLE_VIEWER, ROLE_EMPLOYEE)
 OWNER_SCOPES: frozenset[str] = frozenset({"SELF", "TEAM", "ALL"})
 
 PERM_CUSTOMER_READ = "customer.read"
@@ -138,6 +139,15 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
         }
     ),
     ROLE_VIEWER: frozenset({PERM_FINANCE_READ, PERM_REPORT_READ}),
+    # 普通员工：仅业务录入（建单 + 读客户/合作方），不含 finance.read / report.read
+    # 及任何管理类权限——经营中心、资金中心对其隐藏（前端导航按权限收口）。
+    ROLE_EMPLOYEE: frozenset(
+        {
+            PERM_ORDER_CREATE,
+            PERM_CUSTOMER_READ,
+            PERM_COUNTERPARTY_READ,
+        }
+    ),
 }
 
 
@@ -374,6 +384,7 @@ DEV_USERS: dict[str, CurrentUser] = {
     ),
     "auditor": CurrentUser.build(id=4, username="auditor", roles=[ROLE_AUDITOR], display_name="审核人"),
     "viewer": CurrentUser.build(id=5, username="viewer", roles=[ROLE_VIEWER], display_name="经营查看人"),
+    "employee": CurrentUser.build(id=6, username="employee", roles=[ROLE_EMPLOYEE], display_name="普通员工"),
 }
 
 
@@ -461,6 +472,7 @@ __all__ = [
     "CurrentUser",
     "ROLE_ADMIN",
     "ROLE_AUDITOR",
+    "ROLE_EMPLOYEE",
     "ROLE_FINANCE",
     "ROLE_OPERATOR",
     "ROLE_PERMISSIONS",

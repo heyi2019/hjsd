@@ -74,6 +74,8 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "report.export",
   ],
   viewer: ["finance.read", "report.read"],
+  // 普通员工：仅业务录入，不含 finance.read / report.read 及管理类——经营中心、资金中心隐藏。
+  employee: ["order.create", "customer.read", "counterparty.read"],
 };
 
 export const DEV_ROLES: { value: string; label: string }[] = [
@@ -82,6 +84,7 @@ export const DEV_ROLES: { value: string; label: string }[] = [
   { value: "finance", label: "财务" },
   { value: "auditor", label: "业务审核人" },
   { value: "viewer", label: "经营查看人" },
+  { value: "employee", label: "普通员工" },
 ];
 
 interface SessionValue {

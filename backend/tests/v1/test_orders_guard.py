@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.enums import Direction
+from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
 from app.value_added_services import service as installment_service
 from app.orders import events, service
@@ -399,12 +400,54 @@ def test_create_order_link_rejects_split_ratio_over_100(seeded_db):
 
 
 def test_list_orders_filters_by_owner(seeded_db):
-    service.list_orders(seeded_db, owner_id=1)
+    """owner_id 必须真落到 SQL：只返回该负责人的单，别人的单与空值单都不得混入。"""
+    mine = service.create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", owner_id=1
+    )
+    other = service.create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", owner_id=2
+    )
+    seeded_db.commit()
+
+    rows = service.list_orders(seeded_db, owner_id=1)
+
+    ids = {row.id for row in rows}
+    assert mine.id in ids
+    assert other.id not in ids
+    assert {row.owner_id for row in rows} == {1}
 
 
 def test_list_orders_filters_by_pool(seeded_db):
-    # 触发 list_orders 的 pool_id 过滤分支（604-612 行）
-    service.list_orders(seeded_db, pool_id=1)
+    """pool_id 必须落到 order_events 存在性子查询：只有在该资金账户发生过事件的单才命中。"""
+    invest = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+    if invest is None or profit is None:
+        pytest.fail("种子资金池缺失")
+
+    acc_hit = _new_account(seeded_db, game_account="guard-pool-hit")
+    acc_miss = _new_account(seeded_db, game_account="guard-pool-miss")
+    hit = service.create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+        account_id=acc_hit.id,
+    )
+    miss = service.create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+        account_id=acc_miss.id,
+    )
+    service.post_event(
+        seeded_db, hit.id, event_type="BUY", amount=Decimal("100"),
+        occurred_on=TODAY, actor="pytest", pool_id=invest.id,
+    )
+    service.post_event(
+        seeded_db, miss.id, event_type="BUY", amount=Decimal("100"),
+        occurred_on=TODAY, actor="pytest", pool_id=profit.id,
+    )
+
+    rows = service.list_orders(seeded_db, pool_id=invest.id)
+
+    ids = {row.id for row in rows}
+    assert hit.id in ids
+    assert miss.id not in ids
 
 
 def test_update_order_applies_extra_values_when_provided(seeded_db):

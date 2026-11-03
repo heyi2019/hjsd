@@ -190,7 +190,7 @@ RAISES_RE = re.compile(
     r'([A-Za-z_][\w\.]*(?:\s*,\s*(?!match\s*=)[A-Za-z_][\w\.]*)*)'
     r'(?:\s*,\s*match\s*=\s*[rf]?["\']([^"\']*)["\'])?'
 )
-ASSERT_RE = re.compile(r'^\s*assert\s+(?!=)(.+?)\s*$', re.M)
+ASSERT_HEAD_RE = re.compile(r'^[ \t]*assert[ \t]+(?!=)', re.M)
 EXPECT_RE = re.compile(r'\bexpect\s*\(')
 WEAK_CRITERIA = "正常执行不抛异常（用例无显式断言）"
 
@@ -268,6 +268,65 @@ def _criteria_from_expect(body: str) -> str:
     return _clip("断言 " + body[start:end], 110) + suffix
 
 
+def _brackets_balanced(text: str) -> bool:
+    depth = 0
+    for ch in text:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+def _iter_asserts(body: str) -> list[tuple[str, str]]:
+    """逐条产出 `(判定表达式, 消息)`，跨行括号自动续行。
+
+    不能用逐行正则：`assert (\n    f(...)\n    == expected\n)` 会被截成半句
+    （曾产出「断言 persisted == len(...), (」和只剩 `(` 的空白标准）；而消息
+    也不能按「第一个逗号」切——`assert f(a, "ACTIVE") == x` 里那个逗号在括号内，
+    会导致消息被取成实参 `ACTIVE`（曾产出 54 条只有一个值的合格标准）。
+    """
+    found: list[tuple[str, str]] = []
+    for head in ASSERT_HEAD_RE.finditer(body):
+        start = head.end()
+        depth = 0
+        i = start
+        while i < len(body):
+            ch = body[i]
+            if ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                depth -= 1
+                if depth < 0:
+                    break
+            elif ch == "\n" and depth == 0:
+                break
+            i += 1
+        raw = re.sub(r'#[^\n]*', '', body[start:i])
+        # 顶层逗号之后才是 assert 的消息，括号内的逗号不算。
+        depth = 0
+        cut = len(raw)
+        for idx, ch in enumerate(raw):
+            if ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                cut = idx
+                break
+        expr = re.sub(r'\s+', ' ', raw[:cut]).strip()
+        # 剥掉包裹整条断言的括号（多行写法常用）。
+        while expr.startswith("(") and expr.endswith(")") and _brackets_balanced(expr[1:-1]):
+            expr = re.sub(r'\s+', ' ', expr[1:-1]).strip()
+        literal = re.match(r'\s*[rf]?[\'"]([^\'"\n]*)[\'"]', raw[cut + 1:] if cut < len(raw) else "")
+        message = (literal.group(1).strip() if literal else "")
+        if expr:
+            found.append((expr, message))
+    return found
+
+
 def _criteria_from_body(body: str, *, frontend: bool) -> str:
     """从真实断言推导合格标准：后端取首个 raises / assert，前端取首个 expect。"""
     if not body:
@@ -279,10 +338,8 @@ def _criteria_from_body(body: str, *, frontend: bool) -> str:
         exc = m.group(1).replace(" ", "")
         msg = (m.group(2) or "").strip()
         return f"抛出 {exc}" + (f"，消息匹配「{msg}」" if msg else "")
-    for a in ASSERT_RE.finditer(body):
-        expr = re.sub(r'\s+#.*$', '', a.group(1)).strip()
-        if expr:
-            return _clip("断言 " + expr)
+    for _expr, _message in _iter_asserts(body):
+        return _clip("断言 " + _expr)
     return ""
 
 
@@ -294,12 +351,11 @@ def extract_criteria(doc: str | None, body: str, *, frontend: bool = False) -> t
         s = s.strip()
         if EXPECT_KW.search(s) and len(s) >= 4:
             return expected, s
-    # assert 消息：`[^,\n]+` 必须限定在同一行 —— 用 `[^,]+` 会跨行吞到下一个
-    # 逗号+引号，把多行字符串的空白片段当成消息（实测产出空白合格标准）。
-    for m in re.finditer(r'assert\s+[^,\n]+,\s*[\'"]([^\'"\n]+)[\'"]', body):
-        msg = m.group(1).strip()
-        if msg:
-            return expected, msg
+    # assert 消息：必须按顶层逗号切（括号内的实参逗号不是消息分隔符），否则
+    # `assert f(a, "ACTIVE") == x` 的合格标准会被取成实参本身。
+    for _expr, _message in _iter_asserts(body):
+        if _message:
+            return expected, _message
     if cd:
         return expected, cd
     # 无 docstring 可用：从真实断言机械推导。断言本身就是可执行、可核对的合格标准，

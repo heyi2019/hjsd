@@ -18,14 +18,12 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.domain.enums import CashflowStatus, Direction, EventType
 from app.domain.foundation import Pool
 from app.domain.trade_models.cashflow import Cashflow
-from app.domain.trade_models.order import OrderEvent
-from app.domain.trade import Account, Order
-from app.orders import service as orders_service
+from app.domain.trade import Account
 
 TODAY = date(2026, 10, 4)
 

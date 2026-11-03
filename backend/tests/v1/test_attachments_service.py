@@ -199,7 +199,13 @@ def test_assert_permission_read_requires_create_or_event_post(seeded_db):
 # ---- _assert_visible 各分支 ----
 
 def test_assert_visible_quality_issue_always_ok(seeded_db):
-    svc._assert_visible(seeded_db, _user(), svc._Target("quality_issue", "x"))
+    """quality_issue 类型的附件不做归属校验，任何用户都必须可见。
+
+    对照组是订单/资金池分支——同样的 user 与归属会抛 NotFound；这里不抛才说明
+    `entity_type == "quality_issue"` 的提前返回真的生效，而不是恰好命中了 null 分支。
+    """
+    target = svc._Target("quality_issue", "x", order=_order(seeded_db, owner_id=2), pool_id=1)
+    assert svc._assert_visible(seeded_db, _user(uid=9, pool_ids=()), target) is None
 
 
 def test_assert_visible_order_owner_match_and_mismatch(seeded_db):

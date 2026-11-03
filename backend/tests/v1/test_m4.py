@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.stocks import service as stocks_service
@@ -490,6 +491,7 @@ class TestEnumConstraintDrift:
     """
 
     def test_every_batch_status_passes_db_check(self, seeded_db):
+        """ImportBatchStatus 的每个取值都必须通过数据库 CHECK 约束并真正入库。"""
         from app.domain.enums import ImportBatchStatus
 
         for status in ImportBatchStatus:
@@ -505,9 +507,18 @@ class TestEnumConstraintDrift:
                 seeded_db.flush()
             except Exception as exc:  # noqa: BLE001
                 pytest.fail(f"批次状态 {status.value} 被 CHECK 拒绝：{exc}")
+        persisted = seeded_db.scalar(
+            select(func.count())
+            .select_from(ImportBatch)
+            .where(ImportBatch.batch_no.like("CHK%"))
+        )
+        assert persisted == len(ImportBatchStatus), (
+            f"只有 {persisted}/{len(ImportBatchStatus)} 个批次状态真正入库"
+        )
         seeded_db.rollback()
 
     def test_every_row_status_passes_db_check(self, seeded_db):
+        """ImportRowStatus 的每个取值都必须通过数据库 CHECK 约束并真正入库。"""
         from app.domain.enums import ImportRowStatus
 
         batch = import_service.create_batch(
@@ -526,4 +537,13 @@ class TestEnumConstraintDrift:
             except Exception as exc:  # noqa: BLE001
                 pytest.fail(f"行状态 {status.value} 被 CHECK 拒绝：{exc}")
             seeded_db.expunge(row)
+        # create_batch 自带的原始行会额外占一行，故比对状态集合而非行数。
+        persisted = set(
+            seeded_db.scalars(
+                select(ImportRow.status).where(ImportRow.batch_id == batch["id"])
+            ).all()
+        )
+        assert persisted == {status.value for status in ImportRowStatus}, (
+            f"入库状态集合 {sorted(persisted)} 与枚举 {sorted(s.value for s in ImportRowStatus)} 不一致"
+        )
         seeded_db.rollback()

@@ -4,10 +4,9 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.database import Base
 from app.core.errors import AppError, ErrorCode
 from app.core.numbering import MAX_SEQUENCE_VALUE, allocate_number, ensure_sequence, peek_number
 from app.domain.enums import SequenceKey

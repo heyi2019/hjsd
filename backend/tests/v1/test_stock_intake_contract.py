@@ -23,12 +23,11 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
 from sqlalchemy import func, select
 
 from app.core.errors import ErrorCode
 from app.domain.enums import AccountStatus
-from app.domain.trade import Account, Order
+from app.domain.trade import Account
 from app.orders import service as orders_service
 
 TODAY = date(2026, 10, 4)

@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-03 06:59 UTC",
-  "last_run_id": "20261103-145914-431cba9-10366",
-  "run_batches": 40,
+  "generated_at": "2026-11-03 07:07 UTC",
+  "last_run_id": "20261103-150741-13eafc8-13701",
+  "run_batches": 48,
   "cases_total": 2564,
   "module_def": {
     "A": 22,
@@ -22,5 +22,5 @@
   "skip": 0,
   "retired_cases": 4,
   "pending_criteria": 0,
-  "weak_criteria": 5
+  "weak_criteria": 0
 }

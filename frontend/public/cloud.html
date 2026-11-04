@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>宜游轩 ERP · 云服务接入</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f5f7fa; color: #1f2937; font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    .head p { margin: 0; color: #6b7280; }
+    .badge { flex: none; padding: 4px 10px; border-radius: 999px; background: #e8f5ec; color: #18794e; font-size: 12px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+    .grid .card { margin-bottom: 0; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .chip { padding: 3px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 12px; }
+    .chip.active { background: #dbeafe; color: #1d4ed8; }
+    .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    select, input, textarea, button { font: inherit; }
+    select, input, textarea { padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #1f2937; }
+    input, textarea { display: block; width: 100%; margin-bottom: 8px; }
+    textarea { resize: vertical; }
+    button { padding: 7px 14px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer; }
+    button:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+    button.primary:hover:not(:disabled) { color: #fff; opacity: .9; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; text-align: left; white-space: nowrap; }
+    th { background: #f8fafc; color: #475569; font-weight: 600; }
+    .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .muted { color: #6b7280; }
+    .notes { margin-top: 10px; font-size: 13px; }
+    .note { padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
+    .alert { padding: 10px 14px; margin-bottom: 16px; border-radius: 8px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+    .ok { margin-top: 10px; padding: 8px 12px; border-radius: 6px; background: #e8f5ec; color: #18794e; }
+    .foot { font-size: 13px; margin-top: 8px; }
+    a { color: #2563eb; }
+    @media (max-width: 640px) { .wrap { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <div>
+        <h1>宜游轩 ERP · 云服务接入</h1>
+        <p>预览应用已连接真实云数据库、账号、文件与模型服务</p>
+      </div>
+      <span class="badge">云服务已开启</span>
+    </header>
+
+    <div id="alert" class="alert" hidden></div>
+
+    <section class="card">
+      <h2>预备库数据（只读）</h2>
+      <div id="chips" class="chips"></div>
+      <div class="toolbar">
+        <select id="table" aria-label="选择数据表"></select>
+        <span id="total" class="muted"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="grid-head"></thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prev" type="button">上一页</button>
+        <span id="page-info" class="muted"></span>
+        <button id="next" type="button">下一页</button>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>云端业务记录（可写）</h2>
+        <input id="note-title" maxlength="120" placeholder="记录标题（1-120 字）" />
+        <textarea id="note-content" maxlength="2000" rows="2" placeholder="内容（可选，≤2000 字）"></textarea>
+        <button id="note-add" class="primary" type="button">写入并读回</button>
+        <div id="notes" class="notes"></div>
+      </section>
+
+      <section class="card">
+        <h2>免密钥 AI 摘要</h2>
+        <button id="ai-run" type="button">生成业务数据摘要</button>
+        <p id="ai-out" class="muted">点击按钮，由云端模型基于上方真实数据统计生成。</p>
+      </section>
+
+      <section class="card">
+        <h2>账号与附件</h2>
+        <p id="auth-state" class="muted">附件能力需要登录；业务数据与 AI 摘要无需登录。</p>
+        <div class="row">
+          <button id="auth-btn" type="button">使用 WorkBuddy 登录</button>
+          <button id="storage-btn" type="button" hidden>验证附件上传下载</button>
+        </div>
+        <p id="storage-out" class="ok" hidden></p>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <a href="./">返回 ERP 主界面</a>
+      <span class="muted"> · 数据来自上线母本，不含口令、手机号、实名与图片字段</span>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    /** 唯一来源：workbuddy_cloud_service / activate 返回的 publicConfig。 */
+    var publicConfig = {
+      endpoint: 'https://yyxuan-erp-preview.app.workbuddy.host',
+      oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
+      publishableKey: 'wbpk_RuvvSocMWWv718cmitkxuo_XLyLV8Kqj6iWnFvtJL3FgrgcMlybO5AI'
+    };
+
+    var $ = function (id) { return document.getElementById(id); };
+    function showError(message) { $('alert').textContent = message; $('alert').hidden = false; }
+    function clearError() { $('alert').hidden = true; }
+    function esc(value) {
+      return String(value).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function fmt(value) {
+      if (value === null || value === undefined || value === '') return '—';
+      if (typeof value === 'boolean') return value ? '是' : '否';
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+    }
+    function friendly(error) {
+      var item = error || {};
+      var code = item.code || item.kind || '';
+      if (code.indexOf('quota_') === 0) return '云服务额度不足或请求过于频繁，请稍后再试。';
+      if (code === '42501') return '当前身份没有该操作权限，请登录后再试。';
+      if (code === '42P01') return '云端数据表尚未创建。';
+      if (code.indexOf('auth_') === 0 || code === 'unauthenticated' || code === 'invalid_grant') return '登录状态已失效，请重新登录。';
+      if (code.indexOf('network') === 0 || code === 'network' || code === 'backend-unavailable') return '网络异常，无法连接云服务，请检查网络后重试。';
+      return item.message || '云服务请求失败，请稍后重试。';
+    }
+
+    if (typeof WorkBuddyCloud === 'undefined' || typeof WorkBuddyCloud.createWorkBuddyCloud !== 'function') {
+      showError('云服务 SDK 加载失败，请检查网络后刷新页面。');
+      return;
+    }
+    var cloud = WorkBuddyCloud.createWorkBuddyCloud({
+      endpoint: publicConfig.endpoint,
+      oauthRelayBaseUrl: publicConfig.oauthRelayBaseUrl,
+      publishableKey: publicConfig.publishableKey
+    });
+
+    var PAGE_SIZE = 10;
+    var TABLES = [
+      { key: 'orders', label: '订单', fields: [['order_no', '订单编号'], ['order_type', '类型'], ['trade_date', '成交日'], ['status', '状态'], ['note', '备注']] },
+      { key: 'stocks', label: '库存', fields: [['stock_no', '库存编号'], ['game_type', '游戏'], ['game_account', '游戏账号'], ['status', '状态'], ['inventory_status', '在库'], ['cost_amount', '成本']] },
+      { key: 'cashflow', label: '资金流水', fields: [['flow_no', '流水号'], ['occurred_on', '发生日'], ['direction', '方向'], ['category', '类别'], ['amount', '金额'], ['status', '状态']] },
+      { key: 'order_events', label: '业务事件', fields: [['event_no', '事件编号'], ['event_type', '类型'], ['occurred_on', '发生日'], ['amount', '金额'], ['is_posted', '已过账']] }
+    ];
+
+    var current = 'orders';
+    var page = 1;
+    var total = 0;
+    var counts = { orders: 0, stocks: 0, cashflow: 0, order_events: 0 };
+    var session = null;
+
+    function def() {
+      for (var i = 0; i < TABLES.length; i += 1) if (TABLES[i].key === current) return TABLES[i];
+      return TABLES[0];
+    }
+
+    function renderChips() {
+      $('chips').innerHTML = TABLES.map(function (item) {
+        return '<span class="chip' + (item.key === current ? ' active' : '') + '">' + esc(item.label) + ' ' + counts[item.key] + '</span>';
+      }).join('');
+    }
+
+    function renderRows(rows) {
+      var fields = def().fields;
+      $('grid-head').innerHTML = '<tr>' + fields.map(function (f) { return '<th>' + esc(f[1]) + '</th>'; }).join('') + '</tr>';
+      if (!rows.length) {
+        $('grid-body').innerHTML = '<tr><td colspan="' + fields.length + '">暂无数据</td></tr>';
+      } else {
+        $('grid-body').innerHTML = rows.map(function (row) {
+          var payload = row.payload || {};
+          return '<tr>' + fields.map(function (f) { return '<td>' + esc(fmt(payload[f[0]])) + '</td>'; }).join('') + '</tr>';
+        }).join('');
+      }
+      $('total').textContent = '共 ' + total + ' 条，来自 heijin_erp_release（已脱敏）';
+      $('page-info').textContent = '第 ' + page + ' / ' + Math.max(1, Math.ceil(total / PAGE_SIZE)) + ' 页';
+      $('prev').disabled = page <= 1;
+      $('next').disabled = page * PAGE_SIZE >= total;
+    }
+
+    function renderNotes(rows) {
+      if (!rows.length) { $('notes').innerHTML = '<span class="muted">暂无记录</span>'; return; }
+      $('notes').innerHTML = rows.map(function (row) {
+        return '<div class="note"><strong>' + esc(row.title) + '</strong> <span class="muted">· ' + esc(new Date(row.created_at).toLocaleString('zh-CN')) + '</span></div>';
+      }).join('');
+    }
+
+    function renderAuth() {
+      if (session) {
+        $('auth-state').textContent = '已登录：' + (session.name || String(session.id).slice(0, 8));
+        $('auth-btn').textContent = '退出登录';
+        $('storage-btn').hidden = false;
+      } else {
+        $('auth-state').textContent = '附件能力需要登录；业务数据与 AI 摘要无需登录。';
+        $('auth-btn').textContent = '使用 WorkBuddy 登录';
+        $('storage-btn').hidden = true;
+      }
+    }
+
+    function pickSession(raw) {
+      if (!raw || !raw.user || !raw.user.id) return null;
+      return { id: raw.user.id, name: raw.user.name };
+    }
+
+    async function restoreAuth() {
+      var url = new URL(window.location.href);
+      if (!url.searchParams.has('code') && !url.searchParams.has('error')) {
+        var restored = await cloud.auth.getSession();
+        if (restored.error) showError(friendly(restored.error));
+        session = pickSession(restored.data);
+        return;
+      }
+      var provider = url.searchParams.get('provider');
+      var handler = provider === 'workbuddy' ? cloud.auth.handleWorkBuddyCallback
+        : provider === 'wechat' ? cloud.auth.handleWechatWebCallback : null;
+      if (!handler) { showError('授权回调缺少有效的登录方式，请重新登录。'); return; }
+      var callback = await handler.call(cloud.auth);
+      if (callback.error) { showError(friendly(callback.error)); return; }
+      if (callback.data) {
+        for (var i = 0; i < 3; i += 1) url.searchParams.delete(['code', 'state', 'provider'][i]);
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        session = pickSession(callback.data);
+      } else {
+        var again = await cloud.auth.getSession();
+        session = pickSession(again.data);
+      }
+    }
+
+    async function loadCounts() {
+      for (var i = 0; i < TABLES.length; i += 1) {
+        var item = TABLES[i];
+        var result = await cloud.database.from('erp_preview_records')
+          .select('id', { count: 'exact', head: true }).eq('source_table', item.key);
+        if (result.error) { showError(friendly(result.error)); return; }
+        counts[item.key] = result.count || 0;
+      }
+      renderChips();
+    }
+
+    async function loadRows() {
+      var from = (page - 1) * PAGE_SIZE;
+      var result = await cloud.database.from('erp_preview_records')
+        .select('*', { count: 'exact' })
+        .eq('source_table', current)
+        .order('source_id', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (result.error) { showError(friendly(result.error)); return; }
+      total = result.count || 0;
+      renderRows(result.data || []);
+    }
+
+    async function loadNotes() {
+      var result = await cloud.database.from('erp_cloud_records')
+        .select('id, title, content, kind, created_at')
+        .order('created_at', { ascending: false }).limit(5);
+      if (result.error) { showError(friendly(result.error)); return; }
+      renderNotes(result.data || []);
+    }
+
+    async function addNote() {
+      clearError();
+      var title = $('note-title').value.trim();
+      if (!title) { showError('请填写记录标题。'); return; }
+      var content = $('note-content').value.trim();
+      var result = await cloud.database.from('erp_cloud_records')
+        .insert({ title: title, content: content || null, kind: 'note' }).select();
+      if (result.error) { showError(friendly(result.error)); return; }
+      $('note-title').value = '';
+      $('note-content').value = '';
+      await loadNotes();
+    }
+
+    async function runSummary() {
+      clearError();
+      $('ai-run').disabled = true;
+      $('ai-out').textContent = '生成中…';
+      try {
+        var models = await cloud.llm.models.list();
+        if (!Array.isArray(models) || models.length === 0) { showError('当前应用没有可用模型，请在云服务管理页确认模型目录。'); $('ai-out').textContent = ''; return; }
+        var model = null;
+        for (var i = 0; i < models.length; i += 1) {
+          if (models[i].enabled !== false && models[i].disabled !== true) { model = models[i]; break; }
+        }
+        if (!model) { showError('模型目录中没有启用的模型。'); $('ai-out').textContent = ''; return; }
+        var text = '';
+        var stream = cloud.llm.chat.completions.create({
+          model: model.id,
+          messages: [
+            { role: 'system', content: '你是宜游轩ERP的数据助手，回答简洁，不编造数据。' },
+            { role: 'user', content: '用一句话概括：云端现有 ' + counts.orders + ' 张订单、' + counts.stocks + ' 条库存、' + counts.cashflow + ' 笔资金流水、' + counts.order_events + ' 条业务事件。' }
+          ],
+          stream: true
+        });
+        for await (var part of stream) {
+          var delta = part.choices && part.choices[0] && part.choices[0].delta;
+          if (delta && delta.content) text += delta.content;
+        }
+        $('ai-out').textContent = text.trim() || '模型未返回文本内容。';
+      } catch (reason) {
+        showError(friendly(reason));
+        $('ai-out').textContent = '';
+      } finally {
+        $('ai-run').disabled = false;
+      }
+    }
+
+    async function signIn() {
+      clearError();
+      // cloud.html 是真实存在的静态文件，回调必须回到加载了 SDK 的这一页；
+      // 同时保留 sharecode 等业务参数与 hash，仅剔除单次的授权参数。
+      var back = new URL(window.location.href);
+      for (var i = 0; i < 3; i += 1) back.searchParams.delete(['code', 'state', 'provider'][i]);
+      var result = await cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() });
+      if (result.error) { showError(friendly(result.error)); return; }
+      if (result.data && result.data.url) window.location.assign(result.data.url);
+      else showError('未获取到登录跳转地址，请稍后重试。');
+    }
+
+    async function signOut() {
+      await cloud.auth.signOut();
+      session = null;
+      $('storage-out').hidden = true;
+      renderAuth();
+    }
+
+    async function checkStorage() {
+      clearError();
+      if (!session) { showError('请先使用 WorkBuddy 账号登录，再验证附件能力。'); return; }
+      try {
+        var path = cloud.storage.userPath(session.id, 'attachments/' + crypto.randomUUID() + '.txt');
+        var body = new Blob(['宜游轩ERP 云服务附件自检 ' + new Date().toISOString()], { type: 'text/plain' });
+        var uploaded = await cloud.storage.upload(path, body, { contentType: 'text/plain' });
+        if (uploaded.error) { showError(friendly(uploaded.error)); return; }
+        var signed = await cloud.storage.createSignedUrl(path, 600);
+        if (signed.error) { showError(friendly(signed.error)); return; }
+        var downloaded = await cloud.storage.download(path);
+        if (downloaded.error) { showError(friendly(downloaded.error)); return; }
+        var text = await downloaded.data.text();
+        $('storage-out').textContent = '上传 / 签名 URL / 下载均通过（' + text.length + ' 字符）';
+        $('storage-out').hidden = false;
+      } catch (reason) {
+        showError(friendly(reason));
+      }
+    }
+
+    $('table').innerHTML = TABLES.map(function (item) {
+      return '<option value="' + item.key + '">' + esc(item.label) + '</option>';
+    }).join('');
+    $('table').addEventListener('change', function (event) {
+      current = event.target.value;
+      page = 1;
+      renderChips();
+      void loadRows();
+    });
+    $('prev').addEventListener('click', function () { if (page > 1) { page -= 1; void loadRows(); } });
+    $('next').addEventListener('click', function () { if (page * PAGE_SIZE < total) { page += 1; void loadRows(); } });
+    $('note-add').addEventListener('click', function () { void addNote(); });
+    $('ai-run').addEventListener('click', function () { void runSummary(); });
+    $('auth-btn').addEventListener('click', function () { void (session ? signOut() : signIn()); });
+    $('storage-btn').addEventListener('click', function () { void checkStorage(); });
+
+    (async function boot() {
+      try {
+        await restoreAuth();
+        renderAuth();
+        renderChips();
+        await Promise.all([loadCounts(), loadRows(), loadNotes()]);
+      } catch (reason) {
+        showError(friendly(reason));
+      }
+    })();
+  })();
+  </script>
+</body>
+</html>

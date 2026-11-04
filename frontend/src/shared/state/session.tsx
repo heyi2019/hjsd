@@ -2,7 +2,8 @@
  * 前端只用它控制按钮显隐；后端仍会二次鉴权，隐藏菜单不构成权限控制。 */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, setDevUser as persistDevUser } from "../api/client";
+import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, persistAccessToken, setDevUser as persistDevUser } from "../api/client";
+import type { SessionUser } from "../api/client";
 
 export const ALL_PERMISSIONS = [
   "customer.read",
@@ -94,6 +95,8 @@ interface SessionValue {
   switchUser: (user: string) => void;
   authenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
+  /** 免密登录（手机号验证码 / 微信）拿到 token 后统一走这里落会话。 */
+  loginWithToken: (token: string, user: SessionUser) => void;
   mustChangePassword: boolean;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -135,6 +138,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await changePasswordApi(oldPassword, newPassword);
     setMustChangePassword(false);
   }, []);
+  const loginWithToken = useCallback((token: string, next: SessionUser) => {
+    // token 落盘与内存态必须同时完成：只写其中一边会出现「刷新后失效」或
+    // 「已登录但页面停在登录页」两种半死状态。
+    persistAccessToken(token);
+    setUser(next.role.toLowerCase());
+    setMustChangePassword(Boolean(next.must_change_password));
+    setAuthenticated(true);
+  }, []);
   const logout = useCallback(async () => {
     // 后端 /auth/logout 失败也必须退出本地会话：否则「退出登录」点了没反应，
     // 用户以为已退出却仍停留在已登录界面。
@@ -150,8 +161,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[user] ?? []);
-    return { user, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, changePassword, login, logout };
-  }, [user, switchUser, authenticated, mustChangePassword, changePassword, login, logout]);
+    return { user, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, changePassword, login, loginWithToken, logout };
+  }, [user, switchUser, authenticated, mustChangePassword, changePassword, login, loginWithToken, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

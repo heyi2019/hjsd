@@ -628,3 +628,39 @@
 /* 竖排表单标签：清除 antd 残留的冒号/尾部空格（::after 注入的字符 + 右外边距），
    否则「名字」右侧会凭空多一段空白。必填星号（::before）保留。 */
 .form-no-colon .ant-form-item-label > label::after { content: none !important; }
+
+/* 免密登录（2026-11-05）：登录方式切换、微信入口、绑定手机号面板。
+   .login-card 内已有 input 与提交按钮的统一样式，这里只补新增结构自身的排版，
+   不重复声明字号/色彩，避免与设计层既有规则互相覆盖。 */
+.login-notice {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-antd-bg-container);
+  color: var(--color-text-secondary);
+  font: var(--font-body-s);
+}
+
+.login-method-switch {
+  margin-block: var(--space-3) var(--space-4);
+}
+
+.login-platform {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+}
+
+.login-platform__hint {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font: var(--fs-footnote)/1.5 var(--font-sans);
+  text-align: center;
+}
+
+.login-bind__hint {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-tertiary);
+  font: var(--fs-footnote)/1.5 var(--font-sans);
+}

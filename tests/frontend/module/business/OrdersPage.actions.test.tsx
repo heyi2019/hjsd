@@ -368,7 +368,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     })));
   });
 
-  it("L250：编辑有登记事件订单仅改备注时提示「备注已保存」并关闭弹窗", async () => {
+  it("编辑有登记事件订单：成交日期可改、PATCH 带日期、提示「订单已更新」并关闭弹窗", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       {
         ...order1,
@@ -379,10 +379,17 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
     const modal = await modalOf(/编辑订单 · HS-2026-0001/);
+    // 回归：有登记事件时日期不再被禁用（后端会联动平移账期）
+    expect(within(modal).getByLabelText("成交日期")).not.toBeDisabled();
+    await ui.clear(within(modal).getByLabelText("成交日期"));
+    await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
     await ui.type(within(modal).getByLabelText("备注"), "仅更新备注");
     await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
-    // L250：有登记事件只能改备注，成功提示必须明确「备注已保存」而非笼统「订单已更新」
-    await waitFor(() => expect(message.success).toHaveBeenCalledWith("备注已保存"));
+    await waitFor(() => expect(catalog.ordersApi.patch).toHaveBeenCalledWith(1, expect.objectContaining({
+      trade_date: "2026-10-05",
+      note: "仅更新备注",
+    })));
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("订单已更新"));
     // 保存后弹窗应关闭
     await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
   });
@@ -936,13 +943,13 @@ describe("buildOrderPatchPayload 纯函数", () => {
     expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1", game_type: "星穹铁道" });
   });
 
-  it("已有登记事件：只带备注，不带成交日期也不带快照", () => {
+  it("已有登记事件：仍带成交日期（后端联动平移账期），但不带账号快照", () => {
     const payload = buildOrderPatchPayload({
       values: { trade_date: "2026-11-02", note: "补充说明" },
       snapshot,
       hasPosted: true,
     });
-    expect(payload).toEqual({ note: "补充说明", form_extra: undefined });
+    expect(payload).toEqual({ trade_date: "2026-11-02", note: "补充说明", form_extra: undefined });
   });
 
   it("快照密码被隐去（无 order.create）：不带 account_snapshot，避免覆盖成空", () => {

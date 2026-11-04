@@ -7,7 +7,7 @@ BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 登记、状态机、路由缺�
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -973,9 +973,8 @@ class TestGetAndListOrders:
                 seeded_db, order.id, actor="operator", trade_date=None
             )
 
-    def test_posted_order_cannot_update_accounting_fields_but_can_update_note(
-        self, seeded_db
-    ):
+    def test_posted_order_can_shift_trade_date_and_accounting_dates(self, seeded_db):
+        """成交日期放开后：有登记事件的订单也能改日期，事件/资金流水按天数差平移。"""
         order = _order(seeded_db, order_type="DG")
         order_service.post_event(
             seeded_db,
@@ -986,14 +985,43 @@ class TestGetAndListOrders:
             actor="pytest",
             portion="GROSS",
         )
-        with pytest.raises(Validation, match="登记事件"):
-            order_service.update_order(
-                seeded_db, order.id, actor="operator", trade_date=D
-            )
+        # 补一条「成交日后第 2 天」的事件，验证平移保留相对时间关系而非统一改日期。
+        seeded_db.add(OrderEvent(
+            order_id=order.id,
+            event_type="DELIVER",
+            event_no="EV-SHIFT-01",
+            is_posted=False,
+            amount=Decimal("0"),
+            portion="PRINCIPAL",
+            occurred_on=D + timedelta(days=2),
+            created_by="pytest",
+            updated_by="pytest",
+        ))
+        seeded_db.flush()
+        new_date = D + timedelta(days=5)
+
         updated = order_service.update_order(
+            seeded_db, order.id, actor="operator", trade_date=new_date
+        )
+        assert updated.trade_date == new_date
+        events = list(seeded_db.scalars(
+            select(OrderEvent).where(OrderEvent.order_id == order.id)
+        ).all())
+        shifted = {e.event_no: e.occurred_on for e in events}
+        assert shifted["EV-SHIFT-01"] == D + timedelta(days=7)
+        assert all(value in {new_date, D + timedelta(days=7)} for value in shifted.values())
+        flows = list(seeded_db.scalars(
+            select(Cashflow).where(Cashflow.order_id == order.id)
+        ).all())
+        assert flows, "SELL 事件应派生资金流水，用于验证账期联动"
+        assert all(f.occurred_on == new_date for f in flows)
+
+        # 只改备注不传日期时不触发平移，日期保持新值。
+        unchanged = order_service.update_order(
             seeded_db, order.id, actor="operator", note="仅改备注"
         )
-        assert updated.note == "仅改备注"
+        assert unchanged.note == "仅改备注"
+        assert unchanged.trade_date == new_date
 
     def test_order_cancel_requires_no_posted_events(self, seeded_db):
         order = _order(seeded_db)

@@ -160,17 +160,17 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
           wrapperCol={{ flex: "auto" }} scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
           <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
-            订单编号、业务类型、账号关联与状态不可编辑；已有登记事件的订单只能修改备注，核算字段须通过冲销/更正处理。
+            订单编号、业务类型、账号关联与状态不可编辑；修改成交日期会同步平移本单事件与资金流水日期，并重取返点/提成规则快照。
           </Typography.Paragraph>
           <CfgItem
             name="trade_date"
             label="成交日期"
-            rules={orderHasPostedEvents ? [] : [{ required: true, message: "请输入成交日期" }]}
-            extra={orderHasPostedEvents ? "已有登记事件，成交日期不可修改" : undefined}
+            rules={[{ required: true, message: "请输入成交日期" }]}
+            extra={orderHasPostedEvents ? "该单已有登记事件，改日期将同步平移事件与资金流水日期" : undefined}
             getValueFromEvent={dateValueFromEvent}
             getValueProps={dateValueProps}
           >
-            <DateField disabled={orderHasPostedEvents} />
+            <DateField />
           </CfgItem>
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="订单备注（选填）" />

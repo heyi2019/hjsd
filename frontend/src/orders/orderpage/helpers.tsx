@@ -244,7 +244,7 @@ export function resolveCancelAmount(params: {
 /**
  * 订单编辑 PATCH 入参组装（原本内联在 submitEditOrder 里）。
  * 三条规则都由后端契约决定，抽出来才可免挂载覆盖：
- *  1. 已有登记事件（is_posted）→ 只允许改备注，不再回写成交日期与账号快照；
+ *  1. 成交日期始终回写：后端按天数差平移本单事件/资金流水日期并重取规则快照；
  *  2. 快照密码被后端隐去（无 order.create 权限）→ 完全不带 account_snapshot，
  *     避免把隐藏密码覆盖成空；
  *  3. 快照是整体替换：表单里没有的控件（钱包实名 / 营地账号）沿用原快照值，
@@ -257,7 +257,8 @@ export function buildOrderPatchPayload(params: {
 }): OrderPatchPayload {
   const { values, snapshot, hasPosted } = params;
   const payload: OrderPatchPayload = {};
-  if (!hasPosted) payload.trade_date = values.trade_date as string;
+  // 成交日期始终回写；hasPosted 只影响账号快照（后端对有登记事件的单也拒收快照）。
+  payload.trade_date = values.trade_date as string;
   const note = (values.note as string | undefined)?.trim();
   payload.note = note ? note : null;
   payload.form_extra = (values.form_extra as Record<string, unknown> | undefined) ?? undefined;

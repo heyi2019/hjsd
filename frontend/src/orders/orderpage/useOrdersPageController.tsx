@@ -382,7 +382,7 @@ export function useOrdersPageController(params: {
 
   const submitEditOrder = async (values: Record<string, unknown>) => {
     if (!selectedOrder) return;
-    // 后端规则：已有登记事件的订单只能改备注（核算字段必须走冲销/更正）。
+    // 成交日期现在也可改（后端联动平移账期）；hasPosted 仅用于决定账号快照是否回写。
     const orderHasPosted = (selectedOrder.events ?? []).some((event) => event.is_posted);
     setEditSubmitting(true);
     try {
@@ -392,9 +392,8 @@ export function useOrdersPageController(params: {
         hasPosted: orderHasPosted,
       });
       await ordersApi.patch(selectedOrder.id, payload);
-      // L250：有登记事件的订单只能改备注，成功提示需明确「备注已保存」而非笼统的「订单已更新」，
-      // 让用户清楚知道保存结果，避免误以为需重试/刷新。
-      appMessage.success(orderHasPosted ? "备注已保存" : "订单已更新");
+      // 成交日期放开后，有登记事件的订单也能改主字段，统一提示「订单已更新」。
+      appMessage.success("订单已更新");
       setEditOpen(false);
       setSelectedOrder(await ordersApi.get(selectedOrder.id));
       await load();

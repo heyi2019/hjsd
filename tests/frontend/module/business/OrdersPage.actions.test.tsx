@@ -411,6 +411,27 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
   });
 
+  it("分润：比例与金额不再互算，填写一项不改写另一项", async () => {
+    // 用户裁决（2026-11-05）：比例与金额各自独立录入，前端不得自行换算。
+    // 旧实现用 syncAllocationPair 在 onValuesChange 里双向回填，改金额会静默改写比例，
+    // 用户无法手动精调；此处锁死「只写自己这一格」的行为。
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const rate = within(modal).getByLabelText("比例");
+    const amount = within(modal).getByLabelText("金额");
+
+    // 填比例：金额保持空白，不按利润折算回填
+    fireEvent.change(rate, { target: { value: "30" } });
+    expect(rate).toHaveValue("30");
+    expect(amount).toHaveValue("");
+
+    // 填金额：比例保持原值，不按金额反算
+    fireEvent.change(amount, { target: { value: "1500" } });
+    expect(amount).toHaveValue("1500");
+    expect(rate).toHaveValue("30");
+  });
+
   it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
     // 空分润 → 按操作口径起步：买号、售出、运营、公司四项固定展开。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
@@ -441,6 +462,84 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
     expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
+  });
+
+  it("分润：按操作四项无候选人时，运营默认当前登录人（不是角色）", async () => {
+    // 2026-11-05 裁决：姓名默认取当前登录人。本单无任何动作负责人，
+    // 买号/售出不可填，运营位必须落到「李四（lisi）」而不是留空或只默认角色。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [],
+      total: 0,
+      order_profit: "5000.00",
+    });
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...order1,
+      form_extra: {},
+      events: [],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getByText("李四（lisi）")).toBeInTheDocument();
+    // 公司位固定不绑人，不能被当前登录人覆盖。
+    expect(within(modal).getByText("公司（不绑定人员）")).toBeInTheDocument();
+  });
+
+  it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {
+    // 存量按人（无 allocation_type）走 PERSON 口径；新增行过去只默认 role=OWNER、姓名留空。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [{ id: 1, order_id: 1, user_id: 11, role: "OWNER", allocation_type: null, allocation_rate: "100" }],
+      total: 1,
+      order_profit: "5000.00",
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
+    await ui.click(within(modal).getByRole("button", { name: /增加一行/ }));
+    // 新行姓名直接带出当前登录人（李四/lisi），角色仍按业绩归属人兜底。
+    const selects = within(modal).getAllByText("李四（lisi）");
+    expect(selects.length).toBeGreaterThan(0);
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(2);
+  });
+
+  it("分润：按操作四项时比例与金额同样不互算", async () => {
+    // 同一裁决的另一半：原 syncAllocationPair 由两种口径共用，故按操作四项也必须独立录入。
+    // 只测按姓名口径会漏掉「买号/售出/运营/公司」四行的情况。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [],
+      total: 0,
+      order_profit: "5000.00",
+    });
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...order1,
+      form_extra: {
+        business_responsible_ids: [11],
+        delivery_responsible_ids: [22],
+      },
+      events: [
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "1500.00" },
+      ],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const rates = within(modal).getAllByLabelText("比例");
+    const amounts = within(modal).getAllByLabelText("金额");
+    expect(rates).toHaveLength(4);
+
+    // 填买号行比例：本行金额保持空白，另外三行也不得被牵连改写
+    fireEvent.change(rates[0], { target: { value: "30" } });
+    expect(rates[0]).toHaveValue("30");
+    expect(amounts[0]).toHaveValue("");
+    expect(amounts[1]).toHaveValue("");
+    expect(amounts[2]).toHaveValue("");
+
+    // 再填本行金额：比例保持原值，不按金额反算
+    fireEvent.change(amounts[0], { target: { value: "1000" } });
+    expect(amounts[0]).toHaveValue("1000");
+    expect(rates[0]).toHaveValue("30");
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
@@ -548,7 +647,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     });
   });
 
-  it("分润：亏损单展示亏损提示（金额分润不可用）", async () => {
+  it("分润：亏损单提示改为「金额填负数」而非「不可用」", async () => {
+    // 2026-11-05 裁决后亏损单允许按金额分润，提示语必须说明填负数（-300 = 分担 300 亏损）。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: allocationRows,
       total: allocationRows.length,
@@ -557,7 +657,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getByText(/金额分润不可用/)).toBeInTheDocument();
+    expect(within(modal).getByText(/（亏损）金额分润请填负数/)).toBeInTheDocument();
+    expect(within(modal).queryByText(/金额分润不可用/)).toBeNull();
     expect(within(modal).getByText("-800.00")).toBeInTheDocument();
   });
 
@@ -833,12 +934,47 @@ describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () =>
     if (r.ok) expect(r.items[0]).toMatchObject({ allocation_rate: "0", allocation_amount: "2500" });
   });
 
-  it("亏损/无利润单按金额分润 → 拒绝", () => {
+  // 亏损单分润（2026-11-05 裁决「亏损的时候分亏损」）：金额填负数，方向须与盈亏一致。
+  it("亏损单填正数金额 → 拒绝（方向必须与盈亏一致）", () => {
     const r = validateAllocations(
       [{ employee: 9, allocation_rate: "0", allocation_amount: "200" }],
       "-800.00",
     );
-    expect(r).toEqual({ ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" });
+    expect(r).toEqual({ ok: false, error: "该单为亏损单，分润金额必须填负数（亏损分担额）" });
+  });
+
+  it("亏损单填负数金额 → 通过，按金额提交并保留负号", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "-200" }],
+      "-800.00",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.items[0]).toMatchObject({ allocation_rate: "0", allocation_amount: "-200" });
+  });
+
+  it("亏损单超额分担（-900 超过 -800）→ 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "-900" }],
+      "-800.00",
+    );
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toContain("分润金额合计不能超过订单总利润");
+  });
+
+  it("盈利单填负数金额 → 拒绝", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "0", allocation_amount: "-200" }],
+      "500.00",
+    );
+    expect(r).toEqual({ ok: false, error: "该单为盈利单，分润金额不能为负数" });
+  });
+
+  it("利润为 0 时按比例分润 → 通过", () => {
+    const r = validateAllocations(
+      [{ employee: 9, allocation_rate: "100", allocation_amount: "0" }],
+      "0.00",
+    );
+    expect(r.ok).toBe(true);
   });
 
   it("金额合计超过订单总利润 → 拒绝", () => {

@@ -89,7 +89,14 @@ export const DEV_ROLES: { value: string; label: string }[] = [
 ];
 
 interface SessionValue {
-  user: string;
+  /**
+   * 系统角色（小写，如 admin / operator / finance），仅用于权限点映射。
+   * 与「用户」是两回事：用户是 users 表里的人（id / username / display_name），
+   * 角色是 users.role 这一列。需要按人匹配时用 username 或 /auth/me 的 id，勿用本字段。
+   */
+  role: string;
+  /** 当前登录人的用户名（users.username）。与 role 分开保存，避免「拿角色当人比」。 */
+  username: string;
   permissions: Set<string>;
   can: (code: string) => boolean;
   switchUser: (user: string) => void;
@@ -107,7 +114,10 @@ interface SessionValue {
 const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<string>(currentDevUser());
+  // role 与 username 分开存：dev 态直接拿 dev 身份兜底（此时两者同为 dev 用户名，
+  // 与 X-Dev-User 直通口径一致）；有 token 时由 /auth/me 分别回填真实角色与用户名。
+  const [role, setRole] = useState<string>(currentDevUser());
+  const [username, setUsername] = useState<string>(currentDevUser());
   // DEV 态默认视为已登录（X-Dev-User 直通、本地无 token）；显式点「退出登录」后
   // 回落 false 落登录页，刷新页面即恢复直通——开发态不会被关在登录页外。
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
@@ -117,25 +127,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return;
     void currentUserApi().then((current) => {
-      setUser(current.role.toLowerCase());
+      setRole(current.role.toLowerCase());
+      setUsername(current.username);
       setMustChangePassword(Boolean(current.must_change_password));
       setPasswordlessSession(Boolean(current.auth_method && current.auth_method !== "password"));
     }).catch(() => { localStorage.removeItem(ACCESS_TOKEN_KEY); setAuthenticated(false); });
   }, []);
   const switchUser = useCallback((next: string) => {
     persistDevUser(next);
-    setUser(next);
+    // dev 直通时「当前身份」本身就是这个 dev 用户名，role 与 username 同步。
+    setRole(next);
+    setUsername(next);
   }, []);
-  const login = useCallback(async (username: string, password: string) => {
-    if (import.meta.env.DEV && username.trim().toLowerCase() === "admin" && !password) {
+  const login = useCallback(async (account: string, password: string) => {
+    if (import.meta.env.DEV && account.trim().toLowerCase() === "admin" && !password) {
       persistDevUser("admin");
-      setUser("admin");
+      setRole("admin");
+      setUsername("admin");
       setMustChangePassword(false);
       setAuthenticated(true);
       return;
     }
-    const loggedIn = await loginApi(username, password);
-    setUser(loggedIn.role.toLowerCase());
+    const loggedIn = await loginApi(account, password);
+    setRole(loggedIn.role.toLowerCase());
+    // 用户名必须单独存：角色来自 users.role，用户名来自 users.username，二者不可互相代替。
+    setUsername(loggedIn.username);
     setMustChangePassword(Boolean(loggedIn.must_change_password));
     setPasswordlessSession(false);
     setAuthenticated(true);
@@ -148,7 +164,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // token 落盘与内存态必须同时完成：只写其中一边会出现「刷新后失效」或
     // 「已登录但页面停在登录页」两种半死状态。
     persistAccessToken(token);
-    setUser(next.role.toLowerCase());
+    setRole(next.role.toLowerCase());
+    setUsername(next.username);
     setMustChangePassword(Boolean(next.must_change_password));
     setPasswordlessSession(true);
     setAuthenticated(true);
@@ -168,9 +185,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const value = useMemo<SessionValue>(() => {
-    const permissions = new Set<string>(ROLE_PERMISSIONS[user] ?? []);
-    return { user, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout };
-  }, [user, switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout]);
+    const permissions = new Set<string>(ROLE_PERMISSIONS[role] ?? []);
+    return { role, username, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout };
+  }, [role, username, switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

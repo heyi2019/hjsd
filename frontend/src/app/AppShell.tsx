@@ -66,7 +66,7 @@ export function AppShell() {
   const businessTab = active === "business" ? (rawBizTab ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { user, authenticated, mustChangePassword, logout, can } = useSession();
+  const { role, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
@@ -228,7 +228,7 @@ export function AppShell() {
                 不是运行时可选参数——故不放下拉选择器，避免误以为可自行切换权限。 */}
             <span className="topbar-role">
               <span className="muted">当前角色{import.meta.env.DEV ? "（开发态）" : ""}</span>
-              <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === user)?.label ?? user}</span>
+              <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === role)?.label ?? role}</span>
             </span>
             <ConfirmButton
               className="topbar-action topbar-action--logout"

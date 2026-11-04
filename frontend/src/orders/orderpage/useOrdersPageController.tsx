@@ -118,6 +118,8 @@ export function useOrdersPageController(params: {
   const [allocationMode, setAllocationMode] = useState<AllocationMode>("ACTION");
   /** 按操作分配时的动作执行人候选，来自建单/售出负责人和运营信息中的操作人。 */
   const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
+  /** 当前登录人在员工花名册中的 ID：分润各行姓名默认取他，而不是默认某个角色。 */
+  const [currentEmployeeId, setCurrentEmployeeId] = useState<number | undefined>(undefined);
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
@@ -160,6 +162,19 @@ export function useOrdersPageController(params: {
         employeesApi.list(),
       ]);
       const candidates = buildActionAllocationCandidates(order);
+      // 分润的「姓名」只能落在用户（users 表）上，取值一律走 /auth/me 的 id / username。
+      // 不能用 session.role（ADMIN/OPERATOR 这类系统角色），
+      // 也不能用 dev 用户名（currentDevUser 在无本地配置时兜底成 "admin"，不是登录人）。
+      let currentId: number | undefined;
+      try {
+        const current = await currentUser();
+        currentId = userResult.find(
+          (item) => item.is_active && (item.id === current.id || item.username === current.username),
+        )?.id;
+      } catch {
+        // 会话解析失败不阻断分润：姓名留空，由必填规则提示，绝不猜人。
+      }
+      setCurrentEmployeeId(currentId);
       const typed = result.items.filter((item) => item.allocation_type);
       const mode: AllocationMode = typed.length > 0 || result.items.length === 0 ? "ACTION" : "PERSON";
       setActionOrder(order);
@@ -172,7 +187,7 @@ export function useOrdersPageController(params: {
       // 角色必须原样带回表单：不回填就会在保存时被默认值 OWNER 覆盖掉。
       const rows: AllocationFormRow[] =
         mode === "ACTION"
-          ? buildActionAllocationRows(result.items, candidates)
+          ? buildActionAllocationRows(result.items, candidates, currentId)
           : result.items.map((item) => ({
               employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
               role: item.role || "OWNER",
@@ -542,6 +557,7 @@ export function useOrdersPageController(params: {
     cancelableEventsForScope,
     closeCancelTransaction,
     createType,
+    currentEmployeeId,
     currentOperator,
     editForm,
     editOpen,

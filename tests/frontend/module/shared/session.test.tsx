@@ -21,10 +21,11 @@ beforeEach(() => {
 
 /** 探针组件：把 session 暴露成可断言的文本，避免在测试里重复写 Context 样板。 */
 function Probe() {
-  const { user, permissions, can, switchUser, authenticated, login } = useSession();
+  const { role, username, permissions, can, switchUser, authenticated, login } = useSession();
   return (
     <div>
-      <span data-testid="user">{user}</span>
+      <span data-testid="role">{role}</span>
+      <span data-testid="username">{username}</span>
       <span data-testid="perm-count">{permissions.size}</span>
       <span data-testid="can-create">{String(can("order.create"))}</span>
       <span data-testid="can-update">{String(can("order.update"))}</span>
@@ -34,6 +35,9 @@ function Probe() {
       </button>
       <button type="button" onClick={() => void login("admin", "")}>
         开发免密登录
+      </button>
+      <button type="button" onClick={() => void login("xiaoxuan", "pwd")}>
+        真实登录
       </button>
     </div>
   );
@@ -63,7 +67,7 @@ describe("SessionProvider：角色 → 权限", () => {
 
   it("finance 可读财务但不可改客户", () => {
     renderLight(<Probe />, { user: "finance" });
-    const probe = screen.getByTestId("user");
+    const probe = screen.getByTestId("role");
     expect(probe.textContent).toBe("finance");
   });
 
@@ -87,7 +91,7 @@ describe("switchUser：切换角色", () => {
     renderLight(<Probe />, { user: "admin" });
     expect(screen.getByTestId("can-create").textContent).toBe("true");
     await ui.click(screen.getByRole("button", { name: "切到财务" }));
-    expect(screen.getByTestId("user").textContent).toBe("finance");
+    expect(screen.getByTestId("role").textContent).toBe("finance");
     expect(localStorage.getItem(DEV_USER_KEY)).toBe("finance");
     expect(screen.getByTestId("can-update").textContent).toBe("false");
   });
@@ -99,9 +103,26 @@ describe("开发版免密登录", () => {
 
     await ui.click(screen.getByRole("button", { name: "开发免密登录" }));
 
-    expect(screen.getByTestId("user")).toHaveTextContent("admin");
+    expect(screen.getByTestId("role")).toHaveTextContent("admin");
     expect(screen.getByTestId("authenticated")).toHaveTextContent("true");
     expect(client.login).not.toHaveBeenCalled();
+  });
+});
+
+describe("角色与用户分离", () => {
+  it("登录后 role 取 users.role、username 取 users.username，不互相代替", async () => {
+    // 原实现把两者塞进同一个 user 字段：dev 态是用户名、生产态是角色，
+    // 于是「按人匹配」的地方拿角色去比 username，生产必不命中。
+    vi.mocked(client.login).mockResolvedValue({ id: 5, username: "xiaoxuan", role: "OPERATOR", display_name: "小轩" });
+    renderLight(<Probe />, { user: "admin" });
+    expect(screen.getByTestId("role")).toHaveTextContent("admin");
+
+    await ui.click(screen.getByRole("button", { name: "真实登录" }));
+
+    expect(screen.getByTestId("role")).toHaveTextContent("operator");
+    expect(screen.getByTestId("username")).toHaveTextContent("xiaoxuan");
+    // 权限仍按角色判定
+    expect(screen.getByTestId("can-create")).toHaveTextContent("true");
   });
 });
 

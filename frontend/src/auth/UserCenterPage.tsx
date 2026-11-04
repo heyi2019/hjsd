@@ -11,12 +11,12 @@ import { DEV_ROLES, ROLE_PERMISSIONS, useSession } from "../shared/state/session
 import { PERMISSION_LABEL } from "../shared/lib/labels";
 
 export function UserCenterPage({ onClose }: { onClose?: () => void }) {
-  const { user, changePassword, logout } = useSession();
+  const { role, changePassword, logout } = useSession();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
-  const roleLabel = DEV_ROLES.find((r) => r.value === user)?.label ?? "未设置角色";
-  const permissions = ROLE_PERMISSIONS[user] ?? [];
+  const roleLabel = DEV_ROLES.find((r) => r.value === role)?.label ?? "未设置角色";
+  const permissions = ROLE_PERMISSIONS[role] ?? [];
 
   const submit = async (values: { old_password: string; new_password: string; confirm_password: string }) => {
     if (values.new_password !== values.confirm_password) {

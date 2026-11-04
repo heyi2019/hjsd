@@ -9,7 +9,6 @@ import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { executionActionLabel, money, today } from "../../shared/lib/format";
-import { amountByBasisPoints, basisPointsByAmount, fromBasisPoints, fromCents, toBasisPoints, toCents } from "../../shared/lib/money";
 import { ordersApi, policyApi } from "../../shared/api/catalog";
 import { requiredMoneyRules, percentRules, moneyRules } from "../../shared/lib/validators";
 import { InventoryCancellationDialog } from "../../stocks/InventoryCancellationDialog";
@@ -193,6 +192,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     allocationOpen,
     allocationProfit,
     allocationSubmitting,
+    currentEmployeeId,
     employeeOptions,
     loadLedgerDetail,
     profitRoleOptions,
@@ -207,40 +207,20 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     (kind === "BUY" || kind === "SELL") &&
     (actionOrder?.events ?? []).some((event) => event.event_type === kind && event.is_posted);
   const staffOptions = employeeOptions.filter((option) => option.value !== "COMPANY");
-  /** 买号、售出和运营优先只能选业务事实中的负责人；没有候选时退回全部员工，由后端兜底校验。 */
+  /**
+   * 按操作四项的人员只能取业务事实上已登记的执行人：
+   * 买号看业务负责人、售出看交付负责人、运营看运营负责人或运营类事件的操作人。
+   * 没有候选时返回空（不退回全部员工）——人员编辑入口只在账号台账与库存中心，
+   * 这里留空即表示该动作尚未登记负责人，由页面提示去台账补，而不是就地挑一个人。
+   */
   const optionsFor = (kind?: AllocationType) => {
     if (kind === "BUY" || kind === "SELL" || kind === "OPERATION") {
       const ids = allocationCandidates[kind];
-      const picked = employeeOptions.filter(
+      return employeeOptions.filter(
         (option) => typeof option.value === "number" && ids.includes(option.value),
       );
-      return picked.length > 0 ? picked : staffOptions;
     }
     return staffOptions;
-  };
-  const syncAllocationPair = (index: number, field: "allocation_rate" | "allocation_amount", raw: string) => {
-    const rows = (allocationForm.getFieldValue("allocations") as AllocationFormRow[] | undefined) ?? [];
-    const nextRows = rows.map((row, rowIndex) => {
-      if (rowIndex !== index) return row;
-      const next = { ...row, [field]: raw };
-      // 比率↔金额互算：利润与比率都先换成整数（分 / 基点）再乘除，
-      // `profit * rate / 100` 的浮点中间值会给出 0.005 级别的错位。
-      const profitCents = toCents(allocationProfit);
-      if (!raw.trim()) {
-        next[field === "allocation_rate" ? "allocation_amount" : "allocation_rate"] = "";
-      } else if (Number.isFinite(profitCents) && profitCents > 0) {
-        const value = Number(raw.trim());
-        if (!Number.isFinite(value) || value < 0) return next;
-        if (field === "allocation_rate") {
-          next.allocation_amount = fromCents(amountByBasisPoints(profitCents, toBasisPoints(value)));
-        } else {
-          const bp = basisPointsByAmount(profitCents, toCents(value));
-          if (Number.isFinite(bp)) next.allocation_rate = fromBasisPoints(bp);
-        }
-      }
-      return next;
-    });
-    allocationForm.setFieldsValue({ allocations: nextRows });
   };
   return (
       <BusinessActionModal
@@ -259,19 +239,6 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           wrapperCol={{ flex: "auto" }}
           scope="ALLOCATION"
           form={allocationForm}
-          onValuesChange={(changedValues) => {
-            const changedRows = changedValues.allocations as Record<string, AllocationFormRow | undefined> | undefined;
-            const changedEntry = Object.entries(changedRows ?? {}).find(([, row]) => row != null);
-            if (!changedEntry) return;
-            const [indexText, changedRow] = changedEntry;
-            if (!changedRow) return;
-            const index = Number(indexText);
-            const field = changedRow.allocation_rate !== undefined
-              ? "allocation_rate"
-              : changedRow.allocation_amount !== undefined ? "allocation_amount" : undefined;
-            if (!field) return;
-            syncAllocationPair(index, field, changedRow[field] ?? "");
-          }}
           onFinish={async (values: { allocations: AllocationFormRow[]; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             const allRows = values.allocations ?? [];
@@ -312,14 +279,14 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
               <span>
                 订单总利润：
                 <MoneyText value={allocationProfit} tone="auto" strong />
-                {allocationIsLoss ? "（亏损）金额分润不可用，请按比例或暂不分润" : null}
+                {allocationIsLoss ? "（亏损）金额分润请填负数，表示该人分担的亏损额" : null}
               </span>
             }
           />
           <Typography.Paragraph type="secondary">
             {isAction
-              ? "按操作分配：买号、售出、运营、公司四项。比例和金额可任选其一，填写后自动换算另一项；买号/售出只能给该动作的执行人。"
-              : "每行一位员工：比例和金额可任选其一，填写后自动换算另一项。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。"}
+              ? "按操作分配：买号、售出、运营、公司四项。比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。买号/售出只能给该动作的执行人。"
+              : "每行一位员工：比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
@@ -329,7 +296,9 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                   // 公司位不绑人；本单没有的动作位（如代挂无买号）也不给填。
                   const company = kind === "COMPANY";
                   const actionMissing = (kind === "BUY" || kind === "SELL") && !hasPosted(kind);
-                  const employeeDisabled = company || actionMissing;
+                  // 按操作四项的人员一律锁定为台账登记的执行人：分润只分钱、不编人。
+                  // 人员编辑入口只在账号台账与库存中心，避免两处口径打架。
+                  const employeeDisabled = isAction || company || actionMissing;
                   return (
                     <AdaptiveFormGrid key={field.key} className={`orders-allocation-row${isAction ? " is-action" : ""}`}>
                       <Form.Item name={[field.name, "allocation_type"]} hidden>
@@ -374,7 +343,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                       <Form.Item
                         name={[field.name, "allocation_amount"]}
                         label="金额"
-                        rules={moneyRules("金额")}
+                        rules={moneyRules("金额", { allowNegative: true })}
                       >
                         <Input
                           prefix="¥"
@@ -403,7 +372,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                     permission="policy.manage"
                     type="dashed"
                     block
-                    onClick={() => add({ role: "OWNER", allocation_rate: "", allocation_amount: "" })}
+                    onClick={() => add({ employee: currentEmployeeId, role: "OWNER", allocation_rate: "", allocation_amount: "" })}
                   >
                     + 增加一行
                   </PermissionButton>

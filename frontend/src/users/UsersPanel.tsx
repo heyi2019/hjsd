@@ -35,7 +35,7 @@ const PHONE_RULES = [
 // 否则本页的 phone / password 在「新增」「编辑」「重置密码」之间会重复成同一个 DOM id，
 // 导致 <label for> 绑定到错误的输入框（点标签聚焦错位、读屏播报错乱）。
 export function UsersPanel() {
-  const { user } = useSession();
+  const { role } = useSession();
   const roleOptions = useOptionSet("USER_ROLE") ?? USER_ROLE_FALLBACK;
   const scopeOptions = useOptionSet("OWNER_SCOPE") ?? OWNER_SCOPE_FALLBACK;
   const [rows, setRows] = useState<User[]>([]);
@@ -79,7 +79,7 @@ export function UsersPanel() {
     <ErrorBanner error={loadError} onRetry={() => void load()} />
     {import.meta.env.DEV ? (
       <Typography.Paragraph type="secondary">
-        开发态当前角色：{user}；开发态角色不纳入服务端人员列表，下面仅展示可由后端管理的用户账号。
+        开发态当前角色：{role}；开发态角色不纳入服务端人员列表，下面仅展示可由后端管理的用户账号。
       </Typography.Paragraph>
     ) : null}
     <DataTable<User>

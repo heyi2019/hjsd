@@ -287,6 +287,14 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await fillByLabel(dialog, "返点金额", "10.00");
     await fillByLabel(dialog, "返点比例", "5");
     await fillByLabel(dialog, "返点日期", "2026-10-21");
+    // 返点日期是 antd DatePicker（DateField）。fillByLabel 用 force 强填内部 input 会触发
+    // 面板弹出，面板浮层可能遮挡页脚「创建」按钮，使点击等不到可点击态而卡满 30s 默认超时
+    //（完整套件高负载下动画更慢、更易撞上，表现为间歇性失败）。显式收起面板后再提交。
+    const pickerPanel = dialog.locator(".ant-picker-panel").first();
+    if (await pickerPanel.isVisible().catch(() => false)) {
+      await page.keyboard.press("Escape");
+      await pickerPanel.waitFor({ state: "hidden" }).catch(() => undefined);
+    }
     await dialog.getByRole("button", { name: /创\s*建/ }).click();
 
     await expect(page.getByText("返点记录已创建")).toBeVisible({ timeout: 10000 });

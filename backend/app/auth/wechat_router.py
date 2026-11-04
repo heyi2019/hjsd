@@ -39,11 +39,16 @@ class AuthorizeOut(BaseModel):
 
     authorize_url: str
     state: str
+    # 回传通道，前端据此在回调时用相同 channel 兑换 code。
+    channel: str = "web"
 
 
 class WeChatLoginIn(RequestModel):
     code: str = Field(min_length=1, max_length=512)
     state: str = Field(min_length=1, max_length=2048)
+    # web = 桌面扫码（网站应用），h5 = 手机微信内网页授权（公众号）。
+    # 两者的 code 由不同 appid 签发，必须各用自己的 appid/secret 去换，不能混用。
+    channel: str = Field(default="web", pattern="^(web|h5)$")
 
 
 class BindCodeIn(RequestModel):
@@ -146,6 +151,7 @@ def _token_payload(user: User, *, auth_method: str) -> dict:
 def login_methods(settings: Settings = Depends(get_settings)) -> dict:
     """登录页据此决定展示哪些入口。任何渠道未就绪都不点亮按钮。"""
     ready, reason = settings.wechat_ready
+    h5_ready, h5_reason = settings.wechat_h5_ready
     return {
         "password": {"enabled": True},
         "phone_code": {
@@ -159,15 +165,39 @@ def login_methods(settings: Settings = Depends(get_settings)) -> dict:
             "verify_mode": settings.wechat_bind_verify_mode,
             "reason": reason,
         },
+        # 手机端专用：公众号网页授权。桌面端不要用这一项（微信外无法完成授权）。
+        "wechat_h5": {
+            "enabled": bool(settings.wechat_h5_effective_enabled and h5_ready),
+            "configured": bool(settings.wechat_h5_effective_enabled),
+            "provider": settings.wechat_h5_provider,
+            "verify_mode": settings.wechat_bind_verify_mode,
+            "reason": h5_reason,
+        },
     }
 
 
 @router.get("/wechat/authorize", response_model=AuthorizeOut)
 def wechat_authorize(
     redirect_uri: str = "",
+    channel: str = "web",
     settings: Settings = Depends(get_settings),
 ) -> AuthorizeOut:
+    if channel not in {"web", "h5"}:
+        raise Validation("不支持的微信登录通道")
     state = verification.issue_ticket(settings, purpose=_STATE_PURPOSE, phone="", ttl_seconds=600)
+    if channel == "h5":
+        if settings.wechat_h5_provider == wechat.MP:
+            # 真实通道必须使用公众号后台配置过的网页授权域名，不接受前端任意传参。
+            target = settings.wechat_h5_redirect_uri
+        else:
+            target = redirect_uri.strip() or settings.wechat_h5_redirect_uri
+        if not target:
+            raise Validation("缺少微信 H5 回调地址，无法发起登录")
+        return AuthorizeOut(
+            authorize_url=wechat.build_h5_authorize_url(settings, state=state, redirect_uri=target),
+            state=state,
+            channel="h5",
+        )
     if settings.wechat_provider == wechat.OPEN_PLATFORM:
         # 真实通道必须使用开放平台备案过的回调地址，不接受前端任意传参。
         target = settings.wechat_redirect_uri
@@ -178,6 +208,7 @@ def wechat_authorize(
     return AuthorizeOut(
         authorize_url=wechat.build_authorize_url(settings, state=state, redirect_uri=target),
         state=state,
+        channel="web",
     )
 
 
@@ -188,13 +219,19 @@ def wechat_login(
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> PasswordlessLoginOut:
-    if not settings.wechat_effective_enabled:
+    if payload.channel == "h5":
+        if not settings.wechat_h5_effective_enabled:
+            raise Validation("微信 H5 登录未启用")
+    elif not settings.wechat_effective_enabled:
         raise Validation("微信登录未启用")
     # state 是我们自己签发的，验签即证明本次回跳由本系统发起（CSRF 防护）。
     verification.read_ticket(settings, payload.state, purpose=_STATE_PURPOSE)
     _guard(f"wechat-login:{_client_ip(request)}", 20, 60, settings, "微信登录尝试过于频繁，请稍后再试")
 
-    identity = wechat.exchange_code(settings, code=payload.code)
+    if payload.channel == "h5":
+        identity = wechat.exchange_h5_code(settings, code=payload.code)
+    else:
+        identity = wechat.exchange_code(settings, code=payload.code)
     result = wechat_service.resolve_login(db, settings, identity)
 
     if result.state == "logged_in" and result.user is not None:

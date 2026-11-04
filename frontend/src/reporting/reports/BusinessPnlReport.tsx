@@ -30,28 +30,19 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
       align: "right",
       render: (v: string) => <MoneyText value={v} tone="auto" strong />,
     },
-    { title: "已结算返点", dataIndex: "settled_rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "未归集返点", dataIndex: "uncollected_rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
-    {
-      title: "完整收益",
-      dataIndex: "full_income",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
-    },
   ];
   return (
     <Card className="glass" title="业务级损益 R5">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>
-        完整收益 = 主营利润；返点收入与分期坏账已计入主营收入 / 成本，已结算返点、未归集返点仅作展示列，不重复加回。
+        主营毛利 = 所有收入 − 所有支出；返点收入与分期坏账已分别计入收入 / 成本。返点金额统一按返点记录金额，历史「已结算返点 / 未归集返点 / 完整收益」列已下线。
       </Note>
       <StatRow
         items={[
+          { label: "主营收入", amount: data?.total.main_income ?? "-" },
+          { label: "主营成本", amount: data?.total.main_cost ?? "-" },
           { label: "主营毛利", amount: data?.total.main_profit ?? "-", tone: "auto" },
-          { label: "已结算返点", amount: data?.total.settled_rebate ?? "-" },
-          { label: "未归集返点", amount: data?.total.uncollected_rebate ?? "-" },
-          { label: "完整收益", amount: data?.total.full_income ?? "-", tone: "auto" },
         ]}
       />
              <DataTable<BusinessPnlRow>

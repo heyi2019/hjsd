@@ -74,9 +74,6 @@ export interface BusinessPnlRow {
   main_income: string;
   main_cost: string;
   main_profit: string;
-  settled_rebate: string;
-  uncollected_rebate: string;
-  full_income: string;
 }
 
 export interface BusinessPnlReport {

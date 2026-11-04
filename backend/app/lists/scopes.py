@@ -271,9 +271,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("main_income", "主营收入"),
             ListColumn("main_cost", "主营成本"),
             ListColumn("main_profit", "主营毛利"),
-            ListColumn("settled_rebate", "已结算返点"),
-            ListColumn("uncollected_rebate", "未归集返点"),
-            ListColumn("full_income", "完整收益"),
         ),
     ),
     ListScope(

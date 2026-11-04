@@ -67,12 +67,15 @@ class TestReports:
         assert month[0]["account_direct_cost"] == 1300
         assert month[0]["operating_expense"] == 0
 
-    def test_r5_uncollected_rebate_is_separate_column(self, seeded_db):
+    def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
+        """11-05 二次裁决：结算展示列下线，返点金额全站只认 base_amount。"""
         data = reporting_service.r5_business_pnl(seeded_db)
         for item in data["items"]:
-            assert "uncollected_rebate" in item
-            # 返点收入已计入主营利润，完整收益不重复加回，也不摊未归集
-            assert item["full_income"] == item["main_profit"]
+            assert {"main_income", "main_cost", "main_profit"} <= set(item)
+            for key in ("settled_rebate", "uncollected_rebate", "full_income"):
+                assert key not in item
+        for key in ("settled_rebate", "uncollected_rebate", "full_income"):
+            assert key not in data["total"]
 
     def test_daily_funds_matches_pool_balance(self, seeded_db):
         from datetime import date

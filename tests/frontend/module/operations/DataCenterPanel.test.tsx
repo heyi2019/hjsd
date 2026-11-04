@@ -37,9 +37,6 @@ const businessPnl = {
     main_income: "1,000.00",
     main_cost: "200.00",
     main_profit: "800.00",
-    settled_rebate: "0.00",
-    uncollected_rebate: "0.00",
-    full_income: "800.00",
   },
   items: [],
 };

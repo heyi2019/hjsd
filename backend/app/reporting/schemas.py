@@ -101,18 +101,12 @@ class BusinessPnlItemOut(ReportModel):
     main_income: Decimal
     main_cost: Decimal
     main_profit: Decimal
-    settled_rebate: Decimal
-    uncollected_rebate: Decimal
-    full_income: Decimal
 
 
 class BusinessPnlTotalOut(ReportModel):
     main_income: Decimal
     main_cost: Decimal
     main_profit: Decimal
-    settled_rebate: Decimal
-    uncollected_rebate: Decimal
-    full_income: Decimal
 
 
 class BusinessPnlOut(ReportModel):

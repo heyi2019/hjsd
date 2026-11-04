@@ -221,9 +221,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       },
     ) as never);
     vi.mocked(catalog.reportsApi.businessPnl).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { main_profit: "0", settled_rebate: "0", uncollected_rebate: "0", full_income: "0" } } : {
-        items: [{ order_type: "HS", business_mode: "SELF", main_income: "100", main_cost: "50", main_profit: "50", settled_rebate: "0", uncollected_rebate: "0", full_income: "50" }],
-        total: { main_profit: "50", settled_rebate: "0", uncollected_rebate: "0", full_income: "50" },
+      params?.from ? { items: [], total: { main_profit: "0" } } : {
+        items: [{ order_type: "HS", business_mode: "SELF", main_income: "100", main_cost: "50", main_profit: "50" }],
+        total: { main_profit: "50" },
       },
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });

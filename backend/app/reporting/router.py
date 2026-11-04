@@ -76,7 +76,7 @@ def business_pnl(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> BusinessPnlOut:
-    """R5 业务级损益：未归集返点独立列，不摊给业务。"""
+    """R5 业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
     return service.r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 

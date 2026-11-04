@@ -55,7 +55,7 @@
 
 上表除 `testing/功能编号注册表.csv` 与 `testing/功能代码测试映射表.csv` 外均由脚本生成，**跑完测试若产生 diff 应随该次改动一并提交**（它们是「当前测了什么」的快照）。
 
-另有两份 nodeid ↔ 测试编号的映射索引**不入库**：`tests/backend/_report/case_index.json`、`tests/backend/_report/case_number_map.json`。原因：每次执行都整份重写（约 584KB），入库只剩无意义 diff；CI 的 `backend-gate.yml` 在跑测试前已先执行 `scripts/gen_test_case_library.py` 重建，本地同理。`conftest.py` 读不到时返回空映射（编号列缺省），不会让测试失败。
+另有两份 nodeid ↔ 测试编号的映射索引**不入库**：`tests/backend/_report/case_index.json`、`tests/backend/_report/case_number_map.json`。原因：每次执行都整份重写（约 584KB），入库只剩无意义 diff；`backend-gate.yml` 在跑完测试后执行 `scripts/gen_test_case_library.py` 重建，本地同理。**编号不依赖这两份不入库文件**：生成器在映射缺失时由 `_load_number_map()` 从入库的《测试用例库.csv》自举恢复序号，否则全新 checkout 会按排序重排、与入库快照错位（实测 2666 条里 1640 条漂移）。`conftest.py` 读不到索引时返回空映射（编号列缺省）、不会让测试失败；因 CI 的生成器排在测试之后，该缺省在 CI 会出现，属已知缺口待处理。
 
 ### 3.3 治理留痕（时点性，不随代码更新）
 

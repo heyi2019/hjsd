@@ -6,11 +6,13 @@
   - docs/testing/测试用例库.csv   （12 核心字段 + 测试名称/功能名称/关联旧编号/流程编号/备注）
   - docs/testing/测试用例库.md    （按功能编号分组的可读视图）
   - tests/backend/_report/case_index.json   （nodeid -> 测试用例编号，供执行记录器关联）
-  - tests/backend/_report/case_number_map.json（持久化序号，保证编号稳定不漂移）
+  - tests/backend/_report/case_number_map.json（本地持久化序号；不入库）
 
 编号规则：<类型>-<功能编号>-<三位序号>，类型=UT/IT/E2E，功能编号见 功能编号注册表.csv。
 类型判定：后端落在 run_regression.py 的 unit 组 -> UT，其余 -> IT；前端 vitest -> IT。
-幂等：重复运行只追加新用例序号，已分配编号冻结（case_number_map.json 持久化）。
+幂等：重复运行只追加新用例序号，已分配编号冻结。该 map 不入库，全新 checkout /
+CI 缺失时由 _load_number_map() 从入库的《测试用例库.csv》自举恢复，否则按排序
+重排编号会与入库快照错位（实测 2666 条里 1640 条漂移）。
 
 文件 -> 功能 -> 模块(A/B/C/D/E/F/SYS) 的映射统一取自 scripts/test_catalog.py（单一事实源）。
 """
@@ -463,13 +465,45 @@ def extract_precond(relpath: str, body: str) -> str:
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
+def _load_number_map() -> dict[str, int]:
+    """恢复「层级|功能编号|文件名|函数标识 → 序号」，保证编号不漂移。
+
+    case_number_map.json 按设计不入库（.gitignore：每次整份重写约 584KB）。
+    全新 checkout / CI 上它不存在，旧实现从空 map 起按排序重新分配序号：
+    因历史编号带空洞（删过的用例留号），重排后实测 2666 条里 **1640 条**
+    与入库快照不一致，报告的 nodeid↔编号关联整体错位。
+
+    故优先读生成器产物；缺失时从**入库的**《测试用例库.csv》自举同一份映射
+    （csv 的「测试层级 / 功能编号 / 自动化测试文件及函数 / 测试函数标识 /
+    测试编号」五列足以还原 key 与序号）。两份都无才是真正的首次生成，
+    返回空 dict 走原有分配逻辑。
+    """
+    if os.path.exists(CASE_MAP):
+        return json.load(open(CASE_MAP, encoding="utf-8"))
+    if not os.path.exists(OUT_CSV):
+        return {}
+    out: dict[str, int] = {}
+    with open(OUT_CSV, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            rel = row.get("自动化测试文件及函数") or ""
+            name = row.get("测试函数标识") or ""
+            tier = row.get("测试层级") or ""
+            func = row.get("功能编号") or ""
+            # 只取编号末段数字，不假设前缀结构：层级前缀可能是 E2E（含数字），
+            # 用 [A-Z]+ 会把全部 53 条 E2E 漏掉、编号照样漂移。
+            parts = (row.get("测试编号") or "").rsplit("-", 1)
+            if not (rel and name and tier and func and len(parts) == 2 and parts[1].isdigit()):
+                continue
+            key = f"{tier}|{func}|{os.path.basename(rel)}|{name}"
+            out[key] = int(parts[1])
+    return out
+
+
 def main() -> None:
     os.makedirs(REPORT_DIR, exist_ok=True)
     reg = load_registry()
 
-    number_map: dict[str, int] = {}
-    if os.path.exists(CASE_MAP):
-        number_map = json.load(open(CASE_MAP, encoding="utf-8"))
+    number_map: dict[str, int] = _load_number_map()
 
     cases: list[dict] = []
     index: dict[str, str] = {}

@@ -284,9 +284,39 @@ def test_sale_scopes_have_independent_field_sets(seeded_db):
             )
         )
 
-    assert [count(code) for code in codes] == [13, 13, 13]
+    # 三份字段集按各自界面差异化：回收/提号含分期与分笔，代挂只有佣金口径。
+    assert [count(code) for code in codes] == [28, 28, 21]
     assert count("SALE") == 0
+    assert amount_of("SALEREC").label == "售出金额"
+    assert amount_of("SALEDG").label == "利润"
+    assert "sale_amount" in {
+        row.field_key
+        for row in seeded_db.scalars(
+            select(OrderFormField).where(OrderFormField.order_type_code == "SALEDG")
+        )
+    }
+    assert "payment_method" not in {
+        row.field_key
+        for row in seeded_db.scalars(
+            select(OrderFormField).where(OrderFormField.order_type_code == "SALEDG")
+        )
+    }
+    # 无界面控件的占位行已清理；条件必填的依赖字段必须在同一作用域内。
+    for code in codes:
+        keys = {
+            row.field_key
+            for row in seeded_db.scalars(
+                select(OrderFormField).where(OrderFormField.order_type_code == code)
+            )
+        }
+        assert not {"first_due_on", "customer_id"} & keys
+        for row in seeded_db.scalars(
+            select(OrderFormField).where(OrderFormField.order_type_code == code)
+        ):
+            if row.required_when:  # JSON 列可能存的是 JSON null 而非 SQL NULL
+                assert row.required_when["field"] in keys
+
     amount_of("SALEREC").label = "回收成交价"
     seeded_db.flush()
     assert amount_of("SALETH").label == "售出金额"
-    assert amount_of("SALEDG").label == "售出金额"
+    assert amount_of("SALEDG").label == "利润"

@@ -1,26 +1,39 @@
-"""订单金额口径：已过账事件的收入 / 买入成本 / 直接费用汇总。
+"""订单金额口径：事件口径的成交额 / 本金，以及资金明细口径的利润。
 
 为什么单独成模块：
 - 报表（app/reporting/service.py）与规则派生（返点基数、分期服务费基数）必须
   用同一套口径，否则「报表说成交额 1000，返点按 900 计提」这类不一致会查不出来。
 - 该口径是订单域事实，不属于报表，下沉到 orders 域避免反向依赖。
 
-口径（与 BAS 报表一致，勿凭直觉改）：
-- SELL 事件金额 = 收入；BUY 事件金额 = 买入成本；COST 事件金额 = 直接费用；
-- CANCEL 仅在其显式 offset 某事件时才做会计冲销；裸取消只改流程状态，不改历史损益。
+口径（勿凭直觉改）：
+- GROSS / PRINCIPAL：已过账事件口径，SELL=成交额、BUY=本金占用、COST=直接费用；
+  CANCEL 仅在其显式 offset 某事件时才做会计冲销；裸取消只改流程状态。
+- PROFIT（2026-11-05 用户裁决）：该订单**所有收入 − 所有支出**，可正、可负、可为 0。
+  资金走向只有收入 / 支出两种，不以「有没有生成 cashflow 行」为界：
+  收入 = 资金流水 IN + 返点记录金额；支出 = 资金流水 OUT + 分期坏账金额。
+  返点登记即完成收入确认（app/finance/rebates.py），分期坏账是回收时确认的损失，
+  两者都不生成资金流水，但都有明确资金走向，必须计入利润。
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
-from app.domain.enums import EventType
-from app.domain.trade import OrderEvent
+from app.domain.enums import Direction, EventType, InstallmentDispositionAction
+from app.domain.trade import (
+    Cashflow,
+    Installment,
+    InstallmentDisposition,
+    OrderEvent,
+    RebateRecord,
+)
 
 ZERO = Decimal("0.00")
 
@@ -76,19 +89,149 @@ def event_totals(
     return income, buy_amount, direct_cost
 
 
+def _profit_flow_rows(
+    session: Session,
+    *,
+    order_ids: list[int] | None,
+    from_date: date | None,
+    to_date: date | None,
+) -> list[tuple[int, date, Decimal, Decimal]]:
+    """「无资金流水、但有资金走向」的事实明细：(order_id, 归期, 收入, 支出)。
+
+    - 返点记录 = 收入，金额取返点金额 `base_amount`，按 `collected_on` 归期；
+      与库存详情「资金明细」的返点收入行同源（前端标为「收入」）。
+    - 分期坏账 = 支出，金额取 `Installment.bad_debt_amount`，按回收处置
+      `InstallmentDisposition.occurred_on` 归期；一份合约只有一次 RECOVER，
+      连接不会放大金额。
+
+    不过滤审核状态 / 资金性质：资金走向只有收入、支出两类，登记即计入。
+    """
+    rows: list[tuple[int, date, Decimal, Decimal]] = []
+
+    rebate_stmt = select(
+        RebateRecord.source_order_id,
+        RebateRecord.collected_on,
+        RebateRecord.base_amount,
+    )
+    if order_ids is not None:
+        rebate_stmt = rebate_stmt.where(RebateRecord.source_order_id.in_(order_ids))
+    if from_date is not None:
+        rebate_stmt = rebate_stmt.where(RebateRecord.collected_on >= from_date)
+    if to_date is not None:
+        rebate_stmt = rebate_stmt.where(RebateRecord.collected_on <= to_date)
+    for order_id, occurred_on, amount in session.execute(rebate_stmt).all():
+        rows.append((int(order_id), occurred_on, _money(amount), ZERO))
+
+    bad_debt_stmt = (
+        select(
+            Installment.order_id,
+            InstallmentDisposition.occurred_on,
+            Installment.bad_debt_amount,
+        )
+        .join(
+            InstallmentDisposition,
+            InstallmentDisposition.installment_id == Installment.id,
+        )
+        .where(
+            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
+            Installment.bad_debt_amount > 0,
+        )
+    )
+    if order_ids is not None:
+        bad_debt_stmt = bad_debt_stmt.where(Installment.order_id.in_(order_ids))
+    if from_date is not None:
+        bad_debt_stmt = bad_debt_stmt.where(InstallmentDisposition.occurred_on >= from_date)
+    if to_date is not None:
+        bad_debt_stmt = bad_debt_stmt.where(InstallmentDisposition.occurred_on <= to_date)
+    for order_id, occurred_on, amount in session.execute(bad_debt_stmt).all():
+        rows.append((int(order_id), occurred_on, ZERO, _money(amount)))
+
+    return rows
+
+
+def _resolved_ids(order_ids: Iterable[int] | None) -> list[int] | None:
+    if order_ids is None:
+        return None
+    return list(order_ids)
+
+
+def order_profit_flow_by_order(
+    session: Session,
+    *,
+    order_ids: Iterable[int] | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> dict[int, tuple[Decimal, Decimal]]:
+    """按订单汇总返点收入 / 坏账支出：`{order_id: (收入, 支出)}`。"""
+    ids = _resolved_ids(order_ids)
+    if ids is not None and not ids:
+        return {}
+    totals: dict[int, list[Decimal]] = defaultdict(lambda: [ZERO, ZERO])
+    for order_id, _on, income, expense in _profit_flow_rows(
+        session, order_ids=ids, from_date=from_date, to_date=to_date
+    ):
+        totals[order_id][0] += income
+        totals[order_id][1] += expense
+    return {key: (value[0], value[1]) for key, value in totals.items()}
+
+
+def order_profit_flow_by_date(
+    session: Session,
+    *,
+    order_ids: Iterable[int] | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> dict[date, tuple[Decimal, Decimal]]:
+    """按发生日汇总返点收入 / 坏账支出：`{date: (收入, 支出)}`（R2 按月聚合用）。"""
+    ids = _resolved_ids(order_ids)
+    if ids is not None and not ids:
+        return {}
+    totals: dict[date, list[Decimal]] = defaultdict(lambda: [ZERO, ZERO])
+    for _order_id, occurred_on, income, expense in _profit_flow_rows(
+        session, order_ids=ids, from_date=from_date, to_date=to_date
+    ):
+        totals[occurred_on][0] += income
+        totals[occurred_on][1] += expense
+    return {key: (value[0], value[1]) for key, value in totals.items()}
+
+
+def order_cashflow_profit(session: Session, order_id: int) -> Decimal:
+    """订单利润：所有收入 − 所有支出（可正、可负、可为 0）。
+
+    收入 = 资金流水 IN 合计 + 返点记录金额；支出 = 资金流水 OUT 合计 + 分期坏账。
+    不过滤审核状态与资金性质；冲销流水本身是反向流水，自然被计入。
+    """
+    rows = session.execute(
+        select(Cashflow.direction, func.coalesce(func.sum(Cashflow.amount), 0))
+        .where(Cashflow.order_id == order_id)
+        .group_by(Cashflow.direction)
+    ).all()
+    income = ZERO
+    expense = ZERO
+    for direction, total in rows:
+        if direction == Direction.IN.value:
+            income += _money(total)
+        else:
+            expense += _money(total)
+    rebate_income, bad_debt_expense = order_profit_flow_by_order(
+        session, order_ids=[order_id]
+    ).get(order_id, (ZERO, ZERO))
+    return to_money((income + rebate_income) - (expense + bad_debt_expense))
+
+
 def order_amounts(session: Session, order_id: int) -> dict[str, Decimal]:
     """按订单取口径金额：成交额 / 本金 / 利润。
 
-    - GROSS：卖出收入合计（成交额）
-    - PRINCIPAL：买入成本合计（本金占用）
-    - PROFIT：收入 - 买入成本 - 直接费用（不含返点，避免规则自引用）
+    - GROSS：卖出收入合计（成交额，事件口径）
+    - PRINCIPAL：买入成本合计（本金占用，事件口径）
+    - PROFIT：该订单所有收入 − 所有支出（可负、可 0）
     """
     events = list(
         session.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id)).all()
     )
-    income, buy_amount, direct_cost = event_totals(events)
+    income, buy_amount, _ = event_totals(events)
     return {
         "GROSS": income,
         "PRINCIPAL": buy_amount,
-        "PROFIT": income - buy_amount - direct_cost,
+        "PROFIT": order_cashflow_profit(session, order_id),
     }

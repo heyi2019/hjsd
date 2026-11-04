@@ -199,7 +199,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
 
     expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
     expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/净利 = 收入 - 账号采购成本 - 直接成本 \+ 返点/)).toBeInTheDocument();
+    expect(screen.getByText(/净利 = 所有收入 − 所有支出/)).toBeInTheDocument();
     expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
   });
 });

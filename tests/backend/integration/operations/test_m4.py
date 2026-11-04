@@ -71,8 +71,8 @@ class TestReports:
         data = reporting_service.r5_business_pnl(seeded_db)
         for item in data["items"]:
             assert "uncollected_rebate" in item
-            # 完整收益只加已结算返点，不摊未归集
-            assert item["full_income"] == item["main_profit"] + item["settled_rebate"]
+            # 返点收入已计入主营利润，完整收益不重复加回，也不摊未归集
+            assert item["full_income"] == item["main_profit"]
 
     def test_daily_funds_matches_pool_balance(self, seeded_db):
         from datetime import date
@@ -86,8 +86,10 @@ class TestReports:
     def test_order_profit_totals_are_consistent(self, seeded_db):
         data = reporting_service.order_profit_detail(seeded_db)
         for item in data["items"]:
+            # 净利 = 资金明细所有收入 − 所有支出（11-05 裁决）；
+            # 返点独立成列、不进净利。
             assert item["net_profit"] == (
-                item["income"] - item["buy_amount"] - item["direct_cost"] + item["rebate"]
+                item["income"] - item["buy_amount"] - item["direct_cost"]
             )
 
     def test_r3_drills_down_to_orders(self, seeded_db):

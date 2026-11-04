@@ -42,6 +42,7 @@ from app.domain.trade import (
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.orders import service as orders_service
+from app.orders.amounts import order_profit_flow_by_order
 
 from .schemas import (
     AccountOut,
@@ -549,7 +550,8 @@ def execution_detail(
             for row in db.scalars(select(AuditLog).where(or_(*audit_filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
         ]
     # 财务汇总与上面组装出的明细同源：事件流水 + 订单独立流水 + 返点收入。
-    # 返点不过滤 status——与前端既有口径保持一致（未收取的返点也计入应收收入）。
+    # 资金走向只有收入 / 支出两种：返点登记即收入确认、分期坏账是回收时确认
+    # 的损失（支出），两者都不生成资金流水，但都必须计入总收入 / 总支出与净额。
     zero = Decimal("0.00")
     cashflow_income = zero
     total_expense = zero
@@ -568,6 +570,19 @@ def execution_detail(
     for order_rebates in rebates_by_order.values():
         for rebate in order_rebates:
             rebate_income += rebate.base_amount
+    # 坏账是支出，与订单利润同源；它不占「资金明细」流水行，但必须扣减净额。
+    bad_debt_expense = zero
+    if order_ids:
+        bad_debt_expense = sum(
+            (
+                expense
+                for _rebate_income, expense in order_profit_flow_by_order(
+                    db, order_ids=order_ids
+                ).values()
+            ),
+            zero,
+        )
+    total_expense += bad_debt_expense
     finance_summary = ExecutionFinanceSummaryOut(
         cashflow_income=cashflow_income,
         rebate_income=rebate_income,

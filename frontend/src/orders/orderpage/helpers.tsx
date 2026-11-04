@@ -84,7 +84,11 @@ export function buildActionAllocationCandidates(order: Pick<Order, "events" | "f
   };
 }
 
-/** 按操作四项构建表单行：买号/售出只有唯一执行人时自动带出，多人协作留空由人工选。 */
+/**
+ * 按操作四项构建表单行：姓名默认取「当前登录人」，不是角色。
+ * - 买号/售出：唯一执行人直接带出；多人时只有当前登录人本身是执行人之一才默认他，否则留空由人工选。
+ * - 运营：没有候选或候选含当前登录人时默认当前登录人（运营通常就是当前操作人）。
+ */
 export function buildActionAllocationRows(
   items: Array<{
     allocation_type?: AllocationType | null;
@@ -94,6 +98,7 @@ export function buildActionAllocationRows(
     allocation_amount?: string;
   }>,
   candidates: ActionAllocationCandidates,
+  currentEmployeeId?: number,
 ): AllocationFormRow[] {
   const order: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
   return order.map((kind) => {
@@ -105,7 +110,10 @@ export function buildActionAllocationRows(
       employee = "COMPANY";
     } else {
       const ids = candidates[kind];
-      employee = ids.length === 1 ? ids[0] : undefined;
+      if (ids.length === 1) employee = ids[0];
+      else if (currentEmployeeId != null && (kind === "OPERATION" ? ids.length === 0 || ids.includes(currentEmployeeId) : ids.includes(currentEmployeeId))) {
+        employee = currentEmployeeId;
+      }
     }
     return {
       allocation_type: kind,
@@ -137,7 +145,7 @@ export function validateAllocations(
       const amount = Number(String(row.allocation_amount ?? "").trim());
       const hasRate = String(row.allocation_rate ?? "").trim() !== "";
       const hasAmount = String(row.allocation_amount ?? "").trim() !== "";
-      if ((!hasRate && !hasAmount) || (hasRate && (!Number.isFinite(rate) || rate < 0)) || (hasAmount && (!Number.isFinite(amount) || amount < 0))) {
+      if ((!hasRate && !hasAmount) || (hasRate && (!Number.isFinite(rate) || rate < 0)) || (hasAmount && !Number.isFinite(amount))) {
         return { ok: false, error: `${ALLOCATION_TYPE_LABEL[row.allocation_type as AllocationType]} 请输入有效的比例或金额` };
       }
       if (hasRate) rateTotal += rate;
@@ -157,8 +165,12 @@ export function validateAllocations(
     }
     if (!useRate) {
       const profit = Number(orderProfit);
-      if (profit <= 0) return { ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" };
-      if (amountTotal > profit) return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
+      if (profit > 0 && amountTotal < 0) return { ok: false, error: "该单为盈利单，分润金额不能为负数" };
+      if (profit < 0 && amountTotal > 0) return { ok: false, error: "该单为亏损单，分润金额必须填负数（亏损分担额）" };
+      if (profit === 0) return { ok: false, error: "该单利润为 0，按金额分润只能填 0，请改用比例" };
+      if (Math.abs(amountTotal) > Math.abs(profit)) {
+        return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
+      }
     }
     items.forEach((item, index) => {
       const row = rows[index];
@@ -174,9 +186,10 @@ export function validateAllocations(
     const rate = String(row.allocation_rate ?? "").trim();
     const amount = String(row.allocation_amount ?? "").trim();
     const hasRate = Number(rate) > 0;
-    const hasAmount = Number(amount) > 0;
+    // 亏损单的金额是负数（-300 = 分担 300 亏损），故不能用 `> 0` 判定「填了金额」。
+    const hasAmount = amount !== "" && Number(amount) !== 0;
     if (!hasRate && !hasAmount) return { ok: false, error: "每行至少填比例或金额之一" };
-    if (hasRate && hasAmount && Number.isFinite(Number(rate)) && Number.isFinite(Number(amount)) && Number(orderProfit) > 0) {
+    if (hasRate && hasAmount && Number.isFinite(Number(rate)) && Number.isFinite(Number(amount)) && Number(orderProfit) !== 0) {
       const expectedAmount = Number(orderProfit) * Number(rate) / 100;
       if (Math.abs(expectedAmount - Number(amount)) > 0.01) return { ok: false, error: "比例和金额换算不一致" };
     }
@@ -193,10 +206,15 @@ export function validateAllocations(
   if (useRate && amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
     return { ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" };
   }
-  if (!useRate && amountTotal > 0) {
+  if (!useRate && amountTotal !== 0) {
     const profit = Number(orderProfit);
-    if (profit <= 0) return { ok: false, error: "该单当前为亏损或无利润，不能按金额分润，请改用比例" };
-    if (amountTotal > profit) return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
+    if (profit > 0 && amountTotal < 0) return { ok: false, error: "该单为盈利单，分润金额不能为负数" };
+    if (profit < 0 && amountTotal > 0) return { ok: false, error: "该单为亏损单，分润金额必须填负数（亏损分担额）" };
+    if (profit === 0) return { ok: false, error: "该单利润为 0，按金额分润只能填 0，请改用比例" };
+    // 亏损单按绝对值比较：profit=-1000 时下限即 -1000（不得超额分担亏损）。
+    if (Math.abs(amountTotal) > Math.abs(profit)) {
+      return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
+    }
   }
   items.forEach((item, index) => {
     const row = rows[index];

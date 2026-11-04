@@ -44,7 +44,7 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <Note>
-        完整收益 = 主营毛利 + 已结算返点收益；未归集返点独立列示，不摊给业务（REB-01-06）。
+        完整收益 = 主营利润；返点收入与分期坏账已计入主营收入 / 成本，已结算返点、未归集返点仅作展示列，不重复加回。
       </Note>
       <StatRow
         items={[

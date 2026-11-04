@@ -125,6 +125,7 @@ def test_summary_splits_cashflow_and_rebate_income(seeded_client, seeded_db, hea
     assert Decimal(summary["rebate_income"]) == Decimal("50.00")
     assert Decimal(summary["total_income"]) == Decimal("150.00")
     assert Decimal(summary["total_expense"]) == Decimal("300.00")
+    # 净额 = 所有收入 − 所有支出；返点登记即收入，必须并入净额（11-05 裁决）。
     assert Decimal(summary["net_amount"]) == Decimal("-150.00")
 
 
@@ -185,7 +186,8 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
     assert Decimal(summary["rebate_income"]) == rebate_total == Decimal("20.00")
     assert Decimal(summary["total_income"]) == inflow + rebate_total
     # 净额允许为负，用 Decimal 精确比较，不经 float。
-    assert Decimal(summary["net_amount"]) == inflow + rebate_total - outflow
+    # 资金走向只有收入 / 支出：返点虽不生成流水，仍是收入，计入净额。
+    assert Decimal(summary["net_amount"]) == inflow + rebate_total - outflow == Decimal("-203.68")
 
 
 def test_summary_is_zero_without_any_flow(seeded_client, seeded_db, headers):

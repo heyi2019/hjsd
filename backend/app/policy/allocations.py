@@ -114,7 +114,7 @@ def _set_person_allocations(
                 f"分配角色必须为 {AllocationRole.values()}",
                 details={"field": "role", "value": item.get("role")},
             )
-        if rate > 0 and amount > 0:
+        if rate != 0 and amount != 0:
             raise Validation(
                 "同一分润行不能同时填比例和金额，二者只能选一个",
                 details={"field": "items"},
@@ -148,14 +148,27 @@ def _set_person_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
-    if total_amount > 0:
+    if total_amount != 0:
         profit = order_amounts(session, order_id)["PROFIT"]
-        if profit <= 0:
+        # 金额方向必须与订单盈亏一致：盈利单填正数、亏损单填负数（负数=该人分担的亏损额）。
+        # 方向反了等于把亏损记成收益，故直接拒绝而不是取绝对值。
+        if profit > 0 and total_amount < 0:
             raise Validation(
-                "该单尚无正利润，不能按金额分润；请改用比例分润",
-                details={"profit": str(profit)},
+                f"该单为盈利单（利润 {profit}），分润金额不能为负数",
+                details={"total_amount": str(total_amount), "profit": str(profit)},
             )
-        if total_amount > profit:
+        if profit < 0 and total_amount > 0:
+            raise Validation(
+                f"该单为亏损单（利润 {profit}），分润金额必须填负数（亏损分担额）",
+                details={"total_amount": str(total_amount), "profit": str(profit)},
+            )
+        if profit == 0:
+            raise Validation(
+                "该单利润为 0，按金额分润只能填 0；请改用比例分润",
+                details={"total_amount": str(total_amount)},
+            )
+        # 以绝对值为界：亏损单的「不超过利润」= 不得超额分担亏损（profit=-1000 时下限 -1000）。
+        if abs(total_amount) > abs(profit):
             raise Validation(
                 f"分润金额合计 {total_amount} 超过订单利润 {profit}",
                 details={"total_amount": str(total_amount), "profit": str(profit)},

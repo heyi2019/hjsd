@@ -236,7 +236,7 @@ class ExecutionFinanceSummaryOut(BaseModel):
     """账号维度的财务汇总：明细在前端拼装，合计一律由后端给。
 
     口径与本接口的 orders 完全一致（事件流水 + 订单独立流水 + 返点收入），
-    前端不再对详情数据做第二遍累加。
+    另含分期坏账支出（损失计提，不占资金明细流水行）；前端不再对详情数据做第二遍累加。
     """
 
     cashflow_income: Decimal

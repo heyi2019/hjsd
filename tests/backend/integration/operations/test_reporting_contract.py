@@ -318,12 +318,16 @@ class TestR2MonthlyPnl:
 
         monthly = reporting_service.r2_monthly_pnl(seeded_db)
         oct_item = _month_item(monthly, "2026-10")
-        assert oct_item["sales_income"] == 0
-        assert oct_item["account_direct_cost"] == 500
+        # 资金明细口径（11-05 裁决）：撤销售出产生一笔反向资金流水，
+        # 收入列仍是已入账的 800，冲销的 800 计入支出；净利仍为 -500。
+        assert oct_item["sales_income"] == 800
+        assert oct_item["account_direct_cost"] == 1300
+        assert oct_item["operating_profit"] == -500
 
         detail = reporting_service.order_profit_detail(seeded_db)["items"][0]
-        assert detail["income"] == 0
+        assert detail["income"] == 800
         assert detail["buy_amount"] == 500
+        assert detail["direct_cost"] == 800
         assert detail["net_profit"] == -500
 
 

@@ -247,3 +247,62 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
     rows = [row for group in report["groups"] for row in group.get("orders", [])]
 
     assert [row["profit_base"] for row in rows] == [Decimal("120.00")]
+
+
+# ---- 亏损单分润（2026-11-05 用户裁决「亏损的时候分亏损」）----
+# 亏损单按金额分润填负数，表示该人分担的亏损额。方向必须与订单盈亏一致，
+# 且报表 base 取负值（`amount != 0` 判据；旧实现用 `> 0` 会把负数当未填而回退比例）。
+
+
+def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
+    """亏损单（利润 -500）填 -300：落库为负，报表 profit_base 也取 -300。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],
+    )
+
+    assert [row["allocation_amount"] for row in rows] == ["-300.00"]
+    assert all(row["allocation_rate"] == "0.00" for row in rows)
+
+    report = reporting_service.r3_commission_reconciliation(seeded_db)
+    entries = [row for group in report["groups"] for row in group.get("orders", [])]
+    assert [row["profit_base"] for row in entries] == [Decimal("-300.00")]
+
+
+def test_person_mode_rejects_positive_amount_on_loss_order(seeded_db):
+    """亏损单填正数等于把亏损记成收益，必须拒绝。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "300"}],
+        )
+
+
+def test_person_mode_rejects_over_shared_loss(seeded_db):
+    """亏损 -500，合计 -600 属于超额分担，必须拒绝（按绝对值比较）。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-600"}],
+        )
+
+
+def test_person_mode_rejects_negative_amount_on_profit_order(seeded_db):
+    """盈利单填负数同样是方向错误，必须拒绝。"""
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
+
+    with pytest.raises(Validation):
+        policy_service.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],
+        )

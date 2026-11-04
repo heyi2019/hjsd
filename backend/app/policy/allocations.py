@@ -246,6 +246,14 @@ def _set_action_allocations(
     # 四类必须齐全，但每个动作可以有多行（一个动作多人时按人数分别录一行，份额均分）。
     if any(not item.get("allocation_type") for item in normalized_items):
         raise Validation("利润分配项必须标注买号、售出、运营或公司归属")
+    # 类型合法性先判：否则一个 BAD 会先被「四类不齐全」吞掉，用户看到的不是真实原因。
+    for item in normalized_items:
+        candidate = str(item["allocation_type"]).upper()
+        if candidate not in {"BUY", "SELL", "OPERATION", "COMPANY"}:
+            raise Validation(
+                "分配项必须为 BUY、SELL、OPERATION 或 COMPANY；COMPANY 表示公司归属",
+                details={"field": "allocation_type", "value": item["allocation_type"]},
+            )
     present_types = {str(item["allocation_type"]).upper() for item in normalized_items}
     if present_types != {"BUY", "SELL", "OPERATION", "COMPANY"}:
         raise Validation("利润分配必须包含买号、售出、运营和公司归属四项")

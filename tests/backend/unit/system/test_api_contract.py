@@ -14,6 +14,7 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/v1/attachments/{attachment_id}/download"),
         ("DELETE", "/api/v1/game-types/{game_type_id}"),
         ("DELETE", "/api/v1/rebates/{rebate_id}"),
+        ("DELETE", "/api/v1/stocks/{account_id}"),
         ("GET", "/api/v1/orders/export.csv"),
         ("GET", "/api/v1/orders/export.xlsx"),
         ("GET", "/api/v1/stocks/export.csv"),
@@ -61,4 +62,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 175（订单台账 xlsx 导出：GET /orders/export.xlsx，非 JSON 已入豁免表）。
     # → 179（派生运算下沉后端 +4：GET /pools/balances、GET /installments/totals、
     # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
-    assert public_routes == 179
+    # → 189（2026-11-05 实测：账号删除 + 免密登录/绑定、列表列配置、库存统计等累计 +10）
+    assert public_routes == 189

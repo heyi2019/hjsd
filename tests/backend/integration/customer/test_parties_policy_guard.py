@@ -412,15 +412,18 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_duplicate_allocation_type(self, seeded_db):
-        # 583: 利润分配项不可重复
+        # 583 → 2026-11-05 新口径：一个动作多人时按人数各录一行、份额均分，
+        # 「项类型」允许重复；判重改为 (allocation_type, user_id)，同一动作同一人员不可重复。
+        # 构造四类齐全 + BUY 两行，但两行的 user_id 都为空 → 应命中按人判重。
         order = _order(seeded_db)
         items = [
-            {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
-            {"allocation_type": "BUY", "user_id": None, "role": "SALES", "allocation_rate": "25"},
-            {"allocation_type": "OPERATION", "user_id": 1, "role": "OWNER", "allocation_rate": "25"},
-            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+            {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "20"},
+            {"allocation_type": "BUY", "user_id": None, "role": "SALES", "allocation_rate": "20"},
+            {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "20"},
+            {"allocation_type": "OPERATION", "user_id": 1, "role": "OWNER", "allocation_rate": "20"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "20"},
         ]
-        with pytest.raises(Validation, match="分配项不可重复"):
+        with pytest.raises(Validation, match="同一动作下同一人员不可重复分润"):
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_company_with_user_rejected(self, seeded_db):

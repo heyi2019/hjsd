@@ -259,6 +259,12 @@ def _seed_e2e_fixtures(db) -> None:
     IN_STOCK 账号而失败——这也是当初 playwright 被迫每次 `E2E_RESET=1` 全量重建的根因。
     现改为**按 (business_mode, inventory_type) 确保每种都有足量的 IN_STOCK 账号**，
     不足即补，从而可去掉每次重建、直接复用常驻库（省 5–15s 启动 + 重播种子）。
+
+    补足编号必须取**全库最大号 +1**，不能按类型各自维护递增段：三段起点
+    20000 / 20100 / 20200 仅隔 100，而每轮消耗约 12 个账号，SELF 段涨过 20100
+    就会撞上 PICKUP 已存在的 KU_20100…（stock_no 全表唯一），db.flush() 抛
+    IntegrityError → webServer 启动即失败、整轮 E2E 全挂。实测常驻库曾涨到
+    SELF KU_20036，距 KU_20100 仅 64 个号。
     字段严格对齐当前 ORM（见 app/domain/trade_models/account.py）。
     """
     from app.domain.parties import Customer  # noqa: E402
@@ -292,32 +298,38 @@ def _seed_e2e_fixtures(db) -> None:
         ("DISTRIBUTION", "CONSIGNMENT", 20200),
     ]
     _TARGET_PER_TYPE = 12
+
+    # 一次取全库账号：算全局最大编号 + 各类型在库数/总数。
+    # 见函数 docstring：补足必须从**全库**最大号之后递增，否则分段号会互相撞。
+    rows = db.query(
+        Account.business_mode,
+        Account.inventory_type,
+        Account.inventory_status,
+        Account.stock_no,
+    ).all()
+    global_max = 0
+    in_stock_by_type: dict[tuple[str, str], int] = {}
+    total_by_type: dict[tuple[str, str], int] = {}
+    for biz_mode, inv_type, inv_status, stock_no in rows:
+        key = (biz_mode, inv_type)
+        total_by_type[key] = total_by_type.get(key, 0) + 1
+        if inv_status == "IN_STOCK":
+            in_stock_by_type[key] = in_stock_by_type.get(key, 0) + 1
+        tail = str(stock_no or "").split("_")[-1]
+        if tail.isdigit():
+            global_max = max(global_max, int(tail))
+
     for biz_mode, inv_type, stock_prefix in _PLANS:
-        # 该类型现有 IN_STOCK 数量（已出库的账号不计入，会被补足）。
-        in_stock = (
-            db.query(Account)
-            .filter(
-                Account.business_mode == biz_mode,
-                Account.inventory_type == inv_type,
-                Account.inventory_status == "IN_STOCK",
-            )
-            .count()
-        )
-        need = _TARGET_PER_TYPE - in_stock
+        key = (biz_mode, inv_type)
+        need = _TARGET_PER_TYPE - in_stock_by_type.get(key, 0)
         if need <= 0:
             continue
-        # 现有最大 stock_no 后缀，补足时从其 +1 递增，避免重复 KU_ 编号。
-        max_no = stock_prefix
-        for rec in (
-            db.query(Account.stock_no)
-            .filter(Account.business_mode == biz_mode, Account.inventory_type == inv_type)
-            .all()
-        ):
-            tail = rec[0].split("_")[-1]
-            if tail.isdigit():
-                max_no = max(max_no, int(tail))
+        # 空库首次保留三段起点（互不重叠）；已有账号则统一从全局最大号之后递增，
+        # 三个类型依次接着用，绝不重复，也永远不会爬进别的段。
+        seq_start = stock_prefix if total_by_type.get(key, 0) == 0 else global_max + 1
         for j in range(need):
-            suffix = max_no + 1 + j
+            suffix = seq_start + j
+            global_max = max(global_max, suffix)
             db.add(Account(
                 stock_no=f"KU_{suffix}",
                 game_account=f"e2e_{inv_type.lower()}_{suffix}",

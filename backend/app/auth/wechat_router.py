@@ -74,7 +74,7 @@ class CodeOut(BaseModel):
     dev_code: str | None = None
 
 
-class LoginOut(BaseModel):
+class PasswordlessLoginOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str
@@ -173,13 +173,13 @@ def wechat_authorize(
     )
 
 
-@router.post("/wechat/login", response_model=LoginOut)
+@router.post("/wechat/login", response_model=PasswordlessLoginOut)
 def wechat_login(
     payload: WeChatLoginIn,
     request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> LoginOut:
+) -> PasswordlessLoginOut:
     if not settings.wechat_effective_enabled:
         raise Validation("微信登录未启用")
     # state 是我们自己签发的，验签即证明本次回跳由本系统发起（CSRF 防护）。
@@ -191,10 +191,10 @@ def wechat_login(
 
     if result.state == "logged_in" and result.user is not None:
         db.commit()
-        return LoginOut(status="logged_in", **_token_payload(result.user))
+        return PasswordlessLoginOut(status="logged_in", **_token_payload(result.user))
 
     db.commit()
-    return LoginOut(
+    return PasswordlessLoginOut(
         status="bind_required",
         bind_ticket=result.bind_ticket,
         verify_mode=settings.wechat_bind_verify_mode,
@@ -224,13 +224,13 @@ def wechat_bind_send_code(
     )
 
 
-@router.post("/wechat/bind/confirm", response_model=LoginOut)
+@router.post("/wechat/bind/confirm", response_model=PasswordlessLoginOut)
 def wechat_bind_confirm(
     payload: BindConfirmIn,
     request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> LoginOut:
+) -> PasswordlessLoginOut:
     phone = verification.normalize_phone(payload.phone)
     identity = wechat_service.read_bind_ticket(settings, payload.bind_ticket)
     user = wechat_service.assert_phone_bindable(db, phone=phone, identity=identity)
@@ -254,7 +254,7 @@ def wechat_bind_confirm(
 
     wechat_service.create_binding(db, user=user, identity=identity, phone=phone, actor=user.username)
     db.commit()
-    return LoginOut(status="logged_in", **_token_payload(user))
+    return PasswordlessLoginOut(status="logged_in", **_token_payload(user))
 
 
 @router.post("/phone/code", response_model=CodeOut)
@@ -278,13 +278,13 @@ def phone_send_code(
     )
 
 
-@router.post("/phone/login", response_model=LoginOut)
+@router.post("/phone/login", response_model=PasswordlessLoginOut)
 def phone_login(
     payload: PhoneLoginIn,
     request: Request,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> LoginOut:
+) -> PasswordlessLoginOut:
     if not settings.phone_code_login_enabled:
         raise Validation("手机号验证码登录未启用")
     phone = verification.normalize_phone(payload.phone)
@@ -296,7 +296,7 @@ def phone_login(
         settings, ticket=payload.code_ticket, purpose=verification.PHONE_LOGIN, phone=phone, code=payload.code
     )
     user = wechat_service.resolve_phone_user(db, phone)
-    return LoginOut(status="logged_in", **_token_payload(user))
+    return PasswordlessLoginOut(status="logged_in", **_token_payload(user))
 
 
 @router.get("/wechat/bindings", response_model=list[BindingOut])

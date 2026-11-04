@@ -11,6 +11,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth.verification import assert_valid_phone, normalize_phone
 from app.core.audit import record_audit
 from app.core.errors import AuthError, Conflict, Validation
 from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password
@@ -57,12 +58,21 @@ def _required_bool(value: object, *, message: str) -> bool:
 
 
 def _optional_phone(value: object) -> str | None:
+    """用户名下的手机号：空白视为未配置；非空则按免密登录的同一口径归一化+校验。
+
+    2026-11-05 起手机号是手机号验证码 / 微信扫码登录的准入依据，写入口（设置-用户）
+    必须与读侧用同一套规则，否则「配进去了但登录说未开通」这类问题极难排查
+    （带 +86 / 空格 / 连字符的号码在通讯录复制场景很常见）。
+    """
     if value is None:
         return None
     if not isinstance(value, str):
         raise Validation("手机号必须为文本", details={"field": "phone"})
-    normalized = value.strip()
-    return normalized or None
+    normalized = normalize_phone(value)
+    if not normalized:
+        return None
+    assert_valid_phone(normalized)
+    return normalized
 
 
 def _check_phone_unique(session: Session, phone: str | None, *, exclude_user_id: int | None = None) -> None:

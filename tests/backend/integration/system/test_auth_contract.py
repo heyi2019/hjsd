@@ -495,6 +495,45 @@ def test_user_phone_is_unique_and_creation_records_hired_on(client: TestClient):
     assert "手机号已存在" in duplicate.json()["message"]
 
 
+def test_user_phone_is_normalized_and_format_validated(client: TestClient):
+    """设置-用户写入的手机号必须与免密登录读侧同一口径（归一化 + 11 位校验）。
+
+    回归背景：手机号是手机号验证码 / 微信扫码登录的准入依据。写入侧若只 trim
+    不校验，「+86 138-0000-0000」这类从通讯录复制的号码会原样落库，登录侧
+    归一化后匹配不上，表现为「后台明明配了手机号，登录却说未开通」；而随便
+    填的脏值（如 8 位）则永远不会生效，且没有任何报错。
+    """
+    created = client.post(
+        "/api/v1/users",
+        json={
+            "username": "phone-norm",
+            "display_name": "通讯录复制",
+            "password": "password123",
+            "role": "OPERATOR",
+            "phone": "+86 139-0000-2222",
+        },
+        headers={"X-Dev-User": "admin"},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["phone"] == "13900002222"
+
+    bad = client.patch(
+        f"/api/v1/users/{created.json()['id']}",
+        json={"phone": "1390000"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert bad.status_code == 422, bad.text
+    assert "手机号" in bad.json()["message"]
+
+    cleared = client.patch(
+        f"/api/v1/users/{created.json()['id']}",
+        json={"phone": "  "},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["phone"] is None
+
+
 def test_user_service_rejects_unknown_and_immutable_fields(seeded_db):
     user = seeded_db.get(User, 1)
     assert user is not None

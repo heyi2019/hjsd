@@ -159,10 +159,22 @@ def build_plan(rows: list[dict], accounts: list[dict]) -> tuple[list[dict], list
 
 
 def reset_business_data(db) -> None:
+    # 返点分次结算表 2026-11-05 下线：全新库已不建此表，旧库仍保留历史表。
+    # 该表 FK 指向 rebate_records（ON DELETE RESTRICT），旧库必须先清空，
+    # 否则下面 DELETE rebate_records 会被外键拦住。
+    legacy_tables = ("rebate_settlements",)
+    for t in legacy_tables:
+        exists = db.execute(
+            text("SELECT to_regclass(:qualified) IS NOT NULL"),
+            {"qualified": f"public.{t}"},
+        ).scalar()
+        if exists:
+            db.execute(text(f'DELETE FROM "{t}"'))
+
     order = [
         "cashflow", "order_events", "order_profit_allocations",
         "order_customer_roles", "order_counterparty_roles", "order_links",
-        "rebate_settlements", "rebate_records", "installment_dispositions",
+        "rebate_records", "installment_dispositions",
         "installment_schedules", "installments", "orders", "stocks",
         "quality_issues", "notifications", "attachments", "reconciliations",
         "deposits", "customer_leads", "import_rows", "import_batches",

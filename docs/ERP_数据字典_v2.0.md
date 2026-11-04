@@ -34,7 +34,7 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | 经营规则 | `policy_definitions`、`policy_versions` |
 | 交易 | `orders`、`order_events`、`order_links`、`stocks` |
 | 分期 | `installments`、`installment_schedules`、`installment_dispositions` |
-| 资金 | `cashflow`、`deposits`、`rebate_records`、`rebate_settlements`、`reconciliations` |
+| 资金 | `cashflow`、`deposits`、`rebate_records`、`reconciliations` |
 | 配置与展示 | `order_form_fields`、`order_form_section_labels`、`option_sets`、`list_column_configs`、`list_custom_columns` |
 | 运营支撑 | `import_batches`、`import_rows`、`quality_issues`、`notifications`、`attachments` |
 | 账号 | `users`、`teams`、`revoked_tokens` |
@@ -174,7 +174,7 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | `cashflow` | flow_no, pool_id, occurred_on, nature, fund_nature, accounting_attribute, category, direction, amount, status, order_id, deposit_id, order_event_id, transfer_id, reversal_of_id, reviewed_by, reviewed_at, reversal_reason, note, form_extra | 必属池；三轴并存——`nature` 现金性质、`fund_nature` 资金属性、`accounting_attribute` 核算属性；事件派生流水一对一；冲销经 `reversal_of_id` 反向成对，不删除原流水；内部划转经 `transfer_id` 两腿成对；运营消耗 `category` 必须写 `房租` / `日用` |
 | `deposits` | pool_id, counterparty_id, source_order_id, paid_amount, returned_amount, lost_amount, status, paid_on, expected_release_on, released_on, lost_on, note | 可退押金不进损益，必须关联现金流；不单独生成押金编号 |
 | `rebate_records` | rebate_no, source_order_id, rebate_type, channel, rate, base_amount, policy_version_id, policy_snapshot, link_status, status, collected_on, note, operator_user_ids, form_extra | 新记录来源订单必填；费率与规则版本快照一并固化；存量 19 笔允许 `UNLINKED` |
-| `rebate_settlements` | settlement_no, rebate_record_id, settled_on, gross_amount, platform_fee, net_amount, cashflow_id, fee_cashflow_id, reversal_of_id, note | 毛额 − 手续费 = 净额；手续费可单开流水，经 `fee_cashflow_id` 关联；分次到账逐条登记 |
+| `rebate_settlements`（已下线） | — | 2026-11-05 裁决：返点登记即收入确认，金额唯一取 `rebate_records.base_amount`，不再有分次到账 / 手续费 / 冲销子记录；新库不建此表，已有库历史表保留不 drop |
 | `reconciliations` | pool_id, reconciled_on, account_label, system_balance, statement_balance, difference, status, reason, unmatched_flow_ids(JSON), resolved_by, resolved_at, note | 判重键 `(pool_id, reconciled_on, account_label)`；系统余额 = 池内已审核流水有符号和 |
 
 ### 4.7 配置与展示
@@ -223,9 +223,9 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | 资金流水·收入 | `SR00001` | 5 |
 | 库存 | `KU_00001` | 5 |
 | 返点记录 | `HS0001-RB01` | — |
-| 返点到账 | `HS0001-RB01-CF-01` | — |
 
-订单编号域随业务动态生成（`ensure_sequence` 按 `order_type_defs.sequence_key/prefix`）；`ORDER_DFQ` 已随代分期下线删除。库存编号在建 BUY 事件（HS/TH）或建单（DG）时发放。
+
+订单编号域随业务动态生成（`ensure_sequence` 按 `order_type_defs.sequence_key/prefix`）；`ORDER_DFQ` 已随代分期下线删除。库存编号在建 BUY 事件（HS/TH）或建单（DG）时发放。返点分次到账编号 `HS0001-RB01-CF-01` 与 `rebate_settlements` 表已于 2026-11-05 下线。
 
 ## 6. 活字段边界
 

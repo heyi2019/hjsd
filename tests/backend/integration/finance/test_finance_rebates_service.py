@@ -191,24 +191,6 @@ def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
     assert record.rebate_type == "SELL"
 
 
-
-
-# ----------------------------------------------------- settle_rebate 订单不可见 (201-202)
-
-
-# ----------------------------------------------------- list_rebate_settlements 未知 (336)
-
-
-# ----------------------------------------------------- reverse_rebate_settlement 各类校验
-
-
-# 注：429 / 463 为外键保证的防御分支（cashflow_id / fee_cashflow_id 指向
-# cashflows.id；运行时测试库 FK 开启，常规 ORM 插入造不出悬空引用，故看似不可达）。
-# 与 reconciliation L153 纯逻辑死代码不同，此处是依赖 FK 的有效防御，保留不删；
-# 已由原生 sqlite3 连接绕过 FK 造脏态覆盖（见 test_finance_reporting_task5_tail.py 的
-# test_reverse_settlement_missing_cashflow_row / _missing_fee_cashflow_row）。
-
-
 # ----------------------------------------------------- get_rebate 作用域 (571-586)
 def test_get_rebate_no_user(seeded_db):
     record = rebates.create_rebate(

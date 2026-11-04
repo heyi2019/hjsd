@@ -185,6 +185,9 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
     engine, _target, _env = migration_db
     tables = set(inspect(engine).get_table_names())
     assert EXPECTED_TABLES <= tables
+    # 分次结算模型层 11-05 下线：活动基线靠 create_all 按 ORM 建表，
+    # 全新库不能再长出这张无人写入的死表（已有库的历史表保留不 drop）。
+    assert "rebate_settlements" not in tables
 
     deposit_columns = _column_names(engine, "deposits")
     assert "deposit_no" not in deposit_columns

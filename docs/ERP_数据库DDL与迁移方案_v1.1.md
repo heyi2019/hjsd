@@ -11,7 +11,7 @@
 
 ## 1. 建表顺序
 
-`pools` → `order_type_defs` → `order_type_pools` → `policy_definitions` → `policy_versions` → `customers` / `counterparties` → `stocks` → `orders` → `order_customer_roles` / `order_counterparty_roles` → `order_profit_allocations` → `order_events` → `cashflow` → `installments` → `installment_schedules` → `rebate_records` → `rebate_settlements` → `deposits` → `order_form_fields` / `form_extra`。
+`pools` → `order_type_defs` → `order_type_pools` → `policy_definitions` → `policy_versions` → `customers` / `counterparties` → `stocks` → `orders` → `order_customer_roles` / `order_counterparty_roles` → `order_profit_allocations` → `order_events` → `cashflow` → `installments` → `installment_schedules` → `rebate_records` → `deposits` → `order_form_fields` / `form_extra`。
 
 ## 2. DDL 约束清单
 
@@ -31,7 +31,7 @@
 | installments | `id`, `inst_no UNIQUE`, `order_id UNIQUE` | `contract_type` 为 STOCK_SALE/PICKUP_SALE/CONSIGNMENT_SALE；`delivery_mode` 为 PLATFORM_OPERATOR/CUSTOMER_SELF；三类合约分别仅接受 HS / TH / DG 订单；总应收勾稽 |
 | installment_schedules | `id`, `UNIQUE(installment_id, period_no)` | FK installments；期次应收/实收/到期日/状态；支持部分收款与逾期 |
 | rebate_records | `id`, `rebate_no UNIQUE` | 新数据 source_order 必填 |
-| rebate_settlements | `id`, `settlement_no UNIQUE`, `cashflow_id UNIQUE` | gross - fee = net |
+| rebate_settlements（已下线） | — | 2026-11-05 下线；新库不建此表，已有库历史表保留不 drop |
 | deposits | `id` | paid/returned 金额；占用与每次释放流水通过 `cashflow.deposit_id` 关联；不单独生成押金编号 |
 | policy_definitions | `id`, `policy_code UNIQUE` | 定义规则类型与可用范围；不直接保存业务快照 |
 | policy_versions | `id`, `UNIQUE(policy_definition_id, version, effective_from)` | 生效区间、配置 JSON、状态、审批审计；已被引用不可更新/删除 |

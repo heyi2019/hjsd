@@ -9,7 +9,6 @@ from app.domain.trade import (
     Order,
     OrderEvent,
     RebateRecord,
-    RebateSettlement,
 )
 
 
@@ -59,20 +58,9 @@ def rebate_no(session: Session, *, order_no: str, order_id: int) -> str:
     return f"{order_no}-RB{count + 1:02d}"
 
 
-def rebate_settlement_no(session: Session, *, rebate_no: str, rebate_record_id: int) -> str:
-    _lock_row(session, RebateRecord, rebate_record_id)
-    count = session.scalar(
-        select(func.count(RebateSettlement.id)).where(
-            RebateSettlement.rebate_record_id == rebate_record_id
-        )
-    ) or 0
-    return f"{rebate_no}-CF-{count + 1:02d}"
-
-
 __all__ = [
     "cashflow_no",
     "event_no",
     "installment_no",
     "rebate_no",
-    "rebate_settlement_no",
 ]

@@ -32,7 +32,7 @@
 2. 建 `pools`、`order_type_defs`、`order_type_pools`、`customers`、`counterparties` 等主数据；客户与合作方分别按 `CUS`、`CP` 编号。
 3. 建 `stocks`、`orders`、`order_customer_roles`、`order_counterparty_roles`、`order_events`、`cashflow`，实现订单客户/合作方多角色关联与事件→现金流一对一。
 4. 建 `installments` 与 `installment_schedules`：以 `contract_type` 区分 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，期次计划支持 PAYMENT、逾期、换绑、断分期处置，结清交付以无现金流 DELIVER 记录。
-5. 建 `rebate_records`、`rebate_settlements`，支持 `HS0001-RB01` 与分次到账。
+5. 建 `rebate_records`，支持 `HS0001-RB01` 返点记录；登记即收入确认，金额唯一取 `base_amount`（分次到账已下线）。
 6. 建 `deposits`，关联押金缴纳、退回的现金流。
 7. 建 `field_definitions`、`entity_extra_values`，实现非核算活字段。
 8. 建报表所需索引与新业务质量校验。
@@ -47,7 +47,7 @@
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注为客户资料；联系方式非唯一；新建返回重复候选，管理员合并后来源置 `MERGED`；停用/合并后不可新关联，历史关系保留 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台与客户分离；仅允许匹配的业务角色参与订单；停用后不可新关联 |
 | 分期 | installments / installment_schedules | `STOCK_SALE` 仅 HS、`PICKUP_SALE` 仅 TH、`CONSIGNMENT_SALE` 仅 DG；一单一合约；期次计划与总应收、已收、剩余应收勾稽 |
-| 返点 | rebate_records / rebate_settlements | 新归集必须来源订单；结算毛额−手续费=净额 |
+| 返点 | rebate_records | 新归集必须来源订单；金额唯一取 `base_amount`，登记即收入确认 |
 | 押金 | deposits | 可退押金不进经营损益；缴退均关联现金流 |
 | 活字段 | field_definitions / entity_extra_values | 不得覆盖固定核算字段；有历史值只能停用 |
 

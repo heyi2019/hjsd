@@ -294,7 +294,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "report_export", label: "报表导出" },
     { value: "policy_version", label: "规则版本" },
     { value: "import_batch", label: "导入批次" },
-    { value: "rebate_settlement", label: "返点结算" },
     { value: "rebate_record", label: "返点记录" },
     { value: "OrderTypeDef", label: "业务类型" },
     { value: "counterparty", label: "合作方" },

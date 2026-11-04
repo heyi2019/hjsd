@@ -1,14 +1,13 @@
-"""REPORT-01 Task #5 收口：finance / reporting 剩余 16 行缺失（直调内部函数绕过 DI）。
+"""REPORT-01 Task #5 收口：finance / reporting 剩余覆盖（直调内部函数绕过 DI）。
 
 覆盖目标（行号来自 coverage 基线）：
 - app/finance/deposits.py::cancel_deposit  cancel_deposit 服务层 押金不存在 NotFound
 - app/finance/rebates.py:179/182       _rebate_base_from_snapshot snapshot 空 / config 非 dict
-- app/finance/rebates.py:645           void_rebate 零结算(OPEN)但已有结算流水的拒绝分支
-- app/finance/rebates.py:429/463       reverse_rebate_settlement 关联 cashflow / fee 悬空
-                                      （FK 保证不可达 -> session_replication_role 绕过，见 _corrupt_settlement_fk）
 - app/finance/router.py:492-495/503    cancel_deposit 端点（未知 + 成功两条路径）
-- app/finance/router.py:601/604        void_rebate 端点
 - app/reporting/service.py:130/132     report_csv 的 normalize：None 与复合值序列化
+
+返点分次结算（`rebate_settlements`）模型层已于 2026-11-05 下线，原针对
+`reverse_rebate_settlement` / `void_rebate` 结算分支的辅助函数与用例一并移除。
 """
 from __future__ import annotations
 
@@ -69,35 +68,6 @@ def test_rebate_base_from_snapshot_empty(seeded_db):
 
 def test_rebate_base_from_snapshot_config_not_dict(seeded_db):
     assert rebates._rebate_base_from_snapshot(seeded_db, {"config": "x"}, None) is None  # 182
-
-
-# ----------------------------------------------------------- rebates.py:645
-
-
-# ----------------------------------------------------------- rebates.py:429 / 463
-# 这两行是 cashflow_id / fee_cashflow_id 指向不存在现金流的防御分支。
-# 运行时测试库 FK 开启，ORM 不能直接插悬空引用 -> 独立连接设 session_replication_role 绕过。
-def _corrupt_settlement_fk(seeded_db, settlement_id: int, column: str, bad_id: int) -> None:
-    """用独立连接绕过外键造悬空引用（生产上 DBA 直连改数据同样会产生）。
-
-    PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
-    `session_replication_role` 设为 `replica` 后 FK 触发器不执行。用后必须 `RESET`，
-    否则连接归还连接池后被复用，会静默关掉后续用例的外键约束。
-    """
-    engine = seeded_db.get_bind().engine
-    seeded_db.commit()  # 先释放行锁，否则独立连接的 UPDATE 会等锁
-    with engine.connect() as raw:
-        try:
-            raw.exec_driver_sql("SET session_replication_role = 'replica'")
-            raw.exec_driver_sql(
-                f"UPDATE rebate_settlements SET {column} = %s WHERE id = %s",
-                (bad_id, settlement_id),
-            )
-            raw.commit()
-        finally:
-            raw.exec_driver_sql("RESET session_replication_role")
-            raw.commit()
-    seeded_db.expire_all()  # 让主会话重载（否则 identity map 返回旧对象）
 
 
 # ----------------------------------------------------------- finance/router.py:492-495 / 503

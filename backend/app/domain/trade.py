@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from .trade_models.account import Account
 from .trade_models.cashflow import Cashflow, OrderProfitAllocation, Reconciliation
-from .trade_models.deposit_rebate import Deposit, RebateRecord, RebateSettlement
+from .trade_models.deposit_rebate import Deposit, RebateRecord
 from .trade_models.form_config import OrderFormField, OrderFormSectionLabel
 from .trade_models.installment import (
     Installment,
@@ -35,6 +35,5 @@ __all__ = [
     "OrderLink",
     "OrderProfitAllocation",
     "RebateRecord",
-    "RebateSettlement",
     "Reconciliation",
 ]

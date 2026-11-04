@@ -1,6 +1,8 @@
 """finance.router：押金与返点 API（FIN-04 / REB-01）。
 
-押金与返点均**不在列表内直接登记**：缴纳/释放/结算都走独立写接口并产生现金流。
+押金不在列表内直接登记，缴纳/释放走独立写接口并产生现金流；
+返点登记即完成收入确认，金额唯一取 `rebate_records.base_amount`，
+不再有分次结算 / 冲销写接口。
 """
 
 from datetime import date

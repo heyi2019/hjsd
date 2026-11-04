@@ -25,7 +25,7 @@
 - `pools` 是资金池主数据，余额由流水聚合；池、业务及两者路由均可配置。
 - 历史不猜测：无法可靠关联的记录标 `UNLINKED`、`ORPHAN` 或 `UNLINKED_TRANSFER`。
 - 固定核算字段保证审计；活字段只扩展业务描述，不得改变金额、池、事件、关联或核算。
-- 物理表名唯一：`cashflow`、`installments`、`installment_schedules`、`rebate_records`、`rebate_settlements`；禁止另造 `installment_contracts`、`rebate_accruals` 等同义模型。REST 资源路径可使用复数形式（如 `/cashflows`），但底层实体仍为 `cashflow`。
+- 物理表名唯一：`cashflow`、`installments`、`installment_schedules`、`rebate_records`；禁止另造 `installment_contracts`、`rebate_accruals` 等同义模型。REST 资源路径可使用复数形式（如 `/cashflows`），但底层实体仍为 `cashflow`。返点分次结算表 `rebate_settlements` 已于 2026-11-05 下线。
 
 ## 分层
 
@@ -83,7 +83,6 @@ erDiagram
   ORDER ||--o| INSTALLMENT : "HS STOCK_SALE / TH PICKUP_SALE / DG CONSIGNMENT_SALE"
   INSTALLMENT ||--o{ INSTALLMENT_SCHEDULE : plans
   ORDER ||--o| REBATE_RECORD : sources
-  REBATE_RECORD ||--o{ REBATE_SETTLEMENT : settles
   POLICY_VERSION ||--o{ ORDER_PROFIT_ALLOCATION : snapshots
   FIELD_DEFINITION ||--o{ ENTITY_EXTRA_VALUE : defines
 ```
@@ -96,7 +95,7 @@ erDiagram
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注等复购资料；客户可跨订单多角色；联系方式非唯一 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台；与客户分离，按业务角色关联 |
 | 分期 | installments / installment_schedules | `installments` 三类合约 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，均从所属订单取库存信息、不单独存 account_id；`installment_schedules` 为期次明细；PAYMENT→换绑→DELIVER |
-| 返点 | rebate_records / rebate_settlements | HS0001-RB01 返点记录，HS0001-RB01-CF-01 分次到账 |
+| 返点 | rebate_records | `HS0001-RB01` 返点记录；登记即收入确认，金额取 `base_amount`（分次到账已下线） |
 | 经营规则 | policy_definitions / policy_versions / order_profit_allocations | 费率、提成、分期、跌价等版本化；已发生业务保存快照 |
 | 活字段 | field_definitions / entity_extra_values | 可增、停用、排序；历史值不可删除 |
 

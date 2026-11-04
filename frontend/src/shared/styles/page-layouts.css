@@ -266,10 +266,24 @@
 .login-card .ant-form { display: grid; gap: var(--space-1); }
 .login-card .ant-form-item { margin-block-end: var(--space-3); }
 .login-card .ant-form > .ant-btn-primary { margin-block-start: var(--space-2); }
-.login-card .ant-form-item .ant-form-item-label { padding-block-end: var(--space-1); }
+/* 登录卡片固定用「标签在上、控件在下」，需在本卡片内覆盖共享层的横向表单规范
+   （antd-adapter.css 把所有非 inline 表单的标签压成 flex:0 0 108px + overflow:hidden）。
+   不覆盖时「短信验证码」这类 5 字标签会被压窄折行，视觉上像标签被裁切。
+   共享层是全站级规则，只在此处就地收口，不改它。 */
+.login-card .ant-form-item .ant-form-item-row { flex-direction: column !important; }
+.login-card .ant-form-item .ant-form-item-label {
+  flex: none !important;
+  max-width: none !important;
+  overflow: visible !important;
+  padding-block-end: var(--space-1);
+  padding-right: 0 !important;
+  text-align: left !important;
+}
+.login-card .ant-form-item .ant-form-item-control { max-width: 100%; }
 .login-card .ant-form-item .ant-form-item-label > label {
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
   color: rgba(240, 245, 255, 0.72) !important;
 }
 .login-card .ant-input,
@@ -630,15 +644,18 @@
 .form-no-colon .ant-form-item-label > label::after { content: none !important; }
 
 /* 免密登录（2026-11-05）：登录方式切换、微信入口、绑定手机号面板。
-   .login-card 内已有 input 与提交按钮的统一样式，这里只补新增结构自身的排版，
-   不重复声明字号/色彩，避免与设计层既有规则互相覆盖。 */
+   .login-card 内已有 input 与提交按钮的统一样式，这里只补新增结构自身的排版。
+   注意：.login-card 是**固定深色**卡片（底下是深色渐变舞台），卡片内文案不能用
+   --color-text-tertiary / --color-text-secondary 这类随主题翻转的令牌——浅色主题下
+   它们是深灰，压在深卡片上对比度只有 1.1:1（实测），故与 .login-sub / .login-card-foot
+   同法使用浅色字面值。 */
 .login-notice {
   margin: var(--space-2) 0 0;
   padding: var(--space-2) var(--space-3);
-  border: var(--border-w) solid var(--color-border);
+  border: var(--border-w) solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-sm);
-  background: var(--color-antd-bg-container);
-  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(226, 235, 255, 0.88);
   font: var(--font-body-s);
 }
 
@@ -654,13 +671,13 @@
 
 .login-platform__hint {
   margin: 0;
-  color: var(--color-text-tertiary);
+  color: rgba(226, 235, 255, 0.55);
   font: var(--fs-footnote)/1.5 var(--font-sans);
   text-align: center;
 }
 
 .login-bind__hint {
   margin: 0 0 var(--space-3);
-  color: var(--color-text-tertiary);
+  color: rgba(226, 235, 255, 0.62);
   font: var(--fs-footnote)/1.5 var(--font-sans);
 }

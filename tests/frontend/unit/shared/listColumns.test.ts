@@ -22,7 +22,15 @@ const columns = [
 ];
 
 describe("markMobileHiddenColumns", () => {
-  const cols = [
+  // 显式标注列类型：字面量数组会被 TS 推断成「onCell 零参数、返回 { "data-x": string }」，
+  // 与真实 ColumnType 不符，调用 onCell(record, index) / 读 cell.className 会误报 TS2554/TS2339。
+  type MarkTestColumn = {
+    key?: string;
+    dataIndex?: string;
+    className?: string;
+    onCell?: (record: unknown, index?: number) => Record<string, unknown>;
+  };
+  const cols: MarkTestColumn[] = [
     { key: "customer_no" },
     { key: "phone", className: "keep", onCell: () => ({ "data-x": "1" }) },
     { key: "status" },

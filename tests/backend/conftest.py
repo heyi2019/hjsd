@@ -630,14 +630,37 @@ from pathlib import Path as _Path  # noqa: E402
 _RESULTS_DIR = _Path(__file__).resolve().parents[2] / "docs" / "testing" / "测试结果库"
 _RESULTS_JSONL = _RESULTS_DIR / "results.jsonl"
 _CASE_INDEX = _Path(__file__).resolve().parent / "_report" / "case_index.json"
+_CASE_LIBRARY_CSV = (_Path(__file__).resolve().parents[2] / "docs" / "testing" / "测试用例库.csv")
 
 # 运行级状态（模块级，整个 session 共享）
 _RUN_STATE: dict = {"run_id": None, "case_index": {}, "rows": {}}
 
 
 def _load_case_index() -> dict:
+    """nodeid -> 测试编号。
+
+    case_index.json 按设计不入库，且 backend-gate 是「测试在前、生成器在后」：
+    全新 checkout / CI 跑 pytest 时这份索引尚未生成，旧实现直接返回空映射，
+    当次执行记录的 case_no 会整批缺省。故缺失时从**入库的**《测试用例库.csv》
+    自举同一份映射（生成器写 index 的口径即 f"{文件}::{函数标识}"）。
+    两份都读不到仍返回空 dict——记录器是 best-effort 旁路，绝不阻断测试。
+    """
     try:
-        return _json.loads(_CASE_INDEX.read_text(encoding="utf-8"))
+        if _CASE_INDEX.exists():
+            return _json.loads(_CASE_INDEX.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    try:
+        import csv as _csv
+        out: dict = {}
+        with _CASE_LIBRARY_CSV.open(encoding="utf-8-sig", newline="") as f:
+            for row in _csv.DictReader(f):
+                rel = row.get("自动化测试文件及函数") or ""
+                name = row.get("测试函数标识") or ""
+                no = row.get("测试编号") or ""
+                if rel and name and no:
+                    out[f"{rel}::{name}"] = no
+        return out
     except Exception:
         return {}
 

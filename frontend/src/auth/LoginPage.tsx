@@ -314,6 +314,9 @@ export function LoginPage() {
               />
             ) : null}
 
+            {/* 表单与微信入口同属「登录动作」，自成一组：.login-card-body 的 24px 节奏
+                只管「标题 / 切换器 / 动作组」三段之间，按钮之间用组内 12px。 */}
+            <div className="login-actions">
             {mode === "phone" && showPhone ? (
               <Form layout="vertical" onFinish={submitPhone} onValuesChange={(_, all) => setPhoneValues(all as Record<string, string>)}>
                 <Form.Item
@@ -363,6 +366,7 @@ export function LoginPage() {
                 <p className="login-platform__hint">首次登录需绑定后台已配置的手机号</p>
               </div>
             ) : null}
+            </div>
           </>
         )}
 

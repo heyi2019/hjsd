@@ -663,10 +663,19 @@
   margin-block: var(--space-3) var(--space-4);
 }
 
+/* 「登录动作」组：表单与微信入口同属一组，组内 12px。
+   卡片正文用 flex + 24px 节奏（page-layouts.css:250），若微信入口直接挂在正文下，
+   24px 组间距会再叠加自身 16px 外边距 → 两枚按钮间实测 40px，明显断开。
+   分组后：标题/切换器/动作组之间 24px，登录与微信之间 12px。 */
+.login-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .login-platform {
   display: grid;
   gap: var(--space-2);
-  margin-block-start: var(--space-4);
+  margin-block-start: 0;
 }
 
 .login-platform__hint {

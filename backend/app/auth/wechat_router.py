@@ -19,7 +19,13 @@ from app.core.database import get_db
 from app.core.errors import PermissionDenied, RateLimited, Validation
 from app.core.ratelimit import login_limiter
 from app.core.schemas import RequestModel
-from app.core.security import CurrentUser, build_access_token, get_current_user
+from app.core.security import (
+    AUTH_METHOD_PHONE,
+    AUTH_METHOD_WECHAT,
+    CurrentUser,
+    build_access_token,
+    get_current_user,
+)
 from app.core.settings import Settings, get_settings
 from app.domain.users import User
 
@@ -117,7 +123,8 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _token_payload(user: User) -> dict:
+def _token_payload(user: User, *, auth_method: str) -> dict:
+    """签发免密登录 token。amr 标记认证方式，供改密时判断能否跳过「当前密码」。"""
     current = CurrentUser.build(
         id=user.id,
         username=user.username,
@@ -126,6 +133,7 @@ def _token_payload(user: User) -> dict:
         owner_scope=user.owner_scope,
         pool_ids=frozenset(user.pool_ids or []),
         team_ids=frozenset(user.team_ids or []),
+        auth_method=auth_method,
     )
     return {
         "access_token": build_access_token(current),
@@ -191,7 +199,9 @@ def wechat_login(
 
     if result.state == "logged_in" and result.user is not None:
         db.commit()
-        return PasswordlessLoginOut(status="logged_in", **_token_payload(result.user))
+        return PasswordlessLoginOut(
+            status="logged_in", **_token_payload(result.user, auth_method=AUTH_METHOD_WECHAT)
+        )
 
     db.commit()
     return PasswordlessLoginOut(
@@ -254,7 +264,7 @@ def wechat_bind_confirm(
 
     wechat_service.create_binding(db, user=user, identity=identity, phone=phone, actor=user.username)
     db.commit()
-    return PasswordlessLoginOut(status="logged_in", **_token_payload(user))
+    return PasswordlessLoginOut(status="logged_in", **_token_payload(user, auth_method=AUTH_METHOD_WECHAT))
 
 
 @router.post("/phone/code", response_model=CodeOut)
@@ -296,7 +306,7 @@ def phone_login(
         settings, ticket=payload.code_ticket, purpose=verification.PHONE_LOGIN, phone=phone, code=payload.code
     )
     user = wechat_service.resolve_phone_user(db, phone)
-    return PasswordlessLoginOut(status="logged_in", **_token_payload(user))
+    return PasswordlessLoginOut(status="logged_in", **_token_payload(user, auth_method=AUTH_METHOD_PHONE))
 
 
 @router.get("/wechat/bindings", response_model=list[BindingOut])

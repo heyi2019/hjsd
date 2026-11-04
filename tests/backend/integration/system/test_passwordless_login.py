@@ -289,3 +289,140 @@ def test_wechat_bind_password_mode(monkeypatch: pytest.MonkeyPatch, client: Test
         assert ok.json()["status"] == "logged_in"
     finally:
         get_settings.cache_clear()
+
+
+# ---------------------------------------------------------------- 首次设置密码
+# 改密页是登录后的强制闸门，而免密登录的人从未输入过密码。若无条件要求「当前密码」，
+# 这类账号首次登录即死锁（UserUpdate 也不接 must_change_password，管理员没有接口能替他清掉）。
+
+
+def _phone_login(client: TestClient, phone: str) -> dict:
+    sent = _send_code(client, phone)
+    response = client.post(
+        "/api/v1/auth/phone/login",
+        json={"phone": phone, "code": sent["dev_code"], "code_ticket": sent["code_ticket"]},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _change_password(client: TestClient, token: str, body: dict) -> object:
+    return client.post(
+        "/api/v1/auth/change-password",
+        json=body,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+
+def test_passwordless_login_can_set_initial_password(client: TestClient) -> None:
+    """免密登录 + 尚未自设密码：允许不提供当前密码，直接设新密码。"""
+    created = _create_user(client, username="deadlock1", phone="13800000031")
+    assert created["must_change_password"] is True
+
+    logged = _phone_login(client, "13800000031")
+    token = logged["access_token"]
+    assert logged["user"]["must_change_password"] is True
+
+    response = _change_password(client, token, {"new_password": "BrandNew@2026"})
+    assert response.status_code == 200, response.text
+
+    # 设完之后用新密码能登录，且强制改密标记已清除。
+    relogin = client.post(
+        "/api/v1/auth/login", json={"username": "deadlock1", "password": "BrandNew@2026"}
+    )
+    assert relogin.status_code == 200, relogin.text
+    assert relogin.json()["user"]["must_change_password"] is False
+
+
+def test_passwordless_session_cannot_skip_old_password_once_password_is_set(
+    client: TestClient,
+) -> None:
+    """边界：设过密码之后，免密会话改密必须验旧密码，否则 token 泄露即可静默改密。"""
+    _create_user(client, username="deadlock2", phone="13800000032")
+    token = _phone_login(client, "13800000032")["access_token"]
+    assert _change_password(client, token, {"new_password": "First@2026"}).status_code == 200
+
+    # 同一个免密会话，此时 must_change_password 已为假
+    response = _change_password(client, token, {"new_password": "Second@2026"})
+    assert response.status_code == 401, response.text
+    assert "原密码" in response.text
+
+    ok = _change_password(client, token, {"old_password": "First@2026", "new_password": "Second@2026"})
+    assert ok.status_code == 200, ok.text
+
+
+def test_password_session_still_requires_old_password(client: TestClient) -> None:
+    """回归：账号密码登录的会话，不提供当前密码一律拒绝。"""
+    _create_user(client, username="deadlock3", phone="13800000033", password="Origin@2026")
+
+    logged = client.post(
+        "/api/v1/auth/login", json={"username": "deadlock3", "password": "Origin@2026"}
+    )
+    assert logged.status_code == 200, logged.text
+    token = logged.json()["access_token"]
+
+    assert _change_password(client, token, {"new_password": "Another@2026"}).status_code == 401
+    wrong = _change_password(
+        client, token, {"old_password": "not-the-password", "new_password": "Another@2026"}
+    )
+    assert wrong.status_code == 401, wrong.text
+    assert "原密码" in wrong.text
+    ok = _change_password(
+        client, token, {"old_password": "Origin@2026", "new_password": "Another@2026"}
+    )
+    assert ok.status_code == 200, ok.text
+
+
+def test_token_records_authentication_method(client: TestClient) -> None:
+    """amr 必须如实记录来源：三种登录方式各自不同。"""
+    from app.core.security import decode_token
+
+    _create_user(client, username="amruser", phone="13800000034", password="Amr@2026")
+
+    phone_token = _phone_login(client, "13800000034")["access_token"]
+    assert decode_token(phone_token)["amr"] == "phone_code"
+
+    password_token = client.post(
+        "/api/v1/auth/login", json={"username": "amruser", "password": "Amr@2026"}
+    ).json()["access_token"]
+    assert decode_token(password_token)["amr"] == "password"
+
+
+def test_legacy_token_without_amr_cannot_skip_old_password(client: TestClient) -> None:
+    """老 token（1.0.3 之前签发，无 amr）按密码会话处理，不得借免密口子绕过旧密码。"""
+    from app.core.security import encode_token
+
+    created = _create_user(client, username="legacy1", phone="13800000035")
+    assert created["must_change_password"] is True
+
+    legacy = encode_token(
+        {
+            "sub": str(created["id"]),
+            "username": "legacy1",
+            "roles": ["OPERATOR"],
+            "pool_ids": [],
+            "team_ids": [],
+            "owner_scope": "SELF",
+        }
+    )
+    response = _change_password(client, legacy, {"new_password": "Legacy@2026"})
+    assert response.status_code == 401, response.text
+
+
+def test_token_with_unknown_amr_is_rejected(client: TestClient) -> None:
+    """amr 只接受白名单值，伪造的认证方式直接按无效凭证处理。"""
+    from app.core.security import encode_token
+
+    created = _create_user(client, username="fakeamr", phone="13800000036")
+    forged = encode_token(
+        {
+            "sub": str(created["id"]),
+            "username": "fakeamr",
+            "roles": ["OPERATOR"],
+            "pool_ids": [],
+            "team_ids": [],
+            "owner_scope": "SELF",
+            "amr": "totally-made-up",
+        }
+    )
+    assert _change_password(client, forged, {"new_password": "Fake@2026"}).status_code == 401

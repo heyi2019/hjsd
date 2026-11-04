@@ -38,6 +38,13 @@ ROLE_EMPLOYEE = "EMPLOYEE"
 ALL_ROLES: tuple[str, ...] = (ROLE_ADMIN, ROLE_OPERATOR, ROLE_FINANCE, ROLE_AUDITOR, ROLE_VIEWER, ROLE_EMPLOYEE)
 OWNER_SCOPES: frozenset[str] = frozenset({"SELF", "TEAM", "ALL"})
 
+# 认证方式（写进 token 的 amr 声明）。免密登录进来的会话从未输入过密码，
+# 改密时的「当前密码」校验需要据此区分，否则首次登录会死锁。
+AUTH_METHOD_PASSWORD = "password"
+AUTH_METHOD_PHONE = "phone_code"
+AUTH_METHOD_WECHAT = "wechat"
+AUTH_METHODS: frozenset[str] = frozenset({AUTH_METHOD_PASSWORD, AUTH_METHOD_PHONE, AUTH_METHOD_WECHAT})
+
 PERM_CUSTOMER_READ = "customer.read"
 PERM_CUSTOMER_CONTACT_READ = "customer.contact.read"
 PERM_CUSTOMER_CREATE = "customer.create"
@@ -163,6 +170,8 @@ class CurrentUser:
     pool_ids: frozenset[int] = frozenset()  # 空集表示“无池授权”，明细接口应返回空
     team_ids: frozenset[int] = frozenset()
     owner_scope: str = "SELF"  # SELF / TEAM / ALL
+    # 本次会话是怎么认证进来的。老 token 不带 amr，缺省按 password 处理（历史上只有这一条路径）。
+    auth_method: str = AUTH_METHOD_PASSWORD
 
     @classmethod
     def build(cls, *, id: int, username: str, roles: Iterable[str], **kwargs: Any) -> "CurrentUser":
@@ -175,6 +184,11 @@ class CurrentUser:
     @property
     def is_admin(self) -> bool:
         return ROLE_ADMIN in self.roles
+
+    @property
+    def password_authenticated(self) -> bool:
+        """本次会话是否由「账号密码」建立——只有这种会话能证明用户知道旧密码。"""
+        return self.auth_method == AUTH_METHOD_PASSWORD
 
     def has(self, code: str) -> bool:
         return code in self.permissions
@@ -326,6 +340,7 @@ def build_access_token(user: "CurrentUser", *, settings: Settings | None = None)
             "pool_ids": sorted(user.pool_ids),
             "team_ids": sorted(user.team_ids),
             "owner_scope": user.owner_scope,
+            "amr": user.auth_method,
         },
         settings=settings,
     )
@@ -342,6 +357,7 @@ def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
         pool_ids = payload.get("pool_ids", [])
         team_ids = payload.get("team_ids", [])
         owner_scope = payload.get("owner_scope", "SELF")
+        auth_method = payload.get("amr", AUTH_METHOD_PASSWORD)
         jti = payload.get("jti")
         if user_id <= 0 or not isinstance(username, str) or not username.strip():
             raise ValueError("身份声明无效")
@@ -353,6 +369,8 @@ def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
             raise ValueError("数据范围(scope)无效")
         if not isinstance(owner_scope, str) or owner_scope not in OWNER_SCOPES:
             raise ValueError("归属范围无效")
+        if not isinstance(auth_method, str) or auth_method not in AUTH_METHODS:
+            raise ValueError("认证方式无效")
         display_name = payload.get("display_name", username.strip())
         if not isinstance(display_name, str) or not display_name.strip():
             raise ValueError("显示名称无效")
@@ -368,6 +386,7 @@ def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
         pool_ids=frozenset(pool_ids),
         team_ids=frozenset(team_ids),
         owner_scope=owner_scope,
+        auth_method=auth_method,
     )
 
 
@@ -405,6 +424,11 @@ def get_current_user(
             raise AuthError("登录凭证内容无效")
         if jti and db.get(RevokedToken, jti):
             raise AuthError("登录已退出，请重新登录")
+        # 认证方式随 token 走，且必须在重建 CurrentUser 时带下去——否则免密登录的会话
+        # 会被误判为密码会话，首次设置密码又回到死锁。
+        auth_method = payload.get("amr", AUTH_METHOD_PASSWORD)
+        if not isinstance(auth_method, str) or auth_method not in AUTH_METHODS:
+            raise AuthError("登录凭证内容无效")
         try:
             user_id = int(payload.get("sub", 0))
         except (TypeError, ValueError) as error:
@@ -423,6 +447,7 @@ def get_current_user(
                 pool_ids=frozenset(account.pool_ids or []),
                 team_ids=frozenset(account.team_ids or []),
                 owner_scope=account.owner_scope,
+                auth_method=auth_method,
             )
         if settings.is_development:
             # 开发/测试环境允许用签名 token 模拟尚未落库的角色，便于权限链路验证。
@@ -468,6 +493,10 @@ def require_role(*roles: str):
 __all__ = [
     "ALL_PERMISSIONS",
     "ALL_ROLES",
+    "AUTH_METHODS",
+    "AUTH_METHOD_PASSWORD",
+    "AUTH_METHOD_PHONE",
+    "AUTH_METHOD_WECHAT",
     "DEV_USERS",
     "CurrentUser",
     "ROLE_ADMIN",

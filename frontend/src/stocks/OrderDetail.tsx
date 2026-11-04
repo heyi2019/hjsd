@@ -192,6 +192,8 @@ export function OrderDetail({
   onSave,
   onCancel,
   saving,
+  timeShiftDays,
+  onTimeShift,
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
@@ -208,6 +210,9 @@ export function OrderDetail({
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
+  /** 编辑态时间联动：平移天数与 setter。 */
+  timeShiftDays?: number;
+  onTimeShift?: (days: number) => void;
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
@@ -332,6 +337,8 @@ export function OrderDetail({
       onSave={onSave}
       onCancel={onCancel}
       saving={saving}
+      timeShiftDays={timeShiftDays}
+      onTimeShift={onTimeShift}
     />
   );
 }

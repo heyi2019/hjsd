@@ -93,9 +93,21 @@ class ExecutionEditItem(RequestModel):
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
+class ExecutionTimeShift(RequestModel):
+    """账号台账时间联动：任一时间锚点改 N 天，整单时间轴平移 N 天（保留相对关系）。
+
+    与订单台账「成交日期」同源口径：trade_date、事件/流水 occurred_on 同步平移，
+    另外把台账展示用的 created_at / posted_at 时间戳一并平移，避免界面值不动。
+    分期 first_due_on / 期次 due_on 属客户还款计划，不随之平移。
+    """
+
+    delta_days: int = Field(ge=-3650, le=3650)
+
+
 class ExecutionEditRequest(RequestModel):
     events: list[ExecutionEditItem] = Field(max_length=100)
     profile: AccountProfileUpdate | None = None
+    time_shift: ExecutionTimeShift | None = None
 
 
 class AccountInventoryOut(BaseModel):

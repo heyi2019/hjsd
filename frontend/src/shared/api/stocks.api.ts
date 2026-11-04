@@ -30,6 +30,6 @@ export const stocksApi = {
       .then((r) => r.data),
   executionDetail: (id: number) =>
     api.get<AccountExecutionDetail>(`/stocks/${id}/execution-detail`).then((r) => r.data),
-  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[] }) =>
+  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[]; time_shift?: { delta_days: number } }) =>
     api.patch<{ ok: boolean }>(`/stocks/${id}/execution-edit`, payload).then((r) => r.data),
 };

@@ -1,6 +1,7 @@
-import { Space } from "antd";
+import { Space, Typography } from "antd";
+import dayjs from "dayjs";
 import type { Account, AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/catalog";
-import { BusinessRegistrationForm, PermissionButton } from "../shared/ui";
+import { BusinessRegistrationForm, DateField, PermissionButton } from "../shared/ui";
 import { FieldConfigScope } from "../orders/ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
@@ -20,6 +21,52 @@ import "./OrderDetail.css";
 
 // 兼容既有引用路径：外部仍从本文件取这三个行类型。
 export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } from "./OrderDetail.shared";
+
+/** 编辑态时间联动：三个锚点都能改，任一改动按天数差平移整条时间轴，另两项即时预览。
+ *  台账显示的这三个值分别是 Order.created_at / SELL 事件 posted_at / Cashflow.created_at，
+ *  后端按同一个 delta 平移账期与展示时间戳，保证界面与报表归属不脱节。 */
+function TimeShiftFields({
+  registeredAt, soldAt, flowAt, shiftDays, onShift,
+}: {
+  registeredAt: string;
+  soldAt: string;
+  flowAt: string;
+  shiftDays: number;
+  onShift: (days: number) => void;
+}) {
+  const field = (label: string, original: string) => {
+    const base = original && original !== "-" ? original.slice(0, 10) : "";
+    const shown = base ? dayjs(base).add(shiftDays, "day").format("YYYY-MM-DD") : "";
+    return (
+      <label className="inventory-time-shift__field">
+        <span>{label}</span>
+        <DateField
+          aria-label={`编辑${label}`}
+          disabled={!base}
+          value={shown ? dayjs(shown) : null}
+          onChange={(value) => onShift(value && base ? value.startOf("day").diff(dayjs(base).startOf("day"), "day") : 0)}
+        />
+      </label>
+    );
+  };
+  return (
+    <div className="inventory-detail__section inventory-time-shift">
+      <div className="inventory-detail__section-heading">
+        <Typography.Text strong>时间联动</Typography.Text>
+        <Typography.Text type="secondary">
+          {shiftDays === 0
+            ? "改任一项，本单订单、事件与资金流水时间同步平移，分期还款计划不变"
+            : `整单时间轴平移 ${shiftDays} 天，分期还款计划不变`}
+        </Typography.Text>
+      </div>
+      <div className="inventory-time-shift__fields">
+        {field("订单创建时间", registeredAt)}
+        {field("售出时间", soldAt)}
+        {field("流水时间", flowAt)}
+      </div>
+    </div>
+  );
+}
 
 type OrderDetailViewProps = {
   meta: OrderDetailMeta;
@@ -42,6 +89,9 @@ type OrderDetailViewProps = {
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
+  /** 编辑态时间联动：当前平移天数与 setter（由库存台账控制器持有）。 */
+  timeShiftDays?: number;
+  onTimeShift?: (days: number) => void;
 };
 
 /** 详情容器：只负责「板块怎么摆」，板块内部各自独立成文件（见 OrderDetail*.tsx）。
@@ -67,6 +117,8 @@ export function OrderDetailView({
   onSave,
   onCancel,
   saving,
+  timeShiftDays,
+  onTimeShift,
 }: OrderDetailViewProps) {
   const extraFieldsBySection = (section: string): OrderDetailField[] => meta.orderExtras
     .filter((field) => field.section === section)
@@ -76,6 +128,13 @@ export function OrderDetailView({
     return (
       <div className="inventory-detail inventory-detail--editing">
         <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} />
+        <TimeShiftFields
+          registeredAt={meta.registeredAt}
+          soldAt={meta.soldAt}
+          flowAt={financeRows.find((row) => row.key.startsWith("flow-"))?.occurredAt ?? financeRows[0]?.occurredAt ?? "-"}
+          shiftDays={timeShiftDays ?? 0}
+          onShift={onTimeShift ?? (() => undefined)}
+        />
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"

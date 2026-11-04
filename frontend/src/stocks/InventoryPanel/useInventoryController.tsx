@@ -54,6 +54,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
   const [invEditExtraForm] = Form.useForm();
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
+  // 编辑态时间联动：三个锚点共用一个平移天数，保存时整单时间轴按此 delta 平移。
+  const [timeShiftDays, setTimeShiftDays] = useState(0);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
@@ -140,6 +142,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
+    setTimeShiftDays(0);
     await Promise.all([
       employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause))),
       loadExecution(account),
@@ -153,6 +156,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setInlineEditId(null);
     setEditingAccount(null);
     setEventDrafts({});
+    setTimeShiftDays(0);
     invEditExtraForm.resetFields();
     setDetailTarget(null);
   }
@@ -392,8 +396,12 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
         const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
-      if (events.length) {
-        await stocksApi.updateExecution(id, { profile, events });
+      if (events.length || timeShiftDays !== 0) {
+        await stocksApi.updateExecution(id, {
+          profile,
+          events,
+          time_shift: timeShiftDays !== 0 ? { delta_days: timeShiftDays } : undefined,
+        });
         setEditingAccount(null);
         setEventDrafts({});
         setInlineEditId(null);
@@ -413,6 +421,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       }
       setEditingAccount(null);
       setEventDrafts({});
+      setTimeShiftDays(0);
       invEditExtraForm.resetFields();
       setInlineEditId(null);
       setDetailTarget(null);
@@ -568,6 +577,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     sortDesc,
     inventoryStats,
     updateEventDraft,
+    timeShiftDays,
+    setTimeShiftDays,
     voidForm,
     voidPools,
     voidTarget,

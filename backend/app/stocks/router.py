@@ -3,7 +3,7 @@
 账号状态与成本由订单事件驱动，本模块**不提供**改状态/改成本入口（ACC-01-03/04）。
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -43,6 +43,8 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.orders import service as orders_service
 from app.orders.amounts import order_profit_flow_by_order
+# 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
+from app.orders.mutations import _shift_accounting_dates
 
 from .schemas import (
     AccountOut,
@@ -68,6 +70,49 @@ router = APIRouter(tags=["ACC-01 账号台账"])
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
 edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
+
+
+def _apply_time_shift(db: Session, account_id: int, delta_days: int, actor: str) -> None:
+    """账号台账时间联动：把该账号关联订单的整条时间轴平移 N 天。
+
+    账期（trade_date / 事件与流水 occurred_on / 规则快照）走订单台账同源函数；
+    台账界面展示的「登记时间」「售出时间」「流水时间」取的是 created_at / posted_at
+    时间戳，必须一并平移，否则改完日期界面仍显示旧值。
+    分期还款计划（first_due_on / 期次 due_on）按既定口径不动。
+    """
+    if delta_days == 0:
+        return
+    db.flush()  # 让同一请求内先前的执行记录改动对下面的查询可见
+    shift = timedelta(days=delta_days)
+    orders = list(db.scalars(select(Order).where(Order.account_id == account_id)).all())
+    if not orders:
+        raise NotFound("账号关联订单不存在")
+    order_ids = [order.id for order in orders]
+    events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id.in_(order_ids))).all())
+    flows = list(db.scalars(select(Cashflow).where(Cashflow.order_id.in_(order_ids))).all())
+    for order in orders:
+        new_trade_date = order.trade_date + shift
+        _shift_accounting_dates(db, order, actor=actor, new_trade_date=new_trade_date)
+        order.trade_date = new_trade_date
+        if order.created_at is not None:
+            order.created_at = order.created_at + shift
+        order.updated_by = actor
+    for event in events:
+        if event.posted_at is not None:
+            event.posted_at = event.posted_at + shift
+        if event.created_at is not None:
+            event.created_at = event.created_at + shift
+        event.updated_by = actor
+    for flow in flows:
+        if flow.created_at is not None:
+            flow.created_at = flow.created_at + shift
+        flow.updated_by = actor
+    record_audit(
+        db, action="ORDER_UPDATE", entity_type="inventory_time_shift",
+        entity_id=account_id, actor=actor,
+        before={"delta_days": 0},
+        after={"delta_days": delta_days, "orders": len(orders), "events": len(events), "cashflows": len(flows)},
+    )
 
 
 @router.patch("/stocks/{account_id}/execution-edit")
@@ -142,6 +187,8 @@ def update_execution_detail(
     account.cost_amount = Decimal(str(account.cost_amount)) + cost_delta
     if changes:
         account.updated_by = user.username
+    if payload.time_shift is not None:
+        _apply_time_shift(db, account_id, payload.time_shift.delta_days, user.username)
     db.flush()
     return {"ok": True}
 

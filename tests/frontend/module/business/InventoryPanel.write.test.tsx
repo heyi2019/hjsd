@@ -484,3 +484,55 @@ describe("OrderDetailDeliverySection", () => {
     });
   });
 });
+
+describe("InventoryPanel：账号台账编辑态时间联动", () => {
+  it("三个时间都可改，改任一项联动预览，保存带整单平移天数", async () => {
+    const detail = {
+      account: accounts[0],
+      orders: [{
+        order_id: 21,
+        order_no: "HS0001",
+        order_type: "HS",
+        trade_date: "2026-10-15",
+        created_at: "2026-10-15T10:19:00",
+        status: "ACTIVE",
+        events: [{
+          id: 31, event_no: "EV0001", event_type: "BUY", amount: "100.00",
+          occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00",
+          portion: "PRINCIPAL", is_posted: true, operator: "admin",
+          cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+        }, {
+          id: 32, event_no: "EV0002", event_type: "SELL", amount: "200.00",
+          occurred_on: "2026-10-17", occurred_at: "2026-10-17T11:00:00",
+          portion: "GROSS", is_posted: true, operator: "admin",
+        }],
+        cashflows: [], customers: [], counterparties: [], rebates: [], extra_values: {},
+      }],
+      finance_summary: { cashflow_income: "0", rebate_income: "0", total_income: "0", total_expense: "100.00", net_amount: "-100.00" },
+    };
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(detail as never);
+    resolveMock(vi.mocked(catalog.stocksApi.updateExecution), { ok: true });
+
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+
+    const created = await screen.findByLabelText("编辑订单创建时间");
+    const sold = screen.getByLabelText("编辑售出时间");
+    const flow = screen.getByLabelText("编辑流水时间");
+    expect((created as HTMLInputElement).value).toBe("2026-10-15");
+    expect((sold as HTMLInputElement).value).toBe("2026-10-17");
+    expect((flow as HTMLInputElement).value).toBe("2026-10-15");
+
+    fireEvent.change(sold, { target: { value: "2026-10-20" } });
+    fireEvent.keyDown(sold, { key: "Enter", code: "Enter" });
+    expect(await screen.findByText(/整单时间轴平移 3 天/)).toBeInTheDocument();
+    expect((created as HTMLInputElement).value).toBe("2026-10-18");
+    expect((flow as HTMLInputElement).value).toBe("2026-10-18");
+
+    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({
+      time_shift: { delta_days: 3 },
+    })));
+  });
+});

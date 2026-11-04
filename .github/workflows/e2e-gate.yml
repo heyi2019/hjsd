@@ -1,8 +1,8 @@
 name: e2e-gate
 
-# E2E 门禁（2026-11-03 重建）：真实 Chromium + 真实后端 + 独立 PG 库 heijin_erp_e2e。
-# 「用完就丢」对齐 pytest 测试库：每次运行 e2e_db.py 对 heijin_erp_e2e 重建 + 重播种子，
-# 库容器常驻、数据每跑清空，绝不触碰 dev/test/release。
+# E2E 门禁：真实 Chromium + 真实后端 + 独立 PG 库 heijin_erp_e2e。
+# 复用常驻 e2e 库（不再每次重建）：e2e_db.py 按 (business_mode, inventory_type) 补足
+# IN_STOCK 账号，用例消耗后在库账号下一轮自动补齐；库容器常驻、绝不触碰 dev/test/release。
 # main / test 推送、PR、手动触发均阻塞。
 
 on:

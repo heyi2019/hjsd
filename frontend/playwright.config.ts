@@ -45,9 +45,10 @@ export default defineConfig({
   //      - 共享 vite dev server 在多浏览器上下文并发下加载竞争，form hydration 超时类 flaky
   //        （order-abandon-confirm 点关闭后确认框未弹出即一例）。
   //   ③ 试过「write 串行 + readonly 并行 + dependencies 串行两段」：仍触发 ② 的两类失败。
-  // 结论：E2E 有状态 + 时序敏感，硬并行引入 flaky；维持串行 150s 全绿。若要再提速，
-  // 正确杠杆是改用 `vite build` + `vite preview`（静态产物，无 transform 竞争）而非 dev server，
-  // 或把 visual 与数据解耦——那是独立重构，不在本次「调参」范围。
+  // 结论：E2E 有状态 + 时序敏感，硬并行引入 flaky；维持串行。前述「提速杠杆」已落地：
+  // 前端 webServer 改用 `vite build --mode e2e` + `vite preview`（静态产物，无 dev server
+  // 的 per-request transform 竞争，多上下文加载更稳）；`--mode e2e` 由 vite.config.ts
+  // define import.meta.env.DEV=true，保留零登录直通。详见 webServer[0]。
   fullyParallel: false,
   workers: 1,
   // 控制台看过程，JSON 供 `backend/scripts/record_e2e_results.py` 翻译进
@@ -67,13 +68,16 @@ export default defineConfig({
   },
   webServer: [
     {
-      // 前端 DEV server：VITE_API_BASE=/api/v1 走同源代理（vite.config.ts 代理到
-      // ERP_E2E_BACKEND_PORT=8124），零登录直通。
-      command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} VITE_API_BASE=/api/v1 npx vite --port ${E2E_FRONTEND_PORT} --strictPort`,
+      // 前端：vite build --mode e2e（vite.config.ts 在该模式 define import.meta.env.DEV=true，
+      // 保留零登录直通——session.tsx 依赖 DEV 为真 → 后端开发态旁路鉴权）→ vite preview
+      // 静态产物服务。相较 dev server，preview 无 per-request transform，多浏览器上下文加载
+      // 无竞争，E2E 更稳。VITE_API_BASE=/api/v1 由 preview 代理（preview.proxy）转到本套
+      // E2E 后端（8124）。reuseExistingServer:false 确保每次新构建的 preview，不误复用
+      // 常驻 dev server（5173）或残留实例。
+      command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} VITE_API_BASE=/api/v1 npx vite build --mode e2e && npx vite preview --port ${E2E_FRONTEND_PORT} --strictPort`,
       url: E2E_FRONTEND_BASE,
-      // 端口空闲则起新实例；若已有对应端口的 vite 则复用。
-      reuseExistingServer: true,
-      timeout: 120000,
+      reuseExistingServer: false,
+      timeout: 180000,
     },
     {
       // E2E 后端：e2e_backend.sh 起独立 PG 库（heijin_erp_e2e）+ uvicorn。

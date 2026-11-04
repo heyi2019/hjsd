@@ -15,8 +15,24 @@ export default defineConfig(({ mode }) => {
     ?? env.ERP_E2E_BACKEND_PORT
     ?? "8123";
 
+  // dev（server）与 preview 共用同一套 /api/v1 代理：E2E 用 preview 模式（见
+  // playwright.config.ts），若只在 server 段配代理，preview 会连不上后端。
+  const apiProxy = {
+    "/api/v1": {
+      target: `http://127.0.0.1:${backendPort}`,
+      changeOrigin: true,
+    },
+  };
+
+  // E2E 走 `vite build --mode e2e` + preview：preview 是 production 构建产物，
+  // import.meta.env.DEV 在 build 时恒为 false，但 E2E 依赖 DEV 真值走零登录直通
+  // （session.tsx:108 的 authenticated 默认 import.meta.env.DEV）。故 e2e 模式强制
+  // define DEV 为 true，仅作用于 E2E 构建，不影响 development / production 构建。
+  const define = mode === "e2e" ? { "import.meta.env.DEV": "true" } : {};
+
   return {
     plugins: [react()],
+    define,
     resolve: {
       alias: { "@": here("./src") },
     },
@@ -24,12 +40,13 @@ export default defineConfig(({ mode }) => {
     // 开发时统一走同源路径，由 Vite 在本机转发到后端，避免 CORS/PNA 拦截。
     server: {
       host: "0.0.0.0",
-      proxy: {
-        "/api/v1": {
-          target: `http://127.0.0.1:${backendPort}`,
-          changeOrigin: true,
-        },
-      },
+      proxy: apiProxy,
+    },
+    // preview 段代理与 server 完全一致：E2E 走 `vite build + vite preview` 时，
+    // 前端的 /api/v1 请求须同样转发到本套 E2E 后端端口（8124）。
+    preview: {
+      host: "0.0.0.0",
+      proxy: apiProxy,
     },
     build: {
       chunkSizeWarningLimit: 1200,

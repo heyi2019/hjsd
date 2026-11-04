@@ -149,10 +149,11 @@ async function readSettingsTabs(page: Page): Promise<string[]> {
 for (const center of CENTERS) {
   test(`全叶子走查：${center.nav}（${center.dynamic ? "动态读取" : `${center.tabs!.length} 个`} Tab）`, async ({ page }) => {
     // 本用例逐 Tab 依次切换并各做两次断言，耗时随 Tab 数线性增长（经营中心 13 个）。
-    // 正常负载下约 8s，但全量串行跑 + 机器有其它负载时会明显变慢，曾出现 45s 顶到
-    // 全局 timeout 而失败、单独跑却 8s 通过的 flaky。这里按 Tab 数给足预算，
-    // 不放松任何断言——超时只用来区分「慢」与「真的走不通」。
-    test.setTimeout(Math.max(45_000, (center.dynamic ? 13 : center.tabs!.length) * 8_000));
+    // 正常负载下约 8s，但全量串行跑 + 机器有其它负载（同机并行 vite/build 进程）时会
+    // 明显变慢，曾出现顶到预算超时、单独跑却秒过 的 flaky。这里按 Tab 数给足预算
+    // （15s/Tab，约实测上限 2x 余量；下限 60s），不放松任何断言——超时只用来区分
+    // 「慢」与「真的走不通」（真卡住远超时仍会失败）。
+    test.setTimeout(Math.max(60_000, (center.dynamic ? 13 : center.tabs!.length) * 15_000));
 
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));

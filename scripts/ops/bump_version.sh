@@ -3,7 +3,7 @@
 #
 #   backend/app/version.py       ← 唯一事实源（deploy.sh 从这里解析镜像 tag）
 #   frontend/package.json        ← 前端包版本
-#   frontend/package-lock.json   ← 根包版本（漏改会让 npm ci 结果与 package.json 不符）
+#   package-lock.json            ← 根锁文件 packages['frontend'].version（npm workspaces 结构）
 #
 # 用法：
 #   scripts/ops/bump_version.sh --check         只校验三处是否一致（CI 可用，不写文件）
@@ -57,7 +57,7 @@ dry = os.environ["DRY_RUN"] == "1"
 
 version_py = root / "backend" / "app" / "version.py"
 pkg_path = root / "frontend" / "package.json"
-lock_path = root / "frontend" / "package-lock.json"
+lock_path = root / "package-lock.json"  # npm workspaces：锁文件在仓库根
 
 for p in (version_py, pkg_path, lock_path):
     if not p.is_file():
@@ -76,7 +76,7 @@ def read_version_py() -> str:
 def read_json_versions() -> tuple[str, str]:
     pkg = json.loads(pkg_path.read_text("utf-8"))["version"]
     lock = json.loads(lock_path.read_text("utf-8"))
-    return pkg, lock["packages"][""]["version"]
+    return pkg, lock["packages"]["frontend"]["version"]
 
 
 current = read_version_py()
@@ -86,7 +86,7 @@ if mode == "check":
     ok = pkg_v == current and lock_v == current
     print(f"  backend/app/version.py      {current}")
     print(f"  frontend/package.json       {pkg_v}")
-    print(f"  frontend/package-lock.json  {lock_v}")
+    print(f"  package-lock.json (frontend) {lock_v}")
     if not ok:
         print("✗ 版本不一致，请运行 scripts/ops/bump_version.sh <patch|minor|major|x.y.z>", file=sys.stderr)
         sys.exit(1)
@@ -125,23 +125,28 @@ if n_pkg != 1:
     sys.exit("✗ package.json 替换失败")
 
 lock_text = lock_path.read_text("utf-8")
-lock_new, n_lock = re.subn(r'"version": "[^"]*"', f'"version": "{new}"', lock_text, count=2)
-if n_lock != 2:
-    sys.exit(f"✗ package-lock.json 期望替换 2 处（顶层 + 根包），实际 {n_lock} 处，已中止")
+# 根锁文件里 version 字段成百上千，只能精确命中 workspaces 子包那一段。
+lock_new, n_lock = re.subn(
+    r'("frontend": \{\s*"name": "[^"]+",\s*"version": ")[^"]+(")',
+    lambda m: m.group(1) + new + m.group(2),
+    lock_text,
+    count=1,
+)
+if n_lock != 1:
+    sys.exit(f"✗ package-lock.json 的 packages['frontend'].version 替换失败（命中 {n_lock} 处），已中止")
 
 # ---- 落盘前先校验替换结果可解析且三处一致（防正则改坏 JSON）----
 def verify(pkg_s: str, lock_s: str) -> None:
     got_pkg = json.loads(pkg_s)["version"]
     got_lock = json.loads(lock_s)
     assert got_pkg == new, f"package.json={got_pkg}"
-    assert got_lock["version"] == new, f"lock 顶层={got_lock['version']}"
-    assert got_lock["packages"][""]["version"] == new, "lock 根包未同步"
+    assert got_lock["packages"]["frontend"]["version"] == new, "lock 的 frontend 子包版本未同步"
 
 verify(pkg_new, lock_new)
 
 print(f"==> 版本 {current} → {new}" + ("（dry-run，未写文件）" if dry else ""))
 if dry:
-    print("  backend/app/version.py / frontend/package.json / frontend/package-lock.json")
+    print("  backend/app/version.py / frontend/package.json / package-lock.json (frontend)")
     sys.exit(0)
 
 version_py.write_text(v_new, "utf-8")
@@ -175,7 +180,7 @@ cat <<'TIP'
 
 后续（脚本不代做）：
   1) 更新 RELEASE.md：新增 V<新版本> 章节，写清相对上一版的变更
-  2) git add backend/app/version.py frontend/package.json frontend/package-lock.json RELEASE.md
+  2) git add backend/app/version.py frontend/package.json package-lock.json RELEASE.md
      git commit -m "release: v<新版本> ..."
   3) scripts/ops/bump_version.sh --tag 可代打 tag；或手动 git tag -a v<新版本>
   4) 部署无需改配置：deploy.sh 从 version.py 解析，镜像 tag 与 /health 自动跟随

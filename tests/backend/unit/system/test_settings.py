@@ -35,16 +35,19 @@ def test_frontend_version_matches_backend_release_version():
 
     典型漂移：只改 `backend/app/version.py` 就发版 → 前端包版本仍是旧的，
     页面/构建产物与 `/health` 报的版本号打架。发版请走
-    `scripts/ops/bump_version.sh`，它一次改齐三处（version.py / package.json /
-    package-lock.json），本断言是事后兜底。
+    `scripts/ops/bump_version.sh`，它一次改齐三处（version.py / frontend/package.json /
+    根 package-lock.json 的 frontend 子包），本断言是事后兜底。
     """
     import json
 
     from app.version import __version__ as release_version
 
     pkg_path = PROJECT_ROOT / "frontend" / "package.json"
-    lock_path = PROJECT_ROOT / "frontend" / "package-lock.json"
+    # npm workspaces 的真实锁文件在仓库根，版本只落在 packages["frontend"]；
+    # 旧断言指向 frontend/package-lock.json（不存在）被 `if is_file()` 静默跳过，等于没守。
+    lock_path = PROJECT_ROOT / "package-lock.json"
     assert pkg_path.is_file(), f"缺少前端 package.json：{pkg_path}"
+    assert lock_path.is_file(), f"缺少根锁文件：{lock_path}"
 
     pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
     assert pkg["version"] == release_version, (
@@ -52,12 +55,10 @@ def test_frontend_version_matches_backend_release_version():
         f"{release_version} 不一致，请运行 scripts/ops/bump_version.sh"
     )
 
-    if lock_path.is_file():
-        lock = json.loads(lock_path.read_text(encoding="utf-8"))
-        assert lock["version"] == release_version, "package-lock.json 顶层版本未同步"
-        assert lock["packages"][""]["version"] == release_version, (
-            "package-lock.json 根包版本未同步"
-        )
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    assert lock["packages"]["frontend"]["version"] == release_version, (
+        "package-lock.json 的 packages['frontend'].version 未同步"
+    )
 
 
 def _release_sections(text: str) -> dict[str, str]:

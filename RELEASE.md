@@ -15,12 +15,12 @@ scripts/ops/changelog.sh --from v1.0.1        # 先看草稿，不落盘
 scripts/ops/changelog.sh --from v1.0.1 --write # 插入到顶部（已有该版本章节会拒绝）
 
 # 3 提交并打 tag（tag 必须指向含本次版本改动的提交）
-git add backend/app/version.py frontend/package.json frontend/package-lock.json RELEASE.md
+git add backend/app/version.py frontend/package.json package-lock.json RELEASE.md
 git commit -m "release: v1.1.1 ..."
 scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 ```
 
-> **漏写会被测试挡住**：`backend/tests/v1/test_settings.py::test_release_notes_has_section_for_current_version`
+> **漏写会被测试挡住**：`tests/backend/unit/system/test_settings.py::test_release_notes_has_section_for_current_version`
 > 断言本文件存在当前版本的 `## Vx.y.z` 章节，且章节内含「发布时间」「本次内容」。
 > 版本号涨了、章节没跟上 → `run_regression.py ci` 直接红，不再依赖人记得。
 
@@ -30,10 +30,46 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | --- | --- | --- |
 | `backend/app/version.py` | 唯一事实源；`deploy.sh` 据此生成镜像 tag | `/health` 与镜像 tag 报旧版本 |
 | `frontend/package.json` | 前端包版本 | 前端无法反查 |
-| `frontend/package-lock.json` | 根包版本（顶层 + `packages[""]` 两处） | `npm ci` 结果与 package.json 不符 |
+| `package-lock.json`（仓库根） | workspaces 子包 `packages["frontend"].version` | `npm ci` 结果与 package.json 不符 |
 
 部署侧**无需任何配置**：`deploy.sh` 用 `sed` 从 `version.py` 解析并 `export APP_VERSION`，
 镜像 tag（`heijin-backend:<版本>`）与容器内 `/api/v1/health` 的 `app_version` 自动跟随。
+
+---
+
+## V1.0.3
+
+**发布时间：** 2026-11-05 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.3` |
+| 前端构建版本 | `1.0.3` |
+| 后端 API 版本 | `1.0.3`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | 活动链仅 `0001` = head（`create_all` + `seed_catalog`），不再加增量迁移 |
+
+### 本次内容
+
+- **售出表单三分**：回收 / 提号 / 代挂售出由共用 `SALE` 拆为 `SALEREC` / `SALETH` / `SALEDG` 独立作用域，三份字段与板块标题各自配置、互不影响；按界面差异化补齐后可配字段 28 / 28 / 21 项，代挂金额称「利润」且不含分期与分笔字段。**已有库升级必须执行 `backend/scripts/split_sale_form_scopes.py`**，否则回落默认值并丢失管理员配置。
+- **利润口径统一**：分润基数 = 该订单所有收入 − 所有支出，可正可负可 0；返点记录计入收入、分期坏账计入支出（二者不生成 cashflow）；报表与订单详情同源。结算展示层与 `rebate_settlements` 模型层下线，已有库历史表保留不 drop。
+- **分润与订单**：亏损单允许按金额负数分润；一个动作多人时按人数均分，台账增删执行人联动分润人数；「我的订单」覆盖全部事件执行人而非仅 SELL。
+- **时间与删除**：成交日期可编辑并按天数平移该单事件/流水账期、重取规则快照；账号台账编辑态三个时间联动平移（含系统时间戳）；账号删除仅管理员、原因必填、关联单据保留并显式解绑、审计留全快照。
+- **登录**：桌面端免密登录（密码 / 手机号验证码 / 微信）保留，准入为已配置手机号且在职、不开放注册；**H5 两套入口与微信 H5 通道已下线**，前端回到单入口。生产 `.env` 显式关闭两条免密链路。
+- **上线口径**：迁移链压平为活基线 `0001`，上线改为原地增量（dump → drill → `schema_diff.py` 只补缺失 → `APP_VERSION` 换镜像），主键须单独核 `pg_constraint`。
+
+### 发布前检查
+
+- `scripts/ops/bump_version.sh --check` 三处版本一致；`run_regression.py ci` / `fe` 与 Playwright E2E 结果已定性。
+- 已有库按 `docs/ERP_生产上线执行单_v1.3_20261105.md` B4 跑拆分脚本，并检查 C1 字段数增量为预期。
+- 结构比对除列与索引外，必须核对 `pg_constraint.contype='p'`（业务表缺失主键数为 0）。
+
+### 回滚
+
+镜像按 `APP_VERSION` 回退到上一版；数据库侧拆分脚本只插不删、旧 `SALE` 行完整保留，`rebate_settlements` 历史表亦未 drop，回退旧镜像无需清理数据。
+
+### 已知遗留
+
+**1.0.3 不含首次设密死锁修复**：启用免密登录前必须先发 1.0.4；当前生产两条链路显式关闭，请勿在 1.0.3 上开启。
 
 ---
 

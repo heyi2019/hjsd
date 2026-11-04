@@ -1,8 +1,10 @@
 name: e2e-gate
 
 # E2E 门禁：真实 Chromium + 真实后端 + 独立 PG 库 heijin_erp_e2e。
-# 复用常驻 e2e 库（不再每次重建）：e2e_db.py 按 (business_mode, inventory_type) 补足
-# IN_STOCK 账号，用例消耗后在库账号下一轮自动补齐；库容器常驻、绝不触碰 dev/test/release。
+# 数据策略：每轮不清数据。本地常驻复用 e2e 库，CI 的 postgres service 则是全新空库——
+# 两者都走 e2e_db.py 默认 keep 分支（create_all 补表 + 幂等播种），夹具按
+# (business_mode, inventory_type) 补足 IN_STOCK 账号，用例消耗后下一轮自动补齐；
+# 自动化不再注入 E2E_RESET=1。绝不触碰 dev/test/release。
 # main / test 推送、PR、手动触发均阻塞。
 
 on:

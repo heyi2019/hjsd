@@ -241,7 +241,9 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 - 后端测试只认 `TEST_DATABASE_URL`，**刻意不回落 `DATABASE_URL`**；库名必须含 `test`，
   且命中 `release`/`prod` 等黑名单或与 `DATABASE_URL` 同库时直接 abort（夹具会 TRUNCATE 全表）。
-- E2E 用 `heijin_erp_e2e`，每次运行重建并重播种子，用完即弃，绝不触碰 dev/test/release。
+- E2E 用 `heijin_erp_e2e`，常驻复用、每轮不清数据（`e2e_db.py` 默认 keep 分支补表 + 幂等播种，
+  夹具按类型补足 `IN_STOCK` 账号供重复跑测；CI 全新空库由 keep 分支建表初始化），
+  绝不触碰 dev/test/release。
 
 ## 6. 当前已知缺口
 

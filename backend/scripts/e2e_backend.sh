@@ -34,7 +34,8 @@ export DATABASE_URL="$E2E_URL"
 export E2E_DATABASE_URL="$E2E_URL"
 
 # 默认**不清数据**（e2e 库同时当第五个可查看环境，不能每次启动就清空）；
-# 需要干净起点时设 E2E_RESET=1（playwright.config.ts 的 webServer 就是这么调的）。
+# 自动化（playwright webServer）与人工启动都走默认 keep 分支，靠 e2e_db.py 的夹具
+# 按类型补足 IN_STOCK 账号来重复跑测。仅人工需要彻底清空时才设 E2E_RESET=1。
 if [[ "${E2E_RESET:-0}" == "1" ]]; then
   echo "[e2e-backend] 重置并播种 E2E 库（E2E_RESET=1）：$E2E_URL"
   "$PY" scripts/e2e_db.py --reset

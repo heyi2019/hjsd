@@ -2,11 +2,14 @@
 
 两种模式（默认 keep 是用户裁决：E2E 库同时当「第五个可查看环境」，不能每次启动就清空）：
   - `python scripts/e2e_db.py`（默认）：create_all 补缺失表 + 幂等播种，**不删任何行**，
-    已有单据/库存/流水原样保留；
+    已有单据/库存/流水原样保留；自动化（playwright webServer）与人工启动都走这条。
+    夹具按 (business_mode, inventory_type) 补足 IN_STOCK 账号，用例消耗后下一轮自动补齐，
+    故无需每轮重建也能重复跑测。
   - `python scripts/e2e_db.py --reset`（或 `E2E_RESET=1`）：drop_all + create_all + TRUNCATE，
-    得到干净起点；playwright 自动化走这条。
+    得到干净起点；仅供人工需要彻底清空时使用，自动化已不再注入 E2E_RESET。
 
-注意「重置只发生在跑前，不在跑后」：库 heijin_erp_e2e 一直存在，跑完的数据原样留着。
+注意：库 heijin_erp_e2e 一直存在，跑完的数据原样留着。CI 的 postgres service 每次是
+全新空库，由默认 keep 分支的 create_all + 幂等播种完成初始化，同样不需要 --reset。
 
 
 设计对齐 `tests/backend/conftest.py` 的 `v1_engine` 夹具：
@@ -24,9 +27,9 @@
     无任何非 ORM 表；"TRUNCATE 不能带 CASCADE" 的铁律只针对 dev/release（那里有
     配置表要保留）。本库全清正好是要的目的。
 
-用法（playwright.config.ts 的 webServer 调起时设 `E2E_RESET=1`）：
-  python scripts/e2e_db.py               # 保留数据 + 补种子（默认，给人看）
-  python scripts/e2e_db.py --reset       # 重建 + 清空 + 种子（自动化）
+用法（自动化与人工默认均不带额外参数）：
+  python scripts/e2e_db.py               # 保留数据 + 补种子 + 补足在库账号（默认）
+  python scripts/e2e_db.py --reset       # 重建 + 清空 + 种子（仅人工需要干净起点时）
   python scripts/e2e_db.py --reset-only  # 仅重建不补 E2E 业务夹具
 """
 from __future__ import annotations
@@ -209,12 +212,13 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
     两种模式：
       - `keep=True`（默认，给人看数据用）：**不删任何行**。只 create_all 补齐缺失的表，
         再跑一遍播种（全部函数都有 existing 守卫，天然幂等）。已有单据/库存/流水原样保留。
-      - `keep=False`（`--reset`，给自动化跑测试用）：drop_all + create_all 强制把表结构
-        对齐当前 ORM（含 CHECK 约束、新增列等），再 TRUNCATE 全表，得到干净起点。
+      - `keep=False`（`--reset`，仅人工需要干净起点时用）：drop_all + create_all 强制把表
+        结构对齐当前 ORM（含 CHECK 约束、新增列等），再 TRUNCATE 全表，得到干净起点。
         避免「库已存在 → create_all 不改旧表」导致的约束落后。
 
     选择默认 keep 的原因：E2E 库同时被当作第五个「可查看环境」，每次启动都清空会让人
-    打开页面就看不到数据。自动化需要干净起点时显式传 --reset / 设 E2E_RESET=1 即可。
+    打开页面就看不到数据。自动化复用常驻库，靠夹具补足 IN_STOCK 账号保证可重复跑测，
+    只有人工需要彻底清空时才显式传 --reset / 设 E2E_RESET=1。
     业务库绝不可走这条路（见文件头铁律）。
     """
     url = _e2e_database_url()

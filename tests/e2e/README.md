@@ -16,7 +16,9 @@
 
 **环境**
 
-独立库 `heijin_erp_e2e`，每次运行由 `e2e_db.py` 重建并重播种子，用完即弃；
+独立库 `heijin_erp_e2e`，**常驻复用、每轮不清数据**：`e2e_db.py` 默认 keep 分支只补缺失表
++ 幂等播种，夹具按 `(business_mode, inventory_type)` 补足 `IN_STOCK` 账号，用例消耗后下一轮
+自动补齐。CI 的 postgres service 是全新空库，同样由 keep 分支的 `create_all` 完成初始化；
 绝不触碰 `heijin_erp_dev` / `heijin_erp_test` / `heijin_erp_release`。
 
 **当前状态**

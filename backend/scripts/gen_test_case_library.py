@@ -444,8 +444,8 @@ def extract_priority(test_type: str, relpath: str, fname: str, func_id: str) -> 
 
 def extract_precond(relpath: str, body: str) -> str:
     if relpath.startswith("tests/e2e/"):
-        return ("vite(5181) + uvicorn(8124) + PG 独立库 heijin_erp_e2e"
-                "（每轮 create_all+TRUNCATE+seed，用完即丢）")
+        return ("vite build+preview(5181) + uvicorn(8124) + PG 独立库 heijin_erp_e2e"
+                "（常驻复用、每轮不清数据；默认 keep 分支补表 + 幂等播种 + 按类型补足 IN_STOCK 账号）")
     if is_frontend_test(relpath):
         return "组件挂载；mock 网络层(apiMock)；局部渲染"
     items = []

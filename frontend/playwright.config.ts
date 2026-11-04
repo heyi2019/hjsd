@@ -13,9 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
  *     由 vite 代理到本套 E2E 后端端口（ERP_E2E_BACKEND_PORT=8124）——后端无 CORS 中间件，
  *     必须用同源代理而非跨域直连，否则请求被浏览器拦截。
  *
- * 数据策略：「人工看保留、自动化清空」。e2e_backend.sh 默认只补表与种子、不删数据
- * （e2e 库同时当第五个可查看环境）；playwright 的 webServer 显式注入 E2E_RESET=1，
- * 才执行 create_all + TRUNCATE 全表 + 重播种子，保证自动化从干净起点跑。
+ * 数据策略：复用常驻 e2e 库，不再每次重建。e2e_backend.sh 默认（不清数据）只补缺失表
+ * + 幂等播种；e2e_db.py 的夹具按 (business_mode, inventory_type) 补足 IN_STOCK 账号，
+ * 故用例消耗在库账号后下一轮仍能补齐，自动化直接复用既有库（省 5–15s 启动 + 重播种子）。
  *
  * 隔离端口：8123/5173 被常驻 dev 后端/前端占用，E2E 独占 8124/5181，彻底绕开业务环境。
  * 可用环境变量覆盖：
@@ -77,9 +77,10 @@ export default defineConfig({
     },
     {
       // E2E 后端：e2e_backend.sh 起独立 PG 库（heijin_erp_e2e）+ uvicorn。
-      // E2E_RESET=1 只在自动化跑测时清库：人工启动后端默认保留数据（见 e2e_db.py）。
-      // reuseExistingServer:false 保证每次强制重建，避免脏数据累积或复用错库。
-      command: `E2E_RESET=1 ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} bash ../backend/scripts/e2e_backend.sh`,
+      // 不再注入 E2E_RESET=1：复用常驻 e2e 库，由 e2e_db.py 的夹具按类型补足 IN_STOCK
+      // 账号，避免每次跑测都 drop+create+重播种子（省 5–15s）。人工/自动化行为一致。
+      // reuseExistingServer:false 保证每次强制重启 uvicorn，避免复用错的后端实例。
+      command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} bash ../backend/scripts/e2e_backend.sh`,
       url: `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1/auth/me`,
       reuseExistingServer: false,
       timeout: 120000,

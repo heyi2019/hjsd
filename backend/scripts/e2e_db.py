@@ -250,14 +250,17 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
 def _seed_e2e_fixtures(db) -> None:
     """E2E 业务夹具：客户 + 干净在库账户，供建单 / 售出 / 资金等真实写入联调用例。
 
-    仅建「最小可用」数据：业务写路径用例（business-write / finance-write-ui）多数
-    走 UI 自己造订单，这里补的是下拉数据源（买家客户、在库库存账户）。
-    字段严格对齐当前 ORM（见 app/domain/trade/stocks 等）；若后续模型变更，
-    本函数报错的用例即提示需同步，不会静默污染。
+    关键修正：E2E 套件串行共享同一常驻库，用例会「消耗」在库账号（建单后出库）。
+    早期实现只在 `count()==0` 时一次性补满，导致不清数据复用库时第二轮就找不到
+    IN_STOCK 账号而失败——这也是当初 playwright 被迫每次 `E2E_RESET=1` 全量重建的根因。
+    现改为**按 (business_mode, inventory_type) 确保每种都有足量的 IN_STOCK 账号**，
+    不足即补，从而可去掉每次重建、直接复用常驻库（省 5–15s 启动 + 重播种子）。
+    字段严格对齐当前 ORM（见 app/domain/trade_models/account.py）。
     """
     from app.domain.parties import Customer  # noqa: E402
     from app.domain.trade_models.account import Account  # noqa: E402
 
+    # 客户不随用例消耗而消失，仅做「空库才建」初始化（避免无限累积）。
     if db.query(Customer).count() == 0:
         # 客户编号用 9xxx 段：后端新建客户走 allocate_number 自动分配（CUS0001…），
         # 与种子客户错开，避免撞 uq_customers_no（实测 CUS0001-0003 与自动分配首值冲突）。
@@ -269,41 +272,64 @@ def _seed_e2e_fixtures(db) -> None:
                 owner_id=1,
                 note="E2E 夹具",
             ))
-    if db.query(Account).count() == 0:
-        # 各类业务形态各造若干干净在库账号，供 HS/TH/DG 真实写入联调用例按 inventory_type 取用：
-        # HS→SELF/RECOVERY、TH→DISTRIBUTION/PICKUP、DG(代挂)→DISTRIBUTION/CONSIGNMENT。
-        # 因 E2E 套件串行共享同一 ephemeral 库，用例会「消耗」在库账号（建单后出库），
-        # 故每类多造几份，让后续用例仍能 find 到 IN_STOCK 的同类账号（find 会跳过已出库的）。
-        # 不写显式 id——交 PG 自增，避免序列错位。
-        _GAMES = [
-            "王者荣耀", "原神", "和平精英", "英雄联盟", "穿越火线",
-            "崩坏星穹铁道", "蛋仔派对", "第五人格", "QQ飞车", "三国杀",
-            "光遇", "明日方舟",
-        ]
-        _CHANNELS = ["微信区", "官服", "QQ区", "B服", "iOS", "安卓", "抖音", "TapTap"]
-        _PLANS = [
-            ("SELF", "RECOVERY", 20000),
-            ("DISTRIBUTION", "PICKUP", 20100),
-            ("DISTRIBUTION", "CONSIGNMENT", 20200),
-        ]
-        for biz_mode, inv_type, stock_prefix in _PLANS:
-            for j in range(len(_GAMES)):
-                db.add(Account(
-                    stock_no=f"KU_{str(stock_prefix + j)}",
-                    game_account=f"e2e_{inv_type.lower()}_{j + 1}",
-                    camp_account=f"e2e_camp_{inv_type.lower()}_{j + 1}",
-                    game_password="e2e-pwd",
-                    channel_region=_CHANNELS[j % len(_CHANNELS)],
-                    bound_phone="13800000000",
-                    has_secondary=False,
-                    wallet_realname="E2E",
-                    business_mode=biz_mode,
-                    inventory_type=inv_type,
-                    status="WAITING",
-                    inventory_status="IN_STOCK",
-                    game_type=_GAMES[j],
-                    cost_amount=0,
-                ))
+
+    # 在库账号按类型补足：确保每种 (business_mode, inventory_type) 组合都有
+    # _TARGET_PER_TYPE 个 IN_STOCK 账号。补足时 stock_no 接在该类型现有最大号之后递增，
+    # 绝不撞号（首轮 0 段 20000/20100/20200 + 后续补足段均不重叠）。
+    _GAMES = [
+        "王者荣耀", "原神", "和平精英", "英雄联盟", "穿越火线",
+        "崩坏星穹铁道", "蛋仔派对", "第五人格", "QQ飞车", "三国杀",
+        "光遇", "明日方舟",
+    ]
+    _CHANNELS = ["微信区", "官服", "QQ区", "B服", "iOS", "安卓", "抖音", "TapTap"]
+    _PLANS = [
+        ("SELF", "RECOVERY", 20000),
+        ("DISTRIBUTION", "PICKUP", 20100),
+        ("DISTRIBUTION", "CONSIGNMENT", 20200),
+    ]
+    _TARGET_PER_TYPE = 12
+    for biz_mode, inv_type, stock_prefix in _PLANS:
+        # 该类型现有 IN_STOCK 数量（已出库的账号不计入，会被补足）。
+        in_stock = (
+            db.query(Account)
+            .filter(
+                Account.business_mode == biz_mode,
+                Account.inventory_type == inv_type,
+                Account.inventory_status == "IN_STOCK",
+            )
+            .count()
+        )
+        need = _TARGET_PER_TYPE - in_stock
+        if need <= 0:
+            continue
+        # 现有最大 stock_no 后缀，补足时从其 +1 递增，避免重复 KU_ 编号。
+        max_no = stock_prefix
+        for rec in (
+            db.query(Account.stock_no)
+            .filter(Account.business_mode == biz_mode, Account.inventory_type == inv_type)
+            .all()
+        ):
+            tail = rec[0].split("_")[-1]
+            if tail.isdigit():
+                max_no = max(max_no, int(tail))
+        for j in range(need):
+            suffix = max_no + 1 + j
+            db.add(Account(
+                stock_no=f"KU_{suffix}",
+                game_account=f"e2e_{inv_type.lower()}_{suffix}",
+                camp_account=f"e2e_camp_{inv_type.lower()}_{suffix}",
+                game_password="e2e-pwd",
+                channel_region=_CHANNELS[j % len(_CHANNELS)],
+                bound_phone="13800000000",
+                has_secondary=False,
+                wallet_realname="E2E",
+                business_mode=biz_mode,
+                inventory_type=inv_type,
+                status="WAITING",
+                inventory_status="IN_STOCK",
+                game_type=_GAMES[j % len(_GAMES)],
+                cost_amount=0,
+            ))
     db.flush()
 
 

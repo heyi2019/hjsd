@@ -235,3 +235,50 @@ export function profitClass(value: string | number | null | undefined): string {
   if (!Number.isFinite(num) || num === 0) return "";
   return num > 0 ? "h5-row__profit--up" : "h5-row__profit--down";
 }
+
+// ---------------------------------------------------------------- 事件与资金
+
+/** 订单事件（EventType）。文案与桌面端 EXECUTION_ACTION_LABEL 一致，
+ *  但 CANCEL 在移动端写「冲销」而不是「取消」——它冲的是某一条事件，
+ *  与「取消订单」是两件事，同名会让人误以为整单作废。 */
+export const EVENT_LABEL: Record<string, string> = {
+  BUY: "买号",
+  COST: "费用支出",
+  SELL: "售出",
+  PAYMENT: "回款",
+  DELIVER: "交付",
+  CANCEL: "冲销",
+  REFUND: "退款",
+};
+
+const EVENT_TONE: Record<string, Tone> = {
+  BUY: "blue",
+  COST: "orange",
+  SELL: "green",
+  PAYMENT: "green",
+  DELIVER: "purple",
+  CANCEL: "gray",
+  REFUND: "red",
+};
+
+export function eventLabel(type: string): string {
+  return EVENT_LABEL[type] ?? type;
+}
+
+export function eventTone(type: string): Tone {
+  return EVENT_TONE[type] ?? "gray";
+}
+
+/** 退款责任方 */
+export const REFUND_RESPONSIBILITY_LABEL: Record<string, string> = {
+  COMPANY: "公司承担",
+  CUSTOMER: "客户承担",
+  CONSIGNOR: "寄售方承担",
+  PLATFORM: "平台承担",
+  OTHER: "其他",
+};
+
+/** 资金流向 */
+export function directionLabel(direction: string): string {
+  return direction === "IN" ? "收入" : direction === "OUT" ? "支出" : direction;
+}

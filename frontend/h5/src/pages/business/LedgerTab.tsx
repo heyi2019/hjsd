@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listOrders, type OrderRow } from "../../api";
+import { listOrders, type OrderRow, type SessionUser } from "../../api";
 import {
   money,
   orderTypeGlyph,
@@ -10,6 +10,7 @@ import {
   statusTone,
 } from "../../labels";
 import { SearchIcon } from "../../icons";
+import { CreateOrderFab } from "../../components/CreateOrderFab";
 import { navigate } from "../../router";
 
 const PAGE_SIZE = 20;
@@ -20,7 +21,7 @@ const TYPES = [
   { value: "DG", label: "代挂" },
 ];
 
-export function LedgerTab() {
+export function LedgerTab({ user }: { user: SessionUser }) {
   const [items, setItems] = useState<OrderRow[]>([]);
   const [total, setTotal] = useState(0);
   const [keyword, setKeyword] = useState("");
@@ -145,6 +146,8 @@ export function LedgerTab() {
           ))}
         </ul>
       )}
+
+      <CreateOrderFab user={user} />
 
       {!loading && items.length < total ? (
         <button

@@ -6,7 +6,11 @@ import { ChangePasswordPage } from "./pages/ChangePasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { BusinessPage, type BusinessTab } from "./pages/business/BusinessPage";
 import { OrderDetailPage } from "./pages/business/OrderDetailPage";
+import { OrderCreatePage } from "./pages/business/OrderCreatePage";
+import { OrderEditPage } from "./pages/business/OrderEditPage";
+import { OrderRefundPage } from "./pages/business/OrderRefundPage";
 import { StockDetailPage } from "./pages/business/StockDetailPage";
+import { StockSalePage } from "./pages/business/StockSalePage";
 import { CustomersPage } from "./pages/customers/CustomersPage";
 import { CustomerDetailPage } from "./pages/customers/CustomerDetailPage";
 import { CustomerFormPage } from "./pages/customers/CustomerFormPage";
@@ -148,12 +152,36 @@ function resolveScreen(
   if (isUnder(path, "/business")) {
     const raw = path.split("/")[2];
     const tab: BusinessTab = BUSINESS_TABS.includes(raw as BusinessTab) ? (raw as BusinessTab) : "inventory";
-    return { screen: <BusinessPage tab={tab} />, tab: "business" };
+    return { screen: <BusinessPage tab={tab} user={user} />, tab: "business" };
+  }
+
+  // 三段路径必须排在两段的 /orders/:id 之前，否则 "new"/"edit" 会被当成 id。
+  const createMatch = matchPath("/orders/new/:kind", path);
+  if (createMatch) {
+    const kind = createMatch.kind.toUpperCase();
+    if (kind === "HS" || kind === "TH" || kind === "DG") {
+      return { screen: <OrderCreatePage kind={kind} />, tab: null };
+    }
+  }
+
+  const editMatch = matchPath("/orders/:id/edit", path);
+  if (editMatch) {
+    return { screen: <OrderEditPage orderId={Number(editMatch.id)} />, tab: null };
+  }
+
+  const refundMatch = matchPath("/orders/:id/refund", path);
+  if (refundMatch) {
+    return { screen: <OrderRefundPage orderId={Number(refundMatch.id)} />, tab: null };
   }
 
   const orderMatch = matchPath("/orders/:id", path);
   if (orderMatch) {
     return { screen: <OrderDetailPage orderId={Number(orderMatch.id)} />, tab: null };
+  }
+
+  const saleMatch = matchPath("/stocks/:id/sale", path);
+  if (saleMatch) {
+    return { screen: <StockSalePage stockId={Number(saleMatch.id)} />, tab: null };
   }
 
   const stockMatch = matchPath("/stocks/:id", path);

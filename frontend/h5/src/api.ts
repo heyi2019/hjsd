@@ -252,6 +252,8 @@ export async function fetchStockTotal(): Promise<number> {
 
 /** 订单详情：后端 GET /orders/{id} 返回全量字段，移动端只取要展示的部分。 */
 export interface OrderDetail extends OrderRow {
+  account_id?: number | null;
+  link_status?: string | null;
   owner_name?: string | null;
   capital_type?: string | null;
   note?: string | null;
@@ -290,6 +292,8 @@ export interface StockRow {
   buy_date?: string | null;
   inventory_age_days?: number | null;
   inventory_age_level?: "NORMAL" | "WARNING" | "OVERDUE" | null;
+  /** 入库订单 ID：库存售出必须在它上面登记 SELL 事件，缺失就无法售出。 */
+  source_order_id?: number | null;
   source_order_no?: string | null;
   note?: string | null;
 }
@@ -309,9 +313,15 @@ export async function listStocks(params: {
   return data;
 }
 
+/**
+ * 单个账号。
+ * 后端**没有** `GET /stocks/{id}`（只有 PATCH），直接取会 405；单账号资料在
+ * `GET /stocks/{id}/execution-detail` 的 `account` 里，这里复用它，
+ * 顺带拿到财务汇总，详情页不必再发第二个请求。
+ */
 export async function fetchStock(id: number): Promise<StockRow> {
-  const { data } = await http.get<StockRow>(`/stocks/${id}`);
-  return data;
+  const { data } = await http.get<{ account: StockRow }>(`/stocks/${id}/execution-detail`);
+  return data.account;
 }
 
 // ---------------------------------------------------------------- 客户
@@ -468,5 +478,631 @@ export async function fetchInstallmentTotals(params?: {
     "/installments/totals",
     { params },
   );
+  return data;
+}
+
+// ---------------------------------------------------------------- 建单基础数据
+// 说明：以下接口与桌面端 `shared/api/*.api.ts` 一一对应，但**不自动翻页**。
+// H5 的列表都带分页或筛选，一次拉全量会把蜂窝网络下的首屏拖到十几秒。
+
+export interface OptionItem {
+  value: string;
+  label: string;
+}
+
+export interface OrderTypeRow {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  contract_type?: string | null;
+}
+
+export interface FormFieldRow {
+  id: number;
+  order_type_code: string;
+  field_key: string;
+  label: string;
+  field_type: string;
+  options?: OptionItem[] | null;
+  flow_direction?: "IN" | "OUT" | null;
+  required: boolean;
+  required_when?: { field: string; op: "eq" | "ne" | "filled"; values?: string[] } | null;
+  is_active: boolean;
+  sort_order: number;
+  locked: boolean;
+  is_custom: boolean;
+  section?: string | null;
+  note?: string | null;
+}
+
+export interface PoolRow {
+  id: number;
+  code: string;
+  name: string;
+  pool_type: string;
+  ownership: string;
+  status: string;
+  note?: string | null;
+}
+
+export interface GameTypeRow {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  is_default: boolean;
+  channel_regions?: string[];
+}
+
+export interface EmployeeOption {
+  id: number;
+  username: string;
+  display_name: string;
+  is_active: boolean;
+}
+
+export interface CounterpartyRow {
+  id: number;
+  counterparty_no: string;
+  display_name: string;
+  type: string;
+  status: string;
+  contact_name?: string | null;
+  phone?: string | null;
+  wechat?: string | null;
+  qq?: string | null;
+  source?: string | null;
+  note?: string | null;
+}
+
+export async function listOrderTypes(): Promise<OrderTypeRow[]> {
+  const { data } = await http.get<OrderTypeRow[]>("/order-types");
+  return data;
+}
+
+export async function listFormFields(orderTypeCode: string): Promise<FormFieldRow[]> {
+  const { data } = await http.get<FormFieldRow[]>("/order-form-fields", {
+    params: { order_type_code: orderTypeCode, include_inactive: true },
+  });
+  return data;
+}
+
+export async function listSectionLabels(orderTypeCode: string): Promise<Record<string, string>> {
+  const { data } = await http.get<Record<string, string>>("/order-form-fields/section-labels", {
+    params: { order_type_code: orderTypeCode },
+  });
+  return data;
+}
+
+export async function listPools(): Promise<PoolRow[]> {
+  const { data } = await http.get<PoolRow[]>("/pools");
+  return data;
+}
+
+export async function listGameTypes(includeInactive = false): Promise<GameTypeRow[]> {
+  const { data } = await http.get<GameTypeRow[]>("/game-types", { params: { include_inactive: includeInactive } });
+  return data;
+}
+
+export async function listEmployees(): Promise<EmployeeOption[]> {
+  const { data } = await http.get<EmployeeOption[]>("/users/options");
+  return data;
+}
+
+export async function listCounterparties(params?: { type?: string }): Promise<CounterpartyRow[]> {
+  const { data } = await http.get<CounterpartyRow[]>("/counterparties", { params });
+  return data;
+}
+
+export async function listOptionSet(code: string): Promise<OptionItem[]> {
+  const { data } = await http.get<{ options: OptionItem[] | null }>(`/option-sets/${code}`);
+  return data.options ?? [];
+}
+
+// ---------------------------------------------------------------- 订单写操作
+
+export interface OrderCreatePayload {
+  order_type: string;
+  trade_date: string;
+  account_snapshot?: {
+    game_account: string;
+    game_type?: string;
+    game_password?: string;
+    camp_account?: string;
+    channel_region?: string;
+    bound_phone?: string;
+    bound_phone_owner?: string;
+    has_secondary?: boolean;
+    wallet_realname?: string;
+    note?: string;
+    extra_values?: Record<string, unknown>;
+  };
+  confirm_repurchase?: boolean;
+  note?: string | null;
+  form_extra?: Record<string, unknown>;
+  customer_roles?: { customer_id: number; role: string }[];
+  counterparty_roles?: { counterparty_id: number; role: string }[];
+  initial_buy?: { amount: string; occurred_on: string; pool_id?: number; portion?: string; note?: string };
+  initial_costs?: {
+    amount: string;
+    occurred_on: string;
+    pool_id?: number;
+    portion?: string;
+    flow_category?: string;
+    note?: string;
+  }[];
+}
+
+/** 建单。后端会返回 REPURCHASE_CONFIRM_REQUIRED / INVENTORY_ACCOUNT_IN_STOCK 两个业务码。 */
+export async function createOrder(payload: OrderCreatePayload): Promise<OrderDetail> {
+  const { data } = await http.post<OrderDetail>("/orders", payload);
+  return data;
+}
+
+export interface OrderEventPayload {
+  event_type: "BUY" | "COST" | "SELL" | "PAYMENT" | "DELIVER" | "CANCEL" | "REFUND";
+  amount?: string;
+  occurred_on: string;
+  pool_id?: number;
+  pool_id2?: number;
+  amount2?: string;
+  portion?: string;
+  delivery_mode?: string;
+  offset_event_id?: number;
+  reason?: string;
+  refund_responsibility?: "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER";
+  operator_user_ids?: number[];
+  flow_category?: string;
+  note?: string;
+  bound_phone?: string;
+  bound_phone_owner?: string;
+  form_extra?: Record<string, unknown>;
+}
+
+export async function postOrderEvent(orderId: number, payload: OrderEventPayload): Promise<unknown> {
+  const { data } = await http.post(`/orders/${orderId}/events`, payload);
+  return data;
+}
+
+export async function cancelOrder(
+  orderId: number,
+  payload: { reason: string; form_extra?: Record<string, unknown> },
+): Promise<OrderDetail> {
+  const { data } = await http.post<OrderDetail>(`/orders/${orderId}/cancel`, payload);
+  return data;
+}
+
+export async function patchOrder(
+  orderId: number,
+  payload: {
+    trade_date?: string;
+    note?: string | null;
+    form_extra?: Record<string, unknown>;
+    account_snapshot?: Record<string, unknown> | null;
+  },
+): Promise<OrderDetail> {
+  const { data } = await http.patch<OrderDetail>(`/orders/${orderId}`, payload);
+  return data;
+}
+
+export async function addOrderCustomerRole(
+  orderId: number,
+  payload: { customer_id: number; role: string },
+): Promise<unknown> {
+  const { data } = await http.post(`/orders/${orderId}/customer-roles`, payload);
+  return data;
+}
+
+// ---------------------------------------------------------------- 库存售出 / 分期
+
+export async function createInstallmentForOrder(payload: {
+  order_id: number;
+  contract_type: string;
+  principal: string;
+  down_payment: string;
+  service_fee: string;
+  periods: number;
+  per_period_service_fee: string;
+  per_period: string;
+  first_due_on: string;
+  adjust_final_period?: boolean;
+  note?: string;
+  schedule?: { period_no: number; due_on: string }[];
+}): Promise<{ id: number }> {
+  const { data } = await http.post<{ id: number }>("/installments", payload);
+  return data;
+}
+
+export async function payInstallment(
+  id: number,
+  payload: { amount: string; paid_on: string; period_no?: number; pool_id?: number; note?: string },
+): Promise<unknown> {
+  const { data } = await http.post(`/installments/${id}/payments`, payload);
+  return data;
+}
+
+export interface ScheduleRow {
+  period_no: number;
+  due_on: string;
+  amount: string;
+  service_fee?: string;
+  paid_amount?: string;
+  status: string;
+}
+
+export async function fetchInstallmentSchedules(id: number): Promise<ScheduleRow[]> {
+  const { data } = await http.get<ScheduleRow[]>(`/installments/${id}/schedules`);
+  return data;
+}
+
+export async function fetchInstallment(id: number): Promise<InstallmentRow> {
+  const { data } = await http.get<InstallmentRow>(`/installments/${id}`);
+  return data;
+}
+
+export async function installmentAction(
+  id: number,
+  action: "cancel" | "settle-early" | "default" | "deliver" | "recover",
+  payload: Record<string, unknown>,
+): Promise<unknown> {
+  const { data } = await http.post(`/installments/${id}/${action}`, payload);
+  return data;
+}
+
+// ---------------------------------------------------------------- 资金写操作
+
+export async function createCashflow(payload: {
+  pool_id: number;
+  occurred_on: string;
+  direction: "IN" | "OUT";
+  nature: string;
+  fund_nature?: string;
+  accounting_attribute?: string;
+  category: string;
+  amount: string;
+  order_id?: number;
+  note?: string | null;
+}): Promise<CashflowRow> {
+  const { data } = await http.post<CashflowRow>("/cashflows", payload);
+  return data;
+}
+
+export async function reverseCashflow(
+  id: number,
+  payload: { reversed_on: string; reason: string },
+): Promise<CashflowRow> {
+  const { data } = await http.post<CashflowRow>(`/cashflows/${id}/reverse`, payload);
+  return data;
+}
+
+export async function createTransfer(payload: {
+  from_pool_id: number;
+  to_pool_id: number;
+  amount: string;
+  occurred_on: string;
+  note?: string;
+}): Promise<unknown> {
+  const { data } = await http.post("/transfers", payload);
+  return data;
+}
+
+export interface ReconciliationRow {
+  id: number;
+  pool_id: number;
+  reconciled_on: string;
+  account_label: string;
+  statement_balance: string;
+  book_balance?: string;
+  difference?: string;
+  status: string;
+  reason?: string | null;
+}
+
+export async function listReconciliations(): Promise<ReconciliationRow[]> {
+  const { data } = await http.get<ReconciliationRow[]>("/reconciliations");
+  return data;
+}
+
+export async function createReconciliation(payload: {
+  pool_id: number;
+  reconciled_on: string;
+  account_label: string;
+  statement_balance: string;
+  note?: string;
+}): Promise<ReconciliationRow> {
+  const { data } = await http.post<ReconciliationRow>("/reconciliations", payload);
+  return data;
+}
+
+export async function resolveReconciliation(id: number, reason: string): Promise<ReconciliationRow> {
+  const { data } = await http.post<ReconciliationRow>(`/reconciliations/${id}/resolve`, { reason });
+  return data;
+}
+
+export interface DepositRow {
+  id: number;
+  pool_id: number;
+  amount: string;
+  returned_amount?: string;
+  lost_amount?: string;
+  paid_on: string;
+  status: string;
+  note?: string | null;
+}
+
+export async function listDeposits(): Promise<DepositRow[]> {
+  const { data } = await http.get<DepositRow[]>("/deposits");
+  return data;
+}
+
+// ---------------------------------------------------------------- 报表
+
+export interface MonthlyPnlReport {
+  rows?: { month: string; income: string; expense: string; profit: string }[];
+  from?: string;
+  to?: string;
+  [key: string]: unknown;
+}
+
+export async function fetchMonthlyPnl(params?: { from?: string; to?: string }): Promise<MonthlyPnlReport> {
+  const { data } = await http.get<MonthlyPnlReport>("/reports/monthly-pnl", { params });
+  return data;
+}
+
+export async function fetchCommissionReport(params?: { from?: string; to?: string; mine?: boolean }): Promise<unknown> {
+  const { data } = await http.get("/reports/commission", { params });
+  return data;
+}
+
+export async function fetchBusinessPnl(params?: { from?: string; to?: string }): Promise<unknown> {
+  const { data } = await http.get("/reports/business-pnl", { params });
+  return data;
+}
+
+export async function fetchDailyFunds(params?: { on?: string }): Promise<unknown> {
+  const { data } = await http.get("/reports/daily-funds", { params });
+  return data;
+}
+
+export async function fetchOrderProfit(params?: { from?: string; to?: string }): Promise<unknown> {
+  const { data } = await http.get("/reports/order-profit", { params });
+  return data;
+}
+
+export async function fetchInventoryHealth(): Promise<unknown> {
+  const { data } = await http.get("/reports/inventory-health");
+  return data;
+}
+
+export async function fetchFinanceDimensions(params?: { from?: string; to?: string }): Promise<unknown> {
+  const { data } = await http.get("/reports/finance-dimensions", { params });
+  return data;
+}
+
+// ---------------------------------------------------------------- 设置
+
+export interface ManagedUser {
+  id: number;
+  username: string;
+  display_name: string;
+  role: string;
+  owner_scope: string;
+  pool_ids: number[];
+  team_ids: number[];
+  phone?: string | null;
+  is_active: boolean;
+  must_change_password: boolean;
+}
+
+export async function listUsers(): Promise<ManagedUser[]> {
+  const { data } = await http.get<ManagedUser[]>("/users");
+  return data;
+}
+
+export async function createUser(payload: Record<string, unknown>): Promise<ManagedUser> {
+  const { data } = await http.post<ManagedUser>("/users", payload);
+  return data;
+}
+
+export async function updateUser(id: number, payload: Record<string, unknown>): Promise<ManagedUser> {
+  const { data } = await http.patch<ManagedUser>(`/users/${id}`, payload);
+  return data;
+}
+
+export async function resetUserPassword(id: number, password: string): Promise<void> {
+  await http.post(`/users/${id}/reset-password`, { password });
+}
+
+export interface PolicyRow {
+  id: number;
+  policy_code: string;
+  name: string;
+  scope_type: string;
+  status?: string;
+  description?: string | null;
+}
+
+export async function listPolicies(): Promise<{ items: PolicyRow[]; total: number }> {
+  const { data } = await http.get<{ items: PolicyRow[]; total: number }>("/policies");
+  return data;
+}
+
+export async function listPolicyVersions(definitionId: number): Promise<{ items: Record<string, unknown>[]; total: number }> {
+  const { data } = await http.get<{ items: Record<string, unknown>[]; total: number }>(
+    `/policies/${definitionId}/versions`,
+  );
+  return data;
+}
+
+export interface AuditRow {
+  id: number;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  actor: string;
+  created_at: string;
+  summary?: string | null;
+  details?: Record<string, unknown> | null;
+}
+
+export async function listAuditLogs(params?: {
+  entity_type?: string;
+  actor?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: AuditRow[]; total: number }> {
+  const { data } = await http.get<{ items: AuditRow[]; total: number }>("/audit-logs", {
+    params: { limit: params?.limit ?? 30, offset: params?.offset ?? 0, entity_type: params?.entity_type, actor: params?.actor },
+  });
+  return data;
+}
+
+export interface ImportBatchRow {
+  id: number;
+  source_name: string;
+  status: string;
+  row_count?: number;
+  created_at?: string;
+}
+
+export async function listImportBatches(): Promise<{ items: ImportBatchRow[]; total: number }> {
+  const { data } = await http.get<{ items: ImportBatchRow[]; total: number }>("/imports/batches");
+  return data;
+}
+
+export interface SequenceRow {
+  sequence_key: string;
+  prefix: string;
+  padding: number;
+  current_value: number;
+}
+
+export async function listSequences(): Promise<SequenceRow[]> {
+  const { data } = await http.get<SequenceRow[]>("/sequences");
+  return data;
+}
+
+export interface OptionSetRow {
+  id: number;
+  code: string;
+  label: string;
+  group: string;
+  editable: boolean;
+  options: OptionItem[] | null;
+  description?: string | null;
+}
+
+export async function listOptionSets(): Promise<OptionSetRow[]> {
+  const { data } = await http.get<{ items: OptionSetRow[] }>("/option-sets");
+  return data.items;
+}
+
+// ---------------------------------------------------------------- 客户写操作
+
+export async function updateCustomer(id: number, payload: Record<string, unknown>): Promise<CustomerRow> {
+  const { data } = await http.patch<CustomerRow>(`/customers/${id}`, payload);
+  return data;
+}
+
+export async function setCustomerStatus(id: number, status: string): Promise<CustomerRow> {
+  const { data } = await http.patch<CustomerRow>(`/customers/${id}/status`, { status });
+  return data;
+}
+
+export async function mergeCustomer(
+  id: number,
+  targetCustomerId: number,
+  reason: string,
+): Promise<CustomerRow> {
+  const { data } = await http.post<CustomerRow>(`/customers/${id}/merge`, {
+    target_customer_id: targetCustomerId,
+    reason,
+  });
+  return data;
+}
+
+export async function createCounterparty(payload: Record<string, unknown>): Promise<CounterpartyRow> {
+  const { data } = await http.post<CounterpartyRow>("/counterparties", payload);
+  return data;
+}
+
+export async function updateCounterparty(id: number, payload: Record<string, unknown>): Promise<CounterpartyRow> {
+  const { data } = await http.patch<CounterpartyRow>(`/counterparties/${id}`, payload);
+  return data;
+}
+
+export async function setCounterpartyActive(id: number, active: boolean): Promise<CounterpartyRow> {
+  const { data } = await http.patch<CounterpartyRow>(`/counterparties/${id}/status`, { active });
+  return data;
+}
+
+// ---------------------------------------------------------------- 订单执行明细
+// 订单本身（GET /orders/{id}）不带事件；事件、流水、客户/合作方都在账号维度的
+// 执行明细里（GET /stocks/{account_id}/execution-detail），一张账号可能挂着多张单。
+
+export interface ExecutionEvent {
+  id: number;
+  event_no: string;
+  event_type: string;
+  amount: string;
+  cancellable_amount: string;
+  occurred_on: string;
+  occurred_at?: string | null;
+  pool_id?: number | null;
+  offset_event_id?: number | null;
+  portion: string;
+  delivery_mode?: string | null;
+  is_posted: boolean;
+  note?: string | null;
+  operator: string;
+  cashflow?: {
+    flow_no: string;
+    pool_name?: string | null;
+    direction: string;
+    category: string;
+    amount: string;
+    note?: string | null;
+  } | null;
+}
+
+export interface ExecutionOrder {
+  order_id: number;
+  order_no: string;
+  order_type: string;
+  trade_date: string;
+  status: string;
+  note?: string | null;
+  cashflows?: {
+    flow_no: string;
+    pool_name?: string | null;
+    occurred_on: string;
+    direction: string;
+    nature: string;
+    category: string;
+    amount: string;
+    note?: string | null;
+    operator: string;
+  }[];
+  customers?: { id: number; display_name: string; role: string }[];
+  counterparties?: { id: number; display_name: string; role: string }[];
+  events: ExecutionEvent[];
+  operator: string;
+}
+
+export interface AccountExecutionDetail {
+  account: Record<string, unknown> & { id: number; stock_no?: string | null; game_account?: string | null };
+  orders: ExecutionOrder[];
+  finance_summary: {
+    cashflow_income: string;
+    rebate_income: string;
+    total_income: string;
+    total_expense: string;
+    net_amount: string;
+  };
+}
+
+export async function fetchExecutionDetail(accountId: number): Promise<AccountExecutionDetail> {
+  const { data } = await http.get<AccountExecutionDetail>(`/stocks/${accountId}/execution-detail`);
   return data;
 }

@@ -1,3 +1,4 @@
+import type { SessionUser } from "../../api";
 import { navigate } from "../../router";
 import { InventoryTab } from "./InventoryTab";
 import { LedgerTab } from "./LedgerTab";
@@ -11,7 +12,7 @@ const TABS: { key: BusinessTab; label: string }[] = [
   { key: "collections", label: "分期" },
 ];
 
-export function BusinessPage({ tab }: { tab: BusinessTab }) {
+export function BusinessPage({ tab, user }: { tab: BusinessTab; user: SessionUser }) {
   return (
     <div className="h5-page">
       <header className="h5-pagehead">
@@ -35,7 +36,7 @@ export function BusinessPage({ tab }: { tab: BusinessTab }) {
       </div>
 
       {tab === "inventory" ? <InventoryTab /> : null}
-      {tab === "ledger" ? <LedgerTab /> : null}
+      {tab === "ledger" ? <LedgerTab user={user} /> : null}
       {tab === "collections" ? <CollectionsTab /> : null}
     </div>
   );

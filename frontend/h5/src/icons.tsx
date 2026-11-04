@@ -3,12 +3,13 @@
  * emoji 会因为平台字体不同变得花哨且不可控，故一律用内联 SVG。
  */
 
-type IconProps = { size?: number; filled?: boolean };
+type IconProps = { size?: number; filled?: boolean; className?: string };
 
-const base = (size: number) => ({
+const base = (size: number, className?: string) => ({
   width: size,
   height: size,
   viewBox: "0 0 24 24",
+  className,
   fill: "none",
   stroke: "currentColor",
   strokeWidth: 1.7,
@@ -108,6 +109,31 @@ export function ChevronLeftIcon({ size = 20 }: IconProps) {
   return (
     <svg {...base(size)} strokeWidth={2.2}>
       <path d="M14.5 5.5 8 12l6.5 6.5" />
+    </svg>
+  );
+}
+
+export function CheckIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...base(size, className)} strokeWidth={2.4}>
+      <path d="m5 12.6 4.4 4.4L19 7.4" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...base(size, className)} strokeWidth={2.2}>
+      <path d="M12 5.5v13M5.5 12h13" />
+    </svg>
+  );
+}
+
+export function ClockIcon({ size = 18, className }: IconProps) {
+  return (
+    <svg {...base(size, className)}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M12 7.6V12l3.2 2" />
     </svg>
   );
 }

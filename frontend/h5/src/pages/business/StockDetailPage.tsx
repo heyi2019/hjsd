@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { fetchStock, type StockRow } from "../../api";
 import { money, stockStatusLabel, stockStatusTone } from "../../labels";
-import { DetailHead, DetailNav, KeyValue } from "../../components/Detail";
+import { DetailHead, KeyValue } from "../../components/Detail";
+import { navigate } from "../../router";
 
 /** 账号密码在库里是明文（既定裁决，勿加密/脱敏），但手机常在他人视线内，
  *  默认折叠、点一下才显示，属于展示层的保护，不改变存储口径。 */
@@ -36,9 +37,27 @@ export function StockDetailPage({ stockId }: { stockId: number }) {
     };
   }, [stockId]);
 
+  const canSell = stock?.status === "WAITING" && Boolean(stock.source_order_id);
+
   return (
-    <div className="h5-page">
-      <DetailNav title="账号详情" />
+    <div className={`h5-page${canSell ? " h5-page--withdock" : ""}`}>
+      <header className="h5-navbar">
+        <button type="button" className="h5-navbar__back" onClick={() => navigate("/business/inventory", true)}>
+          返回
+        </button>
+        <div className="h5-navbar__title">账号详情</div>
+        <div className="h5-navbar__spacer">
+          {stock?.source_order_id ? (
+            <button
+              type="button"
+              className="h5-navbar__action"
+              onClick={() => navigate(`/orders/${stock.source_order_id}`)}
+            >
+              来源单
+            </button>
+          ) : null}
+        </div>
+      </header>
 
       {error ? <div className="h5-alert h5-alert--error" role="alert">{error}</div> : null}
       {!stock && !error ? <p className="h5-empty">加载中…</p> : null}
@@ -101,6 +120,14 @@ export function StockDetailPage({ stockId }: { stockId: number }) {
             />
           </section>
         </>
+      ) : null}
+
+      {canSell && stock ? (
+        <div className="h5-dock">
+          <button type="button" className="h5-primary h5-primary--grow" onClick={() => navigate(`/stocks/${stock.id}/sale`)}>
+            售出这个账号
+          </button>
+        </div>
       ) : null}
     </div>
   );

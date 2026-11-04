@@ -1507,3 +1507,805 @@ input {
     transform: none;
   }
 }
+
+/* ================================================================ 表单与弹出层
+ * 这一段是全模块写操作共用的骨架：底部弹出层、字段、选择器、提交条。
+ * 只允许在这里定义一次，页面里不要再就地写 input 高度/圆角——否则
+ * 同一个「金额输入框」在四个页面会长出四种样子。
+ */
+
+/* ---------------------------------------------------------------- 底部弹出层 */
+
+.h5-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.h5-sheet__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: h5-fade 180ms ease-out;
+}
+
+.h5-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 88vh;
+  border-radius: 22px 22px 0 0;
+  background: var(--h5-card);
+  box-shadow: 0 -12px 40px -18px rgba(0, 0, 0, 0.4);
+  animation: h5-sheet-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  padding-bottom: var(--h5-safe-b);
+}
+
+.h5-sheet--dense {
+  animation-duration: 140ms;
+}
+
+.h5-sheet__grip {
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 0;
+  border-radius: 999px;
+  background: var(--h5-hairline);
+  flex: 0 0 auto;
+}
+
+.h5-sheet__head {
+  padding: 10px 20px 4px;
+  text-align: center;
+}
+
+.h5-sheet__head h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.h5-sheet__head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+}
+
+.h5-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px 20px 12px;
+}
+
+.h5-sheet__foot {
+  flex: 0 0 auto;
+  padding: 8px 20px 12px;
+  border-top: 1px solid var(--h5-separator);
+}
+
+.h5-sheet__confirm {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.h5-sheet__confirm .h5-primary {
+  margin-top: 0;
+}
+
+@keyframes h5-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes h5-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------------------------------------------------------------- 动作面板 */
+
+.h5-actionsheet {
+  display: grid;
+  border-radius: 14px;
+  background: var(--h5-bg);
+  overflow: hidden;
+}
+
+.h5-actionsheet__item {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--h5-separator);
+  background: transparent;
+  text-align: left;
+  color: var(--h5-label);
+  font-size: 16px;
+}
+
+.h5-actionsheet__item:last-child {
+  border-bottom: 0;
+}
+
+.h5-actionsheet__item:active:not(:disabled) {
+  background: var(--h5-fill);
+}
+
+.h5-actionsheet__item.is-danger {
+  color: var(--h5-red);
+}
+
+.h5-actionsheet__item:disabled {
+  color: var(--h5-label-3);
+}
+
+.h5-actionsheet__hint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--h5-label-2);
+}
+
+.h5-actionsheet__cancel {
+  width: 100%;
+  height: 50px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--h5-bg);
+  color: var(--h5-label);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- 选择面板 */
+
+.h5-search--sheet {
+  margin-bottom: 8px;
+  background: var(--h5-bg);
+}
+
+.h5-optionlist {
+  display: grid;
+  border-radius: 14px;
+  background: var(--h5-bg);
+  overflow: hidden;
+}
+
+.h5-optionlist__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--h5-separator);
+  background: transparent;
+  text-align: left;
+  color: var(--h5-label);
+  font-size: 16px;
+}
+
+.h5-optionlist__item:last-child {
+  border-bottom: 0;
+}
+
+.h5-optionlist__item.is-active {
+  color: var(--h5-blue);
+  font-weight: 600;
+}
+
+.h5-optionlist__item em {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--h5-label-2);
+}
+
+/* ---------------------------------------------------------------- 字段 */
+
+.h5-formbody {
+  display: grid;
+  gap: 18px;
+  padding: 16px 20px calc(140px + var(--h5-safe-b));
+}
+
+.h5-field__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.h5-field__label label {
+  font-size: 13px;
+  line-height: 17px;
+  font-weight: 500;
+  color: var(--h5-label-2);
+}
+
+.h5-field__required {
+  margin-left: 3px;
+  color: var(--h5-red);
+}
+
+.h5-field__aside {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--h5-label-2);
+  white-space: nowrap;
+}
+
+.h5-field__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--h5-label-2);
+}
+
+.h5-field__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--h5-red);
+}
+
+.h5-field--invalid input,
+.h5-field--invalid textarea {
+  box-shadow: 0 0 0 1.5px var(--h5-red);
+}
+
+.h5-field input,
+.h5-field textarea,
+.h5-input,
+.h5-textarea {
+  font-size: 16px; /* 低于 16px 时 iOS Safari 聚焦会自动放大整页 */
+}
+
+.h5-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--h5-fill);
+  color: var(--h5-label);
+  outline: none;
+  transition: box-shadow 160ms ease;
+}
+
+.h5-input::placeholder,
+.h5-textarea::placeholder {
+  color: var(--h5-label-3);
+}
+
+.h5-input:focus-visible,
+.h5-textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--h5-blue) 38%, transparent);
+}
+
+.h5-input:disabled {
+  color: var(--h5-label-2);
+  background: var(--h5-fill-2);
+}
+
+/* 日期控件在 iOS 上自带内边距与日历图标，需要压掉高度差 */
+.h5-input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+}
+
+.h5-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--h5-fill);
+  color: var(--h5-label);
+  line-height: 22px;
+  resize: none;
+  outline: none;
+}
+
+.h5-money {
+  position: relative;
+}
+
+.h5-money > span {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--h5-label-2);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.h5-input--money {
+  padding-left: 30px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 选择行：收起态就是一行「值 + 箭头」 */
+.h5-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px 0 14px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--h5-fill);
+  color: var(--h5-label);
+  font-size: 16px;
+  text-align: left;
+}
+
+.h5-picker.is-empty .h5-picker__value {
+  color: var(--h5-label-3);
+}
+
+.h5-picker:disabled {
+  color: var(--h5-label-2);
+}
+
+.h5-picker__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.h5-picker svg {
+  color: var(--h5-label-3);
+  flex: 0 0 auto;
+}
+
+/* 胶囊组：少量互斥选项 */
+.h5-chipgroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.h5-chip.is-active {
+  background: var(--h5-blue);
+  color: #ffffff;
+}
+
+/* 开关行 */
+.h5-switchrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.h5-switchrow__main span {
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.h5-switchrow__main p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--h5-label-2);
+}
+
+.h5-switchrow__toggle {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: var(--h5-fill-2);
+  transition: background-color 200ms ease;
+}
+
+.h5-switchrow__toggle span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.h5-switchrow__toggle.is-on {
+  background: var(--h5-green);
+}
+
+.h5-switchrow__toggle.is-on span {
+  transform: translateX(20px);
+}
+
+/* ---------------------------------------------------------------- 分组卡片 */
+
+.h5-formsection {
+  display: grid;
+  gap: 0;
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  overflow: hidden;
+}
+
+.h5-formsection__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 4px;
+}
+
+.h5-formsection__head h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.h5-formsection__head p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--h5-label-2);
+}
+
+.h5-formsection__body {
+  display: grid;
+  gap: 14px;
+  padding: 12px 16px 16px;
+}
+
+/* 分组内的输入框改为贴卡片的浅底，避免「卡中卡」的层层白块 */
+.h5-formsection .h5-input,
+.h5-formsection .h5-textarea,
+.h5-formsection .h5-picker {
+  background: var(--h5-bg);
+}
+
+/* 附加费用这类可增删的行 */
+.h5-repeatrow {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--h5-bg);
+}
+
+.h5-repeatrow__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--h5-label-2);
+}
+
+.h5-repeatrow__remove {
+  border: 0;
+  background: transparent;
+  color: var(--h5-red);
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.h5-formsection__addrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--h5-blue);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 2px 0;
+}
+
+/* ---------------------------------------------------------------- 提交条 */
+
+.h5-submitbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 12;
+  padding: 10px 20px calc(10px + var(--h5-safe-b));
+  background: var(--h5-chrome);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--h5-separator);
+}
+
+.h5-submitbar__hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--h5-label-2);
+  text-align: center;
+}
+
+.h5-submitbar__row {
+  display: flex;
+  gap: 10px;
+}
+
+.h5-submitbar__row .h5-primary {
+  margin-top: 0;
+}
+
+.h5-primary--grow {
+  flex: 1 1 auto;
+}
+
+.h5-primary--danger {
+  background: var(--h5-red);
+}
+
+.h5-ghost--full {
+  width: 100%;
+}
+
+.h5-ghost:disabled,
+.h5-primary:disabled {
+  opacity: 0.45;
+}
+
+/* 表单页顶栏的返回箭头需要与文字垂直居中 */
+.h5-navbar__chevron {
+  margin-right: -2px;
+  transform: rotate(180deg);
+}
+
+.h5-navbar__title small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 400;
+  color: var(--h5-label-2);
+}
+
+/* 顶栏右侧动作按钮 */
+.h5-navbar__action {
+  border: 0;
+  background: transparent;
+  color: var(--h5-blue);
+  font-size: 15px;
+  padding: 6px 0 6px 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .h5-sheet__scrim {
+    background: rgba(0, 0, 0, 0.56);
+  }
+
+  .h5-switchrow__toggle span {
+    background: #ebebf0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .h5-sheet,
+  .h5-sheet__scrim {
+    animation: none;
+  }
+
+  .h5-switchrow__toggle,
+  .h5-switchrow__toggle span {
+    transition: none;
+  }
+}
+
+/* 表单页尾注：说明性文字，不与字段抢注意力 */
+.h5-footnote {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+}
+
+/* ================================================================ 详情页时间线与底部操作条 */
+
+/* 详情页底部有操作条时，内容要预留出它的高度 */
+.h5-page--withdock {
+  padding-bottom: calc(84px + var(--h5-safe-b));
+}
+
+.h5-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  gap: 10px;
+  padding: 10px 20px calc(10px + var(--h5-safe-b));
+  background: var(--h5-chrome);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--h5-separator);
+}
+
+.h5-dock .h5-primary {
+  margin-top: 0;
+}
+
+.h5-section__count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--h5-label-2);
+}
+
+/* 事件时间线：竖线 + 语义色圆点 */
+.h5-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+}
+
+.h5-timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 16px 12px 14px;
+}
+
+.h5-timeline__item + .h5-timeline__item {
+  border-top: 1px solid var(--h5-separator);
+}
+
+.h5-timeline__dot {
+  width: 9px;
+  height: 9px;
+  margin: 6px auto 0;
+  border-radius: 50%;
+  background: var(--h5-label-3);
+}
+
+.h5-timeline__dot--blue { background: var(--h5-blue); }
+.h5-timeline__dot--green { background: var(--h5-green); }
+.h5-timeline__dot--orange { background: var(--h5-orange); }
+.h5-timeline__dot--purple { background: var(--h5-purple); }
+.h5-timeline__dot--red { background: var(--h5-red); }
+.h5-timeline__dot--gray { background: var(--h5-label-3); }
+
+.h5-timeline__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.h5-timeline__head strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.h5-timeline__amount {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.h5-timeline__meta {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--h5-label-2);
+}
+
+.h5-timeline__note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--h5-label);
+}
+
+/* 关联入口 */
+.h5-linklist {
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  overflow: hidden;
+}
+
+.h5-linkrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--h5-separator);
+  background: transparent;
+  color: var(--h5-label);
+  font-size: 16px;
+}
+
+.h5-linkrow:last-child {
+  border-bottom: 0;
+}
+
+.h5-linkrow em {
+  font-style: normal;
+  font-size: 14px;
+  color: var(--h5-label-2);
+}
+
+/* 只读金额块（编辑页顶部提示当前口径） */
+.h5-readonly {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--h5-bg);
+}
+
+.h5-readonly span {
+  display: block;
+  font-size: 12px;
+  color: var(--h5-label-2);
+}
+
+.h5-readonly strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 悬浮新建按钮：贴在底栏上方 16px，避开 Home 指示条 */
+.h5-fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(76px + var(--h5-safe-b));
+  z-index: 18;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--h5-blue);
+  color: #ffffff;
+  box-shadow: 0 10px 22px -8px rgba(10, 90, 255, 0.7);
+  transition: transform 140ms ease-out;
+}
+
+.h5-fab:active {
+  transform: scale(0.94);
+}

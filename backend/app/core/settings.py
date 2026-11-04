@@ -144,20 +144,6 @@ class Settings(BaseSettings):
     # 「绑定一次、之后免验证码」永远走不到。需要模拟多个微信号时改这个值。
     wechat_mock_open_id: str = "mock_demo_openid"
 
-    # 微信 H5 通道（公众号网页授权），与上面的「网站应用扫码」是两套独立凭据：
-    # 扫码走开放平台网站应用的 qrconnect，手机在微信内没法扫自己的屏，必须换成
-    # 公众号的 oauth2/authorize（静默或显式授权后直接回跳）。
-    #   disabled  关闭（H5 端不显示微信入口）
-    #   mock      本地/演示：与扫码 mock 同一套假 code 流程
-    #   mp        公众号网页授权真实通道（需公众号 APPID / SECRET 与已备案的网页授权域名）
-    # 注意：同一自然人「网站应用 openid」与「公众号 openid」并不相同，两者要在系统里
-    # 认成同一个人，须把公众号与网站应用绑到同一开放平台主体下（走 unionid）。
-    wechat_h5_enabled: bool = False
-    wechat_h5_provider: str = "disabled"
-    wechat_h5_app_id: str = ""
-    wechat_h5_app_secret: str = ""
-    wechat_h5_redirect_uri: str = ""
-
     @model_validator(mode="after")
     def _validate_runtime_security(self) -> "Settings":
         """生产配置不得沿用开发密钥或通配 CORS。"""
@@ -187,14 +173,6 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in {"disabled", "mock", "openplatform"}:
             raise ValueError("WECHAT_PROVIDER 只能是 disabled / mock / openplatform")
-        return normalized
-
-    @field_validator("wechat_h5_provider")
-    @classmethod
-    def _validate_wechat_h5_provider(cls, value: str) -> str:
-        normalized = value.strip().lower()
-        if normalized not in {"disabled", "mock", "mp"}:
-            raise ValueError("WECHAT_H5_PROVIDER 只能是 disabled / mock / mp")
         return normalized
 
     @field_validator("wechat_bind_verify_mode")
@@ -232,23 +210,6 @@ class Settings(BaseSettings):
                 return False, "微信 AppID / AppSecret 未配置"
             if not self.wechat_redirect_uri:
                 return False, "微信回调地址 WECHAT_REDIRECT_URI 未配置"
-        return True, None
-
-    @property
-    def wechat_h5_effective_enabled(self) -> bool:
-        """H5 端是否展示微信入口：开关打开且通道不是 disabled。"""
-        return self.wechat_h5_enabled and self.wechat_h5_provider != "disabled"
-
-    @property
-    def wechat_h5_ready(self) -> tuple[bool, str | None]:
-        """H5 通道可用性。与扫码通道同口径：缺凭据就不点亮按钮。"""
-        if not self.wechat_h5_effective_enabled:
-            return False, "微信 H5 登录未启用"
-        if self.wechat_h5_provider == "mp":
-            if not self.wechat_h5_app_id or not self.wechat_h5_app_secret:
-                return False, "公众号 AppID / AppSecret 未配置"
-            if not self.wechat_h5_redirect_uri:
-                return False, "公众号网页授权回调域名 WECHAT_H5_REDIRECT_URI 未配置"
         return True, None
 
     @property

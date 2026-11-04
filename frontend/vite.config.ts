@@ -51,15 +51,6 @@ export default defineConfig(({ mode }) => {
     build: {
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
-        // 两个独立入口：
-        //   index.html     桌面端（React + antd 全量）
-        //   h5/index.html  移动端 H5（零 antd，独立包）
-        // H5 不做成「同一入口里按 UA 二选一」：那样 antd 会随首屏一起下载，
-        // 手机端白等 1.1MB；独立入口让 H5 只加载自己需要的代码。
-        input: {
-          main: here("./index.html"),
-          h5: here("./h5/index.html"),
-        },
         output: {
           // 拆成三个缓存层，目的是**让业务改动不再污染第三方包的 hash**：
           //  - react：React 运行时 + 路由，一年动不了几次；

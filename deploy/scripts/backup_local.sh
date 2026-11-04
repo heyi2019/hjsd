@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 本地开发库 / 发布库每日备份（macOS 宿主机，PostgreSQL 跑在 docker 容器里）
+# 本地数据库每日备份（macOS 宿主机，PostgreSQL 跑在 docker 容器里）
 #
 # 与 backup_daily.sh 的分工：
 #   - backup_daily.sh 面向 ECS 生产（docker compose 的 db 服务 + deploy/.env）；
-#   - 本脚本面向本机自建的 heijin-db-1 容器（dev / release 两库），归属本仓库的
-#     deploy/container/compose.yaml。
+#   - 本脚本面向本机自建的 heijin-db-1 容器（默认只备 dev；release 母本已上线退役），
+#     归属本仓库的 deploy/container/compose.yaml。
 #   两者产物格式一致（pg_dump -Fc + .sha256 sidecar），可互相用 restore_pg.sh 恢复。
 #
 # 契约：
@@ -38,7 +38,7 @@ cd "$(dirname "$0")/../.."   # -> 仓库根
 
 CONTAINER="${ERP_PG_CONTAINER:-heijin-db-1}"
 DB_USER="${ERP_PG_USER:-erp_app}"
-DBS="${ERP_LOCAL_BACKUP_DBS:-heijin_erp_dev heijin_erp_release}"
+DBS="${ERP_LOCAL_BACKUP_DBS:-heijin_erp_dev}"
 KEEP="${ERP_BACKUP_KEEP:-14}"
 OUT="${ERP_LOCAL_BACKUP_DIR:-backups/local}"
 

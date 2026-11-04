@@ -67,6 +67,44 @@ describe("UsersPanel：用户管理动作", () => {
     await waitFor(() => expect(vi.mocked(client.api).patch).toHaveBeenCalledWith("/users/7", expect.objectContaining({ display_name: "新业务同事" })));
   });
 
+  // 手机号是免密登录（手机号验证码 / 微信扫码）的准入依据，2026-11-05 补进用户编辑：
+  // 后端 UserUpdate 一直支持 phone，但界面上没有入口，管理员无法自助配置。
+  it("用户编辑可填写手机号并随更新提交，空值不报错", async () => {
+    renderLight(<UsersPanel />, { user: "admin" });
+
+    expect(await screen.findByText("operator01")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: /编辑/ }));
+    const dialog = within(screen.getByRole("dialog", { name: "编辑用户：operator01" }));
+
+    // 字段存在且带说明
+    expect(dialog.getByText("手机号")).toBeInTheDocument();
+    expect(dialog.getByText("留空表示不启用免密登录")).toBeInTheDocument();
+
+    await ui.type(dialog.getByLabelText("手机号"), "13900002222");
+    await ui.click(dialog.getByRole("button", { name: /OK/ }));
+
+    await waitFor(() =>
+      expect(vi.mocked(client.api).patch).toHaveBeenCalledWith(
+        "/users/7",
+        expect.objectContaining({ phone: "13900002222" }),
+      ),
+    );
+  });
+
+  it("手机号格式不对时前端即时拦截，不发请求", async () => {
+    renderLight(<UsersPanel />, { user: "admin" });
+
+    expect(await screen.findByText("operator01")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: /编辑/ }));
+    const dialog = within(screen.getByRole("dialog", { name: "编辑用户：operator01" }));
+
+    await ui.type(dialog.getByLabelText("手机号"), "1390000");
+    await ui.click(dialog.getByRole("button", { name: /OK/ }));
+
+    expect(await dialog.findByText("请输入正确的 11 位手机号")).toBeInTheDocument();
+    expect(vi.mocked(client.api).patch).not.toHaveBeenCalled();
+  });
+
   // 停用与重置密码拆成两个用例：停用现在带 Popconfirm，弹层残留会干扰后续点击。
   it("管理员停用用户需二次确认", async () => {
     renderLight(<UsersPanel />, { user: "admin" });

@@ -19,6 +19,8 @@ export interface ManagedUser extends EmployeeOption {
   pool_ids: number[];
   team_ids: number[];
   must_change_password: boolean;
+  /** 免密登录（手机号验证码 / 微信扫码）的准入依据；留空=不启用。 */
+  phone?: string | null;
 }
 
 export interface Team {

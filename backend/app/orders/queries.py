@@ -39,7 +39,9 @@ def list_orders(
     )
     return list(
         session.scalars(
-            stmt.order_by(Order.id).limit(limit).offset(offset)
+            # 列表按「最近优先」：先交易日倒序，同日再按 id 倒序。
+            # 原来是 Order.id 升序，等于把最老的 20 条排在第一页，手机端和台账都反直觉。
+            stmt.order_by(Order.trade_date.desc(), Order.id.desc()).limit(limit).offset(offset)
         ).unique().all()
     )
 

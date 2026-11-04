@@ -35,10 +35,14 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
   const mountedRef = useRef(true);
   const loadSummary = async () => {
     setSummaryLoading(true);
+    // 「我的本月收益」按自然月至今统计：跨月不清零的话，月初会和上月混在一起。
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const [personalOrdersResult, ordersResult, earningsResult] = await Promise.allSettled([
       ordersApi.list({ mine: true }),
       ordersApi.list(),
-      reportsApi.commission({ mine: true }),
+      reportsApi.commission({ mine: true, from: monthStart, to: monthEnd }),
     ]);
     if (!mountedRef.current) return;
     if (personalOrdersResult.status === "fulfilled") {
@@ -54,7 +58,8 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
       setSummaryError(normalizeError(ordersResult.reason));
     }
     if (earningsResult.status === "fulfilled") {
-      setPersonalEarnings(earningsResult.value.total.profit_base);
+      // payable 才是「我这份」提成；profit_base 是整单利润基数，不是个人收益。
+      setPersonalEarnings(earningsResult.value.total.payable);
       setEarningsError(null);
     } else {
       setEarningsError(normalizeError(earningsResult.reason));

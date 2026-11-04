@@ -56,13 +56,16 @@ jobs:
             echo "groups=unit cross B C D" >> "$GITHUB_OUTPUT"  # PR/test：单元 + 核心集成 + 跨模块
           fi
 
+      # 回归默认走 pytest-xdist 并行（--parallel）：每个 worker 由 conftest 自动建
+      # 独立库、退出时回收，默认串行行为不变。本地实测 ci 全量 1684 passed
+      # ~99s → 51s（约 -48%）。lint 不是 pytest，不加该开关。
       - name: Run backend regression (分层)
         working-directory: backend
         run: |
           python run_regression.py lint
           for g in ${{ steps.scope.outputs.groups }}; do
             echo "=== 执行分组: $g ==="
-            python run_regression.py "$g" --backend-only || exit 1
+            python run_regression.py "$g" --backend-only --parallel || exit 1
           done
 
       - name: Generate test case library + report

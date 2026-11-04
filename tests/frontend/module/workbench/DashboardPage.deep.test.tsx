@@ -63,7 +63,9 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     ] as unknown as Order[]);
     vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
       items: [],
-      total: { order_count: 1, profit_base: "123.45", payable: "0.00", paid: "0.00", difference: "0.00" },
+      // 2026-11-05 口径：工作台「我的收益」取 total.payable（本人应付提成），
+      // 不是整单利润基数 profit_base。给两者不同值，反证不会误取利润基数。
+      total: { order_count: 1, profit_base: "999.99", payable: "123.45", paid: "0.00", difference: "0.00" },
     });
     renderLight(<DashboardPage />, { user: "operator" });
 
@@ -74,6 +76,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     expect(within(orderCard).getByText("2")).toBeInTheDocument();
     expect(within(totalCard).getByText("3")).toBeInTheDocument();
     expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();
+    expect(within(earningsCard).queryByText("999.99")).toBeNull();
   });
 
   it("订单汇总接口失败时业务总览显示占位「-」而非 0", async () => {

@@ -52,7 +52,21 @@ test("分润弹窗默认按操作模型保存四项比例", async ({ page, reque
     (item) => item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
   );
   expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
-  const created = await request.post(`${base}/orders`, { headers, data: { order_type: "HS", trade_date: "2026-10-17", account_id: account!.id } });
+  // 2026-11-05 新口径：分润人员已锁定为账号台账 / 库存中心登记的执行人，弹窗里不再手选。
+  // 故建单时就把三类负责人登记到订单 form_extra，作为台账事实来源。
+  const users = (await (await request.get(`${base}/users`, { headers })).json()) as Array<{ id: number; username: string; is_active: boolean }>;
+  const pick = users.find((u) => u.is_active && u.username === "admin")!;
+  expect(pick, "缺少在职 admin 用户").toBeTruthy();
+  const created = await request.post(`${base}/orders`, { headers, data: {
+    order_type: "HS",
+    trade_date: "2026-10-17",
+    account_id: account!.id,
+    form_extra: {
+      business_responsible_ids: [pick.id],
+      delivery_responsible_ids: [pick.id],
+      operation_responsible_ids: [pick.id],
+    },
+  } });
   expect(created.status()).toBe(201);
   const order = await created.json();
   const buyEvent = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
@@ -61,12 +75,6 @@ test("分润弹窗默认按操作模型保存四项比例", async ({ page, reque
   expect(contract.status()).toBe(201);
   const buy = await request.post(`${base}/orders/${order.id}/events`, { headers, data: { event_type: "BUY", amount: "100", occurred_on: "2026-10-17" } });
   expect(buy.status()).toBe(201);
-
-  // 取一个在职用户（admin）作为分润绑人对象；分润弹窗默认「按操作」模型，
-  // 买号/运营动作位绑人，售出/公司位禁用不绑人。
-  const users = (await (await request.get(`${base}/users`, { headers })).json()) as Array<{ id: number; username: string; is_active: boolean }>;
-  const pick = users.find((u) => u.is_active && u.username === "admin")!;
-  expect(pick, "缺少在职 admin 用户").toBeTruthy();
 
   await page.goto("/");
   await navItem(page, "业务中心").click();
@@ -86,24 +94,13 @@ test("分润弹窗默认按操作模型保存四项比例", async ({ page, reque
   // 不再有「增加一行」按人模型（按人模型仅在订单已存按人分润时回显）。
   await expect(dialog.getByText(`分润 · ${order.order_no}`, { exact: false })).toBeVisible();
 
-  // 四项各填 25%（合计 100%）；买号（BUY 已入账）/运营 动作位绑 admin，
-  // 售出（无 SELL 事件）禁用不绑人、公司位固定不绑人。
+  // 四项各填 25%（合计 100%）。人员一律由台账登记的执行人决定：四个姓名下拉都是禁用态，
+  // 不再有可点开的人员列表（继续点会 30s 超时）；换人只能去账号台账 / 库存中心。
   // 行顺序固定为 [买号, 售出, 运营, 公司]（actionKinds 常量），按索引定位最稳。
   const actionRows = dialog.locator(".orders-allocation-row.is-action");
   await expect(actionRows).toHaveCount(4);
-  const kinds = ["买号", "售出", "运营", "公司"] as const;
-  const bindable = new Set(["买号", "运营"]);
   for (let i = 0; i < 4; i += 1) {
-    const kind = kinds[i];
-    if (bindable.has(kind)) {
-      await actionRows.nth(i).locator(".ant-select-selector").first().click();
-      await page
-        .locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)")
-        .last()
-        .locator(".ant-select-item-option", { hasText: pick.username })
-        .first()
-        .click();
-    }
+    await expect(actionRows.nth(i).getByRole("combobox").first()).toBeDisabled();
     await actionRows.nth(i).locator('.ant-form-item:has(.ant-form-item-label:has-text("比例")) input').fill("25");
   }
 
@@ -115,14 +112,14 @@ test("分润弹窗默认按操作模型保存四项比例", async ({ page, reque
 
   const saved = await (await request.get(`${base}/orders/${order.id}/profit-allocations`, { headers })).json();
   expect(saved.items).toHaveLength(4);
-  // 按操作模型：BUY/SELL/OPERATION 绑定人（有 user_id），COMPANY 固定不绑人。
+  // 按操作模型：BUY/SELL/OPERATION 都取台账登记的执行人，COMPANY 固定不绑人。
   const byType: Record<string, { user_id: number | null }> = {};
   for (const it of saved.items as Array<{ allocation_type: string; user_id: number | null }>) {
     byType[it.allocation_type] = { user_id: it.user_id };
   }
   expect(byType.BUY.user_id).toBe(pick.id);
+  expect(byType.SELL.user_id).toBe(pick.id);
   expect(byType.OPERATION.user_id).toBe(pick.id);
-  // 公司位固定不绑人；售出位无 SELL 事件禁用不绑人，其 user_id 取订单交付负责人候选值，不单独断言。
   expect(byType.COMPANY.user_id).toBeNull();
 });
 

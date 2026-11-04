@@ -13,6 +13,7 @@
 | v1.1 | 2026-11-03 | 补 B0「换代码」；B6 与 D 段显式传 `APP_VERSION` |
 | v1.2 | 2026-11-04 | 上线包换成 `release_20261104_022127.dump`（220 字段）；C1 增加字段数验收 |
 | **v1.3** | **2026-11-05** | **放弃覆盖式重建**：生产已有真实业务数据（120 单 / 91 库存 / 372 流水 / 202 事件），任何 `DROP DATABASE` 都是数据事故。改为**原地增量升级**——只补新增表 + 换镜像，业务数据零改动。首个按本单执行的是 1.0.2 → 1.0.3 |
+| v1.3 补录 | 2026-11-05 06:35 | 追加 **B4「售出表单三作用域补齐」** 与 **C6 验收**：下一版（含 `SALEREC/SALETH/SALEDG` 拆分）升级时须实跑 `split_sale_form_scopes.py`。**1.0.3 不含该拆分，不执行 B4**；v1.3 原有的 1.0.3 步骤与全部验收数字一字未改 |
 
 ---
 
@@ -76,6 +77,7 @@ v1.2 的前提是「生产库业务数据为空，用 Release 包整体覆盖」
 - [ ] amd64 双镜像已构建并 `docker load` 到 ECS，**旧镜像 `1.0.2` 仍在**
 - [ ] 升级前备份双端留档、sha256 一致
 - [ ] 窗口确定（**本版停机时间 = 容器重启，约 10–20 秒**，远短于 v1.2 的 20 分钟）
+- [ ] **判定本次是否需执行 B4**：新镜像的 `backend/app/orders/form_scopes.py` 含 `SALEREC` / `SALETH` / `SALEDG` → 需要；只有旧 `SALE`（**1.0.3 即是**）→ 整步跳过 B4，C1 字段数期望仍为 220
 
 ---
 
@@ -302,6 +304,41 @@ ssh heijin-prod 'cd /opt/heijin/deploy && docker compose ps --format "table {{.S
 
 > 看到 IMAGE 是 `1.0.2` 或更旧，说明 `APP_VERSION` 没传到——重跑本步，不要去查库。
 
+### B4. 补齐售出表单三作用域（**仅 1.0.4 及含表单拆分的版本**）
+
+> **本步为 11-05 补录，1.0.3 不执行。** 判定：新镜像里 `backend/app/orders/form_scopes.py` 是否存在 `SALEREC` / `SALETH` / `SALEDG`。只有旧 `SALE` 就整步跳过，C1 的 `220` 字段期望也不要改。
+
+**为什么必须跑**：回收 / 提号 / 代挂三张售出表单已从共用 `SALE` 拆成三个独立作用域。活基线 `0001` 在生产已 stamp，`create_all` + `seed_catalog` **不会重播种子**；换镜像后若不跑本步，三张表单会回落到硬编码默认值，管理员对旧 `SALE` 改过的标签、必填、启停、板块标题全部丢失。
+
+**顺序硬约束**：必须 **B3 换完新镜像之后**再跑——脚本依赖新代码里的 `_CATALOG_BLOB`（三份差异化字段集），旧镜像里既没有该脚本也没有新种子；B1 备份已完成是前置条件。脚本随镜像落在 `/app/scripts/`，**无需额外 scp**。
+
+```bash
+# 1) 确认脚本在新镜像内、且容器内 DATABASE_URL 已注入（grep -c 只输出计数，不回显连接串）
+ssh heijin-prod 'cd /opt/heijin/deploy \
+  && docker compose exec -T backend ls /app/scripts/split_sale_form_scopes.py \
+  && docker compose exec -T backend env | grep -c "^DATABASE_URL="'
+
+# 2) 执行补齐（幂等，可重跑）
+ssh heijin-prod 'cd /opt/heijin/deploy && docker compose exec -T backend python3 scripts/split_sale_form_scopes.py'
+```
+
+**检查点**：第 1 步输出脚本路径 `/app/scripts/split_sale_form_scopes.py` 与 `1`（`ls` 失败即脚本不在镜像内）；第 2 步打印 `复制字段行 N，板块标题行 M` 与三作用域现状——`SALEREC fields=28`、`SALETH fields=28`、`SALEDG fields=21`。**二次执行复制行数必为 0，且四 scope 行数与总字段数与首次完全一致**（首次复制行数也可能是 0：历史 `SALE` 全是默认值时由新种子直接播种）。三份的 `section_labels` 应等于历史 `SALE` 板块标题行数；若生产从未配过板块标题则三份均为 0，前端用硬编码默认标题，属正常。第 1 步失败说明换的不是含拆分的镜像，停手查 B3，不要手工补配置。
+
+> **两处口径提醒**：① 执行过 B4 后，C1 的字段数不再是 220——三份新作用域共 **+77 行**（28+28+21），旧 `SALE` 13 行保留，升级前 220 → 终态 **297**；选项集 63、`policy_definitions` 0 不变，**字段数增加是预期而非数据异常**。② 脚本按新种子的字段键白名单复制，历史 `SALE` 上**管理员自建的自定义字段不会被带到三份**，需升级后在设置页按三个作用域分别重建（内置字段的标签 / 必填 / 启停改动会继承）。
+
+```bash
+ssh heijin-prod 'cd /opt/heijin/deploy && docker compose exec -T db psql -U erp_app -d heijin_erp -c "
+select order_type_code, count(*) as fields from order_form_fields
+where order_type_code in (\$\$SALE\$\$,\$\$SALEREC\$\$,\$\$SALETH\$\$,\$\$SALEDG\$\$)
+group by 1 order by 1;"'
+```
+
+**期望**：`SALE | 13`（历史行保留）、`SALEREC | 28`、`SALETH | 28`、`SALEDG | 21`。
+
+> **回滚是安全的**：脚本**只插入缺失行，不更新、不删除**，旧 `SALE` 行原样保留。若按 D 段回滚到不含拆分的旧镜像，旧代码只认 `SALE`，三份新行对它不可见，售出表单行为与升级前一致，**无需清理数据**。
+>
+> 脚本对历史行做了两件事：① 只有「管理员改过」的 `SALE` 字段才复制，未改过的交给新种子按差异化默认值播种——否则代挂的「利润」会被旧默认值「售出金额」盖回；② 按各作用域字段键白名单复制，**代挂不会重新出现分期 / 分笔字段**。
+
 ---
 
 ## C. 验收
@@ -374,6 +411,15 @@ ssh heijin-prod 'curl -s http://127.0.0.1/api/v1/health; echo; curl -s http://12
 
 > 第 3 步的重点是「非管理员账号」。v1.2 及更早版本中 `/order-form-fields`、`/section-labels`、`/scopes` 三个 GET 要求 `field-definition.manage`（仅 ADMIN），其他角色拿到 403 后前端 `catch` 里**静默降级为空配置**——界面上只有一行报错，管理员配的字段与标题对他们是彻底失效的。
 
+### C6. 三份售出表单配置（**仅执行过 B4 时验**）
+
+1. 「设置 → 表单字段」作用域下拉出现 **回收售出 / 提号售出 / 代挂售出** 三项，归「库存中心」分组；
+2. 三份字段数为 **28 / 28 / 21**；代挂 `amount` 标签是 **「利润」**、买家昵称是 **「委托方昵称」**，且**不含分期与分笔字段**；
+3. 改「回收售出」任一字段标签或停用某字段 → 只有回收售出表单变化，提号 / 代挂不受影响；
+4. 库存中心分别打开三种货源的售出弹窗 → 字段与板块标题按各自配置渲染，无「回落到默认值」现象。
+
+> 第 2 / 4 步看到默认标签或三份一模一样，说明 **B4 漏跑**：回到 B4 补跑后重验，**不要去前端改配置**。
+
 ---
 
 ## D. 回滚（约 1 分钟）
@@ -420,6 +466,7 @@ ssh heijin-prod 'docker exec deploy-db-1 psql -U erp_app -d heijin_erp \
 | `CUSTOMER.trade_role`（`order_form_fields.id=160`）待裁决 | 档案级客户角色与「角色按单判定」冲突 | 若停用需同步 `catalog_seed.py` blob + 三库 + 重导上线包 |
 | `deploy/scripts/deploy.sh` 引用文档版本号 | 违反「代码不得引用文档」 | 下次改该脚本时一并清理 |
 | 120 单 `owner_id` 多为 1 | 归属人显示「系统管理员」 | 仅展示层，按需调整 |
+| **三份售出表单拆分尚未上线（生产仍 1.0.3）** | 生产 `order_form_fields` 只有旧 `SALE` 13 行；含拆分的新版本上线时若漏跑 B4，三张售出表单回落默认值并丢失管理员既有配置 | **1.0.4 发版时执行 B4 + C6**；1.0.3 本次不执行 |
 | ECS PG `archive_mode=off` | 无 PITR，只有每日 dump | 尽快补物理基备 + WAL 归档 |
 
 ---
@@ -436,6 +483,7 @@ ssh heijin-prod 'docker exec deploy-db-1 psql -U erp_app -d heijin_erp \
 | B1 | 备份 | 30 s |
 | B2 | **补表（在线）** | **2 s** |
 | B3 | 换镜像重启 | **20 s** |
+| B4（1.0.4 起） | 补齐售出表单三作用域 | < 5 s（幂等脚本，1.0.3 跳过） |
 | C1–C4 | 库层 + 主键 + 余额 + 版本验收 | 2 min |
 | C5 | 业务冒烟 | 5 min |
 

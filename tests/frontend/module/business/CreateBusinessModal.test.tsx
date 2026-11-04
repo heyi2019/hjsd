@@ -134,7 +134,7 @@ it("回收建单在资金信息后展示交付信息", async () => {
   expect(content.indexOf("交付信息")).toBeLessThan(content.indexOf("客户信息"));
 });
 
-it("回收建单将资金账户紧跟账号号价，不再展示独立资金流水", async () => {
+it("回收建单将资金账户紧跟回收金额，不再展示独立资金流水", async () => {
   const { container } = await openTypedModal("HS");
   const content = container.textContent ?? "";
   expect(screen.getByText("资金明细", { exact: true })).toBeInTheDocument();

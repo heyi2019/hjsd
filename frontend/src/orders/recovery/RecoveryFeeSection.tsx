@@ -14,9 +14,9 @@ export function RecoveryFeeSection(props: {
   const cfg = useFieldConfig();
   const financeTitle = sectionLabel("FINANCE", "资金明细");
   return (
-    <BusinessRegistrationSection className="finance-section" title={financeTitle} description="填写账号价格与实际发生的附加费用">
+    <BusinessRegistrationSection className="finance-section" title={financeTitle} description="填写回收金额与实际发生的附加费用">
       <BusinessRegistrationGroup className="primary-amount-fields">
-        <CfgItem name="recovery_price" label={fieldLabel(cfg, "recovery_price", "账号号价")} rules={[{ required: true, message: "回收价必填" }]}>
+        <CfgItem name="recovery_price" label={fieldLabel(cfg, "recovery_price", "回收金额")} rules={[{ required: true, message: "回收金额必填" }]}>
           <MoneyInput placeholder="请输入金额" />
         </CfgItem>
         <CfgItem name="payment_pool_id" fixedLabel="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>

@@ -76,7 +76,7 @@ describe("ThFeeSection：费用卡片标题", () => {
     );
   }
 
-  it("TH 费用卡片：账号号价/预计收买家标题跟随配置改名", () => {
+  it("TH 费用卡片：提号金额/预计收买家标题跟随配置改名", () => {
     renderTh({
       th_purchase_amount: makeField({ field_key: "th_purchase_amount", label: "提号成本", field_type: "NUMBER", required: true }),
       th_receive_amount: makeField({ field_key: "th_receive_amount", label: "预计收买价", field_type: "NUMBER", required: true }),
@@ -87,7 +87,7 @@ describe("ThFeeSection：费用卡片标题", () => {
 
   it("TH 费用卡片：无配置时降级显示原硬编码标题", () => {
     renderTh({});
-    expect(screen.getByText("账号号价")).toBeInTheDocument();
+    expect(screen.getByText("提号金额")).toBeInTheDocument();
     expect(screen.getByText("预计收买家")).toBeInTheDocument();
   });
 

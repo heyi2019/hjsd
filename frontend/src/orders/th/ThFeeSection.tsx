@@ -19,9 +19,9 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
   const totalCost = sumMoney([purchaseAmount, intermediaryFee, ...(expenseItems ?? []).map((item) => item.amount)]);
 
   return (
-    <BusinessRegistrationSection className="finance-section th-fees" title={financeTitle} description="填写账号价格、预计收款与实际发生的附加费用">
+    <BusinessRegistrationSection className="finance-section th-fees" title={financeTitle} description="填写提号金额、预计收款与实际发生的附加费用">
       <BusinessRegistrationGroup className="primary-amount-fields th-fee-primary">
-          <CfgItem alwaysActive name="th_purchase_amount" label={fieldLabel(cfg, "th_purchase_amount", "账号号价")} rules={[{ required: true, message: "账号号价必填" }]}>
+          <CfgItem alwaysActive name="th_purchase_amount" label={fieldLabel(cfg, "th_purchase_amount", "提号金额")} rules={[{ required: true, message: "提号金额必填" }]}>
             <MoneyInput placeholder="请输入金额" />
           </CfgItem>
           <CfgItem alwaysActive name="payment_pool_id" fixedLabel="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>

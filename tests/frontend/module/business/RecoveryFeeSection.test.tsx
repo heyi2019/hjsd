@@ -34,7 +34,7 @@ function renderHs(cfg: FieldConfigMap) {
   );
 }
 
-it("HS 费用卡片：账号号价标题跟随配置改名", () => {
+it("HS 费用卡片：回收金额标题跟随配置改名", () => {
   renderHs({
     recovery_price: makeField({ field_key: "recovery_price", label: "回收结算价", field_type: "NUMBER", required: true }),
   });
@@ -43,5 +43,5 @@ it("HS 费用卡片：账号号价标题跟随配置改名", () => {
 
 it("HS 费用卡片：无配置时降级显示原硬编码标题", () => {
   renderHs({});
-  expect(screen.getByText("账号号价")).toBeInTheDocument();
+  expect(screen.getByText("回收金额")).toBeInTheDocument();
 });

@@ -16,6 +16,7 @@ import { downloadInventoryCsv } from "../inventory-export";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { useReloadOnActive } from "../../shared/state/reloadOnActive";
+import { useSession } from "../../shared/state/session";
 import type { BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuItems } from "./helpers";
 
@@ -23,6 +24,9 @@ import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuIte
 const INVENTORY_STATS_DEBOUNCE_MS = 200;
 
 export function useInventoryController({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+  // 账号删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
+  const { role } = useSession();
+  const canDelete = role === "admin";
   const [rows, setRows] = useState<Account[]>([]);
   const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
@@ -51,6 +55,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [voidPools, setVoidPools] = useState<Pool[]>([]);
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   const [voiding, setVoiding] = useState(false);
+  // 删除二次确认：target 非空即弹窗打开，deleting 控制防重与按钮 loading。
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
   const [invEditExtraForm] = Form.useForm();
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
@@ -245,6 +252,28 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     }
   }
 
+  /** 删除账号成功后重拉台账：订单已解绑，上层订单/分期视图也要同步刷新。 */
+  async function submitDelete(reason: string) {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleting(true);
+    try {
+      await stocksApi.remove(target.id, reason);
+      setDeleteTarget(null);
+      dropExecutionCache(target.id);
+      if (inlineEditId === target.id) cancelInlineEdit();
+      expandTo(expandedAccountIds.filter((key) => String(key) !== String(target.id)));
+      appMessage.success("账号已删除");
+      await load();
+      onOrdersChanged?.();
+    } catch (cause) {
+      // 失败时弹窗保持打开，用户可改原因后重试；错误必须出声，不能「点了没反应」。
+      appMessage.error(normalizeError(cause).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function handleMoreAction(key: string, row: Account) {
     if (key === "offsale") {
       void openPlatformOffsale(row);
@@ -304,7 +333,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     {
       title: "操作",
       key: "actions",
-      width: 230,
+      width: 292,
       render: (_value, row) => (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
@@ -380,10 +409,24 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
               </PermissionButton>
             </Dropdown>
           </> : null}
+          {canDelete ? <PermissionButton
+            permission="order.create"
+            type="link"
+            size="small"
+            danger
+            aria-label="删除账号"
+            onClick={(event) => {
+              event.stopPropagation();
+              setDeleteTarget(row);
+            }}
+          >
+            删除
+          </PermissionButton> : null}
         </Space>
       ),
     },
   ];
+
   const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
   async function saveInline() {
@@ -510,10 +553,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     arrangeColumns,
     businessMode,
     businessOptions,
+    canDelete,
     columns,
     consignmentTarget,
     countInventoryRows,
     dateRange,
+    deleteTarget,
+    deleting,
     detailTarget,
     dropExecutionCache,
     editingAccount,
@@ -557,6 +603,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     savingAccount,
     setBusinessMode,
     setConsignmentTarget,
+    setDeleteTarget,
     setDetailTarget,
     setDateRange,
     setEditingAccount,
@@ -585,6 +632,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     voiding,
     cancelInlineEdit,
     saveInline,
+    submitDelete,
     submitVoid,
     visibleRows,
   };

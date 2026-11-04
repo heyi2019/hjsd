@@ -4,6 +4,7 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { ordersApi, stocksApi } from "../../shared/api/catalog";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
+import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
 import { InventoryConsignmentModal } from "../InventoryConsignmentModal";
 import { InventoryPlatformOffsaleModal } from "../InventoryPlatformOffsaleModal";
 import { InventoryProfileModal } from "../InventoryProfileModal";
@@ -16,6 +17,8 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
   const {
     cancelInlineEdit,
     consignmentTarget,
+    deleteTarget,
+    deleting,
     detailTarget,
     editingAccount,
     employees,
@@ -35,12 +38,14 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     saveInline,
     savingAccount,
     setConsignmentTarget,
+    setDeleteTarget,
     setDetailTarget,
     setExecutionDetails,
     setPlatformOffsaleTarget,
     setProfileTarget,
     setRebateTarget,
     setSaleTarget,
+    submitDelete,
     submitVoid,
     updateEventDraft,
     voidForm,
@@ -170,6 +175,13 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           });
         }}
         onError={(error) => controller.setError(normalizeError(error))}
+      />
+      {/* 删除确认与其它弹窗同级渲染：嵌套进受控 Modal 的 children 会被父级 open=false 打断关闭渲染。 */}
+      <InventoryDeleteDialog
+        account={deleteTarget}
+        submitting={deleting}
+        onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+        onConfirm={(reason) => submitDelete(reason)}
       />
     </>
   );

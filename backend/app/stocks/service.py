@@ -11,12 +11,13 @@ from .inventory import (
     list_accounts,
     total_inventory_cost,
 )
-from .profile import create_account, get_account, update_account_profile
+from .profile import create_account, delete_account, get_account, update_account_profile
 
 __all__ = [
     "account_is_visible",
     "count_accounts",
     "create_account",
+    "delete_account",
     "get_account",
     "inventory",
     "inventory_age_days",

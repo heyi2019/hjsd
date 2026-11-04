@@ -315,6 +315,7 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/search/SearchPanel.tsx", "查询表单，非数据录入"],
   ["src/users/TeamsPanel.tsx", "团队管理，系统表单"],
   ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
+  ["src/stocks/InventoryPanel/InventoryDeleteDialog.tsx", "账号删除二次确认：删除原因只写审计日志、不落业务字段，属系统级确认输入，不开放表单字段配置"],
 ]);
 let wiredCount = 0;
 for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {

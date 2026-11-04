@@ -4,14 +4,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
-from app.core.errors import NotFound, Validation
+from app.core.errors import Conflict, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
-from app.domain.trade import Account
+from app.domain.imports import ImportRow
+from app.domain.trade import Account, InstallmentDisposition, Order
 from app.parties import service as parties_service
 from ._common import (
     _UNSET,
@@ -259,4 +261,85 @@ def update_account_profile(
     return account
 
 
-__all__ = ["create_account", "get_account", "update_account_profile"]
+def delete_account(
+    session: Session,
+    account_id: int,
+    *,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+) -> None:
+    """物理删除库存账号（仅管理员），业务单据全部保留。
+
+    口径（2026-11-05 裁决）：账号行删除，**订单 / 事件 / 资金流水 / 返点一律保留**，
+    订单里的 ``account_snapshot`` 仍保存账号文本，报表按订单取数不受影响。
+    关联解绑由本服务显式完成（而不是只靠数据库 ON DELETE SET NULL）：
+    生产库是增量升级而来，外键行为以这份代码为准，避免老库 FK 定义不一致时
+    删除直接撞约束或留下悬空引用。
+
+    ``installment_dispositions.account_id`` 是 RESTRICT 且非空，必须显式拦截，
+    否则 flush 抛底层 IntegrityError，用户只看到 500 且不知道该怎么处理。
+    删除原因与账号快照写入审计日志，删除本身不可恢复。
+    """
+    account = get_account(session, account_id, user)
+    cleaned_reason = reason.strip()
+    if not cleaned_reason:
+        raise Validation("删除原因不能为空", details={"field": "reason"})
+    if session.scalar(
+        select(InstallmentDisposition.id)
+        .where(InstallmentDisposition.account_id == account_id)
+        .limit(1)
+    ) is not None:
+        raise Conflict("该账号存在分期处置记录，不能删除，请先处理分期")
+    linked_orders = [
+        {"id": order_id, "order_no": order_no}
+        for order_id, order_no in session.execute(
+            select(Order.id, Order.order_no).where(Order.account_id == account_id)
+        ).all()
+    ]
+    import_row_count = session.query(ImportRow).filter(
+        ImportRow.mapped_account_id == account_id
+    ).count()
+    before = {
+        "id": account.id,
+        "stock_no": account.stock_no,
+        "game_account": account.game_account,
+        "camp_account": account.camp_account,
+        "game_type": account.game_type,
+        "business_mode": account.business_mode,
+        "inventory_type": account.inventory_type,
+        "value_added_service": account.value_added_service,
+        "platform": account.platform,
+        "status": account.status,
+        "inventory_status": account.inventory_status,
+        "cost_amount": str(account.cost_amount),
+        "buy_date": account.buy_date.isoformat() if account.buy_date else None,
+        "inventory_entry_at": account.inventory_entry_at.isoformat() if account.inventory_entry_at else None,
+        "note": account.note,
+        "created_by": account.created_by,
+    }
+    session.query(Order).filter(Order.account_id == account_id).update(
+        {Order.account_id: None}, synchronize_session=False
+    )
+    session.query(ImportRow).filter(ImportRow.mapped_account_id == account_id).update(
+        {ImportRow.mapped_account_id: None}, synchronize_session=False
+    )
+    session.delete(account)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.ACCOUNT_DELETE,
+        entity_type="account",
+        entity_id=str(account_id),
+        actor=actor,
+        before=before,
+        after={
+            "deleted": True,
+            "unlinked_orders": linked_orders,
+            "unlinked_import_rows": import_row_count,
+        },
+        reason=cleaned_reason,
+    )
+
+
+__all__ = ["create_account", "delete_account", "get_account", "update_account_profile"]

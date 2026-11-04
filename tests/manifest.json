@@ -64,17 +64,17 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 94,
+        "files": 96,
         "layers": {
           "fast": 14,
           "quick": 8,
-          "react": 56,
+          "react": 58,
           "deep": 16
         },
         "cases": {
           "fast": 96,
           "quick": 88,
-          "react": 756,
+          "react": 761,
           "deep": 124
         },
         "byArea": {
@@ -87,7 +87,7 @@
           },
           "module": {
             "workbench": 6,
-            "business": 17,
+            "business": 19,
             "customer": 3,
             "finance": 5,
             "operations": 7,
@@ -96,7 +96,7 @@
             "system": 10
           }
         },
-        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/，分层与用例数不变。",
+        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。本次改动前 HEAD 已有 95 个测试文件但 expected 仍记 94（守卫本来就是红的，非本次引入）；本次新增 InventoryPanel.delete.test.tsx 后按实际扫描对齐为 96 / react 58 / module.business 19。StocksApiRoutes.test.ts 与新增文件共 +5 例，cases.react 只按本轮增量记 761，HEAD 遗留那 1 个文件的用例数待下次全量基线刷新；baseline 两块是 2026-11-04 时点实测，保持原值不动。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

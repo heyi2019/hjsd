@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.core.schemas import PageOut, RequestModel
 
@@ -83,6 +83,21 @@ class AccountProfileUpdate(RequestModel):
     extra_values: dict[str, object] | None = None
     # 表单字段配置体系（INVEDIT 作用域）：合并进账号 form_extra。
     form_extra: dict[str, object] | None = None
+
+
+class AccountDeleteRequest(RequestModel):
+    """删除账号的二次确认载荷：原因必填，只进审计日志，不落业务表。"""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=200)
+
+    @field_validator("reason")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        # str_strip_whitespace 已去首尾空格；这里再兜一次，防止纯空白绕过 min_length。
+        if not value.strip():
+            raise ValueError("删除原因不能为空")
+        return value.strip()
 
 
 class ExecutionEditItem(RequestModel):
@@ -268,6 +283,7 @@ __all__ = [
     "AccountOut",
     "AccountListOut",
     "AccountProfileUpdate",
+    "AccountDeleteRequest",
     "ExecutionEditItem",
     "ExecutionEditRequest",
     "AccountInventoryOut",

@@ -40,7 +40,7 @@ from app.domain.trade import (
     Reconciliation,
 )
 from app.core.audit import record_audit
-from app.core.errors import Conflict, NotFound, Validation
+from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
 from app.orders import service as orders_service
 from app.orders.amounts import order_profit_flow_by_order
 # 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
@@ -50,6 +50,7 @@ from .schemas import (
     AccountOut,
     AccountListOut,
     AccountProfileUpdate,
+    AccountDeleteRequest,
     ExecutionEditRequest,
     InventoryResponseOut,
     InventoryStatsOut,
@@ -382,6 +383,29 @@ def update_account_profile(
     )
     extras = parties_service.get_extra_values(db, entity_type="account", entity_id=item.id)
     return _account_output(item, include_credentials=True, extra_values=extras)
+
+
+def _require_admin(user: CurrentUser) -> None:
+    """账号删除不可逆：权限收紧到系统管理员，operator/finance 即使有建单权也不可删。"""
+    if not user.is_admin:
+        raise PermissionDenied("仅系统管理员可删除账号")
+
+
+@router.delete("/stocks/{account_id}", status_code=204, response_model=None)
+def delete_account(
+    account_id: int,
+    payload: AccountDeleteRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage,
+) -> Response:
+    """删除库存账号（仅管理员）。
+
+    请求体必带删除原因（空白一律 422）；账号行物理删除，订单/事件/流水/返点
+    全部保留并解绑，账号快照与原因写入审计日志，操作不可恢复。
+    """
+    _require_admin(user)
+    service.delete_account(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
+    return Response(status_code=204)
 
 
 @router.get("/stocks/inventory", response_model=InventoryResponseOut)

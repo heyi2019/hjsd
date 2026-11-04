@@ -1,0 +1,993 @@
+/*
+ * H5（移动端）样式 —— Apple / iOS 设计语言。
+ *
+ * 取值依据 HIG（developer.apple.com/design）：
+ *  - 字号走 Dynamic Type 默认档：Large Title 34 / Title2 22 / Headline 17 / Body 17 /
+ *    Subhead 15 / Footnote 13 / Caption 12；
+ *  - 颜色走语义色：label / secondaryLabel / tertiaryLabel + systemGroupedBackground，
+ *    蓝 #007AFF（深色 #0A84FF）、红 #FF3B30（深色 #FF453A）；
+ *  - 控件层用材质（导航栏/标签栏毛玻璃），内容层实色，不叠 blur；
+ *  - 点击目标 ≥ 44px；正文对比度 ≥ 4.5:1。
+ *
+ * 三条工程硬约束（与视觉无关，但必须守）：
+ *  1) 禁止页面级横向滚动；
+ *  2) 底栏与卡片吃 safe-area-inset；
+ *  3) 输入框字号 ≥16px：低于 16px 时 iOS Safari 聚焦会自动放大整页。
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* 语义色 —— 浅色 */
+  --h5-bg: #f2f2f7;              /* systemGroupedBackground */
+  --h5-card: #ffffff;
+  --h5-card-2: #ffffff;
+  --h5-label: #000000;
+  --h5-label-2: rgba(60, 60, 67, 0.6);   /* secondaryLabel */
+  --h5-label-3: rgba(60, 60, 67, 0.3);   /* tertiaryLabel */
+  --h5-separator: rgba(60, 60, 67, 0.29);
+  --h5-fill: rgba(120, 120, 128, 0.12);  /* systemGray5 用于输入框/次按钮底 */
+  --h5-fill-2: rgba(120, 120, 128, 0.16);
+  --h5-blue: #007aff;
+  --h5-red: #ff3b30;
+  --h5-green: #34c759;
+
+  /* 控件层材质 */
+  --h5-chrome: rgba(249, 249, 249, 0.82);
+  --h5-chrome-hair: rgba(60, 60, 67, 0.29);
+
+  --h5-radius-card: 12px;
+  --h5-radius-btn: 12px;
+  --h5-safe-b: env(safe-area-inset-bottom, 0px);
+  --h5-safe-t: env(safe-area-inset-top, 0px);
+
+  --h5-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --h5-bg: #000000;                    /* systemBackground（深色分组底也用黑） */
+    --h5-card: #1c1c1e;                  /* secondarySystemGroupedBackground */
+    --h5-card-2: #1c1c1e;
+    --h5-label: #ffffff;
+    --h5-label-2: rgba(235, 235, 245, 0.6);
+    --h5-label-3: rgba(235, 235, 245, 0.3);
+    --h5-separator: rgba(84, 84, 88, 0.65);
+    --h5-fill: rgba(120, 120, 128, 0.32);
+    --h5-fill-2: rgba(120, 120, 128, 0.44);
+    --h5-blue: #0a84ff;
+    --h5-red: #ff453a;
+    --h5-green: #30d158;
+    --h5-chrome: rgba(22, 22, 24, 0.82);
+    --h5-chrome-hair: rgba(84, 84, 88, 0.65);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--h5-bg);
+  color: var(--h5-label);
+  font-family: var(--h5-font);
+  font-size: 17px;
+  line-height: 22px;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* iOS 上按钮默认不可拖选，避免长按出现选择框。 */
+  user-select: none;
+}
+
+input {
+  font: inherit;
+  font-size: 16px; /* 低于 16px 时 iOS 聚焦会自动放大整页 */
+  color: var(--h5-label);
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--h5-blue) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ---------------------------------------------------------------- 启动态 */
+
+.h5-boot {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  color: var(--h5-label-2);
+  font-size: 15px;
+  background: var(--h5-bg);
+}
+
+.h5-boot__spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid var(--h5-fill-2);
+  border-top-color: var(--h5-label-3);
+  animation: h5-spin 0.85s linear infinite;
+}
+
+@keyframes h5-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------------------------------------------------------- 登录 */
+
+.h5-login {
+  min-height: 100dvh;
+  padding: calc(28px + var(--h5-safe-t)) 20px calc(24px + var(--h5-safe-b));
+  background: var(--h5-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.h5-login__hero {
+  color: var(--h5-label);
+}
+
+.h5-login__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--h5-label-2);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.h5-login__brand::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--h5-blue);
+  /* 品牌标记：一个蓝色的圆角方块，与 App 图标语言一致 */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.h5-login__hero h1 {
+  margin: 18px 0 6px;
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.h5-login__hero p {
+  margin: 0;
+  color: var(--h5-label-2);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.h5-login__card {
+  background: var(--h5-card);
+  border-radius: var(--h5-radius-card);
+  padding: 4px 16px 16px;
+}
+
+.h5-login__card--plain {
+  margin-top: 4px;
+}
+
+.h5-login__card h2 {
+  margin: 12px 0 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.h5-login__sub {
+  margin: 2px 0 16px;
+  color: var(--h5-label-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.h5-login__hint {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--h5-label-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.h5-login__foot {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--h5-label-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* 分段控件（iOS Segmented Control） */
+.h5-switch {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 2px;
+  margin: 4px 0 16px;
+  border-radius: 9px;
+  background: var(--h5-fill);
+}
+
+.h5-switch button {
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--h5-label);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.h5-switch button.is-active {
+  background: var(--h5-card);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.h5-switch button:disabled {
+  color: var(--h5-label-3);
+}
+
+/* 表单 */
+.h5-form {
+  display: grid;
+  gap: 12px;
+}
+
+.h5-field {
+  display: grid;
+  gap: 6px;
+}
+
+.h5-field > span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+}
+
+.h5-field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--h5-fill);
+  color: var(--h5-label);
+  outline: none;
+}
+
+.h5-field input::placeholder {
+  color: var(--h5-label-3);
+}
+
+.h5-field input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--h5-blue) 45%, transparent);
+}
+
+.h5-field__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 主按钮：iOS filled button */
+.h5-primary {
+  height: 50px;
+  border: 0;
+  border-radius: var(--h5-radius-btn);
+  background: var(--h5-blue);
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+
+.h5-primary:active:not(:disabled) {
+  transform: scale(0.985);
+  opacity: 0.9;
+}
+
+.h5-primary:disabled {
+  opacity: 0.4;
+}
+
+/* 次按钮：iOS gray fill */
+.h5-ghost {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--h5-fill);
+  color: var(--h5-blue);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.h5-ghost:disabled {
+  color: var(--h5-label-3);
+}
+
+.h5-wechat {
+  position: relative;
+  width: 100%;
+  height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--h5-radius-btn);
+  background: var(--h5-fill);
+  color: var(--h5-label);
+  font-size: 17px;
+  font-weight: 500;
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+
+.h5-wechat:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.h5-wechat:disabled {
+  color: var(--h5-label-3);
+}
+
+.h5-login__divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 12px;
+  color: var(--h5-label-3);
+  font-size: 13px;
+}
+
+.h5-login__divider::before,
+.h5-login__divider::after {
+  content: "";
+  height: 1px;
+  background: var(--h5-separator);
+}
+
+.h5-link {
+  border: 0;
+  background: transparent;
+  color: var(--h5-blue);
+  font-size: 17px;
+  padding: 6px 2px;
+  justify-self: center;
+  min-height: 32px;
+}
+
+/* 提示条 */
+.h5-alert {
+  margin-bottom: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 18px;
+  background: color-mix(in srgb, var(--h5-blue) 10%, transparent);
+  color: var(--h5-blue);
+}
+
+.h5-alert--error {
+  background: color-mix(in srgb, var(--h5-red) 12%, transparent);
+  color: var(--h5-red);
+}
+
+/* ---------------------------------------------------------------- 应用外壳 */
+
+.h5-app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--h5-bg);
+}
+
+.h5-main {
+  flex: 1 1 auto;
+  padding-bottom: calc(49px + var(--h5-safe-b));
+}
+
+/* 标签栏：控件层，用材质表达层级 */
+.h5-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 20;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding-bottom: var(--h5-safe-b);
+  background: var(--h5-chrome);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--h5-chrome-hair);
+}
+
+.h5-tabbar__item {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  padding: 6px 0 4px;
+  min-height: 49px;
+  border: 0;
+  background: transparent;
+  color: var(--h5-label-2);
+  transition: color 140ms ease-out;
+}
+
+.h5-tabbar__item.is-active {
+  color: var(--h5-blue);
+}
+
+.h5-tabbar__icon {
+  display: grid;
+  place-items: center;
+  height: 26px;
+}
+
+.h5-tabbar__label {
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ---------------------------------------------------------------- 内容页 */
+
+.h5-page {
+  padding-bottom: 24px;
+}
+
+/* Large Title 页头 */
+.h5-hero {
+  padding: calc(16px + var(--h5-safe-t)) 20px 8px;
+  background: var(--h5-bg);
+  color: var(--h5-label);
+}
+
+.h5-hero__kicker {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+}
+
+.h5-hero h1 {
+  margin: 2px 0 2px;
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.h5-hero__meta {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--h5-label-2);
+}
+
+/* 三宫格：一张分组卡，列间用发丝线分隔 */
+.h5-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  overflow: hidden;
+}
+
+.h5-metric {
+  display: grid;
+  gap: 2px;
+  padding: 12px 12px 14px;
+  min-width: 0;
+  position: relative;
+}
+
+.h5-metric + .h5-metric::before {
+  content: "";
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 0;
+  width: 1px;
+  background: var(--h5-separator);
+}
+
+.h5-metric span {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--h5-label-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h5-metric strong {
+  font-size: 18px;
+  line-height: 23px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--h5-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 内页页头 */
+.h5-pagehead {
+  padding: calc(12px + var(--h5-safe-t)) 20px 8px;
+}
+
+.h5-pagehead h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.h5-pagehead p {
+  margin: 0;
+  color: var(--h5-label-2);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+/* 分组标题（iOS grouped section header） */
+.h5-section {
+  padding: 22px 20px 0;
+}
+
+.h5-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  padding-inline: 4px;
+}
+
+.h5-section__head h2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--h5-label-2);
+  letter-spacing: 0.01em;
+}
+
+.h5-section__head .h5-link {
+  justify-self: auto;
+  font-size: 15px;
+  padding: 0;
+  min-height: 0;
+}
+
+/* 资金卡：一张分组卡，两列 */
+.h5-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  overflow: hidden;
+}
+
+.h5-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px 14px;
+  min-width: 0;
+  position: relative;
+}
+
+.h5-card + .h5-card::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 0;
+  width: 1px;
+  background: var(--h5-separator);
+}
+
+.h5-card__label {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h5-card__value {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 内嵌分组列表：一张卡 + 发丝分隔线（行尾留白 16px） */
+.h5-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  overflow: hidden;
+}
+
+.h5-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 60px;
+  padding: 10px 16px;
+  position: relative;
+}
+
+.h5-row + .h5-row::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 16px 0;
+  height: 1px;
+  background: var(--h5-separator);
+}
+
+.h5-row--stacked {
+  align-items: start;
+}
+
+.h5-row--button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 17px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: var(--h5-label);
+  min-height: 48px;
+}
+
+.h5-row--button:active {
+  background: var(--h5-fill);
+}
+
+.h5-row--button svg {
+  color: var(--h5-label-3);
+}
+
+.h5-row__main {
+  min-width: 0;
+}
+
+.h5-row__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.h5-row__title strong {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h5-row__meta {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h5-row__side {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--h5-label-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.h5-row__side strong {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--h5-label);
+}
+
+.h5-row__status {
+  color: var(--h5-label-2);
+}
+
+/* 状态用语义色，而不是一律蓝色（蓝色在 iOS 里表示「可点」，会误导） */
+.h5-row__status--done {
+  color: var(--h5-green);
+}
+
+.h5-row__status--muted {
+  color: var(--h5-label-3);
+}
+
+.h5-tag {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--h5-fill);
+  color: var(--h5-label-2);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.h5-empty {
+  margin: 0;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--h5-label-2);
+  font-size: 15px;
+  background: var(--h5-card);
+  border-radius: var(--h5-radius-card);
+}
+
+/* 搜索与筛选 */
+.h5-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  gap: 10px;
+  padding: 8px 20px 10px;
+  background: var(--h5-chrome);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.h5-search {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--h5-fill);
+  font-size: 16px;
+}
+
+.h5-search::placeholder {
+  color: var(--h5-label-3);
+}
+
+.h5-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.h5-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.h5-chip {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--h5-fill);
+  color: var(--h5-label);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+
+.h5-chip.is-active {
+  background: var(--h5-blue);
+  color: #ffffff;
+}
+
+.h5-more {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 12px 20px 0;
+  height: 44px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--h5-card);
+  color: var(--h5-blue);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.h5-more:disabled {
+  color: var(--h5-label-3);
+}
+
+/* 键值分组（我的页） */
+.h5-kv {
+  display: grid;
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  overflow: hidden;
+}
+
+.h5-kv > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 17px;
+  position: relative;
+}
+
+.h5-kv > div + div::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 16px 0;
+  height: 1px;
+  background: var(--h5-separator);
+}
+
+.h5-kv span {
+  color: var(--h5-label);
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.h5-kv strong {
+  font-weight: 400;
+  color: var(--h5-label-2);
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 破坏性操作：iOS 列表里的红字行，而不是大色块按钮 */
+.h5-danger {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 22px 20px 0;
+  height: 50px;
+  border-radius: var(--h5-radius-card);
+  border: 0;
+  background: var(--h5-card);
+  color: var(--h5-red);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.h5-danger:active {
+  background: var(--h5-fill);
+}
+
+/* 内容区左右留白：列表/提示/空态统一 20px（HIG 移动端边距） */
+.h5-page > .h5-list,
+.h5-page > .h5-alert,
+.h5-page > .h5-empty {
+  margin-inline: 20px;
+}
+
+.h5-page > .h5-section + .h5-section {
+  padding-top: 22px;
+}
+
+/* ---------------------------------------------------------------- 自适应 */
+
+@media (min-width: 768px) {
+  /* 平板/桌面打开 H5 时保持手机阅读宽度，不铺满整屏 */
+  .h5-app,
+  .h5-login {
+    max-width: 520px;
+    margin-inline: auto;
+  }
+
+  .h5-tabbar {
+    max-width: 520px;
+    margin-inline: auto;
+    border-inline: 1px solid var(--h5-chrome-hair);
+  }
+}
+
+/* 降低透明度：材质退化为实色，避免毛玻璃下层文字透出干扰阅读 */
+@media (prefers-reduced-transparency: reduce) {
+  .h5-tabbar,
+  .h5-toolbar {
+    background: var(--h5-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* 增强对比：发丝线加深，次级文字提到可读对比 */
+@media (prefers-contrast: more) {
+  :root {
+    --h5-label-2: rgba(60, 60, 67, 0.85);
+    --h5-separator: rgba(60, 60, 67, 0.6);
+  }
+
+  .h5-alert,
+  .h5-tag {
+    border: 1px solid currentColor;
+  }
+}
+
+@media (prefers-color-scheme: dark) and (prefers-contrast: more) {
+  :root {
+    --h5-label-2: rgba(235, 235, 245, 0.9);
+    --h5-separator: rgba(235, 235, 245, 0.5);
+  }
+}
+
+/* 减弱动态效果：位移/缩放改为无动画 */
+@media (prefers-reduced-motion: reduce) {
+  .h5-boot__spinner {
+    animation: none;
+    border-top-color: var(--h5-label-2);
+  }
+
+  .h5-primary,
+  .h5-wechat,
+  .h5-switch button,
+  .h5-chip,
+  .h5-tabbar__item {
+    transition: none;
+  }
+
+  .h5-primary:active:not(:disabled),
+  .h5-wechat:active:not(:disabled) {
+    transform: none;
+  }
+}

@@ -523,6 +523,63 @@ def test_router_permission_denied_for_viewer(seeded_client, viewer_headers):
     assert resp.status_code == 403
 
 
+def test_router_form_config_readable_by_operator(seeded_client, headers, operator_headers):
+    """读端点只要求登录：非管理员角色必须拿到完整表单配置（2026-11-05 修正）。
+
+    回归背景：三个 GET 原挂在 field-definition.manage（仅 ADMIN）下，OPERATOR /
+    FINANCE / AUDITOR 一律 403；前端 useOrderFormConfig / useOrderFormSectionLabels
+    在 catch 里降级为空配置，于是「管理员配好的自定义字段与板块标题」对非管理员
+    彻底失效，界面上只留下两行 403 控制台报错。本用例锁住「读放开、写仍拦」。
+    """
+    # 管理员先配一个自定义字段 + 一个板块标题改名
+    created = seeded_client.post(
+        "/api/v1/order-form-fields", headers=headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS", field_key="op_readable", label="经办可见字段", field_type="TEXT",
+        ).model_dump(mode="json"),
+    )
+    assert created.status_code == 201, created.text
+    seeded_client.put(
+        "/api/v1/order-form-fields/section-labels", headers=headers,
+        json={"order_type_code": "HS", "labels": {"FINANCE": "资金明细（经办可见）"}},
+    )
+
+    # 1) 经办人读得到字段定义
+    fields = seeded_client.get(
+        "/api/v1/order-form-fields", headers=operator_headers,
+        params={"order_type_code": "HS"},
+    )
+    assert fields.status_code == 200, fields.text
+    assert any(row["field_key"] == "op_readable" for row in fields.json())
+
+    # 2) 经办人读得到板块标题
+    labels = seeded_client.get(
+        "/api/v1/order-form-fields/section-labels", headers=operator_headers,
+        params={"order_type_code": "HS"},
+    )
+    assert labels.status_code == 200, labels.text
+    assert labels.json().get("FINANCE") == "资金明细（经办可见）"
+
+    # 3) 经办人读得到作用域注册表
+    scopes = seeded_client.get("/api/v1/order-form-fields/scopes", headers=operator_headers)
+    assert scopes.status_code == 200, scopes.text
+    assert scopes.json()
+
+    # 4) 写仍然被拦：读放开不等于放开配置权
+    denied_create = seeded_client.post(
+        "/api/v1/order-form-fields", headers=operator_headers,
+        json=OrderFormFieldCreate(
+            order_type_code="HS", field_key="op_write_try", label="越权", field_type="TEXT",
+        ).model_dump(mode="json"),
+    )
+    assert denied_create.status_code == 403
+    denied_labels = seeded_client.put(
+        "/api/v1/order-form-fields/section-labels", headers=operator_headers,
+        json={"order_type_code": "HS", "labels": {"FINANCE": "越权改名"}},
+    )
+    assert denied_labels.status_code == 403
+
+
 def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, headers):
     """闭环实证：设置页改名 → 落库 → 前端数据源(GET /order-form-fields)实时返回新名、旧名消失。
 

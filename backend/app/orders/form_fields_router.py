@@ -14,12 +14,21 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_FIELD_DEFINITION_MANAGE,
     CurrentUser,
+    get_current_user,
     require_permissions,
 )
 from app.orders import schemas
 
 router = APIRouter(tags=["ORD-01/02 建单表单配置"])
 
+# 读写分权（2026-11-05 修正）：字段定义与板块标题是**表单渲染元数据**，建单、库存、
+# 客户、分期、返点、资金等几乎所有业务表单挂载时都要读它（FieldConfigScope /
+# useOrderFormConfig / useOrderFormSectionLabels）。
+# 原先把三个 GET 也挂在 field-definition.manage 上，导致 OPERATOR / FINANCE / AUDITOR
+# 全部 403；前端 catch 后降级为空配置且不报错，表现为「管理员配好的自定义字段与
+# 板块标题对非管理员彻底失效」，只有控制台两行 403 可见，极易漏判。
+# 口径与 options / lists 两个 router 一致：读=登录即可，写=field-definition.manage。
+read_form_config = Depends(get_current_user)
 manage_form_fields = require_permissions(PERM_FIELD_DEFINITION_MANAGE)
 
 @router.get(
@@ -27,7 +36,7 @@ manage_form_fields = require_permissions(PERM_FIELD_DEFINITION_MANAGE)
     response_model=list[schemas.FormScopeOut],
 )
 def list_form_scopes(
-    _user: CurrentUser = manage_form_fields,
+    _user: CurrentUser = read_form_config,
 ) -> list[schemas.FormScopeOut]:
     """表单作用域注册表：设置页「表单」下拉的单一事实源。"""
     from app.orders.form_scopes import list_scopes
@@ -43,7 +52,7 @@ def list_order_form_fields(
     order_type_code: str,
     include_inactive: bool = True,
     db: Session = Depends(get_db),
-    _user: CurrentUser = manage_form_fields,
+    _user: CurrentUser = read_form_config,
 ) -> list[schemas.OrderFormFieldOut]:
     """按业务类型 code 列出建单表单字段配置（含停用项）。"""
     from app.orders import form_fields as ff
@@ -63,7 +72,7 @@ def list_order_form_fields(
 def list_section_labels(
     order_type_code: str,
     db: Session = Depends(get_db),
-    _user: CurrentUser = manage_form_fields,
+    _user: CurrentUser = read_form_config,
 ) -> dict[str, str]:
     """按业务类型返回板块键→显示标题映射（设置面板与建单表单共用的板块标题来源）。"""
     from app.orders import form_fields as ff

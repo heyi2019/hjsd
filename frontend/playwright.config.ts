@@ -38,7 +38,16 @@ export default defineConfig({
   testDir: "../tests/e2e",
   timeout: 30000,
   expect: { timeout: 10000 },
-  // E2E 涉及真实浏览器状态与 antd 下拉，串行最稳，避免并行互相干扰。
+  // E2E 整轮串行（workers:1）的原因（2026-11-04 实测验证，勿擅自改并行）：
+  //   ① 写库用例共享 heijin_erp_e2e 的 document_sequences 计数器，并发会撞唯一约束 → flaky。
+  //   ② 纯 UI / 只读用例虽不写库，但有两个结构性脆弱点：
+  //      - visual 基线拍的是「写后数据态」，拆分执行顺序后仪表盘实时数字变了 → 截图 1% 差异失败；
+  //      - 共享 vite dev server 在多浏览器上下文并发下加载竞争，form hydration 超时类 flaky
+  //        （order-abandon-confirm 点关闭后确认框未弹出即一例）。
+  //   ③ 试过「write 串行 + readonly 并行 + dependencies 串行两段」：仍触发 ② 的两类失败。
+  // 结论：E2E 有状态 + 时序敏感，硬并行引入 flaky；维持串行 150s 全绿。若要再提速，
+  // 正确杠杆是改用 `vite build` + `vite preview`（静态产物，无 transform 竞争）而非 dev server，
+  // 或把 visual 与数据解耦——那是独立重构，不在本次「调参」范围。
   fullyParallel: false,
   workers: 1,
   // 控制台看过程，JSON 供 `backend/scripts/record_e2e_results.py` 翻译进

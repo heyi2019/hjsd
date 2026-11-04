@@ -14,7 +14,7 @@ import { customersApi,
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
 import { InstallmentScheduleFields, resizeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSection";
@@ -25,6 +25,13 @@ import { lastPeriodAmount, perPeriodServiceFee, saleInstallmentMismatch, saleIns
 import "./InventorySaleModal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
+
+/** 三类售出各自独立的表单作用域：改一份的字段/必填/板块标题不影响另外两份。 */
+const SALE_SCOPE_BY_INVENTORY_TYPE: Record<string, string> = {
+  RECOVERY: "SALEREC",
+  PICKUP: "SALETH",
+  CONSIGNMENT: "SALEDG",
+};
 
 /** 买家角色：代挂（CONSIGNMENT）为委托方 CONSIGNOR，其余（回收/提号）为买家 BUYER。 */
 function buyerRoleOf(inventoryType: string | null | undefined): "BUYER" | "CONSIGNOR" {
@@ -60,7 +67,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
-  const { config } = useOrderFormConfig(open ? "SALE" : undefined);
+  const saleScope = SALE_SCOPE_BY_INVENTORY_TYPE[resolvedType ?? ""];
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
   const saleAmount = Form.useWatch("amount", form);
   const amount2 = Form.useWatch("amount2", form);
@@ -221,12 +228,12 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     >
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
-      <FieldConfigContext.Provider value={config}>
+      <FieldConfigScope scope={saleScope ?? ""} active={open && Boolean(saleScope)}>
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="SALE" form={form} onFinish={submit}>
+          wrapperCol={{ flex: "auto" }} scope={saleScope ?? ""} form={form} onFinish={submit}>
           <RecoveryCustomerSection title={buyerInfoTitle} />
           <DeliveryInfoSection showIntermediary employees={employees} />
           <section className="inventory-sale-cashflow inventory-sale-cashflow--full-width" aria-labelledby="inventory-sale-cashflow-title">
@@ -300,7 +307,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
           </section>
           <CustomFieldSection testIdSuffix="inventory-sale" />
         </BusinessRegistrationForm>
-      </FieldConfigContext.Provider>
+      </FieldConfigScope>
     </BusinessActionModal>
   );
 }

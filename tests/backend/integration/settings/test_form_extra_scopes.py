@@ -246,3 +246,47 @@ def test_account_profile_merges_form_extra(seeded_client, seeded_db, headers):
     assert response.status_code == 200, response.text
     account = seeded_db.get(Account, account_id)
     assert account.form_extra == {"supplier": "号商A"}
+
+
+def test_sale_scopes_have_independent_field_sets(seeded_db):
+    """三类售出表单各自独立：改一份的字段标签不影响另外两份。
+
+    测试库 seed_template 只播基础主数据、不播 catalog，故本用例显式调用活基线种子。
+    """
+    from sqlalchemy import func, select
+
+    from app.domain.trade_models.form_config import OrderFormField
+    from app.foundation.catalog_seed import seed_catalog
+    from app.orders.form_scopes import SCOPE_CODES
+
+    seed_catalog(seeded_db, actor="pytest")
+    seeded_db.flush()
+
+    codes = ("SALEREC", "SALETH", "SALEDG")
+    assert all(code in SCOPE_CODES for code in codes)
+    assert "SALE" not in SCOPE_CODES
+
+    def count(code: str) -> int:
+        return int(
+            seeded_db.scalar(
+                select(func.count())
+                .select_from(OrderFormField)
+                .where(OrderFormField.order_type_code == code)
+            )
+            or 0
+        )
+
+    def amount_of(code: str):
+        return seeded_db.scalar(
+            select(OrderFormField).where(
+                OrderFormField.order_type_code == code,
+                OrderFormField.field_key == "amount",
+            )
+        )
+
+    assert [count(code) for code in codes] == [13, 13, 13]
+    assert count("SALE") == 0
+    amount_of("SALEREC").label = "回收成交价"
+    seeded_db.flush()
+    assert amount_of("SALETH").label == "售出金额"
+    assert amount_of("SALEDG").label == "售出金额"

@@ -321,4 +321,22 @@ describe("库存售出三表单分支", () => {
       unmount();
     }
   });
+
+  it("三类售出各取独立作用域配置，互不共用", async () => {
+    const cases = [
+      [RecoverySaleModal, accounts[0], "SALEREC"],
+      [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }, "SALETH"],
+      [ConsignmentSaleModal, { ...accounts[0], inventory_type: "CONSIGNMENT" }, "SALEDG"],
+    ] as const;
+
+    for (const [Modal, account, scope] of cases) {
+      vi.mocked(catalog.orderFormFieldsApi.list).mockClear();
+      vi.mocked(catalog.orderFormFieldsApi.listSectionLabels).mockClear();
+      const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+      await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith(scope, true));
+      expect(vi.mocked(catalog.orderFormFieldsApi.list).mock.calls.every(([code]) => code === scope)).toBe(true);
+      expect(catalog.orderFormFieldsApi.listSectionLabels).toHaveBeenCalledWith(scope);
+      unmount();
+    }
+  });
 });

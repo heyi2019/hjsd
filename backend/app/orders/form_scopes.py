@@ -39,7 +39,10 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("ALLOCATION", "订单分润", GROUP_ORDER_OP),
     FormScope("REFUND", "资金收支", GROUP_ORDER_OP),
     # ---- 库存中心（迁移 0003；按库存中心页面操作顺序）----
-    FormScope("SALE", "售出", GROUP_INVENTORY),
+    # 售出按货源类型拆成三份独立表单配置；改一份不影响另外两份。
+    FormScope("SALEREC", "回收售出", GROUP_INVENTORY),
+    FormScope("SALETH", "提号售出", GROUP_INVENTORY),
+    FormScope("SALEDG", "代挂售出", GROUP_INVENTORY),
     FormScope("CONSIGN", "寄售", GROUP_INVENTORY),
     FormScope("INVREBATE", "返点", GROUP_INVENTORY),
     FormScope("INVREFUND", "取消", GROUP_INVENTORY),

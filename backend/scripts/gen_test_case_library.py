@@ -268,7 +268,7 @@ def extract_method(test_type: str, relpath: str, body: str, func_id: str) -> str
     if test_type == "UT":
         isolate = "无 DB/纯函数"
     elif test_type == "E2E":
-        isolate = "真实浏览器(chromium)+真实后端+ephemeral 库(整轮重建)"
+        isolate = "真实浏览器(chromium)+真实后端+常驻 e2e 库(每轮不清数据，按类型补足 IN_STOCK 账号)"
     elif is_frontend_test(relpath):
         isolate = "组件测试(mount/交互)"
     else:
@@ -509,7 +509,7 @@ def main() -> None:
         for tname, doc, body in scan_ts(full):
             cases.append(_stage("IT", func, rel, tname, doc, body, fn, primary, related, ""))
 
-    # ---- E2E（Playwright：真实浏览器 + 真实后端 + ephemeral 库）----
+    # ---- E2E（Playwright：真实浏览器 + 真实后端 + 常驻 e2e 库）----
     # 递归扫 tests/e2e/<区域>/：规格按区域分目录（2026-11-04 迁出包内 e2e/）。
     # 只扫一层会让搬进区域目录的 15 个规格从用例库整批消失；support/ 是夹具不是规格。
     e2e_dir = os.path.join(REPO, "tests", "e2e")

@@ -13,7 +13,7 @@ import { navItem } from "../support/api-stub";
  * 前置：后端运行在 8123（8000 被 Docker 占用）。
  */
 test.describe("real frontend<->backend integration", () => {
-  test("客户中心：真实 /customers 返回 2 条且渲染到表格", async ({
+  test("客户中心：真实 /customers 返回客户列表且渲染到表格", async ({
     page,
   }) => {
     const customersResp = page.waitForResponse(

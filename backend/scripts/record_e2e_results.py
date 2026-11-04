@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Playwright E2E 执行结果 → 测试结果库/results.jsonl（后端执行记录器的 E2E 补口）。
 
-为什么需要它：`tests/v1/conftest.py` 只能记录 pytest，`record_frontend_results.py`
+为什么需要它：`tests/backend/conftest.py` 只能记录 pytest，`record_frontend_results.py`
 只能记录 vitest。E2E 跑完原本只在终端留痕 —— 浏览器用例在《测试报告》里
 永远显示「未执行」，报告的 E2E 行恒为 0。本脚本把 Playwright 的 JSON 报告翻成
 与后端完全相同的记录格式，追加进同一份 results.jsonl，报告侧无需任何特判。
@@ -13,6 +13,8 @@
 
 关联口径：case_index.json 的 E2E 键为 `tests/e2e/<区域>/<规格文件名>::<标题>`
 （2026-11-04 规格从包内 frontend/e2e/ 迁到仓库根 tests/e2e/<区域>/）。
+case_index.json 按设计不入库，e2e-gate 也不跑生成器 → 文件缺失时脚本从入库的
+《测试用例库.csv》自举同一份映射，避免整步因 FileNotFoundError 失败。
 Playwright JSON 的 `spec.file` 是**相对 testDir 的路径**（`system/modal-footer.spec.ts`），
 故必须补 `tests/e2e/` 前缀；漏了就是全部记录落空、报告仍旧显示 0。
 
@@ -38,7 +40,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend"
-CASE_INDEX = REPO / "backend" / "tests" / "v1" / "_report" / "case_index.json"
+CASE_INDEX = REPO / "tests" / "backend" / "_report" / "case_index.json"
+CASE_LIBRARY_CSV = REPO / "docs" / "testing" / "测试用例库.csv"
 RESULTS = REPO / "docs" / "testing" / "测试结果库" / "results.jsonl"
 
 _RANK = {"PASS": 0, "SKIP": 1, "FAIL": 2, "ERROR": 3}
@@ -137,6 +140,31 @@ def _walk_suites(suites, out: list) -> None:
         _walk_suites(s.get("suites"), out)
 
 
+def _load_case_index() -> dict:
+    """nodeid -> 测试编号。
+
+    case_index.json 由 gen_test_case_library.py 生成、按设计不入库
+    （docs/README.md：CI 重建、本地各自生成）。但 e2e-gate 并不跑该生成器，
+    所以 CI 上这份文件根本不存在——旧实现直接 read_text() 会抛
+    FileNotFoundError，令「记录 E2E 结果」整步失败、门禁红。
+
+    故优先读生成器产物；缺失时退回到**入库的**《测试用例库.csv》自举同一份
+    映射——生成器写 csv 的 nodeid 口径正是 f"{文件}::{函数标识}"。
+    """
+    if CASE_INDEX.exists():
+        return json.loads(CASE_INDEX.read_text(encoding="utf-8"))
+    import csv
+    out: dict[str, str] = {}
+    with CASE_LIBRARY_CSV.open(encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            rel = row.get("自动化测试文件及函数") or ""
+            name = row.get("测试函数标识") or ""
+            no = row.get("测试编号") or ""
+            if rel and name and no:
+                out[f"{rel}::{name}"] = no
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="把 Playwright E2E JSON 结果写入测试结果库")
     ap.add_argument("--json", default="test-results/playwright-report.json",
@@ -152,7 +180,7 @@ def main() -> int:
         print("[e2e] 请先执行 `npx playwright test`（playwright.config.ts 已配 json reporter）")
         return 2
 
-    index: dict = json.loads(CASE_INDEX.read_text(encoding="utf-8"))
+    index: dict = _load_case_index()
     data = json.loads(report_path.read_text(encoding="utf-8"))
 
     specs: list = []

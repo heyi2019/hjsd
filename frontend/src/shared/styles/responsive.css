@@ -191,19 +191,15 @@
   .customer-table .ant-table-tbody > tr > td:last-child { width: 96px; white-space: nowrap; overflow: visible; }
 }
 
-/* 次要列移动端隐藏（<768px，含平板竖屏）：ui-col-md-up = 仅 md 及以上显示。
-   实现上必须「双写」：列的 className 管表头 th，onCell 管表体 td —— antd 的
-   column.className 只落到表头，只写一处理会出现「表头隐藏、表体不隐藏」的列错位。
-   为什么不用 antd 的 responsive 属性：那在 jsdom（无 breakpoint）里会把列整个过滤掉，
-   批量单测直接失败；CSS 隐藏保留 DOM，取值断言不受影响。
-   已打标：资金流水 8 列、库存 5 列、分期合约 7 列。 */
+/* <768px（含平板竖屏）表格口径：全部列保留、容器内横滑，不做次要列隐藏。
+   窄屏隐藏列统一走「按列 key 打标」的 ui-col-mobile-hide（见下方 ≤640px 块与
+   listColumns.ts 的 markMobileHiddenColumns）——按物理序号隐藏会随列表列配置错位。
+   这里只处理横滑时的宽度与占位。 */
 @media (max-width: 767px) {
-  .ant-table-thead > tr > th.ui-col-md-up,
-  .ant-table-tbody > tr > td.ui-col-md-up { display: none; }
-  /* 隐藏列的格子虽已 display:none，rc-table 的 measure-row 仍会按原列数占位
-     （实测每列 ~42px，8 列约 336px 虚高）。隐藏列的宽度已确定，无需再测。 */
+  /* rc-table 的 measure-row 会按原列数占位（实测每列 ~42px，8 列约 336px 虚高）。
+     列宽已交给下面的 auto 规则按内容自适应，无需再测。 */
   .ant-table-measure-row { display: none; }
-  /* <col> 上的 inline 固定宽度（如审核追溯 190 / 操作 170）在列已隐藏后仍占宽度，
+  /* <col> 上的 inline 固定宽度（如审核追溯 190 / 操作 170）会把表格撑出屏外，
      移动端统一放开按内容自适应（inline style 只能被 !important 覆盖）。 */
   .ant-table col[style] { width: auto !important; }
   /* 操作列一排按钮会把列撑到 600px+；移动端允许换行，换取横向大幅收窄（纵向排布可接受）。 */

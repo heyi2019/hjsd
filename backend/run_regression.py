@@ -203,6 +203,7 @@ GROUPS = {
         "tests/backend/integration/business/test_account_stock_no.py",
         "tests/backend/unit/business/test_account_inventory_age.py",
         "tests/backend/integration/business/test_inventory_stats.py",
+        "tests/backend/integration/business/test_account_delete.py",
     ],
     "orders": [
         "tests/backend/unit/system/test_core_contract.py",
@@ -232,6 +233,7 @@ GROUPS = {
         "tests/backend/integration/business/test_execution_finance_summary.py",
         "tests/backend/integration/business/test_order_duplicate_account.py",
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
+        "tests/backend/integration/business/test_profit_cashflow_basis.py",
     ],
     "installments": [
         "tests/backend/integration/business/test_installments_contract.py",
@@ -316,6 +318,7 @@ GROUPS = {
         "tests/backend/unit/system/test_backup_scripts.py",
         "tests/backend/unit/system/test_public_release_security.py",
         "tests/backend/integration/system/test_ratelimit.py",
+        "tests/backend/integration/system/test_passwordless_login.py",
     ],
 }
 

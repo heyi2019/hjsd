@@ -52,52 +52,65 @@ export function ChangePasswordPage({
 
   return (
     <div className="h5-login">
-      <section className="h5-login__card h5-login__card--plain">
-        <h2>{passwordless ? "设置登录密码" : "修改登录密码"}</h2>
-        <p className="h5-login__sub">
+      <header className="h5-login__hero">
+        <div className="h5-login__brand">
+          <span className="h5-login__mark" aria-hidden>宜</span>
+          宜游轩 ERP
+        </div>
+        <h1>{passwordless ? "设置登录密码" : "修改登录密码"}</h1>
+        <p>
           {passwordless
-            ? "你本次通过免密方式登录，直接设置一个登录密码即可"
+            ? "本次通过免密方式登录，先设置一个登录密码即可进入"
             : "为保障账号安全，请设置新的登录密码"}
         </p>
+      </header>
 
-        {error ? <div className="h5-alert h5-alert--error" role="alert">{error}</div> : null}
+      <div className="h5-login__body">
+        <section className="h5-login__card">
+          {error ? <div className="h5-alert h5-alert--error" role="alert">{error}</div> : null}
 
-        <div className="h5-form">
-          {passwordless ? null : (
+          <div className="h5-form">
+            {passwordless ? null : (
+              <label className="h5-field">
+                <span>当前密码</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="请输入当前密码"
+                  value={oldPassword}
+                  onChange={(event) => setOldPassword(event.target.value)}
+                />
+              </label>
+            )}
             <label className="h5-field">
-              <span>当前密码</span>
+              <span>新密码</span>
               <input
                 type="password"
-                autoComplete="current-password"
-                value={oldPassword}
-                onChange={(event) => setOldPassword(event.target.value)}
+                autoComplete="new-password"
+                placeholder="至少 8 位"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
               />
             </label>
-          )}
-          <label className="h5-field">
-            <span>新密码（至少 8 位）</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-            />
-          </label>
-          <label className="h5-field">
-            <span>确认新密码</span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={repeat}
-              onChange={(event) => setRepeat(event.target.value)}
-            />
-          </label>
-          <button type="button" className="h5-primary" disabled={busy} onClick={submit}>
-            {busy ? "提交中…" : "保存并进入"}
-          </button>
-          <button type="button" className="h5-link" onClick={onSignOut}>退出登录</button>
-        </div>
-      </section>
+            <label className="h5-field">
+              <span>确认新密码</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                placeholder="再输入一次"
+                value={repeat}
+                onChange={(event) => setRepeat(event.target.value)}
+              />
+            </label>
+            <button type="button" className="h5-primary" disabled={busy} onClick={submit}>
+              {busy ? "提交中…" : "保存并进入"}
+            </button>
+            <button type="button" className="h5-link" onClick={onSignOut}>退出登录</button>
+          </div>
+        </section>
+      </div>
+
+      <footer className="h5-login__foot">宜游轩 ERP · 移动端</footer>
     </div>
   );
 }

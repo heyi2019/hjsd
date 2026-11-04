@@ -202,22 +202,22 @@ export function LoginPage({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
   return (
     <div className="h5-login">
       <header className="h5-login__hero">
-        <div className="h5-login__brand">宜游轩</div>
-        <h1>经营，
-          <br />
-          进入高速模式。
-        </h1>
-        <p>订单、资金、库存与利润，在一个工作台里实时同步。</p>
+        <div className="h5-login__brand">
+          <span className="h5-login__mark" aria-hidden>宜</span>
+          宜游轩 ERP
+        </div>
+        <h1>{bind ? "绑定手机号" : "登录工作台"}</h1>
+        <p>
+          {bind
+            ? "首次微信登录需绑定后台已配置的手机号"
+            : "使用管理员分配给你的账号进入工作台"}
+        </p>
       </header>
 
-      <section className="h5-login__card">
-        <h2>{bind ? "绑定手机号" : "登录工作台"}</h2>
-        <p className="h5-login__sub">
-          {bind ? "首次微信登录需绑定后台已配置的手机号" : "使用你的账号继续经营工作"}
-        </p>
-
-        {error ? <div className="h5-alert h5-alert--error" role="alert">{error}</div> : null}
-        {notice ? <div className="h5-alert">{notice}</div> : null}
+      <div className="h5-login__body">
+        <section className="h5-login__card">
+          {error ? <div className="h5-alert h5-alert--error" role="alert">{error}</div> : null}
+          {notice ? <div className="h5-alert">{notice}</div> : null}
 
         {bind ? (
           <div className="h5-form">
@@ -315,6 +315,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
                     autoComplete="username"
                     autoCapitalize="none"
                     autoCorrect="off"
+                    placeholder="请输入用户名"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                   />
@@ -324,6 +325,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
                   <input
                     type="password"
                     autoComplete="current-password"
+                    placeholder="请输入密码"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />
@@ -386,9 +388,10 @@ export function LoginPage({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
             </p>
           </>
         )}
-      </section>
+        </section>
+      </div>
 
-      <footer className="h5-login__foot">宜游轩 ERP ／ 移动端</footer>
+      <footer className="h5-login__foot">宜游轩 ERP · 移动端</footer>
     </div>
   );
 }

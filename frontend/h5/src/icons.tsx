@@ -63,3 +63,51 @@ export function ChevronIcon({ size = 18 }: IconProps) {
     </svg>
   );
 }
+
+export function SearchIcon({ size = 17 }: IconProps) {
+  return (
+    <svg {...base(size)} strokeWidth={2}>
+      <circle cx="10.8" cy="10.8" r="6.4" />
+      <path d="m15.6 15.6 4 4" />
+    </svg>
+  );
+}
+
+export function CustomersIcon({ size = 25, filled = false }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="9.4" cy="8.4" r="3.5" fill={filled ? "currentColor" : "none"} stroke={filled ? "none" : "currentColor"} />
+      <path d="M2.8 19.6c.5-3.3 3.3-5.5 6.6-5.5s6.1 2.2 6.6 5.5" />
+      <path d="M16.4 5.5a3.1 3.1 0 0 1 0 6M18 14.6c2 .7 3.4 2.5 3.7 5" />
+    </svg>
+  );
+}
+
+export function WalletIcon({ size = 25, filled = false }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <rect
+        x="2.8"
+        y="6.2"
+        width="18.4"
+        height="13"
+        rx="3.4"
+        fill={filled ? "currentColor" : "none"}
+        stroke={filled ? "none" : "currentColor"}
+      />
+      <path
+        d="M2.8 10.4h18.4"
+        stroke={filled ? "var(--h5-card)" : "currentColor"}
+      />
+      <circle cx="17" cy="14.8" r="1.2" fill={filled ? "var(--h5-card)" : "currentColor"} stroke="none" />
+    </svg>
+  );
+}
+
+export function ChevronLeftIcon({ size = 20 }: IconProps) {
+  return (
+    <svg {...base(size)} strokeWidth={2.2}>
+      <path d="M14.5 5.5 8 12l6.5 6.5" />
+    </svg>
+  );
+}

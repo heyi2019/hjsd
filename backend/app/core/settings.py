@@ -115,6 +115,35 @@ class Settings(BaseSettings):
     # attachments：业务附件独立于数据库文件保存，路径可由部署环境覆盖。
     attachment_storage_dir: str = "data/attachments"
 
+    # 手机号验证码登录 / 微信登录。
+    # 两者共用同一套手机号校验：**只有 users.phone 已配置的在职用户**才能走这两条链路，
+    # 前端不提供注册入口（账号仍由管理员在「设置-用户」中创建）。
+    phone_code_login_enabled: bool = True
+
+    # 短信通道：mock | disabled（真实通道接入后在此追加实现，见 auth/sms.py）。
+    # mock 仅在非 production 下把验证码回显给前端；production 用 mock 会直接拒绝发送，
+    # 避免「上线后忘了配短信通道，验证码被回显在响应里」这种静默不安全。
+    sms_provider: str = "mock"
+    sms_code_ttl_seconds: int = 300
+    sms_code_max_attempts: int = 5
+    sms_resend_interval_seconds: int = 60
+    sms_hourly_limit_per_phone: int = 10
+
+    # 微信登录：默认关闭，凭据与备案域名到位后只改环境变量即可启用。
+    #   disabled      关闭（不出现在登录页）
+    #   mock          本地/演示：授权地址回跳本页并伪造 code，走完整绑定流程
+    #   openplatform  微信开放平台「网站应用」真实 OAuth（需 APP_ID / APP_SECRET / 备案回调域名）
+    wechat_login_enabled: bool = False
+    wechat_provider: str = "disabled"
+    wechat_app_id: str = ""
+    wechat_app_secret: str = ""
+    wechat_redirect_uri: str = ""
+    wechat_bind_verify_mode: str = "sms"  # sms | password（短信通道不可用时的应急兜底）
+    wechat_bind_ticket_seconds: int = 600
+    # mock 通道的「演示微信号」：open_id 必须稳定，否则每次登录都是一张新微信，
+    # 「绑定一次、之后免验证码」永远走不到。需要模拟多个微信号时改这个值。
+    wechat_mock_open_id: str = "mock_demo_openid"
+
     @model_validator(mode="after")
     def _validate_runtime_security(self) -> "Settings":
         """生产配置不得沿用开发密钥或通配 CORS。"""
@@ -137,6 +166,60 @@ class Settings(BaseSettings):
         if value < 0:
             raise ValueError("登录限流次数不得为负数（0 表示每个窗口一律拒绝，请确认意图）")
         return value
+
+    @field_validator("wechat_provider")
+    @classmethod
+    def _validate_wechat_provider(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"disabled", "mock", "openplatform"}:
+            raise ValueError("WECHAT_PROVIDER 只能是 disabled / mock / openplatform")
+        return normalized
+
+    @field_validator("wechat_bind_verify_mode")
+    @classmethod
+    def _validate_bind_verify_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"sms", "password"}:
+            raise ValueError("WECHAT_BIND_VERIFY_MODE 只能是 sms / password")
+        return normalized
+
+    @field_validator("sms_provider")
+    @classmethod
+    def _validate_sms_provider(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"mock", "disabled"}:
+            raise ValueError("SMS_PROVIDER 目前只支持 mock / disabled（真实通道待接入）")
+        return normalized
+
+    @property
+    def wechat_effective_enabled(self) -> bool:
+        """登录页是否展示微信入口：开关打开且通道不是 disabled。"""
+        return self.wechat_login_enabled and self.wechat_provider != "disabled"
+
+    @property
+    def wechat_ready(self) -> tuple[bool, str | None]:
+        """通道是否真的可用。返回 (就绪, 不可用原因)，供登录页如实提示。
+
+        缺凭据时**不让登录页把按钮点亮**——否则用户点了微信登录却拿到一个
+        必然失败的授权地址，比直接不显示更糟。
+        """
+        if not self.wechat_effective_enabled:
+            return False, "微信登录未启用"
+        if self.wechat_provider == "openplatform":
+            if not self.wechat_app_id or not self.wechat_app_secret:
+                return False, "微信 AppID / AppSecret 未配置"
+            if not self.wechat_redirect_uri:
+                return False, "微信回调地址 WECHAT_REDIRECT_URI 未配置"
+        return True, None
+
+    @property
+    def sms_code_deliverable(self) -> bool:
+        """验证码能否真的送达。mock 只在非 production 下可用于回显。"""
+        if self.sms_provider == "disabled":
+            return False
+        if self.sms_provider == "mock" and self.app_env.lower() == "production":
+            return False
+        return True
 
     @property
     def env_file_path(self) -> Path | None:

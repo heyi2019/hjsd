@@ -98,7 +98,9 @@ interface SessionValue {
   /** 免密登录（手机号验证码 / 微信）拿到 token 后统一走这里落会话。 */
   loginWithToken: (token: string, user: SessionUser) => void;
   mustChangePassword: boolean;
-  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+  /** 本次会话由免密登录建立：改密页不要求「当前密码」（用户从未输入过）。 */
+  passwordlessSession: boolean;
+  changePassword: (oldPassword: string | null, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -110,11 +112,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // 回落 false 落登录页，刷新页面即恢复直通——开发态不会被关在登录页外。
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  // 仅用于决定改密页要不要「当前密码」这一栏；真正的准入判定在后端（按 token 的 amr）。
+  const [passwordlessSession, setPasswordlessSession] = useState(false);
   useEffect(() => {
     if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return;
     void currentUserApi().then((current) => {
       setUser(current.role.toLowerCase());
       setMustChangePassword(Boolean(current.must_change_password));
+      setPasswordlessSession(Boolean(current.auth_method && current.auth_method !== "password"));
     }).catch(() => { localStorage.removeItem(ACCESS_TOKEN_KEY); setAuthenticated(false); });
   }, []);
   const switchUser = useCallback((next: string) => {
@@ -132,9 +137,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const loggedIn = await loginApi(username, password);
     setUser(loggedIn.role.toLowerCase());
     setMustChangePassword(Boolean(loggedIn.must_change_password));
+    setPasswordlessSession(false);
     setAuthenticated(true);
   }, []);
-  const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
+  const changePassword = useCallback(async (oldPassword: string | null, newPassword: string) => {
     await changePasswordApi(oldPassword, newPassword);
     setMustChangePassword(false);
   }, []);
@@ -144,6 +150,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     persistAccessToken(token);
     setUser(next.role.toLowerCase());
     setMustChangePassword(Boolean(next.must_change_password));
+    setPasswordlessSession(true);
     setAuthenticated(true);
   }, []);
   const logout = useCallback(async () => {
@@ -157,12 +164,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setAuthenticated(false);
       setMustChangePassword(false);
+      setPasswordlessSession(false);
     }
   }, []);
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[user] ?? []);
-    return { user, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, changePassword, login, loginWithToken, logout };
-  }, [user, switchUser, authenticated, mustChangePassword, changePassword, login, loginWithToken, logout]);
+    return { user, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout };
+  }, [user, switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

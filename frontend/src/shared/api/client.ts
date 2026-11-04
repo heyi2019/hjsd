@@ -156,7 +156,7 @@ export function clearApiCache(): void {
   pending.clear();
 }
 
-export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean };
+export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean; auth_method?: string };
 
 export async function login(username: string, password: string) {
   const response = await api.post<{ access_token: string; user: SessionUser }>("/auth/login", { username, password });
@@ -173,9 +173,14 @@ export async function checkBackendHealth(): Promise<void> {
   await api.get("/health", { timeout: 3_000 });
 }
 
-export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+export async function changePassword(oldPassword: string | null, newPassword: string): Promise<void> {
+  // 免密登录（手机号验证码 / 微信）的会话从未输入过密码，首次设置密码时不带
+  // old_password；是否允许省略由后端按 token 的 amr 与 must_change_password 判定，
+  // 前端不做准入决定。
+  const body: { old_password?: string; new_password: string } = { new_password: newPassword };
+  if (oldPassword) body.old_password = oldPassword;
   // 会话安全操作不能沿用普通请求的 15 秒等待；失败或旧密码错误时应尽快回到可重试状态。
-  await api.post("/auth/change-password", { old_password: oldPassword, new_password: newPassword }, { timeout: 5_000 });
+  await api.post("/auth/change-password", body, { timeout: 5_000 });
 }
 
 export async function logout(): Promise<void> {

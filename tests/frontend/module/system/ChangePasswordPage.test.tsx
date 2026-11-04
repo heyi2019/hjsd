@@ -6,11 +6,13 @@ import { ChangePasswordPage } from "@/auth/ChangePasswordPage";
 
 const changePassword = vi.fn();
 const logout = vi.fn();
+// 免密登录的会话不收集「当前密码」，由后端按 token 的 amr 判定是否允许省略。
+let passwordlessSession = false;
 vi.mock("@/shared/state/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/state/session")>();
   return {
     ...actual,
-    useSession: () => ({ changePassword, logout }),
+    useSession: () => ({ changePassword, logout, passwordlessSession }),
   };
 });
 
@@ -18,6 +20,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
+  passwordlessSession = false;
   changePassword.mockResolvedValue(undefined);
   logout.mockResolvedValue(undefined);
 });
@@ -56,5 +59,18 @@ describe("ChangePasswordPage：首次登录改密", () => {
     renderLight(<ChangePasswordPage />);
     await ui.click(screen.getByRole("button", { name: /退出登录/ }));
     await waitFor(() => expect(logout).toHaveBeenCalled());
+  });
+
+  it("免密登录的会话不要求当前密码", async () => {
+    passwordlessSession = true;
+    renderLight(<ChangePasswordPage />);
+    // 用户从未输入过密码，这一栏不该出现——否则首次登录永远过不去。
+    expect(screen.queryByLabelText("当前密码")).toBeNull();
+    expect(screen.getByText(/免密方式登录/)).toBeInTheDocument();
+
+    await ui.type(screen.getByLabelText("新密码"), "newpassword");
+    await ui.type(screen.getByLabelText("确认新密码"), "newpassword");
+    await ui.click(screen.getByRole("button", { name: /保存新密码/ }));
+    await waitFor(() => expect(changePassword).toHaveBeenCalledWith(null, "newpassword"));
   });
 });

@@ -1,7 +1,7 @@
 /** applyColumnConfig：按列表列配置过滤 + 排序的纯函数。
  *  口径：无配置原样返回；未知列视为可见并排末尾；隐藏列剔除。 */
 import { describe, expect, it } from "vitest";
-import { applyColumnConfig, columnKey, formatCustomValue, orderMobileFields, readCustomValue } from "@/shared/lib/listColumns";
+import { MOBILE_HIDE_CLASS, applyColumnConfig, columnKey, formatCustomValue, markMobileHiddenColumns, orderMobileFields, readCustomValue } from "@/shared/lib/listColumns";
 import type { ListScopeConfig } from "@/shared/api/catalog";
 
 const config: ListScopeConfig = {
@@ -20,6 +20,44 @@ const columns = [
   { dataIndex: "trade_date" },
   { dataIndex: "unknown_new" },
 ];
+
+describe("markMobileHiddenColumns", () => {
+  const cols = [
+    { key: "customer_no" },
+    { key: "phone", className: "keep", onCell: () => ({ "data-x": "1" }) },
+    { key: "status" },
+    { dataIndex: "created_at" },
+  ];
+  const hidden = ["phone", "created_at"];
+
+  it("按 key 双写 th/td 标记，保留已有 className 与 onCell", () => {
+    const result = markMobileHiddenColumns(cols, hidden);
+    expect(result[0]).toEqual({ key: "customer_no" });
+    expect(result[2]).toEqual({ key: "status" });
+    expect(result[1].className).toBe(`keep ${MOBILE_HIDE_CLASS}`);
+    const cell = result[1].onCell!({}, 0);
+    expect(cell["data-x"]).toBe("1");
+    expect(cell.className).toContain(MOBILE_HIDE_CLASS);
+    expect(result[3].className).toContain(MOBILE_HIDE_CLASS);
+  });
+
+  it("列配置隐藏首列 + 调序后，被隐藏的仍是同一批 key（nth-child 会错位）", () => {
+    const cfg: ListScopeConfig = {
+      code: "CUSTOMER", label: "客户档案",
+      columns: [
+        { key: "status", label: "状态", locked: false, is_visible: true, sort_order: 0 },
+        { key: "phone", label: "手机", locked: false, is_visible: true, sort_order: 10 },
+        { key: "created_at", label: "建立时间", locked: false, is_visible: true, sort_order: 20 },
+        { key: "customer_no", label: "客户编号", locked: false, is_visible: false, sort_order: 30 },
+      ],
+    };
+    const arranged = applyColumnConfig(cols, cfg);
+    const marked = markMobileHiddenColumns(arranged, hidden);
+    expect(marked.map(columnKey)).toEqual(["status", "phone", "created_at"]);
+    expect(marked.filter((c) => String((c as { className?: string }).className).includes(MOBILE_HIDE_CLASS)).map(columnKey))
+      .toEqual(["phone", "created_at"]);
+  });
+});
 
 describe("applyColumnConfig", () => {
   it("移动端字段沿用列表配置顺序，并隐藏已配置为不可见的字段", () => {

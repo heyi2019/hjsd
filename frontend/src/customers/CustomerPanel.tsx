@@ -9,7 +9,7 @@ import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { formatDateTimeMinute, money, today } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
-import { useListViewColumns } from "../shared/lib/listColumns";
+import { markMobileHiddenColumns, useListViewColumns } from "../shared/lib/listColumns";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag, CompactActions } from "../shared/ui";
@@ -17,6 +17,8 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { CUSTOMER_ROLE_LABEL, customerDateKey, collectExtras, ExtraFieldControl } from "./CustomersPage.fragments";
 
 const SearchButton = Button;
+/** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
+const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
 const CUSTOMER_STATUS_OPTIONS = [
   { value: "ACTIVE", label: "启用中" },
   { value: "DISABLED", label: "已拉黑" },
@@ -362,7 +364,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         />
       </Space>
       <DataTable<Customer>
-        columns={arrangeColumns(columns)}
+        // 移动端隐藏按列 key 绑定，不随「设置 → 列表字段」的过滤/排序而错位。
+        columns={markMobileHiddenColumns(arrangeColumns(columns), CUSTOMER_MOBILE_HIDDEN_KEYS)}
         rows={rows ?? []}
         loading={loading}
         page={page}

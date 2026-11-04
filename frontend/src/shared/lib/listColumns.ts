@@ -55,6 +55,38 @@ export function columnKey(column: { key?: unknown; dataIndex?: unknown }): strin
   return "";
 }
 
+/** ≤640px 隐藏列的标记 class。th 靠 column.className、td 靠 onCell，antd 必须双写。 */
+export const MOBILE_HIDE_CLASS = "ui-col-mobile-hide";
+
+/** 按列 key 给列打移动端隐藏标记。
+ *  必须在 arrange() / applyColumnConfig() 之后调用：列表列配置会过滤 + 排序，
+ *  用 nth-child 物理序号隐藏会随配置错位（曾把「状态」列藏掉、把联系方式露出来）。
+ *  已有 className / onCell 会被保留并合并，不覆盖列定义自身的行为。 */
+export function markMobileHiddenColumns<T extends { key?: unknown; dataIndex?: unknown }>(
+  columns: T[],
+  hiddenKeys: readonly string[],
+): T[] {
+  const hidden = new Set(hiddenKeys);
+  return columns.map((column) => {
+    if (!hidden.has(columnKey(column))) return column;
+    const source = column as T & {
+      className?: string;
+      onCell?: (record: unknown, index?: number) => Record<string, unknown>;
+    };
+    const baseClassName = source.className ?? "";
+    const baseOnCell = source.onCell;
+    return {
+      ...column,
+      className: [baseClassName, MOBILE_HIDE_CLASS].filter(Boolean).join(" "),
+      onCell: (record: unknown, index?: number) => {
+        const cell: Record<string, unknown> = (baseOnCell ? baseOnCell(record, index) : {}) ?? {};
+        const cellClass = typeof cell.className === "string" ? cell.className : "";
+        return { ...cell, className: [cellClass, MOBILE_HIDE_CLASS].filter(Boolean).join(" ") };
+      },
+    } as unknown as T;
+  });
+}
+
 /** 移动端卡片字段按列表配置排列；配置未提供时保持页面定义顺序。 */
 export function orderMobileFields<T extends { key: string }>(fields: T[], configuredKeys?: string[]): T[] {
   if (!configuredKeys?.length) return fields;

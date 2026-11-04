@@ -1146,6 +1146,44 @@ class TestGetAndListOrders:
         assert {created_by_me.id, owned_by_me.id, sold_by_me.id}.issubset(personal_ids)
         assert foreign.id not in personal_ids
 
+    def test_list_orders_mine_covers_every_event_operator_not_only_sell(self, seeded_db):
+        """每一笔事件都有负责人：非 SELL 事件的执行人、被指派操作人也算「我参与的」。
+
+        旧口径只认 SELL 执行人，买号 / 运营消耗的人在自己工作台看不到他做过的单。
+        """
+        users = list(
+            seeded_db.scalars(
+                select(User).where(User.is_active.is_(True)).order_by(User.id)
+            ).all()
+        )
+        me, other = users[0], users[1]
+
+        buy_by_me = _order(seeded_db, owner_id=other.id)
+        order_service.post_event(
+            seeded_db, buy_by_me.id, event_type="BUY", amount="80.00",
+            occurred_on=D, actor=me.username,
+        )
+        assigned_as_operator = _order(seeded_db, owner_id=other.id)
+        order_service.post_event(
+            seeded_db, assigned_as_operator.id, event_type="BUY", amount="90.00",
+            occurred_on=D, actor="pytest", operator_user_ids=[me.id],
+        )
+        foreign = _order(seeded_db, owner_id=other.id)
+        order_service.post_event(
+            seeded_db, foreign.id, event_type="BUY", amount="70.00",
+            occurred_on=D, actor="pytest",
+        )
+
+        operator = CurrentUser.build(
+            id=me.id, username=me.username, roles=["OPERATOR"], owner_scope="ALL"
+        )
+        personal_ids = {
+            order.id for order in order_service.list_orders(seeded_db, user=operator, mine=True)
+        }
+        assert buy_by_me.id in personal_ids
+        assert assigned_as_operator.id in personal_ids
+        assert foreign.id not in personal_ids
+
     def test_list_orders_supports_workbench_date_owner_keyword_filters(
         self, seeded_client, seeded_db, headers
     ):

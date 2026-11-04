@@ -6,13 +6,14 @@ from __future__ import annotations
 from datetime import date
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
-from app.domain.enums import EventType
 from sqlalchemy import (
+    cast,
     exists,
     func,
     or_,
     select,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 from app.domain.trade import (
     Account,
@@ -102,6 +103,11 @@ def _order_list_stmt(
             )
         )
     if mine and user is not None:
+        # 「我的订单」= 我负责的 + 我参与的。
+        # 每一笔订单事件的执行人都算参与，不限 SELL：买号、售出、运营消耗、
+        # 收付款、交付、取消、退款各自都有负责人，只认 SELL 会让买号/运营的人
+        # 在自己工作台看不到他做过单。`operator_user_ids` 是事件上的多操作人，
+        # 列类型是 json（不是 jsonb），PG 下必须先 cast 再用数组包含判断。
         stmt = stmt.where(
             or_(
                 Order.owner_id == user.id,
@@ -109,8 +115,10 @@ def _order_list_stmt(
                 exists(
                     select(OrderEvent.id).where(
                         OrderEvent.order_id == Order.id,
-                        OrderEvent.event_type == EventType.SELL.value,
-                        OrderEvent.created_by == user.username,
+                        or_(
+                            OrderEvent.created_by == user.username,
+                            cast(OrderEvent.operator_user_ids, JSONB).contains([user.id]),
+                        ),
                     )
                 ),
             )

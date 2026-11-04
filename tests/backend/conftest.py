@@ -17,6 +17,8 @@ import sys
 import time
 from pathlib import Path
 
+import psycopg
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -135,6 +137,81 @@ DB_ROOT_FIXTURE = "v1_engine"
 DB_STATS_ATTR = "_hei_db_channel_stats"
 
 
+# ---------------------------------------------------------------------------
+# pytest-xdist 并行支持（默认串行时完全不触发，行为零变化）
+#
+# 原 conftest 已对 xdist 做了「跳过会话独占锁」的兼容（PYTEST_XDIST_WORKER 时
+# _acquire_session_lock 直接返回 None），但注释写明「并行需要每个 worker 各自一个库，
+# 不在本夹具保证范围内」——共享同一个测试库时，多个 worker 的 seed_template schema
+# 会并发 DROP/CREATE、public 表会被并发 TRUNCATE，互相拆台。
+#
+# 这里补全这一环：xdist 模式下，每个 worker 跑前自动建「基础库名_${worker}」独立库
+# （如 heijin_erp_test_gw0），并把 TEST_DATABASE_URL 指向它；跑完在 pytest_unconfigure
+# 里 DROP 回收。默认串行（无 PYTEST_XDIST_WORKER）时全部跳过，v1_engine / seed_template
+# / 结果记录器逻辑一字未改。
+# ---------------------------------------------------------------------------
+# 并行模式下每个 worker 的独立库 URL。用模块级全局而非 os.environ 承载：
+# conftest 的 _test_database_url 优先读它，但测试里 `Settings(_env_file=None)` 只读
+# .env + os.environ，读不到这个全局——否则 test_settings 的「缺省为空」契约在并行下会误红。
+_XDIV_WORKER_URL: str | None = None
+
+
+def _provision_xdist_worker_db(base_url: str) -> None:
+    """xdist worker 启动时建独立库并把 URL 存进模块全局（不写 os.environ）。
+
+    只在 PYTEST_XDIST_WORKER 存在时生效；库已存在则复用（崩溃残留不重建）。
+    psycopg 不认 SQLAlchemy 的 postgresql+psycopg:// 驱动后缀，建库连接先剥掉。
+    """
+    global _XDIV_WORKER_URL
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return
+    u = make_url(base_url)
+    worker_db = f"{u.database}_{worker}"
+    worker_url = base_url.replace(f"/{u.database}", f"/{worker_db}")
+    admin_url = base_url.replace("postgresql+psycopg", "postgresql").replace(
+        f"/{u.database}", "/postgres"
+    )
+    with psycopg.connect(admin_url, autocommit=True, connect_timeout=10) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (worker_db,))
+        if cur.fetchone() is None:
+            cur.execute(f'CREATE DATABASE "{worker_db}"')
+    _XDIV_WORKER_URL = worker_url
+
+
+def _drop_xdist_worker_db() -> None:
+    """xdist worker 退出时回收其独立库（仅删自己那一个）。"""
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return
+    base = _XDIV_WORKER_URL or os.environ.get("TEST_DATABASE_URL") or ""
+    if not base or "postgresql" not in base:
+        return
+    try:
+        u = make_url(base)
+        admin_url = base.replace("postgresql+psycopg", "postgresql").replace(
+            f"/{u.database}", "/postgres"
+        )
+        with psycopg.connect(admin_url, autocommit=True, connect_timeout=10) as conn:
+            cur = conn.cursor()
+            cur.execute(f'DROP DATABASE IF EXISTS "{u.database}"')
+    except Exception:
+        # 清理失败不应让测试被判红；下次跑会复用该库（TRUNCATE 仍保证干净）
+        pass
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    settings = get_settings()
+    base_url = os.environ.get("TEST_DATABASE_URL") or settings.test_database_url
+    if base_url and os.environ.get("PYTEST_XDIST_WORKER"):
+        _provision_xdist_worker_db(base_url)
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    _drop_xdist_worker_db()
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """给存量测试提供可查询的初始类型标签，并派生数据库依赖标记。"""
     db_marked = 0
@@ -210,7 +287,7 @@ def _test_database_url() -> str:
     误指生产库即数据全毁——宁可在 collect 前直接退出，也不做"尽力而为"。
     """
     settings = get_settings()
-    url = os.environ.get("TEST_DATABASE_URL") or settings.test_database_url
+    url = _XDIV_WORKER_URL or os.environ.get("TEST_DATABASE_URL") or settings.test_database_url
     if not url:
         pytest.exit(
             "未配置测试库：请在 .env 设置 TEST_DATABASE_URL（库名须含 test），"
@@ -590,6 +667,11 @@ def _mask_db(url: str) -> str:
 
 def pytest_sessionstart(session):  # noqa: D401
     try:
+        # xdist worker 各自跑在独立库，并发写同一份 results.jsonl 会交错损坏；
+        # 并行模式下的执行结果不落结果库（本就是 best-effort 旁路，非测试结论依据）。
+        if os.environ.get("PYTEST_XDIST_WORKER"):
+            _RUN_STATE["run_id"] = None
+            return
         _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         ts = _dt.now().strftime("%Y%m%d-%H%M%S")
         _RUN_STATE["run_id"] = f"{ts}-{_git_commit()}-{os.getpid()}"

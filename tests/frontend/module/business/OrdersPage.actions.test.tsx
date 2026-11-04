@@ -464,9 +464,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
   });
 
-  it("分润：按操作四项无候选人时，运营默认当前登录人（不是角色）", async () => {
-    // 2026-11-05 裁决：姓名默认取当前登录人。本单无任何动作负责人，
-    // 买号/售出不可填，运营位必须落到「李四（lisi）」而不是留空或只默认角色。
+  it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
+    // 2026-11-05 裁决：人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
+    // 本单无任何动作负责人，四行人员全部锁定且留空，等待台账补登记。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
@@ -480,9 +480,42 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getByText("李四（lisi）")).toBeInTheDocument();
+    // 无登记执行人 → 不再默认当前登录人
+    expect(within(modal).queryByText("李四（lisi）")).toBeNull();
     // 公司位固定不绑人，不能被当前登录人覆盖。
     expect(within(modal).getByText("公司（不绑定人员）")).toBeInTheDocument();
+    // 买号/售出/运营/公司四项的人员控件全部禁用：人员编辑只在台账与库存中心。
+    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(4);
+  });
+
+  it("分润：按操作四项的人员锁定为台账登记的执行人", async () => {
+    // 买号=业务负责人、售出=交付负责人、运营=运营负责人；三行都不可就地改人。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [],
+      total: 0,
+      order_profit: "5000.00",
+    });
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...order1,
+      form_extra: {
+        business_responsible_ids: [11],
+        delivery_responsible_ids: [22],
+        operation_responsible_ids: [33],
+      },
+      events: [
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "1500.00" },
+      ],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+
+    expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
+    expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
+    expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
+    // 四行人员控件全部禁用，买号/售出/运营不能改选其他人
+    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(4);
   });
 
   it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {
@@ -540,6 +573,56 @@ describe("OrdersPage：操作与筛选分支", () => {
     fireEvent.change(amounts[0], { target: { value: "1000" } });
     expect(amounts[0]).toHaveValue("1000");
     expect(rates[0]).toHaveValue("30");
+  });
+
+  it("分润：一个动作多人时按人数均分，买号 2 人各得一半", async () => {
+    // 2026-11-05 口径：买号登记 2 人，买号这一份利润由 2 人均分；3 人则三人均分。
+    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+      items: [],
+      total: 0,
+      order_profit: "5000.00",
+    });
+    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+      ...order1,
+      form_extra: {
+        business_responsible_ids: [11, 22],
+        delivery_responsible_ids: [22],
+        operation_responsible_ids: [33],
+      },
+      events: [
+        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
+        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "1500.00" },
+      ],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+
+    // 买号两人 → 展开两行：首行写字号合计，第二行只读显示人均值。
+    expect(within(modal).getByText("买号（2 人均分）")).toBeInTheDocument();
+    const totalRates = within(modal).getAllByLabelText("比例合计");
+    expect(totalRates).toHaveLength(1);
+    fireEvent.change(totalRates[0], { target: { value: "30" } });
+    // 另一人的比例是只读的人均值：30 ÷ 2 = 15%
+    expect(within(modal).getByText("15%")).toBeInTheDocument();
+    expect(within(modal).queryByLabelText("比例（人均）")).toBeNull();
+
+    // 售出 40、运营 20、公司 10，四项合计 100
+    const plainRates = within(modal).getAllByLabelText("比例");
+    expect(plainRates).toHaveLength(3);
+    fireEvent.change(plainRates[0], { target: { value: "40" } });
+    fireEvent.change(plainRates[1], { target: { value: "20" } });
+    fireEvent.change(plainRates[2], { target: { value: "10" } });
+
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    const buyRows = payload.filter((item) => item.allocation_type === "BUY");
+    // 买号 30% 拆成两人各 15%，不是一人独得 30%
+    expect(buyRows).toHaveLength(2);
+    expect(buyRows.map((item) => item.allocation_rate)).toEqual(["15", "15"]);
+    expect(buyRows.map((item) => item.user_id)).toEqual([11, 22]);
+    expect(payload).toHaveLength(5);
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {

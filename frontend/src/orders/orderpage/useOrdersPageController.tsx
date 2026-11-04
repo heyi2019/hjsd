@@ -187,7 +187,7 @@ export function useOrdersPageController(params: {
       // 角色必须原样带回表单：不回填就会在保存时被默认值 OWNER 覆盖掉。
       const rows: AllocationFormRow[] =
         mode === "ACTION"
-          ? buildActionAllocationRows(result.items, candidates, currentId)
+          ? buildActionAllocationRows(result.items, candidates)
           : result.items.map((item) => ({
               employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
               role: item.role || "OWNER",

@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundEventPayload, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundEventPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -201,7 +201,10 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
     setAllocationSubmitting,
   } = controller;
   const isAction = allocationMode === "ACTION";
-  const actionKinds: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
+  // 表单值实时镜像：一个动作多人时，第 2 人及以后的行要跟着首行的「合计」实时算出人均值。
+  const watchedRows = Form.useWatch<AllocationFormRow[]>("allocations", allocationForm) ?? [];
+  const groupOf = (kind?: AllocationType) =>
+    kind ? watchedRows.filter((row) => row.allocation_type === kind) : [];
   /** 本单是否有已过账的买号/售出动作；没有的动作位不给填人。 */
   const hasPosted = (kind: AllocationType) =>
     (kind === "BUY" || kind === "SELL") &&
@@ -285,32 +288,51 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           />
           <Typography.Paragraph type="secondary">
             {isAction
-              ? "按操作分配：买号、售出、运营、公司四项。比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。买号/售出只能给该动作的执行人。"
+              ? "按操作分配：买号、售出、运营、公司四项。人员已锁定为账号台账 / 库存中心登记的执行人（买号=业务负责人、售出=交付负责人、运营=运营负责人）。一个动作有多人时，该动作的份额按人数均分（2 人各半、3 人各三分之一），只需在首行填该动作合计。台账之后增删执行人，这里的人数与均分会自动跟着变，合计不变；需要换人请到账号台账或库存中心修改。"
               : "每行一位员工：比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
               <>
-                {fields.map((field, index) => {
-                  const kind = isAction ? actionKinds[index] : undefined;
+                {fields.map((field) => {
+                  const row = watchedRows[field.name] ?? {};
+                  const kind = isAction ? ((row.allocation_type || undefined) as AllocationType | undefined) : undefined;
+                  const group = groupOf(kind);
+                  const people = group.length;
+                  const shareMode = isAction ? row.share_mode ?? "PER_PERSON" : "PER_PERSON";
+                  // 同一动作的第 2 人及以后：不给输入，直接显示「合计 ÷ 人数」。
+                  const shared = isAction && shareMode === "SHARED";
+                  const totalRow = group.find((item) => (item.share_mode ?? "PER_PERSON") === "TOTAL");
+                  const shareIndex = shared ? group.indexOf(row) : -1;
+                  // 合计那一栏没填就不显示 0，避免「未填」看起来像「分了 0 元」。
+                  const totalRateText = String(totalRow?.allocation_rate ?? "").trim();
+                  const totalAmountText = String(totalRow?.allocation_amount ?? "").trim();
+                  const splitRate = totalRow && totalRateText !== "" ? splitEven(Number(totalRateText) || 0, people) : [];
+                  const splitAmount = totalRow && totalAmountText !== "" ? splitEven(Number(totalAmountText) || 0, people) : [];
                   // 公司位不绑人；本单没有的动作位（如代挂无买号）也不给填。
                   const company = kind === "COMPANY";
                   const actionMissing = (kind === "BUY" || kind === "SELL") && !hasPosted(kind);
                   // 按操作四项的人员一律锁定为台账登记的执行人：分润只分钱、不编人。
                   // 人员编辑入口只在账号台账与库存中心，避免两处口径打架。
                   const employeeDisabled = isAction || company || actionMissing;
+                  const kindLabel = kind ? ALLOCATION_TYPE_LABEL[kind] : "姓名";
+                  const employeeLabel = isAction && shareMode === "TOTAL" && people > 1 ? `${kindLabel}（${people} 人均分）` : kindLabel;
+                  const split = isAction && shareMode === "TOTAL" && people > 1;
                   return (
                     <AdaptiveFormGrid key={field.key} className={`orders-allocation-row${isAction ? " is-action" : ""}`}>
                       <Form.Item name={[field.name, "allocation_type"]} hidden>
                         <Input />
                       </Form.Item>
+                      <Form.Item name={[field.name, "share_mode"]} hidden>
+                        <Input />
+                      </Form.Item>
                       <Form.Item
                         name={[field.name, "employee"]}
-                        label={kind ? ALLOCATION_TYPE_LABEL[kind] : "姓名"}
+                        label={employeeLabel}
                         rules={employeeDisabled ? [] : [{ required: true, message: "请选择姓名" }]}
                       >
                         <Select
-                          placeholder={actionMissing ? "本单无此动作" : "选择员工"}
+                          placeholder={actionMissing ? "本单无此动作" : isAction && !company ? "由台账登记的执行人决定" : "选择员工"}
                           options={company ? [{ value: "COMPANY", label: "公司（不绑定人员）" }] : optionsFor(kind)}
                           disabled={employeeDisabled}
                           className="ui-control-width-200"
@@ -325,32 +347,45 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                           />
                         </Form.Item>
                       )}
-                      <Form.Item
-                        name={[field.name, "allocation_rate"]}
-                        label="比例"
-                        rules={
-                          isAction
-                            ? [...percentRules("比例"), { required: true, message: "请填写比例" }]
-                            : percentRules("比例")
-                        }
-                      >
-                        <Input
-                          suffix="%"
-                          inputMode="decimal"
-                          className="ui-control-width-120"
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, "allocation_amount"]}
-                        label="金额"
-                        rules={moneyRules("金额", { allowNegative: true })}
-                      >
-                        <Input
-                          prefix="¥"
-                          inputMode="decimal"
-                          className="ui-control-width-140"
-                        />
-                      </Form.Item>
+                      {shared ? (
+                        <>
+                          <Form.Item label="比例（人均）">
+                            <Typography.Text className="orders-allocation-shared">{splitRate.length ? `${splitRate[shareIndex] ?? 0}%` : "—"}</Typography.Text>
+                          </Form.Item>
+                          <Form.Item label="金额（人均）">
+                            <Typography.Text className="orders-allocation-shared">{splitAmount.length ? money(String(splitAmount[shareIndex] ?? 0)) : "—"}</Typography.Text>
+                          </Form.Item>
+                        </>
+                      ) : (
+                        <>
+                          <Form.Item
+                            name={[field.name, "allocation_rate"]}
+                            label={split ? "比例合计" : "比例"}
+                            rules={
+                              isAction
+                                ? [...percentRules("比例"), { required: true, message: "请填写比例" }]
+                                : percentRules("比例")
+                            }
+                          >
+                            <Input
+                              suffix="%"
+                              inputMode="decimal"
+                              className="ui-control-width-120"
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "allocation_amount"]}
+                            label={split ? "金额合计" : "金额"}
+                            rules={moneyRules("金额", { allowNegative: true })}
+                          >
+                            <Input
+                              prefix="¥"
+                              inputMode="decimal"
+                              className="ui-control-width-140"
+                            />
+                          </Form.Item>
+                        </>
+                      )}
                       {!isAction ? (
                         <>
                           <PermissionButton

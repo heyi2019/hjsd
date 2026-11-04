@@ -381,6 +381,60 @@ class TestProfitAllocation:
         with pytest.raises(Validation):
             policy_service.set_allocations(seeded_db, order.id, items=items)
 
+    def test_allocation_splits_one_action_across_multiple_executors(self, seeded_db):
+        """一个动作多人：买号 2 人各占一半份额（30% → 15% / 15%），允许 5 行落库。"""
+        order = self._order(seeded_db)
+        # 买号动作登记了 2 位业务负责人 → 分润按 2 行均分。
+        order.form_extra = {**(order.form_extra or {}), "business_responsible_ids": [1, 7]}
+        seeded_db.flush()
+        items = [
+            {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_rate": "15"},
+            {"allocation_type": "BUY", "user_id": 7, "role": "BUYER", "allocation_rate": "15"},
+            {"allocation_type": "SELL", "user_id": None, "role": "SALES", "allocation_rate": "40"},
+            {"allocation_type": "OPERATION", "user_id": 2, "role": "SERVICE", "allocation_rate": "20"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
+        ]
+        listed = policy_service.set_allocations(seeded_db, order.id, items=items)
+
+        buy_rows = [item for item in listed if item["allocation_type"] == "BUY"]
+        assert len(buy_rows) == 2
+        assert {item["user_id"] for item in buy_rows} == {1, 7}
+        assert [to_money(item["allocation_rate"]) for item in buy_rows] == [to_money("15"), to_money("15")]
+        # 四项合计仍是 100%，没有被 5 行撑大
+        assert to_money(listed[0]["total_rate"]) == to_money("100")
+
+    def test_allocation_rejects_same_person_twice_in_one_action(self, seeded_db):
+        """同一动作下同一人不能占两行，否则等于自己和自己均分。"""
+        from app.core.errors import Validation
+        order = self._order(seeded_db)
+        order.form_extra = {**(order.form_extra or {}), "business_responsible_ids": [1, 7]}
+        seeded_db.flush()
+        items = [
+            {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_rate": "15"},
+            {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_rate": "15"},
+            {"allocation_type": "SELL", "user_id": None, "role": "SALES", "allocation_rate": "40"},
+            {"allocation_type": "OPERATION", "user_id": 2, "role": "SERVICE", "allocation_rate": "20"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
+        ]
+        with pytest.raises(Validation):
+            policy_service.set_allocations(seeded_db, order.id, items=items)
+
+    def test_allocation_rejects_multiple_company_rows(self, seeded_db):
+        """公司行仍然只能有一行。"""
+        from app.core.errors import Validation
+        order = self._order(seeded_db)
+        order.form_extra = {**(order.form_extra or {}), "business_responsible_ids": [1]}
+        seeded_db.flush()
+        items = [
+            {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_rate": "20"},
+            {"allocation_type": "SELL", "user_id": None, "role": "SALES", "allocation_rate": "40"},
+            {"allocation_type": "OPERATION", "user_id": 2, "role": "SERVICE", "allocation_rate": "20"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
+        ]
+        with pytest.raises(Validation):
+            policy_service.set_allocations(seeded_db, order.id, items=items)
+
     def test_allocation_cannot_choose_seller_before_sale(self, seeded_db):
         from app.core.errors import Validation
         order = self._order(seeded_db)

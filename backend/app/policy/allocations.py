@@ -243,12 +243,17 @@ def _set_action_allocations(
     total = Decimal("0")
     user_ids: set[int] = set()
     allocation_types: set[str] = set()
-    if len(normalized_items) != 4 or any(not item.get("allocation_type") for item in normalized_items):
-        raise Validation("利润分配必须且只能包含买号、售出、运营和公司归属四项")
+    # 四类必须齐全，但每个动作可以有多行（一个动作多人时按人数分别录一行，份额均分）。
+    if any(not item.get("allocation_type") for item in normalized_items):
+        raise Validation("利润分配项必须标注买号、售出、运营或公司归属")
+    present_types = {str(item["allocation_type"]).upper() for item in normalized_items}
+    if present_types != {"BUY", "SELL", "OPERATION", "COMPANY"}:
+        raise Validation("利润分配必须包含买号、售出、运营和公司归属四项")
     has_typed_items = True
     # 动作执行人候选：建单/卖出表单中的业务负责人是业务事实来源；
     # 没有表单负责人时，再回退到事件 operator_user_ids / created_by。
     action_actor_ids: dict[str, list[int]] = {}
+    action_person_keys: set[tuple[str, int | None]] = set()
     if has_typed_items:
         for action_type in ("BUY", "SELL"):
             configured_key = {
@@ -330,9 +335,17 @@ def _set_action_allocations(
             allocation_type = str(allocation_type).upper()
             if allocation_type not in {"BUY", "SELL", "OPERATION", "COMPANY"}:
                 raise Validation("分配项必须为 BUY、SELL、OPERATION 或 COMPANY；COMPANY 表示公司归属", details={"field": "allocation_type"})
-            if allocation_type in allocation_types:
-                raise Validation("利润分配项不可重复", details={"allocation_type": allocation_type})
+            # 公司归属只能有一行；买号/售出/运营允许多人各占一行，但同一人不可重复。
+            if allocation_type == "COMPANY" and allocation_type in allocation_types:
+                raise Validation("公司归属只能有一行", details={"allocation_type": allocation_type})
             allocation_types.add(allocation_type)
+            person_key = (allocation_type, None if item.get("user_id") is None else int(item["user_id"]))
+            if person_key in action_person_keys:
+                raise Validation(
+                    "同一动作下同一人员不可重复分润",
+                    details={"allocation_type": allocation_type, "user_id": person_key[1]},
+                )
+            action_person_keys.add(person_key)
             if allocation_type == "COMPANY" and item.get("user_id") is not None:
                 raise Validation("公司收益不绑定人员", details={"field": "user_id"})
             if allocation_type == "OPERATION" and item.get("user_id") is None:
@@ -342,9 +355,14 @@ def _set_action_allocations(
             if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids:
                 candidates = action_actor_ids[allocation_type]
                 if item.get("user_id") is None:
-                    # 只有唯一执行人时自动绑定；多人协作时由人工指定，不替用户猜。
+                    # 只有唯一执行人时自动绑定；多人协作时为每人各录一行，不替用户猜。
                     if len(candidates) == 1:
                         item["user_id"] = candidates[0]
+                    else:
+                        raise Validation(
+                            f"{allocation_type} 有 {len(candidates)} 位执行人，请为每人分别填写分润行",
+                            details={"field": "user_id", "allowed_user_ids": candidates},
+                        )
                 elif int(item["user_id"]) not in candidates:
                     raise Validation(
                         f"{allocation_type} 收益人必须绑定对应动作执行人，且必须是该动作的执行人",

@@ -15,8 +15,9 @@ RUN npm ci --registry=https://registry.npmmirror.com
 
 COPY frontend/ ./frontend/
 
-# ui_guards.mjs 需比对后端枚举定义；构建期挂载后端源码供其只读校验
-COPY backend/app /backend/app
+# ui_guards.mjs 按 cwd(frontend)/../backend/app/domain/enums.py 读取枚举做对齐校验，
+# 故后端源码必须落在 /app/backend/app；放 /backend/app 会 ENOENT 直接中断构建。
+COPY backend/app /app/backend/app
 
 WORKDIR /app/frontend
 # 生产使用同源相对路径，由 nginx 反代 /api/v1 到后端，浏览器零跨域

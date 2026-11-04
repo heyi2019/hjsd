@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { changePassword, logout, type SessionUser } from "../api";
 import { ROLE_LABEL } from "../labels";
-import { ChevronIcon } from "../icons";
+import { ChevronIcon, WalletIcon } from "../icons";
+import { navigate } from "../router";
 
 const AUTH_METHOD_LABEL: Record<string, string> = {
   password: "账号密码",
@@ -80,6 +81,26 @@ export function MinePage({
             <span>本次登录</span>
             <strong>{AUTH_METHOD_LABEL[user.auth_method ?? "password"] ?? "账号密码"}</strong>
           </div>
+        </div>
+      </section>
+
+      {/*
+        资金中心入口放在「我的」：资金是低频查看型功能，占底栏一格会挤掉「建单」。
+        入口要显眼可见（不能藏进设置二级菜单），因为查余额是常用动作。
+      */}
+      <section className="h5-section">
+        <div className="h5-section__head"><h2>更多功能</h2></div>
+        <div className="h5-list">
+          <button type="button" className="h5-row h5-row--link" onClick={() => navigate("/funds")}>
+            <span className="h5-row__icon h5-row__icon--green" aria-hidden>
+              <WalletIcon size={20} />
+            </span>
+            <div className="h5-row__main">
+              <div className="h5-row__title"><strong>资金中心</strong></div>
+              <p className="h5-row__meta">账户余额 · 流水 · 对账 · 押金</p>
+            </div>
+            <ChevronIcon />
+          </button>
         </div>
       </section>
 

@@ -223,6 +223,8 @@ export async function listOrders(params: {
   status?: string;
   tradeDateFrom?: string;
   tradeDateTo?: string;
+  /** 只看自己经办的单（后端 `mine=true` 按当前登录用户过滤）。 */
+  mine?: boolean;
 }): Promise<Page<OrderRow>> {
   const { data } = await http.get<Page<OrderRow>>("/orders", {
     params: {
@@ -233,6 +235,7 @@ export async function listOrders(params: {
       status: params.status || undefined,
       trade_date_from: params.tradeDateFrom || undefined,
       trade_date_to: params.tradeDateTo || undefined,
+      mine: params.mine || undefined,
     },
   });
   return data;
@@ -246,6 +249,38 @@ export async function fetchPoolBalances(): Promise<PoolBalance[]> {
 export async function fetchStockTotal(): Promise<number> {
   const { data } = await http.get<Page<unknown>>("/stocks", { params: { limit: 1 } });
   return data.total ?? 0;
+}
+
+/** 在库账号数：`status=WAITING` 才是「待售在库」，不带条件会把已售也算进来。 */
+export async function fetchInventoryCount(): Promise<number> {
+  const { data } = await http.get<Page<unknown>>("/stocks", {
+    params: { status: "WAITING", limit: 1 },
+  });
+  return data.total ?? 0;
+}
+
+/** 提成对账（R3）：`mine=true` 只看自己；按月传 from/to 得到「本月收益」。 */
+export interface CommissionTotal {
+  order_count: number;
+  profit_base: string;
+  payable: string;
+  paid: string;
+  difference: string;
+}
+
+export async function fetchCommission(params?: {
+  from?: string;
+  to?: string;
+  mine?: boolean;
+}): Promise<{ total: CommissionTotal }> {
+  const { data } = await http.get<{ total: CommissionTotal }>("/reports/commission", {
+    params: {
+      from: params?.from || undefined,
+      to: params?.to || undefined,
+      mine: params?.mine || undefined,
+    },
+  });
+  return data;
 }
 
 // ---------------------------------------------------------------- 订单详情
@@ -333,6 +368,7 @@ export interface CustomerRow {
   contact_name?: string | null;
   phone?: string | null;
   wechat?: string | null;
+  qq?: string | null;
   source?: string | null;
   status: string;
   note?: string | null;
@@ -416,6 +452,13 @@ export interface CashflowRow {
   order_no?: string | null;
   operator?: string | null;
   note?: string | null;
+  /** 来源标记：OTHER（手工登记）/ ORDER_EVENT / REBATE_SETTLEMENT / DEPOSIT / TRANSFER。 */
+  source?: string;
+  /** 以下四个任一非空都表示该流水必须走原业务链路冲销，不能直接 /cashflows/{id}/reverse。 */
+  order_event_id?: number | null;
+  deposit_id?: number | null;
+  transfer_id?: string | null;
+  reversal_of_id?: number | null;
 }
 
 export async function listCashflows(params: {
@@ -776,9 +819,13 @@ export async function reverseCashflow(
   return data;
 }
 
+/**
+ * 账户间划转：两腿成对写入（转出 / 转入各一条流水）。
+ * 后端字段名是 `source_pool_id` / `target_pool_id`，写成 from/to 会直接 422。
+ */
 export async function createTransfer(payload: {
-  from_pool_id: number;
-  to_pool_id: number;
+  source_pool_id: number;
+  target_pool_id: number;
   amount: string;
   occurred_on: string;
   note?: string;
@@ -792,11 +839,16 @@ export interface ReconciliationRow {
   pool_id: number;
   reconciled_on: string;
   account_label: string;
+  /** 账面余额：后端字段名 `system_balance`，不是 `book_balance`。 */
+  system_balance: string;
   statement_balance: string;
-  book_balance?: string;
-  difference?: string;
+  difference: string;
   status: string;
   reason?: string | null;
+  unmatched_flow_ids?: number[];
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  note?: string | null;
 }
 
 export async function listReconciliations(): Promise<ReconciliationRow[]> {
@@ -809,6 +861,9 @@ export async function createReconciliation(payload: {
   reconciled_on: string;
   account_label: string;
   statement_balance: string;
+  /** 账面与实盘不一致时后端强制要求（422 "存在差异时必须填写差异原因"）。 */
+  reason?: string;
+  unmatched_flow_ids?: number[];
   note?: string;
 }): Promise<ReconciliationRow> {
   const { data } = await http.post<ReconciliationRow>("/reconciliations", payload);
@@ -823,16 +878,65 @@ export async function resolveReconciliation(id: number, reason: string): Promise
 export interface DepositRow {
   id: number;
   pool_id: number;
-  amount: string;
+  /** 后端字段是 `paid_amount`（实收押金），不是 `amount`。 */
+  paid_amount: string;
   returned_amount?: string;
   lost_amount?: string;
+  /** 剩余 = 实收 − 已退 − 已损失，由后端 computed_field 给出，前端不再相减。 */
+  remaining_amount?: string;
   paid_on: string;
+  expected_release_on?: string | null;
+  released_on?: string | null;
+  lost_on?: string | null;
+  counterparty_id?: number | null;
+  source_order_id?: number | null;
   status: string;
   note?: string | null;
+  created_at?: string;
+  operator?: string;
 }
 
-export async function listDeposits(): Promise<DepositRow[]> {
-  const { data } = await http.get<DepositRow[]>("/deposits");
+export async function listDeposits(poolId?: number): Promise<DepositRow[]> {
+  const { data } = await http.get<DepositRow[]>("/deposits", {
+    params: { pool_id: poolId ?? undefined },
+  });
+  return data;
+}
+
+export async function createDeposit(payload: {
+  pool_id: number;
+  amount: string;
+  paid_on: string;
+  counterparty_id?: number | null;
+  source_order_id?: number | null;
+  expected_release_on?: string | null;
+  note?: string | null;
+}): Promise<DepositRow> {
+  const { data } = await http.post<DepositRow>("/deposits", payload);
+  return data;
+}
+
+export async function returnDeposit(
+  id: number,
+  payload: { amount: string; released_on: string },
+): Promise<DepositRow> {
+  const { data } = await http.post<DepositRow>(`/deposits/${id}/returns`, payload);
+  return data;
+}
+
+export async function loseDeposit(
+  id: number,
+  payload: { amount: string; lost_on: string; category: string; reason: string },
+): Promise<unknown> {
+  const { data } = await http.post(`/deposits/${id}/losses`, payload);
+  return data;
+}
+
+export async function cancelDeposit(
+  id: number,
+  payload: { cancelled_on: string; reason: string },
+): Promise<DepositRow> {
+  const { data } = await http.post<DepositRow>(`/deposits/${id}/cancel`, payload);
   return data;
 }
 
@@ -1104,5 +1208,62 @@ export interface AccountExecutionDetail {
 
 export async function fetchExecutionDetail(accountId: number): Promise<AccountExecutionDetail> {
   const { data } = await http.get<AccountExecutionDetail>(`/stocks/${accountId}/execution-detail`);
+  return data;
+}
+
+// ---------------------------------------------------------------- 合作方 / 需求线索
+
+export async function fetchCounterparty(id: number): Promise<CounterpartyRow> {
+  const { data } = await http.get<CounterpartyRow>(`/counterparties/${id}`);
+  return data;
+}
+
+export interface LeadRow {
+  id: number;
+  lead_no: string;
+  customer_id: number;
+  request_type: string;
+  budget?: string | null;
+  target: string;
+  status: string;
+  converted_order_id?: number | null;
+  closed_reason?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export async function listLeads(params?: { status?: string; customerId?: number }): Promise<LeadRow[]> {
+  const { data } = await http.get<LeadRow[]>("/leads", {
+    params: {
+      status: params?.status || undefined,
+      customer_id: params?.customerId ?? undefined,
+    },
+  });
+  return data;
+}
+
+export async function fetchLead(id: number): Promise<LeadRow> {
+  const { data } = await http.get<LeadRow>(`/leads/${id}`);
+  return data;
+}
+
+export async function createLead(payload: {
+  customer_id: number;
+  request_type: string;
+  budget?: string | null;
+  target: string;
+  note?: string | null;
+}): Promise<LeadRow> {
+  const { data } = await http.post<LeadRow>("/leads", payload);
+  return data;
+}
+
+export async function closeLead(id: number, reason: string): Promise<LeadRow> {
+  const { data } = await http.post<LeadRow>(`/leads/${id}/close`, { reason });
+  return data;
+}
+
+export async function convertLead(id: number, orderId: number): Promise<LeadRow> {
+  const { data } = await http.post<LeadRow>(`/leads/${id}/convert`, { order_id: orderId });
   return data;
 }

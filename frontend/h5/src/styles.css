@@ -1330,6 +1330,15 @@ input {
   background: var(--h5-fill);
 }
 
+/* 列表里的单选状态（如转单时挑订单）：底色 + 左侧勾选点，不能只靠颜色深浅区分 */
+.h5-row--link.is-selected {
+  background: color-mix(in srgb, var(--h5-blue) 10%, transparent);
+}
+
+.h5-row--link.is-selected .h5-row__title strong {
+  color: var(--h5-blue);
+}
+
 /* 详情页头：图标 + 标题 + 状态 */
 .h5-detail-head {
   display: flex;
@@ -2308,4 +2317,163 @@ input {
 
 .h5-fab:active {
   transform: scale(0.94);
+}
+
+/* 二级页面页头返回（如资金从「我的」进入）：小字蓝色，不抢主标题 */
+.h5-pagehead__back {
+  margin: 0 0 2px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--h5-blue);
+  font: inherit;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.h5-pagehead__back:active {
+  opacity: 0.55;
+}
+
+/* 建单类型卡：整卡可点，三行信息（标题 / 一句话 / 要点），不用表格 */
+.h5-kindlist {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.h5-kindcard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--h5-radius-card);
+  background: var(--h5-card);
+  color: var(--h5-label);
+  font: inherit;
+  text-align: left;
+  transition: transform 120ms ease-out;
+}
+
+.h5-kindcard:active {
+  transform: scale(0.985);
+  background: var(--h5-fill);
+}
+
+.h5-kindcard__main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.h5-kindcard__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.h5-kindcard__title em {
+  font-style: normal;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--h5-fill-2);
+  color: var(--h5-label-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.h5-kindcard__summary {
+  color: var(--h5-label-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.h5-kindcard__points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.h5-kindcard__points span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--h5-fill);
+  color: var(--h5-label-2);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.h5-kindcard__go {
+  color: var(--h5-label-3);
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* 工作台三项数字：可点击的统计格（按钮形态，但保持统计格外观）。
+   注意：这里给按钮清零 border 会覆盖上面的 `.h5-stat + .h5-stat` 分隔线，
+   所以紧接着把分隔线按更高特异性补回来，不能靠源码顺序侥幸。 */
+button.h5-stat {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.h5-stat + .h5-stat,
+button.h5-stat + button.h5-stat,
+.h5-stat + button.h5-stat {
+  border-inline-start: 1px solid var(--h5-separator);
+}
+
+button.h5-stat:active {
+  opacity: 0.6;
+}
+
+/* 第三行小字：说明口径（「创建 / 售出订单」「本月应得提成」） */
+.h5-stat em {
+  font-style: normal;
+  color: var(--h5-label-3);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* 金额型统计格：位数多，比纯数字小一档才不会挤成省略号 */
+.h5-stat__money {
+  font-size: 17px !important;
+}
+
+.h5-stat__money small {
+  margin-inline-end: 1px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 组合筛选的说明行：范围（我的/全部人）+ 类型，避免用户以为两个 chip 是单选 */
+.h5-filterhint {
+  margin: 0;
+  padding: 0 20px 6px;
+  color: var(--h5-label-2);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* 「我的」是范围开关而非类型 tab：选中用浅蓝描边态，避免与类型 chip 的实心蓝并排时
+   看起来像「两个都选中」的错觉。 */
+.h5-chip--scope.is-active {
+  background: color-mix(in srgb, var(--h5-blue) 14%, transparent);
+  color: var(--h5-blue);
+  font-weight: 600;
 }

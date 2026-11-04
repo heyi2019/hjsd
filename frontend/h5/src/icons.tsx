@@ -137,3 +137,21 @@ export function ClockIcon({ size = 18, className }: IconProps) {
     </svg>
   );
 }
+
+/** 建单：圆角方框里一个加号。filled 时方框实心，与底栏其它图标的选中态一致。 */
+export function CreateIcon({ size = 25, filled = false }: IconProps) {
+  return (
+    <svg {...base(size)} strokeWidth={1.8}>
+      <rect
+        x="3.4"
+        y="3.4"
+        width="17.2"
+        height="17.2"
+        rx="5.4"
+        fill={filled ? "currentColor" : "none"}
+        stroke={filled ? "none" : "currentColor"}
+      />
+      <path d="M12 8.4v7.2M8.4 12h7.2" stroke={filled ? "var(--h5-card)" : "currentColor"} strokeWidth={2} />
+    </svg>
+  );
+}

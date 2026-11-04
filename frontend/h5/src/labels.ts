@@ -156,6 +156,58 @@ export const CUSTOMER_STATUS_LABEL: Record<string, string> = {
   MERGED: "已合并",
 };
 
+/** 押金（DepositStatus） */
+export const DEPOSIT_STATUS_LABEL: Record<string, string> = {
+  PAID: "已交",
+  PARTIALLY_RETURNED: "部分退还",
+  RETURNED: "已退还",
+  LOST: "已没收",
+  CANCELLED: "已作废",
+};
+
+const DEPOSIT_STATUS_TONE: Record<string, Tone> = {
+  PAID: "blue",
+  PARTIALLY_RETURNED: "orange",
+  RETURNED: "green",
+  LOST: "red",
+  CANCELLED: "gray",
+};
+
+/** 日对账（ReconciliationStatus） */
+export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
+  OPEN: "有差异",
+  RESOLVED: "已核销",
+};
+
+const RECONCILIATION_STATUS_TONE: Record<string, Tone> = {
+  OPEN: "orange",
+  RESOLVED: "green",
+};
+
+/** 流水性质：手工记账时用户选的就是这三个，写清楚比显示枚举值重要。 */
+export const NATURE_LABEL: Record<string, string> = {
+  BUSINESS_IN: "业务收入",
+  BUSINESS_OUT: "业务支出",
+  EXTERNAL_IN: "外部/借款",
+  INTERNAL: "内部调拨",
+};
+
+export function depositStatusLabel(value: string): string {
+  return DEPOSIT_STATUS_LABEL[value] ?? "未知";
+}
+
+export function depositStatusTone(value: string): Tone {
+  return DEPOSIT_STATUS_TONE[value] ?? "gray";
+}
+
+export function reconciliationStatusLabel(value: string): string {
+  return RECONCILIATION_STATUS_LABEL[value] ?? "未知";
+}
+
+export function reconciliationStatusTone(value: string): Tone {
+  return RECONCILIATION_STATUS_TONE[value] ?? "gray";
+}
+
 export function stockStatusLabel(value: string): string {
   return STOCK_STATUS_LABEL[value] ?? "未知";
 }

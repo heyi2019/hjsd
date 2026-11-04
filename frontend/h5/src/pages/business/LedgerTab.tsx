@@ -14,18 +14,26 @@ import { CreateOrderFab } from "../../components/CreateOrderFab";
 import { navigate } from "../../router";
 
 const PAGE_SIZE = 20;
+
+/**
+ * 筛选条：一个「范围」（全部 / 我的）+ 一个「类型」（回收 / 提号 / 代挂）。
+ *
+ * 两者是**正交**的：选了「我的」再点「回收」= 只看我做的回收单，按钮文案也这么写，
+ * 不让用户猜。类型再点一次取消，回到「全部类型」。
+ * 业务简称与桌面端订单台账一致：回收（HS）/ 提号（TH）/ 代挂（DG）。
+ */
 const TYPES = [
-  { value: "", label: "全部" },
-  { value: "HS", label: "回收销售" },
-  { value: "TH", label: "提号销售" },
+  { value: "HS", label: "回收" },
+  { value: "TH", label: "提号" },
   { value: "DG", label: "代挂" },
-];
+] as const;
 
 export function LedgerTab({ user }: { user: SessionUser }) {
   const [items, setItems] = useState<OrderRow[]>([]);
   const [total, setTotal] = useState(0);
   const [keyword, setKeyword] = useState("");
   const [orderType, setOrderType] = useState("");
+  const [mine, setMine] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +50,7 @@ export function LedgerTab({ user }: { user: SessionUser }) {
           offset,
           keyword: keyword.trim() || undefined,
           orderType: orderType || undefined,
+          mine: mine || undefined,
         });
         // 快速改筛选时会并发多次请求，只认最后一次的结果，避免旧结果覆盖新筛选。
         if (seq !== requestId.current) return;
@@ -57,7 +66,7 @@ export function LedgerTab({ user }: { user: SessionUser }) {
         }
       }
     },
-    [keyword, orderType],
+    [keyword, mine, orderType],
   );
 
   useEffect(() => {
@@ -79,15 +88,36 @@ export function LedgerTab({ user }: { user: SessionUser }) {
             onChange={(event) => setKeyword(event.target.value)}
           />
         </label>
-        <div className="h5-chips" role="tablist" aria-label="业务类型">
+        <div className="h5-chips" role="tablist" aria-label="业务筛选">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!mine && !orderType}
+            className={`h5-chip${!mine && !orderType ? " is-active" : ""}`}
+            onClick={() => {
+              setMine(false);
+              setOrderType("");
+            }}
+          >
+            全部
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mine}
+            className={`h5-chip h5-chip--scope${mine ? " is-active" : ""}`}
+            onClick={() => setMine((prev) => !prev)}
+          >
+            我的
+          </button>
           {TYPES.map((type) => (
             <button
-              key={type.value || "all"}
+              key={type.value}
               type="button"
               role="tab"
               aria-selected={orderType === type.value}
               className={`h5-chip${orderType === type.value ? " is-active" : ""}`}
-              onClick={() => setOrderType(type.value)}
+              onClick={() => setOrderType((prev) => (prev === type.value ? "" : type.value))}
             >
               {type.label}
             </button>
@@ -95,6 +125,13 @@ export function LedgerTab({ user }: { user: SessionUser }) {
           <span className="h5-chips__count">共 {total}</span>
         </div>
       </div>
+
+      {mine || orderType ? (
+        <p className="h5-filterhint">
+          当前筛选：{mine ? "只看我的" : "全部人"}
+          {orderType ? ` · ${TYPES.find((item) => item.value === orderType)?.label ?? orderType}` : ""}
+        </p>
+      ) : null}
 
       {error ? <div className="h5-alert h5-alert--error" role="alert">{error}</div> : null}
 

@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import {
-  fetchPoolBalances,
-  fetchStockTotal,
+  fetchCommission,
+  fetchInventoryCount,
   listOrders,
   type OrderRow,
-  type PoolBalance,
   type SessionUser,
 } from "../api";
 import {
   greeting,
   money,
-  moneyWan,
   orderTypeGlyph,
   orderTypeLabel,
   orderTypeTone,
@@ -19,11 +17,37 @@ import {
   today,
 } from "../labels";
 
-export function DashboardPage({ user, onOpenOrders }: { user: SessionUser; onOpenOrders: () => void }) {
-  const [pools, setPools] = useState<PoolBalance[]>([]);
-  const [total, setTotal] = useState<number | null>(null);
+/** 本月区间：月初 → 今天。收益按「实际发生」计，不把未来日期算进去。 */
+function monthRange(): { from: string; to: string } {
+  const now = new Date();
+  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  return { from, to: today() };
+}
+
+/**
+ * 工作台：我的三项数字 + 最近业务。
+ *
+ * 三个数字的口径（与桌面端工作台完全一致，两端改一处必须同步另一处）：
+ *  - 我的订单：`/orders?mine=true` 的总数，即当前登录用户创建/经办的订单；
+ *  - 在库账号：`/stocks?status=WAITING` 的总数（不含已售）；
+ *  - 我的本月收益：`/reports/commission?mine=true&from=月初&to=今天` 的 `payable`
+ *    （本月应得提成），不是订单利润基数——那是整单的利润，不是「我的」。
+ *
+ * 刻意**不放资金余额卡**：可用资金属于资金中心（`/funds`），从「我的」进入。
+ */
+export function DashboardPage({
+  user,
+  onOpenOrders,
+  onOpenInventory,
+}: {
+  user: SessionUser;
+  onOpenOrders: () => void;
+  onOpenInventory: () => void;
+}) {
+  const [myOrders, setMyOrders] = useState<number | null>(null);
+  const [inventoryCount, setInventoryCount] = useState<number | null>(null);
+  const [monthEarnings, setMonthEarnings] = useState<string | null>(null);
   const [todayCount, setTodayCount] = useState<number | null>(null);
-  const [stockTotal, setStockTotal] = useState<number | null>(null);
   const [recent, setRecent] = useState<OrderRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,20 +55,22 @@ export function DashboardPage({ user, onOpenOrders }: { user: SessionUser; onOpe
   useEffect(() => {
     let alive = true;
     const day = today();
+    const range = monthRange();
     void Promise.allSettled([
-      fetchPoolBalances(),
-      listOrders({ limit: 1 }),
+      listOrders({ limit: 1, mine: true }),
       listOrders({ limit: 1, tradeDateFrom: day, tradeDateTo: day }),
-      listOrders({ limit: 5 }),
-      fetchStockTotal(),
+      // 「最近业务」只要自己的单；列表接口已按交易日倒序（近 → 远），取 5 条即可。
+      listOrders({ limit: 5, mine: true }),
+      fetchInventoryCount(),
+      fetchCommission({ mine: true, from: range.from, to: range.to }),
     ]).then((results) => {
       if (!alive) return;
-      const [poolResult, totalResult, todayResult, recentResult, stockResult] = results;
-      if (poolResult.status === "fulfilled") setPools(poolResult.value);
-      if (totalResult.status === "fulfilled") setTotal(totalResult.value.total);
+      const [mineResult, todayResult, recentResult, stockResult, earningsResult] = results;
+      if (mineResult.status === "fulfilled") setMyOrders(mineResult.value.total);
       if (todayResult.status === "fulfilled") setTodayCount(todayResult.value.total);
       if (recentResult.status === "fulfilled") setRecent(recentResult.value.items);
-      if (stockResult.status === "fulfilled") setStockTotal(stockResult.value);
+      if (stockResult.status === "fulfilled") setInventoryCount(stockResult.value);
+      if (earningsResult.status === "fulfilled") setMonthEarnings(earningsResult.value.total.payable);
 
       // 任一块失败都要让用户看见，而不是显示成 0（0 和「没加载到」后果完全不同）。
       const failed = results.find((item) => item.status === "rejected");
@@ -58,58 +84,32 @@ export function DashboardPage({ user, onOpenOrders }: { user: SessionUser; onOpe
     };
   }, []);
 
-  const available = pools.reduce((sum, pool) => sum + Number(pool.available ?? 0), 0);
-  const profitPool = pools.find((pool) => pool.pool_code === "HJ_PROFIT");
-  const investPool = pools.find((pool) => pool.pool_code === "HJ_INVEST");
-  const availableText = moneyWan(available);
-
   return (
     <div className="h5-page">
       <header className="h5-hero">
-        <p className="h5-hero__kicker">{today()} · 工作台</p>
+        <p className="h5-hero__kicker">
+          {today()} · {loading ? "工作台" : `今日 ${todayCount ?? 0} 单`}
+        </p>
         <h1>{greeting()}，{user.display_name || user.username}</h1>
       </header>
 
-      <section className="h5-balance" aria-label="资金总览">
-        <div className="h5-balance__top">
-          <span>可用资金</span>
-          <span className="h5-balance__badge">{pools.length ? `${pools.length} 个账户` : "未同步"}</span>
-        </div>
-        <p className="h5-balance__value">
-          {loading ? (
-            "—"
-          ) : (
-            <>
-              <small>¥</small>
-              {availableText.text}
-              {availableText.unit ? <span className="h5-balance__unit">{availableText.unit}</span> : null}
-            </>
-          )}
-        </p>
-        <div className="h5-balance__split">
-          <div>
-            <span>投资款 · HJ_INVEST</span>
-            <strong>¥{money(investPool?.available)}</strong>
-          </div>
-          <div>
-            <span>利润 · HJ_PROFIT</span>
-            <strong>¥{money(profitPool?.available)}</strong>
-          </div>
-        </div>
-      </section>
-
-      <div className="h5-stats">
-        <div className="h5-stat">
-          <strong>{loading ? "—" : (todayCount ?? "—")}</strong>
-          <span>今日单量</span>
-        </div>
-        <div className="h5-stat">
-          <strong>{loading ? "—" : (total ?? "—")}</strong>
-          <span>累计订单</span>
-        </div>
-        <div className="h5-stat">
-          <strong>{loading ? "—" : (stockTotal ?? "—")}</strong>
+      <div className="h5-stats" aria-label="我的三项数字">
+        <button type="button" className="h5-stat" onClick={onOpenOrders}>
+          <strong>{loading ? "—" : (myOrders ?? "—")}</strong>
+          <span>我的订单</span>
+          <em>创建 / 售出订单</em>
+        </button>
+        <button type="button" className="h5-stat" onClick={onOpenInventory}>
+          <strong>{loading ? "—" : (inventoryCount ?? "—")}</strong>
           <span>在库账号</span>
+        </button>
+        <div className="h5-stat">
+          <strong className="h5-stat__money">
+            <small>¥</small>
+            {loading ? "—" : money(monthEarnings)}
+          </strong>
+          <span>我的本月收益</span>
+          <em>本月应得提成</em>
         </div>
       </div>
 
@@ -117,7 +117,7 @@ export function DashboardPage({ user, onOpenOrders }: { user: SessionUser; onOpe
 
       <section className="h5-section">
         <div className="h5-section__head">
-          <h2>最近业务</h2>
+          <h2>我的最近业务</h2>
           <button type="button" className="h5-link" onClick={onOpenOrders}>全部</button>
         </div>
 

@@ -325,5 +325,17 @@
 
 .th-business-page .ui-page-header__desc { max-width: 42rem; }
 @media (max-width: 640px) {
-  .dashboard-entry-group--distribution .dashboard-entry-group__items { grid-template-columns: 1fr; }
+  /* 分销组（提号 / 代挂）在窄屏改单列，会与父级固定的 106px 第二行冲突：
+     两张 106px 卡片纵向叠加后溢出容器，被后续「我的业务总览」盖住，
+     观感就是「代挂被隐藏」。恢复两列并排消除溢出，行高改 auto 兜底，
+     再把这个组提到第二位，让代挂落在 375px 首屏内。
+     order 只作用于 .ui-entry-row 的直接子项：PermissionGate 返回 Fragment，
+     EntryRow 直接渲染该 div，三组确为直接子项。 */
+  .dashboard-page .ui-entry-row > .dashboard-entry-group--sell { order: 0; }
+  .dashboard-page .ui-entry-row > .dashboard-entry-group--distribution { order: 1; }
+  .dashboard-page .ui-entry-row > .dashboard-entry-group--self-owned { order: 2; }
+  .dashboard-entry-group--distribution { grid-template-rows: var(--sz-42) auto; }
+  .dashboard-entry-group--distribution .dashboard-entry-group__items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

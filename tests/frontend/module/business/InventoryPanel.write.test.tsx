@@ -524,11 +524,18 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
     expect((sold as HTMLInputElement).value).toBe("2026-10-17");
     expect((flow as HTMLInputElement).value).toBe("2026-10-15");
 
-    fireEvent.change(sold, { target: { value: "2026-10-20" } });
-    fireEvent.keyDown(sold, { key: "Enter", code: "Enter" });
-    expect(await screen.findByText(/整单时间轴平移 3 天/)).toBeInTheDocument();
-    expect((created as HTMLInputElement).value).toBe("2026-10-18");
-    expect((flow as HTMLInputElement).value).toBe("2026-10-18");
+    // antd DatePicker 把输入文本同步进内部 state 是异步的：change 后立刻同步 keyDown
+    // 会读到旧 inputValue，导致 onChange 偶发不触发（曾随机红 4/6）。改用真实异步交互。
+    const user = userEvent.setup();
+    await user.clear(sold);
+    await user.type(sold, "2026-10-20");
+    await user.keyboard("{Enter}");
+    await waitFor(
+      () => expect(screen.getByText(/整单时间轴平移 3 天/)).toBeInTheDocument(),
+      { timeout: 3000 },
+    );
+    expect((screen.getByLabelText("编辑订单创建时间") as HTMLInputElement).value).toBe("2026-10-18");
+    expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-18");
 
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({

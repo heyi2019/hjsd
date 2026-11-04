@@ -148,12 +148,12 @@ pytest 已把传递依赖展开进 `item.fixturenames`，`conftest.py` 的 `pyte
 
 ```text
 cd frontend
-npm run test:fast            # 纯逻辑 + 静态守卫：14 文件 / 96 例 / 7s
-npm run test:quick           # 提交前默认：8 文件 / 88 例 / 27s
-npm run test:react           # 组件与页面：56 文件 / 756 例 / 120s
-npm run test:react-deep      # 重型交互（不含在 test:full 里）：16 文件 / 124 例 / 46s
-npm run test:full            # fast + quick + react，层间串行，约 154s
-npm run test:full:all        # 再加 react-deep（发版前）
+npm run test:fast            # 纯逻辑 + 静态守卫：14 文件 / 96 例 / 8.4s
+npm run test:quick           # 提交前默认：8 文件 / 88 例 / 23.3s
+npm run test:react           # 组件与页面：56 文件 / 756 例 / 116.6s
+npm run test:react-deep      # 重型交互（不含在 test:full 里）：16 文件 / 124 例 / 37.3s
+npm run test:full            # fast + quick + react，轻量层并发、重层串行，约 145s
+npm run test:full:all        # 再加 react-deep（发版前），约 182s
 npm run test:panel business  # 只跑某区域：tests/frontend/<unit|module>/business
 npm run test:changed         # 按 git 变更自动选区域（改 src/orders → business）
 npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e（15 spec / 62 例）
@@ -162,6 +162,57 @@ npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_
 三层与四档的关系：`fast`/`quick`/`react`/`react-deep` 是**跑法**（执行成本档），
 `unit`/`module` 与区域是**归属**（文件放哪）。`test-layers.mjs` 只登记前者的文件清单，
 归属永远扫磁盘——两套清单必然漂移，这是 2026-10-27 已经付过学费的坑。
+
+#### 耗时账（2026-11-04 实测，8 核 macOS；数字会随机器变，结论看比例）
+
+整轮 `test:full:all`：**185.5s → 181.9s**。单看比例不大，因为耗时结构本身就长这样：
+
+| 层 | 串行实测 | 说明 |
+|---|---|---|
+| fast | 8.4s / 14 文件 | 纯逻辑 + 守卫，无 jsdom 重渲染 |
+| quick | 23.3s / 8 文件 | 其中 `CreateBusinessModal` **14.8s**，单个重文件就是本层下界 |
+| react | 116.6s / 56 文件 / 756 例 | 4 worker（核数 / 2） |
+| react-deep | 37.3s / 16 文件 / 124 例 | 2 worker（核数 / 4），4 worker 32.7s、1 worker 45.8s |
+
+**react 层的 116.6s 花在哪**（`vitest --reporter=verbose` 自报占比）：
+tests 50% / import 26% / transform 14% / environment 7% / setup 2%。
+即**只有一半是真在跑用例**，另一半是每个文件各自重建 jsdom 与模块图的固定成本。
+
+**并行效率为什么只有 1.4×**：同一份 react 层，单 worker **163.5s**（三次实测
+164.74 / 160.84 / 164.92），4 worker **116.6s**，8 worker **120.9s**（更差）。
+固定成本 ≈ 1.3s/文件（jsdom 环境 + antd 模块图求值），56 文件 ≈ 73s，这部分**只能靠
+`isolate:false` 消掉，而它已验证不可用**（见下）。用例体本身 ≈ 90s，4 worker 摊下来
+14.5s/worker，却要等固定成本排队——所以加 worker 到 8 反而回退。
+
+**一条测量纪律**：并发跑出来的「单例耗时」不可用于优化决策。同一批 4 个慢文件，
+8 核 4 worker 下自报 79.5s，单 worker 实测只有 **31.3s**——膨胀 2.5×，是 CPU 抢占
+计入用例时长。判断某条用例慢不慢，必须 `--maxWorkers=1` 单跑。
+
+**采纳的优化**（每条都有前后对照）：
+
+| 优化 | 前后 | 收益 |
+|---|---|---|
+| quick 层 `forks` → `threads` | 27.20s → 19.28s | -29%，8 个文件各自起进程的冷启动成本占大头 |
+| react-deep 1 → 2 worker | 45.77s → 34.08s | -26%；4 worker 32.65s 边际已很小，取 2 以适应 CI |
+| worker 数按核推导（不写死 4） | — | 本地 8 核 → 4/2，CI 4 vCPU → 2/2，避免超订 |
+| fast 与 quick 并发（`test:full` 内） | 31.7s → 27.7s | -13%，仅核数 ≥6 时启用，4 vCPU 以下回落串行并保持日志不交错 |
+| 五层 4 worker 上限 | — | 实测 4 = 116.6s、6 = 110.8s、8 = 120.9s，取核数/2 |
+
+**已否决的方案**（勿再试，均实测）：
+
+| 方案 | 结果 |
+|---|---|
+| `isolate: false` 复用模块图 | **99 条失败**：跨文件 mock/模块状态串扰，`resetAllMocks` + 清 body 都兜不住。这是省掉 1.3s/文件固定成本的唯一途径，代价太大，放弃 |
+| `userEvent.setup({ delay: null })` 全库 130 处 | 116.5s → 114.1s（-2%，噪声级），且 `InstallmentsPanel` **3 条红**（依赖事件间让出微任务）。收益不抵风险 |
+| react 改 `pool: forks` | 116.48s vs threads 116.6s，打平，无理由改 |
+| react + react-deep 并发 | 148.3s vs 串行 153.9s（-3.6%），且 deep 出现 1 条 60s 超时。重层并发会互相抢 CPU |
+| fast + quick + deep 三者并发 | 64.4s vs 串行 69.0s，但 deep 被拖慢 37.3s→~60s，不稳定 |
+| 全外部化 antd（关 `deps.inline`） | cssinjs 桩失效，丢掉 5× 提速来源，交互用例确定性失败 |
+| `theme.token.motion=false` 替代 rc-motion 桩 | 功能可行但更慢（78.85s → 94~100s） |
+
+**结构性结论**：react 层已是「56 个文件各自重建环境」的成本主导，用例体只占一半；
+在不牺牲 `isolate` 的前提下，把单个用例再抠 10~20ms 对整轮毫无意义。要再上一个台阶，
+唯一的杠杆是减少单文件渲染量（不是减少用例）——目前没有安全做法，故止步于此。
 
 #### 前端测试的模块定位：一律用 `@/` 与 `@fixtures/`
 

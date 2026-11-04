@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +19,20 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 //   3) server.fs.allow 必须放开到仓库根，否则包外文件被 Vite 白名单拦
 const REPO = path.resolve(here(".."));
 const SRC = here("./src");
+
+// [2026-11-04 实测重定] worker 数按核数推导，不写死：本地 8 核 → 4/2，CI 4 vCPU → 2/2。
+// 写死 4 的后果是在 GitHub 2~4 vCPU runner 上超订 2 倍，反比 2 worker 慢。
+// 实测（8 核，56 文件 / 756 例，同机同代码）：
+//   react  1 worker 163.5s（三次 164.74/160.84/164.92）
+//   react  4 worker 116.6s ← 采纳（每 worker 约吃 2 核，核数/2）
+//   react  6 worker 110.8s（-5%，CI 上必超订，收益不可移植）
+//   react  8 worker 120.9s ← 反超订回退，证明确实每 worker 要 2 核
+//   react  pool:"forks" 4 worker 116.5s（与 threads 打平，不构成改动理由）
+// react-deep 同样按核推导（16 文件 / 124 例）：
+//   1 worker 45.77s / 2 worker 34.08s / 4 worker 32.65s ← 取 2，边际收益已很小
+const CPUS = os.cpus().length;
+const REACT_WORKERS = Math.max(2, Math.floor(CPUS / 2));
+const DEEP_WORKERS = Math.max(2, Math.floor(CPUS / 4));
 
 // Antd v5 + jsdom reliable test config.
 // Three settings are mandatory (see SKILL.md):
@@ -105,7 +120,11 @@ export default defineConfig({
           name: "quick",
           sequence: { groupOrder: 2 },
           include: quickTests,
-          pool: "forks",
+          // [2026-11-04 实测] forks → threads：8 文件 / 88 例 27.20s → 19.28s（-29%）。
+          // quick 层只有 8 个文件，forks 每个文件起一个进程，Node+jsdom 冷启动成本占大头；
+          // threads 复用同一进程池，本层用例之间没有跨文件模块状态依赖。
+          // worker 数再往上（4）几乎无收益（19.73s）：单个 14.8s 的重文件就是下界。
+          pool: "threads",
           maxWorkers: 2,
           minWorkers: 1,
           retry: 0,
@@ -127,15 +146,10 @@ export default defineConfig({
             ...quickTests,
             "tests/frontend/**/*.deep.test.{ts,tsx}",
           ],
-          // [2026-11-03 实测重定] maxWorkers 1→2 之后机器已升到 8 核，2 worker 只吃到
-          // 214% CPU（6 核闲置）。三档实测（91 文件 / 432 用例，同机同代码）：
-          //   2 worker 181.89s（cpu 214%）
-          //   4 worker 144.62s（cpu 372%）← 采纳，-20%
-          //   6 worker 156.72s（cpu 372%）← 反而回退，超订（每 worker 要 2 核）
-          // 结论：worker 数取「物理核 / 2」。jsdom+antd 在 4 worker 下 91 文件全绿、
-          // 零 retry 触发的失败。新增机器或升配后按此公式重测。
+          // worker 数见文件顶部 REACT_WORKERS（核数 / 2）。jsdom+antd 用例是 CPU 密集型的
+          // （每 worker 约吃 2 核），超订会互相拖慢。
           pool: "threads",
-          maxWorkers: 4,
+          maxWorkers: REACT_WORKERS,
           minWorkers: 1,
         },
       },
@@ -145,12 +159,12 @@ export default defineConfig({
           name: "react-deep",
           sequence: { groupOrder: 4 },
           include: ["tests/frontend/**/*.deep.test.{ts,tsx}"],
-          // 与 react 同构：单 worker 避免 jsdom+antd 争抢。deep 重型用例（大量 userEvent
-          // 交互 + antd Modal）集中于此层，由 test:full:deep / test:full:all 触发，日常
-          // test:full 不含（提速日常反馈）。单进程跑以复用 vite transform 缓存（分片子进程
-          // 会各自重 transform antd 致 408s，单进程同层仅需 ~170s）。
+          // 与 react 同构的 threads 池，但 worker 数按核数取 1/4（8 核 → 2）。
+          // [2026-11-04 实测] 单 worker 45.77s → 2 worker 34.08s（-26%），4 worker 32.65s（边际很小）。
+          // 注意与「分片」区分：早年把 deep 拆成多个 vitest *进程*（408s）之所以更慢，是每个进程
+          // 各自重 transform antd；同一进程池内的多 worker 共享 transform 缓存，不踩这个坑。
           pool: "threads",
-          maxWorkers: 1,
+          maxWorkers: DEEP_WORKERS,
           minWorkers: 1,
           retry: 0,
         },

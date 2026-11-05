@@ -42,6 +42,10 @@ def _release_tree(
         'case "$args" in\n'
         '  *"ps --status running --services"*) printf "db\\nbackend\\n"; exit 0 ;;\n'
         '  *"ps -q"*) printf "fakecid0123456789\\n"; exit 0 ;;\n'
+        # deploy.sh 的发布前后库状态自检需要 7 列状态与 3 列售出作用域计数；
+        # 其余 psql（backup_daily.sh 的表数探测）沿用原来的单列返回。
+        "  *information_schema.tables*) printf '41|NONE|0|63|13|220|0001\\n'; exit 0 ;;\n"
+        "  *SALEREC*) printf '28|28|21\\n'; exit 0 ;;\n"
         "  *psql*)\n"
         "    printf '1\\n'\n"
         "    exit 0 ;;\n"

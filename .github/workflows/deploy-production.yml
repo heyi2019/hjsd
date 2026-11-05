@@ -54,9 +54,13 @@ jobs:
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
 
           docker buildx build --platform linux/amd64 --load \
+            --cache-from type=gha,scope=heijin-backend \
+            --cache-to type=gha,mode=max,scope=heijin-backend \
             -t "heijin-backend:${VERSION}" \
             -f backend/Dockerfile backend
           docker buildx build --platform linux/amd64 --load \
+            --cache-from type=gha,scope=heijin-frontend \
+            --cache-to type=gha,mode=max,scope=heijin-frontend \
             -t "heijin-frontend:${VERSION}" \
             -f frontend/Dockerfile .
 

@@ -62,7 +62,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [invEditExtraForm] = Form.useForm();
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   // 编辑态时间联动：三个锚点共用一个平移天数，保存时整单时间轴按此 delta 平移。
-  const [timeShiftDays, setTimeShiftDays] = useState(0);
+  const [timeShiftMinutes, setTimeShiftDays] = useState(0);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
@@ -439,11 +439,11 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
         const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
-      if (events.length || timeShiftDays !== 0) {
+      if (events.length || timeShiftMinutes !== 0) {
         await stocksApi.updateExecution(id, {
           profile,
           events,
-          time_shift: timeShiftDays !== 0 ? { delta_days: timeShiftDays } : undefined,
+          time_shift: timeShiftMinutes !== 0 ? { delta_minutes: timeShiftMinutes } : undefined,
         });
         setEditingAccount(null);
         setEventDrafts({});
@@ -624,7 +624,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     sortDesc,
     inventoryStats,
     updateEventDraft,
-    timeShiftDays,
+    timeShiftMinutes,
     setTimeShiftDays,
     voidForm,
     voidPools,

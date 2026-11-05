@@ -26,25 +26,28 @@ export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } f
  *  台账显示的这三个值分别是 Order.created_at / SELL 事件 posted_at / Cashflow.created_at，
  *  后端按同一个 delta 平移账期与展示时间戳，保证界面与报表归属不脱节。 */
 function TimeShiftFields({
-  registeredAt, soldAt, flowAt, shiftDays, onShift,
+  registeredAt, soldAt, flowAt, shiftMinutes, onShift,
 }: {
   registeredAt: string;
   soldAt: string;
   flowAt: string;
-  shiftDays: number;
-  onShift: (days: number) => void;
+  shiftMinutes: number;
+  onShift: (minutes: number) => void;
 }) {
   const field = (label: string, original: string) => {
-    const base = original && original !== "-" ? original.slice(0, 10) : "";
-    const shown = base ? dayjs(base).add(shiftDays, "day").format("YYYY-MM-DD") : "";
+    const base = original && original !== "-" ? original : "";
+    const shown = base ? dayjs(base).add(shiftMinutes, "minute").format("YYYY-MM-DD HH:mm") : "";
     return (
       <label className="inventory-time-shift__field">
         <span>{label}</span>
         <DateField
+          showTime={{ format: "HH:mm" }}
+          format="YYYY-MM-DD HH:mm"
+          minuteStep={1}
           aria-label={`编辑${label}`}
           disabled={!base}
           value={shown ? dayjs(shown) : null}
-          onChange={(value) => onShift(value && base ? value.startOf("day").diff(dayjs(base).startOf("day"), "day") : 0)}
+          onChange={(value) => onShift(value && base ? value.diff(dayjs(base), "minute") : 0)}
         />
       </label>
     );
@@ -54,9 +57,9 @@ function TimeShiftFields({
       <div className="inventory-detail__section-heading">
         <Typography.Text strong>时间联动</Typography.Text>
         <Typography.Text type="secondary">
-          {shiftDays === 0
+          {shiftMinutes === 0
             ? "改任一项，本单订单、事件与资金流水时间同步平移，分期还款计划不变"
-            : `整单时间轴平移 ${shiftDays} 天，分期还款计划不变`}
+            : `整单时间轴平移 ${shiftMinutes} 分钟，分期还款计划不变`}
         </Typography.Text>
       </div>
       <div className="inventory-time-shift__fields">
@@ -90,8 +93,8 @@ type OrderDetailViewProps = {
   onCancel?: () => void;
   saving?: boolean;
   /** 编辑态时间联动：当前平移天数与 setter（由库存台账控制器持有）。 */
-  timeShiftDays?: number;
-  onTimeShift?: (days: number) => void;
+  timeShiftMinutes?: number;
+  onTimeShift?: (minutes: number) => void;
 };
 
 /** 详情容器：只负责「板块怎么摆」，板块内部各自独立成文件（见 OrderDetail*.tsx）。
@@ -117,7 +120,7 @@ export function OrderDetailView({
   onSave,
   onCancel,
   saving,
-  timeShiftDays,
+  timeShiftMinutes,
   onTimeShift,
 }: OrderDetailViewProps) {
   const extraFieldsBySection = (section: string): OrderDetailField[] => meta.orderExtras
@@ -132,7 +135,7 @@ export function OrderDetailView({
           registeredAt={meta.registeredAt}
           soldAt={meta.soldAt}
           flowAt={financeRows.find((row) => row.key.startsWith("flow-"))?.occurredAt ?? financeRows[0]?.occurredAt ?? "-"}
-          shiftDays={timeShiftDays ?? 0}
+          shiftMinutes={timeShiftMinutes ?? 0}
           onShift={onTimeShift ?? (() => undefined)}
         />
         <BusinessRegistrationForm

@@ -109,14 +109,14 @@ class ExecutionEditItem(RequestModel):
 
 
 class ExecutionTimeShift(RequestModel):
-    """账号台账时间联动：任一时间锚点改 N 天，整单时间轴平移 N 天（保留相对关系）。
+    """账号台账时间联动：任一时间锚点改 N 分钟，整单时间轴平移 N 分钟（保留相对关系）。
 
     与订单台账「成交日期」同源口径：trade_date、事件/流水 occurred_on 同步平移，
     另外把台账展示用的 created_at / posted_at 时间戳一并平移，避免界面值不动。
     分期 first_due_on / 期次 due_on 属客户还款计划，不随之平移。
     """
 
-    delta_days: int = Field(ge=-3650, le=3650)
+    delta_minutes: int = Field(ge=-5256000, le=5256000)
 
 
 class ExecutionEditRequest(RequestModel):

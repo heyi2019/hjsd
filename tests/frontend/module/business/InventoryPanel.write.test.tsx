@@ -503,7 +503,7 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
           cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
         }, {
           id: 32, event_no: "EV0002", event_type: "SELL", amount: "200.00",
-          occurred_on: "2026-10-17", occurred_at: "2026-10-17T11:00:00",
+          occurred_on: "2026-10-17", occurred_at: "2026-10-17",
           portion: "GROSS", is_posted: true, operator: "admin",
         }],
         cashflows: [], customers: [], counterparties: [], rebates: [], extra_values: {},
@@ -520,26 +520,27 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
     const created = await screen.findByLabelText("编辑订单创建时间");
     const sold = screen.getByLabelText("编辑售出时间");
     const flow = screen.getByLabelText("编辑流水时间");
-    expect((created as HTMLInputElement).value).toBe("2026-10-15");
-    expect((sold as HTMLInputElement).value).toBe("2026-10-17");
-    expect((flow as HTMLInputElement).value).toBe("2026-10-15");
+    // 时间字段现已按分钟级展示（format YYYY-MM-DD HH:mm），基准含真实分钟。
+    expect((created as HTMLInputElement).value).toBe("2026-10-15 10:19");
+    expect((sold as HTMLInputElement).value).toBe("2026-10-17 00:00");
+    expect((flow as HTMLInputElement).value).toBe("2026-10-15 10:20");
 
     // antd DatePicker 把输入文本同步进内部 state 是异步的：change 后立刻同步 keyDown
     // 会读到旧 inputValue，导致 onChange 偶发不触发（曾随机红 4/6）。改用真实异步交互。
     const user = userEvent.setup();
     await user.clear(sold);
-    await user.type(sold, "2026-10-20");
+    await user.type(sold, "2026-10-20 00:00");
     await user.keyboard("{Enter}");
     await waitFor(
-      () => expect(screen.getByText(/整单时间轴平移 3 天/)).toBeInTheDocument(),
+      () => expect(screen.getByText(/整单时间轴平移 4320 分钟/)).toBeInTheDocument(),
       { timeout: 3000 },
     );
-    expect((screen.getByLabelText("编辑订单创建时间") as HTMLInputElement).value).toBe("2026-10-18");
-    expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-18");
+    expect((screen.getByLabelText("编辑订单创建时间") as HTMLInputElement).value).toBe("2026-10-18 10:19");
+    expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-18 10:20");
 
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({
-      time_shift: { delta_days: 3 },
+      time_shift: { delta_minutes: 4320 },
     })));
   });
 });

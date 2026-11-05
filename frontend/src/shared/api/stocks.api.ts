@@ -33,6 +33,6 @@ export const stocksApi = {
     api.delete<void>(`/stocks/${id}`, { data: { reason } }).then(() => undefined),
   executionDetail: (id: number) =>
     api.get<AccountExecutionDetail>(`/stocks/${id}/execution-detail`).then((r) => r.data),
-  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[]; time_shift?: { delta_days: number } }) =>
+  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[]; time_shift?: { delta_minutes: number } }) =>
     api.patch<{ ok: boolean }>(`/stocks/${id}/execution-edit`, payload).then((r) => r.data),
 };

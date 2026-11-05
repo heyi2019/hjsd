@@ -298,13 +298,18 @@ test.describe("UI visual regression", () => {
         return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       });
       await dragMouseSteps(page, point, { x: point.x + deltaX, y: point.y + deltaY }, 14);
-      const after = await readSize();
       if (dimension === "width") {
         // 负载下 pointermove 会被合并、位移缩水，故拖拽距离取 240、阈值留余量（拖南/北边均增高窗口）。
-        expect(after.width).toBeLessThan(before.width - 60);
+        // 用 poll 等 resize 处理器把宽度真正写回，避免 mouse.up 后状态更新滞后导致偶发断言失败。
+        await expect
+          .poll(async () => (await readSize()).width, { timeout: 5000 })
+          .toBeLessThan(before.width - 60);
       } else {
         // 高度经 --resizable-modal-height 变量生效：拖南边向下、拖北边向上都会把窗口拉高，故两方向均增高。
-        expect(after.heightVar).toBeGreaterThan(before.heightVar + 60);
+        // 同样用 poll 等变量落地，消除全量负载下「拖完即读、变量尚未应用」的 flake。
+        await expect
+          .poll(async () => (await readSize()).heightVar, { timeout: 5000 })
+          .toBeGreaterThan(before.heightVar + 60);
       }
     }
   });
